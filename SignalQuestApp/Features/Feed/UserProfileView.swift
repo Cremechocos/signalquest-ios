@@ -40,7 +40,7 @@ final class UserProfileViewModel: ObservableObject {
             items = page.items
             nextCursor = page.nextCursor
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -54,7 +54,7 @@ final class UserProfileViewModel: ObservableObject {
             items.append(contentsOf: page.items.filter { !known.contains($0.id) })
             nextCursor = page.nextCursor
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -86,7 +86,7 @@ final class UserProfileViewModel: ObservableObject {
                     reverted.followersCount = max(0, reverted.followersCount + (reverted.isFollowing ? 1 : -1))
                     profile = reverted
                 }
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
                 Haptics.error()
             }
         }
@@ -109,7 +109,7 @@ final class UserProfileViewModel: ObservableObject {
                 applyReactionResponse(itemId: item.id, response: response)
             } catch {
                 restore(previous)
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
             }
         }
         Haptics.light()
@@ -130,7 +130,7 @@ final class UserProfileViewModel: ObservableObject {
                 applyReactionResponse(itemId: item.id, response: response)
             } catch {
                 restore(previous)
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
             }
         }
         Haptics.medium()
@@ -151,7 +151,7 @@ final class UserProfileViewModel: ObservableObject {
                 applyReactionResponse(itemId: item.id, response: response)
             } catch {
                 restore(previous)
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
             }
         }
     }
@@ -745,7 +745,7 @@ struct UserProfileView: View {
             // Erreur PROPRE à l'ouverture : passer par `model.errorMessage`
             // afficherait « Profil indisponible » avec un bouton qui recharge
             // le profil — un contresens, le profil s'est bien chargé.
-            conversationError = error.localizedDescription
+            conversationError = error.userFacingMessage
             Haptics.error()
         }
     }

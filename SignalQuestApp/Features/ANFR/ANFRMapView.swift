@@ -266,8 +266,7 @@ struct ANFRMapView: View {
             .buttonStyle(SQPressButtonStyle())
         }
         .padding(SQSpace.xs + 1)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private var operatorStrip: some View {

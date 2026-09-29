@@ -80,7 +80,7 @@ final class MyIdentificationsViewModel: ObservableObject {
                 Haptics.error()
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -110,7 +110,7 @@ final class MyIdentificationsViewModel: ObservableObject {
                 Haptics.error()
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -508,7 +508,7 @@ private struct IdentificationDetailSheet: View {
                 Haptics.error()
             }
         } catch {
-            adoptError = error.localizedDescription
+            adoptError = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -585,7 +585,7 @@ private struct IdentificationDetailSheet: View {
             if !item.sectors.isEmpty {
                 infoRow("Secteurs", item.sectors.map(String.init).joined(separator: ", "))
             }
-            if let band = item.band { infoRow("Bande", "B\(band)") }
+            if let band = item.band { infoRow("Bande", SQUnits.band(band, technology: item.tech ?? (item.type == "gnb" ? "NR" : nil))) }
             if let ci = item.ci { infoRow("CI / ECI", ci) }
             if let mcc = mccMnc { infoRow("MCC / MNC", mcc) }
             if let market = item.marketCode { infoRow("Marché", market) }
@@ -596,8 +596,7 @@ private struct IdentificationDetailSheet: View {
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.xs)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private var mccMnc: String? {

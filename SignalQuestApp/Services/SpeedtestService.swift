@@ -860,7 +860,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             // remonte ici une erreur qui n'est pas une `CancellationError`.
             if Task.isCancelled { throw CancellationError() }
             if forceIPerfForCloudflareFallback { throw error }
-            sqDebugLog("[SpeedtestService] DL iPerf3 KO (\(error.localizedDescription)) — bascule Cloudflare")
+            sqDebugLog("[SpeedtestService] DL iPerf3 KO (\(error)) — bascule Cloudflare")
             return try await runCloudflareTest(
                 pathStatus: pathStatus,
                 location: location,
@@ -1086,13 +1086,13 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     throw CancellationError()
                 } catch {
                     lastULError = error
-                    sqDebugLog("[SpeedtestService] Upload attempt \(attemptIndex + 1) failed (streams=\(ulStreams) portPref=\(preferred)): \(error.localizedDescription)")
+                    sqDebugLog("[SpeedtestService] Upload attempt \(attemptIndex + 1) failed (streams=\(ulStreams) portPref=\(preferred)): \(error)")
                     // Court backoff avant le second essai (RST / busy).
                     try? await Task.sleep(nanoseconds: 350_000_000)
                 }
             }
             if !didUpload, let lastULError {
-                sqDebugLog("[SpeedtestService] Upload failed (best-effort, DL only): \(lastULError.localizedDescription)")
+                sqDebugLog("[SpeedtestService] Upload failed (best-effort, DL only): \(lastULError)")
             }
         } catch is CancellationError {
             ulLoadedPingsTask.cancel()
@@ -4072,19 +4072,21 @@ enum IPerf3Error: Error, LocalizedError {
         }
     }
 
+    /// Ce qui s'est passé et quoi faire, sans le vocabulaire du protocole :
+    /// « Connexion iPerf3 fermée (123/456 octets) » s'affichait tel quel (MES-16).
+    /// Le cas exact reste lisible dans les journaux de debug (`\(error)`).
     var errorDescription: String? {
         switch self {
-        case .cancelled: return String(localized: "Connexion iPerf3 annulée")
-        case .timeout: return String(localized: "Délai dépassé sur le serveur iPerf3")
-        case .emptyRead: return "Lecture iPerf3 vide"
-        case .connectionClosed(let got, let expected):
-            return String(localized: "Connexion iPerf3 fermée (\(got)/\(expected) octets)")
-        case .accessDenied: return String(localized: "Serveur iPerf3 occupé (ACCESS_DENIED)")
-        case .serverError: return "Erreur serveur iPerf3"
-        case .invalidJSON: return String(localized: "Réponse iPerf3 JSON invalide")
-        case .incomplete: return "Test iPerf3 incomplet"
-        case .invalidPort: return "Port iPerf3 invalide"
-        case .unexpectedState(let s): return String(localized: "État iPerf3 inattendu (\(s))")
+        case .cancelled:
+            return String(localized: "Mesure annulée.")
+        case .timeout:
+            return String(localized: "Le serveur de mesure ne répond pas. Réessaie, ou choisis un autre serveur.")
+        case .accessDenied:
+            return String(localized: "Ce serveur de mesure est occupé. Réessaie dans un instant, ou choisis-en un autre.")
+        case .invalidPort:
+            return String(localized: "Ce serveur de mesure est mal configuré. Choisis-en un autre.")
+        case .emptyRead, .connectionClosed, .serverError, .invalidJSON, .incomplete, .unexpectedState:
+            return String(localized: "La mesure s’est interrompue en cours de route. Réessaie dans un instant.")
         }
     }
 }

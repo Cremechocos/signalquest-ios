@@ -232,7 +232,7 @@ final class ComposerViewModel: ObservableObject {
                 pickedImageData = data
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -260,7 +260,7 @@ final class ComposerViewModel: ObservableObject {
                 errorMessage = String(localized: "Aucun speedtest enregistré pour le moment.")
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -334,7 +334,7 @@ final class ComposerViewModel: ObservableObject {
 
         } catch {
 
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
 
             Haptics.error()
 
@@ -371,7 +371,7 @@ final class ComposerViewModel: ObservableObject {
             clearDraft()
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

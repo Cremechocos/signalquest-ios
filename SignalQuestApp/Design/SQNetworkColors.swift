@@ -1,26 +1,18 @@
 import SwiftUI
 import UIKit
 
-/// SOURCE UNIQUE des échelles de couleur « qualité réseau » (débit, RSRP,
-/// génération).
+/// Accès historique aux couleurs « qualité réseau » (débit, RSRP, génération).
 ///
-/// Ces trois échelles sont CANONIQUES : elles reproduisent à l'identique les
-/// barèmes de la carte principale (`MapExplorerView` : `SpeedBand`,
-/// `CoverageQualityBand`, `CoverageGenerationBand`), eux-mêmes alignés sur le
-/// web (`lib/speedColorUtils.ts`, `lib/signal-quality.ts`) et sur Android.
-///
-/// TOUT nouveau call site qui a besoin de colorer un débit, un RSRP ou une
-/// génération DOIT passer par ici plutôt que de recopier des seuils : c'est ce
-/// qui garantit qu'une même mesure a la même couleur partout (carte, fiches,
-/// messagerie, sessions). Ne PAS diverger de ces valeurs sans mettre à jour la
-/// carte et le web en même temps.
+/// Les seuils et teintes vivent désormais dans `SQQualityScale`
+/// (`Core/Shared/`), seule source partagée avec le widget. Ce type garde ses
+/// appels existants et ne fait que déléguer : ne plus recopier de seuils ailleurs.
 enum SQNetworkColors {
 
     // MARK: Gris « inconnu / aucun »
 
     /// Teinte neutre partagée par les bandes « inconnu » (RSRP) et « aucun »
     /// (génération). Identique au web (`QUALITY_HEX.unknown`).
-    static let unknownHex: UInt32 = 0x94A3B8
+    static let unknownHex: UInt32 = SQQualityScale.unknownHex
     static var unknownUIColor: UIColor { uiColor(unknownHex) }
 
     // MARK: Débit (Mb/s) → couleur
@@ -32,15 +24,7 @@ enum SQNetworkColors {
     static func speedUIColor(_ mbps: Double) -> UIColor { uiColor(speedHex(mbps)) }
 
     static func speedHex(_ mbps: Double) -> UInt32 {
-        switch mbps {
-        case 1000...:    return 0x3B82F6 // exceptionnel
-        case 600..<1000: return 0x06B6D4 // excellent
-        case 300..<600:  return 0x22C55E // très bon
-        case 100..<300:  return 0x84CC16 // bon
-        case 30..<100:   return 0xEAB308 // moyen
-        case 10..<30:    return 0xF97316 // lent
-        default:         return 0xEF4444 // très lent
-        }
+        SQQualityScale.Throughput(mbps: mbps).hex
     }
 
     // MARK: RSRP (dBm) → couleur
@@ -55,14 +39,7 @@ enum SQNetworkColors {
     static func rsrpUIColor(_ rsrp: Double?) -> UIColor { uiColor(rsrpHex(rsrp)) }
 
     static func rsrpHex(_ rsrp: Double?) -> UInt32 {
-        guard let rsrp, rsrp <= -44 else { return unknownHex }
-        switch rsrp {
-        case (-80)...:      return 0x10B981 // excellent
-        case -90..<(-80):   return 0x84CC16 // bon
-        case -100..<(-90):  return 0xF59E0B // moyen
-        case -110..<(-100): return 0xF97316 // faible
-        default:            return 0xEF4444 // très faible
-        }
+        SQQualityScale.Signal(rsrp: rsrp).hex
     }
 
     // MARK: Génération (technologie) → couleur
@@ -72,12 +49,7 @@ enum SQNetworkColors {
     static func generationUIColor(_ tech: String?) -> UIColor { uiColor(generationHex(tech)) }
 
     static func generationHex(_ tech: String?) -> UInt32 {
-        let t = (tech ?? "").uppercased()
-        if t.contains("5G") || t.contains("NR") { return 0x8B5CF6 }
-        if t.contains("4G") || t.contains("LTE") { return 0x3B82F6 }
-        if t.contains("3G") || t.contains("UMTS") || t.contains("HSPA") || t.contains("WCDMA") { return 0x14B8A6 }
-        if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return 0x64748B }
-        return unknownHex
+        SQQualityScale.Generation(technology: tech).hex
     }
 
     // MARK: Helper

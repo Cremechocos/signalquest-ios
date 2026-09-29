@@ -201,7 +201,7 @@ struct AntennaReportSheet: View {
             }
         } catch {
             if error.isCancellation { return }
-            self.error = error.localizedDescription
+            self.error = error.userFacingMessage
             Haptics.error()
         }
     }

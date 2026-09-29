@@ -18,7 +18,7 @@ final class AntennaReportsListViewModel: ObservableObject {
                 .sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
         } catch {
             if error.isCancellation { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 }

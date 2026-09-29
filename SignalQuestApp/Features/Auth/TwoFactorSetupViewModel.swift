@@ -69,13 +69,13 @@ final class TwoFactorSetupViewModel: ObservableObject {
     func confirm() async {
         guard requireCurrent(), phase == .ready, let setup = storedSetup else { return }
         guard TwoFactorEnrollmentService.validCode(normalizedCode) else {
-            errorMessage = TwoFactorEnrollmentError.invalidCode.localizedDescription
+            errorMessage = TwoFactorEnrollmentError.invalidCode.userFacingMessage
             return
         }
         if let expiry = setup.expiresAt, expiry <= now() {
             eraseSecret()
             phase = .needsNewSetup
-            errorMessage = TwoFactorEnrollmentError.expiredSetup.localizedDescription
+            errorMessage = TwoFactorEnrollmentError.expiredSetup.userFacingMessage
             return
         }
         let submittedCode = normalizedCode
@@ -95,14 +95,14 @@ final class TwoFactorSetupViewModel: ObservableObject {
             code = ""
             if didEnable {
                 phase = .profileRefreshFailed
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
             } else if let failure = error as? TwoFactorEnrollmentError,
                       [.expiredSetup, .replacedSetup, .alreadyEnabled].contains(failure) {
                 handleSetupError(failure)
                 if serverAlreadyEnabled { await reloadProfile(operation: operation) }
             } else {
                 phase = .ready
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
             }
         }
     }
@@ -123,7 +123,7 @@ final class TwoFactorSetupViewModel: ObservableObject {
         } catch {
             guard current(operation) else { return }
             phase = .profileRefreshFailed
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -145,7 +145,7 @@ final class TwoFactorSetupViewModel: ObservableObject {
         } else {
             phase = .loadFailed
         }
-        errorMessage = error.localizedDescription
+        errorMessage = error.userFacingMessage
     }
 
     private func begin(_ phase: Phase) -> UUID {
@@ -162,7 +162,7 @@ final class TwoFactorSetupViewModel: ObservableObject {
         guard !Task.isCancelled else {
             eraseSecret()
             phase = needsProfileRefresh ? .profileRefreshFailed : .loadFailed
-            errorMessage = APIError.cancelled.localizedDescription
+            errorMessage = APIError.cancelled.userFacingMessage
             return false
         }
         return true
@@ -175,7 +175,7 @@ final class TwoFactorSetupViewModel: ObservableObject {
             didEnable = false
             serverAlreadyEnabled = false
             phase = .sessionChanged
-            errorMessage = TwoFactorEnrollmentError.sessionChanged.localizedDescription
+            errorMessage = TwoFactorEnrollmentError.sessionChanged.userFacingMessage
             return false
         }
         return true

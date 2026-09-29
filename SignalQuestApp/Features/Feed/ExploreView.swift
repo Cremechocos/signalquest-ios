@@ -58,7 +58,7 @@ final class ExploreViewModel: ObservableObject {
             trending = try await trends
             suggestions = try await people
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -103,7 +103,7 @@ final class ExploreViewModel: ObservableObject {
             // alors `URLError(.cancelled)` ou `APIError.cancelled`, pas
             // `CancellationError`. Elle s'affichait « Requête annulée » (SOC-15).
             if !error.isCancellation {
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
             }
         }
     }
@@ -135,7 +135,7 @@ final class ExploreViewModel: ObservableObject {
             hashtagItems = page.items
             hashtagCursor = page.nextCursor
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -153,7 +153,7 @@ final class ExploreViewModel: ObservableObject {
             hashtagItems.append(contentsOf: page.items.filter { !known.contains($0.id) })
             hashtagCursor = page.nextCursor
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -177,7 +177,7 @@ final class ExploreViewModel: ObservableObject {
                 followOverrides[author.id] = result.following
             } catch {
                 followOverrides[author.id] = wasFollowed
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
                 Haptics.error()
             }
         }

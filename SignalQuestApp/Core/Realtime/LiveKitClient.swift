@@ -769,7 +769,7 @@ final class LiveKitClient: ObservableObject {
             }
             isSpeakerOn = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
         } catch {
-            mediaErrorMessage = "Sortie audio indisponible : \(error.localizedDescription)"
+            mediaErrorMessage = "Sortie audio indisponible : \(error.userFacingMessage)"
             logger.error("Speaker route failed: \(error.localizedDescription, privacy: .public)")
         }
     }

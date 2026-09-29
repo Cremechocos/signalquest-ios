@@ -458,7 +458,7 @@ final class DriveTestViewModel: ObservableObject {
         if case APIError.http(let status, _, _, _, _) = error, status == 401 {
             return String(localized: "Session expirée — reconnecte-toi pour enregistrer tes mesures.")
         }
-        return String(localized: "Échec d'envoi (\(subject)) : \(error.localizedDescription)")
+        return String(localized: "Échec d'envoi (\(subject)) : \(error.userFacingMessage)")
     }
 
     /// Met à jour l'instantané « réseau autour de moi » (F8) lu par le widget d'accueil.
@@ -772,7 +772,7 @@ final class DriveTestViewModel: ObservableObject {
                 break
             } catch {
                 // Un test raté n'interrompt pas la session : on note et on continue.
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
             }
             refreshSessionBytes()
             // Les valeurs (ping/DL/UL) RESTENT affichées ; elles ne se réinitialisent
@@ -1210,8 +1210,8 @@ struct DriveTestView: View {
             // (DriveTestMapView.speedColor), au lieu de 3 couleurs incomplètes qui
             // laissaient les points sans clé de lecture (UI-06).
             legendSection(
-                "Débit speedtest (Mbps)",
-                items: SQSignalScale.Throughput.allCases.map { ($0.label, $0.color, $0.glyph) },
+                String(localized: "Débit mesuré (Mbit/s)"),
+                items: SQQualityScale.Throughput.allCases.map { ($0.rangeLabel, $0.color, $0.glyph) },
                 mark: .diamond
             )
         }

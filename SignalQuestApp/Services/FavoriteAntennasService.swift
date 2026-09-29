@@ -276,7 +276,7 @@ final class FavoriteAntennasService: ObservableObject {
                         // inverse plus récente peut continuer ; un nouvel ajout
                         // nécessitera un nouveau geste et donc un nouvel UUID.
                         if !rejected.pending.contains(where: { $0.targetKey == intent.targetKey }) {
-                            presentedError = error.localizedDescription
+                            presentedError = error.userFacingMessage
                         }
                         continue
                     }
@@ -290,7 +290,7 @@ final class FavoriteAntennasService: ObservableObject {
             }
         } catch {
             guard isCurrent(expected), !error.isCancellation else { return }
-            presentedError = error.localizedDescription
+            presentedError = error.userFacingMessage
             // Le snapshot et les intentions restent locaux. Un réessai réutilise
             // leurs requestId ; aucune liste vide ni restauration périmée n'est envoyée.
         }

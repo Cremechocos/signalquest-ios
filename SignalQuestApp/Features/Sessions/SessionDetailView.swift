@@ -390,8 +390,7 @@ struct SessionDetailView: View {
             }
             .padding(SQSpace.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground()
         }
     }
 
@@ -434,8 +433,7 @@ struct SessionDetailView: View {
             }
             .padding(SQSpace.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground()
         }
     }
 
@@ -529,8 +527,7 @@ struct SessionDetailView: View {
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private func antennaRow(_ antenna: ServingAntenna) -> some View {

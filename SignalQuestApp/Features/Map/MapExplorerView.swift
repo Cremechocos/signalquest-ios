@@ -787,7 +787,7 @@ final class MapExplorerViewModel: ObservableObject {
                 displayLimitMessages.append(String(localized: "Une partie de cette zone dépasse la projection de la carte."))
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             return
         }
         if AppEnvironment.usesDemoData {
@@ -900,7 +900,7 @@ final class MapExplorerViewModel: ObservableObject {
                 displayLimitMessages.append(String(localized: "Niveau de détail adapté pour couvrir toute la zone visible. Zoome pour préciser."))
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             return
         }
         // Retain response metadata for the final, fixed-order status aggregation.
@@ -921,7 +921,7 @@ final class MapExplorerViewModel: ObservableObject {
                 let result: (snapshot: SocialMapSnapshot?, error: String?) = await {
                     guard wantsSocialSnapshot else { return (.empty, nil) }
                     do { return (try await svc.snapshot(bounds: bounds, zoom: zoom, lightweight: snapshotLightweight), nil) }
-                    catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
+                    catch { return (nil, error.isCancellation ? nil : error.userFacingMessage) }
                 }()
                 return .snapshot(result)
             }
@@ -947,7 +947,7 @@ final class MapExplorerViewModel: ObservableObject {
                         }
                         return (nil, MapSnapshotMerging.unique(parts, id: \.id), nil)
                     } catch {
-                        return (nil, nil, error.isCancellation ? nil : error.localizedDescription)
+                        return (nil, nil, error.isCancellation ? nil : error.userFacingMessage)
                     }
                 }()
                 return .antenna(result)
@@ -979,7 +979,7 @@ final class MapExplorerViewModel: ObservableObject {
                     do {
                         let sites = try await svc.plannedSitesLayer(market: market, operatorName: op, territory: territory, bands: bands)
                         return (sites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) }, nil)
-                    } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
+                    } catch { return (nil, error.isCancellation ? nil : error.userFacingMessage) }
                 }()
                 return .planned(result)
             }
@@ -989,7 +989,7 @@ final class MapExplorerViewModel: ObservableObject {
                     do {
                         let sites = try await svc.outageSitesLayer(market: market, operatorName: op, territory: territory, bands: bands)
                         return (sites.filter { bounds.contains(lat: $0.lat, lon: $0.lon) }, nil)
-                    } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
+                    } catch { return (nil, error.isCancellation ? nil : error.userFacingMessage) }
                 }()
                 return .outage(result)
             }
@@ -1002,7 +1002,7 @@ final class MapExplorerViewModel: ObservableObject {
                             parts.append(try await outagesSvc.outages(in: segment, marketCode: market, operatorKey: op))
                         }
                         return (MapSnapshotMerging.unique(parts, id: \.id), nil, parts.contains { $0.count >= 500 })
-                    } catch { return (nil, error.isCancellation ? nil : error.localizedDescription, false) }
+                    } catch { return (nil, error.isCancellation ? nil : error.userFacingMessage, false) }
                 }()
                 return .communityOutage(result)
             }
@@ -1025,7 +1025,7 @@ final class MapExplorerViewModel: ObservableObject {
                     do {
                         let points = try await svc.coveragePoints(bounds: bounds, market: market, operatorName: op, technology: techs.sorted().first, bands: bands)
                         return ((MapTileLayerResult(tiles: []), points), nil)
-                    } catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
+                    } catch { return (nil, error.isCancellation ? nil : error.userFacingMessage) }
                 }()
                 return .coverage(result)
             }
@@ -1036,7 +1036,7 @@ final class MapExplorerViewModel: ObservableObject {
                     // soit le filtre opérateur des antennes → opérateur forcé à "ALL". Seul le
                     // mode « Amis » restreint l'ensemble.
                     do { return (try await svc.publicPhotos(bounds: bounds, zoom: zoom, market: market, operatorName: "ALL", friendsOnly: photosFriendsOnly), nil) }
-                    catch { return (nil, error.isCancellation ? nil : error.localizedDescription) }
+                    catch { return (nil, error.isCancellation ? nil : error.userFacingMessage) }
                 }()
                 return .photos(result)
             }
@@ -1246,7 +1246,7 @@ final class MapExplorerViewModel: ObservableObject {
 
     func friendsFallbackDidFail(_ error: Error) {
         friendsConnectionState = .unavailable
-        friendsConnectionError = error.localizedDescription
+        friendsConnectionError = error.userFacingMessage
     }
 
     func deactivateFriendsStream() {
@@ -2558,8 +2558,7 @@ struct MapExplorerView: View {
         }
         .padding(.horizontal, SQSpace.md + 2)
         .padding(.vertical, SQSpace.sm + 2)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground(cornerRadius: SQRadius.md)
         // Bornée à 280 (repli 2 lignes pour les erreurs longues) et CENTRÉE dans la
         // colonne bas-centre (alignement centré par défaut du `.frame`) — plus
         // d'alignement `.leading` hérité de l'ancienne position bas-gauche.

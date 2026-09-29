@@ -199,7 +199,7 @@ struct EditProfileView: View {
             Haptics.success()
             dismiss()
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.userFacingMessage
         }
     }
 }

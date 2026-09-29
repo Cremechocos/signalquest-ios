@@ -190,7 +190,7 @@ final class SpeedtestVisibilityViewModel: ObservableObject {
         isLoading = false
         isSaving = false
         confirmationMessage = nil
-        errorMessage = SpeedtestVisibilityError.sessionChanged.localizedDescription
+        errorMessage = SpeedtestVisibilityError.sessionChanged.userFacingMessage
     }
 
     private static func message(for error: Error) -> String {
@@ -207,6 +207,6 @@ final class SpeedtestVisibilityViewModel: ObservableObject {
             default: break
             }
         }
-        return error.localizedDescription
+        return error.userFacingMessage
     }
 }

@@ -232,8 +232,7 @@ struct ProfileView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private func statCell(label: String, value: String, accent: Bool = false) -> some View {
@@ -305,8 +304,7 @@ struct ProfileView: View {
         }
         .padding(.vertical, SQSpace.lg)
         .padding(.horizontal, SQSpace.lg + 2)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Progression · Niveau \(level)")
         .accessibilityValue("\(inLevel) sur \(goal) points · \(Int(progress * 100)) %")
@@ -391,6 +389,13 @@ struct ProfileView: View {
                 } label: {
                     menuRow(title: "Réglages", icon: "gearshape.fill")
                 }
+                menuSeparator
+                NavigationLink {
+                    SQGlossaryView()
+                } label: {
+                    menuRow(title: "Aide et glossaire", icon: "questionmark.circle")
+                }
+                .accessibilityIdentifier("profile.glossary")
             }
         }
     }
@@ -410,8 +415,7 @@ struct ProfileView: View {
                 .padding(.leading, SQSpace.xs)
                 .accessibilityAddTraits(.isHeader)
             VStack(spacing: 0) { content() }
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                .sqShadowCard()
+                .sqCardBackground()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -467,8 +471,7 @@ struct ProfileView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, SQSpace.md)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground(cornerRadius: SQRadius.lg)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -519,7 +522,7 @@ struct ProfileView: View {
             stats = try await services.users.stats()
             statsError = nil
         } catch {
-            statsError = error.localizedDescription
+            statsError = error.userFacingMessage
         }
         progression = try? await profileTask
     }

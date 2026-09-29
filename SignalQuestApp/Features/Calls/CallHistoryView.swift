@@ -59,7 +59,7 @@ final class CallHistoryViewModel: ObservableObject {
             page = 1
             hasMore = false
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -71,7 +71,7 @@ final class CallHistoryViewModel: ObservableObject {
             try await service.deleteEntry(callId: call.id)
         } catch {
             calls = previous
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 }

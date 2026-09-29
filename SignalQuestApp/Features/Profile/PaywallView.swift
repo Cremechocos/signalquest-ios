@@ -162,8 +162,7 @@ struct PaywallView: View {
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .accessibilityElement(children: .combine)
     }
 

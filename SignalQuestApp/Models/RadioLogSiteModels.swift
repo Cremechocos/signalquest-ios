@@ -40,7 +40,7 @@ struct RadioLogCell: Identifiable, Sendable, Equatable {
 
     /// `B3 · 1300` — bande et porteuse, quand elles sont connues.
     var bandLabel: String? {
-        let parts = [band.map { "B\($0)" }, earfcn.map(String.init)].compactMap { $0 }
+        let parts = [band.map { SQUnits.band($0, isNR: identityKind == "NCI") }, earfcn.map(String.init)].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

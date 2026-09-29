@@ -1,28 +1,16 @@
 import SwiftUI
 
+/// Les fiches antenne partagent l'entrée et la feuille du glossaire général
+/// (`Design/Glossary`), qui y ajoute l'exemple et les termes liés.
+typealias AntennaGlossaryEntry = SQGlossaryEntry
+typealias AntennaGlossarySheet = SQGlossarySheet
+
 /// Les termes radio de la fiche antenne, expliqués avec les chiffres du site
 /// qu'on est en train de regarder.
 ///
 /// « Dégagement Fresnel : 312 % » ne veut rien dire pour qui n'a pas fait de
 /// radio, et une définition générique ne vaut guère mieux. Chaque entrée dit
 /// donc ce qu'est la grandeur, ce que vaut CE site, et ce qu'il faut en conclure.
-struct AntennaGlossaryEntry: Identifiable, Equatable {
-    var id: String { title }
-    let title: String
-    /// Ce que la grandeur mesure, en une ou deux phrases.
-    let definition: String
-    /// Lecture de la valeur du site en cours — nil quand elle est inconnue.
-    let reading: String?
-    /// Repères chiffrés, quand ils aident à situer la valeur.
-    let scale: [(String, String)]
-    /// Schéma, quand la grandeur se montre mieux qu'elle ne se décrit.
-    var illustration: AntennaGlossaryIllustration?
-
-    static func == (lhs: AntennaGlossaryEntry, rhs: AntennaGlossaryEntry) -> Bool {
-        lhs.title == rhs.title && lhs.reading == rhs.reading
-    }
-}
-
 enum AntennaGlossary {
     static func distance(_ meters: Double) -> AntennaGlossaryEntry {
         AntennaGlossaryEntry(
@@ -182,72 +170,6 @@ enum AntennaGlossary {
 }
 
 /// Feuille d'explication d'un terme, ouverte depuis le « i » d'une tuile.
-struct AntennaGlossarySheet: View {
-    let entry: AntennaGlossaryEntry
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    if let reading = entry.reading {
-                        Text(reading)
-                            .font(SQType.heading)
-                            .foregroundStyle(SQColor.label)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(SQSpace.lg)
-                            .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                    }
-
-                    if let illustration = entry.illustration {
-                        AntennaGlossaryIllustrationView(illustration: illustration)
-                    }
-
-                    Text(entry.definition)
-                        .font(SQType.body)
-                        .foregroundStyle(SQColor.label)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if !entry.scale.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Repères").sqKicker()
-                            ForEach(entry.scale, id: \.0) { bound, meaning in
-                                HStack(alignment: .top, spacing: SQSpace.md) {
-                                    Text(bound)
-                                        .font(SQFont.archivo(12.5, .bold))
-                                        .foregroundStyle(SQColor.brandRed)
-                                        .frame(width: 92, alignment: .leading)
-                                    Text(meaning)
-                                        .font(SQType.caption)
-                                        .foregroundStyle(SQColor.labelSecondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(SQSpace.lg)
-                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                        .sqShadowCard()
-                    }
-                }
-                .padding(SQSpace.lg + 2)
-            }
-            .signalQuestBackground()
-            .navigationTitle(entry.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }
-                        .tint(SQColor.brandRed)
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-}
-
 /// Tuile de mesure avec son « i ». Le tap n'agrandit pas la valeur : il explique
 /// ce qu'elle veut dire, avec le chiffre du site en exemple.
 struct AntennaMetricTile: View {

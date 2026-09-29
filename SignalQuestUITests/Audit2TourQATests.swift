@@ -122,9 +122,14 @@ final class Audit2TourQATests: XCTestCase {
             back(app)
         }
         if tapIfExists(identified("speedtest.driveTest", in: app), in: app) {
-            pause(4)
+            pause(2)
+            // L'invite de localisation peut s'ouvrir par-dessus la présentation (MES-10).
+            dismissSystemAlerts()
+            pause(2)
             snap("drivetest")
-            if tapIfExists(app.buttons[t("Fermer", "Close")].firstMatch, in: app) {
+            // La présentation ne se ferme que par « J'ai compris » : en cherchant
+            // « Fermer », le tour restait bloqué dessus jusqu'à la fin (iPad, 29/09).
+            if tapIfExists(app.buttons[t("J'ai compris", "Got it")].firstMatch, in: app) {
                 pause(1.5)
                 snap("drivetest-apres-divulgation")
             }
@@ -140,12 +145,16 @@ final class Audit2TourQATests: XCTestCase {
         snap("communaute-bas")
         app.swipeDown(); app.swipeDown()
         for tab in ["latest", "following", "friends", "telecom", "photos", "saved"] {
-            if tapIfExists(identified("feed.tab.\(tab)", in: app), in: app) {
+            let chip = identified("feed.tab.\(tab)", in: app)
+            revealInRow(chip, in: app)
+            if tapIfExists(chip, in: app) {
                 pause(2.5)
                 snap("fil-\(tab)")
             }
         }
-        _ = tapIfExists(identified("feed.tab.forYou", in: app), in: app)
+        let forYou = identified("feed.tab.forYou", in: app)
+        revealInRow(forYou, in: app)
+        _ = tapIfExists(forYou, in: app)
         pause(2)
         let firstPost = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH 'feed.item.'"))
@@ -342,6 +351,24 @@ final class Audit2TourQATests: XCTestCase {
         guard element.isHittable || SignalQuestUITestSupport.scrollToHittable(element, in: app) else { return false }
         element.tap()
         return true
+    }
+
+    /// Les onglets du fil défilent à l'horizontale : en grande taille de texte,
+    /// les derniers sortent de l'écran et `isHittable` échoue en erreur au lieu de
+    /// répondre non (XXL et AX5, 29/09). On fait glisser la rangée jusqu'à eux.
+    private func revealInRow(_ element: XCUIElement, in app: XCUIApplication) {
+        guard element.waitForExistence(timeout: 4) else { return }
+        let window = app.windows.firstMatch.frame
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        for _ in 0..<5 {
+            let frame = element.frame
+            if window.contains(frame) { return }
+            let towardsEnd = frame.maxX > window.maxX
+            let start = CGVector(dx: window.width * (towardsEnd ? 0.8 : 0.2), dy: frame.midY)
+            let end = CGVector(dx: window.width * (towardsEnd ? 0.3 : 0.7), dy: frame.midY)
+            origin.withOffset(start).press(forDuration: 0.05, thenDragTo: origin.withOffset(end))
+            pause(0.6)
+        }
     }
 
     private func firstExisting(_ elements: [XCUIElement]) -> XCUIElement? {

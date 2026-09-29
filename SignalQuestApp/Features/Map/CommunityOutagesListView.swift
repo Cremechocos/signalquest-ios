@@ -175,7 +175,7 @@ final class CommunityOutagesListViewModel: ObservableObject {
             displayedContext = requestedContext
         } catch {
             guard context == requestedContext, loadRevision == request, !Task.isCancelled, !error.isCancellation else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 }
@@ -342,8 +342,7 @@ struct CommunityOutagesListView: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     /// Pastille de gravité, lieu, adresse, méta — et le chevron qui annonce la carte.

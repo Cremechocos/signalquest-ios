@@ -169,7 +169,7 @@ struct FeedPreferencesView: View {
                 errorMessage = nil
             } catch {
                 guard !error.isCancellation else { return }
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
                 // Rechargement : l'état optimiste ne correspond plus au serveur,
                 // et laisser l'écran mentir serait pire que le clignotement.
                 await load()

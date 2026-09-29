@@ -51,8 +51,9 @@ enum SQType {
     static let subhead = SQFont.body(13.5, .medium, relativeTo: .subheadline)
     /// Sous-titres, horodatages — Figtree 12.5.
     static let caption = SQFont.body(12.5, relativeTo: .footnote)
-    /// Micro-labels (dock, badges) — Figtree SemiBold 11, casse normale.
-    static let micro = SQFont.body(11, .semibold, relativeTo: .caption2)
+    /// Micro-labels (dock, badges) — Figtree SemiBold 12, casse normale. Pas
+    /// moins : à 11 pt, les étiquettes devenaient pénibles à lire (TRX-12).
+    static let micro = SQFont.body(12, .semibold, relativeTo: .caption2)
     /// Libellés de boutons — Bricolage SemiBold 16.
     static let button = SQFont.display(16, .semibold)
 }

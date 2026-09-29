@@ -63,68 +63,34 @@ enum CoverageQualityBand: String, CaseIterable, Identifiable {
         [.excellent, .good, .fair, .weak, .poor]
     }
 
-    // Seuils RSRP alignés sur le web (`lib/signal-quality.ts` RSRP_SCALE) :
-    // ≥ -80 excellent · -90 bon · -100 moyen · -110 faible · sinon très faible.
+    /// Seuils et garde-fou (« pas de mesure » → inconnu) : `SQQualityScale.Signal`.
     static func band(for rsrp: Double?) -> CoverageQualityBand {
-        guard let rsrp else { return .unknown }
-        // Garde-fou : un RSRP physiquement impossible (0 = « pas de mesure », ou
-        // > -44 dBm le maximum théorique 3GPP) → INCONNU, jamais « excellent ». Sinon
-        // un point sans vrai RSRP (couverture iOS = génération seule, potentiellement
-        // servie à 0) s'afficherait en faux vert vif sur la carte Signal.
-        guard rsrp <= -44 else { return .unknown }
-        switch rsrp {
-        case (-80)...: return .excellent
-        case -90..<(-80): return .good
-        case -100..<(-90): return .fair
-        case -110..<(-100): return .weak
-        default: return .poor
+        switch SQQualityScale.Signal(rsrp: rsrp) {
+        case .excellent: return .excellent
+        case .good: return .good
+        case .fair: return .fair
+        case .weak: return .weak
+        case .poor: return .poor
+        case .unknown: return .unknown
         }
     }
 
-    var title: String {
+    private var scale: SQQualityScale.Signal {
         switch self {
-        case .excellent: return String(localized: "Excellent")
-        case .good: return String(localized: "Bon")
-        case .fair: return String(localized: "Moyen")
-        case .weak: return String(localized: "Faible")
-        case .poor: return String(localized: "Très faible")
-        case .unknown: return String(localized: "Inconnu")
+        case .excellent: return .excellent
+        case .good: return .good
+        case .fair: return .fair
+        case .weak: return .weak
+        case .poor: return .poor
+        case .unknown: return .unknown
         }
     }
 
-    // Couleurs QUALITY_HEX du web : #10b981 / #84cc16 / #f59e0b / #f97316 / #ef4444.
-    var colorHex: UInt32 {
-        switch self {
-        case .excellent: return 0x10B981
-        case .good: return 0x84CC16
-        case .fair: return 0xF59E0B
-        case .weak: return 0xF97316
-        case .poor: return 0xEF4444
-        case .unknown: return 0x94A3B8
-        }
-    }
+    var title: String { scale.label }
 
-    var swiftUIColor: Color {
-        switch self {
-        case .excellent: return Color(hex: 0x10B981)
-        case .good: return Color(hex: 0x84CC16)
-        case .fair: return Color(hex: 0xF59E0B)
-        case .weak: return Color(hex: 0xF97316)
-        case .poor: return Color(hex: 0xEF4444)
-        case .unknown: return Color(hex: 0x94A3B8)
-        }
-    }
-
-    var uiColor: UIColor {
-        switch self {
-        case .excellent: return UIColor(red: 0x10 / 255, green: 0xB9 / 255, blue: 0x81 / 255, alpha: 1.0)
-        case .good: return UIColor(red: 0x84 / 255, green: 0xCC / 255, blue: 0x16 / 255, alpha: 1.0)
-        case .fair: return UIColor(red: 0xF5 / 255, green: 0x9E / 255, blue: 0x0B / 255, alpha: 1.0)
-        case .weak: return UIColor(red: 0xF9 / 255, green: 0x73 / 255, blue: 0x16 / 255, alpha: 1.0)
-        case .poor: return UIColor(red: 0xEF / 255, green: 0x44 / 255, blue: 0x44 / 255, alpha: 1.0)
-        case .unknown: return UIColor(red: 0x94 / 255, green: 0xA3 / 255, blue: 0xB8 / 255, alpha: 1.0)
-        }
-    }
+    var colorHex: UInt32 { scale.hex }
+    var swiftUIColor: Color { scale.color }
+    var uiColor: UIColor { scale.uiColor }
 }
 
 /// Bandes de GÉNÉRATION pour la couche couverture (mode « génération », distinct du
@@ -138,47 +104,34 @@ enum CoverageGenerationBand: String, CaseIterable, Identifiable {
     static var visibleBands: [CoverageGenerationBand] { [.g5, .g4, .g3, .g2, .none] }
 
     static func band(for tech: String?) -> CoverageGenerationBand {
-        let t = (tech ?? "").uppercased()
-        if t.contains("5G") || t.contains("NR") { return .g5 }
-        if t.contains("4G") || t.contains("LTE") { return .g4 }
-        if t.contains("3G") || t.contains("UMTS") || t.contains("HSPA") || t.contains("WCDMA") { return .g3 }
-        if t.contains("2G") || t.contains("GSM") || t.contains("EDGE") || t.contains("GPRS") { return .g2 }
-        return .none
+        switch SQQualityScale.Generation(technology: tech) {
+        case .fiveG: return .g5
+        case .fourG: return .g4
+        case .threeG: return .g3
+        case .twoG: return .g2
+        case .none: return .none
+        }
+    }
+
+    private var scale: SQQualityScale.Generation {
+        switch self {
+        case .g5: return .fiveG
+        case .g4: return .fourG
+        case .g3: return .threeG
+        case .g2: return .twoG
+        case .none: return .none
+        }
     }
 
     /// Rang de priorité pour élire la génération dominante d'un lieu
     /// (5G > 4G > 3G > 2G > aucun). Sert à ne conserver qu'UNE pastille par point
     /// logique en 5G NSA, où le backend renvoie des frères co-localisés (ancre
     /// LTE taguée « 4G » + cellule NR taguée « 5G »).
-    var rank: Int {
-        switch self {
-        case .g5: return 5
-        case .g4: return 4
-        case .g3: return 3
-        case .g2: return 2
-        case .none: return 0
-        }
-    }
+    var rank: Int { scale.rank }
 
-    var title: String {
-        switch self {
-        case .g5: return "5G"
-        case .g4: return "4G"
-        case .g3: return "3G"
-        case .g2: return "2G"
-        case .none: return String(localized: "Aucun")
-        }
-    }
+    var title: String { scale.label }
 
-    var colorHex: UInt32 {
-        switch self {
-        case .g5: return 0x8B5CF6
-        case .g4: return 0x3B82F6
-        case .g3: return 0x14B8A6
-        case .g2: return 0x64748B
-        case .none: return 0x94A3B8
-        }
-    }
+    var colorHex: UInt32 { scale.hex }
 
     var swiftUIColor: Color { Color(hex: colorHex) }
 }
@@ -196,27 +149,29 @@ enum SpeedBand: String, CaseIterable {
     case exceptional
 
     static func band(forDownload mbps: Double) -> SpeedBand {
-        switch mbps {
-        case 1000...:    return .exceptional
-        case 600..<1000: return .excellent
-        case 300..<600:  return .veryGood
-        case 100..<300:  return .good
-        case 30..<100:   return .medium
-        case 10..<30:    return .slow
-        default:         return .verySlow
+        switch SQQualityScale.Throughput(mbps: mbps) {
+        case .exceptional: return .exceptional
+        case .excellent: return .excellent
+        case .veryGood: return .veryGood
+        case .good: return .good
+        case .medium: return .medium
+        case .slow: return .slow
+        case .verySlow: return .verySlow
         }
     }
 
     var uiColor: UIColor {
+        let scale: SQQualityScale.Throughput
         switch self {
-        case .exceptional: return UIColor(red: 0x3B / 255, green: 0x82 / 255, blue: 0xF6 / 255, alpha: 1.0)
-        case .excellent:   return UIColor(red: 0x06 / 255, green: 0xB6 / 255, blue: 0xD4 / 255, alpha: 1.0)
-        case .veryGood:    return UIColor(red: 0x22 / 255, green: 0xC5 / 255, blue: 0x5E / 255, alpha: 1.0)
-        case .good:        return UIColor(red: 0x84 / 255, green: 0xCC / 255, blue: 0x16 / 255, alpha: 1.0)
-        case .medium:      return UIColor(red: 0xEA / 255, green: 0xB3 / 255, blue: 0x08 / 255, alpha: 1.0)
-        case .slow:        return UIColor(red: 0xF9 / 255, green: 0x73 / 255, blue: 0x16 / 255, alpha: 1.0)
-        case .verySlow:    return UIColor(red: 0xEF / 255, green: 0x44 / 255, blue: 0x44 / 255, alpha: 1.0)
+        case .exceptional: scale = .exceptional
+        case .excellent: scale = .excellent
+        case .veryGood: scale = .veryGood
+        case .good: scale = .good
+        case .medium: scale = .medium
+        case .slow: scale = .slow
+        case .verySlow: scale = .verySlow
         }
+        return scale.uiColor
     }
 }
 

@@ -116,7 +116,7 @@ struct ScheduleMessageSheet: View {
             onScheduled()
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -200,7 +200,7 @@ struct AddReminderSheet: View {
             onAdded()
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

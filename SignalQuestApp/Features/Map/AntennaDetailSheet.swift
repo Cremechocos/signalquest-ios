@@ -18,7 +18,7 @@ final class AntennaDetailViewModel: ObservableObject {
         do {
             details = try await service.details(id: id, market: market, operatorName: operatorName, anfrCode: anfrCode)
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.userFacingMessage
         }
     }
 
@@ -60,7 +60,7 @@ final class AntennaDetailViewModel: ObservableObject {
             await load(id: siteId, market: market, operatorName: operatorName, anfrCode: anfrCode)
         } catch {
             Haptics.error()
-            photoUploadMessage = error.localizedDescription
+            photoUploadMessage = error.userFacingMessage
         }
     }
 
@@ -435,8 +435,7 @@ struct AntennaDetailSheet: View {
             .foregroundStyle(SQColor.label)
             .frame(maxWidth: .infinity)
             .padding(.vertical, SQSpace.md - 1)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground(cornerRadius: SQRadius.md)
         }
         .buttonStyle(SQPressButtonStyle())
     }
@@ -508,7 +507,7 @@ struct AntennaDetailSheet: View {
             options.append(
                 OutageBandOption(
                     token: token,
-                    label: carrier.bandLabel ?? (isNr ? "n\(band)" : "B\(band)"),
+                    label: carrier.bandLabel ?? SQUnits.band(band, isNR: isNr),
                     freqMhz: carrier.txFrequencyMhz.map { Int($0.rounded()) }
                 )
             )
@@ -1299,8 +1298,7 @@ private extension View {
         self
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SQSpace.lg)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground()
             .sqFadeUp()
     }
 }
@@ -1360,8 +1358,7 @@ private struct AntennaDisclosureSection<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .sqFadeUp()
     }
 }

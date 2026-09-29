@@ -214,8 +214,7 @@ struct CommunityOutageDetailSheet: View {
             }
             .padding(SQSpace.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground()
         }
     }
 
@@ -294,8 +293,7 @@ struct CommunityOutageDetailSheet: View {
             infoRow("Captent à nouveau", sightingsLabel)
         }
         .padding(.vertical, SQSpace.xs)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
 

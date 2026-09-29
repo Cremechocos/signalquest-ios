@@ -244,7 +244,7 @@ final class SentinelleViewModel: ObservableObject {
             accessDenied = true
             return false
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.userFacingMessage
             return false
         }
     }

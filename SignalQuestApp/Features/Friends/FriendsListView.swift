@@ -49,7 +49,7 @@ final class FriendsViewModel: ObservableObject {
         // Une annulation (changement d'écran, rafraîchissement concurrent) n'est
         // pas une erreur à montrer.
         let reportable = failures.filter { !$0.isCancellation }
-        errorMessage = reportable.first.map { $0.localizedDescription }
+        errorMessage = reportable.first.map { $0.userFacingMessage }
     }
 
     func accept(_ request: FriendRequest) async {
@@ -87,7 +87,7 @@ final class FriendsViewModel: ObservableObject {
             await load()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 }
@@ -499,7 +499,7 @@ private struct AddFriendSheet: View {
             await onSent()
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

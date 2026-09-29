@@ -71,13 +71,13 @@ struct MapTileLayerResult<Value: MapTilePayload>: Sendable {
         // fallback. A received tile with zero items remains an admitted tile.
         self.tiles = failure.successfulTiles.isEmpty ? nil : failure.successfulTiles
         self.failure = failure
-        self.errorMessage = failure.localizedDescription
+        self.errorMessage = failure.userFacingMessage
     }
 
     private init(error: any Error) {
         self.tiles = nil
         self.failure = nil
-        self.errorMessage = error.isCancellation ? nil : error.localizedDescription
+        self.errorMessage = error.isCancellation ? nil : error.userFacingMessage
     }
 
     static func load(enabled: Bool = true,

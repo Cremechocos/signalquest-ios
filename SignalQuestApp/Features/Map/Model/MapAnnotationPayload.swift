@@ -253,32 +253,14 @@ extension MapAnnotationPayload {
         return Double(text[range].replacingOccurrences(of: ",", with: "."))
     }
 
-    /// Échelle de couleur des speedtests — alignée sur le web
-    /// (`lib/speedColorUtils.ts` SPEED_THRESHOLDS) : rouge → orange → jaune →
-    /// vert clair → vert → cyan → bleu.
+    /// Échelle unique (`SQQualityScale`), la même que le web et Android.
     func speedtestColor(downloadMbps: Double) -> Color {
-        switch downloadMbps {
-        case 1000...:      return Color(hex: 0x3B82F6) // exceptionnel
-        case 600..<1000:   return Color(hex: 0x06B6D4) // excellent
-        case 300..<600:    return Color(hex: 0x22C55E) // très bon
-        case 100..<300:    return Color(hex: 0x84CC16) // bon
-        case 30..<100:     return Color(hex: 0xEAB308) // moyen
-        case 10..<30:      return Color(hex: 0xF97316) // lent
-        default:           return Color(hex: 0xEF4444) // très lent
-        }
+        SQNetworkColors.speedColor(downloadMbps)
     }
 
-    /// Échelle de couleur de couverture par RSRP — alignée sur le web
-    /// (`lib/signal-quality.ts` QUALITY_HEX / RSRP_SCALE).
+    /// Même échelle RSRP que la carte Signal, garde-fou « pas de mesure » compris.
     func coverageColor(rsrp: Double?) -> Color {
-        guard let rsrp else { return Color(hex: 0x94A3B8) } // none
-        switch rsrp {
-        case (-80)...:        return Color(hex: 0x10B981) // excellent
-        case -90..<(-80):     return Color(hex: 0x84CC16) // bon
-        case -100..<(-90):    return Color(hex: 0xF59E0B) // moyen
-        case -110..<(-100):   return Color(hex: 0xF97316) // faible
-        default:              return Color(hex: 0xEF4444) // très faible
-        }
+        SQNetworkColors.rsrpColor(rsrp)
     }
 }
 

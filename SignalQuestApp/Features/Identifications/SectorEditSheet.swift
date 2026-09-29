@@ -100,7 +100,7 @@ final class SectorEditViewModel: ObservableObject {
                 Haptics.error()
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

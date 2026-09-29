@@ -114,8 +114,7 @@ struct SavedMessagesView: View {
         }
         .padding(SQSpace.md + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .opacity(removing.contains(message.id) ? 0.4 : 1)
     }
 
@@ -138,7 +137,7 @@ struct SavedMessagesView: View {
             entries = try await service.savedMessages()
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
         isLoading = false
         await decryptEntries()
@@ -165,7 +164,7 @@ struct SavedMessagesView: View {
             entries.removeAll { $0.message.id == id }
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
         removing.remove(id)

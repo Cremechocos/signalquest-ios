@@ -458,7 +458,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     }
 
     func receiveLocationFailure(_ error: Error, fromOneShot: Bool = true) {
-        errorMessage = error.localizedDescription
+        errorMessage = error.userFacingMessage
         if (error as? CLError)?.code == .denied {
             cachedFix = nil
             lastLocation = nil

@@ -1538,7 +1538,7 @@ struct ConversationDetailView: View {
             await decryptLoadedMessages()
             refreshPolls()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -1736,7 +1736,7 @@ struct ConversationDetailView: View {
             await loadPinned()
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -1747,7 +1747,7 @@ struct ConversationDetailView: View {
             pinnedMessages.removeAll { $0.messageId == message.id }
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -1763,7 +1763,7 @@ struct ConversationDetailView: View {
                 errorMessage = String(localized: "Aucune transcription disponible pour ce message.")
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -1811,7 +1811,7 @@ struct ConversationDetailView: View {
             pollsByMessageId[messageId] = mergePollTexts(updated, messageId: messageId)
             Haptics.selection()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -1822,7 +1822,7 @@ struct ConversationDetailView: View {
             pollsByMessageId[messageId] = mergePollTexts(updated, messageId: messageId)
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -1866,7 +1866,7 @@ struct ConversationDetailView: View {
                 await load()
                 Haptics.success()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
                 Haptics.error()
             }
             return
@@ -1988,7 +1988,7 @@ struct ConversationDetailView: View {
             replyTarget = nil
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -2029,7 +2029,7 @@ struct ConversationDetailView: View {
             replyTarget = nil
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -2078,7 +2078,7 @@ struct ConversationDetailView: View {
             // Échec : on remet l'état d'avant plutôt que d'afficher une
             // réaction que le serveur n'a pas enregistrée.
             messages = messages.map { $0.id == message.id ? message : $0 }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -2110,7 +2110,7 @@ struct ConversationDetailView: View {
                 messages.removeAll { $0.id == message.id }
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -2163,7 +2163,7 @@ struct ConversationDetailView: View {
             Haptics.success()
         } catch {
             guard owner.isCurrent, !error.isCancellation else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -2187,7 +2187,7 @@ struct ConversationDetailView: View {
             try await service.saveMessage(messageId: message.id)
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -2259,7 +2259,7 @@ struct ConversationDetailView: View {
             try await services.friends.block(userId: id)
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -2270,7 +2270,7 @@ struct ConversationDetailView: View {
             try await services.friends.block(userId: userId)
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -2499,7 +2499,7 @@ private struct LiveShareConversationBar: View {
         let parts = [
             radio?.displayOperatorName,
             radio?.technology ?? radio?.connectionType,
-            radio?.band.map { "B\($0)" },
+            radio?.band.map { SQUnits.band($0, technology: radio?.technology) },
             radio?.rsrp.map { "RSRP \($0) dBm" }
         ].compactMap { $0 }.filter { !$0.isEmpty }
         if !parts.isEmpty { return parts.joined(separator: " · ") }
@@ -2832,7 +2832,7 @@ private struct LiveShareSessionCard: View {
         let parts = [
             radio.displayOperatorName,
             radio.technology ?? radio.connectionType,
-            radio.band.map { "B\($0)" },
+            radio.band.map { SQUnits.band($0, technology: radio.technology) },
             radio.rsrp.map { "RSRP \($0) dBm" },
             radio.rsrq.map { "RSRQ \($0) dB" },
             radio.snr.map { "SINR \($0) dB" }

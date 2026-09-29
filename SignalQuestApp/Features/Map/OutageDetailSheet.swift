@@ -80,8 +80,7 @@ struct OutageDetailSheet: View {
             infoRow("Site", site.siteId)
         }
         .padding(.vertical, SQSpace.xs)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     @ViewBuilder

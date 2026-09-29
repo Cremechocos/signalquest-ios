@@ -301,7 +301,7 @@ struct MapItemSheet: View {
                             TechBadge(text: tech, color: TechAccent.color(for: tech))
                         }
                         if let band = details?.band {
-                            TechBadge(text: "B\(band)", color: SQColor.brandOrange)
+                            TechBadge(text: SQUnits.band(band, technology: details?.tech), color: SQColor.brandOrange)
                         }
                     }
                 }
@@ -352,7 +352,7 @@ struct MapItemSheet: View {
             speedtestDetail = try await services.speedtest.details(id: id)
             detailError = nil
         } catch {
-            detailError = "Détail API indisponible: \(error.localizedDescription)"
+            detailError = "Détail API indisponible: \(error.userFacingMessage)"
         }
     }
 
@@ -691,15 +691,18 @@ struct SQSheetHandle: View {
 /// bordure (règle Inputs de la DA Crème).
 struct SQSearchField: View {
     @Binding var text: String
+    /// Clé du catalogue, traduite à l'affichage : passée en `String`, elle
+    /// restait en français dans l'app anglaise (TRX-06).
     var placeholder: String = "Rechercher"
     var onSubmit: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(SQColor.labelSecondary)
-            TextField(placeholder, text: $text)
+                .accessibilityHidden(true)
+            TextField(LocalizedStringKey(placeholder), text: $text)
                 .font(SQType.body)
                 .submitLabel(.search)
                 .onSubmit { onSubmit?() }
@@ -711,12 +714,18 @@ struct SQSearchField: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(SQColor.labelTertiary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Text("Effacer la recherche"))
             }
         }
-        .padding(.horizontal, SQSpace.lg)
-        .frame(height: 44)
+        .padding(.leading, SQSpace.lg)
+        .padding(.trailing, text.isEmpty ? SQSpace.lg : SQSpace.xs)
+        // Hauteur minimale et non fixe : en grande taille de texte, le champ
+        // coupait sa propre saisie (TRX-12).
+        .frame(minHeight: 44)
         .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
 }
@@ -730,30 +739,56 @@ struct SQSegmentedFilter<Value: Hashable>: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
                 ForEach(Array(options.enumerated()), id: \.offset) { _, option in
-                    let isSelected = option.value == selection
-                    Button {
-                        Haptics.selection()
+                    SQChip(label: option.label, systemImage: option.icon,
+                           isSelected: option.value == selection) {
                         selection = option.value
-                    } label: {
-                        HStack(spacing: SQSpace.xs + 2) {
-                            if let icon = option.icon {
-                                Image(systemName: icon)
-                            }
-                            Text(option.label)
-                        }
-                        .font(SQFont.body(13, .semibold))
-                        .padding(.horizontal, SQSpace.lg - 2)
-                        .padding(.vertical, SQSpace.sm)
-                        .background(isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
-                        .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
-                        .sqShadowSoft()
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
             .padding(.horizontal)
         }
+    }
+}
+
+/// Pastille sélectionnable du système Crème : inactive en surface avec ombre
+/// repos, active en brique pleine au texte crème, jamais de bordure hors OLED
+/// (DESIGN.md › Chips). Zone de toucher de 44 pt de haut.
+struct SQChip: View {
+    let label: String
+    var systemImage: String? = nil
+    var isSelected = false
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            Haptics.selection()
+            action()
+        } label: {
+            HStack(spacing: SQSpace.xs + 2) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .accessibilityHidden(true)
+                }
+                // Clé du catalogue : un libellé passé en `String` restait en
+                // français dans l'app anglaise.
+                Text(LocalizedStringKey(label))
+            }
+            .font(SQFont.body(13, .semibold))
+            .padding(.horizontal, SQSpace.lg - 2)
+            .padding(.vertical, SQSpace.sm)
+            .background(isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
+            .overlay {
+                if !isSelected {
+                    Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
+                }
+            }
+            .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
+            .sqShadowSoft()
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -1014,9 +1049,12 @@ struct SQInAppNotificationHost: View {
                 .padding(.vertical, SQSpace.xs)
                 .frame(maxWidth: 520)
                 .background(SQColor.surface, in: Capsule(style: .continuous))
+                // Ombre seule, jamais avec un contour (règle No-Border) : la
+                // variante se lit à l'icône teintée. Le liseré ne sert qu'en OLED,
+                // où l'ombre disparaît sur le noir.
                 .overlay {
                     Capsule(style: .continuous)
-                        .stroke(tint(for: item.variant).opacity(0.28), lineWidth: 1)
+                        .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
                 }
                 .sqShadowDock()
                 .padding(.horizontal, SQSpace.md)

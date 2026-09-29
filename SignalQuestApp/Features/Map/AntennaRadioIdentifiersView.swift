@@ -165,7 +165,7 @@ struct AntennaRadioIdentifiersView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                 }
                 let facts = [
-                    cell.band.map { "B\($0)" },
+                    cell.band.map { SQUnits.band($0, technology: cell.tech) },
                     cell.frequency,
                     cell.earfcn.map { "EARFCN \($0)" },
                     cell.arfcn.map { "ARFCN \($0)" },

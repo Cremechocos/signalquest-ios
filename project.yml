@@ -221,6 +221,8 @@ targets:
       - path: SignalQuestWidget/PrivacyInfo.xcprivacy
         buildPhase: resources
       - path: SignalQuestApp/Core/Shared/WidgetSharedStore.swift
+      # Échelle unique débit / signal / génération : mêmes couleurs que l'app.
+      - path: SignalQuestApp/Core/Shared/SQQualityScale.swift
     configFiles:
       Debug: Config/Debug.xcconfig
       DebugBeta: Config/DebugBeta.xcconfig

@@ -752,7 +752,7 @@ final class AuthSessionViewModel: ObservableObject {
                 errorMessage = String(localized: "Réponse auth invalide")
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -811,7 +811,7 @@ final class AuthSessionViewModel: ObservableObject {
             }
         } catch {
             guard acceptsPublicForm(context, checkCredentials: false) else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -843,7 +843,7 @@ final class AuthSessionViewModel: ObservableObject {
         } catch APIError.http(_, let code, _, _, _) where code == "APPLE_TERMS_REQUIRED" && !acceptedTerms {
             return .requiresTerms
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             return .failed
         }
     }
@@ -866,7 +866,7 @@ final class AuthSessionViewModel: ObservableObject {
                 errorMessage = String(localized: "Code 2FA accepté mais utilisateur absent")
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -884,7 +884,7 @@ final class AuthSessionViewModel: ObservableObject {
             return true
         } catch {
             guard acceptsPublicForm(context) else { return false }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             return false
         }
     }
@@ -903,7 +903,7 @@ final class AuthSessionViewModel: ObservableObject {
             return true
         } catch {
             guard !Task.isCancelled, stateID == startingState, credentials == service.credentialSessionID() else { return false }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             return false
         }
     }

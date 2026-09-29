@@ -61,8 +61,7 @@ struct AntennaProfileView: View {
                         // retrait laissaient une bande vide le long du cadre.
                         .padding(.vertical, SQSpace.md)
                         .padding(.horizontal, SQSpace.sm)
-                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                        .sqShadowCard()
+                        .sqCardBackground()
 
                     legend
                     figures
@@ -502,8 +501,7 @@ struct AntennaProfileView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private var verdictHeadline: String {

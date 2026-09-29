@@ -42,7 +42,7 @@ final class GamificationViewModel: ObservableObject {
             // Catalogue tolérant : un échec ici ne masque pas profil/activité.
             catalog = (try? await c) ?? []
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -164,8 +164,7 @@ struct GamificationView: View {
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Chargement de la progression")
     }
@@ -195,8 +194,7 @@ struct GamificationView: View {
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Niveau \(model.profile?.level ?? 0)")
         .accessibilityValue("\(model.profile?.points ?? 0) points · progression \(Int(xpProgress * 100)) %")
@@ -341,8 +339,7 @@ struct GamificationView: View {
         }
         .padding(SQSpace.lg)
         .frame(width: QuestCardLayout.width(for: dynamicTypeSize), alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .sqShimmer()
     }
 
@@ -568,8 +565,7 @@ private struct QuestCardView: View {
         }
         .padding(SQSpace.lg)
         .frame(width: QuestCardLayout.width(for: dynamicTypeSize), alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .opacity(quest.isClaimed ? 0.62 : 1)
     }
 

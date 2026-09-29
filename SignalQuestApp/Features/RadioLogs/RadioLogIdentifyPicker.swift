@@ -251,7 +251,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
             Haptics.success()
             return result.siteId ?? candidate.siteId
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
             return nil
         }

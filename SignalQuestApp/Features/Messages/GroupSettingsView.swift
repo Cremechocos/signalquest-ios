@@ -370,7 +370,7 @@ struct GroupSettingsView: View {
             errorMessage = nil
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

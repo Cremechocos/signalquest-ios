@@ -187,7 +187,7 @@ struct SpeedtestView: View {
                                 try await services.speedtest.retryPendingSavesReporting()
                                 self.errorMessage = nil
                             } catch {
-                                self.errorMessage = error.localizedDescription
+                                self.errorMessage = error.userFacingMessage
                             }
                             history = await services.speedtest.history()
                         }
@@ -487,8 +487,7 @@ struct SpeedtestView: View {
             }
         }
         .padding(SQSpace.lg + 2)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private func detailItem(label: String, value: String, trailing: String? = nil, highlight: Bool = false) -> some View {
@@ -546,8 +545,7 @@ struct SpeedtestView: View {
             }
         }
         .padding(SQSpace.lg + 2)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     // MARK: - Réglages Drive Test (cadence + budget de données)
@@ -708,8 +706,7 @@ struct SpeedtestView: View {
 
                     }
                     .padding(SQSpace.lg)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                    .sqShadowCard()
+                    .sqCardBackground()
                 }
                 .padding(SQSpace.lg)
             }
@@ -1012,7 +1009,7 @@ struct SpeedtestView: View {
             throw CancellationError()
         } catch {
             try ensureActiveRunSession(sessionID)
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
         try ensureActiveRunSession(sessionID)
         history = await services.speedtest.history()
@@ -1066,7 +1063,7 @@ struct SpeedtestView: View {
             } catch {
                 guard runSessionID == sessionID else { return }
                 liveActivity.cancel()
-                runErrorMessage = error.localizedDescription
+                runErrorMessage = error.userFacingMessage
                 phase = .failed(error.localizedDescription)
                 liveProgress = SpeedtestLiveProgress(phase: .failed(error.localizedDescription))
                 Haptics.warning()
@@ -1121,7 +1118,7 @@ struct SpeedtestView: View {
                 } catch {
                     guard runSessionID == sessionID else { return }
                     // Un test raté n'interrompt pas la rafale : on note et on continue.
-                    errorMessage = error.localizedDescription
+                    errorMessage = error.userFacingMessage
                     Haptics.warning()
                 }
                 if index < total {

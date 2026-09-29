@@ -164,4 +164,35 @@ extension Error {
         guard let api = self as? APIError, case .http(let status, _, _, _, _) = api else { return false }
         return (400..<500).contains(status) && ![401, 408, 425, 429].contains(status)
     }
+
+    /// Message à montrer pour n'importe quelle erreur. Celles qui savent se dire
+    /// (API, speedtest, réglages…) gardent leur texte ; une erreur interne sans
+    /// description affichait sinon « L’opération n’a pas pu s’achever.
+    /// (SignalQuest.E2EEV2MessageCryptoError erreur 3.) » (TRX-26, SOC-29).
+    var userFacingMessage: String {
+        if let url = self as? URLError {
+            switch url.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff:
+                return String(localized: "Pas de connexion Internet. Vérifie ton réseau puis réessaie.")
+            case .timedOut:
+                return String(localized: "Le serveur met trop de temps à répondre. Réessaie.")
+            default:
+                return String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie.")
+            }
+        }
+        if let described = (self as? LocalizedError)?.errorDescription, !described.isEmpty {
+            return described
+        }
+        // Erreurs système (Photos, Keychain, CallKit…) : leur texte est déjà
+        // traduit par iOS, on le garde.
+        let bridged = self as NSError
+        if bridged.userInfo[NSLocalizedDescriptionKey] is String {
+            return bridged.localizedDescription
+        }
+        if self is E2EEV2MessageCryptoError || self is E2EEV2EpochCryptoError
+            || self is E2EEV2BlobCryptoError || self is E2EEV2SignedRequestError {
+            return String(localized: "Le chiffrement n’a pas abouti. Réessaie dans un instant.")
+        }
+        return String(localized: "Une erreur inattendue est survenue. Réessaie.")
+    }
 }

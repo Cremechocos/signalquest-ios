@@ -192,8 +192,7 @@ struct SignalQuestHomeView: View {
                 }
                 .padding(SQSpace.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                .sqShadowCard()
+                .sqCardBackground()
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel(Text("\(outageBannerTitle(outage)). \(outageBannerSubtitle(outage))"))
@@ -265,12 +264,20 @@ struct SignalQuestHomeView: View {
             }
             Spacer(minLength: SQSpace.sm)
             if let networkBadge {
-                Text(LocalizedStringKey(networkBadge))
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 6)
-                    .foregroundStyle(networkTint)
-                    .background(networkTintSoft, in: Capsule(style: .continuous))
+                // Texte à l'encre, couleur portée par le point : teinté sur sa propre
+                // teinte à 14 %, le texte tombait vers 2:1 en jaune et vert clair (TRX-04).
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(networkTint)
+                        .frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
+                    Text(LocalizedStringKey(networkBadge))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(SQColor.label)
+                }
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(networkTintSoft, in: Capsule(style: .continuous))
             }
             // Indice discret que la carte est cliquable (verdict explicable).
             if networkQuality != nil {
@@ -281,8 +288,7 @@ struct SignalQuestHomeView: View {
         }
         .padding(.vertical, SQSpace.lg + 2)
         .padding(.horizontal, SQSpace.xl)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private var isOnline: Bool { services.networkPath.isOnline }
@@ -452,6 +458,13 @@ struct SignalQuestHomeView: View {
                 accented ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
                 in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
             )
+            .overlay {
+                // En « Noir intense », seul ce liseré détache les tuiles du fond (TRX-09).
+                if !accented {
+                    RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+                        .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
+                }
+            }
             .modifier(HomeTileShadow())
             .contentShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         }
@@ -503,8 +516,7 @@ struct SignalQuestHomeView: View {
                     }
                 }
                 .padding(SQSpace.lg)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                .sqShadowCard()
+                .sqCardBackground()
             }
         }
     }
@@ -708,8 +720,7 @@ struct SignalQuestHomeView: View {
                 }
                 .padding(.vertical, SQSpace.lg + 2)
                 .padding(.horizontal, SQSpace.xl)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                .sqShadowCard()
+                .sqCardBackground()
                 .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
             }
             .buttonStyle(SQPressButtonStyle())

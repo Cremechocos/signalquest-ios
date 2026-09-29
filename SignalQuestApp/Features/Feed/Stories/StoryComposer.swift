@@ -70,7 +70,7 @@ final class StoryComposerViewModel: ObservableObject {
                 pickedImageData = data
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 

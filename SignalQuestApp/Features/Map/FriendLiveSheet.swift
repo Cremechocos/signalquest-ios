@@ -118,7 +118,7 @@ struct FriendLiveSheet: View {
             tiles.append(RadioTile(label: "SNR", value: "\(Int(snr)) dB"))
         }
         if let band = radio.band {
-            tiles.append(RadioTile(label: "Bande", value: "B\(band)"))
+            tiles.append(RadioTile(label: "Bande", value: SQUnits.band(band, technology: radio.technology)))
         }
         return tiles
     }

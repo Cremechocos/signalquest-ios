@@ -117,7 +117,7 @@ final class LeaderboardsViewModel: ObservableObject {
             speedStamp += 1
         } catch {
             guard speedGeneration == generation, !Task.isCancelled, !error.isCancellation else { return }
-            speedError = error.localizedDescription
+            speedError = error.userFacingMessage
         }
     }
 
@@ -143,7 +143,7 @@ final class LeaderboardsViewModel: ObservableObject {
             pointsStamp += 1
         } catch {
             guard pointsGeneration == generation, !Task.isCancelled, !error.isCancellation else { return }
-            pointsError = error.localizedDescription
+            pointsError = error.userFacingMessage
         }
     }
 
@@ -561,8 +561,7 @@ private struct LeaderboardHeroCard: View {
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .onAppear { animateIn() }
         .onChangeCompat(of: profile) { _, _ in animateIn() }
         .accessibilityElement(children: .combine)

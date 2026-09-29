@@ -108,8 +108,7 @@ struct PlannedDetailSheet: View {
             infoRow(String(localized: "Mise en service"), formattedDate(site.activation?.lastInServiceDate))
         }
         .padding(.vertical, SQSpace.xs)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     @ViewBuilder

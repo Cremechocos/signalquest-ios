@@ -686,7 +686,7 @@ extension SocialMapSnapshot {
         }
         if filters.contains(.coverage) {
             items += coveragePoints.map { point in
-                MapDisplayItem(id: "coverage-\(point.id)", kind: .coverage, title: point.technology ?? "Couverture", subtitle: point.rsrp.map { "\(Int($0)) dBm" } ?? "Signal serveur", coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng), metric: point.band.map { "B\($0)" })
+                MapDisplayItem(id: "coverage-\(point.id)", kind: .coverage, title: point.technology ?? "Couverture", subtitle: point.rsrp.map { "\(Int($0)) dBm" } ?? "Signal serveur", coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng), metric: point.band.map { SQUnits.band($0, technology: point.technology) })
             }
         }
         if filters.contains(.validation) {

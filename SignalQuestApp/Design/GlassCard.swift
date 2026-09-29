@@ -1,5 +1,18 @@
 import SwiftUI
 
+extension View {
+    /// Fond de carte : surface, rayon continu, ombre carte. En « Noir intense »,
+    /// carte et fond sont tous deux noirs et l'ombre s'efface : le liseré prend le
+    /// relais, sans quoi les cartes se fondaient dans le fond (TRX-09, SOC-26).
+    /// Hors OLED il est transparent : jamais ombre et bordure à la fois.
+    func sqCardBackground(_ fill: Color = SQColor.surface, cornerRadius: CGFloat = SQRadius.xl) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return background(fill, in: shape)
+            .overlay { shape.strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
+            .sqShadowCard()
+    }
+}
+
 /// Carte douce de la DA « Crème & Terre cuite » : fond `SurfaceElevated`,
 /// rayon 22 continu, ombre carte chaude. Ni bordure, ni glassmorphism.
 /// (Nom historique conservé — c'était le conteneur « glass » de l'ancienne DA.)
@@ -21,11 +34,7 @@ struct GlassCard<Content: View>: View {
     var body: some View {
         content
             .padding(padding)
-            .background(
-                SQColor.surface,
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            )
-            .sqShadowCard()
+            .sqCardBackground(cornerRadius: cornerRadius)
     }
 }
 
@@ -99,7 +108,7 @@ struct GradientButton: View {
             .modifier(GradientButtonShadow(style: isEnabled ? style : .ghost))
         }
         .disabled(isBusy)
-        .buttonStyle(SQPressButtonStyle())
+        .buttonStyle(SQPressButtonStyle(scale: 0.97))
     }
 
     private var foreground: Color {
@@ -137,10 +146,13 @@ private struct GradientButtonShadow: ViewModifier {
 
 /// Retour tactile visuel court, sans réduction sous Reduce Motion.
 struct SQPressButtonStyle: ButtonStyle {
+    /// 0,985 pour les cartes et les lignes ; les boutons capsules prennent le
+    /// 0,97 de DESIGN.md, plus lisible sur une petite surface.
+    var scale: CGFloat = 0.985
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? scale : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }

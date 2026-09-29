@@ -449,17 +449,7 @@ struct MapKitMapView: UIViewRepresentable {
             UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
         }
         static func speedColor(_ mbps: Double) -> UIColor {
-            let hex: UInt32
-            switch mbps {
-            case 1000...: hex = 0x3B82F6
-            case 600..<1000: hex = 0x06B6D4
-            case 300..<600: hex = 0x22C55E
-            case 100..<300: hex = 0x84CC16
-            case 30..<100: hex = 0xEAB308
-            case 10..<30: hex = 0xF97316
-            default: hex = 0xEF4444
-            }
-            return uiColor(hex: hex)
+            SQNetworkColors.speedUIColor(mbps)
         }
 
         // MARK: Caméra — n'applique QUE les changements programmatiques (GPS, cluster).

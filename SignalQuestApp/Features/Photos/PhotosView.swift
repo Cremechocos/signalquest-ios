@@ -57,7 +57,7 @@ final class PhotosViewModel: ObservableObject {
             retryPagination = false
         } catch {
             if galleryRequest == request, !error.isCancellation {
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
                 retryPagination = false
             }
         }
@@ -83,7 +83,7 @@ final class PhotosViewModel: ObservableObject {
             retryPagination = false
         } catch {
             if galleryRequest == request, !error.isCancellation {
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
                 retryPagination = true
             }
         }
@@ -123,7 +123,7 @@ final class PhotosViewModel: ObservableObject {
             commentsErrorMessage = nil
         } catch {
             guard commentsRequest == request, selectedPhoto?.id == photo.id, !error.isCancellation else { return }
-            commentsErrorMessage = error.localizedDescription
+            commentsErrorMessage = error.userFacingMessage
         }
     }
 
@@ -150,7 +150,7 @@ final class PhotosViewModel: ObservableObject {
             Haptics.light()
         } catch {
             updatePhotoInState(photo)
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -198,7 +198,7 @@ final class PhotosViewModel: ObservableObject {
             Haptics.success()
         } catch {
             guard commentContext == context, selectedPhoto?.id == photo.id, !error.isCancellation else { return }
-            commentSendErrorMessage = error.localizedDescription
+            commentSendErrorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -237,7 +237,7 @@ final class PhotosViewModel: ObservableObject {
             Haptics.success()
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
             return false
         }
@@ -252,7 +252,7 @@ final class PhotosViewModel: ObservableObject {
             photos.insert(photo, at: 0)
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             return false
         }
     }
@@ -268,7 +268,7 @@ final class PhotosViewModel: ObservableObject {
             return true
         } catch {
             updatePhotoInState(photo)
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
             return false
         }
@@ -864,8 +864,7 @@ struct PhotoDetailView: View {
             .accessibilityLabel("Partager")
         }
         .padding(SQSpace.md + 2)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     // MARK: Lien vers l'antenne
@@ -904,8 +903,7 @@ struct PhotoDetailView: View {
                     .accessibilityHidden(true)
             }
             .padding(SQSpace.md + 2)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground()
         }
         .buttonStyle(SQPressButtonStyle())
     }
@@ -1114,8 +1112,7 @@ struct PhotoUploadView: View {
                         }
                         .padding(SQSpace.md + 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                        .sqShadowCard()
+                        .sqCardBackground()
                     }
                     .buttonStyle(SQPressButtonStyle())
 
@@ -1346,7 +1343,7 @@ struct PhotoShareSheet: View {
         do {
             conversations = AppEnvironment.usesDemoData ? .demo : try await messagesService.conversations()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 

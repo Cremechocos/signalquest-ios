@@ -52,7 +52,7 @@ final class NotificationsCenterViewModel: ObservableObject {
             if let badgeTicket { badge?.publishNotificationBadge(unreadCount: unreadCount, for: badgeTicket) }
         } catch {
             guard loadGeneration == generation, isCurrentAccount, !error.isCancellation else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 

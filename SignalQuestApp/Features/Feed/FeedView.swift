@@ -212,7 +212,7 @@ final class FeedViewModel: ObservableObject {
             }
         } catch {
             guard context == query, request == loadRevision, !error.isCancellation else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -232,7 +232,7 @@ final class FeedViewModel: ObservableObject {
                 suggestedUsers: current.suggestedUsers, requestId: next.requestId ?? current.requestId)
         } catch {
             guard context == query, loading == loadRevision, !error.isCancellation else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 

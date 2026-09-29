@@ -64,7 +64,7 @@ final class MessagesViewModel: ObservableObject {
             try await service.leaveConversation(id: conversation.id)
             conversations.removeAll { $0.id == conversation.id }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 }
@@ -367,8 +367,7 @@ struct MessagesView: View {
         }
         .padding(.vertical, 14)
         .padding(.horizontal, SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }
 
@@ -499,7 +498,7 @@ private struct NewConversationSheet: View {
         do {
             results = try await service.searchUsers(query: trimmed)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -517,7 +516,7 @@ private struct NewConversationSheet: View {
             await onCreated()
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

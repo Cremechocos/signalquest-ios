@@ -178,7 +178,7 @@ struct SignupView: View {
                                      proof: proof, context: context)
             } catch {
                 guard !Task.isCancelled, submissionID == id else { return }
-                challengeError = error.localizedDescription
+                challengeError = error.userFacingMessage
             }
         }
     }

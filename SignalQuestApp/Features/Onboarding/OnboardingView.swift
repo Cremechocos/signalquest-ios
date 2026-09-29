@@ -518,10 +518,10 @@ private struct SpeedDialScene: View {
                 .fill(SQColor.brandRed)
                 .frame(width: 18, height: 18)
 
-            Text("Mbps")
+            // Casse normale et unité de la langue : les majuscules espacées sont
+            // proscrites par la DA (TRX-30).
+            Text(verbatim: SQUnits.throughputUnit(mbps: 0))
                 .font(SQType.micro)
-                .tracking(1.6)
-                .textCase(.uppercase)
                 .foregroundStyle(SQColor.labelSecondary)
                 .offset(y: 44)
         }

@@ -167,8 +167,7 @@ struct DriveSpeedtestDetailSheet: View {
             }
         }
         .padding(.vertical, SQSpace.xs)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private func metaRow(_ icon: String, _ label: String, _ value: String) -> some View {
@@ -228,27 +227,12 @@ struct DriveSpeedtestDetailSheet: View {
         return CGFloat(min(1, log10(clamped + 1) / 3))
     }
 
+    /// Libellés de l'échelle unique : « Moyen » comme sur la carte, et traduits.
     static func speedLabel(_ mbps: Double) -> String {
-        switch mbps {
-        case 1000...: return "Exceptionnel"
-        case 600..<1000: return "Excellent"
-        case 300..<600: return String(localized: "Très bon")
-        case 100..<300: return "Bon"
-        case 30..<100: return "Correct"
-        case 10..<30: return "Lent"
-        default: return String(localized: "Très lent")
-        }
+        SQQualityScale.Throughput(mbps: mbps).label
     }
 
     static func speedColor(_ mbps: Double) -> Color {
-        switch mbps {
-        case 1000...: return Color(hex: 0x3B82F6)
-        case 600..<1000: return Color(hex: 0x06B6D4)
-        case 300..<600: return Color(hex: 0x22C55E)
-        case 100..<300: return Color(hex: 0x84CC16)
-        case 30..<100: return Color(hex: 0xEAB308)
-        case 10..<30: return Color(hex: 0xF97316)
-        default: return Color(hex: 0xEF4444)
-        }
+        SQNetworkColors.speedColor(mbps)
     }
 }

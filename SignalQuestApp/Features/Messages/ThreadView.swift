@@ -94,8 +94,7 @@ struct ThreadView: View {
         }
         .padding(SQSpace.md + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private func replyRow(_ reply: MessageItem) -> some View {
@@ -177,7 +176,7 @@ struct ThreadView: View {
             errorMessage = nil
             await decryptAll()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -193,7 +192,7 @@ struct ThreadView: View {
             draft = ""
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

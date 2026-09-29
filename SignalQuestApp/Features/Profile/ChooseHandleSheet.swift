@@ -157,7 +157,7 @@ struct ChooseHandleSheet: View {
             default: errorText = msg
             }
         } catch {
-            errorText = error.localizedDescription
+            errorText = error.userFacingMessage
         }
     }
 

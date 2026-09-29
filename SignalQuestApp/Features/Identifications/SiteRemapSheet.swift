@@ -86,7 +86,7 @@ final class SiteRemapViewModel: ObservableObject {
                 Haptics.error()
             }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -168,8 +168,7 @@ struct SiteRemapSheet: View {
         }
         .padding(SQSpace.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground(cornerRadius: SQRadius.md)
     }
 
     @ViewBuilder
@@ -200,8 +199,7 @@ struct SiteRemapSheet: View {
                 }
             }
             .padding(SQSpace.md)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground()
         }
     }
 }

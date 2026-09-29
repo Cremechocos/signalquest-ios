@@ -442,7 +442,7 @@ final class RadioLogsViewModel: ObservableObject {
             toast = String(localized: "Journal radio supprimé.")
             Haptics.success()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

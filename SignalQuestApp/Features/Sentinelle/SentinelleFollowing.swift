@@ -219,7 +219,7 @@ struct SentinelleFollowSheet: View {
                     } catch {
                         // L'erreur reste DANS la feuille : la refermer effacerait
                         // ce qui vient d'être collé, et il faudrait recommencer.
-                        self.error = error.localizedDescription
+                        self.error = error.userFacingMessage
                     }
                     busy = false
                 }

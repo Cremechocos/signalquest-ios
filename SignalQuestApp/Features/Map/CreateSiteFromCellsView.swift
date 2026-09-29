@@ -160,7 +160,7 @@ struct CreateSiteFromCellsView: View {
                             radio.enb.map { "eNB \($0)" },
                             radio.gnb.map { "gNB \($0)" },
                             radio.pci.map { "PCI \($0)" },
-                            radio.band.map { "B\($0)" }
+                            radio.band.map { SQUnits.band($0, technology: radio.technology ?? (radio.gnb != nil ? "NR" : nil)) }
                         ].compactMap { $0 }.joined(separator: " · "))
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
@@ -172,8 +172,7 @@ struct CreateSiteFromCellsView: View {
                 }
             }
             .padding(.vertical, SQSpace.xs)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground()
         }
     }
 
@@ -216,7 +215,7 @@ struct CreateSiteFromCellsView: View {
             }
         } catch {
             Haptics.error()
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 

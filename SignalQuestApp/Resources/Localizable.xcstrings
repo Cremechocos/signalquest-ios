@@ -3090,6 +3090,70 @@
         }
       }
     },
+    "−80 dBm et plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−80 dBm and above"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−80 dBm et plus"
+          }
+        }
+      }
+    },
+    "−90 à −100 dBm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−90 to −100 dBm"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−90 à −100 dBm"
+          }
+        }
+      }
+    },
+    "−10 dB et plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−10 dB and above"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−10 dB et plus"
+          }
+        }
+      }
+    },
+    "−10 à −15 dB" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−10 to −15 dB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−10 à −15 dB"
+          }
+        }
+      }
+    },
     "👑" : {
       "localizations" : {
         "en" : {
@@ -3183,6 +3247,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "0 – 3°"
+          }
+        }
+      }
+    },
+    "0 à 13 dB" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0 to 13 dB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0 à 13 dB"
           }
         }
       }
@@ -3366,6 +3446,22 @@
         }
       }
     },
+    "3 à 10 Mbit/s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 to 10 Mbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 à 10 Mbit/s"
+          }
+        }
+      }
+    },
     "3 images maximum par message." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3465,6 +3561,22 @@
         }
       }
     },
+    "5G NSA et 5G SA" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G NSA and 5G SA"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G NSA et 5G SA"
+          }
+        }
+      }
+    },
     "6 caractères minimum. Ce mot de passe ne quitte jamais ton appareil." : {
       "localizations" : {
         "en" : {
@@ -3513,6 +3625,38 @@
         }
       }
     },
+    "10 à 30 Mbit/s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 to 30 Mbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 à 30 Mbit/s"
+          }
+        }
+      }
+    },
+    "10 à 30 ms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 to 30 ms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 à 30 ms"
+          }
+        }
+      }
+    },
     "10 antennes validées" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3547,6 +3691,38 @@
         }
       }
     },
+    "20 dB et plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "20 dB and above"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "20 dB et plus"
+          }
+        }
+      }
+    },
+    "20 Mbit/s et plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "20 Mbps and above"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "20 Mbit/s et plus"
+          }
+        }
+      }
+    },
     "24 heures" : {
       "localizations" : {
         "en" : {
@@ -3559,6 +3735,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "24 heures"
+          }
+        }
+      }
+    },
+    "30 à 100 ms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 to 100 ms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 à 100 ms"
           }
         }
       }
@@ -3660,6 +3852,22 @@
         }
       }
     },
+    "100 Mbit/s et plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100 Mbps and above"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100 Mbit/s et plus"
+          }
+        }
+      }
+    },
     "123 456" : {
       "localizations" : {
         "en" : {
@@ -3672,6 +3880,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "123 456"
+          }
+        }
+      }
+    },
+    "208-01 Orange, 208-10 SFR, 208-15 Free, 208-20 Bouygues Telecom." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "208-01 Orange, 208-10 SFR, 208-15 Free, 208-20 Bouygues Telecom."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "208-01 Orange, 208-10 SFR, 208-15 Free, 208-20 Bouygues Telecom."
           }
         }
       }
@@ -3805,6 +4029,22 @@
         }
       }
     },
+    "À −95 dBm, la navigation reste fluide ; sous −110 dBm, les pages peinent à charger." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At −95 dBm browsing stays smooth; below −110 dBm pages struggle to load."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À −95 dBm, la navigation reste fluide ; sous −110 dBm, les pages peinent à charger."
+          }
+        }
+      }
+    },
     "À choisir" : {
       "localizations" : {
         "en" : {
@@ -3932,6 +4172,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À mes amis"
+          }
+        }
+      }
+    },
+    "à peine sensible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "barely noticeable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "à peine sensible"
           }
         }
       }
@@ -4094,6 +4350,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "absent"
+          }
+        }
+      }
+    },
+    "acceptable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "acceptable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "acceptable"
           }
         }
       }
@@ -5184,6 +5456,23 @@
         }
       }
     },
+    "Aide et glossaire" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help and glossary"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aide et glossaire"
+          }
+        }
+      }
+    },
     "Aimer ce commentaire" : {
       "localizations" : {
         "en" : {
@@ -5853,6 +6142,22 @@
         }
       }
     },
+    "ANFR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR"
+          }
+        }
+      }
+    },
     "Annulé" : {
       "localizations" : {
         "en" : {
@@ -6193,6 +6498,22 @@
         }
       }
     },
+    "Antennes et carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennas and map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennes et carte"
+          }
+        }
+      }
+    },
     "Antennes suivies" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6454,6 +6775,22 @@
         }
       }
     },
+    "appel vidéo correct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "video calls are fine"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "appel vidéo correct"
+          }
+        }
+      }
+    },
     "Appeler" : {
       "localizations" : {
         "en" : {
@@ -6498,6 +6835,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appels chiffrés indisponibles pour cette conversation"
+          }
+        }
+      }
+    },
+    "appels hachés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "choppy calls"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "appels hachés"
           }
         }
       }
@@ -7736,6 +8089,22 @@
         }
       }
     },
+    "Aucun terme trouvé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No matching term"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun terme trouvé"
+          }
+        }
+      }
+    },
     "Aucun territoire dans cette zone" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7782,6 +8151,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun test partagé"
+          }
+        }
+      }
+    },
+    "aucune" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "none"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucune"
           }
         }
       }
@@ -8966,6 +9351,22 @@
         }
       }
     },
+    "Azimut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azimuth"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azimut"
+          }
+        }
+      }
+    },
     "Azimuts" : {
       "localizations" : {
         "en" : {
@@ -8995,6 +9396,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "B4 (AWS)"
+          }
+        }
+      }
+    },
+    "B20 = 800 MHz, idéale à la campagne ; n78 = 3 500 MHz, la 5G rapide des villes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "B20 = 800 MHz, ideal in the countryside; n78 = 3,500 MHz, fast 5G in cities."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "B20 = 800 MHz, idéale à la campagne ; n78 = 3 500 MHz, la 5G rapide des villes."
           }
         }
       }
@@ -9244,6 +9661,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bande"
+          }
+        }
+      }
+    },
+    "Bande de fréquences" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frequency band"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bande de fréquences"
           }
         }
       }
@@ -9595,6 +10028,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bonjour,"
+          }
+        }
+      }
+    },
+    "bonne qualité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "good quality"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bonne qualité"
           }
         }
       }
@@ -10317,6 +10766,22 @@
         }
       }
     },
+    "Ce que rapportent tes contributions : mesures, identifications, validations et quêtes. Ils font monter ton niveau et ton rang dans les classements." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What your contributions earn: measurements, identifications, validations and quests. They raise your level and your leaderboard rank."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que rapportent tes contributions : mesures, identifications, validations et quêtes. Ils font monter ton niveau et ton rang dans les classements."
+          }
+        }
+      }
+    },
     "Ce que vaut le réseau à cet endroit" : {
       "localizations" : {
         "en" : {
@@ -10393,6 +10858,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce relevé ne porte aucun identifiant radio (eNB, gNB ou PCI)."
+          }
+        }
+      }
+    },
+    "Ce serveur de mesure est occupé. Réessaie dans un instant, ou choisis-en un autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This test server is busy. Try again in a moment, or pick another one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce serveur de mesure est occupé. Réessaie dans un instant, ou choisis-en un autre."
+          }
+        }
+      }
+    },
+    "Ce serveur de mesure est mal configuré. Choisis-en un autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This test server is misconfigured. Pick another one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce serveur de mesure est mal configuré. Choisis-en un autre."
           }
         }
       }
@@ -11780,6 +12277,22 @@
         }
       }
     },
+    "Chiffrement de bout en bout" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End-to-end encryption"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiffrement de bout en bout"
+          }
+        }
+      }
+    },
     "Chiffrement E2EE" : {
       "localizations" : {
         "en" : {
@@ -12292,6 +12805,22 @@
         }
       }
     },
+    "Clé de chiffrement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encryption key"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé de chiffrement"
+          }
+        }
+      }
+    },
     "Clé de conversation obsolète — re-partage nécessaire" : {
       "localizations" : {
         "en" : {
@@ -12676,6 +13205,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code opérateur"
+          }
+        }
+      }
+    },
+    "Code opérateur (MCC-MNC)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carrier code (MCC-MNC)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code opérateur (MCC-MNC)"
           }
         }
       }
@@ -13383,6 +13928,22 @@
         }
       }
     },
+    "Confirmer qu’une identification faite par un autre membre est juste. Plus une identification reçoit de validations, plus elle est fiable." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirming that another member’s identification is right. The more validations an identification gets, the more reliable it is."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmer qu’une identification faite par un autre membre est juste. Plus une identification reçoit de validations, plus elle est fiable."
+          }
+        }
+      }
+    },
     "Confirmer ton identité" : {
       "localizations" : {
         "en" : {
@@ -13635,38 +14196,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connexion indisponible"
-          }
-        }
-      }
-    },
-    "Connexion iPerf3 annulée" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iPerf3 connection canceled"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connexion iPerf3 annulée"
-          }
-        }
-      }
-    },
-    "Connexion iPerf3 fermée (%lld/%lld octets)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iPerf3 connection closed (%lld/%lld bytes)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connexion iPerf3 fermée (%1$lld/%2$lld octets)"
           }
         }
       }
@@ -13964,6 +14493,22 @@
         }
       }
     },
+    "Contributions et jeu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contributions and game"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contributions et jeu"
+          }
+        }
+      }
+    },
     "Conversation" : {
       "localizations" : {
         "en" : {
@@ -14158,6 +14703,38 @@
         }
       }
     },
+    "correct, parfois fragile à l’intérieur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fair, sometimes weak indoors"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "correct, parfois fragile à l’intérieur"
+          }
+        }
+      }
+    },
+    "correct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fine"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "correct"
+          }
+        }
+      }
+    },
     "Correction proposée (optionnel)" : {
       "localizations" : {
         "en" : {
@@ -14341,6 +14918,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Couper notifs"
+          }
+        }
+      }
+    },
+    "coupures fréquentes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "frequent drops"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "coupures fréquentes"
           }
         }
       }
@@ -15431,6 +16024,22 @@
         }
       }
     },
+    "Débit mesuré (Mbit/s)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured speed (Mbps)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit mesuré (Mbit/s)"
+          }
+        }
+      }
+    },
     "Débit par opérateur" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15492,23 +16101,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Débit récent · fenêtre de 1 s · pointillés : moyenne cumulée"
-          }
-        }
-      }
-    },
-    "Débit speedtest (Mbps)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speedtest throughput (Mbps)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Débit speedtest (Mbps)"
           }
         }
       }
@@ -15590,6 +16182,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Début"
+          }
+        }
+      }
+    },
+    "décalage perceptible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "noticeable lag"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "décalage perceptible"
           }
         }
       }
@@ -15789,6 +16397,22 @@
         }
       }
     },
+    "dégradée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "poor"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dégradée"
+          }
+        }
+      }
+    },
     "Dégradée" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15850,22 +16474,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déjà pris par un autre membre."
-          }
-        }
-      }
-    },
-    "Délai dépassé sur le serveur iPerf3" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Timed out on the iPerf3 server"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Délai dépassé sur le serveur iPerf3"
           }
         }
       }
@@ -16608,6 +17216,22 @@
         }
       }
     },
+    "Des défis à accomplir, comme mesurer un nouveau lieu ou valider des antennes, qui rapportent des points ; certaines durent une saison." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Challenges to complete, such as measuring a new place or validating antennas, that earn points; some last a season."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des défis à accomplir, comme mesurer un nouveau lieu ou valider des antennes, qui rapportent des points ; certaines durent une saison."
+          }
+        }
+      }
+    },
     "Des données mobiles, en quantité" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16653,6 +17277,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Des paraboles point-à-point : elles raccordent ce site au réseau, ne desservent personne, et ne comptent pas dans les secteurs. Le site visé est déduit du fait que les deux paraboles se répondent — le registre ne le publie pas, pas plus que les fréquences."
+          }
+        }
+      }
+    },
+    "Des speedtests enchaînés automatiquement pendant un trajet, espacés selon la distance, jusqu’au plafond de données que tu choisis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtests run automatically during a trip, spaced by distance, up to the data cap you choose."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des speedtests enchaînés automatiquement pendant un trajet, espacés selon la distance, jusqu’au plafond de données que tu choisis."
           }
         }
       }
@@ -17562,6 +18202,22 @@
         }
       }
     },
+    "Double authentification (2FA)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Two-factor authentication (2FA)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Double authentification (2FA)"
+          }
+        }
+      }
+    },
     "Down" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -18260,6 +18916,22 @@
         }
       }
     },
+    "En 5G NSA, la 5G s’appuie sur une connexion 4G qui reste active : le téléphone affiche 5G, mais l’ancre est en 4G. En 5G SA (autonome), tout passe par la 5G." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In 5G NSA, 5G relies on a 4G connection that stays active: the phone shows 5G, but the anchor is 4G. In 5G SA (standalone), everything goes over 5G."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En 5G NSA, la 5G s’appuie sur une connexion 4G qui reste active : le téléphone affiche 5G, mais l’ancre est en 4G. En 5G SA (autonome), tout passe par la 5G."
+          }
+        }
+      }
+    },
     "En appel" : {
       "localizations" : {
         "en" : {
@@ -18667,6 +19339,22 @@
         }
       }
     },
+    "En plus du mot de passe, un code à usage unique généré par une application d’authentification. Un mot de passe volé ne suffit plus pour entrer dans ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On top of your password, a one-time code generated by an authenticator app. A stolen password is no longer enough to get into your account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En plus du mot de passe, un code à usage unique généré par une application d’authentification. Un mot de passe volé ne suffit plus pour entrer dans ton compte."
+          }
+        }
+      }
+    },
     "en service" : {
       "localizations" : {
         "en" : {
@@ -18777,6 +19465,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "eNB croissant"
+          }
+        }
+      }
+    },
+    "eNB, gNB, opérateur…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eNB, gNB, carrier…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eNB, gNB, opérateur…"
           }
         }
       }
@@ -19246,6 +19951,38 @@
         }
       }
     },
+    "envois rapides" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fast uploads"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "envois rapides"
+          }
+        }
+      }
+    },
+    "envois très lents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "very slow uploads"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "envois très lents"
+          }
+        }
+      }
+    },
     "Envoyé" : {
       "localizations" : {
         "en" : {
@@ -19668,6 +20405,22 @@
         }
       }
     },
+    "Essaie un autre mot, par exemple « signal » ou « débit »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try another word, such as “signal” or “speed”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essaie un autre mot, par exemple « signal » ou « débit »."
+          }
+        }
+      }
+    },
     "Essaie un autre nom ou un @handle." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -19810,22 +20563,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "État inconnu"
-          }
-        }
-      }
-    },
-    "État iPerf3 inattendu (%d)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unexpected iPerf3 state (%d)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "État iPerf3 inattendu (%d)"
           }
         }
       }
@@ -20024,6 +20761,22 @@
         }
       }
     },
+    "excellent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "excellent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "excellent"
+          }
+        }
+      }
+    },
     "Excellent" : {
       "localizations" : {
         "en" : {
@@ -20036,6 +20789,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Excellent"
+          }
+        }
+      }
+    },
+    "excellent, même à l’intérieur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "excellent, even indoors"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "excellent, même à l’intérieur"
+          }
+        }
+      }
+    },
+    "Exceptionnel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exceptional"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exceptionnel"
           }
         }
       }
@@ -20102,6 +20887,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Expire %@"
+          }
+        }
+      }
+    },
+    "Expliquer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explain"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expliquer"
           }
         }
       }
@@ -20858,6 +21659,22 @@
         }
       }
     },
+    "Gigue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jitter"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gigue"
+          }
+        }
+      }
+    },
     "gNB %@" : {
       "localizations" : {
         "en" : {
@@ -21335,6 +22152,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identifiant OFCOM"
+          }
+        }
+      }
+    },
+    "Identifiants de cellule" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cell identifiers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifiants de cellule"
           }
         }
       }
@@ -22556,6 +23389,22 @@
         }
       }
     },
+    "iOS ne dit pas aux apps quel réseau sert le téléphone : SignalQuest reconnaît l’opérateur à l’adresse Internet utilisée. En itinérance ou sous VPN, cette estimation peut se tromper." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS doesn’t tell apps which network serves the phone: SignalQuest recognises the carrier from the Internet address in use. When roaming or on a VPN, this guess can be wrong."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS ne dit pas aux apps quel réseau sert le téléphone : SignalQuest reconnaît l’opérateur à l’adresse Internet utilisée. En itinérance ou sous VPN, cette estimation peut se tromper."
+          }
+        }
+      }
+    },
     "iOS ne donne accès à aucune mesure radio. On enregistre la technologie disponible le long du trajet (5G, 4G, ou aucun réseau), jamais une puissance de signal." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -22569,6 +23418,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iOS ne donne accès à aucune mesure radio. On enregistre la technologie disponible le long du trajet (5G, 4G, ou aucun réseau), jamais une puissance de signal."
+          }
+        }
+      }
+    },
+    "iOS ne donne pas ces numéros aux apps : ils viennent de l’app Android ou de la communauté." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS doesn’t give these numbers to apps: they come from the Android app or the community."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS ne donne pas ces numéros aux apps : ils viennent de l’app Android ou de la communauté."
           }
         }
       }
@@ -23111,6 +23976,22 @@
         }
       }
     },
+    "L’Agence nationale des fréquences publie la liste officielle des antennes autorisées en France, avec leurs technologies et leurs dates de mise en service." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The French national frequency agency publishes the official list of authorised antennas in France, with their technologies and switch-on dates."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’Agence nationale des fréquences publie la liste officielle des antennes autorisées en France, avec leurs technologies et leurs dates de mise en service."
+          }
+        }
+      }
+    },
     "l'antenne pique vers toi" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -23205,6 +24086,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L'écart d'altitude entre le sol sous tes pieds et le sol au pied du support. Un site perché voit par-dessus les obstacles ; un site en contrebas se fait masquer par le moindre relief."
+          }
+        }
+      }
+    },
+    "L’écart entre le signal utile et le bruit ambiant, en dB. Plus il est élevé, plus le téléphone peut monter en débit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The gap between the useful signal and background noise, in dB. The higher it is, the faster the phone can go."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’écart entre le signal utile et le bruit ambiant, en dB. Plus il est élevé, plus le téléphone peut monter en débit."
           }
         }
       }
@@ -23335,6 +24232,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’identité locale E2EE v2 est illisible. Elle n’a pas été remplacée automatiquement."
+          }
+        }
+      }
+    },
+    "L’inclinaison d’une antenne vers le bas. Elle concentre le signal sur la zone à couvrir au lieu de l’envoyer vers l’horizon." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How far an antenna is angled downwards. It focuses the signal on the area to cover instead of sending it to the horizon."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’inclinaison d’une antenne vers le bas. Elle concentre le signal sur la zone à couvrir au lieu de l’envoyer vers l’horizon."
           }
         }
       }
@@ -23486,6 +24399,22 @@
         }
       }
     },
+    "La carte découpée en zones que les mesures de la communauté font passer d’inexplorée à observée, fiable puis complète." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The map split into zones that community measurements move from unexplored to observed, reliable, then complete."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La carte découpée en zones que les mesures de la communauté font passer d’inexplorée à observée, fiable puis complète."
+          }
+        }
+      }
+    },
     "La clé approuvera cet appareil puis restaurera les clés d’historique disponibles." : {
       "localizations" : {
         "en" : {
@@ -23514,6 +24443,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La clé de récupération est créée sur cet appareil et n’est jamais conservée en clair par SignalQuest."
+          }
+        }
+      }
+    },
+    "La clé privée qui ouvre tes conversations chiffrées. Elle est protégée par un mot de passe distinct de celui de ton compte : s’il est perdu, les anciens messages chiffrés ne peuvent plus être lus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The private key that opens your encrypted conversations. It’s protected by a password separate from your account password: if it’s lost, old encrypted messages can no longer be read."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La clé privée qui ouvre tes conversations chiffrées. Elle est protégée par un mot de passe distinct de celui de ton compte : s’il est perdu, les anciens messages chiffrés ne peuvent plus être lus."
           }
         }
       }
@@ -23749,6 +24694,22 @@
         }
       }
     },
+    "La direction vers laquelle pointe un secteur, en degrés depuis le nord : 0° au nord, 90° à l’est, 180° au sud, 270° à l’ouest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The direction a sector points to, in degrees from north: 0° north, 90° east, 180° south, 270° west."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La direction vers laquelle pointe un secteur, en degrés depuis le nord : 0° au nord, 90° à l’est, 180° au sud, 270° à l’ouest."
+          }
+        }
+      }
+    },
     "La distance à vol d'oiseau entre le point de départ et le pied du support, mesurée sur l'ellipsoïde terrestre. Ce n'est pas la longueur du trajet radio, qui monte jusqu'aux antennes." : {
       "localizations" : {
         "en" : {
@@ -23912,6 +24873,22 @@
         }
       }
     },
+    "La force du signal 4G ou 5G reçu de l’antenne, en dBm. Plus le chiffre est proche de zéro, plus le signal est fort : −80 dBm vaut mieux que −110 dBm." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The strength of the 4G or 5G signal received from the antenna, in dBm. The closer to zero, the stronger: −80 dBm beats −110 dBm."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La force du signal 4G ou 5G reçu de l’antenne, en dBm. Plus le chiffre est proche de zéro, plus le signal est fort : −80 dBm vaut mieux que −110 dBm."
+          }
+        }
+      }
+    },
     "La génération, pas le signal" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -24009,6 +24986,22 @@
         }
       }
     },
+    "La mesure s’est interrompue en cours de route. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The measurement stopped partway. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mesure s’est interrompue en cours de route. Réessaie dans un instant."
+          }
+        }
+      }
+    },
     "La panne est terminée" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -24022,6 +25015,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La panne est terminée"
+          }
+        }
+      }
+    },
+    "La plage de fréquences utilisée par une cellule, notée B en 4G et n en 5G. Les basses fréquences portent loin et traversent les murs ; les hautes offrent plus de débit sur une zone plus petite." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The frequency range a cell uses, written B in 4G and n in 5G. Low frequencies reach far and go through walls; high ones give more speed over a smaller area."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La plage de fréquences utilisée par une cellule, notée B en 4G et n en 5G. Les basses fréquences portent loin et traversent les murs ; les hautes offrent plus de débit sur une zone plus petite."
+          }
+        }
+      }
+    },
+    "La part des données qui n’arrivent jamais et doivent être renvoyées. Au-delà de 1 pour cent, les appels coupent et les pages se bloquent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The share of data that never arrives and has to be resent. Above 1 percent, calls drop and pages stall."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La part des données qui n’arrivent jamais et doivent être renvoyées. Au-delà de 1 pour cent, les appels coupent et les pages se bloquent."
+          }
+        }
+      }
+    },
+    "La partie d’un site qui arrose une direction. Un pylône porte souvent trois secteurs, un tous les 120°." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The part of a site that covers one direction. A mast often carries three sectors, one every 120°."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La partie d’un site qui arrose une direction. Un pylône porte souvent trois secteurs, un tous les 120°."
           }
         }
       }
@@ -24070,6 +25111,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La position exacte de chaque speedtest"
+          }
+        }
+      }
+    },
+    "La propreté du signal reçu, en dB : elle baisse quand la cellule est chargée ou brouillée par ses voisines. Proche de zéro, c’est bon." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How clean the received signal is, in dB: it drops when the cell is busy or disturbed by its neighbours. Close to zero is good."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La propreté du signal reçu, en dB : elle baisse quand la cellule est chargée ou brouillée par ses voisines. Proche de zéro, c’est bon."
           }
         }
       }
@@ -24235,6 +25292,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La validation serveur App Store n'est pas encore disponible."
+          }
+        }
+      }
+    },
+    "La variation de la latence d’un paquet à l’autre. Une gigue élevée hache la voix et la vidéo en direct." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How much latency varies from one packet to the next. High jitter makes live voice and video choppy."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La variation de la latence d’un paquet à l’autre. Une gigue élevée hache la voix et la vidéo en direct."
           }
         }
       }
@@ -24600,6 +25673,22 @@
         }
       }
     },
+    "Latence (ping)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latency (ping)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latence (ping)"
+          }
+        }
+      }
+    },
     "Latence comparée sur %@ : " : {
       "localizations" : {
         "en" : {
@@ -24649,6 +25738,22 @@
         }
       }
     },
+    "le bruit domine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "noise dominates"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le bruit domine"
+          }
+        }
+      }
+    },
     "Le chiffrement E2EE v2 est activé pour ce compte." : {
       "localizations" : {
         "en" : {
@@ -24661,6 +25766,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le chiffrement E2EE v2 est activé pour ce compte."
+          }
+        }
+      }
+    },
+    "Le chiffrement n’a pas abouti. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encryption didn’t go through. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement n’a pas abouti. Réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "Le code d’un réseau mobile : le pays (MCC, 208 pour la France) suivi de l’opérateur (MNC)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A mobile network’s code: the country (MCC, 208 for France) followed by the carrier (MNC)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le code d’un réseau mobile : le pays (MCC, 208 pour la France) suivi de l’opérateur (MNC)."
           }
         }
       }
@@ -24780,6 +25917,22 @@
         }
       }
     },
+    "Le débit descendant : la vitesse à laquelle ton téléphone reçoit des données (vidéos, pages web, mises à jour)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download speed: how fast your phone receives data (videos, web pages, updates)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le débit descendant : la vitesse à laquelle ton téléphone reçoit des données (vidéos, pages web, mises à jour)."
+          }
+        }
+      }
+    },
     "le débit médian" : {
       "localizations" : {
         "en" : {
@@ -24792,6 +25945,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "le débit médian"
+          }
+        }
+      }
+    },
+    "Le débit montant : la vitesse à laquelle ton téléphone envoie des données (photos, appels vidéo, sauvegardes)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upload speed: how fast your phone sends data (photos, video calls, backups)."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le débit montant : la vitesse à laquelle ton téléphone envoie des données (photos, appels vidéo, sauvegardes)."
           }
         }
       }
@@ -25251,6 +26420,22 @@
         }
       }
     },
+    "Le résumé des mesures récentes de la communauté autour de toi : débit médian, signal moyen et meilleur opérateur de la zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A summary of recent community measurements around you: median speed, average signal and best carrier in the area."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le résumé des mesures récentes de la communauté autour de toi : débit médian, signal moyen et meilleur opérateur de la zone."
+          }
+        }
+      }
+    },
     "Le secret sera disponible ici pour ton application d’authentification." : {
       "localizations" : {
         "en" : {
@@ -25299,6 +26484,22 @@
         }
       }
     },
+    "Le serveur avec lequel le speedtest échange des données. Un serveur proche et bien raccordé mesure ton réseau mobile, pas le chemin vers un serveur lointain." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server the speedtest exchanges data with. A nearby, well-connected server measures your mobile network, not the path to a distant server."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur avec lequel le speedtest échange des données. Un serveur proche et bien raccordé mesure ton réseau mobile, pas le chemin vers un serveur lointain."
+          }
+        }
+      }
+    },
     "Le serveur de droits est indisponible. Les nouveaux achats sont bloqués par sécurité." : {
       "localizations" : {
         "en" : {
@@ -25311,6 +26512,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le serveur de droits est indisponible. Les nouveaux achats sont bloqués par sécurité."
+          }
+        }
+      }
+    },
+    "Le serveur de mesure ne répond pas. Réessaie, ou choisis un autre serveur." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The test server isn’t responding. Try again, or pick another server."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur de mesure ne répond pas. Réessaie, ou choisis un autre serveur."
+          }
+        }
+      }
+    },
+    "Le serveur met trop de temps à répondre. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server is taking too long to respond. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le serveur met trop de temps à répondre. Réessaie."
           }
         }
       }
@@ -25477,6 +26710,22 @@
         }
       }
     },
+    "Le temps d’un aller-retour entre ton téléphone et le serveur, en millisecondes. Elle compte pour les appels, la visio et les jeux." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The time for a round trip between your phone and the server, in milliseconds. It matters for calls, video chats and games."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le temps d’un aller-retour entre ton téléphone et le serveur, en millisecondes. Elle compte pour les appels, la visio et les jeux."
+          }
+        }
+      }
+    },
     "Le verrouillage n’a pas été activé. Réessaie avec la biométrie ou le code de l’appareil." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -25623,6 +26872,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Légende qualité du signal"
+          }
+        }
+      }
+    },
+    "Lent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slow"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lent"
           }
         }
       }
@@ -26095,6 +27360,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les nouveaux speedtests sont protégés lorsqu’une zone est active et que son masquage est activé. Touche un lieu pour modifier son nom, sa position ou son rayon."
+          }
+        }
+      }
+    },
+    "Les numéros qui désignent une antenne : l’eNB (4G) ou le gNB (5G) repère le site, le CI une cellule précise, le PCI la distingue de ses voisines, le TAC indique sa zone de rattachement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The numbers that designate an antenna: the eNB (4G) or gNB (5G) identifies the site, the CI one specific cell, the PCI tells it apart from its neighbours, and the TAC gives its tracking area."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les numéros qui désignent une antenne : l’eNB (4G) ou le gNB (5G) repère le site, le CI une cellule précise, le PCI la distingue de ses voisines, le TAC indique sa zone de rattachement."
           }
         }
       }
@@ -28073,6 +29354,22 @@
         }
       }
     },
+    "Mesure annulée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measurement cancelled."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesure annulée."
+          }
+        }
+      }
+    },
     "Mesure communautaire : %lld mégabits. %@. Ouvre la carte." : {
       "localizations" : {
         "en" : {
@@ -28855,6 +30152,86 @@
         }
       }
     },
+    "moins de 3 Mbit/s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "under 3 Mbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moins de 3 Mbit/s"
+          }
+        }
+      }
+    },
+    "moins de 1 Mbit/s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "under 1 Mbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moins de 1 Mbit/s"
+          }
+        }
+      }
+    },
+    "moins de 30 ms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "under 30 ms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moins de 30 ms"
+          }
+        }
+      }
+    },
+    "moins de 10 ms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "under 10 ms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moins de 10 ms"
+          }
+        }
+      }
+    },
+    "moins de 1 pour cent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "under 1 percent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moins de 1 pour cent"
+          }
+        }
+      }
+    },
     "Mois" : {
       "localizations" : {
         "en" : {
@@ -29111,6 +30488,22 @@
         }
       }
     },
+    "moyen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fair"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moyen"
+          }
+        }
+      }
+    },
     "Moyen" : {
       "localizations" : {
         "en" : {
@@ -29182,6 +30575,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "N"
+          }
+        }
+      }
+    },
+    "navigation lente" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "slow browsing"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "navigation lente"
           }
         }
       }
@@ -30417,6 +31826,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Opérateur détecté"
+          }
+        }
+      }
+    },
+    "Opérateur deviné par l’adresse IP" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carrier guessed from the IP address"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opérateur deviné par l’adresse IP"
           }
         }
       }
@@ -31859,6 +33284,22 @@
         }
       }
     },
+    "Par exemple" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For example"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par exemple"
+          }
+        }
+      }
+    },
     "Par fournisseur" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -31904,6 +33345,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "parabole %@ m"
+          }
+        }
+      }
+    },
+    "parfait" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "perfect"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "parfait"
           }
         }
       }
@@ -32361,6 +33818,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas assez de mesures dans cette zone."
+          }
+        }
+      }
+    },
+    "Pas de connexion Internet. Vérifie ton réseau puis réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Internet connection. Check your network and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de connexion Internet. Vérifie ton réseau puis réessaie."
           }
         }
       }
@@ -32836,6 +34309,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Personne. Le partage est désactivé."
+          }
+        }
+      }
+    },
+    "Perte de paquets" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Packet loss"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perte de paquets"
           }
         }
       }
@@ -33629,6 +35118,54 @@
         }
       }
     },
+    "plus de 100 ms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "over 100 ms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "plus de 100 ms"
+          }
+        }
+      }
+    },
+    "plus de 30 ms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "over 30 ms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "plus de 30 ms"
+          }
+        }
+      }
+    },
+    "plus de 2 pour cent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "over 2 percent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "plus de 2 pour cent"
+          }
+        }
+      }
+    },
     "Plus de réseau" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -33691,6 +35228,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plusieurs"
+          }
+        }
+      }
+    },
+    "Plusieurs opérateurs partagent le même support, voire les mêmes antennes. Sur un site partagé, l’opérateur qui l’exploite peut différer du tien." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Several carriers share the same structure, sometimes the same antennas. On a shared site, the carrier running it may not be yours."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plusieurs opérateurs partagent le même support, voire les mêmes antennes. Sur un site partagé, l’opérateur qui l’exploite peut différer du tien."
           }
         }
       }
@@ -34218,6 +35771,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Post"
+          }
+        }
+      }
+    },
+    "Pouls réseau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network pulse"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pouls réseau"
           }
         }
       }
@@ -35381,6 +36950,22 @@
         }
       }
     },
+    "Puissance du signal (RSRP)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal strength (RSRP)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puissance du signal (RSRP)"
+          }
+        }
+      }
+    },
     "Pylône" : {
       "localizations" : {
         "en" : {
@@ -35489,6 +37074,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "QR temporaire d’approbation SignalQuest"
+          }
+        }
+      }
+    },
+    "Qualité du signal (RSRQ)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal quality (RSRQ)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualité du signal (RSRQ)"
+          }
+        }
+      }
+    },
+    "Qu’est-ce que « %@ » ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What is “%@”?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qu’est-ce que « %@ » ?"
           }
         }
       }
@@ -36046,6 +37663,22 @@
         }
       }
     },
+    "Rapport signal sur bruit (SNR)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal-to-noise ratio (SNR)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapport signal sur bruit (SNR)"
+          }
+        }
+      }
+    },
     "Rayon" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -36125,6 +37758,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ré-identifier ici"
+          }
+        }
+      }
+    },
+    "réactif" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "responsive"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "réactif"
           }
         }
       }
@@ -36456,7 +38105,7 @@
       }
     },
     "Rechercher dans la conversation" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -36488,8 +38137,24 @@
         }
       }
     },
+    "Rechercher un terme" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search for a term"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher un terme"
+          }
+        }
+      }
+    },
     "Rechercher un utilisateur" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -37412,6 +39077,22 @@
         }
       }
     },
+    "Relier une cellule captée par un téléphone à l’antenne réelle sur la carte. Elle devient publique et rapporte des points." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linking a cell picked up by a phone to the real antenna on the map. It becomes public and earns points."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relier une cellule captée par un téléphone à l’antenne réelle sur la carte. Elle devient publique et rapporte des points."
+          }
+        }
+      }
+    },
     "Renforce le contraste, la graisse des textes et la taille des contrôles pour une lecture plus fiable en extérieur." : {
       "localizations" : {
         "en" : {
@@ -37771,22 +39452,6 @@
         }
       }
     },
-    "Réponse iPerf3 JSON invalide" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Invalid iPerf3 JSON response"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réponse iPerf3 JSON invalide"
-          }
-        }
-      }
-    },
     "Réponse privée sans chiffrement de bout en bout" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -38140,6 +39805,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réseau dégradé"
+          }
+        }
+      }
+    },
+    "Réseau et radio" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network and radio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau et radio"
           }
         }
       }
@@ -39951,6 +41632,22 @@
         }
       }
     },
+    "Sécurité et Sentinelle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Security and Sentinel"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sécurité et Sentinelle"
+          }
+        }
+      }
+    },
     "Segment" : {
       "localizations" : {
         "en" : {
@@ -40240,22 +41937,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Serveur et durée"
-          }
-        }
-      }
-    },
-    "Serveur iPerf3 occupé (ACCESS_DENIED)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iPerf3 server busy (ACCESS_DENIED)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Serveur iPerf3 occupé (ACCESS_DENIED)"
           }
         }
       }
@@ -40729,6 +42410,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Si l’adresse existe, un lien de réinitialisation t’a été envoyé."
+          }
+        }
+      }
+    },
+    "Si l’opérateur affiché pour un site partagé te semble faux, tu peux le signaler depuis sa fiche." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If the carrier shown for a shared site looks wrong, you can report it from its page."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si l’opérateur affiché pour un site partagé te semble faux, tu peux le signaler depuis sa fiche."
           }
         }
       }
@@ -41924,6 +43621,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Source inconnue"
+          }
+        }
+      }
+    },
+    "sous −110 dBm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "below −110 dBm"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sous −110 dBm"
+          }
+        }
+      }
+    },
+    "sous −15 dB" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "below −15 dB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sous −15 dB"
+          }
+        }
+      }
+    },
+    "sous 0 dB" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "below 0 dB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sous 0 dB"
           }
         }
       }
@@ -43357,6 +45102,22 @@
         }
       }
     },
+    "Surveille en continu une connexion, comme ta box, depuis nos serveurs : chaque minute, même téléphone éteint. Coupures, latence et incidents te sont signalés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keeps watching a connection, such as your home router, from our servers: every minute, even with your phone off. Outages, latency and incidents are reported to you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surveille en continu une connexion, comme ta box, depuis nos serveurs : chaque minute, même téléphone éteint. Coupures, latence et incidents te sont signalés."
+          }
+        }
+      }
+    },
     "Suspendre" : {
       "localizations" : {
         "en" : {
@@ -43964,6 +45725,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tes contributions, et celles des autres, dessinent une carte vivante de la 4G/5G partout en France."
+          }
+        }
+      }
+    },
+    "Tes messages sont chiffrés sur ton téléphone et déchiffrés sur celui de tes correspondants : nos serveurs ne stockent que du texte illisible. Deux limites pour l’instant : seul le texte est chiffré, et la clé de chaque conversation est créée par nos serveurs à son ouverture, puis remise chiffrée à chaque membre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your messages are encrypted on your phone and decrypted on your contacts’ phones: our servers only store unreadable text. Two limits for now: only text is encrypted, and each conversation’s key is created by our servers when it starts, then handed to each member in encrypted form."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes messages sont chiffrés sur ton téléphone et déchiffrés sur celui de tes correspondants : nos serveurs ne stockent que du texte illisible. Deux limites pour l’instant : seul le texte est chiffré, et la clé de chaque conversation est créée par nos serveurs à son ouverture, puis remise chiffrée à chaque membre."
           }
         }
       }
@@ -44865,6 +46642,22 @@
         }
       }
     },
+    "Tous les 500 m sur l’autoroute : la carte montre où ton opérateur tient la route." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every 500 m on the motorway: the map shows where your carrier holds up."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous les 500 m sur l’autoroute : la carte montre où ton opérateur tient la route."
+          }
+        }
+      }
+    },
     "Tous les appareils actuels seront révoqués. L’historique non récupéré sera définitivement perdu." : {
       "localizations" : {
         "en" : {
@@ -44925,6 +46718,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tout effacer"
+          }
+        }
+      }
+    },
+    "tout est fluide, même la 4K" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "everything is smooth, even 4K"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tout est fluide, même la 4K"
           }
         }
       }
@@ -45221,6 +47030,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Très faible"
+          }
+        }
+      }
+    },
+    "très faible, coupures probables" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "very weak, drops likely"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "très faible, coupures probables"
           }
         }
       }
@@ -45832,6 +47657,22 @@
         }
       }
     },
+    "Un endroit sans couverture mobile correcte. Les sites du programme « zones blanches » y sont construits par un opérateur, qui les partage avec les autres." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A place without proper mobile coverage. Sites from the white-zone programme are built there by one carrier, which shares them with the others."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un endroit sans couverture mobile correcte. Les sites du programme « zones blanches » y sont construits par un opérateur, qui les partage avec les autres."
+          }
+        }
+      }
+    },
     "Un même pylône porte souvent plusieurs opérateurs. Coche celles qui sont sur le même support pour n'en faire qu'un site." : {
       "localizations" : {
         "en" : {
@@ -45896,6 +47737,22 @@
         }
       }
     },
+    "Un relevé continu du signal radio pendant un déplacement, enregistré avec l’app Android : iOS ne donne pas accès au signal radio." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A continuous record of the radio signal during a trip, made with the Android app: iOS doesn’t give access to the radio signal."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un relevé continu du signal radio pendant un déplacement, enregistré avec l’app Android : iOS ne donne pas accès au signal radio."
+          }
+        }
+      }
+    },
     "Un réseau « au top » doit à la fois **bien capter** et **être rapide**. On retient donc le **moins bon** des deux critères." : {
       "localizations" : {
         "en" : {
@@ -45924,6 +47781,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un seul test, ou plusieurs tests à la suite. Choisis Trajet pour les espacer selon la distance."
+          }
+        }
+      }
+    },
+    "Un signal fort mais un RSRQ bas, c’est souvent une antenne saturée à l’heure de pointe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A strong signal with a low RSRQ often means a congested antenna at rush hour."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un signal fort mais un RSRQ bas, c’est souvent une antenne saturée à l’heure de pointe."
           }
         }
       }
@@ -45973,6 +47846,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un VPN empêche une attribution fiable de l’opérateur. Les mesures sous VPN ne sont pas publiées."
+          }
+        }
+      }
+    },
+    "Une adresse web, par exemple un salon Discord, où Sentinelle envoie ses alertes automatiquement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A web address, such as a Discord channel, where Sentinel sends its alerts automatically."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une adresse web, par exemple un salon Discord, où Sentinelle envoie ses alertes automatiquement."
           }
         }
       }
@@ -46076,6 +47965,22 @@
         }
       }
     },
+    "Une erreur inattendue est survenue. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something unexpected went wrong. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une erreur inattendue est survenue. Réessaie."
+          }
+        }
+      }
+    },
     "Une légende ?" : {
       "localizations" : {
         "en" : {
@@ -46104,6 +48009,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Une limite de données a été atteinte. Zoome pour explorer plus précisément cette zone."
+          }
+        }
+      }
+    },
+    "Une mesure 5G NSA contient souvent deux cellules : l’ancre 4G et la cellule 5G." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A 5G NSA measurement often holds two cells: the 4G anchor and the 5G cell."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une mesure 5G NSA contient souvent deux cellules : l’ancre 4G et la cellule 5G."
           }
         }
       }
@@ -47068,6 +48989,22 @@
         }
       }
     },
+    "vidéo HD correcte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HD video is fine"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vidéo HD correcte"
+          }
+        }
+      }
+    },
     "Ville" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -47246,6 +49183,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Voir 1 réponse"
+          }
+        }
+      }
+    },
+    "Voir aussi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See also"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir aussi"
           }
         }
       }

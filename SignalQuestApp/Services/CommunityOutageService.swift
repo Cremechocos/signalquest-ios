@@ -206,7 +206,7 @@ enum OutageWriteError {
     static func message(for error: Error) -> String {
         guard let api = error as? APIError,
               case .http(let status, let code, _, _, _) = api
-        else { return error.localizedDescription }
+        else { return error.userFacingMessage }
         return phrase(forCode: code) ?? APIError.statusFallback(status)
     }
 

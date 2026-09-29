@@ -78,6 +78,52 @@ enum SQUnits {
         case .imperial: return "\(Int((meters / metersPerFoot).rounded())) ft"
         }
     }
+
+    // MARK: Débit, latence, bande
+
+    /// « 412 Mbit/s », « 64,3 Mbit/s », « 1,2 Gbit/s » ; « Mbps » en anglais.
+    ///
+    /// Trente écrans formataient le débit à la main avec `String(format:)`, donc
+    /// avec un point décimal en français (« 64.0 »), et « Mbps » partout (TRX-24,
+    /// MES-25).
+    static func throughput(mbps: Double, locale: Locale = .current) -> String {
+        guard mbps.isFinite, mbps >= 0 else { return "—" }
+        return "\(throughputValue(mbps: mbps, locale: locale)) \(throughputUnit(mbps: mbps))"
+    }
+
+    /// Le nombre seul, pour un grand chiffre dont l'unité est posée à part. Une
+    /// décimale sous 100 Mbit/s et en Gbit/s, aucune entre les deux.
+    static func throughputValue(mbps: Double, locale: Locale = .current) -> String {
+        guard mbps.isFinite, mbps >= 0 else { return "—" }
+        if mbps >= 1_000 {
+            return (mbps / 1_000).formatted(.number.precision(.fractionLength(1)).locale(locale))
+        }
+        return mbps.formatted(.number.precision(.fractionLength(mbps < 100 ? 1 : 0)).locale(locale))
+    }
+
+    static func throughputUnit(mbps: Double) -> String {
+        mbps >= 1_000 ? String(localized: "Gbit/s") : String(localized: "Mbit/s")
+    }
+
+    /// Latence ou gigue : « 18 ms ».
+    static func milliseconds(_ value: Double) -> String {
+        guard value.isFinite, value >= 0 else { return "—" }
+        return "\(Int(value.rounded())) ms"
+    }
+
+    /// Bande radio : « n78 » en 5G, « B20 » en 4G (TRX-27). Sans technologie
+    /// explicite, les numéros qui n'existent qu'en 5G restent en « n ». La 5G NSA
+    /// seule ne tranche pas : sa bande principale est souvent celle de l'ancre 4G.
+    static func band(_ number: Int, technology: String? = nil) -> String {
+        let tech = (technology ?? "").uppercased()
+        let explicitNR = tech.contains("NR") || (tech.contains("5G") && !tech.contains("NSA"))
+        return band(number, isNR: explicitNR)
+    }
+
+    static func band(_ number: Int, isNR: Bool) -> String {
+        let nrOnly = [77, 78, 79].contains(number) || number >= 257
+        return isNR || nrOnly ? "n\(number)" : "B\(number)"
+    }
 }
 
 /// Miroir observable de la préférence, pour que les vues se rafraîchissent quand

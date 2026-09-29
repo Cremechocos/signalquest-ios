@@ -22,7 +22,7 @@ final class ANFRSiteDetailViewModel: ObservableObject {
         do {
             history = try await service.siteHistory(supId: supId)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 }
@@ -139,8 +139,7 @@ struct ANFRSiteDetailSheet: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     // MARK: Timeline
@@ -186,8 +185,7 @@ struct ANFRSiteDetailSheet: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     // MARK: Helpers

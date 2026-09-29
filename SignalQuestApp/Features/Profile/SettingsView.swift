@@ -1393,7 +1393,7 @@ final class SettingsViewModel: ObservableObject {
         } catch {
             if let pendingURL { try? FileManager.default.removeItem(at: pendingURL) }
             if error.isCancellation || !expectedSession.isCurrent { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -1430,7 +1430,7 @@ final class SettingsViewModel: ObservableObject {
             deletionPreview = try await userService.accountDeletionPreview()
         } catch {
             if error.isCancellation { return }
-            deletionError = error.localizedDescription
+            deletionError = error.userFacingMessage
         }
     }
 
@@ -1999,7 +1999,7 @@ struct SettingsView: View {
                     await session.refreshUser()
                     Haptics.success()
                 } catch {
-                    appleError = error.localizedDescription
+                    appleError = error.userFacingMessage
                     Haptics.error()
                 }
             }
@@ -2017,7 +2017,7 @@ struct SettingsView: View {
                 await session.refreshUser()
                 Haptics.success()
             } catch {
-                appleError = error.localizedDescription
+                appleError = error.userFacingMessage
                 Haptics.error()
             }
         }
@@ -2093,7 +2093,7 @@ struct ChangePasswordView: View {
             try await services.auth.changePassword(currentPassword: current, newPassword: newValue)
             success = true
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.userFacingMessage
         }
     }
 }

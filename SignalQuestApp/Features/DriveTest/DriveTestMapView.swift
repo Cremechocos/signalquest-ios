@@ -204,8 +204,9 @@ struct DriveTestMapView: UIViewRepresentable {
             speedtestAnnotations = points.map { DriveSpeedtestAnnotation(point: $0, coordinate: $0.coordinate, color: Self.speedColor($0.result.downloadAverageMbps)) }
             if !speedtestAnnotations.isEmpty { map.addAnnotations(speedtestAnnotations) }
         }
+        /// Même échelle que la carte principale et la légende (`SQQualityScale`).
         private static func speedColor(_ mbps: Double) -> UIColor {
-            SQSignalScale.Throughput.from(mbps).uiColor
+            SQNetworkColors.speedUIColor(mbps)
         }
 
         // MARK: Délégué

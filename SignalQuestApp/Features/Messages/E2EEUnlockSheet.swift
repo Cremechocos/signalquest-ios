@@ -190,7 +190,7 @@ struct E2EEUnlockSheet: View {
             onUnlock()
             dismiss()
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.userFacingMessage
             Haptics.error()
         }
     }

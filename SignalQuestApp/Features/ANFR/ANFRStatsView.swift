@@ -351,8 +351,7 @@ struct ANFRStatsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
         .overlay(alignment: .topTrailing) {
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 20, weight: .semibold))
@@ -414,8 +413,7 @@ struct ANFRStatsView: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private func operatorBar(_ row: (operator: ANFROperator, value: Int, delta: Int), fraction: Double) -> some View {
@@ -473,8 +471,7 @@ struct ANFRStatsView: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private var operatorPicker: some View {
@@ -566,8 +563,7 @@ struct ANFRStatsView: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     // MARK: Régions (top)
@@ -610,8 +606,7 @@ struct ANFRStatsView: View {
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowCard()
+        .sqCardBackground()
     }
 
     private var topRegions: [ANFRTerritoryMetric] {

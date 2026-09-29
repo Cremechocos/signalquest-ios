@@ -109,7 +109,7 @@ struct ScheduledMessagesView: View {
             errorMessage = nil
             await decryptAll()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
         }
     }
 
@@ -149,7 +149,7 @@ struct ScheduledMessagesView: View {
                 items.removeAll { $0.id == target.id }
                 Haptics.success()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.userFacingMessage
                 Haptics.error()
             }
         }

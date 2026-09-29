@@ -108,8 +108,7 @@ struct MessageSearchView: View {
                 }
             }
             .padding(SQSpace.md + 2)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground()
         }
         .buttonStyle(.plain)
     }

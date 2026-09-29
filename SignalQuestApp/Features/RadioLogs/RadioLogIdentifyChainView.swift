@@ -115,7 +115,7 @@ struct RadioLogIdentifyChainView: View {
                             ForEach(pciLabels.prefix(5), id: \.self) { label in
                                 RadioLogPill(label: label)
                             }
-                            if let bandLabel = site.band.map({ "B\($0)" }) {
+                            if let bandLabel = site.band.map({ SQUnits.band($0, technology: site.techLabel) }) {
                                 RadioLogPill(label: bandLabel)
                             }
                         }

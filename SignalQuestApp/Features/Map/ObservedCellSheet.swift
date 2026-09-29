@@ -34,7 +34,7 @@ struct ObservedCellSheet: View {
             ("TAC", cell.tac),
             ("EARFCN", cell.earfcn.map(String.init)),
             ("NR-ARFCN", cell.nrarfcn.map(String.init)),
-            ("Bande", cell.band.map { "B\($0)" })
+            ("Bande", cell.band.map { SQUnits.band($0, isNR: cell.nrarfcn != nil) })
         ]
     }
 
@@ -179,8 +179,7 @@ struct ObservedCellSheet: View {
                 }
             }
             .padding(.vertical, SQSpace.xs)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-            .sqShadowCard()
+            .sqCardBackground()
         }
     }
 
@@ -222,8 +221,7 @@ struct ObservedCellSheet: View {
                 .foregroundStyle(SQColor.label)
             VStack(alignment: .leading, spacing: 0) { content() }
                 .padding(.vertical, SQSpace.xs)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                .sqShadowCard()
+                .sqCardBackground()
         }
     }
 

@@ -76,7 +76,7 @@ final class PrivacySettingsViewModel: ObservableObject {
             apply(value); privacyBaseline = value; loaded = true
         } catch {
             guard checkSession(), privacyLoadID == ticket, !error.isCancellation else { return }
-            privacyError = error.localizedDescription
+            privacyError = error.userFacingMessage
         }
     }
 
@@ -92,7 +92,7 @@ final class PrivacySettingsViewModel: ObservableObject {
             unitsStore?.apply(value.unitsSystem)
         } catch {
             guard checkSession(), preferencesLoadID == ticket, !error.isCancellation else { return }
-            preferencesError = error.localizedDescription
+            preferencesError = error.userFacingMessage
         }
     }
 
@@ -107,7 +107,7 @@ final class PrivacySettingsViewModel: ObservableObject {
             zones = value; zonesLoaded = true
         } catch {
             guard checkSession(), zonesLoadID == ticket, !error.isCancellation else { return }
-            zonesError = error.localizedDescription
+            zonesError = error.userFacingMessage
         }
     }
 
@@ -139,7 +139,7 @@ final class PrivacySettingsViewModel: ObservableObject {
             Haptics.success()
         } catch {
             guard checkSession(), !error.isCancellation else { return }
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -207,13 +207,13 @@ final class PrivacySettingsViewModel: ObservableObject {
 
     private func handleMutationError(_ error: Error) {
         guard checkSession(), !error.isCancellation else { return }
-        errorMessage = error.localizedDescription
+        errorMessage = error.userFacingMessage
         Haptics.error()
     }
 
     private func handleZoneMutationError(_ error: Error) {
         guard checkSession(), !error.isCancellation else { return }
-        zoneMutationError = error.localizedDescription
+        zoneMutationError = error.userFacingMessage
         Haptics.error()
     }
 

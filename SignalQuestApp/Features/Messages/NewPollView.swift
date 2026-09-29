@@ -102,8 +102,7 @@ struct NewPollView: View {
                         .font(SQType.body)
                         .foregroundStyle(SQColor.label)
                         .padding(SQSpace.md + 2)
-                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                        .sqShadowCard()
+                        .sqCardBackground()
                     }
 
                     if let errorMessage {
@@ -160,7 +159,7 @@ struct NewPollView: View {
             }
             dismiss()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

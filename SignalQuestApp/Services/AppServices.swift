@@ -490,7 +490,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             errorMessage = nil
             syncRuntime()
         } catch {
-            errorMessage = String(localized: "Partage en direct indisponible : \(error.localizedDescription)")
+            errorMessage = String(localized: "Partage en direct indisponible : \(error.userFacingMessage)")
         }
     }
 
@@ -504,7 +504,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             errorMessage = nil
             syncRuntime()
         } catch {
-            errorMessage = String(localized: "Partage en direct indisponible : \(error.localizedDescription)")
+            errorMessage = String(localized: "Partage en direct indisponible : \(error.userFacingMessage)")
         }
     }
 
@@ -541,7 +541,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             errorMessage = nil
             syncRuntime()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -575,7 +575,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             Haptics.success()
             syncRuntime()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -632,7 +632,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             Haptics.success()
             syncRuntime()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -866,7 +866,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
                 sawSuccess = true
                 lastSentLocation = admissibleLocation
             } catch {
-                errorMessage = String(localized: "Partage en direct interrompu : \(error.localizedDescription)")
+                errorMessage = String(localized: "Partage en direct interrompu : \(error.userFacingMessage)")
                 if case APIError.http(let status, _, _, _, _) = error,
                    status == 400 || status == 403 || status == 404 {
                     terminalPublishFailures.insert(session.id)
