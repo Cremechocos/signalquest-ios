@@ -39,7 +39,7 @@ struct SpeedtestView: View {
     /// Plafond de données d'une session Drive Test, en Mo (0 = illimité).
     /// Un test vaut débit × durée : à 300 Mb/s sur 10 s, c'est ~375 Mo. Sans
     /// plafond une session pouvait engloutir des dizaines de gigaoctets.
-    @AppStorage("speedtest_drive_data_cap_mb") private var driveDataCapMB = 5_120
+    @AppStorage("speedtest_drive_data_cap_mb") private var driveDataCapMB = 5_000
     @State private var phase: SpeedtestPhase = .idle
     @State private var result: SpeedtestRunResult?
     @State private var liveProgress = SpeedtestLiveProgress(phase: .idle)
@@ -200,11 +200,12 @@ struct SpeedtestView: View {
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.huge + SQSpace.huge)
+            .sqReadableWidth()
         }
         // Directement sur le ScrollView (avant tout wrap) : rétraction du dock.
         .sqDockAutoMinimize()
         // En mode invité, la barre de navigation du conteneur (« Fermer »,
-        // « Mes reçus ») doit rester visible ; sinon l'en-tête custom suffit.
+        // « Mes tests partagés ») doit rester visible ; sinon l'en-tête custom suffit.
         .toolbar(guestMode ? .automatic : .hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showDriveTest) {
             DriveTestView(services: services)
@@ -244,6 +245,7 @@ struct SpeedtestView: View {
         .sqAnimation(.snappy(duration: 0.32), value: phase)
         .sqAnimation(.snappy(duration: 0.28), value: result)
         .task {
+            DriveTestViewModel.migrateLegacyDataCap()
             if await presentSpeedtestSharePreviewQAIfNeeded() { return }
             // Relecture fraîche de CoreTelephony (opérateur/techno) à l'ouverture
             // de la page, plutôt que le dernier statut publié au démarrage.
@@ -568,7 +570,7 @@ struct SpeedtestView: View {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 chipRow(
                     title: "Plafond de données",
-                    options: [(500, String(localized: "500 Mo")), (2_000, String(localized: "2 Go")), (5_120, String(localized: "5,12 Go")), (0, String(localized: "Sans limite"))],
+                    options: [(500, String(localized: "500 Mo")), (2_000, String(localized: "2 Go")), (5_000, String(localized: "5 Go")), (0, String(localized: "Sans limite"))],
                     accessibilityContext: String(localized: "Plafond de données"),
                     selection: $driveDataCapMB
                 )
@@ -631,7 +633,6 @@ struct SpeedtestView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    SQSheetHandle()
                     VStack(alignment: .leading, spacing: SQSpace.md + 2) {
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
                             Text("Nombre de tests").foregroundStyle(SQColor.label)
@@ -1185,7 +1186,7 @@ struct SpeedtestView: View {
     }
 
     private func abortForNetworkChange(from previousNetwork: String, to newNetwork: String) {
-        let message = "Speedtest arrêté : changement de réseau détecté (\(previousNetwork) -> \(newNetwork)). Relance le test pour mesurer une connexion stable."
+        let message = String(localized: "Speedtest arrêté : changement de réseau détecté (\(previousNetwork) -> \(newNetwork)). Relance le test pour mesurer une connexion stable.")
         networkAbortMessage = message
         errorMessage = message
         runSessionID = nil

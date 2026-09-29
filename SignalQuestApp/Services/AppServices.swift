@@ -470,7 +470,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             errorMessage = nil
             syncRuntime()
         } catch {
-            errorMessage = "Partage en direct indisponible : \(error.localizedDescription)"
+            errorMessage = String(localized: "Partage en direct indisponible : \(error.localizedDescription)")
         }
     }
 
@@ -484,7 +484,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
             errorMessage = nil
             syncRuntime()
         } catch {
-            errorMessage = "Partage en direct indisponible : \(error.localizedDescription)"
+            errorMessage = String(localized: "Partage en direct indisponible : \(error.localizedDescription)")
         }
     }
 
@@ -846,7 +846,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
                 sawSuccess = true
                 lastSentLocation = admissibleLocation
             } catch {
-                errorMessage = "Partage en direct interrompu : \(error.localizedDescription)"
+                errorMessage = String(localized: "Partage en direct interrompu : \(error.localizedDescription)")
                 if case APIError.http(let status, _, _, _, _) = error,
                    status == 400 || status == 403 || status == 404 {
                     terminalPublishFailures.insert(session.id)

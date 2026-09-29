@@ -279,12 +279,12 @@ final class SignalQuestUITests: XCTestCase {
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
         SignalQuestUITestSupport.enterGuestApplication(app, tab: "speed")
         XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Mes reçus"].exists)
-        app.buttons["Mes reçus"].tap()
-        XCTAssertTrue(app.navigationBars["Reçus invités"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Mes tests partagés"].exists)
+        app.buttons["Mes tests partagés"].tap()
+        XCTAssertTrue(app.navigationBars["Tests partagés"].waitForExistence(timeout: 10))
         XCTAssertTrue(
             app.staticTexts.containing(
-                NSPredicate(format: "label CONTAINS %@", "Les reçus sont chiffrés")
+                NSPredicate(format: "label CONTAINS %@", "le droit de supprimer ces tests")
             ).firstMatch.waitForExistence(timeout: 10)
         )
     }

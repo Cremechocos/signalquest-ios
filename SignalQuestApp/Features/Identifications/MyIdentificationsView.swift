@@ -73,10 +73,10 @@ final class MyIdentificationsViewModel: ObservableObject {
             )
             if result.success {
                 await load()
-                toast = "Identification retirée"
+                toast = String(localized: "Identification retirée")
                 Haptics.success()
             } else {
-                toast = "Retrait impossible"
+                toast = String(localized: "Retrait impossible")
                 Haptics.error()
             }
         } catch {
@@ -106,7 +106,7 @@ final class MyIdentificationsViewModel: ObservableObject {
                     : "Identification supprimée"
                 Haptics.success()
             } else {
-                toast = "Suppression impossible"
+                toast = String(localized: "Suppression impossible")
                 Haptics.error()
             }
         } catch {

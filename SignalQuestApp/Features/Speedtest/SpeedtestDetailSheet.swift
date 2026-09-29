@@ -626,7 +626,7 @@ private struct SpeedtestVisibilityControls: View {
     private var explanation: String? {
         switch model.availability {
         case .guest:
-            return String(localized: "Les tests invités se gèrent depuis Mes reçus.")
+            return String(localized: "Pour supprimer un test invité, ouvre Mes tests partagés.")
         case .noServerReference:
             return String(localized: "Ce test n’a pas de référence serveur disponible. Il peut être en attente de synchronisation ou provenir d’une ancienne version.")
         case .sessionChanged: return nil

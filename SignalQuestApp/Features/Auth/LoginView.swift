@@ -60,7 +60,7 @@ struct LoginView: View {
                             VStack(alignment: .leading, spacing: SQSpace.xs) {
                                 SQFormFieldLabel("Code à 6 chiffres")
                                 TextField("Code à 6 chiffres", text: $code,
-                                          prompt: SQFormPrompt.text("Code à 6 chiffres"))
+                                          prompt: SQFormPrompt.text("123 456"))
                                     .textContentType(.oneTimeCode)
                                     .keyboardType(.numberPad)
                                     .font(SQFont.display(28, .bold))
@@ -88,7 +88,7 @@ struct LoginView: View {
                         } else {
                             VStack(alignment: .leading, spacing: SQSpace.xs) {
                                 SQFormFieldLabel("Email")
-                                TextField("Email", text: $email, prompt: SQFormPrompt.text("Email"))
+                                TextField("Email", text: $email, prompt: SQFormPrompt.text("nom@exemple.fr"))
                                     .textInputAutocapitalization(.never)
                                     .keyboardType(.emailAddress)
                                     .textContentType(.username)
@@ -98,7 +98,7 @@ struct LoginView: View {
                             VStack(alignment: .leading, spacing: SQSpace.xs) {
                                 SQFormFieldLabel("Mot de passe")
                                 SecureField("Mot de passe", text: $password,
-                                            prompt: SQFormPrompt.text("Mot de passe"))
+                                            prompt: Text(verbatim: ""))
                                     .textContentType(.password)
                                     .textFieldStyle(SQTextFieldStyle())
                                     .accessibilityLabel("Mot de passe")
@@ -245,7 +245,7 @@ struct LoginView: View {
             guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = credential.identityToken,
                   let identityToken = String(data: tokenData, encoding: .utf8) else {
-                session.errorMessage = "Jeton Apple manquant. Réessaie."
+                session.errorMessage = String(localized: "Jeton Apple manquant. Réessaie.")
                 return
             }
             let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
@@ -266,7 +266,7 @@ struct LoginView: View {
         case .failure(let error):
             // Annulation utilisateur → silencieux ; autre erreur → message générique.
             if (error as? ASAuthorizationError)?.code == .canceled { return }
-            session.errorMessage = "Connexion Apple impossible. Réessaie."
+            session.errorMessage = String(localized: "Connexion Apple impossible. Réessaie.")
         }
     }
 
@@ -368,26 +368,32 @@ struct GuestSpeedtestReceiptsView: View {
     @State private var receiptToDelete: GuestSpeedtestDeletionReceipt?
     @State private var deletingID: String?
     @State private var errorMessage: String?
+    /// Un reçu ne garde que des identifiants : débit et réseau viennent de
+    /// l'historique local (`clientSubmissionId` = id du résultat), s'il existe encore.
+    @State private var localResults: [String: SpeedtestRunResult] = [:]
 
     var body: some View {
         List {
             Section {
                 if receipts.isEmpty {
                     EmptyStateView(
-                        title: "Aucun reçu",
-                        message: "Après un speedtest invité synchronisé, son droit de suppression apparaîtra ici.",
+                        title: "Aucun test partagé",
+                        message: "Les speedtests que tu partages sans compte apparaîtront ici. Tu pourras les supprimer à tout moment.",
                         systemImage: "doc.text.magnifyingglass"
                     )
                     .listRowBackground(Color.clear)
                 } else {
                     ForEach(receipts) { receipt in
+                        let local = localResults[receipt.clientSubmissionId].map(SpeedtestHistoryRow.init(result:))
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
-                            Text(receipt.createdAt.formatted(date: .abbreviated, time: .shortened))
+                            Text(local?.titleLine ?? receipt.createdAt.formatted(date: .abbreviated, time: .shortened))
                                 .font(SQType.heading)
                                 .foregroundStyle(SQColor.label)
-                            Text("Mesure \(receipt.id.prefix(10))…")
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
+                            if let local {
+                                Text(local.subtitleLine)
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
                             Button(role: .destructive) {
                                 receiptToDelete = receipt
                             } label: {
@@ -402,7 +408,7 @@ struct GuestSpeedtestReceiptsView: View {
                     }
                 }
             } footer: {
-                Text("Les reçus sont chiffrés dans le trousseau de cet appareil. SignalQuest ne peut pas recréer un reçu perdu.")
+                Text("Sans compte, le droit de supprimer ces tests est gardé dans le trousseau de cet appareil. S’il est perdu, SignalQuest ne peut pas le recréer.")
             }
 
             if let errorMessage {
@@ -414,14 +420,18 @@ struct GuestSpeedtestReceiptsView: View {
         }
         .scrollContentBackground(.hidden)
         .signalQuestBackground()
-        .navigationTitle("Reçus invités")
+        .navigationTitle("Tests partagés")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
             }
         }
-        .task { refresh() }
+        .task {
+            refresh()
+            let history = await services.speedtest.history()
+            localResults = Dictionary(history.map { ($0.id.uuidString, $0) }, uniquingKeysWith: { first, _ in first })
+        }
         .confirmationDialog(
             "Supprimer définitivement cette mesure ?",
             isPresented: Binding(
@@ -436,7 +446,7 @@ struct GuestSpeedtestReceiptsView: View {
             }
             Button("Annuler", role: .cancel) { receiptToDelete = nil }
         } message: {
-            Text("Le reçu sera effacé uniquement après confirmation du serveur.")
+            Text("Elle sera effacée des serveurs de SignalQuest et de la carte.")
         }
     }
 

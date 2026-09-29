@@ -79,7 +79,7 @@ private struct PasswordResetForm: View {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     SQFormFieldLabel("Nouveau mot de passe")
                     SecureField("Nouveau mot de passe", text: $password,
-                                prompt: SQFormPrompt.text("Nouveau mot de passe"))
+                                prompt: Text(verbatim: ""))
                         .textContentType(.newPassword)
                         .textFieldStyle(SQTextFieldStyle())
                         .accessibilityLabel("Nouveau mot de passe")
@@ -93,7 +93,7 @@ private struct PasswordResetForm: View {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     SQFormFieldLabel("Confirmer le mot de passe")
                     SecureField("Confirmer le mot de passe", text: $confirmation,
-                                prompt: SQFormPrompt.text("Confirmer le mot de passe"))
+                                prompt: Text(verbatim: ""))
                         .textContentType(.newPassword)
                         .textFieldStyle(SQTextFieldStyle())
                         .accessibilityLabel("Confirmer le mot de passe")

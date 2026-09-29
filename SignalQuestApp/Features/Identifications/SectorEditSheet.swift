@@ -30,12 +30,12 @@ final class SectorEditViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         guard let market else {
-            errorMessage = "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement."
+            errorMessage = String(localized: "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement.")
             return
         }
         guard let details = try? await antennas.details(id: item.siteId, market: market, operatorName: operatorName),
               let core = details.core else {
-            errorMessage = "Impossible de charger les secteurs de ce site."
+            errorMessage = String(localized: "Impossible de charger les secteurs de ce site.")
             return
         }
         // Azimuts dédupliqués/triés : porteuses radio si dispo, sinon azimuts bruts.
@@ -54,10 +54,10 @@ final class SectorEditViewModel: ObservableObject {
         // SECTOR-UX-04 : en France le secteur est imposé par le PCI — on l'annonce
         // AVANT l'édition (et non plus après l'appel réseau, façon Android).
         if market == "FR", !unique.isEmpty {
-            infoMessage = "En France, le secteur est déterminé automatiquement à partir du PCI. La sélection ci-dessous est indicative."
+            infoMessage = String(localized: "En France, le secteur est déterminé automatiquement à partir du PCI. La sélection ci-dessous est indicative.")
         }
         if unique.isEmpty {
-            errorMessage = "Ce site n'expose pas d'azimuts de secteur."
+            errorMessage = String(localized: "Ce site n'expose pas d'azimuts de secteur.")
         }
     }
 
@@ -96,7 +96,7 @@ final class SectorEditViewModel: ObservableObject {
                 if let d = result.sectors.first, d >= 1, d <= azimuths.count { self.selectedIndex = d - 1 }
                 Haptics.warning()
             } else {
-                errorMessage = "Le secteur n'a pas pu être enregistré."
+                errorMessage = String(localized: "Le secteur n'a pas pu être enregistré.")
                 Haptics.error()
             }
         } catch {

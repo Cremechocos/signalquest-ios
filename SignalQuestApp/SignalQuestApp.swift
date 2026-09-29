@@ -704,7 +704,7 @@ struct MainTabView: View {
                 .toolbar {
                     if user == nil {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button("Mes reçus") { showGuestReceipts = true }
+                            Button("Mes tests partagés") { showGuestReceipts = true }
                         }
                     }
                 }

@@ -565,7 +565,7 @@ struct ErrorStateView: View {
 /// peut pas détecter le vrai opérateur, et le test n'est donc PAS publié sur la
 /// carte communautaire (il fausserait les données). On le signale clairement.
 struct VPNWarningBanner: View {
-    var message = "VPN actif : ton opérateur ne peut pas être détecté, ce test ne sera pas publié sur la carte."
+    var message = String(localized: "VPN actif : ton opérateur ne peut pas être détecté, ce test ne sera pas publié sur la carte.")
 
     var body: some View {
         HStack(alignment: .top, spacing: SQSpace.sm) {

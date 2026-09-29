@@ -7,7 +7,7 @@ import Foundation
 enum SQSpotlight {
     static func donateLastSpeedtest(_ snapshot: SpeedtestWidgetSnapshot) {
         let attributes = CSSearchableItemAttributeSet(contentType: .text)
-        attributes.title = "Dernier Speedtest — \(Int(snapshot.downloadMbps.rounded())) Mbps"
+        attributes.title = String(localized: "Dernier Speedtest — \(Int(snapshot.downloadMbps.rounded())) Mbps")
         let ul = snapshot.uploadMbps.map { " · \(Int($0.rounded())) Mbps UL" } ?? ""
         attributes.contentDescription = "\(snapshot.network) · \(Int(snapshot.downloadMbps.rounded())) Mbps DL\(ul)"
         attributes.keywords = ["speedtest", "débit", "signalquest", "réseau"]

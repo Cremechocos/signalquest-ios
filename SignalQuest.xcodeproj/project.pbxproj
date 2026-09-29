@@ -493,6 +493,7 @@
 		C6E8D77B6E6274C0DE301A38 /* NearestAntennaTemplateBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1FE525B9AFAD0D19CB5A8F /* NearestAntennaTemplateBuilder.swift */; };
 		C75435201188EE874D2166D2 /* SpeedtestPublicationDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E25A183BF33413186E939C05 /* SpeedtestPublicationDefaultsTests.swift */; };
 		C76E9D4397904608145B72C1 /* SpeedtestPublicationSettingsQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8057CE38296284A6ABDE6B60 /* SpeedtestPublicationSettingsQATests.swift */; };
+		C7BFE229714C22CE5836AC13 /* AppShortcuts.strings in Resources */ = {isa = PBXBuildFile; fileRef = 6CAFC9B2A947381F412B1DBD /* AppShortcuts.strings */; };
 		C89F0219A38079D2441D50BC /* SpeedtestServerPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD6D6F9AEC13320786BD614D /* SpeedtestServerPicker.swift */; };
 		C8E54732763FF7519FA15DB8 /* MessageLocationEvidenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D6FCF33D099D13C7BDE8E51 /* MessageLocationEvidenceTests.swift */; };
 		C8E7712A2C15FF7B8AEC516E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8BCDF535985DE44CBDD88A60 /* Localizable.xcstrings */; };
@@ -940,6 +941,7 @@
 		6FB50D1B352DB3D0600EA5DB /* DriveTestPreflight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestPreflight.swift; sourceTree = "<group>"; };
 		70E4B6F01B0F4B916A069D31 /* SpeedtestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestTests.swift; sourceTree = "<group>"; };
 		70F67E9701F2DA2ADA20F28E /* SpeedtestPeakWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestPeakWindowTests.swift; sourceTree = "<group>"; };
+		712A1F6D81E592E671270431 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		71E4D5592689833F8992519D /* FhAzimuthsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FhAzimuthsTests.swift; sourceTree = "<group>"; };
 		71F03A270597876371BF433F /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		72569C0DE7D33420DBF9B994 /* TransportBackendInteropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportBackendInteropTests.swift; sourceTree = "<group>"; };
@@ -1228,6 +1230,7 @@
 		E8C4B217FF4AF158F90193C6 /* PhotoErrorRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoErrorRecoveryTests.swift; sourceTree = "<group>"; };
 		E8F9D2F40F28C9CB1247B4F5 /* TileCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileCache.swift; sourceTree = "<group>"; };
 		E91AD5F784D0FCE84CBC6FC8 /* LiveKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitClient.swift; sourceTree = "<group>"; };
+		E9545822191F18F53E0EDD61 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		E98AB3B3DAB26FF843400EAD /* DriveTestSessionLifecycleQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestSessionLifecycleQATests.swift; sourceTree = "<group>"; };
 		E9AB1B5761F3E1CD3E8AB3C2 /* E2EEV2NotificationContextStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2NotificationContextStore.swift; sourceTree = "<group>"; };
 		E9B758D5D6419CB4988A7201 /* FavoritesInteropSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesInteropSupport.swift; sourceTree = "<group>"; };
@@ -1695,6 +1698,7 @@
 				B09D80F46CCEBD936FD7DBC6 /* plmn_assignment_registry.json */,
 				3208FA15F4116CDD6FB4BF47 /* PrivacyInfo.xcprivacy */,
 				1317F41437063B83C8936128 /* radio_channel_registry_v1.json */,
+				F6FD9E5462540FFA03D15E2A /* AppShortcuts */,
 				B6B90FAF0243EC4626DC776B /* Fonts */,
 			);
 			path = Resources;
@@ -2476,6 +2480,14 @@
 			path = Realtime;
 			sourceTree = "<group>";
 		};
+		F6FD9E5462540FFA03D15E2A /* AppShortcuts */ = {
+			isa = PBXGroup;
+			children = (
+				6CAFC9B2A947381F412B1DBD /* AppShortcuts.strings */,
+			);
+			path = AppShortcuts;
+			sourceTree = "<group>";
+		};
 		FF1D16EA9CA4056738BE95E5 /* Home */ = {
 			isa = PBXGroup;
 			children = (
@@ -2628,6 +2640,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
+				en,
 				fr,
 			);
 			mainGroup = 78214B716A9029C68E81E8F2;
@@ -2685,6 +2698,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C7BFE229714C22CE5836AC13 /* AppShortcuts.strings in Resources */,
 				836D76211D8B12F2E56901A8 /* Assets.xcassets in Resources */,
 				1BD2371CF7FB602E991C6782 /* BricolageGrotesque-Bold.ttf in Resources */,
 				819A23CD1C96508D7129E5F0 /* BricolageGrotesque-SemiBold.ttf in Resources */,
@@ -3417,6 +3431,18 @@
 			targetProxy = 24AF22F87BBE171C83B6CBDD /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		6CAFC9B2A947381F412B1DBD /* AppShortcuts.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				712A1F6D81E592E671270431 /* en */,
+				E9545822191F18F53E0EDD61 /* fr */,
+			);
+			name = AppShortcuts.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		05576890912DC0B149E7B14B /* Staging */ = {

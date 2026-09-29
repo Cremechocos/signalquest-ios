@@ -48,7 +48,7 @@ final class OnboardingAnimationQATests: XCTestCase {
         XCTAssertFalse(app.buttons["login.guestMap"].exists)
         XCTAssertFalse(app.buttons["login.guestMeasure"].exists)
         SignalQuestUITestSupport.enterGuestApplication(app, tab: "home", locale: locale)
-        XCTAssertTrue(app.staticTexts[locale == "fr" ? "Bienvenue" : "Welcome"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts[locale == "fr" ? "Bienvenue sur" : "Welcome to"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons[locale == "fr" ? "Notifications" : "Notifications"].exists)
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "guest-application-\(locale)-home"; shot.lifetime = .keepAlways; add(shot)
@@ -59,7 +59,7 @@ final class OnboardingAnimationQATests: XCTestCase {
             XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 20))
             XCTAssertFalse(app.buttons["guest.close"].exists)
         }
-        XCTAssertTrue(app.buttons[locale == "fr" ? "Mes reçus" : "My receipts"].exists)
+        XCTAssertTrue(app.buttons[locale == "fr" ? "Mes tests partagés" : "My shared tests"].exists)
         for title in [locale == "fr" ? "Profil" : "Profile", locale == "fr" ? "Communauté" : "Community"] {
             SignalQuestUITestSupport.tab(named: title, in: app).tap()
             XCTAssertTrue(app.buttons["login.submit"].waitForExistence(timeout: 15))

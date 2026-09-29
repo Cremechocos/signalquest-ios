@@ -80,7 +80,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
             comments = fetched.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
         } catch {
             if error.isCancellation { return }
-            errorMessage = "Impossible de charger la discussion."
+            errorMessage = String(localized: "Impossible de charger la discussion.")
         }
         // Deep link (aucune métadonnée de signalement) : on résout l'en-tête au
         // mieux depuis la liste « mes signalements ».
@@ -130,7 +130,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
                 report = try? await service.myReports().first { $0.id == reportId }
             }
         } catch {
-            errorMessage = "Échec de l'envoi. Réessaie."
+            errorMessage = String(localized: "Échec de l'envoi. Réessaie.")
             Haptics.error()
         }
     }

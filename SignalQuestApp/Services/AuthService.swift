@@ -553,7 +553,7 @@ final class AuthSessionViewModel: ObservableObject {
         guard expiration.isCurrent else { return }
         guard case .authenticated = state else { return }
         state = .loggedOut
-        infoMessage = "Ta session a expiré. Reconnecte-toi pour continuer."
+        infoMessage = String(localized: "Ta session a expiré. Reconnecte-toi pour continuer.")
         Task {
             guard expiration.isCurrent else { return }
             // La session HTTP est peut-être déjà invalide, mais le secret de révocation
@@ -730,7 +730,7 @@ final class AuthSessionViewModel: ObservableObject {
             } else if let user = response.user {
                 await setAuthenticated(user)
             } else {
-                errorMessage = "Réponse auth invalide"
+                errorMessage = String(localized: "Réponse auth invalide")
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -788,7 +788,7 @@ final class AuthSessionViewModel: ObservableObject {
                 await setAuthenticated(user, expectedStateID: context.stateID,
                                        expectedCredentialSessionID: received.credentialSessionID)
             } else {
-                errorMessage = "Compte créé mais session non initialisée"
+                errorMessage = String(localized: "Compte créé mais session non initialisée")
             }
         } catch {
             guard acceptsPublicForm(context, checkCredentials: false) else { return }
@@ -818,7 +818,7 @@ final class AuthSessionViewModel: ObservableObject {
                 await setAuthenticated(user)
                 return .continued
             } else {
-                errorMessage = "Réponse Apple invalide"
+                errorMessage = String(localized: "Réponse Apple invalide")
                 return .failed
             }
         } catch APIError.http(_, let code, _, _, _) where code == "APPLE_TERMS_REQUIRED" && !acceptedTerms {
@@ -839,7 +839,7 @@ final class AuthSessionViewModel: ObservableObject {
             if let user = response.user {
                 await setAuthenticated(user)
             } else {
-                errorMessage = "Code 2FA accepté mais utilisateur absent"
+                errorMessage = String(localized: "Code 2FA accepté mais utilisateur absent")
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -856,7 +856,7 @@ final class AuthSessionViewModel: ObservableObject {
             let token = try proof.consume(for: .passwordReset)
             try await service.forgotPassword(email: email, turnstileToken: token)
             guard acceptsPublicForm(context) else { return false }
-            infoMessage = "Si l’adresse existe, un lien de réinitialisation t’a été envoyé."
+            infoMessage = String(localized: "Si l’adresse existe, un lien de réinitialisation t’a été envoyé.")
             return true
         } catch {
             guard acceptsPublicForm(context) else { return false }
@@ -875,7 +875,7 @@ final class AuthSessionViewModel: ObservableObject {
         do {
             try await service.resetPassword(token: token, newPassword: newPassword)
             guard !Task.isCancelled, stateID == startingState, credentials == service.credentialSessionID() else { return false }
-            infoMessage = "Mot de passe mis à jour. Connecte-toi avec le nouveau mot de passe."
+            infoMessage = String(localized: "Mot de passe mis à jour. Connecte-toi avec le nouveau mot de passe.")
             return true
         } catch {
             guard !Task.isCancelled, stateID == startingState, credentials == service.credentialSessionID() else { return false }

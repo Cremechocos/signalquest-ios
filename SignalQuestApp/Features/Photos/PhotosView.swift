@@ -1515,7 +1515,7 @@ struct AntennaSitePickerSheet: View {
         ) else {
             sites = []
             marketLabel = nil
-            errorMessage = "Pays non référencé à cet emplacement. Déplace la carte vers une zone terrestre connue."
+            errorMessage = String(localized: "Pays non référencé à cet emplacement. Déplace la carte vers une zone terrestre connue.")
             return
         }
         guard !Task.isCancelled else { return }
@@ -1523,7 +1523,7 @@ struct AntennaSitePickerSheet: View {
         guard !marketCode.isEmpty else {
             sites = []
             marketLabel = nil
-            errorMessage = "Le registre ne fournit pas de code marché fiable pour cette zone."
+            errorMessage = String(localized: "Le registre ne fournit pas de code marché fiable pour cette zone.")
             return
         }
         marketLabel = market.label

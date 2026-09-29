@@ -1060,6 +1060,22 @@
         }
       }
     },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
     "%@, %@ : %@" : {
       "localizations" : {
         "en" : {
@@ -2044,6 +2060,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld ms"
+          }
+        }
+      }
+    },
+    "%lld non lus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld unread"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld non lus"
           }
         }
       }
@@ -3221,6 +3253,22 @@
         }
       }
     },
+    "1 non lu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 unread"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 non lu"
+          }
+        }
+      }
+    },
     "1 personne" : {
       "localizations" : {
         "en" : {
@@ -3385,18 +3433,18 @@
         }
       }
     },
-    "5,12 Go" : {
+    "5 Go" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "5.12 GB"
+            "value" : "5 GB"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "5,12 Go"
+            "value" : "5 Go"
           }
         }
       }
@@ -3592,6 +3640,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "90 jours"
+          }
+        }
+      }
+    },
+    "99+" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "99+"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "99+"
+          }
+        }
+      }
+    },
+    "123 456" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "123 456"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "123 456"
           }
         }
       }
@@ -3905,6 +3985,22 @@
         }
       }
     },
+    "à toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "there"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "à toi"
+          }
+        }
+      }
+    },
     "Abonné" : {
       "localizations" : {
         "en" : {
@@ -4080,6 +4176,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Accès refusé : clé d'API requise."
+          }
+        }
+      }
+    },
+    "Accès Sentinelle en cours d’activation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinel access is being activated"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accès Sentinelle en cours d’activation"
           }
         }
       }
@@ -5673,6 +5786,40 @@
         }
       }
     },
+    "Ancienne capture de couverture" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Old coverage capture"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancienne capture de couverture"
+          }
+        }
+      }
+    },
+    "Anciennes captures de couverture conservées sur cet appareil. Elles ne sont plus envoyées." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Old coverage captures kept on this device. They are no longer sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anciennes captures de couverture conservées sur cet appareil. Elles ne sont plus envoyées."
+          }
+        }
+      }
+    },
     "Ancre ping" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5836,7 +5983,6 @@
       }
     },
     "Antenne identifiée" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6577,19 +6723,53 @@
         }
       }
     },
-    "Après un speedtest invité synchronisé, son droit de suppression apparaîtra ici." : {
-      "extractionState" : "stale",
+    "Archive conservée sur cet appareil" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "After a synced guest speedtest, its deletion right will appear here."
+            "value" : "Archive kept on this device"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Après un speedtest invité synchronisé, son droit de suppression apparaîtra ici."
+            "value" : "Archive conservée sur cet appareil"
+          }
+        }
+      }
+    },
+    "Archive locale" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local archive"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive locale"
+          }
+        }
+      }
+    },
+    "Archives locales" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local archives"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archives locales"
           }
         }
       }
@@ -6612,7 +6792,6 @@
       }
     },
     "Arrêté" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7052,7 +7231,6 @@
       }
     },
     "Aucun autre participant n’est disponible pour cet appel." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7331,23 +7509,6 @@
         }
       }
     },
-    "Aucun reçu" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No receipts"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun reçu"
-          }
-        }
-      }
-    },
     "Aucun relevé de chemin sur les dernières heures. Le premier arrive au plus tard un quart d’heure après la mise sous surveillance." : {
       "localizations" : {
         "en" : {
@@ -7365,6 +7526,7 @@
       }
     },
     "Aucun réseau — le constat sera daté de maintenant" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7528,7 +7690,6 @@
       }
     },
     "Aucun speedtest enregistré pour le moment." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7574,6 +7735,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun test"
+          }
+        }
+      }
+    },
+    "Aucun test partagé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No shared tests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun test partagé"
           }
         }
       }
@@ -8400,7 +8577,6 @@
       }
     },
     "Aucune transcription disponible pour ce message." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8927,6 +9103,22 @@
         }
       }
     },
+    "Badge obtenu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge earned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge obtenu"
+          }
+        }
+      }
+    },
     "Badge Premium or et rouge, masquable" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9180,19 +9372,18 @@
         }
       }
     },
-    "Bienvenue" : {
-      "extractionState" : "manual",
+    "Bienvenue sur" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome"
+            "value" : "Welcome to"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bienvenue"
+            "value" : "Bienvenue sur"
           }
         }
       }
@@ -9378,7 +9569,6 @@
       }
     },
     "Bonus de série" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9410,8 +9600,41 @@
         }
       }
     },
+    "Brouillon de couverture" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coverage draft"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brouillon de couverture"
+          }
+        }
+      }
+    },
+    "Brouillon interrompu" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrupted draft"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brouillon interrompu"
+          }
+        }
+      }
+    },
     "Bug confirmé" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9569,6 +9792,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Capture partielle — iOS ne donne accès ni au niveau reçu, ni à l'identifiant de cellule."
+          }
+        }
+      }
+    },
+    "Capture terminée" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed capture"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture terminée"
           }
         }
       }
@@ -10159,7 +10399,6 @@
       }
     },
     "Ce site n'expose pas d'azimuts de secteur." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10488,6 +10727,23 @@
         }
       }
     },
+    "Certaines archives locales sont illisibles. Les fichiers ont été conservés." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some local archives could not be read. The files were kept."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certaines archives locales sont illisibles. Les fichiers ont été conservés."
+          }
+        }
+      }
+    },
     "Certaines sources sont en panne. Les dernières données disponibles sont conservées." : {
       "localizations" : {
         "en" : {
@@ -10585,6 +10841,22 @@
         }
       }
     },
+    "Cet appareil ne peut pas utiliser la récupération." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device can’t use recovery."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil ne peut pas utiliser la récupération."
+          }
+        }
+      }
+    },
     "Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé." : {
       "localizations" : {
         "en" : {
@@ -10597,6 +10869,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé."
+          }
+        }
+      }
+    },
+    "Cet appel nécessite E2EE v2 vérifié. Aucun appel non chiffré de bout en bout n’a été lancé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This call requires verified E2EE v2. No call without end-to-end encryption was started."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appel nécessite E2EE v2 vérifié. Aucun appel non chiffré de bout en bout n’a été lancé."
           }
         }
       }
@@ -10709,6 +10997,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette configuration a expiré. Génère un nouveau QR code avant de réessayer."
+          }
+        }
+      }
+    },
+    "Cette consultation reste sur cet appareil et n’envoie aucune coordonnée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viewing this stays on this device and sends no coordinates."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette consultation reste sur cet appareil et n’envoie aucune coordonnée."
           }
         }
       }
@@ -11022,18 +11327,18 @@
         }
       }
     },
-    "Chaque speedtest garde ses débits, sa latence et sa position. Le suivi du trajet sert à espacer les tests ; aucun enregistrement de couverture n’est créé." : {
+    "Chaque speedtest garde ses débits, sa latence et sa position. Le trajet sert seulement à espacer les tests." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Each speedtest keeps its speeds, latency and location. Route tracking spaces the tests; no coverage recording is created."
+            "value" : "Each speedtest keeps its speeds, latency and location. Your route is only used to space out the tests."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chaque speedtest garde ses débits, sa latence et sa position. Le suivi du trajet sert à espacer les tests ; aucun enregistrement de couverture n’est créé."
+            "value" : "Chaque speedtest garde ses débits, sa latence et sa position. Le trajet sert seulement à espacer les tests."
           }
         }
       }
@@ -11146,72 +11451,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chargement des appareils…"
-          }
-        }
-      }
-    },
-    "Accès Sentinelle en cours d’activation" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Accès Sentinelle en cours d’activation"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sentinel access is being activated"
-          }
-        }
-      }
-    },
-    "Tes speedtests en réseau mobile apparaissent sur la carte, à l’endroit où tu les fais. Tes zones privées restent protégées et tu peux masquer une mesure." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your mobile network speedtests appear on the map where you run them. Your private zones stay protected and you can hide any measurement."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tes speedtests en réseau mobile apparaissent sur la carte, à l’endroit où tu les fais. Tes zones privées restent protégées et tu peux masquer une mesure."
-          }
-        }
-      }
-    },
-    "D’un pays à l’autre, antennes officielles et contributions de la communauté se complètent pour dessiner la carte." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "From one country to the next, official cell sites and community contributions come together to build the map."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "D’un pays à l’autre, antennes officielles et contributions de la communauté se complètent pour dessiner la carte."
-          }
-        }
-      }
-    },
-    "Ton droit Premium est détecté. Sentinelle ne l’a pas encore pris en compte." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ton droit Premium est détecté. Sentinelle ne l’a pas encore pris en compte."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your Premium access is detected. Sentinel has not activated it yet."
           }
         }
       }
@@ -12102,6 +12341,22 @@
         }
       }
     },
+    "Clé invalide : saisissez la clé Base64 complète de 256 bits." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid key: enter the full 256-bit Base64 key."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé invalide : saisissez la clé Base64 complète de 256 bits."
+          }
+        }
+      }
+    },
     "Clé mise à jour — appuie pour resynchroniser" : {
       "localizations" : {
         "en" : {
@@ -12232,7 +12487,6 @@
       }
     },
     "Code 2FA accepté mais utilisateur absent" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12820,7 +13074,6 @@
       }
     },
     "Compte créé mais session non initialisée" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13244,7 +13497,6 @@
       }
     },
     "Connexion Apple impossible. Réessaie." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13304,6 +13556,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connexion impossible. Vérifie ta connexion puis réessaie."
+          }
+        }
+      }
+    },
+    "Connexion inconnue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown connection"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion inconnue"
           }
         }
       }
@@ -13368,6 +13636,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connexion partagée avec vous"
+          }
+        }
+      }
+    },
+    "Connexion quotidienne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daily check-in"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion quotidienne"
           }
         }
       }
@@ -13914,22 +14198,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Layers"
-          }
-        }
-      }
-    },
-    "Coupé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Muted"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Coupé"
           }
         }
       }
@@ -14841,6 +15109,23 @@
         }
       }
     },
+    "D’un pays à l’autre, antennes officielles et contributions de la communauté se complètent pour dessiner la carte." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From one country to the next, official cell sites and community contributions come together to build the map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D’un pays à l’autre, antennes officielles et contributions de la communauté se complètent pour dessiner la carte."
+          }
+        }
+      }
+    },
     "Dans %@, %@" : {
       "localizations" : {
         "en" : {
@@ -15507,7 +15792,6 @@
       }
     },
     "Déjà pris par un autre membre." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15688,7 +15972,6 @@
       }
     },
     "Démarrage…" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -16082,6 +16365,22 @@
         }
       }
     },
+    "Dernier Speedtest — %lld Mbps" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest speedtest — %lld Mbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier Speedtest — %lld Mbps"
+          }
+        }
+      }
+    },
     "Dernier test" : {
       "localizations" : {
         "en" : {
@@ -16307,22 +16606,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Des paraboles point-à-point : elles raccordent ce site au réseau, ne desservent personne, et ne comptent pas dans les secteurs. Le site visé est déduit du fait que les deux paraboles se répondent — le registre ne le publie pas, pas plus que les fréquences."
-          }
-        }
-      }
-    },
-    "Des résultats, sans collecte de couverture" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Results without coverage recording"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Des résultats, sans collecte de couverture"
           }
         }
       }
@@ -16734,22 +17017,6 @@
         }
       }
     },
-    "Détection en cours…" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Detecting…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Détection en cours…"
-          }
-        }
-      }
-    },
     "Deux piles réseau distinctes, mesurées séparément. Les superposer est le seul moyen de voir laquelle décroche." : {
       "localizations" : {
         "en" : {
@@ -16950,6 +17217,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Disponible pour tous"
+          }
+        }
+      }
+    },
+    "Disponible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponible."
           }
         }
       }
@@ -17375,6 +17658,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Durée personnalisée des stories"
+          }
+        }
+      }
+    },
+    "Easter egg Canada" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canada easter egg"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Easter egg Canada"
           }
         }
       }
@@ -17833,6 +18132,22 @@
         }
       }
     },
+    "Elle sera effacée des serveurs de SignalQuest et de la carte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It will be erased from SignalQuest’s servers and the map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle sera effacée des serveurs de SignalQuest et de la carte."
+          }
+        }
+      }
+    },
     "Elle sera supprimée de ton compte sur iOS, Android et le web. Les nouveaux speedtests ne seront plus protégés par cette zone." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18160,7 +18475,6 @@
       }
     },
     "En France, le secteur est déterminé automatiquement à partir du PCI. La sélection ci-dessous est indicative." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -18241,7 +18555,7 @@
         }
       }
     },
-    "En pause — WiFi détecté" : {
+    "En pause — Wi-Fi détecté" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -18252,7 +18566,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En pause — WiFi détecté"
+            "value" : "En pause — Wi-Fi détecté"
           }
         }
       }
@@ -19455,7 +19769,6 @@
       }
     },
     "Événement" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -19612,6 +19925,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Évolutions"
+          }
+        }
+      }
+    },
+    "Ex. Alex Martin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e.g. Alex Martin"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ex. Alex Martin"
           }
         }
       }
@@ -20659,6 +20988,22 @@
         }
       }
     },
+    "Hors connexion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors connexion"
+          }
+        }
+      }
+    },
     "Hors de l'axe des secteurs" : {
       "localizations" : {
         "en" : {
@@ -21014,7 +21359,6 @@
       }
     },
     "Identification retirée" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -21519,7 +21863,6 @@
       }
     },
     "Impossible de charger la discussion." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -21585,7 +21928,6 @@
       }
     },
     "Impossible de charger les secteurs de ce site." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -21832,7 +22174,6 @@
       }
     },
     "Impossible de vérifier pour le moment." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -22415,7 +22756,6 @@
       }
     },
     "Jeton Apple manquant. Réessaie." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -22888,6 +23228,38 @@
         }
       }
     },
+    "L’identité locale E2EE v2 est illisible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The local E2EE v2 identity can’t be read."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’identité locale E2EE v2 est illisible."
+          }
+        }
+      }
+    },
+    "L’identité locale E2EE v2 est illisible. Elle n’a pas été remplacée automatiquement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The local E2EE v2 identity can’t be read. It was not replaced automatically."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’identité locale E2EE v2 est illisible. Elle n’a pas été remplacée automatiquement."
+          }
+        }
+      }
+    },
     "L'inclinaison d'une antenne vers le bas. Les opérateurs l'utilisent pour concentrer l'énergie sur la zone à couvrir plutôt que de l'envoyer à l'horizon, où elle brouillerait les cellules voisines. Le chiffre donné ici est purement géométrique : c'est l'angle qui pointerait exactement sur toi." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -23201,6 +23573,7 @@
       }
     },
     "La couverture restera enregistrée localement ; les speedtests attendront le retour du réseau." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -24345,7 +24718,6 @@
       }
     },
     "Le déplacement n'a pas abouti." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -24362,7 +24734,6 @@
       }
     },
     "Le Drive Test a besoin de ta position pour placer les speedtests sur le trajet. Active la localisation dans les Réglages, puis relance." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -24455,6 +24826,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le fuseau atteint %1$lld m de rayon, calculé à %2$lld MHz — la bande la plus basse du site, la plus exigeante."
+          }
+        }
+      }
+    },
+    "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This identification has no market set. No country will be inferred automatically."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement."
+          }
+        }
+      }
+    },
+    "Le marché doit être connu avant de rechercher un site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The market must be known before searching for a site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le marché doit être connu avant de rechercher un site."
           }
         }
       }
@@ -24688,18 +25091,18 @@
         }
       }
     },
-    "Le reçu sera effacé uniquement après confirmation du serveur." : {
+    "Le registre ne fournit pas de code marché fiable pour cette zone." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The receipt will only be deleted after the server confirms."
+            "value" : "The registry doesn’t provide a reliable market code for this area."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le reçu sera effacé uniquement après confirmation du serveur."
+            "value" : "Le registre ne fournit pas de code marché fiable pour cette zone."
           }
         }
       }
@@ -24786,7 +25189,6 @@
       }
     },
     "Le secteur n'a pas pu être enregistré." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -25009,6 +25411,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le verrouillage n’a pas été activé. Réessaie avec la biométrie ou le code de l’appareil."
+          }
+        }
+      }
+    },
+    "Le volume consommé s'affiche en direct. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data usage is shown live. The session stops after the test that reaches the data limit; that test can exceed it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le volume consommé s'affiche en direct. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser."
+          }
+        }
+      }
+    },
+    "Le volume dépend du débit et de la durée du test. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usage depends on test speed and duration. The session stops after the test that reaches the data limit; that test can exceed it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le volume dépend du débit et de la durée du test. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser."
           }
         }
       }
@@ -25243,7 +25679,6 @@
       }
     },
     "Les appels de groupe sont limités à 8 participants." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -25688,22 +26123,6 @@
         }
       }
     },
-    "Les reçus sont chiffrés dans le trousseau de cet appareil. SignalQuest ne peut pas recréer un reçu perdu." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Receipts are encrypted in this device's keychain. SignalQuest can't recreate a lost receipt."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les reçus sont chiffrés dans le trousseau de cet appareil. SignalQuest ne peut pas recréer un reçu perdu."
-          }
-        }
-      }
-    },
     "Les secteurs de ce site ne portent pas les mêmes bandes — les lignes surlignées sont celles qui diffèrent." : {
       "localizations" : {
         "en" : {
@@ -25833,6 +26252,22 @@
         }
       }
     },
+    "Les speedtests que tu partages sans compte apparaîtront ici. Tu pourras les supprimer à tout moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtests you share without an account will appear here. You can delete them at any time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les speedtests que tu partages sans compte apparaîtront ici. Tu pourras les supprimer à tout moment."
+          }
+        }
+      }
+    },
     "Les speedtests resteront en pause et reprendront automatiquement en cellulaire." : {
       "localizations" : {
         "en" : {
@@ -25849,35 +26284,18 @@
         }
       }
     },
-    "Les tests invités se gèrent depuis Mes reçus." : {
-      "extractionState" : "manual",
+    "Les tests suivent la distance et le plafond choisis. Chaque résultat garde sa position." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Manage guest tests in My receipts."
+            "value" : "Tests follow your chosen distance and data limit. Each result keeps its location."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les tests invités se gèrent depuis Mes reçus."
-          }
-        }
-      }
-    },
-    "Les tests suivent la distance et le plafond choisis. Les résultats gardent leur position ; aucune collecte de couverture." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tests follow your chosen distance and data limit. Results keep their location; coverage is not recorded."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les tests suivent la distance et le plafond choisis. Les résultats gardent leur position ; aucune collecte de couverture."
+            "value" : "Les tests suivent la distance et le plafond choisis. Chaque résultat garde sa position."
           }
         }
       }
@@ -26127,22 +26545,6 @@
         }
       }
     },
-    "Limité" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Limited"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Limité"
-          }
-        }
-      }
-    },
     "Lobes" : {
       "localizations" : {
         "en" : {
@@ -26176,7 +26578,6 @@
       }
     },
     "Localisation désactivée. Active-la dans Réglages > SignalQuest pour te localiser sur la carte." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -27041,7 +27442,6 @@
       }
     },
     "Mes mesures" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -27053,22 +27453,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mes mesures"
-          }
-        }
-      }
-    },
-    "Mes reçus" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "My receipts"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mes reçus"
           }
         }
       }
@@ -27135,6 +27519,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mes signalements d'antenne"
+          }
+        }
+      }
+    },
+    "Mes tests partagés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My shared tests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes tests partagés"
           }
         }
       }
@@ -27578,22 +27978,6 @@
         }
       }
     },
-    "Mesure %@…" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Measuring %@…"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mesure %@…"
-          }
-        }
-      }
-    },
     "Mesure communautaire : %lld mégabits. %@. Ouvre la carte." : {
       "localizations" : {
         "en" : {
@@ -27741,6 +28125,22 @@
         }
       }
     },
+    "Mesurée à" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured at"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesurée à"
+          }
+        }
+      }
+    },
     "Mesurer la connexion" : {
       "localizations" : {
         "en" : {
@@ -27787,22 +28187,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "mesures"
-          }
-        }
-      }
-    },
-    "Mesurée à" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Measured at"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mesurée à"
           }
         }
       }
@@ -28037,7 +28421,6 @@
       }
     },
     "Minimum 2 caractères." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -28522,7 +28905,6 @@
       }
     },
     "Mot de passe mis à jour. Connecte-toi avec le nouveau mot de passe." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -28871,7 +29253,6 @@
       }
     },
     "Niveau supérieur" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -29046,6 +29427,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nom, handle ou email"
+          }
+        }
+      }
+    },
+    "nom@exemple.fr" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "name@example.com"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nom@exemple.fr"
           }
         }
       }
@@ -29410,7 +29807,6 @@
       }
     },
     "Nouveau département" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -29541,7 +29937,6 @@
       }
     },
     "Nouveau site visité" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -29883,22 +30278,6 @@
         }
       }
     },
-    "Opérateur détecté" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Detected carrier"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opérateur détecté"
-          }
-        }
-      }
-    },
     "Opérateur déduit du PLMN de la SIM. En itinérance, il peut différer du réseau radio utilisé." : {
       "localizations" : {
         "en" : {
@@ -29915,18 +30294,18 @@
         }
       }
     },
-    "Opérateur estimé par l'accès Internet mobile (IP/ASN). En itinérance, cela ne confirme pas le réseau radio servant." : {
+    "Opérateur détecté" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Carrier estimated from mobile Internet access (IP/ASN). When roaming, this does not confirm the serving radio network."
+            "value" : "Detected carrier"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opérateur estimé par l'accès Internet mobile (IP/ASN). En itinérance, cela ne confirme pas le réseau radio servant."
+            "value" : "Opérateur détecté"
           }
         }
       }
@@ -29976,6 +30355,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Opérateur en cours de détection…"
+          }
+        }
+      }
+    },
+    "Opérateur estimé par l'accès Internet mobile (IP/ASN). En itinérance, cela ne confirme pas le réseau radio servant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carrier estimated from mobile Internet access (IP/ASN). When roaming, this does not confirm the serving radio network."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opérateur estimé par l'accès Internet mobile (IP/ASN). En itinérance, cela ne confirme pas le réseau radio servant."
           }
         }
       }
@@ -31372,7 +31767,6 @@
       }
     },
     "Partage communauté" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -31433,6 +31827,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Partage en direct chiffré"
+          }
+        }
+      }
+    },
+    "Partage en direct indisponible : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live sharing unavailable: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partage en direct indisponible : %@"
+          }
+        }
+      }
+    },
+    "Partage en direct interrompu : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live sharing interrupted: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partage en direct interrompu : %@"
           }
         }
       }
@@ -32026,6 +32452,22 @@
         }
       }
     },
+    "Pays non référencé à cet emplacement. Déplace la carte vers une zone terrestre connue." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No country is listed at this location. Move the map to a known land area."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pays non référencé à cet emplacement. Déplace la carte vers une zone terrestre connue."
+          }
+        }
+      }
+    },
     "PCI" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -32517,7 +32959,6 @@
       }
     },
     "Photo publiée" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -33177,6 +33618,23 @@
         }
       }
     },
+    "Points enregistrés" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorded points"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points enregistrés"
+          }
+        }
+      }
+    },
     "Politique de confidentialité" : {
       "localizations" : {
         "en" : {
@@ -33322,6 +33780,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Position : %@. Toucher pour ouvrir dans Plans."
+          }
+        }
+      }
+    },
+    "Position actuelle indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current location unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position actuelle indisponible"
           }
         }
       }
@@ -33633,6 +34107,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pour situer ton speedtest sur la carte communautaire, SignalQuest a besoin de ta position approximative (~100 m). Tu peux refuser : le test fonctionnera quand même, sans apparaître sur la carte."
+          }
+        }
+      }
+    },
+    "Pour supprimer un test invité, ouvre Mes tests partagés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To delete a guest test, open My shared tests."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour supprimer un test invité, ouvre Mes tests partagés."
           }
         }
       }
@@ -35028,7 +35518,6 @@
       }
     },
     "Quête accomplie" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -35971,7 +36460,6 @@
       }
     },
     "Récompense bonus" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -36159,22 +36647,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reçus côté serveur"
-          }
-        }
-      }
-    },
-    "Reçus invités" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Guest receipts"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reçus invités"
           }
         }
       }
@@ -37076,7 +37548,6 @@
       }
     },
     "Réponse Apple invalide" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -37093,7 +37564,6 @@
       }
     },
     "Réponse auth invalide" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -37252,6 +37722,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reprise automatique en cellulaire"
+          }
+        }
+      }
+    },
+    "Reprise…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resuming…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprise…"
           }
         }
       }
@@ -38278,6 +38764,22 @@
         }
       }
     },
+    "Retrait impossible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t remove"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retrait impossible"
+          }
+        }
+      }
+    },
     "Retrait…" : {
       "localizations" : {
         "en" : {
@@ -38752,6 +39254,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "samedi"
+          }
+        }
+      }
+    },
+    "Sans compte, le droit de supprimer ces tests est gardé dans le trousseau de cet appareil. S’il est perdu, SignalQuest ne peut pas le recréer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Without an account, the right to delete these tests is kept in this device’s keychain. If it is lost, SignalQuest can’t recreate it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans compte, le droit de supprimer ces tests est gardé dans le trousseau de cet appareil. S’il est perdu, SignalQuest ne peut pas le recréer."
           }
         }
       }
@@ -39748,7 +40266,7 @@
         }
       }
     },
-    "Session en pause : WiFi détecté, reprise automatique en cellulaire" : {
+    "Session en pause : Wi-Fi détecté, reprise automatique en cellulaire" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -39759,7 +40277,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Session en pause : WiFi détecté, reprise automatique en cellulaire"
+            "value" : "Session en pause : Wi-Fi détecté, reprise automatique en cellulaire"
           }
         }
       }
@@ -39830,8 +40348,23 @@
         }
       }
     },
+    "Session terrain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field session"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session terrain"
+          }
+        }
+      }
+    },
     "Session terrain terminée" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -39944,6 +40477,22 @@
         }
       }
     },
+    "Seulement des speedtests" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only speedtests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seulement des speedtests"
+          }
+        }
+      }
+    },
     "seules les bandes basses (700, 800 MHz) portent aussi loin" : {
       "localizations" : {
         "en" : {
@@ -40010,7 +40559,6 @@
       }
     },
     "Si l’adresse existe, un lien de réinitialisation t’a été envoyé." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -40192,7 +40740,6 @@
       }
     },
     "Signalement accepté" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -40567,7 +41114,6 @@
       }
     },
     "Site ajouté à la carte" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -41288,6 +41834,22 @@
         }
       }
     },
+    "Speedtest arrêté : changement de réseau détecté (%@ -> %@). Relance le test pour mesurer une connexion stable." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtest stopped: network change detected (%1$@ → %2$@). Run the test again to measure a stable connection."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Speedtest arrêté : changement de réseau détecté (%1$@ -> %2$@). Relance le test pour mesurer une connexion stable."
+          }
+        }
+      }
+    },
     "Speedtest impossible" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -41350,6 +41912,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speedtest partagé"
+          }
+        }
+      }
+    },
+    "Speedtest SignalQuest — %lld Mbps" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest speedtest — %lld Mbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtest SignalQuest — %lld Mbps"
           }
         }
       }
@@ -42072,6 +42650,22 @@
         }
       }
     },
+    "Suppression impossible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t delete"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suppression impossible"
+          }
+        }
+      }
+    },
     "Suppression…" : {
       "localizations" : {
         "en" : {
@@ -42753,7 +43347,6 @@
       }
     },
     "Ta session a expiré. Reconnecte-toi pour continuer." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -43218,6 +43811,23 @@
         }
       }
     },
+    "Tes speedtests en réseau mobile apparaissent sur la carte, à l’endroit où tu les fais. Tes zones privées restent protégées et tu peux masquer une mesure." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your mobile network speedtests appear on the map where you run them. Your private zones stay protected and you can hide any measurement."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes speedtests en réseau mobile apparaissent sur la carte, à l’endroit où tu les fais. Tes zones privées restent protégées et tu peux masquer une mesure."
+          }
+        }
+      }
+    },
     "Test" : {
       "localizations" : {
         "en" : {
@@ -43230,6 +43840,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Test"
+          }
+        }
+      }
+    },
+    "Test %lld en cours…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test %lld in progress…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test %lld en cours…"
+          }
+        }
+      }
+    },
+    "Test %lld terminé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test %lld done"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test %lld terminé"
           }
         }
       }
@@ -43346,6 +43988,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tests"
+          }
+        }
+      }
+    },
+    "Tests partagés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared tests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tests partagés"
           }
         }
       }
@@ -43508,6 +44166,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton compte reste protégé. Seule l’actualisation de son affichage doit être réessayée."
+          }
+        }
+      }
+    },
+    "Ton droit Premium est détecté. Sentinelle ne l’a pas encore pris en compte." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Premium access is detected. Sentinel has not activated it yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton droit Premium est détecté. Sentinelle ne l’a pas encore pris en compte."
           }
         }
       }
@@ -45014,40 +45689,6 @@
         }
       }
     },
-    "Le volume dépend du débit et de la durée du test. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Usage depends on test speed and duration. The session stops after the test that reaches the data limit; that test can exceed it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le volume dépend du débit et de la durée du test. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser."
-          }
-        }
-      }
-    },
-    "Le volume consommé s'affiche en direct. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Data usage is shown live. The session stops after the test that reaches the data limit; that test can exceed it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le volume consommé s'affiche en direct. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser."
-          }
-        }
-      }
-    },
     "Un test tous les" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -45882,7 +46523,6 @@
       }
     },
     "Vérification de la disponibilité…" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -46920,7 +47560,6 @@
       }
     },
     "VPN actif : ton opérateur ne peut pas être détecté, ce test ne sera pas publié sur la carte." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -47080,7 +47719,7 @@
         }
       }
     },
-    "WiFi détecté" : {
+    "Wi-Fi détecté" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -47091,7 +47730,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "WiFi détecté"
+            "value" : "Wi-Fi détecté"
           }
         }
       }
@@ -47340,193 +47979,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ZTD"
-          }
-        }
-      }
-    },
-    "Archives locales" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Archives locales"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Local archives"
-          }
-        }
-      }
-    },
-    "Anciennes captures de couverture conservées sur cet appareil. Elles ne sont plus envoyées." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anciennes captures de couverture conservées sur cet appareil. Elles ne sont plus envoyées."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Old coverage captures kept on this device. They are no longer sent."
-          }
-        }
-      }
-    },
-    "Certaines archives locales sont illisibles. Les fichiers ont été conservés." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Certaines archives locales sont illisibles. Les fichiers ont été conservés."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Some local archives could not be read. The files were kept."
-          }
-        }
-      }
-    },
-    "Brouillon de couverture" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Brouillon de couverture"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Coverage draft"
-          }
-        }
-      }
-    },
-    "Ancienne capture de couverture" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ancienne capture de couverture"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Old coverage capture"
-          }
-        }
-      }
-    },
-    "Archive conservée sur cet appareil" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Archive conservée sur cet appareil"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Archive kept on this device"
-          }
-        }
-      }
-    },
-    "Cette consultation reste sur cet appareil et n’envoie aucune coordonnée." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette consultation reste sur cet appareil et n’envoie aucune coordonnée."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Viewing this stays on this device and sends no coordinates."
-          }
-        }
-      }
-    },
-    "Brouillon interrompu" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Brouillon interrompu"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Interrupted draft"
-          }
-        }
-      }
-    },
-    "Capture terminée" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Capture terminée"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Completed capture"
-          }
-        }
-      }
-    },
-    "Points enregistrés" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Points enregistrés"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recorded points"
-          }
-        }
-      }
-    },
-    "Archive locale" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Archive locale"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Local archive"
           }
         }
       }

@@ -35,7 +35,7 @@ final class SiteRemapViewModel: ObservableObject {
     /// sinon position de l'utilisateur, sinon centre mondial neutre.
     func prepareCenter() async {
         guard let market else {
-            errorMessage = "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement."
+            errorMessage = String(localized: "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement.")
             initialCenter = (await location.currentLocation(timeoutSeconds: 4))?.coordinate
                 ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
             return
@@ -59,7 +59,7 @@ final class SiteRemapViewModel: ObservableObject {
             defer { isLoading = false }
             guard let market else {
                 sites = []
-                errorMessage = "Le marché doit être connu avant de rechercher un site."
+                errorMessage = String(localized: "Le marché doit être connu avant de rechercher un site.")
                 return
             }
             let list = (try? await antennas.list(bbox: bbox, market: market, operatorName: operatorName, technologies: [])) ?? []
@@ -82,7 +82,7 @@ final class SiteRemapViewModel: ObservableObject {
                 Haptics.success()
                 done = true
             } else {
-                errorMessage = "Le déplacement n'a pas abouti."
+                errorMessage = String(localized: "Le déplacement n'a pas abouti.")
                 Haptics.error()
             }
         } catch {

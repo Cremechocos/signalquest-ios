@@ -90,19 +90,29 @@ struct SignalQuestHomeView: View {
     }
 
     private var firstName: String {
-        user?.name?.split(separator: " ").first.map(String.init) ?? (user == nil ? "SignalQuest" : "à toi")
+        user?.name?.split(separator: " ").first.map(String.init) ?? (user == nil ? "SignalQuest" : String(localized: "à toi"))
     }
 
     // MARK: Header — avatar + salutation + cloche
 
     private var header: some View {
         HStack(spacing: SQSpace.md + 2) {
-            SQAvatar(url: user?.avatarUrl, name: user?.name ?? "SignalQuest", size: 54)
-                // Le nom est annoncé juste à droite ; relire aussi l'image
-                // produit un élément sans description utile dans VoiceOver.
-                .accessibilityHidden(true)
+            // Le nom est annoncé juste à droite ; relire aussi l'image produit
+            // un élément sans description utile dans VoiceOver.
+            if let user {
+                SQAvatar(url: user.avatarUrl, name: user.name ?? "SignalQuest", size: 54)
+                    .accessibilityHidden(true)
+            } else {
+                // Invité : le logo, pas un faux avatar « S ».
+                Image("SQLogoMark")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 54, height: 54)
+                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: 0) {
-                Text(user == nil ? String(localized: "Bienvenue") : String(localized: "Bonjour,"))
+                Text(user == nil ? String(localized: "Bienvenue sur") : String(localized: "Bonjour,"))
                     .font(SQFont.body(14))
                     .foregroundStyle(SQColor.labelSecondary)
                 Text(firstName)
@@ -254,12 +264,14 @@ struct SignalQuestHomeView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: SQSpace.sm)
-            Text(LocalizedStringKey(networkBadge))
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
-                .foregroundStyle(networkTint)
-                .background(networkTintSoft, in: Capsule(style: .continuous))
+            if let networkBadge {
+                Text(LocalizedStringKey(networkBadge))
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 6)
+                    .foregroundStyle(networkTint)
+                    .background(networkTintSoft, in: Capsule(style: .continuous))
+            }
             // Indice discret que la carte est cliquable (verdict explicable).
             if networkQuality != nil {
                 Image(systemName: "info.circle")
@@ -281,7 +293,7 @@ struct SignalQuestHomeView: View {
     // vert ne s'affiche que si les mesures de la zone le confirment.
 
     private var networkTitle: String {
-        guard isOnline else { return "Hors connexion" }
+        guard isOnline else { return String(localized: "Hors connexion") }
         if networkStatus.isConstrained { return String(localized: "Réseau limité") }
         if let quality = networkQuality { return quality.level.homeNetworkTitle }
         return String(localized: "Connecté")
@@ -297,25 +309,25 @@ struct SignalQuestHomeView: View {
             if let mbps = quality.medianDownloadMbps {
                 return "\(operatorAndSource) · \(mbps) Mbps"
             }
-            return "\(operatorAndSource) · \(quality.sampleCount) mesures"
+            return "\(operatorAndSource) · " + String(localized: "\(quality.sampleCount) mesures")
         }
         switch networkStatus.connection {
         case .cellular:
             let tech = networkStatus.cellularTechnology?.displayName
-            return ["Cellulaire", tech, networkStatus.operatorName]
+            return [String(localized: "Cellulaire"), tech, networkStatus.operatorName]
                 .compactMap { $0 }
                 .joined(separator: " · ")
         case .wifi: return "Wi-Fi"
         case .wired: return "Ethernet"
-        case .other: return "Connexion inconnue"
+        case .other: return String(localized: "Connexion inconnue")
         }
     }
 
-    private var networkBadge: String {
-        guard isOnline else { return String(localized: "Coupé") }
-        if networkStatus.isConstrained { return String(localized: "Limité") }
-        if let quality = networkQuality { return quality.level.title }
-        return "En ligne"
+    /// Seul le verdict mérite une pastille : « Hors connexion · Coupé » ou
+    /// « Connecté · En ligne » répétaient le titre.
+    private var networkBadge: String? {
+        guard isOnline, !networkStatus.isConstrained else { return nil }
+        return networkQuality?.level.title
     }
 
     private var networkTint: Color {
@@ -354,7 +366,8 @@ struct SignalQuestHomeView: View {
             actionTile(
                 identifier: "community",
                 title: "Communauté",
-                subtitle: "Fil & entraide",
+                // Comme Messages : l'onglet mène à la connexion pour un invité.
+                subtitle: user == nil ? String(localized: "Connexion requise") : "Fil & entraide",
                 systemImage: "person.2"
             ) { router.selectedTab = .community }
 
@@ -372,7 +385,7 @@ struct SignalQuestHomeView: View {
         guard user != nil else { return String(localized: "Connexion requise") }
         let unread = services.unreadConversations
         if unread <= 0 { return String(localized: "Conversations") }
-        return unread == 1 ? "1 non lu" : "\(unread) non lus"
+        return unread == 1 ? String(localized: "1 non lu") : String(localized: "\(unread) non lus")
     }
 
     private func actionTile(

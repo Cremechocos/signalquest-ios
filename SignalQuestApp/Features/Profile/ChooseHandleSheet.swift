@@ -109,14 +109,14 @@ struct ChooseHandleSheet: View {
             return
         }
         if candidate.count < 2 {
-            status = .invalid; message = "Minimum 2 caractères."
+            status = .invalid; message = String(localized: "Minimum 2 caractères.")
             return
         }
         let raw = input
         checkTask = Task {
             try? await Task.sleep(nanoseconds: 350_000_000)
             if Task.isCancelled { return }
-            await MainActor.run { status = .checking; message = "Vérification de la disponibilité…" }
+            await MainActor.run { status = .checking; message = String(localized: "Vérification de la disponibilité…") }
             do {
                 let a = try await services.users.checkHandleAvailability(raw)
                 if Task.isCancelled { return }
@@ -125,14 +125,14 @@ struct ChooseHandleSheet: View {
                         status = .cooldown
                         message = Self.cooldownMessage(a.remainingDays ?? 0)
                     } else if a.available {
-                        status = .available; message = "Disponible."
+                        status = .available; message = String(localized: "Disponible.")
                     } else {
-                        status = .taken; message = "Déjà pris par un autre membre."
+                        status = .taken; message = String(localized: "Déjà pris par un autre membre.")
                     }
                 }
             } catch {
                 if Task.isCancelled { return }
-                await MainActor.run { status = .error; message = "Impossible de vérifier pour le moment." }
+                await MainActor.run { status = .error; message = String(localized: "Impossible de vérifier pour le moment.") }
             }
         }
     }

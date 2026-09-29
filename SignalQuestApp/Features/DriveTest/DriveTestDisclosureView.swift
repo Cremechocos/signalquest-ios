@@ -7,13 +7,14 @@ struct DriveTestDisclosureView: View {
     static let seenKey = "drivetest_speedtests_disclosure_seen_v2"
 
     let onAcknowledge: () -> Void
+    /// La mention des anciens brouillons ne concerne que les appareils qui en ont.
+    @State private var hasLegacyCoverageDrafts = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
+                // Pas de poignée : la feuille ne se ferme que par « J'ai compris ».
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    SQSheetHandle()
-
                     VStack(alignment: .leading, spacing: SQSpace.sm) {
                         Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
                             .font(.system(size: 30, weight: .semibold))
@@ -31,8 +32,8 @@ struct DriveTestDisclosureView: View {
                     VStack(alignment: .leading, spacing: SQSpace.md) {
                         row(
                             icon: "antenna.radiowaves.left.and.right",
-                            title: "Des résultats, sans collecte de couverture",
-                            detail: "Chaque speedtest garde ses débits, sa latence et sa position. Le suivi du trajet sert à espacer les tests ; aucun enregistrement de couverture n’est créé."
+                            title: "Seulement des speedtests",
+                            detail: "Chaque speedtest garde ses débits, sa latence et sa position. Le trajet sert seulement à espacer les tests."
                         )
                         row(
                             icon: "mappin.and.ellipse",
@@ -51,8 +52,10 @@ struct DriveTestDisclosureView: View {
                         )
                     }
 
-                    Text("Les anciens brouillons de couverture restent sur cet appareil et ne sont plus envoyés automatiquement.")
-                        .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                    if hasLegacyCoverageDrafts {
+                        Text("Les anciens brouillons de couverture restent sur cet appareil et ne sont plus envoyés automatiquement.")
+                            .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                    }
 
                     GradientButton("J'ai compris", systemImage: "checkmark") {
                         UserDefaults.standard.set(true, forKey: Self.seenKey)
@@ -66,6 +69,11 @@ struct DriveTestDisclosureView: View {
             .signalQuestBackground()
             .navigationTitle("Drive Test")
             .navigationBarTitleDisplayMode(.inline)
+        }
+        .task {
+            hasLegacyCoverageDrafts = await Task.detached(priority: .utility) {
+                !LocalCoverageArchiveReader.load().entries.isEmpty
+            }.value
         }
     }
 

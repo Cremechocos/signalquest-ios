@@ -155,7 +155,7 @@ struct TwoFactorSetupView: View {
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
             TextField("Code TOTP à 6 chiffres", text: $model.code,
-                      prompt: SQFormPrompt.text("Code TOTP à 6 chiffres"))
+                      prompt: SQFormPrompt.text("123 456"))
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
                 .autocorrectionDisabled()

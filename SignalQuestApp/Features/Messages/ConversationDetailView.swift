@@ -1728,7 +1728,7 @@ struct ConversationDetailView: View {
                let text = transcription.text, !text.isEmpty {
                 transcriptions[message.id] = text
             } else {
-                errorMessage = "Aucune transcription disponible pour ce message."
+                errorMessage = String(localized: "Aucune transcription disponible pour ce message.")
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -2071,7 +2071,7 @@ struct ConversationDetailView: View {
         }
         let expectedSessionID = services.api.credentials.snapshot().sessionID
         guard let location = await services.location.currentLocation(maxAge: 30) else {
-            errorMessage = "Position indisponible — autorise la localisation dans les réglages."
+            errorMessage = String(localized: "Position indisponible — autorise la localisation dans les réglages.")
             Haptics.error()
             return
         }
@@ -2157,17 +2157,17 @@ struct ConversationDetailView: View {
             conversationE2EE: isE2EE,
             verifiedV2: verifiedV2
         ) else {
-            errorMessage = "Cet appel nécessite E2EE v2 vérifié. Aucun appel non chiffré de bout en bout n’a été lancé."
+            errorMessage = String(localized: "Cet appel nécessite E2EE v2 vérifié. Aucun appel non chiffré de bout en bout n’a été lancé.")
             Haptics.error()
             return
         }
         guard conversation.participants.count >= 2 else {
-            errorMessage = "Aucun autre participant n’est disponible pour cet appel."
+            errorMessage = String(localized: "Aucun autre participant n’est disponible pour cet appel.")
             Haptics.error()
             return
         }
         guard CallLifecyclePolicy.canStartCall(participantCount: conversation.participants.count) else {
-            errorMessage = "Les appels de groupe sont limités à 8 participants."
+            errorMessage = String(localized: "Les appels de groupe sont limités à 8 participants.")
             Haptics.error()
             return
         }

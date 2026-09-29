@@ -75,6 +75,11 @@ targets:
       # rejet fréquent.
       - path: SignalQuestApp/Resources/InfoPlist.xcstrings
         buildPhase: resources
+      # Phrases Siri des raccourcis d'app : sans ces traductions, elles n'existent
+      # qu'en français et Siri ne les reconnaît pas sur un iPhone en anglais.
+      # Fichiers .strings par langue : AppShortcuts.xcstrings exige iOS 17.
+      - path: SignalQuestApp/Resources/AppShortcuts
+        buildPhase: resources
     configFiles:
       Debug: Config/Debug.xcconfig
       DebugBeta: Config/DebugBeta.xcconfig

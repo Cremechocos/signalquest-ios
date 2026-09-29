@@ -267,7 +267,7 @@ struct DriveTestPreflightSheet: View {
         case .storage: return String(localized: "Espace de stockage faible")
         case .battery: return String(localized: "Batterie faible")
         case .connectivity: return String(localized: "Connexion indisponible")
-        case .wifi: return String(localized: "WiFi détecté")
+        case .wifi: return String(localized: "Wi-Fi détecté")
         case .constrainedNetwork: return String(localized: "Mode données faibles actif")
         }
     }

@@ -246,7 +246,7 @@ final class ComposerViewModel: ObservableObject {
                 attachedSpeedtest = latest
                 Haptics.light()
             } else {
-                errorMessage = "Aucun speedtest enregistré pour le moment."
+                errorMessage = String(localized: "Aucun speedtest enregistré pour le moment.")
             }
         } catch {
             errorMessage = error.localizedDescription

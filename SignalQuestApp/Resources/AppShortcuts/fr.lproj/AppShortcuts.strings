@@ -1,0 +1,9 @@
+/* Langue source : les phrases du code sont déjà en français. */
+"Lance un speedtest avec ${applicationName}" = "Lance un speedtest avec ${applicationName}";
+"Teste mon débit avec ${applicationName}" = "Teste mon débit avec ${applicationName}";
+"Ouvre la carte ${applicationName}" = "Ouvre la carte ${applicationName}";
+"Montre les antennes avec ${applicationName}" = "Montre les antennes avec ${applicationName}";
+"Ouvre la messagerie ${applicationName}" = "Ouvre la messagerie ${applicationName}";
+"Ouvre mes messages ${applicationName}" = "Ouvre mes messages ${applicationName}";
+"Lance un drive test avec ${applicationName}" = "Lance un drive test avec ${applicationName}";
+"Démarre un drive test ${applicationName}" = "Démarre un drive test ${applicationName}";

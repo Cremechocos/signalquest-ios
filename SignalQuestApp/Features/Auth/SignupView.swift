@@ -31,7 +31,7 @@ struct SignupView: View {
 
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         SQFormFieldLabel("Nom affiché")
-                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Nom affiché"))
+                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Ex. Alex Martin"))
                             .textContentType(.name)
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Nom affiché")
@@ -40,7 +40,7 @@ struct SignupView: View {
 
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         SQFormFieldLabel("Email")
-                        TextField("Email", text: $email, prompt: SQFormPrompt.text("Email"))
+                        TextField("Email", text: $email, prompt: SQFormPrompt.text("nom@exemple.fr"))
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
                             .textContentType(.username)
@@ -58,7 +58,7 @@ struct SignupView: View {
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         SQFormFieldLabel("Mot de passe (min. 8 caractères)")
                         SecureField("Mot de passe (min. 8 caractères)", text: $password,
-                                    prompt: SQFormPrompt.text("Mot de passe (min. 8 caractères)"))
+                                    prompt: Text(verbatim: ""))
                             .textContentType(.newPassword)
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Mot de passe (min. 8 caractères)")
@@ -74,7 +74,7 @@ struct SignupView: View {
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         SQFormFieldLabel("Confirmer le mot de passe")
                         SecureField("Confirmer le mot de passe", text: $passwordConfirm,
-                                    prompt: SQFormPrompt.text("Confirmer le mot de passe"))
+                                    prompt: Text(verbatim: ""))
                             .textContentType(.newPassword)
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Confirmer le mot de passe")
@@ -201,7 +201,7 @@ struct SignupView: View {
             guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = credential.identityToken,
                   let identityToken = String(data: tokenData, encoding: .utf8) else {
-                session.errorMessage = "Jeton Apple manquant. Réessaie."
+                session.errorMessage = String(localized: "Jeton Apple manquant. Réessaie.")
                 return
             }
             let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
@@ -216,7 +216,7 @@ struct SignupView: View {
             }
         case .failure(let error):
             if (error as? ASAuthorizationError)?.code == .canceled { return }
-            session.errorMessage = "Connexion Apple impossible. Réessaie."
+            session.errorMessage = String(localized: "Connexion Apple impossible. Réessaie.")
         }
     }
 

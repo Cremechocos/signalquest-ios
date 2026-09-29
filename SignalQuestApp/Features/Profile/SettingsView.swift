@@ -63,7 +63,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         } catch {
             currentDeviceId = nil
             devices = []
-            errorMessage = "L’identité locale E2EE v2 est illisible. Elle n’a pas été remplacée automatiquement."
+            errorMessage = String(localized: "L’identité locale E2EE v2 est illisible. Elle n’a pas été remplacée automatiquement.")
             return
         }
         guard currentDeviceId != nil else {
@@ -790,7 +790,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
         } catch {
             currentDeviceStatus = nil
             identityGeneration = nil
-            errorMessage = "L’identité locale E2EE v2 est illisible."
+            errorMessage = String(localized: "L’identité locale E2EE v2 est illisible.")
             return
         }
         guard let localDeviceId else {
@@ -834,7 +834,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
     func restoreWithRecoveryKey() async {
         guard activationEnabled, !isBusy, var key = Self.strictRecoveryKey(recoveryInput) else {
             if !recoveryInput.isEmpty {
-                errorMessage = "Clé invalide : saisissez la clé Base64 complète de 256 bits."
+                errorMessage = String(localized: "Clé invalide : saisissez la clé Base64 complète de 256 bits.")
             }
             return
         }
@@ -853,7 +853,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
                 return
             }
         } else if currentDeviceStatus != .approved {
-            errorMessage = "Cet appareil ne peut pas utiliser la récupération."
+            errorMessage = String(localized: "Cet appareil ne peut pas utiliser la récupération.")
             return
         }
 

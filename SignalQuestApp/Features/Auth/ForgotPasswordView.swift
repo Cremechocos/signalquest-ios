@@ -43,7 +43,7 @@ struct ForgotPasswordView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
                             SQFormFieldLabel("Email")
-                            TextField("Email", text: $email, prompt: SQFormPrompt.text("Email"))
+                            TextField("Email", text: $email, prompt: SQFormPrompt.text("nom@exemple.fr"))
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.emailAddress)
                                 .textContentType(.username)

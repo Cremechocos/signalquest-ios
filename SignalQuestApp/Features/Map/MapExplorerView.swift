@@ -1966,7 +1966,11 @@ struct MapExplorerView: View {
             renderVersion: renderVersion,
             viewportRefreshID: viewportRefreshID,
             colorScheme: colorScheme,
-            ornamentBottomInset: horizontalSizeClass == .regular ? SQSpace.sm : SQDock.clearance,
+            // iPad : la mention légale d'Apple passe au-dessus de la rangée du bas
+            // (pastille opérateur de 44 pt), qui la masquait en partie.
+            ornamentBottomInset: horizontalSizeClass == .regular
+                ? SQDock.floatingContentInset + 44 + SQSpace.xs
+                : SQDock.clearance,
             center: $mapCenter,
             zoom: $mapZoom,
             onMoveEnd: { viewport, region in
@@ -2613,9 +2617,9 @@ struct MapExplorerView: View {
                 // simple indisponibilité, au lieu d'un message générique opaque (UXP-08).
                 let status = services.location.authorizationStatus
                 if status == .denied || status == .restricted {
-                    model.errorMessage = "Localisation désactivée. Active-la dans Réglages > SignalQuest pour te localiser sur la carte."
+                    model.errorMessage = String(localized: "Localisation désactivée. Active-la dans Réglages > SignalQuest pour te localiser sur la carte.")
                 } else {
-                    model.errorMessage = "Position actuelle indisponible"
+                    model.errorMessage = String(localized: "Position actuelle indisponible")
                 }
             }
         }

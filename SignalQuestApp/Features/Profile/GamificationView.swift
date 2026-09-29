@@ -693,79 +693,79 @@ private struct GamificationEventDisplay {
             icon = "checkmark.seal.fill"
             tint = SQColor.success; tintSoft = SQColor.successSoft
         case "speedtest", "speed_test":
-            title = "Speedtest"
+            title = String(localized: "Speedtest")
             icon = "speedometer"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case "daily_login", "login_streak":
-            title = "Connexion quotidienne"
+            title = String(localized: "Connexion quotidienne")
             icon = "calendar"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case "badge_earned", "badge":
-            title = "Badge obtenu"
+            title = String(localized: "Badge obtenu")
             icon = "rosette"
             tint = SQColor.warning; tintSoft = SQColor.warningSoft
         case "photo_upload", "photo":
-            title = "Photo publiée"
+            title = String(localized: "Photo publiée")
             icon = "camera.fill"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case "level_up":
-            title = "Niveau supérieur"
+            title = String(localized: "Niveau supérieur")
             icon = "arrow.up.circle.fill"
             tint = SQColor.warning; tintSoft = SQColor.warningSoft
         case "session", "drive_test", "drive":
-            title = "Session terrain"
+            title = String(localized: "Session terrain")
             icon = "car.fill"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case "identification", "antenna_identification":
-            title = "Antenne identifiée"
+            title = String(localized: "Antenne identifiée")
             icon = "antenna.radiowaves.left.and.right"
             tint = SQColor.success; tintSoft = SQColor.successSoft
         case "post", "story", "comment":
-            title = "Partage communauté"
+            title = String(localized: "Partage communauté")
             icon = "bubble.left.and.bubble.right.fill"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case "coverage", "coverage_upload", "measurement", "coverage_measurement":
-            title = "Mesure de couverture"
+            title = String(localized: "Mesure de couverture")
             icon = "dot.radiowaves.left.and.right"
             tint = SQColor.success; tintSoft = SQColor.successSoft
         case "quest", "quest_completed", "quest_complete", "quest_claim":
-            title = "Quête accomplie"
+            title = String(localized: "Quête accomplie")
             icon = "flag.checkered"
             tint = SQColor.warning; tintSoft = SQColor.warningSoft
         case "streak_bonus":
-            title = "Bonus de série"
+            title = String(localized: "Bonus de série")
             icon = "flame.fill"
             tint = SQColor.warning; tintSoft = SQColor.warningSoft
         case "new_site_visited":
-            title = "Nouveau site visité"
+            title = String(localized: "Nouveau site visité")
             icon = "mappin.and.ellipse"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case "new_department":
-            title = "Nouveau département"
+            title = String(localized: "Nouveau département")
             icon = "map.fill"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case "custom_site_created":
-            title = "Site ajouté à la carte"
+            title = String(localized: "Site ajouté à la carte")
             icon = "plus.viewfinder"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case "antenna_report":
-            title = "Signalement accepté"
+            title = String(localized: "Signalement accepté")
             icon = "checkmark.shield.fill"
             tint = SQColor.success; tintSoft = SQColor.successSoft
         case "bug_report_resolved":
-            title = "Bug confirmé"
+            title = String(localized: "Bug confirmé")
             icon = "ladybug.fill"
             tint = SQColor.success; tintSoft = SQColor.successSoft
         case "coverage_session_completed":
-            title = "Session terrain terminée"
+            title = String(localized: "Session terrain terminée")
             icon = "car.fill"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case "admob_reward":
-            title = "Récompense bonus"
+            title = String(localized: "Récompense bonus")
             icon = "gift.fill"
             tint = SQColor.warning; tintSoft = SQColor.warningSoft
         case let raw? where raw.hasPrefix("canada_"):
-            title = "Easter egg Canada"
+            title = String(localized: "Easter egg Canada")
             icon = "leaf.fill"
             tint = SQColor.danger; tintSoft = SQColor.dangerSoft
         case let raw?:
@@ -775,7 +775,7 @@ private struct GamificationEventDisplay {
             icon = "sparkles"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         case nil:
-            title = "Événement"
+            title = String(localized: "Événement")
             icon = "sparkles"
             tint = SQColor.brandRed; tintSoft = SQColor.accentSoft
         }

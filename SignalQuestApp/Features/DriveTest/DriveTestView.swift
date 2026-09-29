@@ -39,7 +39,7 @@ final class DriveTestViewModel: ObservableObject {
     @Published private(set) var testCount = 0
     @Published private(set) var summary: SpeedtestBurstSummary?
     @Published private(set) var lastResult: SpeedtestRunResult?
-    @Published private(set) var statusLabel = "Prêt"
+    @Published private(set) var statusLabel = String(localized: "Prêt")
     @Published private(set) var errorMessage: String?
     /// Vrai quand la localisation est refusée/restreinte : le Drive Test ne peut
     /// placer les speedtests sur le trajet. La vue propose alors les Réglages.
@@ -141,9 +141,17 @@ final class DriveTestViewModel: ObservableObject {
     /// avancer la session : la distance ne sert plus qu'à mesurer plus tôt quand on
     /// roule (cf. `waitUntilNextTestIsDue`).
     static let maxSecondsBetweenTests = 30
-    /// Plafond par défaut : 5 Go. Au-delà, la session s'arrête proprement et le
-    /// dit — jamais en silence.
-    static let defaultDataCapMegabytes = 5_120
+    /// Plafond par défaut : 5 Go (Mo décimaux, comme le compteur). Au-delà, la
+    /// session s'arrête proprement et le dit — jamais en silence.
+    static let defaultDataCapMegabytes = 5_000
+
+    /// L'ancien défaut 5 120 Mo s'affichait « 5,12 Go » : ramené aux 5 Go annoncés,
+    /// sinon le choix enregistré ne correspond plus à aucune option.
+    static func migrateLegacyDataCap(_ defaults: UserDefaults = .standard) {
+        if defaults.object(forKey: "speedtest_drive_data_cap_mb") as? Int == 5_120 {
+            defaults.set(defaultDataCapMegabytes, forKey: "speedtest_drive_data_cap_mb")
+        }
+    }
 
     private var testIntervalMeters: Double {
         let stored = UserDefaults.standard.object(forKey: "speedtest_drive_interval_meters") as? Int
@@ -256,8 +264,8 @@ final class DriveTestViewModel: ObservableObject {
         switch services.location.authorizationStatus {
         case .denied, .restricted:
             locationDenied = true
-            statusLabel = "Localisation désactivée"
-            errorMessage = "Le Drive Test a besoin de ta position pour placer les speedtests sur le trajet. Active la localisation dans les Réglages, puis relance."
+            statusLabel = String(localized: "Localisation désactivée")
+            errorMessage = String(localized: "Le Drive Test a besoin de ta position pour placer les speedtests sur le trajet. Active la localisation dans les Réglages, puis relance.")
             return
         default:
             locationDenied = false
@@ -291,8 +299,8 @@ final class DriveTestViewModel: ObservableObject {
         // reprend automatiquement au retour en cellulaire.
         isPausedForWiFi = Self.isWiFiConnection(services.networkPath.status.connection)
         statusLabel = isPausedForWiFi
-            ? "En pause — WiFi détecté"
-            : "Démarrage…"
+            ? String(localized: "En pause — Wi-Fi détecté")
+            : String(localized: "Démarrage…")
         services.location.startTracking()
         UIApplication.shared.isIdleTimerDisabled = true
         // La Live Activity suit les speedtests du trajet.
@@ -317,7 +325,7 @@ final class DriveTestViewModel: ObservableObject {
             UIApplication.shared.isIdleTimerDisabled = false
             liveActivity.cancel()
             background.end()
-            statusLabel = "Arrêté"
+            statusLabel = String(localized: "Arrêté")
             lastSessionRecap = makeSessionRecap()
             // Draine la file des speedtests en attente (sinon rejeu uniquement à la
             // prochaine visite de l'onglet Speed) : un échec réseau/auth n'est plus perdu.
@@ -368,12 +376,12 @@ final class DriveTestViewModel: ObservableObject {
         sessionTask = nil
         liveMbps = 0
         livePhase = .idle
-        statusLabel = "En pause — WiFi détecté"
+        statusLabel = String(localized: "En pause — Wi-Fi détecté")
         // La Live Activity restait figée sur le dernier test : écran verrouillé,
         // rien ne distinguait une session en pause d'une session qui mesure.
         do {
             liveActivity.update(
-                phaseLabel: String(localized: "En pause — WiFi détecté"),
+                phaseLabel: String(localized: "En pause — Wi-Fi détecté"),
                 downloadMbps: liveDownload,
                 uploadMbps: liveUpload,
                 pingMs: livePing,
@@ -386,7 +394,7 @@ final class DriveTestViewModel: ObservableObject {
 
     private func resumeAfterWiFi() {
         isPausedForWiFi = false
-        statusLabel = "Reprise…"
+        statusLabel = String(localized: "Reprise…")
         if sessionTask == nil {
             sessionTask = Task { await runLoop() }
         }
@@ -712,7 +720,7 @@ final class DriveTestViewModel: ObservableObject {
 
             testCount += 1
             errorMessage = nil
-            statusLabel = "Test \(testCount) en cours…"
+            statusLabel = String(localized: "Test \(testCount) en cours…")
             lastTestCoordinate = services.location.cachedLocation()?.coordinate
             do {
                 let result = try await runOneTest()
@@ -725,7 +733,7 @@ final class DriveTestViewModel: ObservableObject {
                 lastResult = result
                 accumulator.add(result)
                 summary = accumulator.summary(truncatedAt: nil)
-                statusLabel = "Test \(testCount) terminé"
+                statusLabel = String(localized: "Test \(testCount) terminé")
                 if result.coordinate == nil, errorMessage == nil {
                     errorMessage = String(localized: "Position indisponible")
                 }
@@ -1068,7 +1076,7 @@ struct DriveTestView: View {
     /// on informe AVANT que l'utilisateur ait décidé de partir, pas après.
     @State private var showDisclosure = false
     @AppStorage("speedtest_drive_interval_meters") private var driveIntervalMeters = 500
-    @AppStorage("speedtest_drive_data_cap_mb") private var driveDataCapMB = 5_120
+    @AppStorage("speedtest_drive_data_cap_mb") private var driveDataCapMB = 5_000
     /// Le préflight est une interface d'exception : `nil` quand tout est prêt,
     /// sinon uniquement les avertissements ou blocages réellement observables.
     @State private var preflightReport: DriveTestPreflightReport?
@@ -1093,6 +1101,7 @@ struct DriveTestView: View {
         .navigationTitle("Drive Test")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            DriveTestViewModel.migrateLegacyDataCap()
             model.onAppear()
             if !UserDefaults.standard.bool(forKey: DriveTestDisclosureView.seenKey) {
                 showDisclosure = true
@@ -1300,7 +1309,7 @@ struct DriveTestView: View {
     private var driveTestPurpose: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             Text("Des speedtests pendant ton trajet").font(SQType.subhead)
-            Text("Les tests suivent la distance et le plafond choisis. Les résultats gardent leur position ; aucune collecte de couverture.")
+            Text("Les tests suivent la distance et le plafond choisis. Chaque résultat garde sa position.")
                 .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
             HStack {
                 Text("Distance entre tests").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
@@ -1320,7 +1329,7 @@ struct DriveTestView: View {
                 Picker("Plafond de données", selection: $driveDataCapMB) {
                     Text("500 Mo").tag(500)
                     Text("2 Go").tag(2_000)
-                    Text("5,12 Go").tag(5_120)
+                    Text("5 Go").tag(5_000)
                     Text("Sans limite").tag(0)
                 }
                 .pickerStyle(.menu).labelsHidden().tint(SQColor.accentInk).frame(minHeight: 44)
@@ -1419,7 +1428,7 @@ struct DriveTestView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(SQColor.warning)
             VStack(alignment: .leading, spacing: 1) {
-                Text("En pause — WiFi détecté")
+                Text("En pause — Wi-Fi détecté")
                     .font(SQFont.body(13, .semibold))
                     .foregroundStyle(SQColor.label)
                 Text("Reprise automatique en cellulaire")
@@ -1433,7 +1442,7 @@ struct DriveTestView: View {
         .frame(maxWidth: .infinity)
         .background(SQColor.warningSoft, in: Capsule(style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Session en pause : WiFi détecté, reprise automatique en cellulaire")
+        .accessibilityLabel("Session en pause : Wi-Fi détecté, reprise automatique en cellulaire")
     }
 
     private var liveReadout: some View {
@@ -1490,10 +1499,12 @@ struct DriveTestView: View {
                 Text(operatorRowTitle)
                     .font(SQFont.body(15, .semibold))
                     .foregroundStyle(SQColor.label)
-                Text(operatorRowSubtitle)
-                    .font(SQFont.body(11.5))
-                    .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.warning : SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let subtitle = operatorRowSubtitle {
+                    Text(subtitle)
+                        .font(SQFont.body(11.5))
+                        .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.warning : SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer()
         }
@@ -1503,7 +1514,7 @@ struct DriveTestView: View {
         .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Opérateur détecté")
-        .accessibilityValue(model.displayedOperatorLabel.map { "\($0), \(operatorRowSubtitle)" } ?? operatorRowTitle)
+        .accessibilityValue(model.displayedOperatorLabel.map { [$0, operatorRowSubtitle].compactMap { $0 }.joined(separator: ", ") } ?? operatorRowTitle)
     }
 
     private var operatorRowTitle: String {
@@ -1516,8 +1527,9 @@ struct DriveTestView: View {
     /// « Détection en cours… » restait affiché indéfiniment quand l'opérateur
     /// n'était pas résolvable — WiFi, VPN, ou pays absent du registre. Après
     /// plusieurs échecs on annonce le résultat et ses conséquences, plutôt que de
-    /// laisser tourner un message d'attente qui n'attend plus rien.
-    private var operatorRowSubtitle: String {
+    /// laisser tourner un message d'attente qui n'attend plus rien. Pendant la
+    /// détection, le titre suffit : pas de sous-titre qui le répète.
+    private var operatorRowSubtitle: String? {
         if model.displayedOperatorLabel != nil {
             switch model.operatorSource {
             case .sim: return String(localized: "Information SIM")
@@ -1525,7 +1537,7 @@ struct DriveTestView: View {
             case nil: return String(localized: "Opérateur non détecté")
             }
         }
-        guard model.operatorDetectionGaveUp else { return String(localized: "Détection en cours…") }
+        guard model.operatorDetectionGaveUp else { return nil }
         return String(localized: "L’opérateur ne peut pas être confirmé. Les résultats restent disponibles dans ton historique.")
     }
 
