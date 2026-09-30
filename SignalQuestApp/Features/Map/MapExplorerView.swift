@@ -1585,6 +1585,9 @@ struct MapExplorerView: View {
     // Écrans ANFR, repris du menu Profil : c'est ici qu'on cherche une carte.
     @State private var showsANFRMap = false
     @State private var showsANFRStats = false
+    /// Écran ANFR demandé depuis la feuille de filtres, ouvert à sa fermeture :
+    /// naviguer pendant la transition de la feuille échouait.
+    @State private var pendingANFR: MapANFRDestination?
 
     init(service: MapSnapshotServicing,
          antennas: AntennasServicing,
@@ -1684,12 +1687,20 @@ struct MapExplorerView: View {
                 operatorAccent: { model.operatorAccent($0) }
             )
         }
-        .sheet(isPresented: $showFilterSheet) {
+        .sheet(isPresented: $showFilterSheet, onDismiss: {
+            guard let destination = pendingANFR else { return }
+            pendingANFR = nil
+            switch destination {
+            case .map: showsANFRMap = true
+            case .stats: showsANFRStats = true
+            }
+        }) {
             MapAdvancedFilterSheet(
                 selection: filterSelection,
                 allMarkets: model.registryMarkets,
                 dromRegion: model.currentDromRegion,
                 showsFriendsLayer: services.auth.hasStoredCredentials(),
+                onOpenANFR: { pendingANFR = $0 },
                 onApply: applyFilterSelection
             )
             .presentationDetents([.medium, .large], selection: $filterSheetDetent)
@@ -2288,32 +2299,7 @@ struct MapExplorerView: View {
         HStack(spacing: SQSpace.sm) {
             mapSearchField
             filterButton
-            anfrButton
         }
-    }
-
-    /// Accès aux données ANFR — le référentiel public des antennes.
-    ///
-    /// Elles vivaient dans le menu du Profil, où personne ne va chercher une
-    /// carte. Elles appartiennent à l'onglet Carte : c'est la même matière que
-    /// ce qui est affiché ici, sous un autre angle.
-    private var anfrButton: some View {
-        Menu {
-            Button { showsANFRMap = true } label: {
-                Label("Carte ANFR", systemImage: "map.fill")
-            }
-            Button { showsANFRStats = true } label: {
-                Label("Statistiques ANFR", systemImage: "chart.bar.xaxis")
-            }
-        } label: {
-            Image(systemName: "building.2.fill")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(SQColor.label)
-                .frame(width: 44, height: 44)
-                .background { mapGlassBackground(Circle()) }
-                .sqShadowCard()
-        }
-        .accessibilityLabel("Données ANFR")
     }
 
     /// Barre de recherche flottante : capsule 42 pt « verre crème » + blur,

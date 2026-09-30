@@ -245,6 +245,30 @@ final class PrivacySettingsViewModel: ObservableObject {
         } catch { handleMutationError(error); return false }
     }
 
+    /// Enregistrement immédiat (TRX-03) : chaque changement part aussitôt, un
+    /// changement fait pendant l'envoi part juste après, et un échec remet à
+    /// l'écran ce qui est vraiment enregistré au lieu d'un brouillon qui ment.
+    /// Renvoie `true` quand tout ce qui est affiché est enregistré.
+    @discardableResult
+    func autoSave() async -> Bool {
+        // Un envoi est déjà en cours : sa boucle reprendra ce changement.
+        guard !isSaving else { return false }
+        while checkSession(), hasPrivacyChanges {
+            guard canSavePrivacy else { return false }
+            let before = privacyBaseline
+            let sent = currentPrivacy
+            _ = await save()
+            guard checkSession() else { return false }
+            if privacyBaseline == before {
+                // Pas de reçu du serveur : revenir à l'état enregistré, sauf si
+                // l'utilisateur a déjà changé autre chose entre-temps.
+                if currentPrivacy == sent, let baseline = privacyBaseline { apply(baseline) }
+                return false
+            }
+        }
+        return checkSession() && !hasPrivacyChanges
+    }
+
     private var currentPrivacy: SocialPrivacy {
         SocialPrivacy(shareLiveLocationWithFriends: shareLiveLocationWithFriends,
             shareRadioDataWithFriends: shareRadioDataWithFriends, shareSessionsWithFriends: shareSessionsWithFriends,

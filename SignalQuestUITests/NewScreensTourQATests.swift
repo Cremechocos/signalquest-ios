@@ -96,7 +96,7 @@ final class NewScreensTourQATests: XCTestCase {
         profile.tap()
         _ = app.staticTexts.firstMatch.waitForExistence(timeout: 6)
 
-        // Territoires est resté dans le Profil, en tuile sous l'en-tête.
+        // Territoires est resté dans le Profil, en ligne de « Mes contributions » (Lot 4g).
         let territories = app.staticTexts[labels.territories].firstMatch
         if territories.waitForExistence(timeout: 6) {
             territories.tap()

@@ -127,9 +127,9 @@ struct SentinelleBoxView: View {
                     Spacer(minLength: 0)
                 }
                 if let probe = SignalFormatters.date(target.lastProbeAt, includingTime: true, relative: true) {
-                    Text("Dernière salve \(probe).")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                    Text("Dernière mesure \(probe).")
+                        .font(.footnote)
+                        .foregroundStyle(SQColor.label)
                 }
                 SentinelleSuspendedNote(target: target)
                 SentinelleOutagesLine(incidents: incidents)
@@ -150,9 +150,9 @@ struct SentinelleBoxView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 SentinelleSectionTitle(title: "IPv4 et IPv6, côte à côte", systemImage: "arrow.left.arrow.right")
-                Text("Deux piles réseau distinctes, mesurées séparément. Les superposer est le seul moyen de voir laquelle décroche.")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                Text("Les deux versions d’Internet, mesurées séparément : les superposer montre laquelle décroche.")
+                    .font(.footnote)
+                    .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
                 SentinelleWindowPicker(selection: $window)
                 comparisonChart

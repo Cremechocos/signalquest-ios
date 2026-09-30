@@ -29,6 +29,8 @@ struct ProfileView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let user: AuthUser
+    /// Écrans nourris par l'app Android, montrés seulement avec des données.
+    @StateObject private var androidPresence: AndroidDataPresence
     @State private var showEdit = false
     @State private var stats: UserStats?
     @State private var statsError: String?
@@ -42,6 +44,15 @@ struct ProfileView: View {
     @State private var deepLinkShare: SentinelleDeepLink?
     /// Nouvel appareil à examiner après un tap sur une notification E2EE v2.
     @State private var deepLinkE2EEApproval: E2EEDeviceApprovalDeepLink?
+    /// Écran Notifications ouvert depuis les Réglages d'iOS (TRX-21).
+    @State private var showNotificationSettings = false
+    /// La déconnexion se confirme : un appui accidentel coupait la session (TRX-31).
+    @State private var confirmLogout = false
+
+    init(user: AuthUser) {
+        self.user = user
+        _androidPresence = StateObject(wrappedValue: AndroidDataPresence(ownerScope: "user:\(user.id)"))
+    }
 
     var body: some View {
         ScrollView {
@@ -79,7 +90,15 @@ struct ProfileView: View {
                 menuCard
 
                 GradientButton("Déconnexion", systemImage: "rectangle.portrait.and.arrow.right", style: .destructive) {
-                    Task { await session.logout() }
+                    confirmLogout = true
+                }
+                .confirmationDialog("Te déconnecter ?", isPresented: $confirmLogout, titleVisibility: .visible) {
+                    Button("Se déconnecter", role: .destructive) {
+                        Task { await session.logout() }
+                    }
+                    Button("Annuler", role: .cancel) {}
+                } message: {
+                    Text("Tu pourras te reconnecter à tout moment avec ton compte.")
                 }
             }
             .padding(.horizontal, SQSpace.xl)
@@ -124,17 +143,30 @@ struct ProfileView: View {
                 E2EEV2TrustedDevicesView(api: services.api, initialApprovalId: link.id)
             }
         }
+        .sheet(isPresented: $showNotificationSettings) {
+            NavigationStack {
+                NotificationSettingsView(userService: services.users)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("OK") { showNotificationSettings = false }
+                        }
+                    }
+            }
+        }
         .onAppear {
             consumeAntennaReportDeepLink()
             consumeSentinelleDeepLink()
             consumeShareDeepLink()
             consumeE2EEApprovalDeepLink()
+            consumeNotificationSettingsDeepLink()
         }
+        .onChangeCompat(of: router.openNotificationSettings) { _, _ in consumeNotificationSettingsDeepLink() }
         .onChangeCompat(of: router.openSentinelleShareSlug) { _, _ in consumeShareDeepLink() }
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
         .onChangeCompat(of: router.openSentinelle) { _, _ in consumeSentinelleDeepLink() }
         .onChangeCompat(of: router.openE2EEDeviceApprovalId) { _, _ in consumeE2EEApprovalDeepLink() }
         .task { await loadStats() }
+        .task { await refreshAndroidPresence() }
         .refreshable { await loadStats() }
     }
 
@@ -161,6 +193,12 @@ struct ProfileView: View {
         guard let id = router.openAntennaReportId else { return }
         router.openAntennaReportId = nil
         deepLinkReport = AntennaReportDeepLink(id: id)
+    }
+
+    private func consumeNotificationSettingsDeepLink() {
+        guard router.openNotificationSettings else { return }
+        router.openNotificationSettings = false
+        showNotificationSettings = true
     }
 
     private func consumeE2EEApprovalDeepLink() {
@@ -334,13 +372,25 @@ struct ProfileView: View {
 
     private var menuCard: some View {
         VStack(spacing: SQSpace.lg) {
-            menuSection("Mes relevés") {
+            // Remontés des Réglages (MES-21, TRX-22) : Sentinelle, l'une des
+            // rares fonctions Premium utilisées, était à cinq niveaux.
+            menuSection("Mes suivis") {
                 NavigationLink {
-                    SessionsListView(service: services.sessions)
+                    SentinelleView(service: services.sentinelle)
                 } label: {
-                    menuRow(title: "Mes enregistrements de trajet", icon: "point.topleft.down.curvedto.point.bottomright.up")
+                    menuRow(title: "Sentinelle", icon: "wifi.router")
                 }
                 menuSeparator
+                NavigationLink {
+                    FavoriteAntennasView(favorites: services.favoriteAntennas) { favorite in
+                        router.route(toSite: favorite.siteId)
+                    }
+                } label: {
+                    menuRow(title: "Antennes suivies", icon: "star.fill")
+                }
+            }
+
+            menuSection("Mes contributions") {
                 NavigationLink {
                     MyMeasurementsView(service: services.sessions)
                 } label: {
@@ -348,19 +398,9 @@ struct ProfileView: View {
                 }
                 menuSeparator
                 NavigationLink {
-                    RadioLogsView(
-                        service: services.radioLogs,
-                        antennas: services.antennas,
-                        networkPath: services.networkPath
-                    )
+                    PhotosView(service: services.photos)
                 } label: {
-                    menuRow(title: "Logs antennes", icon: "antenna.radiowaves.left.and.right")
-                }
-                menuSeparator
-                NavigationLink {
-                    MyIdentificationsView(service: services.identify)
-                } label: {
-                    menuRow(title: "Mes identifications", icon: "checkmark.seal")
+                    menuRow(title: "Photos", icon: "photo.stack")
                 }
                 menuSeparator
                 NavigationLink {
@@ -375,10 +415,41 @@ struct ProfileView: View {
                     menuRow(title: "Pannes signalées", icon: "exclamationmark.triangle.fill")
                 }
                 menuSeparator
+                // Territoires : plus en tuile sous le niveau (décision du 29/09).
                 NavigationLink {
-                    PhotosView(service: services.photos)
+                    TerritoriesView(service: services.gamification)
                 } label: {
-                    menuRow(title: "Photos", icon: "photo.stack")
+                    menuRow(title: "Territoires", icon: "square.grid.3x3.fill")
+                }
+            }
+
+            // Écrans nourris par l'app Android : affichés seulement si le compte
+            // a de telles données, sinon une ligne dit ce qu'ils apportent.
+            menuSection("Avancé") {
+                if androidPresence.showsAndroidScreens {
+                    NavigationLink {
+                        SessionsListView(service: services.sessions)
+                    } label: {
+                        menuRow(title: "Mes enregistrements de trajet", icon: "point.topleft.down.curvedto.point.bottomright.up")
+                    }
+                    menuSeparator
+                    NavigationLink {
+                        RadioLogsView(
+                            service: services.radioLogs,
+                            antennas: services.antennas,
+                            networkPath: services.networkPath
+                        )
+                    } label: {
+                        menuRow(title: "Logs antennes", icon: "antenna.radiowaves.left.and.right")
+                    }
+                    menuSeparator
+                    NavigationLink {
+                        MyIdentificationsView(service: services.identify)
+                    } label: {
+                        menuRow(title: "Mes identifications", icon: "checkmark.seal")
+                    }
+                } else {
+                    androidHint
                 }
             }
 
@@ -409,6 +480,50 @@ struct ProfileView: View {
                 .accessibilityIdentifier("profile.glossary")
             }
         }
+    }
+
+    /// Sans données Android : ce que l'app Android ajoute, plutôt que trois
+    /// écrans vides.
+    private var androidHint: some View {
+        HStack(alignment: .top, spacing: SQSpace.md + 1) {
+            Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(Color.primary)
+                .frame(width: 36, height: 36)
+                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Avec l’app Android")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(SQColor.label)
+                Text("Elle enregistre tes trajets, tient un journal des antennes captées et aide à les identifier. Ces écrans apparaissent ici dès qu’elle a envoyé des données.")
+                    .font(.footnote)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.md + 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("profile.android.hint")
+    }
+
+    /// Vérifie, au besoin, si le compte a des données Android (trajets,
+    /// identifications, journal radio local).
+    private func refreshAndroidPresence() async {
+        guard !AppEnvironment.usesDemoData else { return }
+        let sessions = services.sessions
+        let identify = services.identify
+        let radioLogs = services.radioLogs
+        await androidPresence.refresh(
+            sessionsTotal: {
+                guard let page = try? await sessions.sessions(offset: 0, limit: 1) else { return nil }
+                return page.pagination?.total ?? page.sessions.count
+            },
+            identifications: { (try? await identify.mine(includeRelated: false))?.count },
+            hasLocalLogs: { !radioLogs.cachedSnapshot().entries.isEmpty }
+        )
     }
 
     /// Une section du menu : intertitre discret + carte. L'intertitre est en
@@ -452,9 +567,6 @@ struct ProfileView: View {
         }
         progressionTile("Classements", icon: "trophy.fill") {
             LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
-        }
-        progressionTile("Territoires", icon: "square.grid.3x3.fill") {
-            TerritoriesView(service: services.gamification)
         }
     }
 

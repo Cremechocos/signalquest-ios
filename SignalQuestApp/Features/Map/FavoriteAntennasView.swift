@@ -6,6 +6,7 @@ import SwiftUI
 /// et met l'interrupteur de notification AVANT la liste. Sans lui, on pourrait suivre dix sites
 /// et ne jamais comprendre pourquoi rien n'arrive.
 struct FavoriteAntennasView: View {
+    @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var networkPath: NetworkPathMonitor
     @ObservedObject var favorites: FavoriteAntennasService
     /// Ouvre la fiche du site depuis la liste. `nil` quand l'écran est présenté hors carte.
@@ -22,6 +23,10 @@ struct FavoriteAntennasView: View {
                         set: { newValue in
                             guard let scope = favorites.captureActionScope() else { return }
                             Task { await favorites.setNotifyOnIssues(newValue, matching: scope) }
+                            // Une alerte sans notifications n'arrive jamais (TRX-01).
+                            if newValue {
+                                Task { await services.notificationPriming.considerPriming(after: .antennaAlert) }
+                            }
                         }
                     )
                 )

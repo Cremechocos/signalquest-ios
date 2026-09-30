@@ -69,7 +69,7 @@ extension TerritoryCell {
 
     /// Couleur de remplissage.
     ///
-    /// La zone blanche (`virgin`) est volontairement la plus DISCRÈTE : c'est
+    /// La zone inexplorée (`virgin`) est volontairement la plus DISCRÈTE : c'est
     /// l'état par défaut de la carte, la peindre vivement ferait un damier
     /// illisible. Ce sont les zones conquises qui doivent ressortir.
     var fillColor: UIColor {
@@ -88,13 +88,15 @@ extension TerritoryCell {
             : UIColor(SQColor.label).withAlphaComponent(0.12)
     }
 
+    /// « Zone blanche » veut dire « sans réseau » en France : une zone que
+    /// personne n'a encore explorée est « inexplorée » (SOC-39).
     var statusLabel: String {
         switch status {
-        case .virgin: return "Zone blanche"
-        case .observed: return "Observée"
-        case .reliable: return "Fiable"
-        case .complete: return "Complète"
-        case .stale: return "À rafraîchir"
+        case .virgin: return String(localized: "Zone inexplorée")
+        case .observed: return String(localized: "Observée")
+        case .reliable: return String(localized: "Fiable")
+        case .complete: return String(localized: "Complète")
+        case .stale: return String(localized: "À rafraîchir")
         }
     }
 }

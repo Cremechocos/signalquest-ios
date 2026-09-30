@@ -120,16 +120,16 @@ struct AppRootView: View {
     @AppStorage(SQFieldMode.storageKey) private var fieldMode = false
 
     /// Enregistre les notifications APNs + le token VoIP dès que la session
-    /// devient authentifiée. Idempotent : `requestAuthorizationAndRegister` ne
-    /// re-sollicite pas l'autorisation déjà déterminée et `registerForVoIPPushes`
-    /// garde sur `voipRegistry == nil`.
+    /// devient authentifiée. Ne pose jamais la question des notifications
+    /// (TRX-01) : `registerIfAuthorized` n'enregistre que si elles sont déjà
+    /// autorisées ; `registerForVoIPPushes` garde sur `voipRegistry == nil`.
     @MainActor
     private func registerPushIfAuthenticated(_ state: AuthSessionViewModel.State) async {
         guard case .authenticated = state, hasCompletedOnboarding else { return }
         // En démo/QA, ne pas solliciter l'autorisation système de notifications
         // (la popup masquerait les captures et n'a pas de sens sans vrai compte).
         guard !AppEnvironment.usesDemoData else { return }
-        await services.push.requestAuthorizationAndRegister()
+        await services.push.registerIfAuthorized()
         services.callManager.registerForVoIPPushes()
         // CALL-VOIP-04 : un login dans une session déjà lancée (install→1er login,
         // ou changement de compte) ne re-livre pas `didUpdate` (registry déjà créé) ;
@@ -588,6 +588,7 @@ struct OfflineBanner: View {
 /// so a transient network outage doesn't force a logged-in user back to login.
 struct OfflineRetryView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
+    @State private var confirmLogout = false
 
     var body: some View {
         ZStack {
@@ -608,9 +609,16 @@ struct OfflineRetryView: View {
                 GradientButton("Réessayer", systemImage: "arrow.clockwise") {
                     Task { await session.retryBootstrap() }
                 }
-                Button("Se déconnecter") { Task { await session.logout() } }
+                Button("Se déconnecter") { confirmLogout = true }
                     .font(SQType.body)
                     .tint(SQColor.labelSecondary)
+                    // Même confirmation qu'au Profil (TRX-31).
+                    .confirmationDialog("Te déconnecter ?", isPresented: $confirmLogout, titleVisibility: .visible) {
+                        Button("Se déconnecter", role: .destructive) {
+                            Task { await session.logout() }
+                        }
+                        Button("Annuler", role: .cancel) {}
+                    }
             }
             .padding(SQSpace.xxl)
         }

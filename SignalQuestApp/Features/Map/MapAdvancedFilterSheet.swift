@@ -1,6 +1,12 @@
 import SwiftUI
 import MapKit
 
+/// Écran ANFR à ouvrir une fois la feuille de filtres fermée.
+enum MapANFRDestination {
+    case map
+    case stats
+}
+
 struct MapAdvancedFilterSheet: View {
     @State private var baseline: MapFilterSelection
     @State private var draft: MapFilterSelection
@@ -12,17 +18,22 @@ struct MapAdvancedFilterSheet: View {
     /// Sans compte, la couche Amis ne peut rien afficher : on ne la propose pas.
     let showsFriendsLayer: Bool
     let onApply: (MapFilterSelection) -> Bool
+    /// Données ANFR, rangées ici en section avancée (décision du 29/09) ;
+    /// `nil` masque la section.
+    let onOpenANFR: ((MapANFRDestination) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(selection: MapFilterSelection, allMarkets: [MarketRegistryEntry],
          dromRegion: DromRegion?, showsFriendsLayer: Bool = true,
+         onOpenANFR: ((MapANFRDestination) -> Void)? = nil,
          onApply: @escaping (MapFilterSelection) -> Bool) {
         _baseline = State(initialValue: selection)
         _draft = State(initialValue: selection)
         _originalDromRegion = State(initialValue: dromRegion)
         self.allMarkets = allMarkets
         self.showsFriendsLayer = showsFriendsLayer
+        self.onOpenANFR = onOpenANFR
         self.onApply = onApply
     }
 
@@ -69,6 +80,7 @@ struct MapAdvancedFilterSheet: View {
                     }
                     .tint(SQColor.accentInk)
                     .disclosureGroupStyle(MapExpertDisclosureStyle())
+                    anfrSection
                     if adjustmentNotice {
                         Text("Les options incompatibles ont été ajustées au pays choisi.")
                             .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
@@ -174,6 +186,43 @@ struct MapAdvancedFilterSheet: View {
             }
             if !plannedAvailable { hint("Les sources prévisionnelles ne sont pas disponibles dans ce pays.") }
         }
+    }
+
+    /// Le registre public des antennes, pour qui veut aller plus loin : un
+    /// bouton permanent sur la carte lui donnait trop de place (29/09).
+    @ViewBuilder
+    private var anfrSection: some View {
+        if let onOpenANFR {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: SQSpace.xs) {
+                    Text("Données ANFR").font(SQType.heading).foregroundStyle(SQColor.label)
+                    SQInfoButton(term: .anfr)
+                }
+                Text("Le registre public des antennes, sur une carte ou en chiffres.")
+                    .font(SQType.caption).foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                // Pas de grille paresseuse : deux boutons, toujours présents dans
+                // l'arbre d'accessibilité, même avant d'avoir défilé jusqu'à eux.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { anfrChips(onOpenANFR) }
+                    VStack(alignment: .leading, spacing: 8) { anfrChips(onOpenANFR) }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func anfrChips(_ onOpenANFR: @escaping (MapANFRDestination) -> Void) -> some View {
+        chip("Carte ANFR", icon: "map.fill", active: false) {
+            onOpenANFR(.map)
+            dismiss()
+        }
+        .accessibilityIdentifier("map.filters.anfr.map")
+        chip("Statistiques ANFR", icon: "chart.bar.xaxis", active: false) {
+            onOpenANFR(.stats)
+            dismiss()
+        }
+        .accessibilityIdentifier("map.filters.anfr.stats")
     }
 
     private var expertSections: some View {

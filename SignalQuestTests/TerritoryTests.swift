@@ -24,7 +24,8 @@ final class TerritoryTests: XCTestCase {
     /// était inatteignable avant le refactor SQL du backend.
     func testVirginIsARealStatus() {
         XCTAssertEqual(cell("virgin").status, .virgin)
-        XCTAssertEqual(cell("virgin").statusLabel, "Zone blanche")
+        // « Zone blanche » veut dire « sans réseau » en France (SOC-39).
+        XCTAssertEqual(cell("virgin").statusLabel, "Zone inexplorée")
     }
 
     /// Un statut inconnu ne doit PAS faire échouer le décodage : la carte

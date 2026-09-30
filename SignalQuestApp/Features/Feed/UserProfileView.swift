@@ -12,6 +12,9 @@ final class UserProfileViewModel: ObservableObject {
     @Published var isLoadingMore = false
     @Published var isTogglingFollow = false
     @Published var errorMessage: String?
+    /// Profil réglé sur « personne » (403 PROFILE_PRIVATE) : un état calme,
+    /// pas « Profil indisponible » avec un « Réessayer » qui n'y peut rien.
+    @Published private(set) var isPrivate = false
     /// Échec d'une action (suivre, like, ami…) : bandeau passager, pas
     /// « Profil indisponible » avec un « Réessayer » qui rechargeait tout (SOC-14).
     @Published var actionError: String?
@@ -39,10 +42,16 @@ final class UserProfileViewModel: ObservableObject {
         do {
             let loaded = try await service.userProfile(userId: userId)
             profile = loaded
+            isPrivate = false
             let page = try await service.userPosts(userId: userId, cursor: nil, mine: loaded.isSelf)
             items = page.items
             nextCursor = page.nextCursor
+        } catch let APIError.http(status, code, _, _, _) where status == 403 && code == "PROFILE_PRIVATE" {
+            isPrivate = true
+            items = []
+            nextCursor = nil
         } catch {
+            if error.isCancellation { return }
             errorMessage = error.userFacingMessage
         }
     }
@@ -296,12 +305,21 @@ struct UserProfileView: View {
                 } else {
                     header
                     secondaryStats
-                    if let error = model.errorMessage {
-                        ErrorStateView(title: "Profil indisponible", message: error) {
-                            Task { await model.load() }
+                    if model.isPrivate {
+                        EmptyStateView(
+                            title: "Profil privé",
+                            message: "Cette personne a choisi de ne pas montrer son profil.",
+                            systemImage: "lock.fill"
+                        )
+                        .accessibilityIdentifier("profile.private")
+                    } else {
+                        if let error = model.errorMessage {
+                            ErrorStateView(title: "Profil indisponible", message: error) {
+                                Task { await model.load() }
+                            }
                         }
+                        postsSection
                     }
-                    postsSection
                 }
             }
             .padding(.horizontal, SQSpace.lg)

@@ -512,7 +512,7 @@ enum SentinelleWording {
     }
 
     static func lostBursts(_ count: Int) -> String {
-        String(localized: "\(count) salve perdue")
+        String(localized: "\(count) mesure perdue")
     }
 
     static func monitored(_ count: Int) -> String {

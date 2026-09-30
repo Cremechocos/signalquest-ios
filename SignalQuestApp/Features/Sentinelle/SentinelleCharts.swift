@@ -239,7 +239,7 @@ struct SentinelleLatencyChart: View {
         let minimum = SentinelleWording.ms(values.min())
         let maximum = SentinelleWording.ms(values.max())
         let losses = series.lostCount == 0
-            ? String(localized: "aucune salve perdue")
+            ? String(localized: "aucune mesure perdue")
             : SentinelleWording.lostBursts(series.lostCount)
         let current = SentinelleWording.ms(last.rttMs)
         return String(localized: "Latence sur \(window.periodLabel) : dernière mesure \(current), minimum \(minimum), maximum \(maximum), \(losses).")

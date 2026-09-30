@@ -2103,6 +2103,46 @@
         }
       }
     },
+    "%lld mesure perdue" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lost check"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lost checks"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesure perdue"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mesures perdues"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld mesures" : {
       "localizations" : {
         "en" : {
@@ -4408,6 +4448,22 @@
         }
       }
     },
+    "Abonné sur Android ou sur le web ? Ton abonnement vaut aussi ici : actualise-le." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subscribed on Android or the web? Your subscription counts here too: refresh it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonné sur Android ou sur le web ? Ton abonnement vaut aussi ici : actualise-le."
+          }
+        }
+      }
+    },
     "Abonnement" : {
       "localizations" : {
         "en" : {
@@ -4992,6 +5048,22 @@
         }
       }
     },
+    "Activer les notifications" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on notifications"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer les notifications"
+          }
+        }
+      }
+    },
     "Activité" : {
       "localizations" : {
         "en" : {
@@ -5135,6 +5207,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Actualiser ma position"
+          }
+        }
+      }
+    },
+    "Actualiser mon abonnement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refresh my subscription"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualiser mon abonnement"
           }
         }
       }
@@ -5314,6 +5402,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Affichage"
+          }
+        }
+      }
+    },
+    "Affichage et carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display and map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affichage et carte"
           }
         }
       }
@@ -5603,6 +5707,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aide et glossaire"
+          }
+        }
+      }
+    },
+    "Aide et légal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help and legal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aide et légal"
           }
         }
       }
@@ -6678,6 +6798,22 @@
         }
       }
     },
+    "Antennes et réseau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennas and network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennes et réseau"
+          }
+        }
+      }
+    },
     "Antennes suivies" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7063,6 +7199,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appels"
+          }
+        }
+      }
+    },
+    "Appels : ne pas déranger" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calls: do not disturb"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appels : ne pas déranger"
           }
         }
       }
@@ -8903,6 +9055,22 @@
         }
       }
     },
+    "aucune mesure perdue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no lost check"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucune mesure perdue"
+          }
+        }
+      }
+    },
     "Aucune mesure pour l’instant" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9658,6 +9826,22 @@
         }
       }
     },
+    "Avancé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advanced"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avancé"
+          }
+        }
+      }
+    },
     "Avant de démarrer" : {
       "localizations" : {
         "en" : {
@@ -9670,6 +9854,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Avant de démarrer"
+          }
+        }
+      }
+    },
+    "Avec l’app Android" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With the Android app"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avec l’app Android"
           }
         }
       }
@@ -10111,6 +10311,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bands and frequencies"
+          }
+        }
+      }
+    },
+    "Bannière quand l’app est ouverte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Banner while the app is open"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bannière quand l’app est ouverte"
           }
         }
       }
@@ -12211,6 +12427,22 @@
         }
       }
     },
+    "Cette personne a choisi de ne pas montrer son profil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This person chose not to show their profile."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette personne a choisi de ne pas montrer son profil."
+          }
+        }
+      }
+    },
     "Cette photo concerne quel réseau ?" : {
       "localizations" : {
         "en" : {
@@ -12418,6 +12650,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chaque maillon est mesuré depuis nos serveurs. Un saut muet ne répond pas aux sondes mais laisse passer le trafic : ce n’est pas une panne."
+          }
+        }
+      }
+    },
+    "Chaque réglage s’enregistre dès que tu le changes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each setting is saved as soon as you change it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque réglage s’enregistre dès que tu le changes."
           }
         }
       }
@@ -14264,6 +14512,22 @@
         }
       }
     },
+    "Compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte"
+          }
+        }
+      }
+    },
     "Compte Apple" : {
       "localizations" : {
         "en" : {
@@ -14309,6 +14573,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Compte créé mais session non initialisée"
+          }
+        }
+      }
+    },
+    "Compte et sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account and security"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte et sécurité"
           }
         }
       }
@@ -17910,6 +18190,22 @@
         }
       }
     },
+    "Dernière mesure %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest check %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière mesure %@."
+          }
+        }
+      }
+    },
     "Dernière mise à jour" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18745,6 +19041,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dispo."
+          }
+        }
+      }
+    },
+    "Disponibilité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Availability"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponibilité"
           }
         }
       }
@@ -19671,6 +19983,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Elle disparaîtra de ta liste et tu ne recevras plus ses messages."
+          }
+        }
+      }
+    },
+    "Elle enregistre tes trajets, tient un journal des antennes captées et aide à les identifier. Ces écrans apparaissent ici dès qu’elle a envoyé des données." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It records your trips, keeps a log of the antennas it picks up and helps identify them. These screens appear here as soon as it has sent data."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle enregistre tes trajets, tient un journal des antennes captées et aide à les identifier. Ces écrans apparaissent ici dès qu’elle a envoyé des données."
           }
         }
       }
@@ -21378,6 +21706,22 @@
         }
       }
     },
+    "État de ta connexion fixe, surveillée en continu depuis nos serveurs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status of your home connection, monitored continuously from our servers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "État de ta connexion fixe, surveillée en continu depuis nos serveurs."
+          }
+        }
+      }
+    },
     "État de votre connexion fixe, surveillée en continu depuis nos serveurs." : {
       "localizations" : {
         "en" : {
@@ -21438,6 +21782,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "État inconnu"
+          }
+        }
+      }
+    },
+    "Être prévenu des réponses ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get notified of replies?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Être prévenu des réponses ?"
+          }
+        }
+      }
+    },
+    "Être prévenu des réactions ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get notified of reactions?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Être prévenu des réactions ?"
           }
         }
       }
@@ -24075,6 +24451,22 @@
         }
       }
     },
+    "Impossible de modifier les aperçus. Réessaie ou désactive les notifications dans les Réglages iOS." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change previews. Try again or turn off notifications in iOS Settings."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de modifier les aperçus. Réessaie ou désactive les notifications dans les Réglages iOS."
+          }
+        }
+      }
+    },
     "Impossible de modifier les aperçus. Réessayez ou désactivez les notifications dans les Réglages iOS." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -24687,6 +25079,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "J’aime"
+          }
+        }
+      }
+    },
+    "J’aime et commentaires sur mes photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Likes and comments on my photos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J’aime et commentaires sur mes photos"
           }
         }
       }
@@ -27492,7 +27900,6 @@
       }
     },
     "Le plus complet" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -27667,6 +28074,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le registre ne fournit pas de code marché fiable pour cette zone."
+          }
+        }
+      }
+    },
+    "Le registre public des antennes, sur une carte ou en chiffres." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The public antenna registry, on a map or in figures."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le registre public des antennes, sur une carte ou en chiffres."
           }
         }
       }
@@ -28528,6 +28951,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les deux mots de passe ne correspondent pas."
+          }
+        }
+      }
+    },
+    "Les deux versions d’Internet, mesurées séparément : les superposer montre laquelle décroche." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The two versions of the Internet, measured separately: overlaying them shows which one drops."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les deux versions d’Internet, mesurées séparément : les superposer montre laquelle décroche."
           }
         }
       }
@@ -30181,6 +30620,38 @@
         }
       }
     },
+    "Mes contributions" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My contributions"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes contributions"
+          }
+        }
+      }
+    },
+    "Mes enregistrements de trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My trip recordings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes enregistrements de trajet"
+          }
+        }
+      }
+    },
     "Mes identifications" : {
       "localizations" : {
         "en" : {
@@ -30279,6 +30750,22 @@
         }
       }
     },
+    "Mes suivis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monitoring"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes suivis"
+          }
+        }
+      }
+    },
     "Mes tests partagés" : {
       "localizations" : {
         "en" : {
@@ -30291,6 +30778,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mes tests partagés"
+          }
+        }
+      }
+    },
+    "Mes zones" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My areas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes zones"
           }
         }
       }
@@ -30665,6 +31168,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Messages éphémères (24 h)"
+          }
+        }
+      }
+    },
+    "Messages et appels" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages and calls"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages et appels"
           }
         }
       }
@@ -31268,6 +31787,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mise en service"
+          }
+        }
+      }
+    },
+    "Mises à jour ANFR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR updates"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mises à jour ANFR"
           }
         }
       }
@@ -31959,6 +32494,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "moyenne"
+          }
+        }
+      }
+    },
+    "moyenne des mesures" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "average of checks"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "moyenne des mesures"
           }
         }
       }
@@ -32682,6 +33234,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "nord-ouest"
+          }
+        }
+      }
+    },
+    "Nos serveurs envoient cinq « pings » d’un coup, une fois par minute, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Our servers send five pings at once, once a minute, and every ten seconds as soon as a packet is missing, to date an outage to within ten seconds. IPv4 and IPv6 are measured separately; %@ counts as reachable as soon as either one answers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nos serveurs envoient cinq « pings » d’un coup, une fois par minute, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; %@ est joignable dès que l’un des deux répond."
           }
         }
       }
@@ -34369,6 +34937,22 @@
         }
       }
     },
+    "Ouvre son profil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens their profile"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre son profil"
+          }
+        }
+      }
+    },
     "Ouvrez SignalQuest pour afficher le message." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -34526,6 +35110,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir les Réglages"
+          }
+        }
+      }
+    },
+    "Ouvrir les réglages de notification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open notification settings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les réglages de notification"
           }
         }
       }
@@ -37568,6 +38168,22 @@
         }
       }
     },
+    "Pour t’alerter d’une panne sur une antenne que tu suis, SignalQuest a besoin des notifications." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To alert you about an outage on an antenna you follow, SignalQuest needs notifications."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour t’alerter d’une panne sur une antenne que tu suis, SignalQuest a besoin des notifications."
+          }
+        }
+      }
+    },
     "Pour toi" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -37581,6 +38197,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pour toi"
+          }
+        }
+      }
+    },
+    "Pour une antenne suivie, l’alerte arrive dès le premier signalement, sans attendre que la communauté confirme." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For an antenna you follow, the alert arrives with the first report, without waiting for the community to confirm."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour une antenne suivie, l’alerte arrive dès le premier signalement, sans attendre que la communauté confirme."
           }
         }
       }
@@ -38195,6 +38827,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Profil indisponible"
+          }
+        }
+      }
+    },
+    "Profil privé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private profile"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil privé"
           }
         }
       }
@@ -39899,6 +40547,22 @@
         }
       }
     },
+    "Recevoir l’alerte de panne ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get outage alerts?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recevoir l’alerte de panne ?"
+          }
+        }
+      }
+    },
     "Recevoir un code par e-mail" : {
       "localizations" : {
         "en" : {
@@ -40468,6 +41132,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réduit les détails"
+          }
+        }
+      }
+    },
+    "Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessaie dans un instant."
           }
         }
       }
@@ -41501,6 +42181,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réponses à mes signalements (e-mail)"
+          }
+        }
+      }
+    },
+    "Réponses à mes signalements, par e-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replies to my reports, by email"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponses à mes signalements, par e-mail"
           }
         }
       }
@@ -45019,6 +45715,22 @@
         }
       }
     },
+    "SignalQuest ne peut pas encore t’envoyer de notifications. Active-les pour être prévenu des messages, des réponses et des pannes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest can't send you notifications yet. Turn them on to hear about messages, replies and outages."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest ne peut pas encore t’envoyer de notifications. Active-les pour être prévenu des messages, des réponses et des pannes."
+          }
+        }
+      }
+    },
     "SignalQuest ne pourra pas réafficher cette clé. Sans appareil approuvé ni cette clé, l’ancien historique chiffré sera perdu." : {
       "localizations" : {
         "en" : {
@@ -45031,6 +45743,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "SignalQuest ne pourra pas réafficher cette clé. Sans appareil approuvé ni cette clé, l’ancien historique chiffré sera perdu."
+          }
+        }
+      }
+    },
+    "SignalQuest peut te prévenir quand on te répond ou qu’on t’appelle, même app fermée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest can let you know when someone replies or calls you, even when the app is closed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest peut te prévenir quand on te répond ou qu’on t’appelle, même app fermée."
+          }
+        }
+      }
+    },
+    "SignalQuest peut te prévenir quand on commente ou aime ta publication, même app fermée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest can let you know when someone comments on or likes your post, even when the app is closed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest peut te prévenir quand on commente ou aime ta publication, même app fermée."
           }
         }
       }
@@ -47848,6 +48592,22 @@
         }
       }
     },
+    "Te déconnecter ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign out?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Te déconnecter ?"
+          }
+        }
+      }
+    },
     "Tech" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -49944,6 +50704,22 @@
         }
       }
     },
+    "Tu choisis ensuite quoi recevoir dans Profil › Réglages › Notifications." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can then choose what to receive in Profile › Settings › Notifications."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu choisis ensuite quoi recevoir dans Profil › Réglages › Notifications."
+          }
+        }
+      }
+    },
     "Tu confirmes" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -50335,6 +51111,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tu pourras changer de nom d’utilisateur dans %lld jours."
+          }
+        }
+      }
+    },
+    "Tu pourras te reconnecter à tout moment avec ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can sign back in at any time with your account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pourras te reconnecter à tout moment avec ton compte."
           }
         }
       }
@@ -52312,6 +53104,22 @@
         }
       }
     },
+    "Voir l’abonnement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See subscription"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir l’abonnement"
+          }
+        }
+      }
+    },
     "Voir l'antenne" : {
       "localizations" : {
         "en" : {
@@ -52875,6 +53683,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zone de Fresnel"
+          }
+        }
+      }
+    },
+    "Zone inexplorée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unexplored area"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zone inexplorée"
           }
         }
       }

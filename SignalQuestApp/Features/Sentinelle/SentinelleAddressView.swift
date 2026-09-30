@@ -242,7 +242,7 @@ struct SentinelleAddressView: View {
                 .foregroundStyle(SQColor.labelTertiary)
             Spacer(minLength: 0)
             Text(series.lostCount == 0
-                ? String(localized: "aucune salve perdue")
+                ? String(localized: "aucune mesure perdue")
                 : SentinelleWording.lostBursts(series.lostCount))
                 .font(SQType.micro)
                 .foregroundStyle(series.lostCount == 0 ? SQColor.labelTertiary : SQColor.dangerInk)
@@ -291,7 +291,7 @@ struct SentinelleAddressView: View {
                     )
                     SentinelleMetricRow(
                         label: "Perte",
-                        hint: "moyenne des salves",
+                        hint: "moyenne des mesures",
                         value: SentinelleWording.percent(metrics.lossPct)
                     )
                 }
@@ -528,9 +528,11 @@ struct SentinelleAddressView: View {
                         }
                     }
 
-                    Text("Sonde ICMP depuis nos serveurs, cinq paquets par salve, une salve par minute — accélérée à une toutes les dix secondes dès qu’un paquet manque, afin de dater une coupure à la dizaine de secondes près. IPv4 et IPv6 sont mesurées séparément ; \(target.label) est réputée joignable dès qu’une des deux répond.")
-                        .font(SQType.micro)
-                        .foregroundStyle(SQColor.labelTertiary)
+                    // Encre pleine : `labelTertiary` reste volontairement sous le
+                    // seuil du texte (DesignTokenContrastTests).
+                    Text("Nos serveurs envoient cinq « pings » d’un coup, une fois par minute, et toutes les dix secondes dès qu’un paquet manque, pour dater une coupure à dix secondes près. IPv4 et IPv6 sont mesurés séparément ; \(target.label) est joignable dès que l’un des deux répond.")
+                        .font(.footnote)
+                        .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     loading

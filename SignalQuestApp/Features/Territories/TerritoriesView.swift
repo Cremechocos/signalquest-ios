@@ -97,9 +97,15 @@ struct TerritoriesView: View {
         .sqShadowSoft()
     }
 
+    /// Légende complète (SOC-39) : les cinq états dessinés sur la carte, dont
+    /// « À rafraîchir », et le contour brique des zones où tu as contribué.
     private var legend: some View {
-        let statuses: [TerritoryCell.Status] = [.virgin, .observed, .reliable, .complete]
-        return HStack(spacing: SQSpace.md) {
+        let statuses: [TerritoryCell.Status] = [.virgin, .observed, .reliable, .complete, .stale]
+        return LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 104), spacing: SQSpace.sm, alignment: .leading)],
+            alignment: .leading,
+            spacing: SQSpace.xs
+        ) {
             ForEach(statuses, id: \.self) { status in
                 let sample = TerritoryCell(
                     cellKey: "", status: status,
@@ -107,30 +113,39 @@ struct TerritoriesView: View {
                     pointsCount: 0, userCount: 0, trustScore: 0,
                     lastObservedAt: nil, mine: false
                 )
-                HStack(spacing: SQSpace.xs) {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(Color(sample.fillColor))
-                        .frame(width: 14, height: 14)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .strokeBorder(SQColor.label.opacity(0.15), lineWidth: 0.5)
-                        )
-                    Text(LocalizedStringKey(sample.statusLabel))
-                        .font(SQFont.body(11))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-                // Chaque entrée annoncée d'un bloc : la pastille seule ne dit
-                // rien à VoiceOver.
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(LocalizedStringKey(sample.statusLabel))
+                legendItem(sample.statusLabel, fill: Color(sample.fillColor),
+                           stroke: SQColor.label.opacity(0.15), lineWidth: 0.5)
             }
+            legendItem(String(localized: "Mes zones"), fill: .clear,
+                       stroke: SQColor.brandRed, lineWidth: 1.5)
         }
-        .foregroundStyle(SQColor.labelSecondary)
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
-        .background(SQColor.surfaceGlass, in: Capsule(style: .continuous))
+        .background(SQColor.surfaceGlass, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .sqShadowSoft()
+    }
+
+    private func legendItem(_ label: String, fill: Color, stroke: Color, lineWidth: CGFloat) -> some View {
+        HStack(spacing: SQSpace.xs) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(fill)
+                .frame(width: 14, height: 14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .strokeBorder(stroke, lineWidth: lineWidth)
+                )
+            // 12 pt à l'encre pleine : le gris secondaire à 11 pt passait sous
+            // le contraste rendu (TRX-12).
+            Text(label)
+                .font(SQFont.body(12, relativeTo: .caption))
+                .foregroundStyle(SQColor.label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        // Chaque entrée annoncée d'un bloc : la pastille seule ne dit rien à
+        // VoiceOver.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
     }
 }
 

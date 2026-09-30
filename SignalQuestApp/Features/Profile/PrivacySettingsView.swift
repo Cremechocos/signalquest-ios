@@ -11,6 +11,8 @@ struct PrivacySettingsView: View {
     /// partage de position (PRIV-LOC-CONSENT-01) : on explique ce que les amis
     /// verront avant que l'activation ne soit informée puis confirmée.
     @State private var showLiveShareDisclosure = false
+    /// « Activer le partage » touché : la fermeture de la feuille n'annule pas.
+    @State private var liveShareConsented = false
     @State private var zoneEditor: PrivacyZoneEditorRoute?
     @EnvironmentObject private var unitsStore: SQUnitsStore
 
@@ -38,18 +40,21 @@ struct PrivacySettingsView: View {
                     get: { model.shareLiveLocationWithFriends },
                     set: { isOn in
                         model.shareLiveLocationWithFriends = isOn
-                        if isOn { showLiveShareDisclosure = true }
+                        // Activer passe d'abord par la divulgation : rien n'est
+                        // enregistré avant « Activer le partage ».
+                        if isOn { showLiveShareDisclosure = true } else { commitPrivacy() }
                     }
                 ))
-                Toggle("Partager mes données radio", isOn: $model.shareRadioDataWithFriends)
-                Toggle("Partager mes sessions", isOn: $model.shareSessionsWithFriends)
-                Toggle("Afficher mes photos sur la carte Amis", isOn: $model.sharePhotosOnFriendMap)
+                Toggle("Partager mes données radio", isOn: committing($model.shareRadioDataWithFriends))
+                Toggle("Partager mes sessions", isOn: committing($model.shareSessionsWithFriends))
+                Toggle("Afficher mes photos sur la carte Amis", isOn: committing($model.sharePhotosOnFriendMap))
                 if model.shareLiveLocationWithFriends {
                     Picker("Quand partager ma position", selection: $model.liveShareMode) {
                         ForEach(LiveShareMode.allCases) { mode in
                             Text(mode.label).tag(mode)
                         }
                     }
+                    .tint(SQColor.accentInk)
                 }
             } header: {
                 Text("Carte des amis")
@@ -60,7 +65,7 @@ struct PrivacySettingsView: View {
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
-            .disabled(!model.loaded || model.isLoadingPrivacy || model.isSaving || !model.isSessionCurrent)
+            .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
 
             if let error = model.preferencesError {
                 Section("Préférences du compte") {
@@ -103,6 +108,7 @@ struct PrivacySettingsView: View {
                         Text(system.label).tag(system)
                     }
                 }
+                .tint(SQColor.accentInk)
             } header: {
                 Text("Unités")
             } footer: {
@@ -185,22 +191,24 @@ struct PrivacySettingsView: View {
 
             Section("Présence") {
                 PresencePreferenceControls(service: services.livePresence)
-                Picker("Afficher ma dernière activité", selection: $model.lastSeenVisibility) {
+                Picker("Afficher ma dernière activité", selection: committing($model.lastSeenVisibility)) {
                     Text("À mes amis").tag(LastSeenVisibility.friends)
                     Text("À personne").tag(LastSeenVisibility.none)
                 }
+                .tint(SQColor.accentInk)
             }
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
-            .disabled(!model.loaded || model.isLoadingPrivacy || model.isSaving || !model.isSessionCurrent)
+            .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
 
             Section {
-                Picker("Qui peut me contacter", selection: $model.messageRequestPolicy) {
+                Picker("Qui peut me contacter", selection: committing($model.messageRequestPolicy)) {
                     Text("Tout le monde").tag(MessageRequestPolicy.everyone)
                     Text("Mes amis uniquement").tag(MessageRequestPolicy.friendsOnly)
                     Text("Personne").tag(MessageRequestPolicy.noOne)
                 }
+                .tint(SQColor.accentInk)
             } header: {
                 Text("Messages privés")
             } footer: {
@@ -209,39 +217,12 @@ struct PrivacySettingsView: View {
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
-            .disabled(!model.loaded || model.isLoadingPrivacy || model.isSaving || !model.isSessionCurrent)
+            .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
 
             if let error = model.errorMessage {
                 Section { Text(error).foregroundStyle(SQColor.dangerInk) }
                     .listRowBackground(SQColor.dangerSoft)
             }
-            if model.savedConfirmation {
-                Section {
-                    Label("Préférences enregistrées", systemImage: "checkmark.circle")
-                        .foregroundStyle(SQColor.success)
-                }
-                .listRowBackground(SQColor.successSoft)
-            }
-
-            Section {
-                GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: model.isSaving) {
-                    let owner = services.api.credentials.snapshot().sessionID
-                    Task {
-                        // Ne propager au diffuseur QUE si l'enregistrement serveur a
-                        // réussi (PRIV-SAVE-UNCOND-05).
-                        guard await model.save(), model.isSessionCurrent,
-                              services.api.credentials.snapshot().sessionID == owner else { return }
-                        services.livePresence.applySharingSettings(
-                            shareLocation: model.shareLiveLocationWithFriends,
-                            shareRadio: model.shareRadioDataWithFriends,
-                            expectedSessionID: owner
-                        )
-                    }
-                }
-                .disabled(!model.canSavePrivacy)
-            }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets())
         }
         .scrollContentBackground(.hidden)
         .signalQuestBackground()
@@ -261,8 +242,17 @@ struct PrivacySettingsView: View {
             guard model.isSessionCurrent else { return }
             services.livePresence.setMode(newMode)
         }
-        .sheet(isPresented: $showLiveShareDisclosure) {
+        .sheet(isPresented: $showLiveShareDisclosure, onDismiss: {
+            // Fermée sans « Activer le partage » (glissée vers le bas) : rien
+            // n'est partagé, l'interrupteur revient à « non ».
+            if !liveShareConsented { model.shareLiveLocationWithFriends = false }
+            liveShareConsented = false
+        }) {
             LiveLocationDisclosureSheet(
+                onConfirm: {
+                    liveShareConsented = true
+                    commitPrivacy()
+                },
                 // Annulation explicite : on revient à l'état désactivé pour que
                 // rien ne soit partagé sans un consentement éclairé.
                 onCancel: { model.shareLiveLocationWithFriends = false }
@@ -317,6 +307,33 @@ struct PrivacySettingsView: View {
         }
         .disabled(model.isLoadingZones || model.zoneBusyId != nil || !model.isSessionCurrent)
         .accessibilityElement(children: .contain)
+    }
+
+    /// Binding qui enregistre au geste (TRX-03). Un chargement écrit la
+    /// @Published directement et ne déclenche donc aucun envoi.
+    private func committing<Value>(_ binding: Binding<Value>) -> Binding<Value> {
+        Binding(
+            get: { binding.wrappedValue },
+            set: { value in
+                binding.wrappedValue = value
+                commitPrivacy()
+            }
+        )
+    }
+
+    private func commitPrivacy() {
+        let owner = services.api.credentials.snapshot().sessionID
+        Task {
+            // Ne propager au diffuseur QUE si l'enregistrement serveur a réussi
+            // (PRIV-SAVE-UNCOND-05).
+            guard await model.autoSave(), model.isSessionCurrent,
+                  services.api.credentials.snapshot().sessionID == owner else { return }
+            services.livePresence.applySharingSettings(
+                shareLocation: model.shareLiveLocationWithFriends,
+                shareRadio: model.shareRadioDataWithFriends,
+                expectedSessionID: owner
+            )
+        }
     }
 
     private func loadError(_ error: String, hasPrevious: Bool, retryID: String? = nil,
@@ -392,6 +409,7 @@ private struct PresencePreferenceControls: View {
 /// regarde, expiration au TTL serveur ~3 min, réservé aux amis). Aucun claim
 /// d'arrière-plan/app fermée — le partage suit le mode choisi juste en dessous.
 private struct LiveLocationDisclosureSheet: View {
+    var onConfirm: () -> Void
     var onCancel: () -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -441,6 +459,7 @@ private struct LiveLocationDisclosureSheet: View {
 
             VStack(spacing: 10) {
                 Button {
+                    onConfirm()
                     dismiss()
                 } label: {
                     Text("Activer le partage")

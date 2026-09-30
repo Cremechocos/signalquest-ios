@@ -300,6 +300,54 @@ final class PrivacySettingsLoadingTests: XCTestCase {
         XCTAssertFalse(fixture.model.zonesLoaded)
     }
 
+    /// Chaque changement s'enregistre, sans bouton (TRX-03).
+    func testAutoSaveSendsEachChangeWithoutAButton() async {
+        let fixture = Fixture()
+        await fixture.model.loadPrivacy()
+        fixture.model.shareRadioDataWithFriends = true
+        let saved = await fixture.model.autoSave()
+        XCTAssertTrue(saved)
+        let patch = await fixture.service.lastPrivacyPatch()
+        XCTAssertEqual(patch?.shareRadioDataWithFriends, true)
+        XCTAssertTrue(fixture.model.shareRadioDataWithFriends)
+    }
+
+    /// Un échec remet à l'écran l'état enregistré, pas un brouillon qui ment.
+    func testAutoSaveFailureRestoresTheSavedState() async {
+        let fixture = Fixture()
+        await fixture.model.loadPrivacy()
+        await fixture.service.failPrivacyUpdates(true)
+        fixture.model.shareRadioDataWithFriends = true
+        let saved = await fixture.model.autoSave()
+        XCTAssertFalse(saved)
+        XCTAssertFalse(fixture.model.shareRadioDataWithFriends)
+        XCTAssertNotNil(fixture.model.errorMessage)
+    }
+
+    /// Un changement fait pendant l'envoi part juste après, sans être perdu.
+    func testChangeMadeDuringASaveIsSavedNext() async {
+        let fixture = Fixture()
+        await fixture.model.loadPrivacy()
+        let started = expectation(description: "Premier PATCH suspendu")
+        let gate = PrivacyResultGate<SocialPrivacy>(onWait: { started.fulfill() })
+        await fixture.service.holdNextPrivacyUpdate(gate)
+        fixture.model.shareRadioDataWithFriends = true
+        let first = Task { await fixture.model.autoSave() }
+        await fulfillment(of: [started], timeout: 1)
+        fixture.model.shareSessionsWithFriends = true
+        let second = await fixture.model.autoSave()
+        XCTAssertFalse(second, "Le second appel laisse la boucle en cours enregistrer")
+        await gate.resolve(SocialPrivacy(shareLiveLocationWithFriends: false, shareRadioDataWithFriends: true,
+            shareSessionsWithFriends: false, sharePhotosOnFriendMap: false, shareExactMeasurements: true,
+            lastSeenVisibility: .none, messageRequestPolicy: .friendsOnly))
+        let firstSaved = await first.value
+        XCTAssertTrue(firstSaved)
+        let patch = await fixture.service.lastPrivacyPatch()
+        XCTAssertEqual(patch?.shareSessionsWithFriends, true)
+        XCTAssertTrue(fixture.model.shareRadioDataWithFriends)
+        XCTAssertTrue(fixture.model.shareSessionsWithFriends)
+    }
+
     func testPrivacySaveSendsOnlyTheChangedSharingField() async {
         let fixture = Fixture()
         await fixture.model.loadPrivacy()
@@ -507,6 +555,7 @@ private actor PrivacyServiceDouble: PrivacyServicing {
     private var preferencesFail = false
     private var zonesFail = false
     private var mutationsFail = false
+    private var privacyUpdateFail = false
     private var preferenceWrites = 0
     private var zoneWrites = 0
     private var privacyReads = 0
@@ -525,6 +574,7 @@ private actor PrivacyServiceDouble: PrivacyServicing {
     func failPreferences(_ value: Bool) { preferencesFail = value }
     func failZones(_ value: Bool) { zonesFail = value }
     func failMutations(_ value: Bool) { mutationsFail = value }
+    func failPrivacyUpdates(_ value: Bool) { privacyUpdateFail = value }
     func replaceStoredZones(_ zones: [PrivacyZone]) { storedZones = zones }
     func setUpdateReply(_ zone: PrivacyZone) { updateReply = zone }
     func holdNextZones(_ gate: PrivacyResultGate<[PrivacyZone]>) { zonesGate = gate }
@@ -549,6 +599,7 @@ private actor PrivacyServiceDouble: PrivacyServicing {
     }
     func update(_ patch: UpdatePrivacyRequest) async throws -> SocialPrivacy {
         privacyPatch = patch
+        if privacyUpdateFail { throw APIError.transport("synthetic") }
         if let gate = privacyUpdateGate {
             privacyUpdateGate = nil
             privacy = await gate.wait()

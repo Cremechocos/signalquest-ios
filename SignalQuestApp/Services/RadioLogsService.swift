@@ -245,12 +245,12 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
                 APIEndpoint(path: "/api/android/radio-logs/pull", query: query),
                 as: RadioLogPullPage.self
             )
-        } catch let APIError.http(status, code, message, _, _) where status == 403 {
+        } catch let APIError.http(status, code, _, _, _) where status == 403 && code == "PREMIUM_REQUIRED" {
             // Refus de DROIT, pas incident réseau : la page doit le dire autrement.
+            // Seul ce code parle de Premium ; un autre 403 (e-mail non vérifié…)
+            // garde son propre message (TRX-34).
             throw RadioLogSyncError.premiumRequired(
-                code == "PREMIUM_REQUIRED"
-                    ? String(localized: "La sauvegarde du journal radio est réservée aux membres Premium.")
-                    : APIError.userFacingMessage(status: status, code: code, serverMessage: message)
+                String(localized: "La sauvegarde du journal radio est réservée aux membres Premium.")
             )
         }
     }

@@ -577,6 +577,28 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         )
     }
 
+    /// Au lancement et à chaque connexion : enregistre l'appareil si
+    /// l'utilisateur a DÉJÀ autorisé les notifications, sans jamais poser la
+    /// question (TRX-01). Elle vient d'une feuille d'explication après une
+    /// action qui lui donne un sens (`NotificationPrimingCoordinator`), ou de
+    /// Réglages › Notifications.
+    @MainActor
+    func registerIfAuthorized() async {
+        Task { [weak self] in await self?.refreshE2eeV2NotificationContext() }
+        await retryPendingRevocations()
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        center.setNotificationCategories(CarPlayNotificationCategories.all())
+        switch await center.notificationSettings().authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            await registerForRemoteNotifications()
+        default:
+            return
+        }
+    }
+
+    /// Pose la question système, puis enregistre l'appareil si c'est accepté.
+    /// Réservé à un geste explicite : « Activer les notifications ».
     @MainActor
     func requestAuthorizationAndRegister() async {
         Task { [weak self] in await self?.refreshE2eeV2NotificationContext() }
@@ -596,19 +618,24 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
             let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound, .providesAppNotificationSettings])
             logger.info("Notification permission granted=\(granted, privacy: .public)")
             if granted {
-                UIApplication.shared.registerForRemoteNotifications()
-                // Un changement de compte ne provoque pas nécessairement une rotation du
-                // token FCM, donc le delegate peut ne pas être rappelé. On relit le token
-                // courant à chaque session authentifiée pour l'associer explicitement au
-                // bon propriétaire côté serveur.
-                if AppDelegate.isFirebaseConfigured,
-                   let token = try? await Messaging.messaging().token(),
-                   !token.isEmpty {
-                    didRegister(fcmToken: token)
-                }
+                await registerForRemoteNotifications()
             }
         } catch {
             logger.error("Permission error: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    @MainActor
+    private func registerForRemoteNotifications() async {
+        UIApplication.shared.registerForRemoteNotifications()
+        // Un changement de compte ne provoque pas nécessairement une rotation du
+        // token FCM, donc le delegate peut ne pas être rappelé. On relit le token
+        // courant à chaque session authentifiée pour l'associer explicitement au
+        // bon propriétaire côté serveur.
+        if AppDelegate.isFirebaseConfigured,
+           let token = try? await Messaging.messaging().token(),
+           !token.isEmpty {
+            didRegister(fcmToken: token)
         }
     }
 
@@ -811,13 +838,14 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
 
     /// Cible du lien « Réglages de notifications » exposé par iOS grâce à l'option
     /// `.providesAppNotificationSettings`. Sans cette implémentation, le lien
-    /// n'ouvrait l'app nulle part (UXP-09). On amène l'utilisateur aux Réglages iOS
-    /// de l'app (notifications), point d'action réel.
+    /// n'ouvrait l'app nulle part (UXP-09). Il mène à l'écran Notifications de
+    /// l'app, où se règle ce que SignalQuest envoie.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             openSettingsFor notification: UNNotification?) {
-        Task { @MainActor in
-            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-            UIApplication.shared.open(url)
+        // Ce lien vient des Réglages d'iOS : y renvoyer faisait une boucle
+        // (TRX-21). Il ouvre désormais l'écran Notifications de l'app.
+        Task { @MainActor [weak self] in
+            self?.router.routeToNotificationSettings()
         }
     }
 

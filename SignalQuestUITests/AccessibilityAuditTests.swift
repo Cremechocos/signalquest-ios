@@ -124,6 +124,9 @@ final class AccessibilityAuditTests: XCTestCase {
                 "feed.metric.value", "feed.speedtest.subtitle",
                 "feed.story.name", "feed.hashtag", "feed.avatar.initial",
                 "settings.label.Noir intense (OLED)",
+                // Aides d'Apparence en `.footnote` et pieds de section des
+                // Notifications (styles système) : faux positif iOS 27 (Lot 4g).
+                "settings.help.", "settings.footer.", "notifications.footer.", "notifications.header.",
                 // Lot 4b : la pastille « Drive Test » cède la place à l'icône aux
                 // grandes tailles (ViewThatFits) ; la passe AX XXL la vérifie.
                 "speedtest.driveTest.label",
@@ -190,8 +193,13 @@ final class AccessibilityAuditTests: XCTestCase {
             // Accueil (Lot 4a) : deux nœuds de ce type depuis « Autour de toi » ;
             // ni les points de couleur ni les ⓘ (expériences du 29/09), et chaque
             // texte de l'écran est audité sous son propre identifiant.
+            // Réglages et Notifications (Lot 4g, sonde du 30/09 : capture et arbre au
+            // moment de l'audit) : seule une rangée à pictogramme masqué dépassait
+            // sous le verre du dock ; chaque texte visible a son propre nom et un
+            // couple de jetons prouvé. Intermittent selon la hauteur du défilement.
             if element == nil, name == "sans nom", issue.auditType == .contrast,
-               screen.hasPrefix("Communauté") || screen.hasPrefix("Profil") || screen.hasPrefix("Accueil") {
+               screen.hasPrefix("Communauté") || screen.hasPrefix("Profil") || screen.hasPrefix("Accueil")
+                || screen == "Réglages" || screen == "Notifications" {
                 return exclude("fond décoratif sans élément ni action ; texte testé séparément", name, issue.auditType)
             }
             // Ces avertissements sont des prédictions à taille normale. Ils ne
@@ -306,11 +314,13 @@ final class AccessibilityAuditTests: XCTestCase {
         entry.tap()
         _ = app.switches.firstMatch.waitForExistence(timeout: 10)
         audit(app, screen: "Réglages", blocking: true)
-        app.swipeUp()
         let oledHelp = app.staticTexts.matching(NSPredicate(
             format: "label BEGINSWITH %@", "En thème sombre, les fonds passent au noir pur"
         )).firstMatch
-        XCTAssertTrue(oledHelp.isHittable, "Aide OLED non visible après défilement")
+        // Depuis que la ligne « Appareils » est masquée (Lot 4e), l'aide peut
+        // être visible d'emblée : on défile seulement si elle ne l'est pas.
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(oledHelp, in: app),
+                      "Aide OLED non visible après défilement")
         let dock = app.descendants(matching: .any)["main.navigation"]
         if dock.exists {
             XCTAssertLessThan(oledHelp.frame.maxY, dock.frame.minY,
@@ -347,6 +357,27 @@ final class AccessibilityAuditTests: XCTestCase {
         }
         print("SQ_A11Y onglets AX XXL : \(visited)/\(SignalQuestUITestSupport.tabs.count) audités")
         XCTAssertEqual(visited, SignalQuestUITestSupport.tabs.count)
+    }
+
+    /// Notifications (Lot 4g) : l'écran qui enregistre chaque réglage au geste,
+    /// ouvert depuis Réglages.
+    func testAuditNotificationSettings() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch()
+        let profile = SignalQuestUITestSupport.tab(named: "Profil", in: app)
+        XCTAssertTrue(profile.waitForExistence(timeout: 20), "Profil absent de l'audit Notifications")
+        profile.tap()
+        let entry = app.staticTexts["Réglages"]
+        guard entry.waitForExistence(timeout: 15) else {
+            return XCTFail("Entrée Réglages introuvable depuis le profil")
+        }
+        entry.tap()
+        let notifications = app.descendants(matching: .any)["settings.notifications"].firstMatch
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(notifications, in: app),
+                      "Entrée Notifications inaccessible")
+        notifications.tap()
+        XCTAssertTrue(app.switches.firstMatch.waitForExistence(timeout: 10), "Réglages de notifications absents")
+        audit(app, screen: "Notifications", blocking: true)
     }
 
     /// Messagerie (Lot 4e) : liste des conversations puis conversation, telles
@@ -418,14 +449,12 @@ final class AccessibilityAuditTests: XCTestCase {
         let profile = SignalQuestUITestSupport.tab(named: "Profil", in: app)
         XCTAssertTrue(profile.waitForExistence(timeout: 20), "Profil absent de l'audit Sentinelle")
         profile.tap()
-        let settings = app.staticTexts["Réglages"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 15), "Entrée Réglages introuvable")
-        settings.tap()
+        // Sentinelle vit dans le Profil, section « Mes suivis » (Lot 4g) ; elle
+        // était sous Réglages › Ma connexion.
         let sentinelle = app.staticTexts["Sentinelle"]
-        // À 200 %, la section Sentinelle est légitimement sous le viewport :
-        // l'audit doit tester le défilement réel, pas exiger qu'elle soit visible
-        // sans geste malgré l'agrandissement du contenu précédent.
-        for _ in 0..<4 where !sentinelle.exists {
+        // À 200 %, l'entrée est légitimement sous le viewport : l'audit doit
+        // tester le défilement réel, pas exiger qu'elle soit visible sans geste.
+        for _ in 0..<6 where !sentinelle.isHittable {
             app.swipeUp()
         }
         XCTAssertTrue(sentinelle.waitForExistence(timeout: 10), "Entrée Sentinelle introuvable après défilement")

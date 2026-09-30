@@ -62,6 +62,19 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertFalse(premium.contains("journal radio"))
     }
 
+    /// Profil réglé sur « personne » : état « Profil privé », sans erreur ni
+    /// « Réessayer » (403 PROFILE_PRIVATE, en prod depuis le 30/09).
+    func testPrivateProfileShowsACalmStateInsteadOfAnError() async {
+        let fixture = ComposerFeedFixture()
+        fixture.userProfileError = APIError.http(status: 403, code: "PROFILE_PRIVATE",
+                                                 message: "Profil privé", requestId: nil, retryAfter: nil)
+        let model = UserProfileViewModel(userId: "u-private", prefill: nil, service: fixture)
+        await model.load()
+        XCTAssertTrue(model.isPrivate)
+        XCTAssertNil(model.errorMessage)
+        XCTAssertTrue(model.items.isEmpty)
+    }
+
     private static func post(text: String) -> UnifiedSocialFeedItem? {
         let json = #"{"id":"post-1","kind":"post","author":{"id":"me","name":"Moi"},"text":"\#(text)"}"#
         return try? JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: Data(json.utf8))
@@ -112,7 +125,8 @@ private final class ComposerFeedFixture: SocialFeedServicing, @unchecked Sendabl
     func weeklyRecap() async throws -> WeeklyRecapStats? { throw ComposerFixtureError.unused }
     func publishWeeklyRecap() async throws -> WeeklyRecapPublishResponse { throw ComposerFixtureError.unused }
     func share(postId: String, conversationId: String) async throws -> String? { throw ComposerFixtureError.unused }
-    func userProfile(userId: String) async throws -> SocialUserProfile { throw ComposerFixtureError.unused }
+    var userProfileError: Error = ComposerFixtureError.unused
+    func userProfile(userId: String) async throws -> SocialUserProfile { throw userProfileError }
     func toggleFollow(userId: String) async throws -> SocialFollowResult { throw ComposerFixtureError.unused }
     func userPosts(userId: String, cursor: String?, mine: Bool) async throws -> SocialFeedPage { throw ComposerFixtureError.unused }
     func trendingHashtags() async throws -> [TrendingHashtag] { throw ComposerFixtureError.unused }

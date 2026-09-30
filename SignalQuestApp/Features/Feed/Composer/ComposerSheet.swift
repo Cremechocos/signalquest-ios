@@ -363,6 +363,7 @@ final class ComposerViewModel: ObservableObject {
 }
 
 struct ComposerSheet: View {
+    @EnvironmentObject private var services: AppServices
     @StateObject private var model: ComposerViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var selectedMode: ComposerMode = .edit
@@ -555,8 +556,15 @@ struct ComposerSheet: View {
                         Task {
                             // Même bouton pour les deux modes : l'action change,
                             // pas la place ni le geste.
+                            let isNewPost = !model.isEditing
                             if model.isEditing { await model.saveEdit() } else { await model.publish() }
-                            if model.didPublish { dismiss() }
+                            guard model.didPublish else { return }
+                            dismiss()
+                            // Premier post : proposer d'être prévenu des réactions
+                            // (TRX-01) ; la feuille attend la fermeture du compositeur.
+                            if isNewPost {
+                                Task { await services.notificationPriming.considerPriming(after: .postPublished) }
+                            }
                         }
                     } label: {
                         Group {

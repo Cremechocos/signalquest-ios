@@ -113,6 +113,8 @@ final class AppServices: ObservableObject {
     let sentinelle: SentinelleServicing
     let entitlements: EntitlementsStore
     let push: PushNotificationService
+    /// Explication des notifications au bon moment (TRX-01).
+    let notificationPriming: NotificationPrimingCoordinator
     let router: AppRouter
     let callManager: CallManager
     let sse: SSEClient
@@ -222,7 +224,20 @@ final class AppServices: ObservableObject {
             api: api,
             synchronizer: AppStoreTransactionSynchronizer(api: api)
         )
-        push = PushNotificationService(api: api, router: appRouter)
+        let pushService = PushNotificationService(api: api, router: appRouter)
+        push = pushService
+        notificationPriming = NotificationPrimingCoordinator(presentSheet: { reason in
+            TopSheetPresenter.present { dismiss in
+                NotificationPrimingSheet(
+                    reason: reason,
+                    onAllow: {
+                        dismiss()
+                        Task { await pushService.requestAuthorizationAndRegister() }
+                    },
+                    onSkip: dismiss
+                )
+            }
+        })
         callManager = CallManager(callsService: callsService, api: api)
     }
 

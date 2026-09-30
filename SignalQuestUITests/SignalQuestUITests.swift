@@ -786,6 +786,10 @@ final class SignalQuestUITests: XCTestCase {
         let logout = app.buttons["Déconnexion"]
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(logout, in: app), "Déconnexion inaccessible")
         logout.tap()
+        // La déconnexion se confirme (TRX-31).
+        let confirm = app.buttons["Se déconnecter"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Confirmation de déconnexion absente")
+        confirm.tap()
         XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 20), "Le logout n'a pas rouvert la connexion")
     }
 

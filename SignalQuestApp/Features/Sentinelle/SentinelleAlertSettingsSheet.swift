@@ -26,7 +26,7 @@ struct SentinelleAlertSettingsSheet: View {
                 if let edits {
                     form(edits.draft)
                 } else if loadFailed {
-                    ErrorStateView(title: "Réglages indisponibles", message: "Réessayez dans un instant.") {
+                    ErrorStateView(title: "Réglages indisponibles", message: "Réessaie dans un instant.") {
                         Task { await load() }
                     }
                     .padding(SQSpace.lg)
@@ -109,6 +109,7 @@ struct SentinelleAlertSettingsSheet: View {
                 Text("Une coupure plus courte que ce seuil est enregistrée dans l’historique "
                      + "sans déclencher d’alerte.")
             }
+            .listRowBackground(SQColor.surface)
 
             Section {
                 TextField("https://discord.com/api/webhooks/…", text: $webhookDraft)
@@ -144,8 +145,8 @@ struct SentinelleAlertSettingsSheet: View {
                     .accessibilityIdentifier("sentinelle.webhook.test")
                     if !canTest {
                         Text("Enregistre l’adresse avant de tester le webhook.")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .font(.footnote)
+                            .foregroundStyle(SQColor.label)
                     }
                 }
 
@@ -153,8 +154,8 @@ struct SentinelleAlertSettingsSheet: View {
                     // Le verdict reste DANS la section, sous le champ : on le lit
                     // pendant qu'on corrige l'URL juste au-dessus.
                     Text(verdict.message)
-                        .font(SQFont.body(12))
-                        .foregroundStyle(verdict.ok ? SQColor.labelSecondary : SQColor.danger)
+                        .font(.footnote)
+                        .foregroundStyle(verdict.ok ? SQColor.label : SQColor.dangerInk)
                         .accessibilityIdentifier("sentinelle.webhook.verdict")
                 }
             } header: {
@@ -163,7 +164,12 @@ struct SentinelleAlertSettingsSheet: View {
                 Text("Discord, Slack et ntfy sont reconnus à leur adresse et reçoivent leur format. "
                      + "Les autres destinataires reçoivent un appel signé.")
             }
+            .listRowBackground(SQColor.surface)
         }
+        // Liste Crème au lieu du gris d'iOS (UI-07), comme Réglages.
+        .scrollContentBackground(.hidden)
+        .signalQuestBackground()
+        .tint(SQColor.brandRed)
         .refreshable { await load() }
     }
 

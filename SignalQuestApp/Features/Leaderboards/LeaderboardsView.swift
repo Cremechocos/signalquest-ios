@@ -174,8 +174,11 @@ final class LeaderboardsViewModel: ObservableObject {
 // MARK: - Vue principale
 
 struct LeaderboardsView: View {
+    @EnvironmentObject private var services: AppServices
     @StateObject private var model: LeaderboardsViewModel
     @Environment(\.dismiss) private var dismiss
+    /// Membre dont on ouvre le profil depuis une ligne du classement (SOC-44).
+    @State private var profileAuthor: SocialFeedAuthor?
     private let gamification: GamificationServicing?
     private let currentUser: AuthUser?
 
@@ -209,6 +212,9 @@ struct LeaderboardsView: View {
         .signalQuestBackground()
         .task { await model.loadAll() }
         .refreshable { await model.loadAll() }
+        .navigationDestinationItemCompat($profileAuthor) { author in
+            UserProfileView(userId: author.id, prefill: author, service: services.feed)
+        }
     }
 
     /// En-tête custom (nav bar système masquée) : bouton retour circulaire 40 pt
@@ -372,7 +378,8 @@ struct LeaderboardsView: View {
                         name: entry.user.displayName,
                         avatarUrl: entry.user.avatarUrl,
                         valueText: "\(Int(entry.value)) \(entry.unit)",
-                        isMe: isMe(entry)
+                        isMe: isMe(entry),
+                        onOpen: { profileAuthor = entry.user }
                     ) {
                         SpeedRowMeta(city: entry.city, tech: entry.tech, isProbablyIOS: entry.isProbablyIOS)
                     }
@@ -420,7 +427,16 @@ struct LeaderboardsView: View {
                         name: entry.displayName,
                         avatarUrl: entry.avatarUrl,
                         valueText: "\(entry.score(for: model.period).formatted()) pts",
-                        isMe: isMe(entry)
+                        isMe: isMe(entry),
+                        onOpen: entry.userId.map { userId -> () -> Void in
+                            {
+                                profileAuthor = SocialFeedAuthor(
+                                    id: userId, name: entry.displayName, handle: nil,
+                                    avatarUrl: entry.avatarUrl, isFriend: nil, isFollowing: nil,
+                                    liveRadio: nil
+                                )
+                            }
+                        }
                     ) {
                         PointsRowMeta(level: entry.level, stats: entry.stats)
                     }
@@ -1154,11 +1170,25 @@ private struct LeaderboardRowView<Meta: View>: View {
     let avatarUrl: URL?
     let valueText: String
     let isMe: Bool
+    /// Ouvre le profil du membre (SOC-44) ; `nil` quand le serveur ne donne
+    /// pas son identifiant.
+    var onOpen: (() -> Void)? = nil
     @ViewBuilder var meta: () -> Meta
 
     var body: some View {
+        if let onOpen {
+            Button(action: onOpen) { row }
+                .buttonStyle(.plain)
+                .accessibilityHint("Ouvre son profil")
+                .accessibilityIdentifier("leaderboard.row.\(rank)")
+        } else {
+            row.accessibilityIdentifier("leaderboard.row.\(rank)")
+        }
+    }
+
+    private var row: some View {
         let shape = RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-        HStack(spacing: SQSpace.md + 1) {
+        return HStack(spacing: SQSpace.md + 1) {
             Text("\(rank)")
                 .font(SQFont.body(14, .semibold))
                 .monospacedDigit()
@@ -1199,8 +1229,8 @@ private struct LeaderboardRowView<Meta: View>: View {
             }
         }
         .modifier(SQSoftShadowIf(active: !isMe))
+        .contentShape(shape)
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("leaderboard.row.\(rank)")
     }
 }
 

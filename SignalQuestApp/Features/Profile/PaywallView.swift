@@ -186,8 +186,10 @@ struct PaywallView: View {
         }.map { SubscriptionPriceCopy.matchesSelection($0.unit, value: $0.value, selection: selectedPeriod) } ?? false
         let isCurrentOrLower = store.activeTier.rank >= tier.rank
         let isPremium = tier == .premium
+        // Encre pleine partout (TRX-13) : `onAccent` à 80 % sur brique tombait
+        // vers 3,7:1, et le gris secondaire en légende passait sous le contraste
+        // rendu. La hiérarchie tient à la taille des textes.
         let primaryText = isPremium ? SQColor.onAccent : SQColor.label
-        let secondaryText = isPremium ? SQColor.onAccent.opacity(0.8) : SQColor.labelSecondary
 
         let card = VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(alignment: .firstTextBaseline) {
@@ -200,13 +202,21 @@ struct PaywallView: View {
                         .foregroundStyle(primaryText)
                 }
                 Spacer()
-                SQEditorialTag(
-                    // « L'essentiel + » promettait des fonctionnalités que Basic
-                    // n'ouvre pas : c'est un palier de soutien, et le nommer
-                    // ainsi est la seule formulation exacte.
-                    text: isPremium ? "Le plus complet" : "Soutien",
-                    color: isPremium ? SQColor.onAccent : SQColor.labelSecondary
-                )
+                // « L'essentiel + » promettait des fonctionnalités que Basic
+                // n'ouvre pas : c'est un palier de soutien, et le nommer ainsi
+                // est la seule formulation exacte.
+                if isPremium {
+                    // Sur brique, l'étiquette standard (encre sombre sur teinte
+                    // translucide) restait sous 3:1 : capsule claire, encre d'accent.
+                    Text("Le plus complet")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .padding(.horizontal, SQSpace.sm + 2)
+                        .padding(.vertical, SQSpace.xs + 1)
+                        .background(SQColor.onAccent, in: Capsule(style: .continuous))
+                } else {
+                    SQEditorialTag(text: "Soutien", color: SQColor.labelSecondary)
+                }
             }
 
             VStack(alignment: .leading, spacing: SQSpace.sm) {
@@ -221,7 +231,7 @@ struct PaywallView: View {
             if let product, let equivalent = SubscriptionPriceCopy.monthlyEquivalent(product: product) {
                 Text(equivalent)
                     .font(SQType.caption)
-                    .foregroundStyle(secondaryText)
+                    .foregroundStyle(primaryText)
             }
             if product != nil && !periodMatchesOffer {
                 Text("Période de l’App Store différente de l’offre choisie. Achat indisponible.")
@@ -238,8 +248,9 @@ struct PaywallView: View {
                 guard let identifier else { return }
                 Task { await store.purchase(identifier) }
             }
+            // Pas d'opacité en plus : le bouton désactivé est déjà grisé, et
+            // l'estomper sur brique rendait « offre actuelle » illisible (TRX-13).
             .disabled(isCurrentOrLower || identifier == nil || !store.eligibility.canPurchase || !periodMatchesOffer)
-            .opacity(isCurrentOrLower || !store.eligibility.canPurchase || !periodMatchesOffer ? 0.62 : 1)
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)

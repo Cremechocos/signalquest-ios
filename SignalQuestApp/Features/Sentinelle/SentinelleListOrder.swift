@@ -18,7 +18,7 @@ enum SentinelleListOrder {
             switch self {
             case .state: return String(localized: "État")
             case .name: return String(localized: "Nom")
-            case .uptime: return String(localized: "Dispo.")
+            case .uptime: return String(localized: "Disponibilité")
             }
         }
     }

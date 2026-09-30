@@ -72,6 +72,9 @@ final class AppRouter: ObservableObject {
     /// Sans identifiant, l'écran s'ouvre quand même — sur son accueil.
     @Published var openSentinelleTargetId: String?
     @Published var openSentinelle = false
+    /// Lien « Réglages de notifications » d'iOS : l'écran Notifications de
+    /// l'app, pas les Réglages d'iOS (TRX-21).
+    @Published var openNotificationSettings = false
     /// Jeton d'un lien de partage ouvert depuis l'extérieur (lien universel).
     @Published var openSentinelleShareSlug: String?
     /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
@@ -97,7 +100,7 @@ final class AppRouter: ObservableObject {
             || openUserProfileId != nil || openSiteId != nil || openCommunityOutage != nil
             || openCommunityOutageId != nil || openAntennaReportId != nil
             || openE2EEDeviceApprovalId != nil || openSentinelleTargetId != nil
-            || openSentinelle || openSentinelleShareSlug != nil
+            || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
             || pendingMapFocus != nil || pendingDriveTest
     }
 
@@ -232,6 +235,12 @@ final class AppRouter: ObservableObject {
         selectedTab = .profile
         openSentinelleTargetId = id
         openSentinelle = true
+    }
+
+    /// Préférences de notifications de l'app, depuis les Réglages d'iOS (TRX-21).
+    func routeToNotificationSettings() {
+        selectedTab = .profile
+        openNotificationSettings = true
     }
 
     /// Un lien de partage reçu par message ouvre la box, pas Safari.

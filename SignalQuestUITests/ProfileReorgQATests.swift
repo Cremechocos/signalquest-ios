@@ -36,13 +36,14 @@ final class ProfileReorgQATests: XCTestCase {
         Thread.sleep(forTimeInterval: 3)
         snap(app, "reorg-01-profil")
 
-        for tile in ["Récompenses", "Classements", "Territoires"] {
+        // Territoires a quitté les tuiles pour « Mes contributions » (Lot 4g).
+        for tile in ["Récompenses", "Classements"] {
             XCTAssertTrue(
                 app.staticTexts[tile].firstMatch.waitForExistence(timeout: 5),
                 "La tuile « \(tile) » manque sous l'en-tête du profil"
             )
         }
-        for section in ["Mes relevés", "Compte"] {
+        for section in ["Mes suivis", "Mes contributions", "Avancé", "Compte"] {
             XCTAssertTrue(
                 app.staticTexts[section].firstMatch.exists,
                 "L'intertitre « \(section) » manque"
@@ -57,18 +58,23 @@ final class ProfileReorgQATests: XCTestCase {
             )
         }
 
-        // ── Carte : les deux écrans ANFR ─────────────────────────────────────
+        // ── Carte : les deux écrans ANFR, en section avancée des filtres ─────
+        // (Lot 4g : plus de bouton permanent sur la carte).
         SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
         Thread.sleep(forTimeInterval: 6)
-        let anfr = app.buttons["Données ANFR"].firstMatch
-        XCTAssertTrue(anfr.waitForExistence(timeout: 15), "Le bouton ANFR manque sur la carte")
-        anfr.tap()
-        Thread.sleep(forTimeInterval: 1)
-        snap(app, "reorg-02-carte-menu-anfr")
-        XCTAssertTrue(app.buttons["Carte ANFR"].firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Statistiques ANFR"].firstMatch.exists)
-        app.buttons["Statistiques ANFR"].firstMatch.tap()
-        Thread.sleep(forTimeInterval: 5)
+        let filters = app.buttons["map.filters"].firstMatch
+        XCTAssertTrue(filters.waitForExistence(timeout: 15), "Le bouton des filtres manque sur la carte")
+        filters.tap()
+        let anfrStats = app.buttons["map.filters.anfr.stats"].firstMatch
+        XCTAssertTrue(anfrStats.waitForExistence(timeout: 10), "La section ANFR manque dans les filtres")
+        _ = SignalQuestUITestSupport.scrollToHittable(anfrStats, in: app)
+        snap(app, "reorg-02-carte-filtres-anfr")
+        XCTAssertTrue(app.buttons["map.filters.anfr.map"].firstMatch.exists)
+        anfrStats.tap()
+        // L'écran s'ouvre à la fermeture de la feuille de filtres.
+        XCTAssertTrue(app.staticTexts["Statistiques ANFR"].firstMatch.waitForExistence(timeout: 10),
+                      "Les statistiques ANFR ne se sont pas ouvertes")
+        Thread.sleep(forTimeInterval: 3)
         snap(app, "reorg-03-anfr-stats")
         back(app)
 

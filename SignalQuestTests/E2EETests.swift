@@ -3568,8 +3568,9 @@ final class E2EEV2LiveShareTransportTests: XCTestCase {
         let push = try String(contentsOf: repository.appendingPathComponent(
             "SignalQuestApp/Core/Push/PushNotificationService.swift"
         ))
+        // Le choix d'aperçu vit dans l'écran Notifications depuis le Lot 4g.
         let settings = try String(contentsOf: repository.appendingPathComponent(
-            "SignalQuestApp/Features/Profile/SettingsView.swift"
+            "SignalQuestApp/Features/Profile/NotificationSettingsView.swift"
         ))
         XCTAssertTrue(appDelegate.contains("handleE2eeV2Envelope"))
         XCTAssertTrue(push.contains("fetchOpaqueNotificationRuntime"))

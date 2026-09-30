@@ -2193,6 +2193,9 @@ struct ConversationDetailView: View {
             sendStatus[localId] = nil
             pendingSends[localId] = nil
             Haptics.success()
+            // Premier message envoyé : le bon moment pour proposer d'être
+            // prévenu des réponses (TRX-01), une seule fois par appareil.
+            Task { await services.notificationPriming.considerPriming(after: .messageSent) }
         } catch {
             // On conserve la bulle et les données de rejeu : l'utilisateur peut
             // réessayer d'un tap. Pas de bannière d'erreur globale ici — le

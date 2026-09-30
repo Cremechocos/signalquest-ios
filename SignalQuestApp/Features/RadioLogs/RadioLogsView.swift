@@ -23,6 +23,8 @@ struct RadioLogsView: View {
     @State private var chainQueue: RadioLogChainQueue?
     @State private var mapTarget: RadioLogSite?
     @State private var showsPurgeConfirmation = false
+    @State private var showsPremiumPaywall = false
+    @State private var isRefreshingEntitlement = false
 
     init(service: RadioLogsServicing, antennas: AntennasServicing, networkPath: NetworkPathMonitor) {
         _model = StateObject(
@@ -60,6 +62,15 @@ struct RadioLogsView: View {
         .toolbar { toolbarContent }
         .refreshable { await model.refresh() }
         .task { await model.onAppear() }
+        .sheet(isPresented: $showsPremiumPaywall, onDismiss: {
+            // Un achat abouti change le droit côté serveur : resynchroniser.
+            Task { await model.refresh() }
+        }) {
+            NavigationStack {
+                PaywallView(store: services.entitlements, entryPoint: .premiumFeature(String(localized: "Logs antennes")))
+            }
+            .presentationDetents([.large])
+        }
         .sheet(isPresented: $showsFilterSheet) {
             RadioLogsFilterSheet(model: model)
         }
@@ -419,14 +430,61 @@ struct RadioLogsView: View {
         }
     }
 
+    /// Refus Premium : dire pourquoi et proposer d'agir (TRX-34). Un abonnement
+    /// pris sur Android ou sur le web vaut ici aussi ; l'app le relit à la demande.
     private func premiumBanner(_ message: String) -> some View {
-        Label(message, systemImage: "lock.fill")
-            .font(SQType.caption)
-            .foregroundStyle(SQColor.warning)
-            .padding(SQSpace.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .padding(.bottom, SQSpace.md)
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Label(message, systemImage: "lock.fill")
+                .font(SQType.caption.weight(.semibold))
+                .foregroundStyle(SQColor.warning)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Abonné sur Android ou sur le web ? Ton abonnement vaut aussi ici : actualise-le.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: SQSpace.sm) { premiumActions }
+                VStack(alignment: .leading, spacing: SQSpace.sm) { premiumActions }
+            }
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .padding(.bottom, SQSpace.md)
+    }
+
+    @ViewBuilder
+    private var premiumActions: some View {
+        premiumAction("Voir l’abonnement", identifier: "radioLogs.premium.paywall") {
+            showsPremiumPaywall = true
+        }
+        premiumAction(isRefreshingEntitlement ? "Vérification…" : "Actualiser mon abonnement",
+                      identifier: "radioLogs.premium.refresh") {
+            Task { await refreshEntitlement() }
+        }
+        .disabled(isRefreshingEntitlement)
+    }
+
+    private func premiumAction(_ title: LocalizedStringKey, identifier: String,
+                               action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(SQType.caption.weight(.semibold))
+                .foregroundStyle(SQColor.label)
+                .padding(.horizontal, SQSpace.md)
+                .frame(minHeight: 44)
+                .background(SQColor.surface, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+
+    /// Relit l'abonnement côté serveur, puis relance la synchronisation.
+    private func refreshEntitlement() async {
+        isRefreshingEntitlement = true
+        defer { isRefreshingEntitlement = false }
+        await services.entitlements.refreshBackendSnapshot()
+        await model.refresh()
     }
 
     @ViewBuilder

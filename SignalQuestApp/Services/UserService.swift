@@ -123,8 +123,8 @@ struct NotificationPreferences: Codable {
     var notifyAnfrUpdatesEmail: Bool?
     // Réponses de la modération à mes signalements d'antenne. Push/in-app sont
     // toujours délivrés (réponse importante) ; seul l'e-mail est opt-out ici.
-    // `= nil` : garde le memberwise init synthétisé compatible avec l'appelant
-    // existant (SettingsViewModel), qui ne fournit pas ce nouveau champ.
+    // `= nil` : garde le memberwise init synthétisé compatible avec
+    // `NotificationPreferences.empty`, qui ne fournit pas ce champ.
     var notifyAntennaReportsEmail: Bool? = nil
     /// Pannes signalées par la communauté sur une antenne que j'utilise.
     ///
@@ -133,6 +133,24 @@ struct NotificationPreferences: Codable {
     /// la demander. `= nil` garde l'init memberwise compatible avec les appelants existants.
     var notifyCommunityOutagesPush: Bool? = nil
     var callsDoNotDisturb: Bool?
+}
+
+extension NotificationPreferences {
+    /// Aucun champ renseigné : base d'un PATCH qui n'envoie que le réglage
+    /// touché (les `nil` ne sont pas encodés, le serveur ne change que ce qu'il
+    /// reçoit).
+    static var empty: NotificationPreferences {
+        NotificationPreferences(
+            notifyPhotoCommentsEmail: nil, notifyPhotoCommentsPush: nil, notifyPhotoCommentsInApp: nil,
+            notifyPhotoLikesEmail: nil, notifyPhotoLikesPush: nil, notifyPhotoLikesInApp: nil,
+            notifyPhotoMentionsEmail: nil, notifyPhotoMentionsPush: nil, notifyPhotoMentionsInApp: nil,
+            notifyPhotoRepliesEmail: nil, notifyPhotoRepliesPush: nil, notifyPhotoRepliesInApp: nil,
+            notifyMessagesEmail: nil, notifyMessagesPush: nil, notifySocialPush: nil,
+            notifyMessagesInApp: nil,
+            notifyAnfrUpdatesPush: nil, notifyAnfrUpdatesEmail: nil,
+            callsDoNotDisturb: nil
+        )
+    }
 }
 
 struct AccountDeletionPreview: Codable, Sendable {

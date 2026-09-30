@@ -1329,17 +1329,6 @@ private struct E2EEV2RecoveryResetView: View {
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    @Published var prefs: NotificationPreferences = NotificationPreferences(
-        notifyPhotoCommentsEmail: nil, notifyPhotoCommentsPush: nil, notifyPhotoCommentsInApp: nil,
-        notifyPhotoLikesEmail: nil, notifyPhotoLikesPush: nil, notifyPhotoLikesInApp: nil,
-        notifyPhotoMentionsEmail: nil, notifyPhotoMentionsPush: nil, notifyPhotoMentionsInApp: nil,
-        notifyPhotoRepliesEmail: nil, notifyPhotoRepliesPush: nil, notifyPhotoRepliesInApp: nil,
-        notifyMessagesEmail: nil, notifyMessagesPush: nil, notifySocialPush: nil,
-        notifyMessagesInApp: nil,
-        notifyAnfrUpdatesPush: nil, notifyAnfrUpdatesEmail: nil,
-        callsDoNotDisturb: nil
-    )
-    @Published var isBusy = false
     @Published var errorMessage: String?
     @Published var isExporting = false
     @Published var deletionPreview: AccountDeletionPreview?
@@ -1412,16 +1401,6 @@ final class SettingsViewModel: ObservableObject {
         clearExport()
     }
 
-    func load() async {
-        do { prefs = try await userService.notificationPreferences() } catch { errorMessage = error.localizedDescription }
-    }
-
-    func save() async {
-        isBusy = true
-        defer { isBusy = false }
-        do { prefs = try await userService.updateNotificationPreferences(prefs) } catch { errorMessage = error.localizedDescription }
-    }
-
     func loadAccountDeletionPreview() async {
         isDeletionPreviewLoading = true
         deletionError = nil
@@ -1485,11 +1464,6 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var appleError: String?
     @State private var showUnlinkAppleConfirm = false
-    /// Statut système réel des notifications : si l'utilisateur a refusé le prompt,
-    /// aucune push n'arrive quels que soient les toggles ci-dessous (UXP-02). On le
-    /// signale et on propose les Réglages plutôt que de laisser des toggles aveugles.
-    @State private var systemNotificationsDenied = false
-    @State private var e2eeNotificationPrivacy: E2EEV2NotificationPrivacy = .full
 
     private var appleLinked: Bool {
         if case .authenticated(let user) = session.state { return user.appleLinked == true }
@@ -1560,118 +1534,10 @@ struct SettingsView: View {
                     } label: { settingsLabel("Appareils E2EE v2", systemImage: "lock.shield") }
                 }
             } header: {
-                Text("Sécurité")
+                Text("Compte et sécurité")
                     .foregroundStyle(SQColor.label)
             }
             .listRowBackground(SQColor.surface)
-            // `Section` porte des surcharges pour List ET pour Table : quand la
-            // première expression du bloc est un NavigationLink à fermeture
-            // traînante, Swift résout vers TableRowContent. Un Text concret en
-            // tête ancre la résolution côté vues.
-            Section {
-                Text("État de votre connexion fixe, surveillée en continu depuis nos serveurs.")
-                    .font(SQFont.body(12))
-                    .foregroundStyle(SQColor.labelSecondary)
-                NavigationLink {
-                    SentinelleView(service: services.sentinelle)
-                } label: { settingsLabel("Sentinelle", systemImage: "wifi.router") }
-            } header: {
-                Text("Ma connexion")
-                    .foregroundStyle(SQColor.label)
-            }
-            .listRowBackground(SQColor.surface)
-            Section {
-                Toggle(isOn: $fieldMode) {
-                    settingsLabel("Mode terrain", systemImage: "sun.max.fill")
-                }
-                .tint(SQColor.brandRed)
-                Text("Renforce le contraste, la graisse des textes et la taille des contrôles pour une lecture plus fiable en extérieur.")
-                    .font(SQFont.body(12))
-                    .foregroundStyle(SQColor.labelSecondary)
-                Toggle(isOn: $pureBlack) {
-                    settingsLabel("Noir intense (OLED)", systemImage: "circle.lefthalf.filled")
-                }
-                .tint(SQColor.brandRed)
-                Text("En thème sombre, les fonds passent au noir pur. Sur un écran OLED, un pixel noir est éteint : l'affichage consomme moins. Sans effet en thème clair.")
-                    .font(.footnote)
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-            } header: {
-                Text("Apparence")
-                    .foregroundStyle(SQColor.label)
-            }
-            .listRowBackground(SQColor.surface)
-            Section {
-                Toggle(isOn: $carPlayCoverageAlerts) {
-                    settingsLabel("Alerte zone mal couverte", systemImage: "car.fill")
-                }
-                .tint(SQColor.brandRed)
-                Text("Sur l'écran de la voiture, te signale quand tu traverses une zone où le réseau est mauvais. Au maximum une alerte toutes les 10 minutes, jamais deux fois la même zone, et rien pendant une manœuvre annoncée.")
-                    .font(SQFont.body(12))
-                    .foregroundStyle(SQColor.labelSecondary)
-            } header: {
-                Text("CarPlay")
-            }
-            .listRowBackground(SQColor.surface)
-            Group {
-                Section {
-                    Toggle(isOn: Binding(
-                        get: { appLockEnabled },
-                        set: { newValue in
-                            appLockSetup.setEnabled(newValue, credentials: services.api.credentials)
-                        }
-                    )) {
-                        settingsLabel("Verrouiller SignalQuest", systemImage: "lock.shield")
-                    }
-                    .accessibilityIdentifier("settings.app-lock")
-                    .disabled(appLockSetup.isConfirming || (!canAuthenticateDeviceOwner && !appLockEnabled))
-                    if !canAuthenticateDeviceOwner && !appLockEnabled {
-                        Text("Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage.")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    if let appLockError = appLockSetup.errorMessage {
-                        Text(appLockError).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
-                    }
-                    if appLockEnabled {
-                        Picker(selection: $lockGraceSeconds) {
-                            Text("Immédiat").tag(0.0)
-                            Text("Après 1 min").tag(60.0)
-                            Text("Après 5 min").tag(300.0)
-                            Text("Après 15 min").tag(900.0)
-                        } label: { settingsLabel("Verrouillage", systemImage: "clock") }
-                        Picker(selection: $autoLogoutSeconds) {
-                            Text("Jamais").tag(0.0)
-                            Text("Après 15 min").tag(900.0)
-                            Text("Après 1 h").tag(3600.0)
-                            Text("Après 8 h").tag(28800.0)
-                        } label: { settingsLabel("Déconnexion auto", systemImage: "rectangle.portrait.and.arrow.right") }
-                    }
-                    // Désactivation de la mémorisation E2EE par biométrie (l'activation
-                    // se fait depuis la feuille de déverrouillage chiffré).
-                    if e2eeBiometricEnabled {
-                        Toggle(isOn: Binding(
-                            get: { e2eeBiometricEnabled },
-                            set: { newValue in
-                                e2eeBiometricEnabled = newValue
-                                if !newValue { E2EEBiometric.clear() }
-                            }
-                        )) {
-                            settingsLabel("Messagerie chiffrée via \(BiometricAuth.kind.label)",
-                                systemImage: "lock.shield",
-                                localizedTitle: "Messagerie chiffrée via \(BiometricAuth.kind.label)")
-                        }
-                    }
-                } header: {
-                    Text("Verrouillage")
-                } footer: {
-                    Text("Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée.")
-                        .font(SQType.caption)
-                }
-                .tint(SQColor.brandRed)
-                .foregroundStyle(SQColor.label)
-                .listRowBackground(SQColor.surface)
-            }
             Section {
                 if appleLinked {
                     HStack(spacing: SQSpace.md) {
@@ -1703,77 +1569,114 @@ struct SettingsView: View {
             }
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
-            Section {
-                NavigationLink {
-                    FavoriteAntennasView(favorites: services.favoriteAntennas)
-                } label: {
-                    HStack {
-                        Label("Antennes suivies", systemImage: "star.fill")
-                        Spacer()
-                        Text("\(services.favoriteAntennas.favorites.count)")
+            Group {
+                Section {
+                    Toggle(isOn: Binding(
+                        get: { appLockEnabled },
+                        set: { newValue in
+                            appLockSetup.setEnabled(newValue, credentials: services.api.credentials)
+                        }
+                    )) {
+                        settingsLabel("Verrouiller SignalQuest", systemImage: "lock.shield")
+                    }
+                    .accessibilityIdentifier("settings.app-lock")
+                    .disabled(appLockSetup.isConfirming || (!canAuthenticateDeviceOwner && !appLockEnabled))
+                    if !canAuthenticateDeviceOwner && !appLockEnabled {
+                        Text("Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage.")
+                            .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                     }
+                    if let appLockError = appLockSetup.errorMessage {
+                        Text(appLockError).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
+                    }
+                    if appLockEnabled {
+                        Picker(selection: $lockGraceSeconds) {
+                            Text("Immédiat").tag(0.0)
+                            Text("Après 1 min").tag(60.0)
+                            Text("Après 5 min").tag(300.0)
+                            Text("Après 15 min").tag(900.0)
+                        } label: { settingsLabel("Verrouillage", systemImage: "clock") }
+                        .tint(SQColor.accentInk)
+                        Picker(selection: $autoLogoutSeconds) {
+                            Text("Jamais").tag(0.0)
+                            Text("Après 15 min").tag(900.0)
+                            Text("Après 1 h").tag(3600.0)
+                            Text("Après 8 h").tag(28800.0)
+                        } label: { settingsLabel("Déconnexion auto", systemImage: "rectangle.portrait.and.arrow.right") }
+                        .tint(SQColor.accentInk)
+                    }
+                    // Désactivation de la mémorisation E2EE par biométrie (l'activation
+                    // se fait depuis la feuille de déverrouillage chiffré).
+                    if e2eeBiometricEnabled {
+                        Toggle(isOn: Binding(
+                            get: { e2eeBiometricEnabled },
+                            set: { newValue in
+                                e2eeBiometricEnabled = newValue
+                                if !newValue { E2EEBiometric.clear() }
+                            }
+                        )) {
+                            settingsLabel("Messagerie chiffrée via \(BiometricAuth.kind.label)",
+                                systemImage: "lock.shield",
+                                localizedTitle: "Messagerie chiffrée via \(BiometricAuth.kind.label)")
+                        }
+                    }
+                } header: {
+                    Text("Verrouillage")
+                } footer: {
+                    Text("Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée.")
+                        .accessibilityIdentifier("settings.footer.lock")
+                        .font(SQType.caption)
                 }
-            } header: {
-                Text("Antennes suivies")
-            } footer: {
-                Text("Les seules antennes pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme.")
+                .tint(SQColor.brandRed)
+                .foregroundStyle(SQColor.label)
+                .listRowBackground(SQColor.surface)
             }
-            .foregroundStyle(SQColor.label)
-            .listRowBackground(SQColor.surface)
-            Section("Notifications") {
-                if systemNotificationsDenied {
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        Label("Les notifications sont désactivées pour SignalQuest. Aucune alerte n’arrivera tant qu’elles ne sont pas réactivées dans les Réglages iOS.", systemImage: "bell.slash.fill")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.warning)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let url = URL(string: UIApplication.openSettingsURLString) {
-                            Link("Ouvrir les Réglages", destination: url)
-                                .font(SQType.caption.weight(.semibold))
-                                .foregroundStyle(SQColor.brandRed)
-                        }
-                    }
-                }
-                Toggle("Messages privés (push)", isOn: bind(\.notifyMessagesPush))
-                Picker(selection: Binding(
-                    get: { e2eeNotificationPrivacy },
-                    set: { value in
-                        if E2EEV2NotificationPrivacyStore.set(value) {
-                            e2eeNotificationPrivacy = value
-                            Haptics.selection()
-                        } else {
-                            model.errorMessage = String(localized: "Impossible de modifier les aperçus. Réessayez ou désactivez les notifications dans les Réglages iOS.")
-                        }
-                    }
-                )) {
-                    Text("Contenu complet").tag(E2EEV2NotificationPrivacy.full)
-                    Text("Expéditeur seulement").tag(E2EEV2NotificationPrivacy.senderOnly)
-                    Text("Tout masquer").tag(E2EEV2NotificationPrivacy.hidden)
+            // Cinq groupes (TRX-22) : compte et sécurité, confidentialité,
+            // notifications, affichage et carte, aide et légal. Piège : un
+            // NavigationLink à fermeture traînante en tête de `Section` fait
+            // résoudre vers TableRowContent ; le modificateur qui le suit ancre
+            // la résolution côté vues.
+            Section {
+                NavigationLink {
+                    PrivacySettingsView(service: services.privacy)
                 } label: {
-                    settingsLabel("Aperçu des messages chiffrés", systemImage: "lock.rectangle")
+                    settingsLabel("Confidentialité", systemImage: "hand.raised.fill")
                 }
-                .pickerStyle(.menu)
-                .frame(minHeight: 48)
-                E2EEV2NotificationPreviewNotice(showReminder: true) { e2eeNotificationPrivacy = $0 }
-                // Le fil PUBLIC, séparé des messages privés : les deux vivaient sous un seul
-                // interrupteur intitulé « Messages », si bien que couper ses messages coupait
-                // aussi commentaires, réponses et mentions.
-                Toggle("Commentaires et réponses", isOn: bind(\.notifySocialPush))
-                Toggle("Messages (in-app)", isOn: bind(\.notifyMessagesInApp))
-                Toggle("Mises à jour ANFR (push)", isOn: bind(\.notifyAnfrUpdatesPush))
-                Toggle("Likes & commentaires (push)", isOn: bind(\.notifyPhotoLikesPush))
-                Toggle("Réponses à mes signalements (e-mail)", isOn: bind(\.notifyAntennaReportsEmail))
-                Toggle("Pannes signalées par la communauté", isOn: bind(\.notifyCommunityOutagesPush))
+                .accessibilityIdentifier("settings.privacy")
+                // Notifications, appels et antennes suivies : un écran à part,
+                // qui enregistre chaque réglage au geste (TRX-03) et que le lien
+                // « Réglages de notifications » d'iOS ouvre directement (TRX-21).
+                NavigationLink {
+                    NotificationSettingsView(userService: services.users)
+                } label: {
+                    settingsLabel("Notifications", systemImage: "bell.badge")
+                }
+                .accessibilityIdentifier("settings.notifications")
             }
-            .tint(SQColor.brandRed)
-            .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
-            Section("Appels") {
-                Toggle("Ne pas déranger", isOn: bind(\.callsDoNotDisturb))
+            Section {
+                Toggle(isOn: $fieldMode) {
+                    settingsLabel("Mode terrain", systemImage: "sun.max.fill")
+                }
+                .tint(SQColor.brandRed)
+                Text("Renforce le contraste, la graisse des textes et la taille des contrôles pour une lecture plus fiable en extérieur.")
+                    .font(.footnote)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("settings.help.fieldMode")
+                Toggle(isOn: $pureBlack) {
+                    settingsLabel("Noir intense (OLED)", systemImage: "circle.lefthalf.filled")
+                }
+                .tint(SQColor.brandRed)
+                Text("En thème sombre, les fonds passent au noir pur. Sur un écran OLED, un pixel noir est éteint : l'affichage consomme moins. Sans effet en thème clair.")
+                    .font(.footnote)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("settings.help.oled")
+            } header: {
+                Text("Affichage et carte")
+                    .foregroundStyle(SQColor.label)
             }
-            .tint(SQColor.brandRed)
-            .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
             Section {
                 ForEach(MapBackdrop.allCases) { option in
@@ -1814,13 +1717,24 @@ struct SettingsView: View {
             .sqAnimation(SQMotion.snappy, value: mapBackdropRaw)
             .listRowBackground(SQColor.surface)
             Section {
-                GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: model.isBusy) {
-                    Task { await model.save() }
+                Toggle(isOn: $carPlayCoverageAlerts) {
+                    settingsLabel("Alerte zone mal couverte", systemImage: "car.fill")
                 }
+                .tint(SQColor.brandRed)
+                Text("Sur l'écran de la voiture, te signale quand tu traverses une zone où le réseau est mauvais. Au maximum une alerte toutes les 10 minutes, jamais deux fois la même zone, et rien pendant une manœuvre annoncée.")
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.labelSecondary)
+            } header: {
+                Text("CarPlay")
             }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets())
-            Section("Informations légales") {
+            .listRowBackground(SQColor.surface)
+            Section("Aide et légal") {
+                NavigationLink {
+                    SQGlossaryView()
+                } label: {
+                    settingsLabel("Aide et glossaire", systemImage: "questionmark.circle")
+                }
+                .accessibilityIdentifier("settings.glossary")
                 Link(destination: AppConfig.current.termsURL) {
                     settingsLabel("Conditions d’utilisation", systemImage: "doc.text")
                 }
@@ -1879,14 +1793,6 @@ struct SettingsView: View {
         }
         .onDisappear { appLockSetup.cancel() }
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: PushOwnerScope.current) {
-            await model.load()
-            e2eeNotificationPrivacy = E2EEV2NotificationPrivacyStore.get()
-        }
-        .task {
-            let settings = await UNUserNotificationCenter.current().notificationSettings()
-            systemNotificationsDenied = settings.authorizationStatus == .denied
-        }
         .sheet(item: $twoFactorEnrollment) { enrollment in
             NavigationStack {
                 TwoFactorSetupView(service: enrollment, acknowledge: {
@@ -2025,17 +1931,6 @@ struct SettingsView: View {
                 Haptics.error()
             }
         }
-    }
-
-    private func bind(_ keyPath: WritableKeyPath<NotificationPreferences, Bool?>) -> Binding<Bool> {
-        Binding(
-            get: { model.prefs[keyPath: keyPath] ?? false },
-            set: { newValue in
-                var copy = model.prefs
-                copy[keyPath: keyPath] = newValue
-                model.prefs = copy
-            }
-        )
     }
 }
 
