@@ -6274,6 +6274,22 @@
         }
       }
     },
+    "Antenne mutualisée entre opérateurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna shared by several operators"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenne mutualisée entre opérateurs"
+          }
+        }
+      }
+    },
     "Antenne partagée par %lld opérateurs" : {
       "localizations" : {
         "en" : {
@@ -30528,6 +30544,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Métrique du classement"
+          }
+        }
+      }
+    },
+    "Mutualisée : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared by %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mutualisée : %@"
           }
         }
       }

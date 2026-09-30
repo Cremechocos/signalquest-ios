@@ -1356,6 +1356,12 @@ struct AntennaDetailSheet: View {
         case "zb":
             guard let leader = core.zbLeader else { return String(localized: "Zone blanche partagée") }
             return String(localized: "Zone blanche partagée, opérée par \(photoOperatorLabel(leader))")
+        case "mutualise":
+            // Métro, tunnels, gares : une antenne pour plusieurs opérateurs,
+            // chacun avec son propre eNB.
+            let names = core.mutualiseOperators.map(photoOperatorLabel)
+            guard !names.isEmpty else { return String(localized: "Antenne mutualisée entre opérateurs") }
+            return String(localized: "Mutualisée : \(names.formatted(.list(type: .and)))")
         case nil, "":
             return nil
         default:

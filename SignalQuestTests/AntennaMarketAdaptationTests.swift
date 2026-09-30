@@ -140,6 +140,24 @@ final class AntennaMarketAdaptationTests: XCTestCase {
         XCTAssertFalse(core.hasStructuralData)
     }
 
+    /// Antenne mutualisée (métro, tunnel, gare) : nouvelle valeur de
+    /// `sharingKind` et liste additive des opérateurs, contrat du 30/09.
+    func testSharedAntennaListsItsOperatorsAndOlderBackendsStayReadable() throws {
+        let shared = try core(minimal(market: "FR").replacingOccurrences(
+            of: "\"operators\": [],",
+            with: "\"operators\": [\"SFR\"], \"sharingKind\": \"mutualise\", \"mutualiseOperators\": [\"SFR\", \"BOUYGUES\"],"
+        ))
+        XCTAssertEqual(shared.sharingKind, "mutualise")
+        XCTAssertEqual(shared.mutualiseOperators, ["SFR", "BOUYGUES"])
+        XCTAssertEqual(shared.operators, ["SFR"], "L'opérateur de la station seul")
+
+        let outside = try core(minimal(market: "FR").replacingOccurrences(
+            of: "\"operators\": [],", with: "\"operators\": [], \"mutualiseOperators\": null,"
+        ))
+        XCTAssertEqual(outside.mutualiseOperators, [])
+        XCTAssertEqual(try core(minimal(market: "FR")).mutualiseOperators, [], "Backend antérieur")
+    }
+
     /// Une fiche officielle ne doit jamais être prise pour une contribution.
     func testOfficialSiteIsNotFlaggedAsCustom() throws {
         let core = try core(minimal(market: "FR", status: "En service", supportType: "Immeuble"))

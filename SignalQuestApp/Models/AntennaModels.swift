@@ -361,6 +361,10 @@ struct AntennaCoreDetails: Decodable, Equatable {
     let sharingKind: String?
     let crozonLeader: String?
     let zbLeader: String?
+    /// Opérateurs d'une antenne mutualisée (métro, tunnel, gare), en codes
+    /// SFR, BOUYGUES, ORANGE, FREE. Champ additif : vide hors mutualisation et
+    /// sur un backend antérieur.
+    let mutualiseOperators: [String]
     let technologies: [String]
     let azimuts: [Double]
     /// Directions des faisceaux hertziens — les paraboles point-à-point qui
@@ -494,7 +498,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
+        case id, supId, siteKey, anfrCode, market, rawLicenseeName, lat, lng, address, commune, postalCode, operators, operatorScope, operatorFacets, sharingKind, crozonLeader, zbLeader, mutualiseOperators, technologies, azimuts, technical, frequencyBands, radioCarriers, cellIdentifiers, siteInfo
         case status, technologiesInProject, sectorSystems, azimutsFh, fhLinks
         case isCustomSite, validationStatus, source, displayName, description
     }
@@ -540,6 +544,7 @@ struct AntennaCoreDetails: Decodable, Equatable {
         sharingKind = c.decodeFlexibleString(forKey: .sharingKind)
         crozonLeader = c.decodeFlexibleString(forKey: .crozonLeader)
         zbLeader = c.decodeFlexibleString(forKey: .zbLeader)
+        mutualiseOperators = c.decodeLossyArray([String].self, forKey: .mutualiseOperators)
         technologies = c.decodeLossyArray([String].self, forKey: .technologies)
         azimuts = c.decodeLossyArray([Double].self, forKey: .azimuts)
         azimutsFh = c.decodeLossyArray([Double].self, forKey: .azimutsFh)
