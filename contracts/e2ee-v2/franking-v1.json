@@ -1,0 +1,16 @@
+{
+  "fixtureVersion": "1",
+  "conversationId": "conversation_01J7ABCD23456789",
+  "senderDeviceId": "device_alice_ios_01J7ABCD2345",
+  "clientRequestId": "message_01J7ABCD23456789",
+  "fkB64": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8=",
+  "payloadUtf8": "{\"body\":{\"text\":\"Bonjour\"},\"counter\":\"1\",\"kind\":\"TEXT\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}",
+  "frankTagB64": "32NvXXrESvArxSvEXhVMygb1XhzSSnvtnR6f3Nzepio=",
+  "ksB64": "wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8=",
+  "envelopeId": "envelope_01J7ABCD23456789",
+  "senderUserId": "user_alice_01J7ABCD23456789",
+  "serverTimeMs": "1790000000250",
+  "keyId": "server_tag_key_01J7ABCD",
+  "serverTagCanonicalUtf8": "SQ-E2EE-V2-SERVER-TAG\n1\n32NvXXrESvArxSvEXhVMygb1XhzSSnvtnR6f3Nzepio=\nconversation_01J7ABCD23456789\nenvelope_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\n1790000000250\nserver_tag_key_01J7ABCD",
+  "serverTagB64": "vFUJ1gDaO87stYuIyrwW8+IuiJ0Au995mILoyTcBfqk="
+}

@@ -1,0 +1,8 @@
+{
+  "fixtureVersion": "1",
+  "conversationId": "conversation_01J7ABCD23456789",
+  "senderDeviceId": "device_alice_ios_01J7ABCD2345",
+  "clientRequestId": "message_01J7ABCD23456789",
+  "canonicalUtf8": "SQ-E2EE-V2-MESSAGE-REF\n1\nconversation_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nmessage_01J7ABCD23456789",
+  "messageRef": "nD7aMgNO2aWXq-JdUCbCc3cuefgXwcqQkFKUrzSENh0"
+}

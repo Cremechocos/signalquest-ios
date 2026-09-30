@@ -1,0 +1,25 @@
+{
+  "fixtureVersion": "1",
+  "moderationPrivateRawB64": "UVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3A=",
+  "moderationPublicX963B64": "BL5Xe1szuMPc+oGFhZPYSTggPni6EPh/t1N27qk31Vkq9SvcZBxDreqeNC/8b9v+XIY8n27TBHGZmh0B7PVAZb4=",
+  "moderationKeyId": "moderation_key_01J7ABCD2345",
+  "hpkeSuite": "0x0010/0x0001/0x0002",
+  "ephemeralIkmB64": "cHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo8=",
+  "senderDeviceId": "device_bruno_android_01J7ABCD",
+  "clientRequestId": "message_01J7ABCD23456789",
+  "clearUtf8": "{\"conversationId\":\"conversation_01J7ABCD23456789\",\"items\":[{\"blobIds\":[],\"envelopeId\":\"envelope_01J7ABCD23456789\",\"frankTagB64\":\"ZLzeea5OBcr9i/B3WpyAU1kkGLAziKHzcc9QJPNWcNQ=\",\"serverTagB64\":\"MOVjSmoBTt8cFdKMphjimIJM+/4xcS+GR83cT62p4tk=\"}],\"reason\":\"HARASSMENT\",\"reportId\":\"report_01J7ABCD23456789\",\"schema\":\"signalquest.e2ee-report\",\"version\":\"1\"}",
+  "infoB64": "U1EtRTJFRS1WMi1SRVBPUlQKMQpnbEYyNDB4NlRQUFIzblVoSzZWbDlKOFlDNE41V3ZnOXFiOUszVW15OW9Z",
+  "sealedPlaintextUtf8": "{\"items\":[{\"envelopeId\":\"envelope_01J7ABCD23456789\",\"fkB64\":\"oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8=\",\"mediaKeys\":[],\"payloadB64\":\"eyJib2R5Ijp7InRleHQiOiJNZXNzYWdlIHNpZ25hbMOpIn0sImNvdW50ZXIiOiIxIiwia2luZCI6IlRFWFQiLCJtZW50aW9ucyI6W10sInJlcGx5VG9SZWYiOm51bGwsInNjaGVtYSI6InNpZ25hbHF1ZXN0LmUyZWUtY29udGVudCIsInNlbnRBdE1zIjoiMTc5MDAwMDAwMDAwMCIsInZlcnNpb24iOiIyIn0=\"}],\"schema\":\"signalquest.e2ee-report-sealed\",\"version\":\"1\"}",
+  "encB64": "BHIy92BLQVZA1RAJkUPlLeEA0hC/9Rmjm+gx//Hddh10Hc+ki1m4Ji8gIZLevlkLckr3b4DrSit4R8pZQwDa33c=",
+  "sealedB64": "lBGEZLCsGBK5Yy5mDMUtEAJSjR/StrgzajMtsJGKjFTdKWc9TQagLILg03lTkEjXFb9MFLG7gpmEUE/i4uRq1nAUFX2FrA+SPYiOjKzHhtJSxGF63mVlQ8yw72ZH+kvwaLiFwkq8hh+vLySlWLPpIxYWXJb+u3AA2qi5+FzMTCSrLYcQHigy4dqaiLw6/aiHwgmvi29UiBQn/PN+yVy75mLDzD+NHlJgWx0kfWQm58P/ctgvUS9r3SrjFFhV1rw7lMa1CE415SW3vAvX12y3IcnCyytLAqQ/xKuP5AL1/rqzvpaRj/n1NFv8625L4bwPfTR/JIDEoiDXqfdcyAirXkp/QCbnEhj39aRnz+kznxm4jq7D9CuR5XjaG5LHzxbNf2ob9ZMbHOI1a+x0hijkgDWfbl7NR/ZovOfSvh3N9HMvvgNxLua90PcsnsdgZnh7KNAuATh79CQld+1dVYkn8R8zcBtdbf1+nfDOqNrqreRA6p+0KGmgSV1DoaDMlpGsFzUWnHM4KIUJrTrOVJsT8heOF7a6TAysddiGzupTNaK3mzik1+cOhS7mPeq2tjztZUklV6HQ0H3fTZYX",
+  "negative": [
+    {
+      "case": "tamperedClear",
+      "clearUtf8": "{\"conversationId\":\"conversation_01J7ABCD23456789\",\"items\":[{\"blobIds\":[],\"envelopeId\":\"envelope_01J7ABCD23456789\",\"frankTagB64\":\"ZLzeea5OBcr9i/B3WpyAU1kkGLAziKHzcc9QJPNWcNQ=\",\"serverTagB64\":\"MOVjSmoBTt8cFdKMphjimIJM+/4xcS+GR83cT62p4tk=\"}],\"reason\":\"SPAM\",\"reportId\":\"report_01J7ABCD23456789\",\"schema\":\"signalquest.e2ee-report\",\"version\":\"1\"}"
+    },
+    {
+      "case": "tamperedSealed",
+      "sealedB64": "lRGEZLCsGBK5Yy5mDMUtEAJSjR/StrgzajMtsJGKjFTdKWc9TQagLILg03lTkEjXFb9MFLG7gpmEUE/i4uRq1nAUFX2FrA+SPYiOjKzHhtJSxGF63mVlQ8yw72ZH+kvwaLiFwkq8hh+vLySlWLPpIxYWXJb+u3AA2qi5+FzMTCSrLYcQHigy4dqaiLw6/aiHwgmvi29UiBQn/PN+yVy75mLDzD+NHlJgWx0kfWQm58P/ctgvUS9r3SrjFFhV1rw7lMa1CE415SW3vAvX12y3IcnCyytLAqQ/xKuP5AL1/rqzvpaRj/n1NFv8625L4bwPfTR/JIDEoiDXqfdcyAirXkp/QCbnEhj39aRnz+kznxm4jq7D9CuR5XjaG5LHzxbNf2ob9ZMbHOI1a+x0hijkgDWfbl7NR/ZovOfSvh3N9HMvvgNxLua90PcsnsdgZnh7KNAuATh79CQld+1dVYkn8R8zcBtdbf1+nfDOqNrqreRA6p+0KGmgSV1DoaDMlpGsFzUWnHM4KIUJrTrOVJsT8heOF7a6TAysddiGzupTNaK3mzik1+cOhS7mPeq2tjztZUklV6HQ0H3fTZYX"
+    }
+  ]
+}

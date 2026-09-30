@@ -1,0 +1,23 @@
+{
+  "fixtureVersion": "1",
+  "signingPrivateRawB64": "MzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVI=",
+  "signingPublicX963B64": "BJ2No1cMFx9s8n54VYRjz7XGcSAh/fZ8FSC1kjrPNdCNfPxc6VpsFcxAGrDbo+eGu3AOchOscKQjTXyy8F0LVpQ=",
+  "topic": "sq.e2ee.join",
+  "proofUtf8": "SQ-E2EE-V2-CALL-JOIN\n1\nconversation_01J7ABCD23456789\ncall_01J7ABCD23456789XY\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\nlk_user_bruno_01J7ABCD23456789\nuser_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\n1790000002000",
+  "signatureDerB64": "MEUCIQDBFJSumOOwTi1jnbcgwQiitfPUxx3KFU3VIwWApkcc8QIgAq5pza7anIrOGnUMW4OxVmPXmeSef/y96f3uBV6I5yM=",
+  "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nlk_user_bruno_01J7ABCD23456789\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEUCIQDBFJSumOOwTi1jnbcgwQiitfPUxx3KFU3VIwWApkcc8QIgAq5pza7anIrOGnUMW4OxVmPXmeSef/y96f3uBV6I5yM=\"}",
+  "negative": [
+    {
+      "case": "highS",
+      "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nlk_user_bruno_01J7ABCD23456789\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEYCIQDBFJSumOOwTi1jnbcgwQiitfPUxx3KFU3VIwWApkcc8QIhAP1RljFRJWN2MeWK86R8TqlZD2DJCJehxwm73L2d2j4u\"}"
+    },
+    {
+      "case": "emptyIdentity",
+      "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\n\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEQCIG7EwxTiN+/fuA/U0cQiJ0q3yEqg6MdzBQl8YSTGMT/LAiAwJwYWfS6Zw2kRSxIN4xXNZz7rzw96/mhl+D7wAFhUcg==\"}"
+    },
+    {
+      "case": "extraKey",
+      "messageUtf8": "{\"a\":null,\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nlk_user_bruno_01J7ABCD23456789\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEUCIQDBFJSumOOwTi1jnbcgwQiitfPUxx3KFU3VIwWApkcc8QIgAq5pza7anIrOGnUMW4OxVmPXmeSef/y96f3uBV6I5yM=\"}"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "fixtureVersion": "1",
+  "userId": "user_alice_01J7ABCD23456789",
+  "approvalId": "approval_0000000000000002",
+  "pendingDeviceId": "device_alice_web_01J7ABCD2345",
+  "fingerprint": "BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
+  "challengeB64Url": "AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0",
+  "expiresAtMs": "1790000300000",
+  "qrPayload": "SQE2EE2|2|approval_0000000000000002|device_alice_web_01J7ABCD2345|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000",
+  "sasCanonicalUtf8": "SQ-E2EE-V2-APPROVAL-SAS\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y\napproval_0000000000000002\nAAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0",
+  "sas": "841594"
+}

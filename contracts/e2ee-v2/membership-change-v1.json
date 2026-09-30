@@ -1,0 +1,55 @@
+{
+  "fixtureVersion": "1",
+  "conversationId": "conversation_01J7ABCD23456789",
+  "actorSigningPrivateRawB64": "MTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1A=",
+  "actorSigningPublicX963B64": "BAx/zDIcdxGSA9vnmGSQfk8KAZF3id6i1HMVMaUqIuK6wXZtIeRhfXL7vvh9bt8tj4C1JpVuPCwXAfFrfzEVAMY=",
+  "chain": [
+    {
+      "action": "ADD",
+      "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n1\nADD\nuser_alice_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\n-\n1790000000000",
+      "signatureDerB64": "MEQCICbAjqTvJ8co6PkG8o3KBUomfN12tZTPmoqv7aHogFtBAiBdAehENXTbY9U77U+YbkH+zse+fTbmo35XJxTSBDvRJQ=="
+    },
+    {
+      "action": "ADD",
+      "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n2\nADD\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nYXH94i-HMDrM2iuoaPiuHgF1xXyAbpUZFyVjzOhGTqk\n1790000000001",
+      "signatureDerB64": "MEQCIFTuH1EqWSLSU9oVpuBqY719eTHlK3IS+sRVbPiK2xWlAiA70scUG4UnuC3Q5E85Pi0w40mZAe4V2emSawMVOzNJvQ=="
+    },
+    {
+      "action": "ROLE_ADMIN",
+      "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n3\nROLE_ADMIN\nuser_alice_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nkLxl5DZU1eOdiYsh5kwQucXiZmE9Fkj2bnpw6vBARV8\n1790000000002",
+      "signatureDerB64": "MEUCIQDzhMjsT9ApST2zi+bRb3U9E7EY8nthBIiA5Hf+Hyb3lQIgDohvi+mlr3S8s604SM5ziMuO02c1Dm8DBsgyaaMbZyg="
+    },
+    {
+      "action": "EXCLUDE_WEB_ON",
+      "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n4\nEXCLUDE_WEB_ON\n-\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000003",
+      "signatureDerB64": "MEUCIQDigokE5jgwxOKlbIPclShn4wdSA4a1H8sEU3SaHQzDlQIgS4qJTxnWOHKmkPx0oYS4cRdQ7QyXKL1q0VexysBGRcw="
+    }
+  ],
+  "negative": [
+    {
+      "case": "brokenChain",
+      "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n3\nADD\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\n6ZbykUme9BkOR9KW4tlYmH89vHvkl_Vqq7Y8OmKc2rY\n1790000000000",
+      "previousUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n2\nADD\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nYXH94i-HMDrM2iuoaPiuHgF1xXyAbpUZFyVjzOhGTqk\n1790000000001"
+    },
+    {
+      "case": "leaveByOther",
+      "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n3\nLEAVE\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nkLxl5DZU1eOdiYsh5kwQucXiZmE9Fkj2bnpw6vBARV8\n1790000000000",
+      "previousUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n2\nADD\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nYXH94i-HMDrM2iuoaPiuHgF1xXyAbpUZFyVjzOhGTqk\n1790000000001"
+    },
+    {
+      "case": "webToggleWithTarget",
+      "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n3\nEXCLUDE_WEB_ON\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nkLxl5DZU1eOdiYsh5kwQucXiZmE9Fkj2bnpw6vBARV8\n1790000000000",
+      "previousUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n2\nADD\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nYXH94i-HMDrM2iuoaPiuHgF1xXyAbpUZFyVjzOhGTqk\n1790000000001"
+    },
+    {
+      "case": "unknownAction",
+      "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n3\nPROMOTE\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nkLxl5DZU1eOdiYsh5kwQucXiZmE9Fkj2bnpw6vBARV8\n1790000000000",
+      "previousUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n2\nADD\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nYXH94i-HMDrM2iuoaPiuHgF1xXyAbpUZFyVjzOhGTqk\n1790000000001"
+    },
+    {
+      "case": "firstWithPrevious",
+      "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n1\nADD\nuser_alice_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nkLxl5DZU1eOdiYsh5kwQucXiZmE9Fkj2bnpw6vBARV8\n1790000000000",
+      "previousUtf8": null
+    }
+  ]
+}

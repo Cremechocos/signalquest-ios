@@ -1,0 +1,47 @@
+{
+  "fixtureVersion": "1",
+  "valid": [
+    {
+      "kind": "TEXT",
+      "payloadUtf8": "{\"body\":{\"text\":\"Salut @bruno\"},\"counter\":\"1\",\"kind\":\"TEXT\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "kind": "EDIT",
+      "payloadUtf8": "{\"body\":{\"targetRef\":\"nD7aMgNO2aWXq-JdUCbCc3cuefgXwcqQkFKUrzSENh0\",\"text\":\"Salut Bruno\"},\"counter\":\"2\",\"kind\":\"EDIT\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000001\",\"version\":\"2\"}"
+    },
+    {
+      "kind": "DELETE",
+      "payloadUtf8": "{\"body\":{\"targetRef\":\"nD7aMgNO2aWXq-JdUCbCc3cuefgXwcqQkFKUrzSENh0\"},\"counter\":\"3\",\"kind\":\"DELETE\",\"mentions\":[],\"replyToRef\":\"nD7aMgNO2aWXq-JdUCbCc3cuefgXwcqQkFKUrzSENh0\",\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000002\",\"version\":\"2\"}"
+    }
+  ],
+  "negative": [
+    {
+      "case": "extraKey",
+      "payloadUtf8": "{\"a\":null,\"body\":{\"text\":\"Salut @bruno\"},\"counter\":\"1\",\"kind\":\"TEXT\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "notCanonical",
+      "payloadUtf8": "{\"body\":{\"text\":\"Salut @bruno\"},\"counter\":\"1\",\"kind\":\"TEXT\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\" }"
+    },
+    {
+      "case": "counterAsNumber",
+      "payloadUtf8": "{\"body\":{\"text\":\"Salut @bruno\"},\"counter\":1,\"kind\":\"TEXT\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "counterZero",
+      "payloadUtf8": "{\"body\":{\"text\":\"Salut @bruno\"},\"counter\":\"0\",\"kind\":\"TEXT\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "emptyText",
+      "payloadUtf8": "{\"body\":{\"text\":\"\"},\"counter\":\"1\",\"kind\":\"TEXT\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "unknownKind",
+      "payloadUtf8": "{\"body\":{\"text\":\"Salut @bruno\"},\"counter\":\"1\",\"kind\":\"POLL\",\"mentions\":[\"user_bruno_01J7ABCD23456789\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    },
+    {
+      "case": "badMention",
+      "payloadUtf8": "{\"body\":{\"text\":\"Salut @bruno\"},\"counter\":\"1\",\"kind\":\"TEXT\",\"mentions\":[\"bruno\"],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}"
+    }
+  ]
+}

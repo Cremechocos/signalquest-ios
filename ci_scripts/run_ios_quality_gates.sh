@@ -48,6 +48,9 @@ for name, file in [('Validate Build Environment', 'validate_build_environment.sh
         raise SystemExit('error: generated build phase is stale: ' + name + '; run xcodegen generate')
 PY_CHECK
 
+# Vecteurs E2EE partagés avec Android et le serveur : empreintes figées.
+"$ROOT/ci_scripts/check_e2ee_vectors.sh"
+
 mkdir -p "$RESULT_ROOT/$RUN_ID"
 
 run_xcodebuild() {

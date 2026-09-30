@@ -1,0 +1,54 @@
+{
+  "fixtureVersion": "1",
+  "conversationId": "conversation_01J7ABCD23456789",
+  "epochNumber": "1",
+  "senderDeviceId": "device_alice_ios_01J7ABCD2345",
+  "clientRequestId": "message_01J7ABCD23456789",
+  "counter": "1",
+  "ttlSeconds": "0",
+  "encryptedBlobIds": [],
+  "algorithm": "AES_256_GCM_HKDF_SHA256",
+  "contentType": "application/vnd.signalquest.e2ee-envelope+json",
+  "kdfInfo": "signalquest-e2ee-v2-message-key-v2",
+  "epochKeyB64": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8=",
+  "keyCommitmentB64": "dVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=",
+  "fkB64": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8=",
+  "payloadUtf8": "{\"body\":{\"text\":\"Bonjour du monde 🌍\"},\"counter\":\"1\",\"kind\":\"TEXT\",\"mentions\":[],\"replyToRef\":null,\"schema\":\"signalquest.e2ee-content\",\"sentAtMs\":\"1790000000000\",\"version\":\"2\"}",
+  "frankTagB64": "CWjn9/rla425k04LvCKc/BoY6r3/KK7S4tJV0sWcNY8=",
+  "saltCanonicalUtf8": "SQ-E2EE-V2-MESSAGE-SALT\n2\nconversation_01J7ABCD23456789\n1\ndevice_alice_ios_01J7ABCD2345\nmessage_01J7ABCD23456789",
+  "saltB64": "3a/7BQkahLIcMOnbLe7wChHEHfmsAFDeYkIoP8n43H0=",
+  "derivedKeyB64": "XrzFEMeqEBDHfY/WdBxdcvhr/b0HnA1F1vNta0TVxW8=",
+  "paddedClearLength": "256",
+  "nonceB64": "YGFiY2RlZmdoaWpr",
+  "aadUtf8": "SQ-E2EE-V2-MESSAGE-ENVELOPE\n2\nconversation_01J7ABCD23456789\n1\ndevice_alice_ios_01J7ABCD2345\nmessage_01J7ABCD23456789\n1\nAES_256_GCM_HKDF_SHA256\napplication/vnd.signalquest.e2ee-envelope+json\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n0\nfELwv9MWDF9b5eEngVXmNm0XRs-8m-enMzIYndmX1CE\nCWjn9/rla425k04LvCKc/BoY6r3/KK7S4tJV0sWcNY8=",
+  "aadB64": "U1EtRTJFRS1WMi1NRVNTQUdFLUVOVkVMT1BFCjIKY29udmVyc2F0aW9uXzAxSjdBQkNEMjM0NTY3ODkKMQpkZXZpY2VfYWxpY2VfaW9zXzAxSjdBQkNEMjM0NQptZXNzYWdlXzAxSjdBQkNEMjM0NTY3ODkKMQpBRVNfMjU2X0dDTV9IS0RGX1NIQTI1NgphcHBsaWNhdGlvbi92bmQuc2lnbmFscXVlc3QuZTJlZS1lbnZlbG9wZStqc29uCmRWc1lqekRadUkxbUJpbTZkRENBRFVZUWFMUkJaaVhCOHNZU0NRRGxFYzA9CjAKZkVMd3Y5TVdERjliNWVFbmdWWG1ObTBYUnMtOG0tZW5NeklZbmRtWDFDRQpDV2puOS9ybGE0MjVrMDRMdkNLYy9Cb1k2cjMvS0s3UzR0SlYwc1djTlk4PQ==",
+  "ciphertextB64": "blKMBUSdwPYjTjcZKJx2Baz3r/AAKm5nCsYx6hkcuPVEt4DcHv1AssDwXRnjK8CoJE2naU5dkxDMZim/vF3RND3vqJ3JsPkDCFIPu62pfJe8arTNHDlT6hRMNbxc/wxqjmOb0IZFj9h3Nfh5H0eu12Or2Lk1en6wOrjoQe250xfST0XjENpNK4SEo5AQdu5Q5un9v9WUHddS3yKCIwta29skub0odDBMoDKUxCWaGo/2Qu3bvdZO0iQTgsbD0qf/9YmfhTMK7HK+7v/BEsfpGfNKQOprMe43pN0EHK0Q5XDSUyL/RmRde49B9rvoc48gN/zp4dvNNzHWqf2ImNnY4ks6OBFGprQVny1gfOPH5lg=",
+  "signatureCanonicalUtf8": "SQ-E2EE-V2-MESSAGE-SIGNATURE\n2\nconversation_01J7ABCD23456789\n1\ndevice_alice_ios_01J7ABCD2345\nmessage_01J7ABCD23456789\n1\nAES_256_GCM_HKDF_SHA256\napplication/vnd.signalquest.e2ee-envelope+json\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n0\nfELwv9MWDF9b5eEngVXmNm0XRs-8m-enMzIYndmX1CE\nCWjn9/rla425k04LvCKc/BoY6r3/KK7S4tJV0sWcNY8=\nYGFiY2RlZmdoaWpr\nU1EtRTJFRS1WMi1NRVNTQUdFLUVOVkVMT1BFCjIKY29udmVyc2F0aW9uXzAxSjdBQkNEMjM0NTY3ODkKMQpkZXZpY2VfYWxpY2VfaW9zXzAxSjdBQkNEMjM0NQptZXNzYWdlXzAxSjdBQkNEMjM0NTY3ODkKMQpBRVNfMjU2X0dDTV9IS0RGX1NIQTI1NgphcHBsaWNhdGlvbi92bmQuc2lnbmFscXVlc3QuZTJlZS1lbnZlbG9wZStqc29uCmRWc1lqekRadUkxbUJpbTZkRENBRFVZUWFMUkJaaVhCOHNZU0NRRGxFYzA9CjAKZkVMd3Y5TVdERjliNWVFbmdWWG1ObTBYUnMtOG0tZW5NeklZbmRtWDFDRQpDV2puOS9ybGE0MjVrMDRMdkNLYy9Cb1k2cjMvS0s3UzR0SlYwc1djTlk4PQ==\nblKMBUSdwPYjTjcZKJx2Baz3r/AAKm5nCsYx6hkcuPVEt4DcHv1AssDwXRnjK8CoJE2naU5dkxDMZim/vF3RND3vqJ3JsPkDCFIPu62pfJe8arTNHDlT6hRMNbxc/wxqjmOb0IZFj9h3Nfh5H0eu12Or2Lk1en6wOrjoQe250xfST0XjENpNK4SEo5AQdu5Q5un9v9WUHddS3yKCIwta29skub0odDBMoDKUxCWaGo/2Qu3bvdZO0iQTgsbD0qf/9YmfhTMK7HK+7v/BEsfpGfNKQOprMe43pN0EHK0Q5XDSUyL/RmRde49B9rvoc48gN/zp4dvNNzHWqf2ImNnY4ks6OBFGprQVny1gfOPH5lg=",
+  "senderSigningPrivateRawB64": "MTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1A=",
+  "senderSigningPublicX963B64": "BAx/zDIcdxGSA9vnmGSQfk8KAZF3id6i1HMVMaUqIuK6wXZtIeRhfXL7vvh9bt8tj4C1JpVuPCwXAfFrfzEVAMY=",
+  "signatureDerB64": "MEQCIHXWTgMA97RQxb+4lM6gDm3d3lhlCB/qrI5xpRJvOS/SAiBEqmip2zoo93X4Nk65ix08iH2bQXDJGScwAkat09U76Q==",
+  "negative": [
+    {
+      "case": "tamperedFrankTag",
+      "frankTagB64": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+    },
+    {
+      "case": "badPadding",
+      "ciphertextB64": "blKMBUSdwPYjTjcZKJx2Baz3r/AAKm5nCsYx6hkcuPVEt4DcHv1AssDwXRnjK8CoJE2naU5dkxDMZim/vF3RND3vqJ3JsPkDCFIPu62pfJe8arTNHDlT6hRMNbxc/wxqjmOb0IZFj9h3Nfh5H0eu12Or2Lk1en6wOrjoQe250xfST0XjENpNK4SEo5AQdu5Q5un9v9WUHddS3yKCIwta29skub0odDBMoDKUxCWaGo/2Qu3bvdZO0iQTgsbD0qf/9YmfhTMK7HK+7v/BEsfpGfNKQOprMe43pN0EHK0Q5XDSUyL/RmRde49B9rvoc48gN/zp4dvNNzHWqf2ImNnY44TYN3YsJPBj4gC4Bhl46+s="
+    },
+    {
+      "case": "counterMismatch",
+      "frankTagB64": "0gIiybIkVwqr+vWM3EYXPyMQXfF8PQJVvSIHVvjnOks=",
+      "aadB64": "U1EtRTJFRS1WMi1NRVNTQUdFLUVOVkVMT1BFCjIKY29udmVyc2F0aW9uXzAxSjdBQkNEMjM0NTY3ODkKMQpkZXZpY2VfYWxpY2VfaW9zXzAxSjdBQkNEMjM0NQptZXNzYWdlXzAxSjdBQkNEMjM0NTY3ODkKMQpBRVNfMjU2X0dDTV9IS0RGX1NIQTI1NgphcHBsaWNhdGlvbi92bmQuc2lnbmFscXVlc3QuZTJlZS1lbnZlbG9wZStqc29uCmRWc1lqekRadUkxbUJpbTZkRENBRFVZUWFMUkJaaVhCOHNZU0NRRGxFYzA9CjAKZkVMd3Y5TVdERjliNWVFbmdWWG1ObTBYUnMtOG0tZW5NeklZbmRtWDFDRQowZ0lpeWJJa1Z3cXIrdldNM0VZWFB5TVFYZkY4UFFKVnZTSUhWdmpuT2tzPQ==",
+      "ciphertextB64": "blKMBUSdwPYjTjcZKJx2Baz3r/AAKm5nCsYx6hkcuPVEt4DcHv1AssDwXRnjK8CoJE2naU5dkxDOf3C9sl3KPiyqKiB/H+lcCFIHvbajKsjsHMu3eTlT6hJANawXqkBN6QGUr4ZFkNhpLehCHmbpixrMmu4rcyL+MI/vduW+0xeeSUDoUplSOZmEvYUcKf5G6qPwsdeRDdxViSDFYgtRgvk/mrpvIGZfuynXkXvea8uLAf/RvctbnXFRwZ+cjLX154uf1JF8iQDNh5CvMP3LK9E3wOprMe43pN0EHK0Q5XDSUyL/RmRde49B9rvoc48gN/zp4dvNNzHWqf2ImNnY4gXBK2MyCALueVomKo3O4VE="
+    },
+    {
+      "case": "counterNotInContext",
+      "contextCounter": "2"
+    },
+    {
+      "case": "highS",
+      "signatureDerB64": "MEUCIHXWTgMA97RQxb+4lM6gDm3d3lhlCB/qrI5xpRJvOS/SAiEAu1WXVSTF1wmKB8mxRnTiwzRpX2w2ToVdw7eEFSiN6Wg="
+    }
+  ]
+}

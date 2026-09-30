@@ -1,0 +1,29 @@
+{
+  "fixtureVersion": "1",
+  "callerSigningPrivateRawB64": "MTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1A=",
+  "callerSigningPublicX963B64": "BAx/zDIcdxGSA9vnmGSQfk8KAZF3id6i1HMVMaUqIuK6wXZtIeRhfXL7vvh9bt8tj4C1JpVuPCwXAfFrfzEVAMY=",
+  "createdAtMs": "1790000000000",
+  "descriptorUtf8": "SQ-E2EE-V2-CALL-DESCRIPTOR\n1\nconversation_01J7ABCD23456789\ncall_01J7ABCD23456789XY\ndevice_alice_ios_01J7ABCD2345\nepoch_01J7ABCD23456789\n1\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\n1790000000000",
+  "signatureDerB64": "MEQCIGhHTBUrMgAWssOXx48dO8izenRRaB/Vy0wEaOBHN9NKAiAXwWIv46a+QsxvHCglX7cRjOxAz/FRTywGDwsBH/ieCA==",
+  "e2eeV2JsonUtf8": "{\"callerDeviceId\":\"device_alice_ios_01J7ABCD2345\",\"descriptor\":\"SQ-E2EE-V2-CALL-DESCRIPTOR\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\ndevice_alice_ios_01J7ABCD2345\\nepoch_01J7ABCD23456789\\n1\\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\n1790000000000\",\"signatureB64\":\"MEQCIGhHTBUrMgAWssOXx48dO8izenRRaB/Vy0wEaOBHN9NKAiAXwWIv46a+QsxvHCglX7cRjOxAz/FRTywGDwsBH/ieCA==\"}",
+  "negative": [
+    {
+      "case": "highS",
+      "signatureDerB64": "MEUCIGhHTBUrMgAWssOXx48dO8izenRRaB/Vy0wEaOBHN9NKAiEA6D6dzxxZQb4zkOPX2qBI7i/6ud21xk9Y7aq/wdxqh0k="
+    },
+    {
+      "case": "expiredRinging",
+      "nowMs": "1790000061000"
+    },
+    {
+      "case": "extraField",
+      "descriptorUtf8": "SQ-E2EE-V2-CALL-DESCRIPTOR\n1\nconversation_01J7ABCD23456789\ncall_01J7ABCD23456789XY\ndevice_alice_ios_01J7ABCD2345\nepoch_01J7ABCD23456789\n1\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\n1790000000000\nextra",
+      "signatureDerB64": "MEUCIQCqeHeEO2vqGOpjwtBvnyFZkcQwtbcRT4JxvyKE0/pAUQIgQqJnVAcLVlw6ALluUJKWoj9o3rC+0nqH+XTgm+cmBpM="
+    },
+    {
+      "case": "shortNonce",
+      "descriptorUtf8": "SQ-E2EE-V2-CALL-DESCRIPTOR\n1\nconversation_01J7ABCD23456789\ncall_01J7ABCD23456789XY\ndevice_alice_ios_01J7ABCD2345\nepoch_01J7ABCD23456789\n1\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\nAQEBAQEBAQEBAQEBAQEBAQ==\n1790000000000",
+      "signatureDerB64": "MEQCIAP7642RMaBL4jOHJgwcc/NJaRojhQIN5qiXstn7Ks82AiB8JaZQ9ma5DcsOQuGokoCMYzGBwADvQRk9ovVWpshGDg=="
+    }
+  ]
+}

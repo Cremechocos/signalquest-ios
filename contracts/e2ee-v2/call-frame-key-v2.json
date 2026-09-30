@@ -1,0 +1,13 @@
+{
+  "fixtureVersion": "1",
+  "conversationId": "conversation_01J7ABCD23456789",
+  "epochNumber": "1",
+  "callId": "call_01J7ABCD23456789XY",
+  "callNonceB64": "kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=",
+  "epochKeyB64": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8=",
+  "info": "signalquest-e2ee-v2-call-frame-key-v2",
+  "saltCanonicalUtf8": "SQ-E2EE-V2-CALL-FRAME-SALT\n2\nconversation_01J7ABCD23456789\n1\ncall_01J7ABCD23456789XY\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=",
+  "saltB64": "Nf+8xXu8kHWXhct7Vm5d+pOn2CBxHOpoaczVie5gcDY=",
+  "frameKeyB64": "ryVIIS5swqua1/mAzfYRxAMSihYu75I9qC/TNOTAttU=",
+  "livekitPassphrase": "ryVIIS5swqua1/mAzfYRxAMSihYu75I9qC/TNOTAttU="
+}

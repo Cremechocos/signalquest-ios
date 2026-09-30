@@ -1,0 +1,31 @@
+{
+  "fixtureVersion": "1",
+  "userId": "user_alice_01J7ABCD23456789",
+  "previousUikPublicX963B64": "BExjNuO4s953G2E6HHoXNINM1pwaT1/+yyQMY7wN2xV09olsXRTKROADd5HCMAMzJZpxuQHlJYV10QfluKxItCQ=",
+  "newUikPrivateRawB64": "FBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM=",
+  "newUikPublicX963B64": "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+  "previousUikFingerprint": "1MNvEc-_7j1hdIysI4qRRqqzzs74Cvk5o8QAOD61Adk",
+  "requestedAtMs": "1790000000000",
+  "effectiveAtMs": "1790259200000",
+  "resetUtf8": "SQ-E2EE-V2-IDENTITY-RESET\n1\nuser_alice_01J7ABCD23456789\nBB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=\n1MNvEc-_7j1hdIysI4qRRqqzzs74Cvk5o8QAOD61Adk\n1790000000000\n1790259200000",
+  "signatureDerB64": "MEQCIH6BgYxUcQif7DVSa7CumV3Yl7W+YVY7JZRBg+Sms21PAiAMVAtgC1QKS6ZDuAFuAKJteHVzr6HC81uSDtiBYalHoQ==",
+  "objectingSigningPrivateRawB64": "MTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1A=",
+  "objectingSigningPublicX963B64": "BAx/zDIcdxGSA9vnmGSQfk8KAZF3id6i1HMVMaUqIuK6wXZtIeRhfXL7vvh9bt8tj4C1JpVuPCwXAfFrfzEVAMY=",
+  "objectionUtf8": "SQ-E2EE-V2-IDENTITY-RESET-OBJECTION\n1\nuser_alice_01J7ABCD23456789\nBB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=\ndevice_alice_ios_01J7ABCD2345\n1790003600000",
+  "objectionSignatureDerB64": "MEUCIQDyit7OTM7ZH87oa7gv8TTros+w0xco9yfPi8BY0LlJQAIgPjbzc01cnfvKT1fHcerwGPKZfK7ZRlMzUygx11DIvGk=",
+  "negative": [
+    {
+      "case": "wrongDelay",
+      "resetUtf8": "SQ-E2EE-V2-IDENTITY-RESET\n1\nuser_alice_01J7ABCD23456789\nBB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=\n1MNvEc-_7j1hdIysI4qRRqqzzs74Cvk5o8QAOD61Adk\n1790000000000\n1790000001000",
+      "signatureDerB64": "MEQCICP/EB1gHmi9Mr2E8mBYhRvz4+W9jJtjeYNx3fJEYn/HAiAlAZ8Qgv6j7O/roCvIbaMknA1aBMChTCXAcV162ux89Q=="
+    },
+    {
+      "case": "signedByPreviousUik",
+      "signatureDerB64": "MEUCIQDMBnKatMjTMWS6R/VGDcsR1Fx1Vv1JYwE1Aw45zjrH7AIgKvyY0J2WCdGvOTN78+RR1srQSAwaKdH3hrr5+pf0BLw="
+    },
+    {
+      "case": "highS",
+      "signatureDerB64": "MEUCIH6BgYxUcQif7DVSa7CumV3Yl7W+YVY7JZRBg+Sms21PAiEA86v0nvSr9bVZvEf+kf9dkkRxhv4FVKspYaryQZq53bA="
+    }
+  ]
+}

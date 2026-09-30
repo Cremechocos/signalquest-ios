@@ -1,0 +1,35 @@
+{
+  "fixtureVersion": "1",
+  "signingPrivateRawB64": "MTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1A=",
+  "signingPublicX963B64": "BAx/zDIcdxGSA9vnmGSQfk8KAZF3id6i1HMVMaUqIuK6wXZtIeRhfXL7vvh9bt8tj4C1JpVuPCwXAfFrfzEVAMY=",
+  "documentUtf8": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1790000000000\",\"kinds\":[\"DELETE\",\"EDIT\",\"TEXT\"],\"payloadVersions\":[\"1\",\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}",
+  "documentSha256B64Url": "Ssle7C_06MOdjfG_I1_nw5usIVNXU8fFJ6SGEVzNXPM",
+  "signatureCanonicalUtf8": "SQ-E2EE-V2-DEVICE-CAPABILITIES\n1\nSsle7C_06MOdjfG_I1_nw5usIVNXU8fFJ6SGEVzNXPM",
+  "signatureDerB64": "MEQCIHlTMroLmz9VgGh9RpQY3FqC4GGr7WxGNW95LPOCyw/OAiA1XoUkzdDWm1K//n+6G/LK6jtr3KQkz1Of/cfmJWGZXw==",
+  "negative": [
+    {
+      "case": "notCanonicalWhitespace",
+      "documentUtf8": "{ \"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1790000000000\",\"kinds\":[\"DELETE\",\"EDIT\",\"TEXT\"],\"payloadVersions\":[\"1\",\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+    },
+    {
+      "case": "duplicateKey",
+      "documentUtf8": "{\"deviceId\":\"x\",\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1790000000000\",\"kinds\":[\"DELETE\",\"EDIT\",\"TEXT\"],\"payloadVersions\":[\"1\",\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+    },
+    {
+      "case": "unsortedKinds",
+      "documentUtf8": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1790000000000\",\"kinds\":[\"TEXT\",\"EDIT\",\"DELETE\"],\"payloadVersions\":[\"1\",\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+    },
+    {
+      "case": "unknownFeature",
+      "documentUtf8": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"telepathy\"],\"issuedAtMs\":\"1790000000000\",\"kinds\":[\"DELETE\",\"EDIT\",\"TEXT\"],\"payloadVersions\":[\"1\",\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+    },
+    {
+      "case": "numberInsteadOfString",
+      "documentUtf8": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1790000000000\",\"kinds\":[\"DELETE\",\"EDIT\",\"TEXT\"],\"payloadVersions\":[\"1\",\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":3,\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+    },
+    {
+      "case": "missingKey",
+      "documentUtf8": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"issuedAtMs\":\"1790000000000\",\"kinds\":[\"DELETE\",\"EDIT\",\"TEXT\"],\"payloadVersions\":[\"1\",\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+    }
+  ]
+}
