@@ -396,6 +396,17 @@ struct MessageAttachment: Decodable, Identifiable, Equatable {
         width = try c.decodeIfPresent(Int.self, forKey: .width)
         height = try c.decodeIfPresent(Int.self, forKey: .height)
     }
+
+    init(id: String?, kind: String, url: URL?, fileName: String?, contentType: String?, size: Int?, width: Int?, height: Int?) {
+        self.id = id
+        self.kind = kind
+        self.url = url
+        self.fileName = fileName
+        self.contentType = contentType
+        self.size = size
+        self.width = width
+        self.height = height
+    }
 }
 
 struct MessageReaction: Codable, Equatable {
@@ -422,6 +433,16 @@ extension MessageConversation {
 
     /// Date montrée sur la rangée de la liste.
     var listDate: Date? { lastMessageAt ?? updatedAt }
+
+    /// Conversation réduite à son identifiant, pour la file d'envoi d'une
+    /// réponse depuis une notification quand le réseau manque.
+    static func replyTarget(id: String) -> MessageConversation {
+        MessageConversation(
+            id: id, title: nil, isGroup: false, e2eeEnabled: false, groupPhotoUrl: nil,
+            createdAt: nil, updatedAt: nil, lastMessageAt: nil, lastReadAt: nil, pinnedAt: nil,
+            participants: [], lastMessage: nil
+        )
+    }
 
     func with(lastReadAt: Date?) -> MessageConversation { copy(lastReadAt: lastReadAt, pinnedAt: pinnedAt) }
 
@@ -695,6 +716,32 @@ struct SearchConversationContext: Decodable, Equatable {
 }
 
 /// Filtres optionnels de recherche, repris des paramètres de `/api/messages/search`.
+/// Membre qu'on peut mentionner dans un groupe (plan 3, vague 2), tel que le
+/// renvoie `/api/users/mention-suggestions`. Seuls les comptes avec un
+/// pseudo sont gardés : la mention passe par lui.
+struct MentionCandidate: Identifiable, Equatable {
+    let id: String
+    let name: String?
+    let handle: String
+    let avatarUrl: URL?
+
+    var displayName: String {
+        if let name, !name.isEmpty { return name }
+        return "@\(handle)"
+    }
+
+    func matches(_ prefix: String) -> Bool {
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive, .anchored]
+        return handle.range(of: prefix, options: options) != nil
+            || (name?.range(of: prefix, options: options) != nil)
+    }
+
+    static let demo = [
+        MentionCandidate(id: "demo-user", name: "Camille", handle: "camille", avatarUrl: nil),
+        MentionCandidate(id: "demo-user-2", name: "Léa", handle: "lea", avatarUrl: nil)
+    ]
+}
+
 struct MessageSearchFilters: Equatable {
     var conversationId: String?
     var authorId: String?

@@ -121,6 +121,8 @@ enum APIError: Error, LocalizedError, Equatable {
         "IDENTIFY_MARKET_MISMATCH": String(localized: "Ce relevé et cette antenne ne sont pas dans le même pays."),
         "IDENTIFY_OPERATOR_MISMATCH": String(localized: "Ce relevé et cette antenne ne sont pas du même opérateur."),
         "VALIDATION_NODE_SITE_MISMATCH": String(localized: "L'identifiant radio ne correspond pas au site choisi."),
+        // Vote sur les identifiants d'un site : on ne rejette pas sa propre identification.
+        "CANNOT_REJECT_OWN_IDENTIFICATION": String(localized: "Tu ne peux pas rejeter ta propre identification."),
         // Ces deux-là ne peuvent pas tomber sur les routes en politique `session`
         // (le cookie suffit) : ils sont mappés pour les routes qui, elles, exigent
         // une clé ou une attestation.

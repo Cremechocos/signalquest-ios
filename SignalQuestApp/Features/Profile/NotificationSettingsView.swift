@@ -156,6 +156,15 @@ struct NotificationSettingsView: View {
 
             Section {
                 preferenceToggle("Pannes signalées par la communauté", \.notifyCommunityOutagesPush)
+                // Plan 3, vague 2 : ce qui déclenche l'alerte près de ses lieux.
+                if model.prefs.notifyCommunityOutagesPush == true {
+                    NavigationLink {
+                        ZoneAlertSettingsView(service: ZoneAlertService(api: services.api))
+                    } label: {
+                        Label("Pannes près de mes lieux", systemImage: "mappin.and.ellipse")
+                    }
+                    .accessibilityIdentifier("notifications.zoneAlerts")
+                }
                 HStack {
                     preferenceToggle("Mises à jour ANFR", \.notifyAnfrUpdatesPush)
                     SQInfoButton(term: .anfr)

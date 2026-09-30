@@ -84,6 +84,8 @@ protocol MessagesServicing: Sendable {
     func uploadGroupPhoto(conversationId: String, data: Data) async throws -> URL?
     // Messagerie avancée (parité Android)
     func searchMessages(query: String, filters: MessageSearchFilters, take: Int) async throws -> [MessageSearchResult]
+    /// Amis mentionnables dont le nom ou le pseudo commence par `prefix`.
+    func mentionSuggestions(prefix: String) async throws -> [MentionCandidate]
     func scheduledMessages(conversationId: String) async throws -> [ScheduledMessage]
     func createScheduledMessage(sendAt: Date, text: String, in conversation: MessageConversation, replyToId: String?, senderId: String?, e2ee: E2EEServicing?) async throws -> ScheduledMessage
     func deleteScheduledMessage(conversationId: String, scheduledId: String) async throws
@@ -1130,6 +1132,33 @@ final class MessagesService: MessagesServicing {
             APIEndpoint(path: "/api/messages/search", query: items),
             as: MessageSearchResponse.self
         ).messages
+    }
+
+    /// Amis seulement : le serveur ne notifie une mention qu'aux amis de
+    /// l'auteur, membres de la conversation.
+    func mentionSuggestions(prefix: String) async throws -> [MentionCandidate] {
+        if AppEnvironment.usesDemoData { return MentionCandidate.demo.filter { $0.matches(prefix) } }
+        struct Response: Decodable {
+            struct User: Decodable {
+                let id: String
+                let name: String?
+                let handle: String?
+                let avatarUrl: String?
+            }
+            let users: [User]
+        }
+        let response = try await api.request(
+            APIEndpoint(path: "/api/users/mention-suggestions", query: [
+                URLQueryItem(name: "q", value: prefix),
+                URLQueryItem(name: "limit", value: "10"),
+                URLQueryItem(name: "friendsOnly", value: "1")
+            ]),
+            as: Response.self
+        )
+        return response.users.compactMap { user in
+            guard let handle = user.handle?.trimmingCharacters(in: .whitespaces), !handle.isEmpty else { return nil }
+            return MentionCandidate(id: user.id, name: user.name, handle: handle, avatarUrl: user.avatarUrl.flatMap(URL.init(string:)))
+        }
     }
 
     func scheduledMessages(conversationId: String) async throws -> [ScheduledMessage] {

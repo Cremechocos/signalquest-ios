@@ -762,6 +762,45 @@ extension Array where Element == MessageConversation {
                     )
                 ],
                 lastMessage: nil
+            ),
+            // Groupe non chiffré : les mentions n'existent que là.
+            MessageConversation(
+                id: "demo-conv-3",
+                title: "Équipe terrain",
+                isGroup: true,
+                e2eeEnabled: false,
+                groupPhotoUrl: nil,
+                createdAt: Date(),
+                updatedAt: Date(),
+                lastMessageAt: Date().addingTimeInterval(-7_200),
+                lastReadAt: Date(),
+                pinnedAt: nil,
+                participants: [
+                    ConversationParticipant(
+                        userId: "mock-user", role: "owner", joinedAt: Date(), lastReadAt: nil,
+                        user: MessageUser(id: "mock-user", name: "SignalQuest iOS", email: "ios@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    ),
+                    ConversationParticipant(
+                        userId: "demo-user", role: "member", joinedAt: Date(), lastReadAt: nil,
+                        user: MessageUser(id: "demo-user", name: "Camille", email: "camille@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    ),
+                    ConversationParticipant(
+                        userId: "demo-user-2", role: "member", joinedAt: Date(), lastReadAt: nil,
+                        user: MessageUser(id: "demo-user-2", name: "Léa", email: "lea@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    )
+                ],
+                lastMessage: MessageItem(
+                    id: "demo-group-message-1", conversationId: "demo-conv-3", senderId: "demo-user-2", kind: "TEXT",
+                    content: "On se retrouve au pylône nord samedi ? https://signalquest.fr/carte", e2eeVersion: nil, e2eeIvB64: nil,
+                    e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil,
+                    createdAt: Date().addingTimeInterval(-7_200), editedAt: nil, deletedAt: nil, replyToId: nil,
+                    threadReplyCount: 0,
+                    sender: MessageUser(id: "demo-user-2", name: "Léa", email: "lea@signalquest.fr", avatarUrl: nil),
+                    attachments: [], reactions: []
+                )
             )
         ]
     }

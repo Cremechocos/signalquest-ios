@@ -187,6 +187,8 @@ targets:
       - path: SignalQuestApp/Core/Shared/E2EEV2NotificationContextStore.swift
       - path: SignalQuestApp/Core/Security/KeychainStore.swift
       - path: SignalQuestApp/Core/Shared/OutageNotificationReceiptContract.swift
+      # Catégorie « Répondre / Marquer comme lu » des notifications de message.
+      - path: SignalQuestApp/Core/Shared/MessageNotificationCategory.swift
     configFiles:
       Debug: Config/Debug.xcconfig
       DebugBeta: Config/DebugBeta.xcconfig

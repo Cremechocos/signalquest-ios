@@ -24,8 +24,13 @@ struct MessageComposerBar: View {
     let onPickPhoto: (PhotosPickerItem, String) -> Void
     /// Note vocale enregistrée : fichier m4a et durée mesurée.
     let onVoiceNote: (URL, TimeInterval) -> Void
+    /// Membres à proposer après « @ » (plan 3, vague 2) ; `nil` hors des
+    /// groupes non chiffrés.
+    var mentionSuggestions: ((String) async -> [MentionCandidate])? = nil
 
     @State private var text = ""
+    @State private var mentionCandidates: [MentionCandidate] = []
+    @State private var mentionTask: Task<Void, Never>?
     @FocusState private var fieldFocused: Bool
     @State private var pickerItem: PhotosPickerItem?
     @StateObject private var recorder = VoiceNoteRecorder()
@@ -87,6 +92,13 @@ struct MessageComposerBar: View {
     }
 
     private var standardBar: some View {
+        VStack(spacing: 0) {
+            if !mentionCandidates.isEmpty { mentionStrip }
+            inputRow
+        }
+    }
+
+    private var inputRow: some View {
         HStack(spacing: SQSpace.sm + 2) {
             Menu {
                 Button { onSchedule(text) } label: {
@@ -188,12 +200,74 @@ struct MessageComposerBar: View {
         }
         .padding(.horizontal, SQSpace.md + 2)
         .padding(.vertical, SQSpace.sm + 2)
-        .onChangeCompat(of: text) { _, newValue in onTyping(newValue) }
+        .onChangeCompat(of: text) { _, newValue in
+            onTyping(newValue)
+            refreshMentions()
+        }
         .onChangeCompat(of: seedToken) { _, _ in text = seedText }
         .onChangeCompat(of: pickerItem) { _, item in
             guard let item else { return }
             onPickPhoto(item, text)
             pickerItem = nil
         }
+    }
+
+    /// Suggestions au-dessus du champ, une pastille par membre.
+    private var mentionStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SQSpace.sm) {
+                ForEach(mentionCandidates) { candidate in
+                    Button { applyMention(candidate) } label: {
+                        HStack(spacing: SQSpace.xs + 2) {
+                            SQAvatar(url: candidate.avatarUrl, name: candidate.displayName, size: 26)
+                                .accessibilityHidden(true)
+                            Text(verbatim: candidate.displayName)
+                                .font(SQFont.body(13, .semibold))
+                                .foregroundStyle(SQColor.label)
+                            Text(verbatim: "@\(candidate.handle)")
+                                .font(SQFont.body(12))
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minHeight: 44)
+                        .background(SQColor.surfaceMuted, in: Capsule())
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(String(localized: "Mentionner \(candidate.displayName), @\(candidate.handle)"))
+                    .accessibilityIdentifier("composer.mention.\(candidate.handle)")
+                }
+            }
+            .padding(.horizontal, SQSpace.md + 2)
+            .padding(.top, SQSpace.sm)
+        }
+    }
+
+    /// Relance les suggestions sur le « @… » en fin de texte, après 250 ms :
+    /// taper « @cam » ne part pas en quatre requêtes.
+    private func refreshMentions() {
+        mentionTask?.cancel()
+        guard let mentionSuggestions,
+              let token = MentionAutocomplete.activeToken(in: text, cursor: text.endIndex),
+              token.kind == .mention,
+              token.query.count >= MentionAutocomplete.minimumQueryLength else {
+            mentionCandidates = []
+            return
+        }
+        mentionTask = Task {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else { return }
+            let found = await mentionSuggestions(token.query)
+            guard !Task.isCancelled else { return }
+            mentionCandidates = found
+        }
+    }
+
+    private func applyMention(_ candidate: MentionCandidate) {
+        guard let token = MentionAutocomplete.activeToken(in: text, cursor: text.endIndex) else { return }
+        Haptics.selection()
+        mentionTask?.cancel()
+        text = MentionAutocomplete.apply(candidate.handle, to: text, token: token).text
+        mentionCandidates = []
     }
 }

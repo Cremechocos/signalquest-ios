@@ -19,7 +19,13 @@ final class ExploreViewModel: ObservableObject {
     /// Publications correspondant à la recherche — jusqu'ici jamais peuplées.
     @Published var searchPosts: [UnifiedSocialFeedItem] = []
     @Published var searchHashtags: [TrendingHashtag] = []
+    /// Lieux et antennes trouvés en même temps (plan 3, vague 2) : la même
+    /// recherche mène aussi à la carte.
+    @Published var searchPlaces: [PlaceResult] = []
+    @Published var searchSites: [AntennaSite] = []
     @Published var isSearching = false
+    /// Posé par la vue : le service des antennes vit dans l'environnement.
+    var antennas: AntennasServicing?
 
     // Flux filtré par hashtag
     @Published var selectedHashtag: String?
@@ -71,6 +77,8 @@ final class ExploreViewModel: ObservableObject {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
             searchResults = []
+            searchPlaces = []
+            searchSites = []
             isSearching = false
             return
         }
@@ -89,10 +97,14 @@ final class ExploreViewModel: ObservableObject {
                 $0.displayName.localizedCaseInsensitiveContains(query) ||
                 ($0.handle?.localizedCaseInsensitiveContains(query) ?? false)
             }
+            searchPlaces = Self.demoPlaces.filter { $0.name.localizedCaseInsensitiveContains(query) }
+            searchSites = []
             return
         }
         isSearching = true
         defer { isSearching = false }
+        let antennasService = antennas
+        async let map = Self.mapResults(for: query, antennas: antennasService)
         do {
             // UN appel au lieu de deux, et surtout : la recherche renvoie enfin
             // des PUBLICATIONS. `searchUsers` n'en rapportait aucune, si bien
@@ -109,7 +121,33 @@ final class ExploreViewModel: ObservableObject {
                 errorMessage = error.userFacingMessage
             }
         }
+        let found = await map
+        guard !Task.isCancelled else { return }
+        searchPlaces = found.places
+        searchSites = found.sites
     }
+
+    /// Trois lieux et trois antennes au plus : la carte garde sa propre
+    /// recherche, plus complète. Un échec laisse la section vide.
+    ///
+    /// Un @pseudo ou un #hashtag ne part pas chez Apple : la recherche de lieux
+    /// ne reçoit que ce qui peut être un lieu, de trois caractères au moins.
+    nonisolated static func mapResults(
+        for query: String, antennas: AntennasServicing?
+    ) async -> (places: [PlaceResult], sites: [AntennaSite]) {
+        guard query.count >= 2, let first = query.first, first != "@", first != "#" else { return ([], []) }
+        let searchesPlaces = query.count >= 3
+        async let places: [PlaceResult] = searchesPlaces ? await MapExplorerViewModel.geocodePlaces(query, near: nil) : []
+        async let sites = (try? await antennas?.quickSearch(
+            query: query, market: MapMarketStore.initialMarketCode(), department: nil
+        )) ?? []
+        return (Array(await places.prefix(3)), Array(await sites.prefix(3)))
+    }
+
+    static let demoPlaces = [
+        PlaceResult(id: "demo-place-lyon", name: "Lyon", subtitle: "Auvergne-Rhône-Alpes, France",
+                    latitude: 45.764, longitude: 4.8357)
+    ]
 
     func selectHashtag(_ tag: String?) {
         guard selectedHashtag != tag else {
@@ -231,7 +269,7 @@ struct ExploreView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
-                SQSearchField(text: $model.searchText, placeholder: "Rechercher un utilisateur") {
+                SQSearchField(text: $model.searchText, placeholder: "Membre, publication, lieu ou antenne") {
                     model.scheduleSearch()
                 }
                 .onChangeCompat(of: model.searchText) { _, _ in
@@ -276,7 +314,10 @@ struct ExploreView: View {
             if model.trending.isEmpty && model.suggestions.isEmpty { await model.load() }
         }
         .refreshable { await model.load() }
-        .onAppear { recentProfiles = Self.storedRecentProfiles() }
+        .onAppear {
+            recentProfiles = Self.storedRecentProfiles()
+            model.antennas = services.antennas
+        }
         .onReceive(NotificationCenter.default.publisher(for: RecentlyViewedStore.didChange)) { _ in
             recentProfiles = Self.storedRecentProfiles()
         }
@@ -367,13 +408,17 @@ struct ExploreView: View {
     @ViewBuilder
     private var searchSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            SQSectionHeader("Utilisateurs")
+            // Sans membre trouvé, l'en-tête restait seul au-dessus des lieux.
+            if model.isSearching || !model.searchResults.isEmpty || !hasOtherSearchResults {
+                SQSectionHeader("Utilisateurs")
+            }
             if model.isSearching {
                 ProgressView()
                     .tint(SQColor.brandRed)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, SQSpace.lg)
-            } else if model.searchResults.isEmpty && model.searchPosts.isEmpty {
+            } else if model.searchResults.isEmpty && model.searchPosts.isEmpty
+                        && model.searchPlaces.isEmpty && model.searchSites.isEmpty {
                 EmptyStateView(
                     title: "Aucun résultat",
                     // Le message parlait de nom et de @handle alors que la
@@ -438,8 +483,96 @@ struct ExploreView: View {
                         // `detailItem` sert déjà à ouvrir une publication depuis cet écran :
                         // en introduire un second dupliquerait la présentation.
                         FeedItemCard(item: item, onTap: { detailItem = item })
-                    }            }
+                    }
+                }
+                if !model.searchPlaces.isEmpty || !model.searchSites.isEmpty {
+                    mapResultsSection
+                }
         }
+    }
+
+    private var hasOtherSearchResults: Bool {
+        !model.searchPosts.isEmpty || !model.searchPlaces.isEmpty || !model.searchSites.isEmpty
+    }
+
+    /// Lieux et antennes de la même recherche (plan 3, vague 2) : ils
+    /// s'ouvrent sur la carte, comme depuis sa propre recherche.
+    private var mapResultsSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Sur la carte")
+                .font(SQFont.archivo(13, .semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, SQSpace.md)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(model.searchPlaces) { place in
+                mapResultRow(icon: "mappin.circle.fill", title: place.name, subtitle: place.subtitle,
+                             id: "explore.map.place") {
+                    services.router.pendingMapFocus = Coordinates(latitude: place.latitude, longitude: place.longitude)
+                    services.router.selectedTab = .map
+                }
+            }
+            ForEach(model.searchSites) { site in
+                mapResultRow(
+                    icon: "antenna.radiowaves.left.and.right",
+                    title: site.address ?? String(localized: "Site \(site.siteId ?? site.id)"),
+                    subtitle: Self.siteSubtitle(site),
+                    id: "explore.map.site"
+                ) {
+                    services.router.route(toSite: site.siteId ?? site.id)
+                }
+            }
+        }
+    }
+
+    private func mapResultRow(icon: String, title: String, subtitle: String?, id: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(width: 32)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: title)
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(2)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(verbatim: subtitle)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
+                }
+                Spacer()
+                Image(systemName: "map")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(SQSpace.md)
+            .frame(minHeight: 44)
+            .sqEditorialCard()
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Ouvre la carte")
+        .accessibilityIdentifier(id)
+    }
+
+    /// « Orange · Free · site n° 37199 », comme la recherche de la carte.
+    private static func siteSubtitle(_ site: AntennaSite) -> String {
+        var seen = Set<String>()
+        var parts = site.operators
+            .filter { seen.insert($0.uppercased()).inserted }
+            .map(SentinelleListOrder.displayOperator)
+        if site.address != nil, let number = site.siteId, !number.isEmpty {
+            parts.append(String(localized: "site n° \(number)"))
+        }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: Tendances

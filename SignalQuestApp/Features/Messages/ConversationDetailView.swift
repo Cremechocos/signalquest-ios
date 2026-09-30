@@ -104,6 +104,8 @@ struct ConversationDetailView: View {
     @State private var showScheduled = false
     @State private var showReminders = false
     @State private var showSaved = false
+    /// Médias et fichiers de la conversation (plan 3, vague 2).
+    @State private var showMedia = false
     /// Messages éphémères (parité Android) : quand actif, les textes envoyés
     /// portent un TTL de 24 h (le backend pose `expiresAt`).
     @State private var ephemeralEnabled = false
@@ -146,6 +148,21 @@ struct ConversationDetailView: View {
               localSession.ownerScopeId == "user:\(user.id)" else { return nil }
         return .privateAccount(localSession)
     }
+    /// Suggestions de mention, seulement dans un groupe non chiffré.
+    private var mentionSuggestionProvider: ((String) async -> [MentionCandidate])? {
+        guard conversation.isGroup, !isE2EE else { return nil }
+        return { prefix in await mentionCandidates(for: prefix) }
+    }
+
+    /// Amis membres du groupe dont le nom ou le pseudo commence par `prefix`
+    /// (plan 3, vague 2) : le serveur ne notifie une mention qu'à eux, et ne
+    /// lit pas le texte d'une conversation chiffrée.
+    private func mentionCandidates(for prefix: String) async -> [MentionCandidate] {
+        let members = Set(conversation.participants.map(\.userId)).subtracting([currentUserId].compactMap { $0 })
+        let found = (try? await service.mentionSuggestions(prefix: prefix)) ?? []
+        return found.filter { members.contains($0.id) }
+    }
+
     /// L'utilisateur peut-il épingler/désépingler (owner/admin) — le backend
     /// renvoie 403 sinon, on masque donc l'action quand le rôle ne le permet pas.
     private var canPin: Bool {
@@ -359,6 +376,9 @@ struct ConversationDetailView: View {
             ) { messageId in
                 handleSearchSelection(messageId)
             }
+        }
+        .navigationDestination(isPresented: $showMedia) {
+            ConversationMediaView(conversation: conversation, service: service)
         }
         .navigationDestination(isPresented: $showScheduled) {
             ScheduledMessagesView(conversation: conversation, service: service, e2ee: e2ee)
@@ -666,6 +686,9 @@ struct ConversationDetailView: View {
                 Button { showSearch = true } label: {
                     Label("Rechercher", systemImage: "magnifyingglass")
                 }
+                Button { showMedia = true } label: {
+                    Label("Médias et fichiers", systemImage: "photo.on.rectangle")
+                }
                 Button { showScheduled = true } label: {
                     Label("Messages programmés", systemImage: "clock")
                 }
@@ -775,7 +798,8 @@ struct ConversationDetailView: View {
                 onShareLocation: { Task { await sendCurrentLocation() } },
                 onLiveShare: { showLiveShare = true },
                 onPickPhoto: { item, caption in Task { await sendAttachment(item: item, caption: caption) } },
-                onVoiceNote: { url, duration in Task { await sendVoiceNote(url: url, duration: duration) } }
+                onVoiceNote: { url, duration in Task { await sendVoiceNote(url: url, duration: duration) } },
+                mentionSuggestions: mentionSuggestionProvider
             )
         }
         .background {
@@ -933,6 +957,8 @@ struct ConversationDetailView: View {
             let hasInteractiveContent =
                 (card?.socialPostId != nil && !AppEnvironment.usesDemoData)
                 || message.attachments.contains { $0.url != nil && isImageAttachment($0) }
+                // Aperçu d'un lien : VoiceOver doit pouvoir l'ouvrir.
+                || (!isE2EE && message.deletedAt == nil && displayedContent(for: message).contains("http"))
             let spokenSummary = spokenTextSummary(for: message, mine: mine, card: card)
             return VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs + 1) {
                 if !mine, conversation.isGroup, isGroupStart, let name = message.sender?.displayName {
@@ -1017,6 +1043,10 @@ struct ConversationDetailView: View {
                             .font(SQType.body)
                             .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                             .accessibilityIdentifier("message.text")
+                        // Aperçu lu par le serveur : jamais dans une conversation chiffrée.
+                        if !isE2EE, message.deletedAt == nil, text.contains("http") {
+                            MessageLinkPreview(text: text, mine: mine)
+                        }
                     }
                     if let transcription = transcriptions[message.id], !transcription.isEmpty {
                         transcriptionView(transcription, mine: mine)
@@ -1049,6 +1079,11 @@ struct ConversationDetailView: View {
             .padding(.vertical, 11)
             .padding(.horizontal, 15)
             .background(mine ? SQColor.brandRed : SQColor.surface, in: bubbleShape(mine: mine))
+            // En OLED, bulle reçue et fond sont noirs : le liseré des cartes
+            // la détache (SOC-26). Transparent hors OLED.
+            .overlay {
+                if !mine { bubbleShape(mine: false).stroke(SQOledPalette.cardStroke, lineWidth: 1) }
+            }
             .modifier(SpokenBubble(summary: spokenSummary, interactive: hasInteractiveContent))
     }
 

@@ -63,7 +63,8 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             return
         }
         guard (info["type"] as? String)?.lowercased() == "e2ee_v2_envelope" else {
-            contentHandler(request.content)
+            // Message : « Répondre » et « Marquer comme lu » selon la conversation.
+            contentHandler(MessageNotificationCategory.categorized(request.content))
             return
         }
         let opaque: E2EEV2OpaqueNotificationRequest?

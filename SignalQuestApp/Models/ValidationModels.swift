@@ -25,10 +25,13 @@ struct ValidationEntry: Decodable, Identifiable, Equatable {
     let value: String
     let validations: Int
     let rejections: Int
+    /// Sa propre identification : on ne la rejette pas. `false` tant que le
+    /// serveur ne l'envoie pas, et le bouton reste alors affiché.
+    let isMine: Bool
 
     var id: String { value }
 
-    enum CodingKeys: String, CodingKey { case value, validations, rejections, votes, count }
+    enum CodingKeys: String, CodingKey { case value, validations, rejections, votes, count, mine }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -38,6 +41,7 @@ struct ValidationEntry: Decodable, Identifiable, Equatable {
             ?? (try? c.decodeIfPresent(Int.self, forKey: .count))
             ?? 0
         rejections = (try? c.decodeIfPresent(Int.self, forKey: .rejections)) ?? 0
+        isMine = (try? c.decodeIfPresent(Bool.self, forKey: .mine)) ?? false
     }
 }
 

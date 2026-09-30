@@ -598,7 +598,7 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         await retryPendingRevocations()
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        center.setNotificationCategories(CarPlayNotificationCategories.all())
+        center.setNotificationCategories(CarPlayNotificationCategories.all().union(MessageNotificationCategory.declared()))
         switch await center.notificationSettings().authorizationStatus {
         case .authorized, .provisional, .ephemeral:
             await registerForRemoteNotifications()
@@ -623,7 +623,7 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         //
         // ⚠️ Côté serveur, le payload APNs doit porter le `category`
         // correspondant, sinon la déclaration ici reste sans effet.
-        center.setNotificationCategories(CarPlayNotificationCategories.all())
+        center.setNotificationCategories(CarPlayNotificationCategories.all().union(MessageNotificationCategory.declared()))
         do {
             let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound, .providesAppNotificationSettings])
             logger.info("Notification permission granted=\(granted, privacy: .public)")
@@ -888,6 +888,19 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
             center.removeDeliveredNotifications(withIdentifiers: [identifier])
             return completion()
         }
+        let action = response.actionIdentifier
+        if action == MessageNotificationCategory.replyAction || action == MessageNotificationCategory.markReadAction {
+            let reply = (response as? UNTextInputNotificationResponse)?.userText
+            let messageId = Self.string(info, "messageId", "message_id")
+            let encrypted = MessageNotificationCategory.isEncrypted(info)
+            Task { [weak self] in
+                await self?.performMessageAction(
+                    action, conversationId: conversationId, messageId: messageId, reply: reply, encrypted: encrypted
+                )
+                completion()
+            }
+            return
+        }
         Task { [weak self] in
             if let receipt {
                 _ = await self?.acknowledgeOutageNotification(id: receipt.id, payload: receipt.payload)
@@ -909,6 +922,54 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
             completion()
             Task { @MainActor in await AppServicesHolder.services.refreshNotificationBadge(force: true) }
         }
+    }
+}
+
+extension PushNotificationService {
+    /// « Répondre » et « Marquer comme lu » depuis une notification de message
+    /// (plan 3, vague 2). La réponse passe par la file d'envoi des messages :
+    /// sans réseau, elle repart plus tard, comme depuis la conversation.
+    @MainActor
+    func performMessageAction(
+        _ action: String, conversationId: String?, messageId: String?, reply: String?, encrypted: Bool
+    ) async {
+        guard let conversationId else { return }
+        let messages = AppServicesHolder.services.messages
+        if action == MessageNotificationCategory.replyAction {
+            guard !encrypted, let text = reply?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
+            // La conversation à jour quand le réseau répond ; sinon l'identifiant
+            // suffit à la file, et le serveur refuse tout texte en clair dans
+            // une conversation chiffrée.
+            let conversation = (try? await messages.conversation(id: conversationId))
+                ?? MessageConversation.replyTarget(id: conversationId)
+            guard conversation.e2eeEnabled != true else { return }
+            _ = try? await messages.sendText(text, in: conversation, replyToId: nil, e2ee: nil, idempotencyKey: nil, ttlSeconds: 0)
+        }
+        // Répondre vaut lecture, comme dans les messageries courantes.
+        if let messageId {
+            try? await messages.markRead(conversationId: conversationId, lastMessageId: messageId)
+        }
+        await AppServicesHolder.services.refreshInboxBadge(force: true)
+    }
+}
+
+extension MessageNotificationCategory {
+    /// Catégories déclarées par l'app, avec ses libellés. Répondre demande le
+    /// déverrouillage : un téléphone posé sur la table n'écrit pas à la place
+    /// de son propriétaire.
+    static func declared() -> Set<UNNotificationCategory> {
+        let reply = UNTextInputNotificationAction(
+            identifier: replyAction,
+            title: String(localized: "Répondre"),
+            options: [.authenticationRequired],
+            textInputButtonTitle: String(localized: "Envoyer"),
+            textInputPlaceholder: String(localized: "Message…")
+        )
+        let markRead = UNNotificationAction(identifier: markReadAction, title: String(localized: "Marquer comme lu"), options: [])
+        return [
+            UNNotificationCategory(identifier: plain, actions: [reply, markRead], intentIdentifiers: [], options: []),
+            UNNotificationCategory(identifier: encrypted, actions: [markRead], intentIdentifiers: [], options: [])
+        ]
     }
 }
 

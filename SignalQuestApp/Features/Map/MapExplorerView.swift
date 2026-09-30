@@ -1380,6 +1380,11 @@ final class MapExplorerViewModel: ObservableObject {
     /// Géocodage ville / adresse / POI via MapKit (moteur carte unique). Biaisé vers
     /// la région courante de la carte. Ne jette jamais (échec → liste vide).
     private func geocodePlaces(_ q: String) async -> [PlaceResult] {
+        await Self.geocodePlaces(q, near: lastCenter)
+    }
+
+    /// Même géocodage, partagé avec la recherche d'Explorer (plan 3, vague 2).
+    nonisolated static func geocodePlaces(_ q: String, near center: CLLocationCoordinate2D?) async -> [PlaceResult] {
         #if DEBUG
         if ProcessInfo.processInfo.environment["SQ_MAP_PROFILE_QA"] == "1" {
             // Fixture dédiée : aucune requête Apple, même en cas d'erreur ou
@@ -1389,7 +1394,7 @@ final class MapExplorerViewModel: ObservableObject {
         #endif
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = q
-        if let center = lastCenter {
+        if let center {
             request.region = MKCoordinateRegion(
                 center: center,
                 span: MKCoordinateSpan(latitudeDelta: 2, longitudeDelta: 2)

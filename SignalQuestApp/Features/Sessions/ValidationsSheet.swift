@@ -109,9 +109,12 @@ struct ValidationsSheet: View {
                                        label: "Valider \(title) \(entry.value)") {
                                 Task { await model.vote(type: type, value: entry.value, action: "validate") }
                             }
-                            voteButton("xmark", tint: SQColor.danger, soft: SQColor.dangerSoft,
-                                       label: "Rejeter \(title) \(entry.value)") {
-                                Task { await model.vote(type: type, value: entry.value, action: "reject") }
+                            // Le serveur refuse le rejet de sa propre identification.
+                            if !entry.isMine {
+                                voteButton("xmark", tint: SQColor.danger, soft: SQColor.dangerSoft,
+                                           label: "Rejeter \(title) \(entry.value)") {
+                                    Task { await model.vote(type: type, value: entry.value, action: "reject") }
+                                }
                             }
                         }
                     }

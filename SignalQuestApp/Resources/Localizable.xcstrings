@@ -3990,6 +3990,38 @@
         }
       }
     },
+    "À" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À"
+          }
+        }
+      }
+    },
+    "À faire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To do"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À faire"
+          }
+        }
+      }
+    },
     "Activer la double authentification" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7601,6 +7633,22 @@
         }
       }
     },
+    "Aucun média" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No media"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun média"
+          }
+        }
+      }
+    },
     "Aucun message" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7712,6 +7760,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun n'est masqué"
+          }
+        }
+      }
+    },
+    "Aucun opérateur coché : toutes les pannes. Deux au plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No carrier ticked: every outage. Two at most."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun opérateur coché : toutes les pannes. Deux au plus."
           }
         }
       }
@@ -9188,6 +9252,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Autour"
+          }
+        }
+      }
+    },
+    "Autour de mes lieux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Around my places"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autour de mes lieux"
           }
         }
       }
@@ -15984,6 +16064,22 @@
         }
       }
     },
+    "De" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De"
+          }
+        }
+      }
+    },
     "Déduite de la connexion depuis laquelle tu consultes." : {
       "localizations" : {
         "en" : {
@@ -16109,6 +16205,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Discord, Slack et ntfy sont reconnus à leur adresse et reçoivent leur format. Les autres destinataires reçoivent un appel signé."
+          }
+        }
+      }
+    },
+    "Distance d’un lieu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distance from a place"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distance d’un lieu"
           }
         }
       }
@@ -20487,6 +20599,22 @@
         }
       }
     },
+    "Fichiers et notes vocales" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Files and voice notes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichiers et notes vocales"
+          }
+        }
+      }
+    },
     "Fil de discussion" : {
       "localizations" : {
         "en" : {
@@ -21295,6 +21423,22 @@
         }
       }
     },
+    "Heures calmes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quiet hours"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heures calmes"
+          }
+        }
+      }
+    },
     "Hier" : {
       "localizations" : {
         "en" : {
@@ -21827,6 +21971,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identification supprimée"
+          }
+        }
+      }
+    },
+    "Identifications en conflit : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifications in conflict: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifications en conflit : %lld"
           }
         }
       }
@@ -26719,6 +26879,22 @@
         }
       }
     },
+    "Les photos, fichiers et notes vocales de la conversation s’afficheront ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos, files and voice notes from this conversation will show up here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les photos, fichiers et notes vocales de la conversation s’afficheront ici."
+          }
+        }
+      }
+    },
     "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -28230,6 +28406,22 @@
         }
       }
     },
+    "Maximum par jour : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daily maximum: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximum par jour : %lld"
+          }
+        }
+      }
+    },
     "Mbit/s" : {
       "localizations" : {
         "en" : {
@@ -28344,6 +28536,22 @@
         }
       }
     },
+    "Me prévenir pour" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alert me about"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Me prévenir pour"
+          }
+        }
+      }
+    },
     "Me rappeler le" : {
       "localizations" : {
         "en" : {
@@ -28356,6 +28564,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Me rappeler le"
+          }
+        }
+      }
+    },
+    "Médias et fichiers" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media and files"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Médias et fichiers"
+          }
+        }
+      }
+    },
+    "Médias indisponibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Médias indisponibles"
           }
         }
       }
@@ -28392,6 +28632,22 @@
         }
       }
     },
+    "Membre, publication, lieu ou antenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Member, post, place or antenna"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membre, publication, lieu ou antenne"
+          }
+        }
+      }
+    },
     "Mensuel" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -28421,6 +28677,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mentionner "
+          }
+        }
+      }
+    },
+    "Mentionner %@, @%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mention %1$@, @%2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mentionner %@, @%@"
           }
         }
       }
@@ -28518,6 +28790,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mes identifications"
+          }
+        }
+      }
+    },
+    "Mes lieux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My places"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes lieux"
           }
         }
       }
@@ -29495,6 +29783,22 @@
         }
       }
     },
+    "Missions à réclamer : %lld (+%lld pts)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missions to claim: %lld (+%lld pts)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missions à réclamer : %lld (+%lld pts)"
+          }
+        }
+      }
+    },
     "Mode Drive Test" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -29732,6 +30036,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mois"
+          }
+        }
+      }
+    },
+    "Moments calmes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quiet times"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moments calmes"
           }
         }
       }
@@ -31282,6 +31602,22 @@
         }
       }
     },
+    "Ouvre la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre la carte"
+          }
+        }
+      }
+    },
     "Ouvre la fiche d’une antenne que tu suis, sur la carte." : {
       "localizations" : {
         "en" : {
@@ -31294,6 +31630,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvre la fiche d’une antenne que tu suis, sur la carte."
+          }
+        }
+      }
+    },
+    "Ouvre le lien" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the link"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre le lien"
           }
         }
       }
@@ -32587,6 +32939,22 @@
         }
       }
     },
+    "Pannes près de mes lieux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outages near my places"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pannes près de mes lieux"
+          }
+        }
+      }
+    },
     "Partager le trajet" : {
       "localizations" : {
         "en" : {
@@ -32649,6 +33017,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PCI incorrect"
+          }
+        }
+      }
+    },
+    "Photo de %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo by %1$@, %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo de %@, %@"
+          }
+        }
+      }
+    },
+    "Photos en cours de vérification : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos being reviewed: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos en cours de vérification : %lld"
           }
         }
       }
@@ -36695,6 +37095,22 @@
         }
       }
     },
+    "Quand la communauté signale un problème près d’un de tes lieux. Chaque réglage s’enregistre dès que tu le changes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the community reports a problem near one of your places. Each setting is saved as soon as you change it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand la communauté signale un problème près d’un de tes lieux. Chaque réglage s’enregistre dès que tu le changes."
+          }
+        }
+      }
+    },
     "Quand partager ma position" : {
       "localizations" : {
         "en" : {
@@ -37814,23 +38230,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rechercher un terme"
-          }
-        }
-      }
-    },
-    "Rechercher un utilisateur" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Search for a user"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rechercher un utilisateur"
           }
         }
       }
@@ -44952,6 +45351,22 @@
         }
       }
     },
+    "Sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur la carte"
+          }
+        }
+      }
+    },
     "Sur ton compte" : {
       "localizations" : {
         "en" : {
@@ -45878,6 +46293,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tes appels apparaîtront ici."
+          }
+        }
+      }
+    },
+    "Tes lieux sont les zones de Confidentialité." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your places are the zones in Privacy."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes lieux sont les zones de Confidentialité."
           }
         }
       }
@@ -47730,6 +48161,22 @@
         }
       }
     },
+    "Tu ne peux pas rejeter ta propre identification." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't reject your own identification."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ne peux pas rejeter ta propre identification."
+          }
+        }
+      }
+    },
     "Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès." : {
       "localizations" : {
         "en" : {
@@ -48219,6 +48666,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un Drive Test sert à cartographier le réseau. Ce que tu enregistres est publié sur la carte communautaire — c'est le principe, il n'y a pas de réglage pour l'en empêcher."
+          }
+        }
+      }
+    },
+    "Un réseau dégradé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A degraded network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un réseau dégradé"
           }
         }
       }
@@ -48766,6 +49229,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Une onde n'emprunte pas seulement la droite entre les deux points : elle occupe un fuseau autour d'elle, la première zone de Fresnel. Tant que ce fuseau reste libre, la liaison se comporte comme en visibilité directe. Le chiffre indique quelle part en reste dégagée."
+          }
+        }
+      }
+    },
+    "Une panne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An outage"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une panne"
           }
         }
       }

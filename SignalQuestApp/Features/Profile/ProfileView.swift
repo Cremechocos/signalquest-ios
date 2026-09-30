@@ -35,6 +35,8 @@ struct ProfileView: View {
     @State private var stats: UserStats?
     @State private var statsError: String?
     @State private var progression: GamificationProfile?
+    /// « À faire » de l'espace personnel (plan 3, vague 2).
+    @State private var overview: UserOverview?
     /// Fil de signalement à ouvrir en sheet (tap sur une notification
     /// `antenna_report_reply`), résolu depuis `router.openAntennaReportId`.
     @State private var deepLinkReport: AntennaReportDeepLink?
@@ -166,8 +168,14 @@ struct ProfileView: View {
         .onChangeCompat(of: router.openSentinelle) { _, _ in consumeSentinelleDeepLink() }
         .onChangeCompat(of: router.openE2EEDeviceApprovalId) { _, _ in consumeE2EEApprovalDeepLink() }
         .task { await loadStats() }
+        // À chaque retour sur le Profil : une mission réclamée ou une photo
+        // validée entre-temps doit quitter « À faire ».
+        .onAppear { Task { await loadOverview() } }
         .task { await refreshAndroidPresence() }
-        .refreshable { await loadStats() }
+        .refreshable {
+            await loadStats()
+            await loadOverview()
+        }
     }
 
     /// Consomme l'intention de deep link posée par le routeur (idempotent : on
@@ -387,6 +395,16 @@ struct ProfileView: View {
                     }
                 } label: {
                     menuRow(title: "Antennes suivies", icon: "star.fill")
+                }
+            }
+
+            let todos = overview?.todos ?? []
+            if !todos.isEmpty {
+                menuSection("À faire") {
+                    ForEach(Array(todos.enumerated()), id: \.offset) { index, todo in
+                        if index > 0 { menuSeparator }
+                        todoLink(todo)
+                    }
                 }
             }
 
@@ -638,7 +656,42 @@ struct ProfileView: View {
         .contentShape(Rectangle())
     }
 
+    /// Une ligne « À faire », vers l'écran où la régler.
+    @ViewBuilder
+    private func todoLink(_ todo: UserOverview.Todo) -> some View {
+        switch todo {
+        case .claimMissions(let count, let rewardXp):
+            NavigationLink {
+                GamificationView(service: services.gamification)
+            } label: {
+                menuRow(title: String(localized: "Missions à réclamer : \(count) (+\(rewardXp) pts)"), icon: "gift.fill")
+            }
+            .accessibilityIdentifier("profile.todo.missions")
+        case .photosInReview(let count):
+            NavigationLink {
+                PhotosView(service: services.photos)
+            } label: {
+                menuRow(title: String(localized: "Photos en cours de vérification : \(count)"), icon: "hourglass")
+            }
+            .accessibilityIdentifier("profile.todo.photos")
+        case .identificationConflicts(let count):
+            NavigationLink {
+                MyIdentificationsView(service: services.identify)
+            } label: {
+                menuRow(title: String(localized: "Identifications en conflit : \(count)"), icon: "exclamationmark.triangle")
+            }
+            .accessibilityIdentifier("profile.todo.identifications")
+        }
+    }
+
     // MARK: - Données
+
+    private func loadOverview() async {
+        // Un échec laisse simplement la section absente : rien d'autre n'en dépend.
+        if let value = try? await UserOverviewService(api: services.api).overview() {
+            overview = value
+        }
+    }
 
     private func loadStats() async {
         // Démonstration : pas d'appel réseau avec la session factice, qui
