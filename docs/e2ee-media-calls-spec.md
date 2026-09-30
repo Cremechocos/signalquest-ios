@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.1**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -58,6 +58,8 @@
 >   - compatibilité des apps installées (§16) ;
 >   - critère d'ouverture des verrous (§17) ;
 >   - `e2eeV2.signatureB64` au lieu de `signature`.
+> - v0.4.1 (30/09/2026) : routes du jalon A proposées (annexe E), à valider
+>   par la session serveur ; empreintes de référence des vecteurs.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -907,7 +909,8 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
   - Les 13 vecteurs existants, une fois réémis, sont identiques à l'octet
     près dans les dépôts iOS, Android et serveur. Le serveur importe ceux qui
     lui manquent.
-  - La CI vérifie les condensats. Le web consomme les vecteurs du serveur.
+  - La CI vérifie les condensats contre `contracts/e2ee-v2/SHA256SUMS`, la
+    référence des trois dépôts. Le web consomme les vecteurs du serveur.
 - **Vecteurs existants** :
   - `blob-chunks-v1`, `call-frame-key-v1`, `content-payload-v1` (cas
     négatifs à ajouter) ;
@@ -988,8 +991,8 @@ Activation conversation par conversation, via l'intersection des capacités. Un
 interrupteur ne peut que désactiver.
 
 **Compatibilité des apps installées.** Leurs analyseurs des contrats v2 exigent
-des clés exactes : le serveur n'ajoute jamais de champ à un contrat v2 déjà
-publié. Une nouveauté passe par l'un de ces moyens :
+des clés exactes. À partir de la première version publiée qui ouvre les
+verrous, le serveur n'ajoute donc jamais de champ à un contrat v2 publié. Une nouveauté passe par l'un de ces moyens :
 
 - une nouvelle version de contrat ;
 - une nouvelle route ;
@@ -1613,3 +1616,126 @@ Le générateur de référence est côté iOS (COM-0) ; chaque plateforme rejoue
 vecteurs dans les deux sens. L'ECDSA étant aléatoire, une signature produite
 par une autre plateforme n'est pas identique à l'octet. On vérifie sa
 validité et sa forme low-S, jamais son égalité.
+
+---
+
+## Annexe E — Routes du jalon A (proposition iOS, à valider par le serveur)
+
+Ces routes prolongent celles que le client iOS appelle déjà sous
+`/api/e2ee/v2/` : appareils, approbations, amorçage, époques, messages,
+enveloppes, récupération. Elles sont fermées en production, et les apps
+publiées gardent leurs verrous fermés. Leurs contrats peuvent donc encore
+changer ; la règle de compatibilité du §16 s'applique à partir de la première
+version publiée qui ouvre les verrous.
+
+### E.0 Conventions
+
+- **Authentification** : cookie de session, plus une requête signée par
+  l'appareil (A.2) sur toute écriture.
+- **Corps et réponses** : JSON à clés exactes. Les objets signés reprennent
+  les formes de l'annexe D (`{"certificate", "signatureB64"}`,
+  `{"list", "signatureB64", "devices"}`, etc.).
+- **Erreurs** : `{"error": "<message>", "code": "<CODE>"}`, avec le statut
+  HTTP qui convient. Les codes propres au jalon A :
+  - `E2EE_DEVICE_LIST_STALE` (409) : la version ou le condensat précédent ne
+    correspond pas ;
+  - `E2EE_EPOCH_STALE` (409) : une autre époque a été acceptée, et la réponse
+    la donne ;
+  - `E2EE_MEMBERSHIP_STALE` (409) : `changeNumber` n'est pas le suivant ;
+  - `E2EE_CAPABILITY_MISSING` (409) : la conversation ne peut pas recevoir ce
+    contenu (§12) ;
+  - `E2EE_CERTIFICATE_INVALID` (422) : certificat qui ne se vérifie pas
+    jusqu'à l'UIK ;
+  - `CONVERSATION_ID_TAKEN` et `CALL_ID_TAKEN` (409) : identifiant choisi par
+    le client déjà utilisé.
+- **Vérification serveur** : le serveur vérifie ce qu'il peut, c'est-à-dire
+  signatures, chaînages, condensats et comparaisons-échanges. Les clients
+  revérifient toujours : le serveur n'est jamais une source de confiance
+  (§1).
+
+### E.1 Identité et appareils
+
+- **`GET /api/e2ee/v2/users/{userId}/identity`**, le paquet de confiance d'un
+  compte. Réponse :
+  - `accountIdentityKeyB64` ;
+  - `deviceList` : `{list, signatureB64, devices}` ;
+  - `certificates` : liste de `{certificate, signatureB64}`, les appareils de
+    la liste courante ;
+  - `capabilities` : liste de `{document, signatureB64}`, le dernier document
+    de chaque appareil ;
+  - `pendingIdentityReset` : `{reset, signatureB64}` ou `null`.
+- **`POST /api/e2ee/v2/bootstrap`**, étendu pour le premier appareil. Corps
+  existant, plus :
+  - `accountIdentityKeyB64` ;
+  - `certificate` ;
+  - `deviceList` (version 1).
+- **`POST /api/e2ee/v2/device-approvals/{id}/approve`**, étendu. Corps :
+  - `certificate` du nouvel appareil ;
+  - `deviceList` suivante ;
+  - `uikWrap` : l'objet de D.1, avec toutes ses clés.
+
+  Le serveur enregistre les trois dans une seule transaction, ou rien.
+- **`PUT /api/e2ee/v2/devices/{deviceId}/certificate`**, rotation de la clé
+  d'accord (`keyVersion` + 1). Corps : `{certificate, deviceList}`.
+- **`POST /api/e2ee/v2/devices/{deviceId}/revoke`**, étendu. Corps :
+  `{deviceList}`, la nouvelle liste sans l'appareil, signée par l'UIK.
+- **`PUT /api/e2ee/v2/devices/{deviceId}/capabilities`**. Corps :
+  `{document, signatureB64}`. Refus si `sequence` n'augmente pas.
+- **`POST /api/e2ee/v2/identity/reset`**, étendu. Corps :
+  - `reset` : `{reset, signatureB64}` (D.14) ;
+  - `certificate` et `deviceList` (version 1) du nouvel ensemble.
+- **`POST /api/e2ee/v2/identity/reset/{resetId}/objection`**. Corps :
+  `{objection, signatureB64}`.
+
+### E.2 Conversations, membres et époques
+
+- **`POST /api/e2ee/v2/conversations`**, création d'une conversation v2
+  (§3.2). Corps :
+  - `conversationId`, choisi par le client ;
+  - `isGroup`, `title` (ou `null`) et `participantIds` ;
+  - `membership` : liste de `{change, signatureB64}` ;
+  - `epoch` : `{epochNumber: "1", previousEpochNumber: "0", manifest, envelopes}`,
+    où `manifest` est `{manifest, signatureB64, recipients}` et `envelopes`
+    suit la forme A.3.
+
+  La création est atomique. Réponse : la conversation, marquée
+  `e2eeProtocolVersion: 2`.
+- **`POST /api/e2ee/v2/conversations/{id}/epochs`**, étendu. Corps :
+  - `previousEpochNumber`, `epochNumber` ;
+  - `manifest` ;
+  - `envelopes`.
+
+  En cas de conflit : 409 `E2EE_EPOCH_STALE`, avec `currentEpoch` au format
+  de `epochs/current`.
+- **`GET /api/e2ee/v2/conversations/{id}/epochs/current`**, étendu. La
+  réponse ajoute le manifeste signé, avec sa liste de destinataires.
+- **`POST /api/e2ee/v2/conversations/{id}/epochs/{epochNumber}/ack`**, accusé
+  de réception. Le serveur passe l'enveloppe de l'appareil en ligne témoin
+  (§2.6).
+- **`POST /api/e2ee/v2/conversations/{id}/membership`**. Corps :
+  `{change, signatureB64}`, en comparaison-échange sur `changeNumber`.
+- **`GET /api/e2ee/v2/conversations/{id}/membership?after=<changeNumber>`** :
+  la suite de la chaîne.
+
+### E.3 Messages et signalements
+
+- **`POST /api/e2ee/v2/conversations/{id}/messages`**, étendu à
+  l'enveloppe v2 :
+  - corps : l'enveloppe de D.7, avec `envelopeVersion: 2`, `counter`,
+    `frankTagB64` et `signatureB64` ;
+  - réponse : `envelopeId`, `serverTagB64`, `serverTimeMs` et `keyId` (§11).
+- **`GET /api/e2ee/v2/envelopes/{id}/fetch`**, étendu : ajoute
+  `serverTagB64`, `serverTimeMs` et `keyId`.
+- **`POST /api/e2ee/v2/reports`**. Corps :
+  `{clear, encB64, sealedB64, moderationKeyId}` (D.10).
+  - Le serveur vérifie les `serverTag` et l'appartenance du signaleur, puis
+    gèle les blobs cités.
+  - Réponse : `{reportId}`.
+
+### E.4 Appels
+
+- **`POST /api/calls/initiate`**. Dans une conversation v2, le corps ajoute
+  `callId` (choisi par l'appelant) et `e2eeV2` (D.11).
+- **Réponses et notifications** : la réponse d'initiation,
+  `/api/calls/pending` et la notification VoIP ou FCM relaient `e2eeV2` tel
+  quel. Les anciennes clés `e2ee` et `e2eeRequired` restent vides (§10.1).
