@@ -1,8 +1,10 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.2**, à valider par les sessions iOS, Android,
-> serveur et web avant tout développement. Le chantier démarre après la bêta
-> iOS 160.
+> Statut : **proposition v0.3**, à valider par les sessions iOS, Android et
+> serveur (qui porte aussi le web) avant tout développement. Le chantier
+> démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
+> iOS, Android et le web, est la condition de la prochaine bêta TestFlight
+> iOS (décision produit du 30/09, §16).
 >
 > - v0.1 (30/09/2026) : première rédaction (plan 2, Lot 6).
 > - v0.2 (30/09/2026) : révisée après une relecture de sécurité indépendante.
@@ -10,13 +12,43 @@
 >   limitée à son propre compte, section « Propriétés de sécurité », franking
 >   refait, appels authentifiés et réglages LiveKit figés, surfaces fermées par
 >   défaut, annexe « octets sur le fil » conforme au code et aux vecteurs.
+> - v0.3 (30/09/2026) : retours des sessions serveur et Android, décisions
+>   produit du 30/09.
+>   - Décisions produit : clés créées par les appareils, appels, navigateurs
+>     sur demande, pas de revue externe, messages programmés (§18).
+>   - Serveur :
+>     - enveloppes d'époque gardées en ligne témoin au lieu d'être
+>       supprimées ;
+>     - signalement en deux parties, l'une en clair, l'autre scellée ;
+>     - le serveur ne refuse que les capacités qu'il voit ;
+>     - `callId` choisi par l'appelant ;
+>     - nouvelles clés JSON pour les appels ;
+>     - numéro d'époque « +1 strict » ;
+>     - manifeste d'époque défini (§3.5) ;
+>     - historique d'appartenance ;
+>     - purge signée des blobs ;
+>     - `serverTag` canonique.
+>   - Android :
+>     - UIK logicielle ;
+>     - rôle de StrongBox ;
+>     - Android 11 et moins ;
+>     - forme low-S imposée ;
+>     - document de capacités signé par l'appareil (§12) ;
+>     - réglages LiveKit tous explicites et marqueur « non chiffré » à
+>       prouver ;
+>     - liste d'emoji figée ;
+>     - surfaces Android.
+>   - Nouveautés :
+>     - jalons A et B (§16) ;
+>     - tickets du jalon A (annexe C) ;
+>     - estimation mise à jour (annexe B).
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
 > audio et vidéo. Une seule génération de protocole, la **v2**, commune aux
-> quatre clients (iOS, Android, web) et au serveur.
+> clients iOS, Android et web, et au serveur.
 >
-> L'inventaire de l'existant et la relecture détaillée, qui décrivent des
+> L'inventaire de l'existant et les relectures détaillées, qui décrivent des
 > écarts de sécurité, ne sont **pas** publiés dans ce dépôt public.
 
 Les mots **DOIT**, **NE DOIT PAS**, **DEVRAIT** et **PEUT** ont le sens des RFC
@@ -53,7 +85,8 @@ réordonner des messages, et fournit le code du client web.
 - **Métadonnées visibles** par le serveur : voir le tableau du §4.4.
 - **Disponibilité** : le serveur peut retenir ou retarder. Les compteurs
   signés (§4.3) rendent les trous détectables, pas impossibles.
-- **Client web** : le serveur fournit le code qui manipule les clés (§2.7).
+- **Client web** : le serveur fournit le code qui manipule les clés. D'où
+  l'accès des navigateurs sur demande seulement (§2.7).
 
 Un protocole de groupe standard (MLS, RFC 9420) offrirait la confidentialité
 persistante par message et la guérison continue. Il est à évaluer pour une v3.
@@ -90,6 +123,10 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
   ECDSA créée sur le premier appareil et gardée seulement par les appareils
   certifiés du compte. Elle circule entre eux, chiffrée de bout en bout, lors
   de l'approbation.
+- Puisqu'elle circule, l'UIK est une **clé logicielle** : elle ne peut pas être
+  une clé matérielle non exportable. Au repos, elle est chiffrée par une clé
+  matérielle de l'appareil (§2.6). Seules les deux clés d'appareil (§2.2) sont
+  matérielles, quand la plateforme le permet.
 - La **clé publique** de l'UIK est ce que les contacts vérifient et épinglent
   (confiance à la première utilisation, puis vérification explicite).
 
@@ -99,11 +136,18 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
   (`P256_X963_ECDH_HKDF_SHA256`) et signature (`P256_X963_ECDSA_SHA256_DER`).
   Les clés privées ne quittent jamais l'appareil (§2.6).
 - **Certificat d'appareil**, signé par l'UIK :
-  `SQ-E2EE-V2-DEVICE-CERT\n1\n<userId>\n<deviceId>\n<identityKeyB64>\n<signingKeyB64>\n<platform>\n<createdAtMs>`,
-  où `platform` vaut `ios`, `android` ou `web`.
-- **Liste d'appareils signée** par l'UIK, versionnée et monotone (un numéro de
-  version qui ne fait que croître) : un client refuse une liste plus ancienne
-  que la dernière vue.
+  `SQ-E2EE-V2-DEVICE-CERT\n1\n<userId>\n<deviceId>\n<keyVersion>\n<identityKeyB64>\n<signingKeyB64>\n<platform>\n<createdAtMs>`.
+  - `platform` vaut `ios`, `android` ou `web`.
+  - `keyVersion` est un entier décimal qui commence à 1 et croît
+    strictement à chaque rotation de la clé d'accord (§2.6). Un appareil
+    certifié détient l'UIK : il signe lui-même le certificat de sa nouvelle
+    clé.
+  - Les capacités ne figurent pas dans le certificat : elles ont leur propre
+    document, signé par l'appareil (§12).
+- **Liste d'appareils signée** par l'UIK, versionnée et monotone. Le serveur
+  n'accepte une nouvelle liste que si sa version vaut la précédente + 1
+  (comparaison-échange). Un client refuse une liste plus ancienne que la
+  dernière vue.
 - **Règle normative** : un client NE DOIT envelopper une clé d'époque, ou
   accepter une signature de message, que pour un appareil dont le certificat se
   vérifie jusqu'à l'UIK épinglée de son propriétaire.
@@ -114,6 +158,8 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
   puis crée l'UIK.
 - Un appareil suivant est `PENDING` jusqu'à ce qu'un appareil certifié du même
   compte l'approuve et signe son certificat avec l'UIK.
+- **Côté serveur**, une approbation n'est enregistrée qu'avec le certificat
+  signé et la nouvelle liste d'appareils signée, dans la **même transaction**.
 - Le **QR** et le **code de proximité** contiennent l'empreinte complète
   `SHA-256(identityKey ‖ signingKey)` du nouvel appareil, et l'approbateur la
   compare automatiquement.
@@ -139,41 +185,64 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
 - Chaque ajout ou retrait de membre est signé par l'appareil d'un
   administrateur, et affiché comme message système vérifié. Un client rejette
   un changement de membre non signé.
-- Chaque époque porte un **manifeste signé de ses destinataires** (`userId`,
-  `deviceId`, empreinte). Chaque destinataire le compare à sa propre vue des
-  membres et des appareils certifiés, et signale tout écart.
+- Le serveur conserve l'**historique des appartenances**, en ajout seul :
+  ajout, retrait, départ, avec la date et l'auteur. Un retrait n'efface pas
+  la ligne d'origine. Cet historique sert à vérifier qu'un signaleur était
+  membre au moment des messages signalés (§11).
+- Chaque époque porte un **manifeste signé de ses destinataires** (§3.5).
+  Chaque destinataire le compare à sa propre vue des membres et des appareils
+  certifiés, et signale tout écart.
 
 ### 2.6 Stockage et rotation des clés d'appareil
 
-- iOS : clés en Secure Enclave quand l'algorithme le permet, sinon Keychain
-  `WhenUnlockedThisDeviceOnly`. Android : Keystore (StrongBox si disponible).
-  Sous Android 12 (API 31), l'accord de clé Keystore n'existe pas : la clé est
-  alors logicielle, chiffrée par une clé Keystore. Web : §2.7.
+- **iOS** : clés d'appareil en Secure Enclave quand l'algorithme le permet,
+  sinon Keychain `ThisDeviceOnly`.
+- **Android** : clés d'appareil dans le Keystore, en environnement d'exécution
+  sécurisé (TEE). StrongBox est lent et n'offre presque jamais l'accord de
+  clé : on ne l'utilise, s'il existe, que pour la clé qui chiffre l'UIK. Avant
+  Android 12 (API 30 et moins), l'accord de clé du Keystore
+  (`PURPOSE_AGREE_KEY`, API 31) n'existe pas. La clé d'accord est alors
+  logicielle, chiffrée par une clé Keystore.
+- **Web** : §2.7.
 - La **clé d'accord** de chaque appareil tourne tous les 30 jours. La nouvelle
-  clé reçoit un nouveau certificat.
-- Le serveur **supprime une enveloppe d'époque** dès que l'appareil
-  destinataire en a accusé réception.
-- L'extension de notification (iOS) et le service de messagerie (Android)
-  n'accèdent qu'aux époques courantes, jamais aux clés d'identité. Le réglage
-  « aucun aperçu » supprime toute copie de clé accessible écran verrouillé.
+  clé reçoit un nouveau certificat (`keyVersion` + 1).
+- **Enveloppes d'époque déjà reçues** : quand l'appareil destinataire accuse
+  réception, le serveur efface le contenu chiffré de l'enveloppe (clé
+  enveloppée, clé éphémère, nonce, signature). Il ne garde qu'une **ligne
+  témoin** (époque, destinataire, date de l'accusé), sur laquelle
+  s'appuient la livraison, l'unicité et la révocation.
+- **Écran verrouillé** :
+  - avec les aperçus, l'extension de notification (iOS) ou le service de
+    messagerie (Android) peut utiliser les clés d'époque courantes écran
+    verrouillé, jamais les clés d'identité ;
+  - avec « aucun aperçu », ces clés exigent le déverrouillage (iOS : classe
+    `WhenUnlocked` ; Android : `setUnlockedDeviceRequired`).
 - Après une restauration d'appareil, les clés locales ont disparu. Le client le
   détecte au démarrage et demande un nouvel enrôlement, plutôt que de laisser un
   appareil fantôme.
 
-### 2.7 Appareils web
+### 2.7 Appareils web (navigateurs)
 
 Une clé WebCrypto non extractible ne protège pas contre un JavaScript
 malveillant, qui peut l'**utiliser**. Or le code web est fourni par le même
-opérateur que l'API. En conséquence :
+opérateur que l'API. Décision produit du 30/09 : les navigateurs accèdent aux
+conversations chiffrées **sur demande seulement**.
 
-- les appareils web sont marqués « navigateur » dans les listes et les
-  manifestes d'époque ;
-- chaque conversation offre l'option « exclure les appareils web » ;
-- le client web est servi depuis une origine statique distincte, avec une CSP
-  stricte, l'intégrité des sous-ressources (SRI) et des bundles reproductibles
-  publiés ;
-- depuis le web, il est impossible d'approuver un appareil ou de restaurer par
-  la récupération.
+- Un navigateur n'est jamais ajouté d'office. Il devient un appareil à la
+  demande de l'utilisateur, approuvé depuis un appareil **mobile** certifié du
+  même compte (QR, §2.3).
+- Il est marqué « navigateur » dans l'écran des appareils, les listes et les
+  manifestes d'époque. Il se révoque depuis le téléphone.
+- Chaque conversation offre l'option « exclure les navigateurs ». Dans une
+  conversation de groupe, un administrateur la règle ; en tête-à-tête, l'un
+  des deux membres. Le réglage est annoncé par un message système vérifié,
+  prend effet à l'époque suivante et figure dans son manifeste (§3.5).
+- Depuis le web, il est impossible d'approuver un appareil ou d'utiliser la
+  récupération.
+- Le client web DEVRAIT être servi depuis une origine statique distincte, avec
+  une CSP stricte, l'intégrité des sous-ressources (SRI) et des bundles
+  reproductibles publiés. C'est un chantier d'infrastructure à part. Savoir
+  s'il est un prérequis du jalon A est une question ouverte (§18).
 
 ### 2.8 Récupération
 
@@ -196,20 +265,34 @@ Format de l'enveloppe : annexe A.3. Vecteur : `epoch-envelope-v1.json`.
 ### 3.1 Création
 
 - La clé d'époque (32 octets) est générée par un **appareil certifié d'un
-  membre actuel**, jamais par le serveur. Numéro croissant par conversation.
+  membre actuel**, jamais par le serveur.
+- Le numéro vaut **exactement le précédent + 1**, et la première époque vaut 1.
+  Un saut est refusé, sans quoi un numéro démesuré figerait la conversation.
 - Elle est enveloppée pour chaque appareil certifié de chaque membre, y compris
   les autres appareils du créateur. L'engagement de clé (annexe A.3) accompagne
   chaque enveloppe, et chaque enveloppe est signée par l'appareil créateur.
-- L'époque est **acceptée** par comparaison-échange : le client envoie
-  `previousEpochNumber`, et le serveur répond `409 E2EE_EPOCH_STALE` si une autre
-  époque a été acceptée entre-temps. Un client n'utilise une époque qu'**après**
-  son acceptation. En cas de conflit, il adopte l'époque acceptée et
-  recommence si une rotation reste nécessaire.
+- **Destinataires** : le serveur accepte toute liste qui forme un
+  sous-ensemble des appareils non révoqués des membres actuels. Il n'impose
+  pas sa propre liste, puisque le client décide (§1.2). Une époque vise au
+  plus 500 appareils, ce qui tient avec son manifeste dans la limite de
+  512 Kio par requête.
+- L'époque est **acceptée** par comparaison-échange sur le numéro courant.
+  Le client envoie `previousEpochNumber`. Si une autre époque a été acceptée
+  entre-temps, le serveur répond `409 E2EE_EPOCH_STALE` avec l'époque
+  acceptée.
+  - Un client n'utilise une époque qu'**après** son acceptation.
+  - En cas de conflit, il adopte l'époque acceptée et recommence si une
+    rotation reste nécessaire.
+  - Les exigences de rotation du serveur (§3.3) sont marquées résolues dans
+    la transaction qui accepte l'époque.
 
 ### 3.2 Nouvelle conversation, nouveaux membres, nouveaux appareils
 
-- Le créateur crée l'époque 1. La conversation est alors v2 pour toujours
-  (§12).
+- Une conversation chiffrée v2 est **créée avec son époque 1** dans la même
+  requête : le serveur ne génère aucune clé. La conversation est alors v2 pour
+  toujours (§12).
+- Dès qu'une conversation est v2, le serveur refuse toute écriture v1 :
+  partage de clé v1, demande de resynchronisation v1, message v1.
 - Un membre sans appareil certifié est « en attente » : il reçoit l'époque
   courante dès qu'un appareil membre la lui enveloppe. Il ne reçoit jamais une
   clé du serveur.
@@ -222,12 +305,14 @@ Format de l'enveloppe : annexe A.3. Vecteur : `epoch-envelope-v1.json`.
 - **La décision appartient au client** : si les destinataires de l'époque
   courante diffèrent de l'ensemble actuel des appareils certifiés des membres
   actuels, le client crée une époque avant tout envoi.
-- Déclencheurs : appareil certifié ajouté ou révoqué, membre ajouté ou retiré,
-  réinitialisation d'identité, usage de la récupération, et au plus tard 30 jours
-  ou 10 000 messages par époque.
-- Le serveur publie aussi des exigences de rotation (confort) et les marque
-  résolues quand une époque plus récente est acceptée. Leur absence ne dispense
-  jamais un client de la règle ci-dessus.
+- Déclencheurs :
+  - appareil certifié ajouté, révoqué ou mis à l'écart (§12) ;
+  - membre ajouté ou retiré ;
+  - réglage « exclure les navigateurs » modifié ;
+  - réinitialisation d'identité, usage de la récupération ;
+  - au plus tard, 30 jours ou 10 000 messages par époque.
+- Le serveur publie aussi des exigences de rotation (confort). Leur absence ne
+  dispense jamais un client de la règle ci-dessus.
 - Un membre sans appareil certifié ne bloque pas une rotation : il est exclu de
   l'époque, et le reçoit dès qu'il a un appareil certifié.
 
@@ -240,6 +325,23 @@ Un client rejette un message :
   compromission ;
 - chiffré sous une époque qui n'est plus la courante depuis plus de 24 heures
   (fenêtre de tolérance pour les messages en vol).
+
+### 3.5 Manifeste d'époque
+
+Le manifeste permet à chaque destinataire de vérifier qui reçoit l'époque. Il
+permet aussi à un appareil qui n'a pas reçu l'époque, par exemple un nouvel
+appareil, de constater qu'une conversation est v2 (§12).
+
+- Ligne de destinataire : `<userId>\n<deviceId>\n<platform>\n<empreinte>`, où
+  `empreinte = b64url(SHA-256(identityKey ‖ signingKey))` (§2.3). Lignes triées
+  par `userId` puis `deviceId`, dans l'ordre des octets UTF-8.
+- `recipientsDigest = b64url(SHA-256("SQ-E2EE-V2-EPOCH-RECIPIENTS\n1" ‖ ("\n" ‖ ligne)*))`.
+- Chaîne signée par l'appareil créateur :
+  `SQ-E2EE-V2-EPOCH-MANIFEST\n1\n<conversationId>\n<epochNumber>\n<creatorUserId>\n<creatorDeviceId>\n<keyCommitmentB64>\n<recipientCount>\n<recipientsDigest>\n<excludesWeb>\n<createdAtMs>`,
+  où `excludesWeb` vaut `0` ou `1`.
+- Le serveur stocke le manifeste, sa signature et la liste des lignes. Il les
+  sert avec l'époque, y compris à un appareil qui n'en est pas destinataire.
+- Vecteur : `epoch-manifest-v1`.
 
 ---
 
@@ -260,6 +362,8 @@ Format existant, v1 de l'enveloppe : annexe A.4. Vecteur :
 - **Chiffrer puis signer** : la signature ECDSA de l'appareil couvre l'AAD, le
   nonce et le chiffré, dans leur **forme textuelle base64 exacte**. Le serveur
   stocke et renvoie ces chaînes à l'octet près.
+- Signatures en **forme low-S** : le signataire normalise (`s → n − s`), et le
+  vérificateur rejette toute signature high-S (§15).
 - Le destinataire vérifie la signature et le certificat **avant** de
   déchiffrer.
 
@@ -325,7 +429,8 @@ Changements, chacun avec ses vecteurs, dont des vecteurs négatifs :
   dans la limite de 20 manifestes ;
 - `POLL_CLOSE` (cible = `messageRef` du sondage) ;
 - réactions : emoji normalisé (§8) ;
-- `CARD` : type `SITE` (fiche d'antenne) et `POST` (publication partagée).
+- `CARD` : type `SITE` (fiche d'antenne) et `POST` (publication partagée) ;
+- longueurs comptées en octets UTF-8 (§15).
 
 Un client qui reçoit une version ou un `kind` inconnu affiche « Contenu non pris
 en charge : mets à jour l'app » et n'interprète rien.
@@ -368,30 +473,47 @@ affichage**, et dans l'outil de modération.
 
 ### 6.3 Transport
 
-- `POST /api/e2ee/v2/blobs`, puis `PUT /blobs/{id}/parts/{n}` (parts de 5 Mio),
-  puis `POST /blobs/{id}/complete`, puis `GET /blobs/{id}/download` (URL signée,
-  courte durée).
+- Routes :
+  1. `POST /api/e2ee/v2/blobs` ;
+  2. `PUT /blobs/{id}/parts/{n}`, par parts de 5 à 8 Mio, la dernière pouvant
+     être plus petite ;
+  3. `POST /blobs/{id}/complete` ;
+  4. `GET /blobs/{id}/download`, qui donne une URL signée de courte durée
+     pour l'hôte public.
+- Les blobs chiffrés sont rangés sous un **préfixe privé**, jamais servi par
+  une URL publique non signée.
 - Le serveur stocke des octets opaques. Il NE DOIT PAS inspecter, redimensionner
   ni transcoder. Un blob non référencé sous 24 heures est supprimé, sauf s'il
-  fait l'objet d'un signalement (§11).
-- Un message n'est accepté que si ses blobs sont complets et appartiennent à
-  l'émetteur. `DELETE` et l'expiration du TTL purgent chiffrés et blobs, sauf en
-  cas de signalement.
+  est gelé par un signalement (§11).
+- Un message n'est accepté que si ses blobs sont complets et ont été créés par
+  le **même appareil émetteur**.
+- **Purge** : la suppression chiffrée (`DELETE`) est invisible du serveur.
+  L'émetteur envoie donc aussi une **demande de purge signée** (requête
+  signée, annexe A.2) qui cite les `blobId` du message supprimé. Cette
+  demande et l'expiration du TTL purgent chiffrés et blobs, sauf gel par un
+  signalement.
 
 ### 6.4 Côté client
 
 - Tailles publiées par paliers Padmé : bourrage chiffré, retiré à la lecture.
 - File d'envoi durable : chiffré sur disque, clé de média dans le trousseau
   jusqu'à l'envoi.
-- Déchiffrement vers un fichier temporaire protégé (iOS
-  `NSFileProtectionComplete`), exclu des sauvegardes. Il n'est affiché qu'après
-  vérification des condensats. La lecture progressive d'une vidéo est permise
-  morceau par morceau, puisque chaque morceau est authentifié. Tout est purgé à
-  la déconnexion et à la révocation.
+- Déchiffrement vers un fichier temporaire protégé, exclu des sauvegardes
+  (iOS : `NSFileProtectionComplete` ; Android : stockage privé de l'app,
+  sauvegarde désactivée). Il n'est affiché qu'après vérification des
+  condensats. La lecture progressive d'une vidéo est permise morceau par
+  morceau, puisque chaque morceau est authentifié. Tout est purgé à la
+  déconnexion et à la révocation.
 - Transférer un fichier vers une autre conversation le **rechiffre** avec une
   nouvelle clé de média.
-- Limites : 512 Mio par blob, 1 Gio par message. Au-delà de 50 Mio en données
-  mobiles, une confirmation est demandée.
+- Limites :
+  - 512 Mio par blob et 1 Gio par message, à revoir avec le budget de
+    stockage (§18) ;
+  - au-delà de 50 Mio en données mobiles, une confirmation est demandée ;
+  - en itinérance, quand la plateforme sait la détecter (Android), le
+    téléchargement automatique se fait en Wi-Fi seulement, par défaut ;
+    iOS ne sait pas la détecter, il s'en tient à la confirmation et au Mode
+    données réduites.
 
 ---
 
@@ -400,7 +522,7 @@ affichage**, et dans l'outil de modération.
 - `AUDIO` : manifeste du blob audio (AAC-LC en M4A, recommandé partout),
   `durationMs`, forme d'onde (charge v2) et transcription facultative.
 - La transcription se fait **uniquement sur l'appareil**. Le serveur NE DOIT PAS
-  transcrire une note d'une conversation chiffrée.
+  transcrire une note d'une conversation chiffrée, v1 comprise.
 
 ---
 
@@ -408,11 +530,14 @@ affichage**, et dans l'outil de modération.
 
 - `REACTION` : cible, emoji, `ADD` ou `REMOVE`.
 - Emoji : **un seul** emoji RGI, pleinement qualifié (avec `FE0F`), en NFC, de
-  32 octets UTF-8 au plus. Tout autre emoji est rejeté.
+  32 octets UTF-8 au plus. La référence est la liste `emoji-test.txt`
+  d'**Unicode 15.1** (statut `fully-qualified`), embarquée par chaque client,
+  puisque Android n'offre pas d'API avant l'API 33. Tout autre emoji est
+  rejeté.
 - Agrégation par `(utilisateur, cible, emoji)`. `ADD` et `REMOVE` sont
   idempotents, et le dernier événement de cet utilisateur l'emporte.
-- Notification : une notification générique, que l'extension précise après
-  déchiffrement (§13).
+- Notification : une notification générique, sans emoji, que l'extension
+  précise après déchiffrement (§13).
 
 ---
 
@@ -432,17 +557,48 @@ affichage**, et dans l'outil de modération.
 
 ## 10. Appels audio et vidéo
 
+### 10.0 Règles d'usage (décision produit du 30/09)
+
+- **Conversation v2** : un appel est toujours chiffré de bout en bout.
+  - Si un appareil certifié d'un membre n'a pas la capacité « appels
+    vérifiés » (§12), l'appel est indisponible, avec « Un membre doit mettre à
+    jour SignalQuest ». Jamais de repli en transport seul.
+  - Un membre sans appareil certifié (app trop ancienne) ne compte pas dans
+    l'intersection. Il ne sonne pas et ne peut pas rejoindre.
+- **Conversation v1** (ancien chiffrement, clé connue du serveur) : l'appel
+  reste possible, protégé pendant le transport seulement.
+  - L'appelant voit d'abord la confirmation « Appel non chiffré de bout en
+    bout » ; un appel reçu porte la même mention.
+  - Le serveur ne marque jamais un appel de conversation v1 comme chiffré.
+- **Exigence** : le jalon A (§16) livre les appels chiffrés sur iOS, Android et
+  le web avant la prochaine bêta TestFlight iOS.
+
 ### 10.1 Descripteur d'appel
 
+- `callId` est **choisi par l'appelant** : 128 bits aléatoires au format
+  opaque (annexe A.1). Le serveur refuse un `callId` déjà utilisé
+  (`409 CALL_ID_TAKEN`). Le descripteur peut ainsi le contenir dès l'appel
+  d'initiation.
 - L'appelant crée un **descripteur signé par son appareil** :
-  `SQ-E2EE-V2-CALL-DESCRIPTOR\n1\n<conversationId>\n<callId>\n<epochId>\n<epochNumber>\n<keyCommitmentB64>\n<callNonceB64>\n<createdAtMs>`,
+  `SQ-E2EE-V2-CALL-DESCRIPTOR\n1\n<conversationId>\n<callId>\n<callerDeviceId>\n<epochId>\n<epochNumber>\n<keyCommitmentB64>\n<callNonceB64>\n<createdAtMs>`,
   où `callNonce` est un aléa de 32 octets.
-- Le serveur le relaie tel quel (réponse d'initiation, notification VoIP,
-  `/api/calls/pending`) et enregistre `Call.e2eeRequired`, `e2eeEpochId` et
-  `e2eeKeyId`.
+- Le serveur relaie le descripteur tel quel, dans une **nouvelle clé JSON**
+  `e2eeV2` (`descriptor`, `signature`, `callerDeviceId`) :
+  - dans la réponse d'initiation ;
+  - dans la notification VoIP ou FCM ;
+  - dans `/api/calls/pending`.
+
+  Il ne remplit jamais les anciennes clés `e2ee` et `e2eeRequired`, pour
+  rester compatible avec les apps déjà publiées. Il enregistre le
+  descripteur, sa signature, l'appareil appelant et le `callNonce` (unique).
+- Pour un appel chiffré, le serveur ne fait sonner, et ne délivre de jeton
+  LiveKit, qu'aux appareils certifiés dotés de la capacité « appels vérifiés ».
 - L'appelé vérifie la signature et le certificat de l'appelant, puis refuse :
-  une époque qui n'est pas la **plus récente active** qu'il connaît, un
-  descripteur de plus de 60 secondes, un `callNonce` déjà vu.
+  - une époque qui n'est pas la **plus récente active** qu'il connaît ;
+  - pour une sonnerie, un descripteur de plus de 60 secondes. Pour une
+    jonction tardive ou un transfert, le descripteur est accepté tant que le
+    serveur donne l'appel pour actif, sous la même règle d'époque ;
+  - un `callNonce` déjà vu pour un autre `callId`.
 
 ### 10.2 Clé de trame
 
@@ -455,17 +611,29 @@ affichage**, et dans l'outil de modération.
 
 ### 10.3 Réglages LiveKit figés, sur les trois SDK
 
+SDK de référence : `client-sdk-swift` 2.14.0, `livekit-android` 2.27.0,
+`livekit-client` (JS) 2.18.x. Chaque changement de version refait le vecteur
+et l'appel croisé.
+
+- **Tous les réglages sont posés explicitement**, jamais laissés aux défauts,
+  qui diffèrent d'un SDK à l'autre.
 - Mode clé partagée. Passphrase = la **chaîne** UTF-8 base64 standard de 44
-  caractères de la clé de trame. Côté web, une chaîne et non un `ArrayBuffer`,
-  sans quoi la dérivation change.
-- La dérivation interne de LiveKit (PBKDF2, 100 000 itérations, sel
-  `LKFrameEncryptionKey`) et la taille effective de la clé AES sont à établir
-  avant tout code, par un vecteur `livekit-shared-key-v1` sur les SDK qui
-  exportent la clé (Swift, Android), puis par un appel croisé à trois
-  plateformes.
+  caractères de la clé de trame. Android : `setSharedKey(String)`. Web : une
+  chaîne et non un `ArrayBuffer`, sans quoi la dérivation change.
+- `keyDerivationAlgorithm = PBKDF2` et `ratchetSalt = "LKFrameEncryptionKey"`,
+  explicites. Le nombre d'itérations et la taille effective de la clé AES
+  sont établis par le vecteur `livekit-shared-key-v1`. Swift et Android le
+  produisent (export de la clé), le web le vérifie par l'appel croisé.
 - `ratchetWindowSize = 0`, `keyRingSize = 16`, `encryptionType = gcm`,
-  `discardFrameWhenCryptorNotReady = true`, marqueur « non chiffré » vide. Le
-  SIF fourni par le serveur est **ignoré**.
+  `discardFrameWhenCryptorNotReady = true`, et `failureTolerance` à une même
+  valeur explicite partout, fixée par le ticket COM-1 (annexe C).
+- **Marqueur « non chiffré »** (`uncryptedMagicBytes`) et **SIF** :
+  - selon l'implémentation, un marqueur vide peut désactiver le passage en
+    clair, ou au contraire faire passer toute trame pour non chiffrée ;
+  - la valeur n'est figée qu'après un test, sur chaque SDK, prouvant qu'une
+    trame non chiffrée injectée n'est **jamais rendue** ;
+  - d'ici là, la valeur explicite est `LK-ROCKS`, et le SIF fourni par le
+    serveur est ignoré.
 - Nouvelle époque pendant l'appel : `setKey` à l'index
   `epochNumber mod keyRingSize` ; l'émission bascule une fois la nouvelle époque
   reçue par tous. `ratchetKey` est interdit.
@@ -473,19 +641,33 @@ affichage**, et dans l'outil de modération.
 
 ### 10.4 Vérification et fermeture par défaut
 
-- Un appel dans une conversation chiffrée **est** chiffré. Le client le vérifie
+- Un appel dans une conversation v2 **est** chiffré. Le client le vérifie
   localement (§12) : il ne rejoint jamais en clair une conversation qu'il sait
   chiffrée, quoi que dise le serveur.
 - Toute piste distante non chiffrée est refusée : désabonnement et fin de
-  l'appel. Une piste n'est rendue qu'une fois son cryptor `ok`.
-- À la jonction, chaque participant envoie sur le canal de données chiffré une
-  **preuve signée** qui lie son identité LiveKit à son appareil certifié. Un
-  participant sans preuve après 10 secondes met fin à l'appel, avec « Appel
-  chiffré impossible ».
-- `missing_key`, `encryption_failed`, `decryption_failed` ou `internal_error`
-  retirent le cadenas et l'annoncent.
-- Pas d'enregistrement composite ni de transcription serveur pour un appel
-  chiffré.
+  l'appel.
+- Une piste n'est rendue que lorsque son cryptor est dans l'état « OK ».
+  - Sous Android, l'état `E2EEState` vaut `NEW`, `OK`, `KEY_RATCHETED`,
+    `MISSING_KEY`, `ENCRYPTION_FAILED`, `DECRYPTION_FAILED` ou
+    `INTERNAL_ERROR`. Swift et JS ont les mêmes états sous d'autres noms.
+  - `NEW` attend l'état « OK ».
+  - `KEY_RATCHETED` ne doit pas survenir, puisque le ratchet est interdit. Il
+    est traité comme une erreur.
+- **Preuve de jonction** : à la jonction, chaque participant envoie une
+  preuve signée par son appareil, qui lie son identité LiveKit à son appareil
+  certifié.
+  - Chaîne signée :
+    `SQ-E2EE-V2-CALL-JOIN\n1\n<conversationId>\n<callId>\n<callNonceB64>\n<livekitIdentity>\n<userId>\n<deviceId>\n<joinedAtMs>`.
+  - Elle passe par le canal de données. Ce canal est chiffré quand le SDK le
+    permet (Android : `DataPacketCryptorManager`). Comme la preuve est signée,
+    un canal non chiffré suffit.
+  - Un participant sans preuve valide après 10 secondes met fin à l'appel,
+    avec « Appel chiffré impossible ».
+  - Vecteur : `call-join-proof-v1`.
+- Les états d'erreur (clé manquante, échec de chiffrement ou de
+  déchiffrement, erreur interne) retirent le cadenas et l'annoncent.
+- Pas d'enregistrement composite, de transcription ni de résumé par le serveur
+  pour un appel chiffré.
 - Limite à écrire : avec une clé partagée, tout détenteur de l'époque peut
   écouter, y compris depuis un participant caché (jeton `hidden`). La clé ne
   sort pas du cercle des membres, mais n'authentifie pas l'émetteur d'une
@@ -493,9 +675,13 @@ affichage**, et dans l'outil de modération.
 
 ### 10.5 Discrétion
 
-- Notification VoIP sans nom d'appelant : l'extension le déchiffre.
-- `includesCallsInRecents = false` pour un appel d'une conversation chiffrée, ce
-  qui évite l'historique d'appels synchronisé par iCloud.
+- Notification VoIP ou FCM d'une conversation v2 **sans nom d'appelant ni
+  titre**. L'app retrouve le nom localement, parmi les membres de la
+  conversation ; à défaut, elle affiche « Appel SignalQuest ».
+- iOS : `includesCallsInRecents = false` pour un appel d'une conversation
+  chiffrée, ce qui évite l'historique d'appels synchronisé par iCloud.
+- Android : `ConnectionService` autogéré, exclu du journal d'appels
+  (`EXTRA_LOG_SELF_MANAGED_CALLS = false`, API 34 et plus).
 - Opus à débit constant.
 
 ---
@@ -510,42 +696,81 @@ conversation, et sans permettre un faux signalement ni un message insignalable.
   `frankTag = HMAC-SHA256(fk, "SQ-E2EE-V2-FRANK\n1\n<conversationId>\n<senderDeviceId>\n<clientRequestId>\n" ‖ charge)`.
 - **Réception** : le destinataire DOIT recalculer `frankTag` après
   déchiffrement, et rejeter le message en cas d'écart. Il conserve `fk`.
-- **Serveur** : à la réception, il calcule
-  `serverTag = HMAC-SHA256(Ks, frankTag ‖ conversationId ‖ envelopeId ‖ senderUserId ‖ senderDeviceId ‖ serverTimeMs ‖ keyId)`
-  et le remet avec le message. Le destinataire le conserve.
-- **Signalement** : pour chaque message (50 au plus), le client envoie la charge
-  exacte, `fk`, `frankTag`, `serverTag` et `envelopeId`, plus les clés de média
-  des blobs concernés. Le tout est chiffré en **HPKE** (RFC 9180 : DHKEM P-256,
-  HKDF-SHA256, AES-256-GCM) pour une clé de modération **épinglée dans les
-  apps**. Aucune clé d'époque n'est transmise.
-- Le serveur vérifie seulement que le signaleur était membre au moment des
-  messages, et conserve les blobs signalés. **L'outil de modération**, isolé et
-  seul détenteur de la clé privée, vérifie tags et condensats et déchiffre.
+- **Serveur** : pour **chaque message v2, dès le premier**, il calcule
+  `serverTag = HMAC-SHA256(Ks, "SQ-E2EE-V2-SERVER-TAG\n1\n<frankTagB64>\n<conversationId>\n<envelopeId>\n<senderUserId>\n<senderDeviceId>\n<serverTimeMs>\n<keyId>")`.
+  `serverTimeMs` est un entier décimal en millisecondes et `keyId` un
+  identifiant opaque. Il remet `serverTag` avec le message, et le
+  destinataire le conserve. Un message sans `serverTag` ne serait jamais
+  signalable. `Ks` ne quitte jamais l'API.
+- **Signalement** : 50 messages au plus. Le rapport a deux parties liées :
+  - **Partie en clair** (JSON canonique, §15) : `reportId`,
+    `conversationId`, `reason` et, pour chaque message, `envelopeId`,
+    `frankTagB64`, `serverTagB64` et `blobIds`. Elle ne révèle rien que le
+    serveur ne connaisse déjà.
+  - **Partie scellée** en HPKE (RFC 9180, mode de base : DHKEM(P-256,
+    HKDF-SHA256), HKDF-SHA256, AES-256-GCM) pour la clé de modération
+    **épinglée dans les apps**.
+    - `info = "SQ-E2EE-V2-REPORT\n1\n" ‖ b64url(SHA-256(partie en clair))`.
+    - Elle contient, pour chaque message, la charge exacte, `fk` et les
+      clés de média des blobs concernés.
+    - Aucune clé d'époque n'est transmise.
+- **API** : elle vérifie chaque `serverTag` avec `Ks`, et que le signaleur
+  était membre au moment des messages (historique, §2.5). Elle gèle les blobs
+  cités. La clé privée de modération n'est **jamais** dans son environnement.
+- **Outil de modération**, isolé et seul détenteur de la clé privée :
+  - il ouvre la partie scellée et vérifie que son `info` correspond à la
+    partie en clair ;
+  - il recalcule chaque `frankTag` à partir de `fk` et de la charge ;
+  - il vérifie les condensats des blobs, puis affiche.
+- Les implémentations HPKE, y compris un sous-ensemble maison (Android, qui
+  n'a pas d'HPKE public avant son API minimale 29), DOIVENT passer les
+  vecteurs de la RFC 9180 pour cette suite.
 - Contexte : le signaleur peut joindre des messages voisins, mais seulement
   des messages qu'il a lui-même reçus, chacun franké.
 - L'utilisateur est prévenu, avant d'envoyer, que les messages signalés seront
   lisibles par l'équipe de modération.
+- Vecteurs : `franking-v1` (`frankTag` et `serverTag`) et `report-v1`.
 
 ---
 
 ## 12. Capacités et états collants
 
-- Chaque appareil déclare ses capacités dans son certificat et à chaque mise à
-  jour : versions d'enveloppe et de charge, `kind` pris en charge, médias,
-  appels vérifiés.
+- **Document de capacités**, signé par la clé de signature de l'appareil (et
+  non par l'UIK, qu'il faudrait autrement réutiliser à chaque mise à jour de
+  l'app).
+  - JSON canonique (§15) :
+    - `schema` (`signalquest.e2ee-capabilities`), `version` (`"1"`),
+      `userId`, `deviceId` ;
+    - `sequence`, strictement croissante, et `issuedAtMs` ;
+    - `envelopeVersions`, `payloadVersions`, `kinds` ;
+    - `features` (`blobs`, `voice`, `calls`, `liveLocation`…).
+  - Chaîne signée :
+    `SQ-E2EE-V2-DEVICE-CAPABILITIES\n1\n<b64url(SHA-256(document))>`.
+  - Republié à chaque mise à jour de l'app et au moins tous les 30 jours. Un
+    client refuse un document de séquence inférieure au dernier vu.
+  - Vecteur : `device-capabilities-v1`.
 - **Capacité d'une conversation** = intersection des capacités des appareils
-  certifiés des membres. Un appareil inactif depuis 90 jours est révoqué
-  automatiquement, pour ne pas tirer l'intersection vers le bas.
+  certifiés des membres dont le dernier document a moins de 90 jours.
+- Un appareil sans document récent est **mis à l'écart** : il sort de
+  l'intersection et des nouvelles époques (§3.3), jusqu'à ce qu'il publie un
+  document à jour. Cette mise à l'écart, décidée par les clients, remplace
+  une révocation automatique par le serveur, qui ne peut rien signer au nom de
+  l'UIK. La révocation proprement dite reste signée par l'UIK.
 - Une fonction absente de l'intersection est désactivée, avec « Un membre doit
   mettre à jour SignalQuest pour recevoir les photos chiffrées ». Jamais de
-  repli en clair. Le serveur refuse (`409 E2EE_CAPABILITY_MISSING`) un contenu
-  que la conversation ne peut pas recevoir.
+  repli en clair.
+- **Le serveur ne refuse que ce qu'il voit**, avec
+  `409 E2EE_CAPABILITY_MISSING` : version d'enveloppe, blobs, appels, partage
+  de position. Les `kind` chiffrés (sondages, réactions…) sont contrôlés par
+  les clients seulement. L'émetteur ne les envoie pas si l'intersection ne les
+  contient pas. Un récepteur qui ne les connaît pas affiche « Contenu non pris
+  en charge ».
 - **États collants** :
-  - « chiffrée » et « v2 » dérivent d'éléments signés (l'époque 1 signée par le
-    créateur), sont mémorisés par l'appareil, et aucune réponse serveur ne peut
-    les faire régresser ;
-  - un appareil qui découvre une conversation (nouvel appareil) se fie à
-    l'époque 1 signée, pas à un booléen du serveur ;
+  - « chiffrée » et « v2 » dérivent d'éléments signés (le manifeste de
+    l'époque 1, signé par le créateur, §3.5), sont mémorisés par l'appareil,
+    et aucune réponse serveur ne peut les faire régresser ;
+  - un appareil qui découvre une conversation (nouvel appareil) se fie à ce
+    manifeste signé, pas à un booléen du serveur ;
   - tout message v1 postérieur à l'époque 1 v2 est rejeté ;
   - un interrupteur de déploiement peut seulement **désactiver** une fonction,
     jamais repasser en clair ni en v1.
@@ -559,21 +784,35 @@ Chaque surface a un test prouvant que rien ne sort en clair.
 | Surface | Règle |
 |---|---|
 | Composeur (photo, micro, sondage, réaction, position) | désactivé si la conversation ne prend pas la fonction en charge |
-| Messages programmés | refusés en v2, ou rechiffrés à l'échéance par l'appareil émetteur |
+| Messages programmés | désactivés dans les conversations v2 (décision du 30/09) ; gardés dans les conversations non chiffrées. Le rechiffrement à l'échéance par l'appareil émetteur pourra venir plus tard |
 | Réponses en fil, citations, transferts | chiffrés ; transfert vers une conversation en clair refusé |
-| Notifications push | titre et corps génériques ; aperçu seulement après déchiffrement par l'extension ; rien si « aucun aperçu » |
-| Réponse rapide (notification, montre, CarPlay, Android Auto, Siri) | chiffrée comme un message, sinon indisponible |
-| Widgets, Live Activities, Spotlight, cibles de partage | aucun contenu déchiffré indexé ni affiché |
+| Notifications push | titre et corps génériques, sans titre de conversation, nom ni emoji ; aperçu seulement après déchiffrement par l'extension ; rien si « aucun aperçu » |
+| Réponse rapide (notification, réponse directe Android, montre, CarPlay, Android Auto, Siri) | chiffrée comme un message, sinon indisponible |
+| Widgets, Live Activities, Spotlight, cibles de partage, Direct Share, tuiles de réglages rapides | aucun contenu déchiffré indexé ni affiché |
 | Recherche | uniquement sur l'appareil |
 | Rappels, notes privées | chiffrés avec une clé propre à l'utilisateur, ou gardés sur l'appareil |
 | Aperçus de liens | générés sur l'appareil, au choix de l'utilisateur ; jamais par le serveur |
 | Partage de position (anciennes routes) | refusé dans une conversation chiffrée |
 | Export | chiffré, ou averti et confirmé ; jamais d'archive en clair silencieuse |
-| Presse-papiers | local seulement, avec expiration (Android : contenu marqué sensible) |
+| Presse-papiers | local seulement, avec expiration (Android 13 et plus : contenu marqué sensible) |
 | Sélecteur d'apps | instantané masqué (Android : `FLAG_SECURE` en option) |
 | Sauvegardes système | clés et caches déchiffrés exclus, de façon normative |
 | Journaux, Crashlytics, analytics | aucun contenu ni identifiant de message ; pas de clé dans `userInfo` |
 | Transcription, résumé, enregistrement serveur | indisponibles |
+
+**Côté serveur**, dans une conversation v2, toute route qui accepte du contenu
+refuse l'écriture en clair. Sont concernées :
+
+- les réactions, les votes et la clôture de sondage ;
+- la transcription, l'enregistrement et le résumé ;
+- les mises à jour du partage de position ;
+- les pièces jointes, les réponses en fil et leurs métadonnées ;
+- la recherche.
+
+La garde porte sur la version de protocole de la conversation (≥ 2), sans
+nouveau type de message. La transcription est refusée aussi dans les
+conversations v1. Pour les autres refus, le calendrier dans les conversations
+v1 suit la version minimale des apps (§18).
 
 ---
 
@@ -589,6 +828,11 @@ Chaque surface a un test prouvant que rien ne sort en clair.
    messages recopiés portent « importé par <appareil> » et n'héritent d'aucune
    authenticité.
 4. Quand la v2 est activée, le serveur cesse toute génération de clé v1.
+   Décision du 30/09 : au jalon A, donc avant la prochaine bêta TestFlight.
+5. Une app sans v2 face à une conversation v2 ne reçoit pas les messages v2.
+   Proposition, à confirmer (§18) : elle affiche « Cette conversation utilise
+   un chiffrement plus récent : mets à jour SignalQuest ».
+6. Appels d'une conversation v1 : §10.0.
 
 ---
 
@@ -597,50 +841,109 @@ Chaque surface a un test prouvant que rien ne sort en clair.
 - Formats **existants** (annexe A) : chaînes canoniques séparées par `\n`,
   identifiants au format opaque (qui empêche d'y injecter `\n`), base64
   standard avec bourrage sauf mention « base64url sans bourrage ».
-- Formats **nouveaux** : JSON canonique RFC 8785 et I-JSON (RFC 7493), avec
-  rejet des clés dupliquées et des substituts isolés ; limites en **octets
-  UTF-8** ; dates RFC 3339 en UTC à la milliseconde (`Z`) ; un tableau
-  « champ → encodage » par format ; décodage strict qui rejette les formes non
-  canoniques.
-- Cryptographie : points P-256 en X9.63 non compressé (65 octets), validés
-  (sur la courbe, pas l'infini). Signatures ECDSA en DER, forme low-S, avec
-  conversion depuis `r‖s` pour WebCrypto. Android convertit ses clés
-  SubjectPublicKeyInfo en X9.63.
-- Source unique des vecteurs : `contracts/e2ee-v2/*.json`, identiques à
-  l'octet près dans les dépôts iOS, Android et serveur, et vérifiés par
-  condensat en CI. Le web consomme ceux du serveur.
-- Vecteurs existants : `blob-chunks-v1`, `call-frame-key-v1`,
-  `content-payload-v1`, `device-approval-v1`, `device-bootstrap-v1`,
-  `epoch-envelope-v1`, `history-migration-v1`, `live-location-payload-v1`,
-  `message-envelope-v1` (à corriger), `recovery-bundle-v1`,
-  `recovery-epoch-envelope-v1`, `recovery-proof-v2`, `signed-request-v1`.
-- À créer : `device-cert-v1`, `device-list-v1`, `safety-number-v1`,
-  `message-ref-v1`, `message-envelope-v2` (compteur, bourrage, franking),
-  `content-payload-v2`, `franking-v1`, `call-descriptor-v1`,
-  `call-frame-key-v2`, `livekit-shared-key-v1`, `capability-intersection-v1`.
+- Formats **nouveaux** :
+  - JSON canonique RFC 8785 et I-JSON (RFC 7493) ;
+  - **analyseur strict**, qui rejette clés dupliquées, substituts isolés et
+    formes non canoniques (un analyseur permissif, comme `org.json`, ne
+    convient pas) ;
+  - **entiers en chaînes décimales** canoniques, comme les tailles de
+    l'annexe A.5, pour éviter les écarts de sérialisation des nombres ;
+  - limites en **octets UTF-8** ;
+  - dates RFC 3339 en UTC à la milliseconde (`Z`) ;
+  - un tableau « champ → encodage » par format.
+- Cryptographie :
+  - points P-256 en X9.63 non compressé (65 octets), validés explicitement
+    (sur la courbe, pas l'infini) ;
+  - Android convertit ses clés SubjectPublicKeyInfo en X9.63 ;
+  - signatures ECDSA en DER, **forme low-S obligatoire** : le signataire
+    normalise (le Keystore Android produit du high-S une fois sur deux
+    environ) et le vérificateur rejette le high-S ;
+  - conversion depuis `r‖s` pour WebCrypto.
+- **Source unique des vecteurs** : `contracts/e2ee-v2/*.json`.
+  - Les 13 vecteurs existants sont identiques à l'octet près dans les dépôts
+    iOS, Android et serveur. Le serveur importe ceux qui lui manquent.
+  - La CI vérifie les condensats. Le web consomme les vecteurs du serveur.
+- **Vecteurs existants** :
+  - `blob-chunks-v1`, `call-frame-key-v1`, `content-payload-v1` (cas
+    négatifs à ajouter) ;
+  - `device-approval-v1`, `device-bootstrap-v1`, `epoch-envelope-v1` ;
+  - `history-migration-v1`, `live-location-payload-v1` ;
+  - `message-envelope-v1` (à corriger) ;
+  - `recovery-bundle-v1`, `recovery-epoch-envelope-v1`, `recovery-proof-v2`,
+    `signed-request-v1`.
+- **À créer** :
+  - identités : `device-cert-v1` (avec `keyVersion`), `device-list-v1`,
+    `device-capabilities-v1`, `safety-number-v1`, `identity-reset-v1` ;
+  - groupes et époques : `membership-change-v1`, `epoch-manifest-v1`,
+    `capability-intersection-v1` ;
+  - messages : `message-ref-v1`, `message-envelope-v2` (compteur, bourrage,
+    franking), `content-payload-v2` ;
+  - modération : `franking-v1` (`frankTag` et `serverTag`), `report-v1` ;
+  - appels : `call-descriptor-v1`, `call-frame-key-v2`, `call-join-proof-v1`,
+    `livekit-shared-key-v1`.
 - Chaque plateforme exécute tous les vecteurs dans les deux sens, plus au moins
-  un **vecteur négatif par règle** (signature fausse, AAD altérée, morceau
-  manquant, octets après `FINAL`, engagement faux, clé JSON dupliquée, tag de
-  franking faux, époque obsolète).
+  un **vecteur négatif par règle** :
+  - signature fausse, signature high-S ;
+  - AAD altérée, engagement faux, tag de franking faux ;
+  - morceau manquant, octets après `FINAL` ;
+  - clé JSON dupliquée ;
+  - époque obsolète, numéro d'époque qui saute ;
+  - manifeste qui ne correspond pas aux enveloppes ;
+  - descripteur d'appel rejoué.
 
 ---
 
 ## 16. Déploiement, quotas et exploitation
 
-Étapes, chacune derrière une capacité serveur et la revue de sécurité :
+**Jalon A — appels chiffrés partout.** Condition de la prochaine bêta
+TestFlight iOS, par décision produit du 30/09. Sur le serveur et les trois
+clients :
 
-1. **Serveur** : routes v2 (certificats et listes signées, époques, enveloppes,
-   messages, blobs, franking), refus du §13, capacité de conversation.
-2. **iOS** : chaîne de confiance, envoi et réception v2 du texte, puis médias,
-   vocal, réactions, sondages, puis appels vérifiés.
-3. **Android** : pile v2 complète et parité.
-4. **Web** : pile v2 en WebCrypto, avec les limites du §2.7.
-5. **Activation** conversation par conversation, via l'intersection des
-   capacités.
+- chaîne de confiance, récupération et réinitialisation d'identité ;
+- identités d'appareil ;
+- époques créées par les appareils : création v2, fin de la génération
+  serveur des clés, manifestes, lignes témoins ;
+- documents de capacités ;
+- messages texte v2, avec franking dès le premier message ;
+- signalement et outil de modération ;
+- surfaces fermées pour le texte et les appels ;
+- appels vérifiés ;
+- navigateurs sur demande.
+
+Critère de sortie :
+
+- appel chiffré croisé iOS ↔ Android ↔ web, sur deux comptes, à deux puis à
+  trois ;
+- tests d'attaque du §17 réussis ;
+- vecteurs au vert partout.
+
+**Jalon B — médias et le reste.** Blobs (photos, vidéos, fichiers), notes
+vocales, réactions et sondages v2, partage de position v2, recopie
+d'historique. Tant qu'il n'est pas livré, ces fonctions restent désactivées
+dans les conversations v2 par l'intersection des capacités. C'est déjà le cas
+aujourd'hui (« texte uniquement »).
+
+Ordre côté serveur, pour le jalon A :
+
+0. Figer formats et vecteurs, et vérifier l'état de la base de production
+   avant tout SQL, écrit idempotent.
+1. Refuser tout de suite la transcription en conversation chiffrée.
+2. Confiance, puis récupération et réinitialisation d'identité.
+3. Époques, capacités, création v2, garde des routes v1.
+4. Messages v2, avec `serverTag` dès le premier.
+5. Refus du §13.
+6. Signalement et outil de modération.
+7. Appels.
+8. Activation, conversation par conversation.
+
+Les blobs et leur purge passent au jalon B.
+
+Activation conversation par conversation, via l'intersection des capacités. Un
+interrupteur ne peut que désactiver.
 
 Quotas (valeurs de départ, à ajuster) : 10 époques par conversation et par
 heure ; 5 approbations d'appareil par compte et par jour ; 20 signalements par
-compte et par jour ; 1 Gio de blobs par message.
+compte et par jour.
 
 Outbox : un message préparé sous une époque qui change avant l'envoi est
 rechiffré, sa charge étant gardée dans le trousseau jusqu'à l'envoi. Un message
@@ -653,33 +956,64 @@ protocole, états des cryptors d'appel.
 
 ## 17. Sécurité et gouvernance
 
-- **Relecture indépendante** de cette spécification (faite pour la v0.1, dont
-  les conclusions sont intégrées ici), puis de chaque implémentation, par un
-  relecteur qui n'a pas écrit le code. Pas de revue externe générale, par
-  décision produit.
+- **Pas de revue externe**, ni générale ni ciblée (décisions produit du 29/09
+  et du 30/09). En contrepartie :
+  - **relecture indépendante** de cette spécification (faite pour la v0.1),
+    puis de chaque implémentation, par un relecteur qui n'a pas écrit le
+    code ;
+  - vecteurs partagés, dont les vecteurs négatifs (§15) ;
+  - fermeture par défaut tant qu'une preuve manque.
 - **Tests croisés** sur deux comptes et trois plateformes : chaque type de
   contenu, dans les deux sens, en ligne et hors ligne, avec ajout, révocation et
   réinitialisation d'appareil.
-- **Tests d'attaque** : un serveur qui ajoute un appareil, fournit une ancienne
-  liste, désigne une ancienne époque pour un appel, injecte une trame non
-  chiffrée, renvoie « non chiffrée » à un nouvel appareil ou rejoue un message.
+- **Tests d'attaque**, où le serveur :
+  - ajoute un appareil, ou fournit une ancienne liste ;
+  - désigne une ancienne époque pour un appel, ou rejoue un descripteur
+    d'appel ;
+  - injecte une trame non chiffrée ;
+  - renvoie « non chiffrée » à un nouvel appareil ;
+  - retire le marqueur « navigateur » d'un appareil ;
+  - fait sonner un appareil sans capacité d'appel ;
+  - rejoue un message.
+
   Chacun doit échouer, et le client doit l'annoncer.
 
 ---
 
 ## 18. Questions ouvertes
 
-1. Calendrier de la fin de la génération serveur des clés v1 : avant la
-   prochaine bêta publique, ou avec la v2 ?
-2. Appels dans les conversations chiffrées tant que les appels vérifiés ne sont
-   pas disponibles partout : refuser des deux côtés, ou autoriser après une
-   confirmation explicite « appel non chiffré » ?
-3. Revue externe ciblée sur la chaîne de confiance, la récupération et les
-   appels, avant la mise en service générale ? C'est la recommandation de la
-   relecture ; aujourd'hui, la décision produit est « pas de revue externe ».
-4. Appareils web : les inclure par défaut dans les conversations chiffrées, ou
-   seulement sur demande ?
-5. Évaluer MLS (RFC 9420, OpenMLS) pour une v3.
+Tranchées le 30/09 (décisions produit) :
+
+1. Fin de la génération serveur des clés v1 : avec la v2, au jalon A, donc
+   avant la prochaine bêta TestFlight (§14).
+2. Appels :
+   - dans les conversations v1, autorisés après la confirmation « Appel non
+     chiffré de bout en bout » ;
+   - dans les conversations v2, toujours chiffrés ;
+   - chiffrés sur iOS, Android et le web avant la prochaine bêta (§10.0).
+3. Revue externe ciblée : non (§17).
+4. Navigateurs : sur demande, approuvés depuis un téléphone (§2.7).
+5. Messages programmés : désactivés au départ dans les conversations v2 (§13).
+
+Ouvertes, avec une proposition :
+
+6. **Refus du §13 dans les conversations v1** : proposition : la
+   transcription est refusée tout de suite, et les autres refus arrivent avec
+   la hausse de version minimale qui accompagnera la bêta du jalon A.
+7. **App sans v2 face à une conversation v2** : proposition du §14.5.
+8. **Outil de modération** : proposition :
+   - un outil en ligne de commande, hors ligne, sur le poste de
+     l'administrateur ;
+   - il est le seul détenteur de la clé privée, avec une sauvegarde hors
+     ligne ;
+   - signalements et blobs gelés sont gardés 90 jours après la décision.
+9. **Origine statique du client web** (§2.7) : prérequis des appels chiffrés
+   depuis le web, donc de la bêta ? Ou chantier qui suit, puisque l'accès web
+   reste sur demande ? Proposition : qui suit.
+10. **Budget de stockage des médias chiffrés** (jalon B) : proposition :
+    limites de départ plus basses (100 Mio par fichier, 200 Mio par message),
+    plus un quota par compte, à revoir avec la capacité disque.
+11. Évaluer MLS (RFC 9420, OpenMLS) pour une v3.
 
 ---
 
@@ -693,8 +1027,8 @@ bourrage.
 
 ### A.1 Identifiants
 
-- Identifiant opaque (conversation, appareil, blob, message cible, option) :
-  `^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$`.
+- Identifiant opaque (conversation, appareil, blob, message cible, option,
+  appel) : `^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$`.
 - `clientRequestId` : `^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$`.
 - Nonce de requête : `^[A-Za-z0-9_-]{16,128}$` (24 octets aléatoires en
   b64url).
@@ -703,8 +1037,14 @@ bourrage.
 
 Chaîne signée (ECDSA P-256, DER) :
 `SQ-E2EE-V2\n<MÉTHODE>\n<cible>\n<timestampMs>\n<nonce>\n<b64url(SHA-256(corps))>`.
-`<cible>` est le chemin plus la requête brute, sans ré-encodage, qui commence
-par `/`, fait au plus 512 octets, a au plus un `?` et aucun `#` ni `\n`.
+
+`<cible>` est le chemin plus la requête brute, sans ré-encodage. Elle :
+
+- commence par `/` ;
+- fait au plus 512 octets ;
+- a au plus un `?` ;
+- ne contient ni `#` ni `\n`.
+
 En-têtes : `x-sq-e2ee-device-id`, `x-sq-e2ee-timestamp-ms`,
 `x-sq-e2ee-nonce`, `x-sq-e2ee-signature`. Vecteur : `signed-request-v1`.
 
@@ -740,12 +1080,16 @@ En-têtes : `x-sq-e2ee-device-id`, `x-sq-e2ee-timestamp-ms`,
 - Nonce du morceau `i` : `préfixe (8 octets) ‖ uint32_be(i)`.
 - AAD du morceau : `SQ-E2EE-V2-BLOB-CHUNK\n1\n<blobId>\nAES_256_GCM_CHUNKED_HKDF_SHA256\n<i>\n<longueurClaireDuMorceau>\n<FINAL|MORE>`.
 - Morceaux de 262 144 octets, tag de 16 octets, 512 Mio au plus.
-- Manifeste, clés exactes : `blobId`, `algorithm`, `mediaKeyB64`,
-  `noncePrefixB64`, `cryptoChunkSize` (262 144), `plaintextSize` et
-  `ciphertextSize` (chaînes décimales `^(0|[1-9][0-9]{0,11})$`),
-  `plaintextSha256` et `ciphertextSha256` (hexadécimal minuscule, 64
-  caractères), `fileName` (≤ 512), `mimeType` (≤ 255), `width` et `height`
-  (1 à 100 000 ou null), `durationMs` (0 à 86 400 000 ou null).
+- Manifeste, clés exactes :
+  - `blobId`, `algorithm`, `mediaKeyB64`, `noncePrefixB64` ;
+  - `cryptoChunkSize` (262 144) ;
+  - `plaintextSize` et `ciphertextSize`, en chaînes décimales
+    `^(0|[1-9][0-9]{0,11})$` ;
+  - `plaintextSha256` et `ciphertextSha256`, en hexadécimal minuscule de 64
+    caractères ;
+  - `fileName` (≤ 512) et `mimeType` (≤ 255) ;
+  - `width` et `height` (1 à 100 000, ou null) ;
+  - `durationMs` (0 à 86 400 000, ou null).
 
 ### A.6 Charge `signalquest.e2ee-content` v1
 
@@ -786,19 +1130,187 @@ UTF-8 (§15).
 Ordres de grandeur en jours de développement, relecture et tests compris.
 Base : l'existant de chaque plateforme.
 
-| Bloc | Serveur | iOS | Android | Web |
-|---|---|---|---|---|
-| Chaîne de confiance (UIK, certificats, listes signées, numéro de sécurité) | 5 | 6 | 7 | 6 |
-| Identités d'appareil, requêtes signées, stockage matériel | 1 | 2 | 8 | 6 |
-| Époques, rotation décidée par le client, capacités, états collants | 6 | 5 | 7 | 6 |
-| Enveloppe et charge v2 (texte, édition, suppression, réactions, sondages) | 5 | 6 | 8 | 7 |
-| Blobs (photos, fichiers, vocal) | 5 | 5 | 7 | 6 |
-| Appels vérifiés (descripteur, réglages LiveKit, preuve de jonction) | 3 | 4 | 6 | 6 |
-| Franking et outil de modération | 5 | 2 | 2 | 2 |
-| Surfaces fermées par défaut | 2 | 3 | 4 | 3 |
-| Migration v1 → v2 | 2 | 3 | 4 | 3 |
-| Vecteurs (dont négatifs), CI, tests croisés et d'attaque | 4 | 4 | 5 | 4 |
-| **Total indicatif** | **~38** | **~40** | **~58** | **~49** |
+- Serveur et Android : réestimés par leurs sessions après la v0.2.
+- iOS et web : réestimés pour les ajouts de la v0.3 (document de capacités,
+  manifeste, preuve de jonction, rapport en deux parties).
+
+| Plateforme | Total | Jalon A | Détail |
+|---|---|---|---|
+| Serveur | ~53 | ~47 | voir liste ci-dessous |
+| iOS | ~42 | ~35 | voir liste ci-dessous |
+| Android | ~65 | ~55 | voir liste ci-dessous |
+| Web | ~51 | ~43 | voir liste ci-dessous |
+
+Détail par plateforme :
+
+- **Serveur** :
+  - confiance 7 ; récupération et réinitialisation 3 ;
+  - époques, capacités et états 7 ; messages v2 6 ; blobs 6 ;
+  - appels 4 ; franking et outil de modération 7 ; surfaces fermées 3 ;
+  - migration 2 ; vecteurs, CI et tests d'attaque 5 ;
+  - préalable production (base, tâches planifiées, secrets) 3.
+  - Hors total : recopie d'historique +2, partage de position v2 +3. L'origine
+    statique du web est un chantier d'infrastructure à part.
+- **iOS** :
+  - confiance 6 ; identités 2 ; époques et capacités 6 ; enveloppe et
+    charge v2 6 ;
+  - blobs 5 ; appels 5 ; franking 3 ; surfaces 3 ;
+  - migration 3 ; vecteurs et tests 3.
+- **Android** :
+  - confiance 7 ; identités et stockage 9 ; époques 7 ; enveloppe et
+    charge v2 10 ;
+  - blobs 7 ; appels 7 ; franking 3 ; surfaces 6 ;
+  - migration 4 ; vecteurs et tests 5.
+- **Web** :
+  - confiance 6 ; identités 6 ; époques et capacités 7 ; enveloppe et
+    charge v2 7 ;
+  - blobs 6 ; appels 7 ; franking 3 ; surfaces 3 ;
+  - migration 3 ; vecteurs 3.
 
 iOS part du plus d'existant : primitives v2, vecteurs, blobs, clé d'appel,
-approbations. Android et le web partent de la v1.
+approbations. Android et le web partent de la v1. Le jalon A retire les blobs
+et une partie de la charge v2 (réactions, sondages).
+
+---
+
+## Annexe C — Tickets du jalon A (appels chiffrés partout)
+
+Chaque ticket cite ses sections. L'ordre est celui des dépendances. La session
+serveur porte aussi le web.
+
+**Commun**
+
+- **COM-0** Vecteurs du jalon A :
+  - formats à publier dans `contracts/e2ee-v2/` : `device-cert-v1`,
+    `device-list-v1`, `device-capabilities-v1`, `epoch-manifest-v1`,
+    `membership-change-v1`, `message-ref-v1`, `message-envelope-v2`,
+    `content-payload-v2` (texte), `franking-v1`, `report-v1`,
+    `call-descriptor-v1`, `call-frame-key-v2`, `call-join-proof-v1` ;
+  - import des vecteurs existants partout ;
+  - CI par condensat (§15).
+- **COM-1** Réglages LiveKit, sur Swift 2.14.0, Android 2.27.0 et JS 2.18.x
+  (§10.3) :
+  - établir la dérivation (PBKDF2, itérations), la taille de clé,
+    `failureTolerance`, et l'effet d'un marqueur « non chiffré » vide et du
+    SIF ;
+  - produire `livekit-shared-key-v1` (Swift, Android) ;
+  - test négatif : une trame non chiffrée injectée n'est jamais rendue.
+
+**Serveur**
+
+- **SRV-A1** Confiance (§2) :
+  - UIK publique, certificats avec `keyVersion` ;
+  - listes signées en comparaison-échange ;
+  - approbation acceptée seulement avec certificat et liste, dans la même
+    transaction ;
+  - historique d'appartenance en ajout seul.
+- **SRV-A2** Récupération et réinitialisation d'identité, avec 72 heures
+  d'opposition (§2.4, §2.8).
+- **SRV-A3** Époques (§3, §14) :
+  - création v2 atomique (conversation et époque 1), « +1 strict » en
+    comparaison-échange ;
+  - destinataires en sous-ensemble ;
+  - manifeste stocké et servi ;
+  - lignes témoins à l'accusé ;
+  - exigences de rotation résolues dans la transaction ;
+  - fin de la génération de clé v1 ;
+  - refus de toute écriture v1 en conversation v2.
+- **SRV-A4** Capacités (§12) : documents signés (dernière séquence), et
+  `409 E2EE_CAPABILITY_MISSING` pour ce que le serveur voit.
+- **SRV-A5** Messages texte v2 (§4) : enveloppe v2, déduplication à vie,
+  `serverTag` dès le premier message.
+- **SRV-A6** Signalement (§11) :
+  - rapport en deux parties, avec vérification de `serverTag` et de
+    l'appartenance ;
+  - gel des blobs cités ;
+  - nouvelle paire de modération P-256 ;
+  - outil de modération (§18, question 8).
+- **SRV-A7** Surfaces (§13) :
+  - refus en conversation v2 ;
+  - transcription refusée aussi en v1 ;
+  - notifications sans titre, nom ni emoji.
+- **SRV-CALL-1** `callId` choisi par l'appelant, format opaque,
+  `409 CALL_ID_TAKEN` (§10.1).
+- **SRV-CALL-2** Descripteur relayé tel quel dans la clé `e2eeV2` de
+  l'initiation, de la notification VoIP et FCM, et de `/api/calls/pending` ;
+  jamais les anciennes clés `e2ee` et `e2eeRequired` (§10.1).
+- **SRV-CALL-3** Enregistrement de l'appel chiffré : descripteur, signature,
+  appareil appelant, `callNonce` unique. Statut « actif » servi pour la
+  jonction tardive et le transfert (§10.1).
+- **SRV-CALL-4** Sonnerie et jeton LiveKit réservés aux appareils certifiés
+  qui ont la capacité « appels vérifiés » (§10.1).
+- **SRV-CALL-5** Notification d'appel d'une conversation v2 sans nom ni titre
+  (§10.5).
+- **SRV-CALL-6** Ni enregistrement composite, ni transcription, ni résumé pour
+  un appel chiffré (§10.4).
+- **SRV-CALL-7** Appels de conversation v1 jamais marqués chiffrés (§10.0).
+- **SRV-A8** Préalable production : état de la base vérifié avant tout SQL,
+  SQL idempotent, tâches planifiées, secrets (dont `Ks`).
+
+**iOS**
+
+- **IOS-A1** Pile v2 existante alignée sur la v0.3 : certificats avec
+  `keyVersion`, documents de capacités, manifestes, low-S (§2, §3.5, §12).
+- **IOS-A2** Conversations chiffrées créées en v2 par l'appareil, et
+  migration à l'ouverture (§3.2, §14).
+- **IOS-A3** Messages texte v2, franking, signalement en deux parties (§4,
+  §11).
+- **IOS-A4** Écran des appareils : navigateurs marqués, approbation par QR,
+  révocation, exclusion par conversation (§2.7).
+- **IOS-CALL-1** Descripteur signé (`callId`, `callNonce`) ; lecture de
+  `e2eeV2` dans l'initiation, la VoIP et `pending` (§10.1).
+- **IOS-CALL-2** Clé de trame v2 et réglages LiveKit figés ; piste rendue
+  seulement à l'état « OK » (§10.2 à §10.4).
+- **IOS-CALL-3** Preuve de jonction : envoi, vérification, fin à 10 secondes
+  (§10.4).
+- **IOS-CALL-4** Règles d'usage (§10.0) : en v2, chiffré ou indisponible. En
+  v1, la confirmation est faite (`05fda8fb`).
+- **IOS-CALL-5** Notification VoIP sans nom, nom retrouvé localement ;
+  `includesCallsInRecents = false` (§10.5).
+
+**Android**
+
+- **AND-A1** Pile v2 (§2, §15) :
+  - identités en TEE, avec repli logiciel sur les API 29 et 30 ;
+  - UIK logicielle, chiffrée par le Keystore ;
+  - low-S, JSON strict, RFC 8785 ;
+  - vecteurs.
+- **AND-A2** Époques créées par l'appareil, manifestes, capacités, création
+  v2 et migration (§3, §12, §14).
+- **AND-A3** Messages texte v2, franking, signalement ; HPKE validé par les
+  vecteurs RFC 9180 (§4, §11).
+- **AND-A4** Écran des appareils : navigateurs marqués, approbation,
+  révocation, exclusion par conversation (§2.7).
+- **AND-CALL-1** Descripteur signé ; lecture de `e2eeV2` (§10.1).
+- **AND-CALL-2** Clé de trame v2 ; `BaseKeyProvider` avec tous les réglages
+  explicites ; piste rendue seulement à `E2EEState.OK` (§10.2 à §10.4).
+- **AND-CALL-3** Preuve de jonction, par `DataPacketCryptorManager` ou canal
+  non chiffré (§10.4).
+- **AND-CALL-4** Règles d'usage (§10.0), dont la confirmation « Appel non
+  chiffré de bout en bout » en v1.
+- **AND-CALL-5** Notification FCM sans nom ;
+  `EXTRA_LOG_SELF_MANAGED_CALLS = false` (§10.5).
+
+**Web**
+
+- **WEB-A1** Pile v2 en WebCrypto : P-256, conversion DER ↔ `r‖s`, low-S,
+  vecteurs (§15).
+- **WEB-A2** Navigateur sur demande : enrôlement par QR approuvé depuis un
+  téléphone. Ni approbation ni récupération depuis le web (§2.7).
+- **WEB-A3** Messages texte v2, franking, signalement (§4, §11).
+- **WEB-CALL-1** Descripteur signé et clé de trame v2 ; `livekit-client`
+  2.18.x avec une passphrase en chaîne et tous les réglages explicites ;
+  piste rendue seulement à l'état « OK » (§10).
+- **WEB-CALL-2** Preuve de jonction (§10.4).
+- **WEB-CALL-3** Règles d'usage (§10.0), dont la confirmation en v1.
+- **WEB-A4** Origine statique (§2.7), selon la réponse à la question 9 du
+  §18.
+
+**Croisé**
+
+- **X-1** Appel chiffré croisé sur deux comptes :
+  - combinaisons iOS ↔ Android, iOS ↔ web et Android ↔ web, à deux puis à
+    trois ;
+  - tests d'attaque du §17 : descripteur rejoué, ancienne époque, trame non
+    chiffrée injectée, navigateur non approuvé, appareil sans capacité.
+- **X-2** Relecture indépendante de chaque implémentation (§17).
