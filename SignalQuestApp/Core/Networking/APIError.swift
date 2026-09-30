@@ -118,6 +118,10 @@ enum APIError: Error, LocalizedError, Equatable {
         "MISSING_CELL_IDENTIFIERS": String(localized: "Ce relevé ne porte aucun identifiant radio (eNB, gNB ou PCI)."),
         "OPERATOR_NOT_ALLOWED": String(localized: "Ton compte ne peut pas identifier de site chez cet opérateur."),
         "IDENTIFY_SITE_NOT_FOUND": String(localized: "Site introuvable : aucune antenne connue pour cet identifiant."),
+        "VALIDATION_SITE_NOT_FOUND": String(localized: "Site introuvable : aucune antenne connue pour cet identifiant."),
+        // Registre officiel (ISED…) momentanément injoignable : le serveur demande
+        // d'attendre une quinzaine de secondes, plus que le rejeu automatique.
+        "OFFICIAL_ANTENNA_SOURCE_UNAVAILABLE": String(localized: "La source officielle des antennes ne répond pas. Réessaie dans quelques secondes."),
         "IDENTIFY_MARKET_MISMATCH": String(localized: "Ce relevé et cette antenne ne sont pas dans le même pays."),
         "IDENTIFY_OPERATOR_MISMATCH": String(localized: "Ce relevé et cette antenne ne sont pas du même opérateur."),
         "VALIDATION_NODE_SITE_MISMATCH": String(localized: "L'identifiant radio ne correspond pas au site choisi."),

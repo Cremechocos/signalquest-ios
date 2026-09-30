@@ -160,7 +160,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
         }
 
         for antenna in nearby where antenna.hasValidCoordinate {
-            let siteId = antenna.siteId ?? antenna.id
+            let siteId = antenna.writeSiteId
             guard !siteId.isEmpty, seen.insert(siteId).inserted else { continue }
             guard let antennaLat = antenna.latitude, let antennaLng = antenna.longitude else { continue }
             let distance = origin.distance(from: CLLocation(latitude: antennaLat, longitude: antennaLng))
@@ -197,7 +197,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
     /// sur les propositions du serveur après avoir regardé la carte, sans
     /// relancer la recherche.
     func addManualChoice(_ antenna: AntennaSite, origin: RadioLogSite) {
-        let siteId = antenna.siteId ?? antenna.id
+        let siteId = antenna.writeSiteId
         guard !siteId.isEmpty else { return }
         if let existing = candidates.first(where: { $0.siteId == siteId }) {
             selectedId = existing.id

@@ -171,6 +171,60 @@ final class AntennaMarketAdaptationTests: XCTestCase {
 /// Sites pointés à la main : seule couche d'antennes disponible dans les pays
 /// sans open data. Le JSON ci-dessous est la réponse RÉELLE de la tuile
 /// bosnienne (z12/2255/1492, août 2026).
+/// SEC-31 : une validation ou une identification écrite depuis une session
+/// désigne le site canadien par sa `siteKey`, jamais par son `sup_id` ISED.
+final class ServingAntennaSiteIdTests: XCTestCase {
+    private func antenna(_ json: String) throws -> ServingAntenna? {
+        ServingAntenna(wrapper: try JSONDecoder().decode(ServingAntennaWrapper.self, from: Data(json.utf8)))
+    }
+
+    func testCanadianSiteIsWrittenUnderItsSiteKey() throws {
+        let siteKey = "3f2a9c1e4b5d6f708192a3b4c5d6e7f801234567"
+        let site = try XCTUnwrap(antenna("""
+        { "ok": true, "result": { "identified": true, "antenna": {
+          "latitude": 45.5, "longitude": -73.6, "sup_id": "M1229", "siteKey": "\(siteKey)" } } }
+        """))
+        XCTAssertEqual(site.siteId, siteKey)
+    }
+
+    func testFrenchSiteKeepsItsSupportNumber() throws {
+        let site = try XCTUnwrap(antenna("""
+        { "ok": true, "result": { "identified": true, "antenna": {
+          "latitude": 44.06, "longitude": 5.9, "sup_id": "1002637", "siteKey": "0042700042" } } }
+        """))
+        XCTAssertEqual(site.siteId, "1002637")
+    }
+
+    func testCommunityKeysFollowTheServerRule() {
+        XCTAssertTrue(ServingAntenna.isCommunitySiteKey(String(repeating: "a", count: 40)))
+        XCTAssertTrue(ServingAntenna.isCommunitySiteKey("7C9E6679-7425-40DE-944B-E07FC1F90AE7"))
+        XCTAssertFalse(ServingAntenna.isCommunitySiteKey("M1229"))
+        XCTAssertFalse(ServingAntenna.isCommunitySiteKey("1002637"))
+        XCTAssertFalse(ServingAntenna.isCommunitySiteKey(String(repeating: "g", count: 40)))
+    }
+
+    func testMapAntennaIsWrittenUnderItsHexKeyInCanadaOnly() {
+        func site(id: String, siteId: String?) -> AntennaSite {
+            AntennaSite(
+                id: id, siteId: siteId, anfrCode: nil, latitude: 45.5, longitude: -73.6,
+                operators: ["BELL"], technologies: ["4G"], bands: [], azimuths: [],
+                sharingType: nil, crozonLeader: nil, address: nil, height: nil, owner: nil
+            )
+        }
+        let hex = "3f2a9c1e4b5d6f708192a3b4c5d6e7f801234567"
+        XCTAssertEqual(site(id: hex, siteId: "M1229").writeSiteId, hex, "Marqueur ISED : son id, pas son sup_id")
+        XCTAssertEqual(site(id: "anfr-123", siteId: "37199").writeSiteId, "37199")
+        XCTAssertEqual(site(id: "cmpo873aw0jnx2fll7pthh8ii", siteId: nil).writeSiteId, "cmpo873aw0jnx2fll7pthh8ii")
+    }
+
+    func testOfficialSourceOutageTellsToRetryShortly() {
+        XCTAssertEqual(
+            APIError.userFacingMessage(status: 503, code: "OFFICIAL_ANTENNA_SOURCE_UNAVAILABLE", serverMessage: ""),
+            String(localized: "La source officielle des antennes ne répond pas. Réessaie dans quelques secondes.")
+        )
+    }
+}
+
 final class CustomSiteDecodeTests: XCTestCase {
 
     private func decode(_ json: String) throws -> AndroidCustomSiteTileResponse {

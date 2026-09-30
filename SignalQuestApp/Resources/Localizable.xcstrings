@@ -24450,6 +24450,22 @@
         }
       }
     },
+    "La source officielle des antennes ne répond pas. Réessaie dans quelques secondes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The official antenna source isn't responding. Try again in a few seconds."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La source officielle des antennes ne répond pas. Réessaie dans quelques secondes."
+          }
+        }
+      }
+    },
     "La transaction App Store n'a pas pu être authentifiée." : {
       "localizations" : {
         "en" : {

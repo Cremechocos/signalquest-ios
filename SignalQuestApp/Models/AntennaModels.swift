@@ -38,6 +38,19 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// Opérateurs du site qui émettent en 5G (support partagé uniquement).
     var operators5G: [String] = []
 
+    /// Identifiant à écrire (validation, identification). Au Canada (ISED), le
+    /// `sup_id` n'est pas unique entre titulaires de licence : le marqueur de
+    /// carte porte l'empreinte hexadécimale du site dans `id`, et c'est elle que
+    /// le serveur attend. En France, le `sup_id` reste la référence.
+    var writeSiteId: String {
+        Self.isHexSiteKey(id) ? id : (siteId ?? id)
+    }
+
+    /// Empreinte hexadécimale de 40 caractères d'un site (ISED, communauté).
+    static func isHexSiteKey(_ value: String) -> Bool {
+        value.range(of: #"^[0-9a-fA-F]{40}$"#, options: .regularExpression) != nil
+    }
+
     /// Le site porte-t-il de la 5G ? `technologies` est déjà normalisé en
     /// « 5G / 4G / 3G / 2G » par `normalizedTechnologies`, le test est donc sûr.
     var has5G: Bool { technologies.contains("5G") }

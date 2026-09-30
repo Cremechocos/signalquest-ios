@@ -366,7 +366,11 @@ struct ServingAntenna: Identifiable, Equatable {
         let a = r.antenna
         let lat = a?.latitude ?? 0
         let lng = a?.longitude ?? 0
-        let resolvedSiteId = a?.supId ?? a?.siteKey ?? r.canonicalSiteId ?? r.hypothesis?.siteId
+        // Canada (ISED) : le `sup_id` n'y est pas unique entre titulaires de
+        // licence ; seule la `siteKey` désigne le site pour les écritures
+        // (validation, identification). En France, le `sup_id` reste en tête.
+        let communitySiteKey = a?.siteKey.flatMap { Self.isCommunitySiteKey($0) ? $0 : nil }
+        let resolvedSiteId = communitySiteKey ?? a?.supId ?? a?.siteKey ?? r.canonicalSiteId ?? r.hypothesis?.siteId
         // Il faut au moins une coordonnée OU un identifiant de site exploitable.
         guard lat != 0 || lng != 0 || resolvedSiteId != nil else { return nil }
 
@@ -392,6 +396,12 @@ struct ServingAntenna: Identifiable, Equatable {
         self.pci = a?.pci
         self.cellId = a?.cellId
         self.id = wrapper.id ?? resolvedSiteId ?? "\(lat),\(lng)"
+    }
+
+    /// Même règle que le serveur : empreinte hexadécimale de 40 caractères
+    /// (Canada, sites communautaires) ou UUID.
+    static func isCommunitySiteKey(_ value: String) -> Bool {
+        AntennaSite.isHexSiteKey(value) || UUID(uuidString: value) != nil
     }
 
     private static func resolveStatus(_ r: ServingAntennaResult) -> ServingStatus {
