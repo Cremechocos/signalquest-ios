@@ -892,12 +892,17 @@ private struct PodiumColumn: View {
         .accessibilityLabel("\(rankLabel), \(entry.name), \(entry.valueText)")
     }
 
+    /// Rang lu par VoiceOver, traduit : « Premier » et « 4e » restaient en
+    /// français dans l'app anglaise (SOC-28).
     private var rankLabel: String {
         switch entry.rank {
-        case 1: return "Premier"
+        case 1: return String(localized: "Premier")
         case 2: return String(localized: "Deuxième")
         case 3: return String(localized: "Troisième")
-        default: return "\(entry.rank)e"
+        default:
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .ordinal
+            return formatter.string(from: NSNumber(value: entry.rank)) ?? "\(entry.rank)"
         }
     }
 

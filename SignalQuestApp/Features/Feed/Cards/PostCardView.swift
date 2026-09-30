@@ -23,7 +23,7 @@ struct PostCardView: View {
                     author: item.author,
                     place: item.placeLabel,
                     createdAt: item.createdAt,
-                    kindBadge: "Post",
+                    kindBadge: nil,
                     kindColor: SQColor.label,
                     onAuthorTap: onAuthorTap
                 )
@@ -35,6 +35,7 @@ struct PostCardView: View {
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
+                        .accessibilityIdentifier("feed.post.text")
                 }
 
                 // Le sondage se place APRÈS le texte et AVANT la pièce jointe :

@@ -14,6 +14,9 @@ final class CommentsViewModel: ObservableObject {
     @Published var replyTo: SocialComment?
     @Published var expandedParentIDs: Set<String> = []
     @Published var repliesByParent: [String: ReplyPage] = [:]
+    /// Commentaire publié : nourrit le classement « Pour toi » après réussite,
+    /// plus à la simple ouverture de la feuille (SOC-19).
+    var onCommentPosted: (() -> Void)?
 
     struct ReplyPage {
         var comments: [SocialComment] = []
@@ -162,6 +165,7 @@ final class CommentsViewModel: ObservableObject {
                 replyTo = nil
             }
             Haptics.success()
+            onCommentPosted?()
             if let parentID, repliesByParent[parentID]?.hasLoaded != true {
                 Task { await loadReplies(for: parentID, cursor: nil) }
             }
@@ -199,6 +203,27 @@ final class CommentsViewModel: ObservableObject {
         }
     }
 
+    /// Supprime son propre commentaire (SOC-12). Retrait après accord du
+    /// serveur : un commentaire qui disparaît puis revient serait pire qu'une
+    /// seconde d'attente.
+    func delete(_ comment: SocialComment) async {
+        do {
+            try await service.delete(postId: postId, commentId: comment.id)
+            withAnimation(SQMotion.standard) {
+                comments.removeAll { $0.id == comment.id }
+                for parentID in Array(repliesByParent.keys) {
+                    repliesByParent[parentID]?.comments.removeAll { $0.id == comment.id }
+                    repliesByParent[parentID]?.sentComments.removeAll { $0.id == comment.id }
+                }
+            }
+            Haptics.success()
+        } catch {
+            guard !error.isCancellation else { return }
+            errorMessage = error.userFacingMessage
+            Haptics.error()
+        }
+    }
+
     @discardableResult
     private func updateComment(_ id: String, liked: Bool, count: Int) -> Bool {
         if let index = comments.firstIndex(where: { $0.id == id }) {
@@ -231,22 +256,34 @@ struct CommentsSheet: View {
     @State private var profileAuthor: SocialFeedAuthor?
     @State private var authorReturnAnchorID: String?
 
+    @State private var reportedComment: SocialComment?
+    @State private var pendingCommentDeletion: SocialComment?
+
     /// Repli pour les anciens appels sans service de profil injecté.
     private let onAuthorTap: ((SocialFeedAuthor) -> Void)?
     private let profileService: SocialFeedServicing?
+    /// Signalement des commentaires des autres (règle 1.2, SOC-12).
+    private let reports: ReportsServicing?
 
     init(service: CommentsServicing, postId: String,
          profileService: SocialFeedServicing? = nil,
-         onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil) {
-        _model = StateObject(wrappedValue: CommentsViewModel(service: service, postId: postId))
+         reports: ReportsServicing? = nil,
+         onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil,
+         onCommentPosted: (() -> Void)? = nil) {
+        let model = CommentsViewModel(service: service, postId: postId)
+        model.onCommentPosted = onCommentPosted
+        _model = StateObject(wrappedValue: model)
         self.profileService = profileService
+        self.reports = reports
         self.onAuthorTap = onAuthorTap
     }
 
     init(model: CommentsViewModel, profileService: SocialFeedServicing? = nil,
+         reports: ReportsServicing? = nil,
          onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil) {
         _model = StateObject(wrappedValue: model)
         self.profileService = profileService
+        self.reports = reports
         self.onAuthorTap = onAuthorTap
     }
 
@@ -274,6 +311,28 @@ struct CommentsSheet: View {
                 if let profileService {
                     UserProfileView(userId: author.id, prefill: author, service: profileService)
                 }
+            }
+            .sheet(item: $reportedComment) { comment in
+                if let reports {
+                    ReportSheet(target: .comment(comment.id), service: reports)
+                }
+            }
+            .confirmationDialog(
+                "Supprimer ce commentaire ?",
+                isPresented: Binding(
+                    get: { pendingCommentDeletion != nil },
+                    set: { if !$0 { pendingCommentDeletion = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingCommentDeletion
+            ) { comment in
+                Button("Supprimer", role: .destructive) {
+                    pendingCommentDeletion = nil
+                    Task { await model.delete(comment) }
+                }
+                Button("Annuler", role: .cancel) { pendingCommentDeletion = nil }
+            } message: { _ in
+                Text("Il disparaîtra pour tout le monde.")
             }
         }
         .presentationDetents([.medium, .large])
@@ -442,6 +501,26 @@ struct CommentsSheet: View {
                 )
                 likeButton(comment)
                     .padding(.leading, SQSpace.xs)
+            }
+        }
+        .contextMenu { commentMenu(comment) }
+    }
+
+    /// Supprimer le sien, signaler celui des autres : ni l'un ni l'autre
+    /// n'était possible (App Store, règle 1.2 ; SOC-12).
+    @ViewBuilder
+    private func commentMenu(_ comment: SocialComment) -> some View {
+        if comment.author.id == LocalAccountScope.currentUserId {
+            Button(role: .destructive) {
+                pendingCommentDeletion = comment
+            } label: {
+                Label("Supprimer le commentaire", systemImage: "trash")
+            }
+        } else if reports != nil {
+            Button(role: .destructive) {
+                reportedComment = comment
+            } label: {
+                Label("Signaler le commentaire", systemImage: "flag")
             }
         }
     }

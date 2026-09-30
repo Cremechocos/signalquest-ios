@@ -44,7 +44,7 @@ struct WeeklyRecapCard: View {
     private var headline: some View {
         switch stats.headline {
         case .topSpeed(let mbps):
-            hero(value: "\(Int(mbps.rounded()))", unit: "Mbps", caption: topSpeedCaption)
+            hero(value: SQUnits.throughputValue(mbps: mbps), unit: SQUnits.throughputUnit(mbps: mbps), caption: topSpeedCaption)
         case .coverage(let points):
             hero(value: "\(points)", unit: "points", caption: "de couverture enregistrés")
         case .validations(let count):

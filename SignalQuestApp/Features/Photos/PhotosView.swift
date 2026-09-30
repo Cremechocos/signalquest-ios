@@ -16,6 +16,10 @@ final class PhotosViewModel: ObservableObject {
     @Published var isLoadingMore = false
     @Published var hasMore = false
     @Published var errorMessage: String?
+    /// Échec d'une action lancée depuis la fiche d'une photo (like, réseau) :
+    /// affiché dans la fiche, pas en « Photos indisponibles » derrière elle
+    /// (SOC-14).
+    @Published var actionError: String?
     @Published var commentsErrorMessage: String?
     @Published var commentSendErrorMessage: String?
     @Published var isLoadingComments = false
@@ -150,7 +154,7 @@ final class PhotosViewModel: ObservableObject {
             Haptics.light()
         } catch {
             updatePhotoInState(photo)
-            errorMessage = error.userFacingMessage
+            if !error.isCancellation { actionError = error.userFacingMessage }
             Haptics.error()
         }
     }
@@ -237,7 +241,8 @@ final class PhotosViewModel: ObservableObject {
             Haptics.success()
             return true
         } catch {
-            errorMessage = error.userFacingMessage
+            // La feuille de partage affiche l'échec : ici il s'affichait
+            // derrière deux feuilles (SOC-37).
             Haptics.error()
             return false
         }
@@ -252,7 +257,7 @@ final class PhotosViewModel: ObservableObject {
             photos.insert(photo, at: 0)
             return true
         } catch {
-            errorMessage = error.userFacingMessage
+            // La feuille d'envoi affiche l'échec elle-même.
             return false
         }
     }
@@ -268,7 +273,7 @@ final class PhotosViewModel: ObservableObject {
             return true
         } catch {
             updatePhotoInState(photo)
-            errorMessage = error.userFacingMessage
+            if !error.isCancellation { actionError = error.userFacingMessage }
             Haptics.error()
             return false
         }
@@ -337,7 +342,7 @@ struct PhotosView: View {
         .signalQuestBackground()
         .refreshable { await model.load() }
         .task { if model.photos.isEmpty { await model.load() } }
-        .sheet(item: $model.selectedPhoto) { _ in
+        .sheet(item: $model.selectedPhoto, onDismiss: { model.actionError = nil }) { _ in
             if let selected = model.selectedPhoto {
                 PhotoDetailView(
                     photo: Binding(
@@ -364,7 +369,8 @@ struct PhotosView: View {
                     },
                     onChangeOperator: { photo, networkOperator in
                         await model.updateOperator(photo, operatorName: networkOperator)
-                    }
+                    },
+                    actionError: model.actionError
                 )
                 .presentationDetents([.large])
                 .presentationBackgroundCompat(SQColor.bg)
@@ -605,6 +611,7 @@ struct PhotoDetailView: View {
     let onSend: () -> Void
     let onShareToConversation: (MessageConversation) async -> Bool
     let onChangeOperator: (Photo, String) async -> Bool
+    var actionError: String? = nil
 
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -633,6 +640,15 @@ struct PhotoDetailView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         heroSection
+                        if let actionError {
+                            Label(actionError, systemImage: "exclamationmark.triangle")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.dangerInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, SQSpace.lg)
+                                .padding(.top, SQSpace.md)
+                                .accessibilityIdentifier("photo.actionError")
+                        }
                         infoSection
                     }
                 }
@@ -647,7 +663,7 @@ struct PhotoDetailView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button { showShareSheet = true } label: {
-                            Label("Partager sur Signal Quest", systemImage: "bubble.left.and.bubble.right")
+                            Label("Partager sur SignalQuest", systemImage: "bubble.left.and.bubble.right")
                         }
                         Button { showNativeShare = true } label: {
                             Label("Partager ailleurs…", systemImage: "square.and.arrow.up")
@@ -850,7 +866,7 @@ struct PhotoDetailView: View {
             // Partager
             Menu {
                 Button { showShareSheet = true } label: {
-                    Label("Partager sur Signal Quest", systemImage: "bubble.left.and.bubble.right")
+                    Label("Partager sur SignalQuest", systemImage: "bubble.left.and.bubble.right")
                 }
                 Button { showNativeShare = true } label: {
                     Label("Partager ailleurs…", systemImage: "square.and.arrow.up")
@@ -1307,7 +1323,7 @@ struct PhotoShareSheet: View {
                         .listRowBackground(SQColor.surface)
                     }
                 } header: {
-                    Text("Partager sur Signal Quest")
+                    Text("Partager sur SignalQuest")
                         .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)
                         .textCase(nil)
@@ -1350,7 +1366,12 @@ struct PhotoShareSheet: View {
     private func share(_ conversation: MessageConversation) async {
         busyConversationId = conversation.id
         defer { busyConversationId = nil }
-        if await onShare(conversation) { dismiss() }
+        errorMessage = nil
+        if await onShare(conversation) {
+            dismiss()
+        } else {
+            errorMessage = String(localized: "Échec de l'envoi. Réessaie.")
+        }
     }
 }
 

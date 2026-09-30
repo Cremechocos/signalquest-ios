@@ -3,10 +3,11 @@ import SwiftUI
 
 /// Centralised formatters shared by the specialised social cards.
 enum SignalFormatters {
+    /// Débit selon la langue (« 64,0 Mbit/s », « 64.0 Mbps ») : le fil
+    /// affichait « 64.0 Mbps » en français (TRX-24).
     static func speed(_ value: Double?) -> String {
         guard let value else { return "—" }
-        if value >= 100 { return "\(Int(value.rounded())) Mbps" }
-        return String(format: "%.1f Mbps", value)
+        return SQUnits.throughput(mbps: value)
     }
 
     static func ms(_ value: Double?) -> String {
@@ -181,7 +182,9 @@ struct CardHeader: View {
     let author: SocialFeedAuthor
     let place: String?
     let createdAt: Date?
-    let kindBadge: String
+    /// `nil` pour un post simple : un badge « Post » sur chaque carte
+    /// n'apprenait rien (UI-08).
+    let kindBadge: String?
     let kindColor: Color
     var onAuthorTap: (() -> Void)? = nil
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -191,13 +194,17 @@ struct CardHeader: View {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
                     authorContent
-                    SQEditorialTag(text: kindBadge, color: kindColor)
+                    if let kindBadge {
+                        SQEditorialTag(text: kindBadge, color: kindColor)
+                    }
                 }
             } else {
                 HStack(spacing: SQSpace.md) {
                     authorContent
                     Spacer()
-                    SQEditorialTag(text: kindBadge, color: kindColor)
+                    if let kindBadge {
+                        SQEditorialTag(text: kindBadge, color: kindColor)
+                    }
                 }
             }
         }

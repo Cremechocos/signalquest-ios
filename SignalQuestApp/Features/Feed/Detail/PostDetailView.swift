@@ -106,7 +106,8 @@ struct PostDetailView: View {
             CommentsSheet(
                 service: commentsService,
                 postId: actions.item.backendPostId,
-                profileService: feedService
+                profileService: feedService,
+                reports: reportsService
             )
         }
         .sheet(isPresented: $showShareSheet) {

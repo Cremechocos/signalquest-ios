@@ -547,6 +547,7 @@
 		D49656ADC5C1C28BD4B49534 /* AntennaSightGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DAA7D338C028E555F8CBAFC /* AntennaSightGeometry.swift */; };
 		D51CA3CADE6EFF922EB818EC /* OutageRadioCaptureBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F2A0E97DFC60C614901475E /* OutageRadioCaptureBuilder.swift */; };
 		D57FB42D1064CB2A6172E6A2 /* RadioLogSiteMapPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0990B1A078A21371068E114 /* RadioLogSiteMapPicker.swift */; };
+		D66392994075971AAE636C1A /* FeedComposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4723D6E89F076CD2D9B55B9B /* FeedComposerTests.swift */; };
 		D6CEFBA50FB780C0C6B045ED /* NetworkPathDedupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83991EBA39D411D1F2DE6744 /* NetworkPathDedupTests.swift */; };
 		D6DE2ADD3CE6FC6F1DDEC1E8 /* CarPlayRootTemplateBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0CBAF083A564C5029D6059 /* CarPlayRootTemplateBuilder.swift */; };
 		D794EE40CF5E7B73E5E675FB /* RemoteVoiceNoteBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650E578A11F7C683E4ABFCA9 /* RemoteVoiceNoteBubble.swift */; };
@@ -873,6 +874,7 @@
 		4667EE4B0BF1383A8D24C87E /* ICMPPinger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICMPPinger.swift; sourceTree = "<group>"; };
 		469A66A89495AAE04EF039F3 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
 		4710561B73DB096826FAEEDE /* PresenceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceModels.swift; sourceTree = "<group>"; };
+		4723D6E89F076CD2D9B55B9B /* FeedComposerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedComposerTests.swift; sourceTree = "<group>"; };
 		47DF9A9E7F62D1F6CA59D010 /* MapFocusLayerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapFocusLayerTests.swift; sourceTree = "<group>"; };
 		48094FF4D7DB822E5425DE54 /* MapSnapshotMerging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSnapshotMerging.swift; sourceTree = "<group>"; };
 		4841F25C76693497780EE838 /* CommentsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentsSheet.swift; sourceTree = "<group>"; };
@@ -2326,6 +2328,7 @@
 				D1C6D2BE5C0DA657640E95A8 /* FavoritesBackendInteropTests.swift */,
 				E9B758D5D6419CB4988A7201 /* FavoritesInteropSupport.swift */,
 				376D00A73D8437EA99DE1207 /* FavoritesMixedBackendInteropTests.swift */,
+				4723D6E89F076CD2D9B55B9B /* FeedComposerTests.swift */,
 				1CDCE02F16F705D9A8F45953 /* FeedContextTests.swift */,
 				3142722FE504FC0934903C62 /* FeedTabsAndSignalsTests.swift */,
 				71E4D5592689833F8992519D /* FhAzimuthsTests.swift */,
@@ -3391,6 +3394,7 @@
 				7CB3792B4DF37AA80E3E1A1E /* FavoritesBackendInteropTests.swift in Sources */,
 				5E08098D056FD3403535B675 /* FavoritesInteropSupport.swift in Sources */,
 				F7D332B5EDDB161BCF33A4C8 /* FavoritesMixedBackendInteropTests.swift in Sources */,
+				D66392994075971AAE636C1A /* FeedComposerTests.swift in Sources */,
 				416E530A51D50131F275D2E4 /* FeedContextTests.swift in Sources */,
 				4F72E61936BCDEFC7E1147C9 /* FeedTabsAndSignalsTests.swift in Sources */,
 				09FBCBE582166AF07D0AB645 /* FhAzimuthsTests.swift in Sources */,

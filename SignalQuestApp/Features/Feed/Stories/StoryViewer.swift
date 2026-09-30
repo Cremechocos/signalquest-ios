@@ -58,6 +58,8 @@ struct StoryViewer: View {
     var onDelete: (SocialStory) -> Void = { _ in }
     /// Fournit la liste « Vu par » d'une story (auteur uniquement).
     var viewersProvider: (SocialStory) async -> [StoryViewerEntry] = { _ in [] }
+    /// Signalement des stories des autres (règle 1.2, SOC-12).
+    var reports: ReportsServicing? = nil
 
     @StateObject private var replySubmission = StoryReplySubmission()
     @FocusState private var replyFocused: Bool
@@ -67,6 +69,15 @@ struct StoryViewer: View {
     @State private var showDeleteConfirm = false
     @State private var showUnencryptedConfirm = false
     @State private var channelConsent = StoryReplyChannelConsent()
+    @State private var reportedStory: SocialStory?
+    @State private var showStoryActions = false
+    /// Doigt posé sur la story : le minuteur s'arrête, comme partout ailleurs
+    /// (SOC-34). Un simple tap ne pause pas : le délai filtre les touchers brefs.
+    @State private var isHolding = false
+    @State private var holdTask: Task<Void, Never>?
+    /// Largeur réelle de la vue : les zones de tap se calculaient sur l'écran
+    /// entier, faux en Split View ou Stage Manager sur iPad (SOC-27).
+    @State private var viewWidth: CGFloat = 0
 
     /// Durée d'affichage dérivée du choix de l'auteur (5/10/15 s côté backend),
     /// bornée 5...15 (STORY-BUG-01 : la constante 6 s ignorait `durationSeconds`).
@@ -105,6 +116,11 @@ struct StoryViewer: View {
         .sheet(isPresented: $showViewers) {
             StoryViewersSheet(viewers: viewers, isLoading: loadingViewers)
         }
+        .sheet(item: $reportedStory) { story in
+            if let reports {
+                ReportSheet(target: .story(story.id), service: reports)
+            }
+        }
         .confirmationDialog("Supprimer cette story ?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Supprimer", role: .destructive) {
                 if let story = currentStory { onDelete(story); dismiss() }
@@ -117,10 +133,34 @@ struct StoryViewer: View {
         } message: {
             Text("Cette réponse sera envoyée dans une conversation privée non chiffrée de bout en bout.")
         }
-        .onTapGesture(coordinateSpace: .local) { location in
-            let half = UIScreen.main.bounds.width / 2
-            if location.x < half { back() } else { forward() }
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { viewWidth = proxy.size.width }
+                    .onChangeCompat(of: proxy.size.width) { _, width in viewWidth = width }
+            }
         }
+        .onTapGesture(coordinateSpace: .local) { location in
+            if viewWidth > 0, location.x < viewWidth / 2 { back() } else { forward() }
+        }
+        // Doigt posé : pause après un court délai, reprise au relâchement.
+        // Geste simultané, pour que le tap garde la navigation.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    guard holdTask == nil, !isHolding else { return }
+                    holdTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 250_000_000)
+                        guard !Task.isCancelled else { return }
+                        isHolding = true
+                    }
+                }
+                .onEnded { _ in
+                    holdTask?.cancel()
+                    holdTask = nil
+                    isHolding = false
+                }
+        )
         .gesture(
             DragGesture(minimumDistance: 22)
                 .onEnded { value in
@@ -166,18 +206,21 @@ struct StoryViewer: View {
             .accessibilityElement()
             .accessibilityLabel(mediaLabel(for: story))
         } else {
-            // Story texte : canevas crème uni (nuit en sombre), typo display encre.
+            // Story texte : canevas « nuit » de la charte, typo display crème.
+            // Le crème du mode clair rendait illisibles le nom, l'heure et les
+            // boutons du lecteur, écrits en blanc pour les photos.
             ZStack {
                 SQColor.bg.ignoresSafeArea()
                 VStack(spacing: SQSpace.lg) {
                     SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 88)
-                    Text(story.text ?? "Story")
+                    Text(story.text ?? String(localized: "Story"))
                         .font(SQFont.display(28, .bold))
                         .foregroundStyle(SQColor.label)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, SQSpace.xxl + 4)
                 }
             }
+            .environment(\.colorScheme, .dark)
         }
     }
 
@@ -225,6 +268,25 @@ struct StoryViewer: View {
                 .accessibilityLabel("Voir le profil de \(story.author.displayName)")
             }
             Spacer()
+            // Feuille d'actions plutôt qu'un menu : son ouverture se voit, et la
+            // story reste en pause pendant le choix.
+            if let story = currentStory, story.isMine != true, reports != nil {
+                Button {
+                    showStoryActions = true
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .accessibilityLabel("Plus d’options")
+                .accessibilityIdentifier("story.more")
+                .confirmationDialog("Story de \(story.author.displayName)", isPresented: $showStoryActions, titleVisibility: .hidden) {
+                    Button("Signaler la story", role: .destructive) { reportedStory = story }
+                    Button("Annuler", role: .cancel) {}
+                }
+            }
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.title3.weight(.semibold))
@@ -409,6 +471,7 @@ struct StoryViewer: View {
         replyFocused || replySubmission.isSending
             || replySubmission.failedStoryID == currentStory?.id
             || showViewers || showDeleteConfirm || showUnencryptedConfirm || voiceOverOn
+            || isHolding || reportedStory != nil || showStoryActions
     }
 
     /// Secondes écoulées sur la story courante à l'instant `now`.
@@ -461,9 +524,9 @@ struct StoryViewer: View {
     /// Label VoiceOver du média d'une story (aucun n'existait auparavant, A11Y-04).
     private func mediaLabel(for story: SocialStory) -> String {
         if let text = story.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
-            return "Story de \(story.author.displayName) : \(text)"
+            return String(localized: "Story de \(story.author.displayName) : \(text)")
         }
-        return "Story de \(story.author.displayName)"
+        return String(localized: "Story de \(story.author.displayName)")
     }
 
     private func forward() {

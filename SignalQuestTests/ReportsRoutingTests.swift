@@ -98,6 +98,19 @@ final class ReportsRoutingTests: XCTestCase {
             try await self.service.report(.comment("c-1"), reason: .illegal, comment: nil)
         }
         XCTAssertEqual(comment.json["targetType"] as? String, "comment")
+
+        // Accepté par le serveur depuis le 29/09 (SOC-12).
+        let story = try await capture {
+            try await self.service.report(.story("s-1"), reason: .harassment, comment: nil)
+        }
+        XCTAssertEqual(story.path, "/api/social/reports")
+        XCTAssertEqual(story.json["targetType"] as? String, "story")
+        XCTAssertEqual(story.json["targetId"] as? String, "s-1")
+    }
+
+    /// Motifs proposés pour un message : ceux du web (SOC-12).
+    func testMessageReportReasonsMatchTheWeb() {
+        XCTAssertEqual(ReportReason.messageReasons.map(\.rawValue), ["spam", "harassment", "illegal", "other"])
     }
 
     /// Le schéma zod backend rejette toute raison hors de cet ensemble.

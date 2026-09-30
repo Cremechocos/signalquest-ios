@@ -432,7 +432,7 @@ struct ConversationDetailView: View {
             ReportSheet(
                 reasons: ReportReason.messageReasons,
                 notice: isE2EE
-                    ? String(localized: "Conversation chiffrée : pour vérifier ce signalement, l’équipe de modération recevra la clé de cette conversation, chiffrée pour elle seule. Elle pourra alors en lire les messages.")
+                    ? String(localized: "Conversation chiffrée : si l’équipe de modération dispose d’une clé de vérification, la clé de cette conversation lui est transmise, chiffrée pour elle seule. Elle pourra alors en lire les messages.")
                     : nil
             ) { reason, comment in
                 try await report(message, reason: reason, comment: comment)
@@ -455,7 +455,7 @@ struct ConversationDetailView: View {
         // au retour, l'embed est rafraîchi (compteur de commentaires).
         .sheet(item: $sharedPostComments, onDismiss: { refreshSharedPostAfterSheet() }) { target in
             CommentsSheet(service: services.comments, postId: target.backendPostId,
-                          profileService: services.feed)
+                          profileService: services.feed, reports: services.reports)
         }
         // Publication complète (réutilise PostDetailView du feed par composition).
         .sheet(item: $sharedPostDetail, onDismiss: { refreshSharedPostAfterSheet() }) { target in
@@ -1789,8 +1789,13 @@ struct ConversationDetailView: View {
             details: comment,
             moderationWrappedKeyB64: wrappedKey
         )
+        // Sans clé de modération côté serveur, le signalement part quand même,
+        // mais le message chiffré restera illisible pour l'équipe : on le dit.
+        let readable = !isE2EE || wrappedKey != nil
         inAppNotifications.show(SQInAppNotificationItem(
-            body: String(localized: "Signalement envoyé. Merci, l’équipe de modération va l’examiner."),
+            body: readable
+                ? String(localized: "Signalement envoyé. Merci, l’équipe de modération va l’examiner.")
+                : String(localized: "Signalement envoyé. Ce message étant chiffré, l’équipe de modération ne pourra pas en lire le contenu."),
             variant: .success
         ))
     }

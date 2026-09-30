@@ -10,21 +10,32 @@ enum StoryAudience: String, CaseIterable, Identifiable, Hashable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .publicAll: return "Public"
-        case .friends: return "Amis"
-        case .closeFriends: return "Proches"
+        case .publicAll: return String(localized: "Public")
+        case .friends: return String(localized: "Amis")
+        case .closeFriends: return String(localized: "Proches")
         }
     }
 }
 
 @MainActor
 final class StoryComposerViewModel: ObservableObject {
-    @Published var text: String = ""
+    /// Plafond du schéma serveur (`POST /api/social/stories`) : au-delà, la story
+    /// entière est refusée (400 INVALID_STORY, sans détail).
+    nonisolated static let maxTextLength = 1200
+    @Published var text: String = "" {
+        didSet {
+            let clamped = Self.clampedCaption(text)
+            if clamped != text { text = clamped }
+        }
+    }
     @Published var selectedItem: PhotosPickerItem?
     @Published var previewImage: UIImage?
     @Published var isSending = false
     @Published var errorMessage: String?
     @Published var didPublish = false
+    /// Story renvoyée par le serveur : le fil l'insère sans attendre le
+    /// prochain rechargement (SOC-34).
+    @Published var publishedStory: SocialStory?
     /// Durée d'affichage de la story (autorisée : 5/10/15 s).
     @Published var displayDuration: Int = 10
 
@@ -49,6 +60,22 @@ final class StoryComposerViewModel: ObservableObject {
     init(service: StoriesServicing, friendsService: FriendsServicing) {
         self.service = service
         self.friendsService = friendsService
+    }
+
+    /// Coupe la légende au plafond du serveur. Le serveur compte comme JavaScript,
+    /// en unités UTF-16 : un emoji peut en valoir quatre. On coupe entre deux
+    /// caractères, jamais au milieu d'un emoji.
+    nonisolated static func clampedCaption(_ value: String) -> String {
+        guard value.utf16.count > maxTextLength else { return value }
+        var result = ""
+        var units = 0
+        for character in value {
+            let size = character.utf16.count
+            if units + size > maxTextLength { break }
+            result.append(character)
+            units += size
+        }
+        return result
     }
 
     /// Charge les amis (sélecteurs) + la liste actuelle d'amis proches. Échec
@@ -77,12 +104,14 @@ final class StoryComposerViewModel: ObservableObject {
     /// Persiste la liste d'amis proches (PUT). Appelé à la fermeture de l'éditeur.
     func saveCloseFriends() async {
         do { _ = try await service.setCloseFriends(userIds: Array(closeFriendIds)) }
-        catch { errorMessage = error.localizedDescription }
+        catch { if !error.isCancellation { errorMessage = error.userFacingMessage } }
     }
 
     func publish() async {
         let caption = text.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        guard caption != nil || pickedImageData != nil else { return }
+        // Un relevé réseau seul fait une story, comme côté serveur : l'appui ne
+        // faisait rien (SOC-34).
+        guard caption != nil || pickedImageData != nil || attachRadio else { return }
         isSending = true
         errorMessage = nil
         defer { isSending = false }
@@ -94,7 +123,7 @@ final class StoryComposerViewModel: ObservableObject {
                 mediaUrl = upload.url
                 thumbnailUrl = upload.thumbnailUrl
             }
-            _ = try await service.create(
+            publishedStory = try await service.create(
                 text: caption,
                 mediaUrl: mediaUrl,
                 thumbnailUrl: thumbnailUrl,
@@ -110,10 +139,15 @@ final class StoryComposerViewModel: ObservableObject {
             didPublish = true
             Haptics.success()
         } catch {
-            // Le backend renvoie 403 si une durée > 24 h est demandée sans Premium.
-            errorMessage = ttlHours != 24
-                ? "Durée longue réservée aux comptes Premium."
-                : error.localizedDescription
+            guard !error.isCancellation else { return }
+            // Seul le refus 403 PREMIUM_REQUIRED parle de Premium : toute erreur
+            // (réseau, 429, 500) s'affichait « Durée longue réservée aux comptes
+            // Premium » dès qu'une durée autre que 24 h était choisie (SOC-34).
+            if case APIError.http(403, let code, _, _, _) = error, code == "PREMIUM_REQUIRED" {
+                errorMessage = String(localized: "Durée longue réservée aux comptes Premium.")
+            } else {
+                errorMessage = error.userFacingMessage
+            }
             Haptics.error()
         }
     }
@@ -125,8 +159,15 @@ struct StoryComposer: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showPremiumPaywall = false
 
-    init(service: StoriesServicing, friendsService: FriendsServicing) {
+    private let onPublished: (SocialStory) -> Void
+
+    init(
+        service: StoriesServicing,
+        friendsService: FriendsServicing,
+        onPublished: @escaping (SocialStory) -> Void = { _ in }
+    ) {
         _model = StateObject(wrappedValue: StoryComposerViewModel(service: service, friendsService: friendsService))
+        self.onPublished = onPublished
     }
 
     var body: some View {
@@ -189,7 +230,10 @@ struct StoryComposer: View {
                     GradientButton("Publier", systemImage: "paperplane.fill", isBusy: model.isSending) {
                         Task {
                             await model.publish()
-                            if model.didPublish { dismiss() }
+                            if model.didPublish {
+                                if let story = model.publishedStory { onPublished(story) }
+                                dismiss()
+                            }
                         }
                     }
                 }
@@ -275,7 +319,7 @@ struct StoryComposer: View {
             if model.audience == .closeFriends {
                 menuRow(
                     systemImage: "star.fill",
-                    title: "Gérer mes amis proches (\(model.closeFriendIds.count))"
+                    title: String(localized: "Gérer mes amis proches (\(model.closeFriendIds.count))")
                 ) {
                     model.showCloseFriendsEditor = true
                 }
@@ -287,8 +331,10 @@ struct StoryComposer: View {
         menuRow(
             systemImage: "eye.slash",
             title: model.hiddenUserIds.isEmpty
-                ? "Masquer à…"
-                : "Masqué à \(model.hiddenUserIds.count) personne\(model.hiddenUserIds.count > 1 ? "s" : "")"
+                ? String(localized: "Masquer à…")
+                : model.hiddenUserIds.count == 1
+                    ? String(localized: "Masqué à 1 personne")
+                    : String(localized: "Masqué à \(model.hiddenUserIds.count) personnes")
         ) {
             model.showHideEditor = true
         }

@@ -9,6 +9,9 @@ final class ExploreViewModel: ObservableObject {
     @Published var suggestions: [SocialFeedAuthor] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// Échec d'une action (suivre, page suivante) : bandeau passager, pas
+    /// « Exploration indisponible » (SOC-14).
+    @Published var actionError: String?
 
     // Recherche d'utilisateurs
     @Published var searchText = ""
@@ -153,7 +156,7 @@ final class ExploreViewModel: ObservableObject {
             hashtagItems.append(contentsOf: page.items.filter { !known.contains($0.id) })
             hashtagCursor = page.nextCursor
         } catch {
-            errorMessage = error.userFacingMessage
+            if !error.isCancellation { actionError = error.userFacingMessage }
         }
     }
 
@@ -177,7 +180,7 @@ final class ExploreViewModel: ObservableObject {
                 followOverrides[author.id] = result.following
             } catch {
                 followOverrides[author.id] = wasFollowed
-                errorMessage = error.userFacingMessage
+                if !error.isCancellation { actionError = error.userFacingMessage }
                 Haptics.error()
             }
         }
@@ -210,6 +213,7 @@ final class ExploreViewModel: ObservableObject {
 struct ExploreView: View {
     @StateObject private var model: ExploreViewModel
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
 
     private let service: SocialFeedServicing
 
@@ -229,6 +233,11 @@ struct ExploreView: View {
                 }
                 .onChangeCompat(of: model.searchText) { _, _ in
                     model.scheduleSearch()
+                }
+                .onChangeCompat(of: model.actionError) { _, message in
+                    guard let message else { return }
+                    inAppNotifications.showError(message)
+                    model.actionError = nil
                 }
 
                 if let error = model.errorMessage {

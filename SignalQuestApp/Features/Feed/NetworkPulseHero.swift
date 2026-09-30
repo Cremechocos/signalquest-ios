@@ -12,6 +12,7 @@ struct NetworkPulseHero: View {
     @State private var pulsing = false
     @State private var freshnessClock = Date()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
@@ -37,7 +38,7 @@ struct NetworkPulseHero: View {
                         ),
                         value: pulsing
                     )
-                Text("Pouls réseau · autour de vous")
+                Text("Pouls réseau · autour de toi")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(SQColor.onAccent)
                     .fixedSize(horizontal: false, vertical: true)
@@ -86,7 +87,23 @@ struct NetworkPulseHero: View {
         .background(SQColor.accentTextSurface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .accessibilityIdentifier("community.networkPulse")
         .sqShadowAccent()
-        .onAppear { pulsing = true }
+        // L'animation en boucle ne tourne qu'à l'écran, app active et hors
+        // Économie d'énergie : elle empêchait l'app d'être jamais au repos,
+        // d'où batterie et tests d'interface ralentis (SOC-45).
+        .onAppear { pulsing = Self.canAnimate(scenePhase) }
+        .onDisappear { pulsing = false }
+        .onChangeCompat(of: scenePhase) { _, phase in pulsing = Self.canAnimate(phase) }
+        .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)) { _ in
+            pulsing = Self.canAnimate(scenePhase)
+        }
+        // Quelques battements suffisent à dire « direct » ; la pastille reste
+        // ensuite pleine.
+        .task(id: pulsing) {
+            guard pulsing else { return }
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled else { return }
+            pulsing = false
+        }
         .task(id: pulse.lastMeasuredAt) {
             freshnessClock = Date()
             guard pulse.lastMeasuredAt != nil else { return }
@@ -138,7 +155,7 @@ struct NetworkPulseHero: View {
 
     private var referenceLine: String? {
         guard let reference = pulse.reference else { return nil }
-        return "Référence \(reference.label) : \(reference.medianDownloadMbps) Mbps (\(reference.sampleCount) tests)"
+        return String(localized: "Référence \(reference.label) : \(SQUnits.throughput(mbps: Double(reference.medianDownloadMbps))) (\(reference.sampleCount) tests)")
     }
 
     private var hasDetails: Bool {
@@ -147,7 +164,7 @@ struct NetworkPulseHero: View {
 
     private func operatorMetrics(_ op: NetworkPulseOperator) -> String {
         var values: [String] = []
-        if let speed = op.medianDownloadMbps { values.append("\(speed) Mbps") }
+        if let speed = op.medianDownloadMbps { values.append(SQUnits.throughput(mbps: Double(speed))) }
         if let rsrp = op.avgRsrpDbm { values.append("\(rsrp) dBm") }
         values.append("n=\(op.sampleCount)")
         return values.joined(separator: " · ")
@@ -199,7 +216,7 @@ struct NetworkPulseHero: View {
             VStack(spacing: SQSpace.sm) {
                 stat(value: rsrpText, label: "dBm moyen")
                 horizontalDivider
-                stat(value: mbpsText, label: "Mbps médian")
+                stat(value: mbpsText, label: "Mbit/s médian")
                 horizontalDivider
                 stat(value: operatorText, label: operatorLabel, compact: hasOperator)
             }
@@ -207,7 +224,7 @@ struct NetworkPulseHero: View {
             HStack(spacing: 0) {
                 stat(value: rsrpText, label: "dBm moyen")
                 divider
-                stat(value: mbpsText, label: "Mbps médian")
+                stat(value: mbpsText, label: "Mbit/s médian")
                 divider
                 stat(value: operatorText, label: operatorLabel, compact: hasOperator)
             }
@@ -250,6 +267,10 @@ struct NetworkPulseHero: View {
             .accessibilityHidden(true)
     }
 
+    private static func canAnimate(_ phase: ScenePhase) -> Bool {
+        phase == .active && !ProcessInfo.processInfo.isLowPowerModeEnabled
+    }
+
     private var rsrpText: String { pulse.avgRsrpDbm.map { "\($0)" } ?? "—" }
     private var mbpsText: String { pulse.medianDownloadMbps.map { "\($0)" } ?? "—" }
     private var hasOperator: Bool { pulse.bestOperator?.isEmpty == false }
@@ -268,7 +289,7 @@ struct NetworkPulseHero: View {
         // faisaient pas, et VoiceOver énonçait un libellé mi-français
         // mi-anglais — le genre de défaut qu'aucune relecture de code ne
         // rattrape, seulement l'écoute ou un relevé des textes rendus.
-        var parts: [String] = [String(localized: "Pouls réseau autour de vous")]
+        var parts: [String] = [String(localized: "Pouls réseau autour de toi")]
         if let rsrp = pulse.avgRsrpDbm { parts.append(String(localized: "RSRP moyen \(rsrp) dBm")) }
         if let mbps = pulse.medianDownloadMbps { parts.append(String(localized: "débit médian \(mbps) mégabits par seconde")) }
         if hasOperator, let op = pulse.bestOperator { parts.append(String(localized: "meilleur opérateur \(op)")) }

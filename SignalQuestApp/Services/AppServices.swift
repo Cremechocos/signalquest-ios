@@ -479,6 +479,9 @@ final class ConversationLiveShareCoordinator: ObservableObject {
     }
 
     func load(conversationId: String, currentUserId: String) async {
+        // Démonstration : aucune session réelle à lire ; l'appel échouait et la
+        // conversation affichait « Session expirée ».
+        guard !AppEnvironment.usesDemoData else { errorMessage = nil; return }
         let generation = activateAccount(currentUserId)
         do {
             let fetched = try await service.liveShareSessions(conversationId: conversationId)
@@ -493,6 +496,7 @@ final class ConversationLiveShareCoordinator: ObservableObject {
     }
 
     func bootstrap(currentUserId: String) async {
+        guard !AppEnvironment.usesDemoData else { errorMessage = nil; return }
         let generation = activateAccount(currentUserId)
         do {
             let fetched = try await service.activeLiveShareSessions()

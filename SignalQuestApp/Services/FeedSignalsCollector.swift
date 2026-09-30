@@ -67,6 +67,31 @@ actor FeedSignalsCollector {
         if buffer.count >= Self.maxBuffer { flush() }
     }
 
+    /// Une carte entre à l'écran : une vue par post et par session, et le
+    /// début de sa lecture. `onVisibleItems` recevait une carte à la fois et
+    /// fermait la lecture de toutes les autres, encore visibles (SOC-19).
+    func didAppear(_ postId: String) {
+        ensureFlushLoop()
+        if seenViews.insert(postId).inserted {
+            buffer.append(Signal(postId: postId, signalType: "view"))
+        }
+        if dwellStart[postId] == nil { dwellStart[postId] = Date() }
+        if buffer.count >= Self.maxBuffer { flush() }
+    }
+
+    /// La carte quitte l'écran : son temps de lecture compte s'il dépasse le seuil.
+    func didDisappear(_ postId: String) {
+        closeDwell(postId, at: Date())
+        if buffer.count >= Self.maxBuffer { flush() }
+    }
+
+    private func closeDwell(_ postId: String, at now: Date) {
+        guard let start = dwellStart.removeValue(forKey: postId) else { return }
+        if now.timeIntervalSince(start) >= Self.dwellThreshold, dwellSent.insert(postId).inserted {
+            buffer.append(Signal(postId: postId, signalType: "dwell"))
+        }
+    }
+
     /// Signal explicite déclenché par une action (like, commentaire, partage…).
     func record(postId: String, type: String) {
         ensureFlushLoop()
@@ -75,8 +100,13 @@ actor FeedSignalsCollector {
     }
 
     /// Vidage forcé — à appeler au passage en arrière-plan, sinon le dernier
-    /// lot est perdu.
-    func flushNow() { flush() }
+    /// lot est perdu. Les lectures en cours sont closes d'abord : le dernier
+    /// post lu avant de quitter l'app n'était jamais compté.
+    func flushNow() {
+        let now = Date()
+        for id in Array(dwellStart.keys) { closeDwell(id, at: now) }
+        flush()
+    }
 
     private func ensureFlushLoop() {
         guard flushTask == nil else { return }

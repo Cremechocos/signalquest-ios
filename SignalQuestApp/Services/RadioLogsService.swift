@@ -248,7 +248,9 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         } catch let APIError.http(status, code, message, _, _) where status == 403 {
             // Refus de DROIT, pas incident réseau : la page doit le dire autrement.
             throw RadioLogSyncError.premiumRequired(
-                APIError.userFacingMessage(status: status, code: code, serverMessage: message)
+                code == "PREMIUM_REQUIRED"
+                    ? String(localized: "La sauvegarde du journal radio est réservée aux membres Premium.")
+                    : APIError.userFacingMessage(status: status, code: code, serverMessage: message)
             )
         }
     }

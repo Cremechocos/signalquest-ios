@@ -10,7 +10,8 @@ struct StoriesBar: View {
         ScrollView(.horizontal, showsIndicators: false) {
             // LazyHStack : ne matérialise que les bulles visibles du rail (les stories
             // hors écran ne sont pas construites) — cf. PERF-RING-01.
-            LazyHStack(spacing: SQSpace.md + 2) {
+            // Alignés en haut : un prénom sur deux lignes ne décale pas les cercles.
+            LazyHStack(alignment: .top, spacing: SQSpace.md + 2) {
                 composeBubble
                 ForEach(stories) { story in
                     Button {
@@ -26,6 +27,9 @@ struct StoriesBar: View {
             .padding(.horizontal)
             .padding(.vertical, SQSpace.xs + 2)
         }
+        // Le rail garde des cercles et des prénoms lisibles : au-delà de cette
+        // taille, les prénoms ne tenaient plus sous leur cercle (UI-15).
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     /// « Ta story » : cercle 60 SurfaceMuted, initiale (ou +) en encre
@@ -66,9 +70,11 @@ struct StoriesBar: View {
                 Text("Ta story")
                     .font(.footnote)
                     .foregroundStyle(SQColor.label)
+                    .multilineTextAlignment(.center)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.7)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(minWidth: 70)
+                    .frame(width: 72)
                     .accessibilityIdentifier("feed.story.name")
             }
         }

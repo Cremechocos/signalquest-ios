@@ -673,6 +673,70 @@
         }
       }
     },
+    "%@ abonné" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ follower"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ abonné"
+          }
+        }
+      }
+    },
+    "%@ abonnés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ followers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ abonnés"
+          }
+        }
+      }
+    },
+    "%@ abonnement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ following"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ abonnement"
+          }
+        }
+      }
+    },
+    "%@ abonnements" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ following"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ abonnements"
+          }
+        }
+      }
+    },
     "%@ absent du secteur %lld degrés" : {
       "localizations" : {
         "en" : {
@@ -976,6 +1040,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ partage avec toi"
+          }
+        }
+      }
+    },
+    "%@ photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ photo"
+          }
+        }
+      }
+    },
+    "%@ photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ photos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ photos"
           }
         }
       }
@@ -5642,6 +5738,22 @@
         }
       }
     },
+    "Ajoute un texte, une photo ou ton relevé radio à ta story." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add some text, a photo or your radio reading to your story."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute un texte, une photo ou ton relevé radio à ta story."
+          }
+        }
+      }
+    },
     "Ajoute une connexion à surveiller depuis l'app." : {
       "localizations" : {
         "en" : {
@@ -8891,6 +9003,22 @@
         }
       }
     },
+    "Aucune photo partagée pour l'instant. Ajoute-en une depuis une antenne ou une publication." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No photos shared yet. Add one from an antenna or a post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune photo partagée pour l'instant. Ajoute-en une depuis une antenne ou une publication."
+          }
+        }
+      }
+    },
     "Aucune position sur cette page" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8938,6 +9066,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune publication"
+          }
+        }
+      }
+    },
+    "Aucune publication avec #%@ pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No posts with #%@ yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune publication avec #%@ pour l’instant."
           }
         }
       }
@@ -11761,6 +11905,22 @@
         }
       }
     },
+    "cet utilisateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "this user"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cet utilisateur"
+          }
+        }
+      }
+    },
     "Cette action est définitive." : {
       "localizations" : {
         "en" : {
@@ -11821,6 +11981,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette adresse rejoint « %@ » : même historique, même alerte, même quota. Ce n’est pas une seconde connexion."
+          }
+        }
+      }
+    },
+    "Cette ancienne photo ne contient pas de marché vérifiable. SignalQuest ne l’attribue pas automatiquement à la France." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This older photo has no verifiable market. SignalQuest doesn’t assign it to France automatically."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette ancienne photo ne contient pas de marché vérifiable. SignalQuest ne l’attribue pas automatiquement à la France."
           }
         }
       }
@@ -11902,6 +12078,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette consultation reste sur cet appareil et n’envoie aucune coordonnée."
+          }
+        }
+      }
+    },
+    "Cette fonction est réservée aux membres Premium." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This feature is for Premium members."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette fonction est réservée aux membres Premium."
+          }
+        }
+      }
+    },
+    "Cette durée n'est pas disponible pour une story." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This duration isn't available for a story."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette durée n'est pas disponible pour une story."
           }
         }
       }
@@ -12048,6 +12256,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette réponse sera envoyée dans une conversation privée non chiffrée de bout en bout."
+          }
+        }
+      }
+    },
+    "Cette story n'a pas pu être publiée. Vérifie son texte et réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This story couldn't be posted. Check its text and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette story n'a pas pu être publiée. Vérifie son texte et réessaie."
           }
         }
       }
@@ -14981,18 +15205,18 @@
         }
       }
     },
-    "Conversation chiffrée : pour vérifier ce signalement, l’équipe de modération recevra la clé de cette conversation, chiffrée pour elle seule. Elle pourra alors en lire les messages." : {
+    "Conversation chiffrée : si l’équipe de modération dispose d’une clé de vérification, la clé de cette conversation lui est transmise, chiffrée pour elle seule. Elle pourra alors en lire les messages." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encrypted conversation: to review this report, the moderation team will receive this conversation’s key, encrypted for them only. They will then be able to read its messages."
+            "value" : "Encrypted conversation: if the moderation team has a review key, this conversation’s key is sent to them, encrypted for them only. They will then be able to read its messages."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conversation chiffrée : pour vérifier ce signalement, l’équipe de modération recevra la clé de cette conversation, chiffrée pour elle seule. Elle pourra alors en lire les messages."
+            "value" : "Conversation chiffrée : si l’équipe de modération dispose d’une clé de vérification, la clé de cette conversation lui est transmise, chiffrée pour elle seule. Elle pourra alors en lire les messages."
           }
         }
       }
@@ -16983,6 +17207,38 @@
         }
       }
     },
+    "Demande d’ami" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Friend request"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande d’ami"
+          }
+        }
+      }
+    },
+    "Demande d’ami acceptée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Friend request accepted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande d’ami acceptée"
+          }
+        }
+      }
+    },
     "Demande envoyée" : {
       "localizations" : {
         "en" : {
@@ -18124,6 +18380,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Détails de la mesure"
+          }
+        }
+      }
+    },
+    "Détails du site indisponibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site details unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Détails du site indisponibles"
           }
         }
       }
@@ -22229,6 +22501,38 @@
         }
       }
     },
+    "Gérer le partage en direct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage live sharing"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérer le partage en direct"
+          }
+        }
+      }
+    },
+    "Gérer mes amis proches (%lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage close friends (%lld)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérer mes amis proches (%lld)"
+          }
+        }
+      }
+    },
     "gigue" : {
       "localizations" : {
         "en" : {
@@ -23219,6 +23523,22 @@
         }
       }
     },
+    "Il disparaîtra pour tout le monde." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It will disappear for everyone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il disparaîtra pour tout le monde."
+          }
+        }
+      }
+    },
     "Il faut au moins deux semaines de mesures pour parler de dérive." : {
       "localizations" : {
         "en" : {
@@ -23458,6 +23778,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Imports"
+          }
+        }
+      }
+    },
+    "Impossible d’annuler le partage. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t undo the share. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’annuler le partage. Réessaie."
           }
         }
       }
@@ -29324,6 +29660,38 @@
         }
       }
     },
+    "Masqué à 1 personne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hidden from 1 person"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masqué à 1 personne"
+          }
+        }
+      }
+    },
+    "Masqué à %lld personnes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hidden from %lld people"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masqué à %lld personnes"
+          }
+        }
+      }
+    },
     "Masqué de la carte" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -29537,6 +29905,22 @@
         }
       }
     },
+    "Mbit/s médian" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median Mbps"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mbit/s médian"
+          }
+        }
+      }
+    },
     "Mbps" : {
       "localizations" : {
         "en" : {
@@ -29549,22 +29933,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mbps"
-          }
-        }
-      }
-    },
-    "Mbps médian" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Median Mbps"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mbps médian"
           }
         }
       }
@@ -31274,6 +31642,22 @@
         }
       }
     },
+    "Mon dernier speedtest SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My latest SignalQuest speedtest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mon dernier speedtest SignalQuest"
+          }
+        }
+      }
+    },
     "Mon rang" : {
       "localizations" : {
         "en" : {
@@ -32382,6 +32766,22 @@
         }
       }
     },
+    "Notification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification"
+          }
+        }
+      }
+    },
     "Notifications" : {
       "localizations" : {
         "en" : {
@@ -32411,6 +32811,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Notifications indisponibles"
+          }
+        }
+      }
+    },
+    "Nouveau commentaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New comment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau commentaire"
           }
         }
       }
@@ -32658,6 +33074,22 @@
         }
       }
     },
+    "Nouvelle réaction" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New reaction"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle réaction"
+          }
+        }
+      }
+    },
     "Nouvelle réaction chiffrée" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -32851,6 +33283,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OK"
+          }
+        }
+      }
+    },
+    "On t’a mentionné" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You were mentioned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On t’a mentionné"
           }
         }
       }
@@ -33986,6 +34434,22 @@
         }
       }
     },
+    "Ouvrir la conversation pour rappeler" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the conversation to call back"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la conversation pour rappeler"
+          }
+        }
+      }
+    },
     "Ouvrir la messagerie SignalQuest" : {
       "localizations" : {
         "en" : {
@@ -34718,7 +35182,6 @@
       }
     },
     "Partagé vers %@" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -34914,7 +35377,7 @@
         }
       }
     },
-    "Partager sur Signal Quest" : {
+    "Partager sur SignalQuest" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -34925,7 +35388,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Partager sur Signal Quest"
+            "value" : "Partager sur SignalQuest"
           }
         }
       }
@@ -35839,6 +36302,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photo publiée"
+          }
+        }
+      }
+    },
+    "Photo SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo SignalQuest"
           }
         }
       }
@@ -37009,7 +37488,7 @@
         }
       }
     },
-    "Pouls réseau · autour de vous" : {
+    "Pouls réseau · autour de toi" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -37020,12 +37499,12 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pouls réseau · autour de vous"
+            "value" : "Pouls réseau · autour de toi"
           }
         }
       }
     },
-    "Pouls réseau autour de vous" : {
+    "Pouls réseau autour de toi" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -37036,7 +37515,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pouls réseau autour de vous"
+            "value" : "Pouls réseau autour de toi"
           }
         }
       }
@@ -37247,6 +37726,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Préfixe %1$@\nProposé %2$@"
+          }
+        }
+      }
+    },
+    "Premier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premier"
           }
         }
       }
@@ -37570,6 +38065,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prochain test dans %lld s"
+          }
+        }
+      }
+    },
+    "Proches" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close friends"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proches"
           }
         }
       }
@@ -37981,6 +38492,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "pts"
+          }
+        }
+      }
+    },
+    "Public" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public"
           }
         }
       }
@@ -38507,6 +39034,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quelqu'un signale le rétablissement"
+          }
+        }
+      }
+    },
+    "Quelqu’un te suit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Someone follows you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelqu’un te suit"
           }
         }
       }
@@ -39989,6 +40532,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réessayer le flux des amis"
+          }
+        }
+      }
+    },
+    "Référence %@ : %@ (%lld tests)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reference %1$@: %2$@ (%3$lld tests)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Référence %@ : %@ (%lld tests)"
           }
         }
       }
@@ -42258,6 +42817,22 @@
         }
       }
     },
+    "Rien ici pour l’instant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing here yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien ici pour l’instant"
+          }
+        }
+      }
+    },
     "Rien ne coupe la droite entre tes yeux et les antennes." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -44085,22 +44660,6 @@
         }
       }
     },
-    "Signal Quest" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SignalQuest"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signal Quest"
-          }
-        }
-      }
-    },
     "Signalé par quelqu'un" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -44164,6 +44723,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Signalement accepté"
+          }
+        }
+      }
+    },
+    "Signalement envoyé. Ce message étant chiffré, l’équipe de modération ne pourra pas en lire le contenu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report sent. As this message is encrypted, the moderation team won’t be able to read its content."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement envoyé. Ce message étant chiffré, l’équipe de modération ne pourra pas en lire le contenu."
           }
         }
       }
@@ -44278,6 +44853,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Signaler la photo"
+          }
+        }
+      }
+    },
+    "Signaler le commentaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report comment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signaler le commentaire"
+          }
+        }
+      }
+    },
+    "Signaler la story" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report story"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signaler la story"
           }
         }
       }
@@ -45868,6 +46475,22 @@
         }
       }
     },
+    "Story" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Story"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Story"
+          }
+        }
+      }
+    },
     "Story de %@" : {
       "localizations" : {
         "en" : {
@@ -45880,6 +46503,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Story de %@"
+          }
+        }
+      }
+    },
+    "Story de %@ : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@’s story: %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Story de %@ : %@"
           }
         }
       }
@@ -46008,23 +46647,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "suffisant, c'est le seuil retenu par l'UIT"
-          }
-        }
-      }
-    },
-    "Suis des membres, lance un speedtest ou publie ta première mesure : le fil se remplira au fur et à mesure." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Follow members, run a speedtest or publish your first measurement: the feed will fill up as you go."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suis des membres, lance un speedtest ou publie ta première mesure : le fil se remplira au fur et à mesure."
           }
         }
       }
@@ -46320,6 +46942,22 @@
         }
       }
     },
+    "Supprimer ce commentaire ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this comment?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ce commentaire ?"
+          }
+        }
+      }
+    },
     "Supprimer ce message pour tout le monde ?" : {
       "localizations" : {
         "en" : {
@@ -46590,6 +47228,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer le brouillon"
+          }
+        }
+      }
+    },
+    "Supprimer le commentaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete comment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le commentaire"
           }
         }
       }
@@ -47076,6 +47730,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ta position reste partagée en continu tant que SignalQuest est ouverte, même sans consulter la carte des amis, ou pendant un Drive Test actif. Le partage se met en pause dès que l'app passe en arrière-plan."
+          }
+        }
+      }
+    },
+    "Ta publication a été repartagée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your post was reshared"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta publication a été repartagée"
           }
         }
       }
@@ -51788,6 +52458,22 @@
         }
       }
     },
+    "Vos positions et vos mesures ne seront plus partagées entre vous deux. Tu pourras lui renvoyer une demande plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your locations and measurements will no longer be shared between you. You can send them a new request later."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos positions et vos mesures ne seront plus partagées entre vous deux. Tu pourras lui renvoyer une demande plus tard."
+          }
+        }
+      }
+    },
     "votre connexion" : {
       "localizations" : {
         "en" : {
@@ -51864,22 +52550,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vous êtes arrivé."
-          }
-        }
-      }
-    },
-    "Vous ne partagerez plus vos positions ni vos mesures. Tu pourras renvoyer une demande plus tard." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You'll no longer share your locations or measurements. You can send a new request later."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous ne partagerez plus vos positions ni vos mesures. Tu pourras renvoyer une demande plus tard."
           }
         }
       }

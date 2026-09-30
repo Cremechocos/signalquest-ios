@@ -297,7 +297,7 @@ struct NotificationsCenterView: View {
     @ViewBuilder
     private func notificationRow(_ item: AppNotification) -> some View {
         let isUnread = item.read != true
-        let titleText = item.title ?? item.type ?? "Notification"
+        let titleText = item.title ?? Self.title(for: item.type)
         HStack(alignment: .top, spacing: SQSpace.md) {
             Image(systemName: icon(for: item.type))
                 .font(.system(size: 15, weight: .medium))
@@ -367,6 +367,23 @@ struct NotificationsCenterView: View {
 
     /// Icône par type de notification (pastille unique `accentSoft` de la DA
     /// Crème : seule la forme distingue le type, la brique reste l'accent).
+    /// Titre lisible quand le serveur n'en envoie pas : la liste affichait le
+    /// type technique (« social_follow », SOC-44).
+    static func title(for kind: String?) -> String {
+        switch kind?.lowercased() {
+        case "message_new": return String(localized: "Nouveau message")
+        case "message_reaction", "social_reaction": return String(localized: "Nouvelle réaction")
+        case "message_mention", "social_mention": return String(localized: "On t’a mentionné")
+        case "social_comment": return String(localized: "Nouveau commentaire")
+        case "social_repost": return String(localized: "Ta publication a été repartagée")
+        case "social_follow": return String(localized: "Quelqu’un te suit")
+        case "friend_request": return String(localized: "Demande d’ami")
+        case "friend_accepted": return String(localized: "Demande d’ami acceptée")
+        case "community_outage": return String(localized: "Panne signalée")
+        default: return String(localized: "Notification")
+        }
+    }
+
     private func icon(for kind: String?) -> String {
         let k = (kind ?? "").lowercased()
         if k.contains("antenna_report") || k.contains("site_report") {

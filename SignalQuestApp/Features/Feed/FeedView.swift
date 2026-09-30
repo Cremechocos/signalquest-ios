@@ -8,6 +8,10 @@ final class FeedViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isLoadingMore = false
     @Published var errorMessage: String?
+    /// Échec d'une action (like, vote, épingle…) : message passager, jamais
+    /// l'écran d'erreur du chargement, dont « Réessayer » rechargeait tout le
+    /// fil (SOC-14).
+    @Published var actionError: String?
     /// Pouls réseau (héro) — nil tant qu'aucune donnée / position n'est disponible.
     @Published var pulse: NetworkPulse?
 
@@ -212,7 +216,13 @@ final class FeedViewModel: ObservableObject {
             }
         } catch {
             guard context == query, request == loadRevision, !error.isCancellation else { return }
-            errorMessage = error.userFacingMessage
+            // Un rafraîchissement raté garde le fil affiché : seul un premier
+            // chargement sans rien à montrer mérite l'écran d'erreur.
+            if page == nil {
+                errorMessage = error.userFacingMessage
+            } else {
+                actionError = error.userFacingMessage
+            }
         }
     }
 
@@ -232,7 +242,8 @@ final class FeedViewModel: ObservableObject {
                 suggestedUsers: current.suggestedUsers, requestId: next.requestId ?? current.requestId)
         } catch {
             guard context == query, loading == loadRevision, !error.isCancellation else { return }
-            errorMessage = error.userFacingMessage
+            // La page déjà lue reste affichée ; faire défiler relance la suite.
+            actionError = error.userFacingMessage
         }
     }
 
@@ -252,7 +263,7 @@ final class FeedViewModel: ObservableObject {
                 await applyReactionResponse(itemId: item.id, response: response)
             } catch {
                 await restore(previous)
-                if !error.isCancellation { errorMessage = error.localizedDescription }
+                if !error.isCancellation { actionError = error.userFacingMessage }
             }
         }
         Haptics.light()
@@ -274,7 +285,7 @@ final class FeedViewModel: ObservableObject {
                 await applyReactionResponse(itemId: item.id, response: response)
             } catch {
                 await restore(previous)
-                if !error.isCancellation { errorMessage = error.localizedDescription }
+                if !error.isCancellation { actionError = error.userFacingMessage }
             }
         }
         Haptics.medium()
@@ -296,7 +307,7 @@ final class FeedViewModel: ObservableObject {
                 await applyReactionResponse(itemId: item.id, response: response)
             } catch {
                 await restore(previous)
-                if !error.isCancellation { errorMessage = error.localizedDescription }
+                if !error.isCancellation { actionError = error.userFacingMessage }
             }
         }
     }
@@ -327,7 +338,7 @@ final class FeedViewModel: ObservableObject {
             do { try await service.setPinned(postId: item.id, pinned: willPin) }
             catch {
                 await restore(previous)
-                if !error.isCancellation { errorMessage = error.localizedDescription }
+                if !error.isCancellation { actionError = error.userFacingMessage }
             }
         }
     }
@@ -350,7 +361,7 @@ final class FeedViewModel: ObservableObject {
             do { try await service.deletePost(postId: item.id) }
             catch {
                 self.page = snapshot
-                if !error.isCancellation { errorMessage = error.localizedDescription }
+                if !error.isCancellation { actionError = error.userFacingMessage }
             }
         }
     }
@@ -376,7 +387,7 @@ final class FeedViewModel: ObservableObject {
                     var copy = current; copy.poll = updated; return copy
                 }
             } catch {
-                if !error.isCancellation { errorMessage = error.localizedDescription }
+                if !error.isCancellation { actionError = error.userFacingMessage }
             }
         }
     }
@@ -391,7 +402,7 @@ final class FeedViewModel: ObservableObject {
                     return copy
                 }
             } catch {
-                if !error.isCancellation { errorMessage = error.localizedDescription }
+                if !error.isCancellation { actionError = error.userFacingMessage }
             }
         }
     }
@@ -403,10 +414,30 @@ final class FeedViewModel: ObservableObject {
             Haptics.success()
             return messageId
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            // La feuille de partage affiche l'échec elle-même.
             Haptics.error()
             return nil
         }
+    }
+
+    /// Story qu'on vient de publier, montrée tout de suite en tête du rail
+    /// (elle n'apparaissait qu'au rechargement suivant, SOC-34).
+    func insertPublishedStory(_ story: SocialStory) {
+        guard let page, !page.stories.contains(where: { $0.id == story.id }) else { return }
+        self.page = SocialFeedPage(
+            items: page.items, nextCursor: page.nextCursor, stories: [story] + page.stories,
+            trendingHashtags: page.trendingHashtags, suggestedUsers: page.suggestedUsers,
+            requestId: page.requestId
+        )
+    }
+
+    func removeStory(_ id: String) {
+        guard let page else { return }
+        self.page = SocialFeedPage(
+            items: page.items, nextCursor: page.nextCursor, stories: page.stories.filter { $0.id != id },
+            trendingHashtags: page.trendingHashtags, suggestedUsers: page.suggestedUsers,
+            requestId: page.requestId
+        )
     }
 
     /// Version courante d'une publication du fil (à défaut, celle reçue).
@@ -600,9 +631,15 @@ struct FeedView: View {
                     if (model.page?.items.isEmpty ?? true), !model.isLoading, model.errorMessage == nil {
                         // État vide explicite : sans lui, un nouveau compte (onglet par
                         // défaut) voit un écran quasi nu, l'app paraît cassée (INT-01).
+                        // Message propre à l'onglet ou au hashtag : « Ton fil est
+                        // encore vide » était faux sur « Amis » ou « Enregistrés » (SOC-38).
                         EmptyStateView(
-                            title: "Ton fil est encore vide",
-                            message: "Suis des membres, lance un speedtest ou publie ta première mesure : le fil se remplira au fur et à mesure.",
+                            title: model.tab == .forYou && model.selectedHashtag == nil
+                                ? "Ton fil est encore vide"
+                                : String(localized: "Rien ici pour l’instant"),
+                            message: model.selectedHashtag.map {
+                                String(localized: "Aucune publication avec #\($0) pour l’instant.")
+                            } ?? model.tab.emptyMessage,
                             systemImage: "sparkles"
                         )
                         .padding(.top, SQSpace.xxl)
@@ -706,6 +743,13 @@ struct FeedView: View {
         } message: { _ in
             Text("Une erreur est survenue. Réessaie.")
         }
+        // Échec d'une action : bandeau passager, ou message dans la fiche
+        // ouverte, qui masquerait le bandeau (SOC-14).
+        .onChangeCompat(of: model.actionError) { _, message in
+            guard let message, presentedSheet == nil else { return }
+            inAppNotifications.showError(message)
+            model.actionError = nil
+        }
         .onChangeCompat(of: router.openUserProfileId) { _, _ in
             Task { await consumeFeedRoutesIfNeeded() }
         }
@@ -743,7 +787,7 @@ struct FeedView: View {
         } message: {
             Text("Cette action est irréversible.")
         }
-        .sheet(item: $presentedSheet) { sheet in
+        .sheet(item: $presentedSheet, onDismiss: { model.actionError = nil }) { sheet in
             switch sheet {
             case .detail(let opened):
                 // L'élément courant du fil, pas la copie prise à l'ouverture : sans
@@ -751,9 +795,18 @@ struct FeedView: View {
                 let item = model.currentItem(opened)
                 SignalDetailSheet(
                     item: item,
-                    onLike: { model.react(item) },
-                    onRepost: { model.repost(item) },
-                    onFavorite: { model.favorite(item) },
+                    onLike: {
+                        if !item.likedByMe { recordSignal("like", for: item) }
+                        model.react(item)
+                    },
+                    onRepost: {
+                        if !item.repostedByMe { recordSignal("repost", for: item) }
+                        model.repost(item)
+                    },
+                    onFavorite: {
+                        if !item.favoritedByMe { recordSignal("favorite", for: item) }
+                        model.favorite(item)
+                    },
                     onComment: { presentedSheet = .comments(item) },
                     onShare: { presentedSheet = .share(item) },
                     onMute: { model.muteNotifications(item) },
@@ -761,13 +814,16 @@ struct FeedView: View {
                     onAuthorTap: {
                         presentedSheet = nil
                         pushProfileAfterDismiss(item.author)
-                    }
+                    },
+                    actionError: model.actionError
                 )
             case .comments(let item):
                 CommentsSheet(
                     service: services.comments,
                     postId: item.backendPostId,
-                    profileService: services.feed
+                    profileService: services.feed,
+                    reports: services.reports,
+                    onCommentPosted: { recordSignal("comment", for: item) }
                 )
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
@@ -779,6 +835,7 @@ struct FeedView: View {
                         await model.share(item, to: conversation)
                     },
                     onShared: { messageId, conversation in
+                        recordSignal("share", for: item)
                         presentShareUndo(messageId: messageId, conversation: conversation)
                     }
                 )
@@ -790,7 +847,7 @@ struct FeedView: View {
             get: { presentedStoryStart.map { _ in StoriesPresentation() } },
             set: { if $0 == nil { presentedStoryStart = nil } }
         )) { _ in
-            if let stories = model.page?.stories, let start = presentedStoryStart {
+            if let stories = model.page?.stories, !stories.isEmpty, let start = presentedStoryStart {
                 StoryViewer(stories: Array(stories[min(start, stories.count - 1)...]),
                             onMarkViewed: { story in
                                 Task { try? await services.stories.markViewed(story.id) }
@@ -804,17 +861,26 @@ struct FeedView: View {
                             },
                             onDelete: { story in
                                 Task {
-                                    try? await services.stories.delete(story.id)
-                                    await model.load()
+                                    // L'échec était avalé : la story restait
+                                    // sans rien dire (SOC-34).
+                                    do {
+                                        try await services.stories.delete(story.id)
+                                        model.removeStory(story.id)
+                                    } catch {
+                                        if !error.isCancellation { model.actionError = error.userFacingMessage }
+                                    }
                                 }
                             },
                             viewersProvider: { story in
                                 (try? await services.stories.viewers(storyId: story.id)) ?? []
-                            })
+                            },
+                            reports: services.reports)
             }
         }
         .sheet(isPresented: $showStoryComposer) {
-            StoryComposer(service: services.stories, friendsService: services.friends)
+            StoryComposer(service: services.stories, friendsService: services.friends) { story in
+                model.insertPublishedStory(story)
+            }
         }
         .sheet(isPresented: $showComposer) {
             ComposerSheet(service: services.feed, userService: services.users)
@@ -826,7 +892,10 @@ struct FeedView: View {
 
     private func presentShareUndo(messageId: String, conversation: MessageConversation) {
         let title = conversation.displayTitle.isEmpty ? "la conversation" : conversation.displayTitle
-        inAppNotifications.showUndo(body: "Partagé vers \(title)", actionLabel: "Annuler") {
+        inAppNotifications.showUndo(
+            body: String(localized: "Partagé vers \(title)"),
+            actionLabel: String(localized: "Annuler")
+        ) {
             undoShare(messageId: messageId)
         }
     }
@@ -838,7 +907,7 @@ struct FeedView: View {
                 await MainActor.run { Haptics.success() }
             } catch {
                 await MainActor.run {
-                    inAppNotifications.showError("Impossible d’annuler le partage. Réessaie.")
+                    inAppNotifications.showError(String(localized: "Impossible d’annuler le partage. Réessaie."))
                 }
             }
         }
@@ -945,7 +1014,7 @@ struct FeedView: View {
                 HStack(spacing: SQSpace.sm) {
                     Image(systemName: "waveform.path.ecg")
                         .foregroundStyle(SQColor.brandRed)
-                    Text("Pouls réseau · autour de vous")
+                    Text("Pouls réseau · autour de toi")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
@@ -982,12 +1051,14 @@ struct FeedView: View {
         .accessibilityElement(children: .contain)
     }
 
+    /// Titre sur une ligne, qui se réduit plutôt que de sortir de l'écran en
+    /// très grand texte et de pousser le menu (UI-15).
     private func headerTitle(singleLine: Bool) -> some View {
         Text("Communauté")
             .font(SQFont.display(26, .bold))
             .foregroundStyle(SQColor.label)
-            .lineLimit(singleLine ? 1 : nil)
-            .fixedSize(horizontal: singleLine, vertical: true)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
             .accessibilityAddTraits(.isHeader)
             .accessibilityIdentifier("feed.header")
     }
@@ -1117,9 +1188,11 @@ struct FeedView: View {
             HStack(spacing: SQSpace.xs + 1) {
                 Image(systemName: systemImage)
                     .font(.system(size: 15, weight: .semibold))
+                // Se réduit un peu avant de se couper : « Messa… » dès le XXL (UI-15).
                 Text(LocalizedStringKey(title))
                     .font(SQFont.body(13, .semibold, relativeTo: .subheadline))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .accessibilityIdentifier("community.header.action.\(identifier).label")
                 if badgeCount > 0 {
                     Text("\(min(badgeCount, 99))")
@@ -1158,28 +1231,27 @@ struct FeedView: View {
             // Chaque action nourrit aussi le classement : ce
             // sont les signaux les plus discriminants, bien plus
             // qu'une simple vue.
+            // Un signal seulement quand l'action AJOUTE (retirer son like
+            // envoyait « like ») ; commentaire et partage après réussite.
             onLike: {
+                if !item.likedByMe { recordSignal("like", for: item) }
                 model.react(item)
-                Task { await services.feedSignals.record(postId: item.id, type: "like") }
             },
             onRepost: {
+                if !item.repostedByMe { recordSignal("repost", for: item) }
                 model.repost(item)
-                Task { await services.feedSignals.record(postId: item.id, type: "repost") }
             },
-            onComment: {
-                presentedSheet = .comments(item)
-                Task { await services.feedSignals.record(postId: item.id, type: "comment") }
-            },
+            onComment: { presentedSheet = .comments(item) },
             onFavorite: {
+                if !item.favoritedByMe { recordSignal("favorite", for: item) }
                 model.favorite(item)
-                Task { await services.feedSignals.record(postId: item.id, type: "favorite") }
             },
-            onShare: {
-                presentedSheet = .share(item)
-                Task { await services.feedSignals.record(postId: item.id, type: "share") }
-            },
+            onShare: { presentedSheet = .share(item) },
             onAuthorTap: { profileAuthor = item.author },
-            onReact: { emoji in model.react(item, emoji: emoji) },
+            onReact: { emoji in
+                if !item.likedByMe { recordSignal("like", for: item) }
+                model.react(item, emoji: emoji)
+            },
             onPollVote: { option in model.votePoll(item, option: option) }
         )
         .contextMenu {
@@ -1217,11 +1289,21 @@ struct FeedView: View {
             // Une vue par post et par session : le collecteur
             // déduplique, l'appeler à chaque réapparition de
             // cellule est donc sans effet de bord.
-            Task { await services.feedSignals.onVisibleItems([item.id]) }
+            Task { await services.feedSignals.didAppear(item.backendPostId) }
             if item.id == model.page?.items.last?.id {
                 Task { await model.loadMore() }
             }
         }
+        .onDisappear {
+            Task { await services.feedSignals.didDisappear(item.backendPostId) }
+        }
+    }
+
+    /// Signal d'engagement du classement « Pour toi », avec l'identifiant brut
+    /// du post : le serveur indexe ses signaux par `post.id`, et l'identifiant
+    /// du fil (« post-… ») ne comptait pour rien (SOC-19).
+    private func recordSignal(_ type: String, for item: UnifiedSocialFeedItem) {
+        Task { await services.feedSignals.record(postId: item.backendPostId, type: type) }
     }
 
     /// Pilule « N nouveautés ».
@@ -1432,7 +1514,7 @@ struct PostShareSheet: View {
         do {
             conversations = AppEnvironment.usesDemoData ? .demo : try await messagesService.conversations()
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 

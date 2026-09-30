@@ -128,9 +128,18 @@ enum APIError: Error, LocalizedError, Equatable {
         "ATTESTATION_FAILED": String(localized: "Application non vérifiée. Mets-la à jour puis réessaie."),
         "FIRST_PARTY_TOKEN_REQUIRED": String(localized: "Application non vérifiée. Mets-la à jour puis réessaie."),
 
+        // Fonction réservée (journal radio synchronisé, durée de story…) : le
+        // message reste neutre, chaque écran nomme sa fonction s'il le peut.
+        "PREMIUM_REQUIRED": String(localized: "Cette fonction est réservée aux membres Premium."),
+
         // Journal radio synchronisé.
-        "PREMIUM_REQUIRED": String(localized: "La sauvegarde du journal radio est réservée aux membres Premium."),
         "TOO_MANY_ITEMS": String(localized: "Trop d'éléments envoyés d'un coup. Réessaie."),
+
+        // Stories (`POST /api/social/stories`) : le serveur ne renvoie que ces
+        // codes, sans détail (confirmé le 30/09).
+        "EMPTY_STORY": String(localized: "Ajoute un texte, une photo ou ton relevé radio à ta story."),
+        "INVALID_STORY_EXPIRATION": String(localized: "Cette durée n'est pas disponible pour une story."),
+        "INVALID_STORY": String(localized: "Cette story n'a pas pu être publiée. Vérifie son texte et réessaie."),
     ]
 }
 

@@ -345,7 +345,7 @@ private struct SpeedtestShareCard: View {
                             .stroke(separator.opacity(0.6), lineWidth: 1)
                     )
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Signal Quest")
+                    Text(verbatim: "SignalQuest")
                         .font(SQFont.displayFixed(24, .bold))
                         .foregroundStyle(textPrimary)
                     Text("Speedtest")

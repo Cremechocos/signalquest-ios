@@ -12,6 +12,14 @@ protocol CommentsServicing: Sendable {
     func like(postId: String, commentId: String) async throws -> CommentReactionResponse
     /// Retire le like ❤️ d'un commentaire (idempotent).
     func unlike(postId: String, commentId: String) async throws -> CommentReactionResponse
+    /// Supprime son propre commentaire (App Store, règle 1.2) : 403 pour celui
+    /// d'un autre, 404 s'il n'existe plus.
+    func delete(postId: String, commentId: String) async throws
+}
+
+extension CommentsServicing {
+    /// Les doubles de test et de démonstration n'ont rien à supprimer.
+    func delete(postId: String, commentId: String) async throws {}
 }
 
 final class CommentsService: CommentsServicing {
@@ -66,6 +74,17 @@ final class CommentsService: CommentsServicing {
         try await api.requestJSON(
             "/api/social/posts/\(normalizedPostId(postId))/comments/\(commentId)/reactions",
             body: ["emoji": "❤️"]
+        )
+    }
+
+    /// `DELETE .../comments/{commentId}` → `{ deleted: true, commentId }`
+    /// (suppression douce côté serveur, auteur seulement ; SOC-12).
+    func delete(postId: String, commentId: String) async throws {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/social/posts/\(normalizedPostId(postId))/comments/\(commentId)",
+                method: .delete
+            )
         )
     }
 

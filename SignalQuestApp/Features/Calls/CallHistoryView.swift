@@ -79,6 +79,7 @@ final class CallHistoryViewModel: ObservableObject {
 struct CallHistoryView: View {
     @StateObject private var model: CallHistoryViewModel
     @State private var confirmingClear = false
+    @EnvironmentObject private var router: AppRouter
     init(service: CallsServicing) {
         _model = StateObject(wrappedValue: CallHistoryViewModel(service: service))
     }
@@ -150,6 +151,28 @@ struct CallHistoryView: View {
                             Label("Supprimer", systemImage: "trash")
                         }
                     }
+                    // Rappeler passe par la conversation : son bouton d'appel
+                    // applique les règles (chiffrement, groupe, réseau) ; la
+                    // ligne ne menait nulle part (SOC-44).
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        if let conversationId = call.conversationId {
+                            Button {
+                                router.route(toConversation: conversationId)
+                            } label: {
+                                Label("Rappeler", systemImage: "phone.arrow.up.right")
+                            }
+                            .tint(SQColor.success)
+                        }
+                    }
+                    .contextMenu {
+                        if let conversationId = call.conversationId {
+                            Button {
+                                router.route(toConversation: conversationId)
+                            } label: {
+                                Label("Ouvrir la conversation pour rappeler", systemImage: "phone.arrow.up.right")
+                            }
+                        }
+                    }
                 }
                 if model.isLoadingMore {
                     ProgressView()
@@ -213,7 +236,8 @@ struct CallHistoryView: View {
         case "ringing": return String(localized: "Sonnerie")
         case "pending": return String(localized: "En attente")
         case "cancelled", "canceled": return String(localized: "Annulé")
-        case .some(let other) where !other.isEmpty: return other.capitalized
+        case "active": return String(localized: "En cours")
+        // Statut inconnu : rien plutôt que le mot brut du serveur (SOC-44).
         default: return "—"
         }
     }

@@ -154,6 +154,7 @@ final class ComposerViewModel: ObservableObject {
     }
 
     private func saveDraft() {
+        guard !isEditing else { return }
         UserDefaults.standard.set(text, forKey: draftTextKey)
         UserDefaults.standard.set(visibility.rawValue, forKey: draftVisibilityKey)
     }
@@ -193,7 +194,9 @@ final class ComposerViewModel: ObservableObject {
 
     var canPublish: Bool {
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hasContent = !body.isEmpty || previewImage != nil || attachedSpeedtest != nil
+        // Un sondage seul suffit, comme dans `publish()` : le bouton restait
+        // désactivé alors que l'envoi l'acceptait (SOC-18).
+        let hasContent = !body.isEmpty || previewImage != nil || attachedSpeedtest != nil || preparedPoll != nil
         return hasContent && !isTextTooLong && !isBusy
     }
 
@@ -211,8 +214,8 @@ final class ComposerViewModel: ObservableObject {
         } else {
             return SocialFeedAuthor(
                 id: "preview-user",
-                name: "Vous",
-                handle: "vous",
+                name: String(localized: "Toi"),
+                handle: "toi",
                 avatarUrl: nil,
                 isFriend: false,
                 isFollowing: false,
@@ -276,72 +279,55 @@ final class ComposerViewModel: ObservableObject {
     }
 
     /// Prépare le composer pour une ÉDITION.
-
     ///
-
     /// Le brouillon n'est volontairement pas touché : éditer un post existant ne
-
     /// doit pas écraser ce que l'utilisateur avait commencé à rédiger ailleurs.
-
+    /// `editingPost` est posé AVANT le texte, et `saveDraft()` ne sauve rien
+    /// pendant une édition : le `didSet` de `text` écrasait le brouillon (SOC-18).
     func beginEditing(_ post: UnifiedSocialFeedItem) {
-
         editingPost = post
-
         text = post.text
-
         if let raw = post.visibility, let parsed = SocialVisibility(rawValue: raw) {
-
             visibility = parsed
-
         }
-
     }
-
 
     /// Enregistre les modifications.
-
     ///
-
     /// Le serveur valide la propriété et répond 403 : on ne s'appuie pas sur le
-
     /// seul masquage de l'UI. Le schéma est `.strict()`, donc on n'envoie que
-
     /// texte et visibilité — une clé inconnue ferait échouer tout le patch.
-
     func saveEdit() async {
-
         guard let post = editingPost else { return }
-
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
         guard !body.isEmpty, !isTextTooLong else { return }
-
         isBusy = true
-
         defer { isBusy = false }
-
         do {
-
             _ = try await service.editPost(
-
                 postId: post.id, text: body, visibility: visibility.rawValue
-
             )
-
             didPublish = true
-
             Haptics.success()
-
         } catch {
-
             errorMessage = error.userFacingMessage
-
             Haptics.error()
-
         }
-
     }
 
+    /// Texte envoyé quand le post n'en a pas (le serveur en exige un) : la
+    /// question d'un sondage seul, sinon une légende traduite. Un sondage seul
+    /// partait sous « Photo SignalQuest », en français quelle que soit la
+    /// langue (SOC-18).
+    var fallbackBody: String {
+        if let question = preparedPoll?.question?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !question.isEmpty {
+            return question
+        }
+        if preparedPoll != nil { return String(localized: "Sondage") }
+        if attachedSpeedtest != nil { return String(localized: "Mon dernier speedtest SignalQuest") }
+        return String(localized: "Photo SignalQuest")
+    }
 
     func publish() async {
         let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -355,8 +341,7 @@ final class ComposerViewModel: ObservableObject {
             // Le service ré-encode, réduit et retire les EXIF hors du main thread,
             // puis conserve le brouillon dans son outbox jusqu'à l'accusé serveur.
             let imageData = preparedImageData()
-            let fallback = attachedSpeedtest != nil ? "Mon dernier speedtest SignalQuest" : "Photo SignalQuest"
-            let safeBody = body.isEmpty ? fallback : body
+            let safeBody = body.isEmpty ? fallbackBody : body
             _ = try await service.publishPost(
                 text: safeBody,
                 visibility: visibility.rawValue,
@@ -838,16 +823,20 @@ struct PostPreviewCard: View {
                     .foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer()
-                SQEditorialTag(
-                    text: speedtest != nil ? "Speedtest" : "Post",
-                    color: speedtest != nil ? SQColor.brandRed : SQColor.label
-                )
+                // Comme dans le fil : badge pour un speedtest, rien pour un post.
+                if speedtest != nil {
+                    SQEditorialTag(text: "Speedtest", color: SQColor.brandRed)
+                }
             }
 
             // Body text
             let bodyTrimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let fallbackText = speedtest != nil ? "Mon dernier speedtest SignalQuest" : "Photo SignalQuest"
-            let displayText = bodyTrimmed.isEmpty ? ((image != nil || speedtest != nil) ? fallbackText : "Quoi de neuf sur le réseau ?") : bodyTrimmed
+            let fallbackText = speedtest != nil
+                ? String(localized: "Mon dernier speedtest SignalQuest")
+                : String(localized: "Photo SignalQuest")
+            let displayText = bodyTrimmed.isEmpty
+                ? ((image != nil || speedtest != nil) ? fallbackText : String(localized: "Quoi de neuf sur le réseau ?"))
+                : bodyTrimmed
 
             Text(displayText)
                 .font(SQType.body)

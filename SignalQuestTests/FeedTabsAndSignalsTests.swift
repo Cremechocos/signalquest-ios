@@ -115,6 +115,32 @@ final class FeedSignalsCollectorTests: XCTestCase {
         XCTAssertTrue(signals.allSatisfy { $0.signalType != "dwell" })
     }
 
+    /// Une carte qui apparaît ne ferme plus la lecture des autres, encore à
+    /// l'écran (SOC-19) : la lecture ne se clôt qu'à la disparition.
+    func testAppearanceDoesNotCloseOtherVisibleCards() async {
+        let api = SpyAPI()
+        let collector = FeedSignalsCollector(api: api)
+        await collector.didAppear("p1")
+        await collector.didAppear("p2")
+        await collector.flushNow()
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        let signals = await decode(api)
+        XCTAssertEqual(signals.filter { $0.signalType == "view" }.map(\.postId).sorted(), ["p1", "p2"])
+    }
+
+    /// Une carte à peine croisée ne compte pas comme lue, même avec l'API
+    /// apparition / disparition.
+    func testQuickDisappearanceSendsNoDwell() async {
+        let api = SpyAPI()
+        let collector = FeedSignalsCollector(api: api)
+        await collector.didAppear("p1")
+        await collector.didDisappear("p1")
+        await collector.flushNow()
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        let signals = await decode(api)
+        XCTAssertTrue(signals.allSatisfy { $0.signalType != "dwell" })
+    }
+
     func testExplicitActionsAreRecorded() async {
         let api = SpyAPI()
         let collector = FeedSignalsCollector(api: api)

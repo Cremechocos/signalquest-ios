@@ -12,6 +12,9 @@ final class UserProfileViewModel: ObservableObject {
     @Published var isLoadingMore = false
     @Published var isTogglingFollow = false
     @Published var errorMessage: String?
+    /// Échec d'une action (suivre, like, ami…) : bandeau passager, pas
+    /// « Profil indisponible » avec un « Réessayer » qui rechargeait tout (SOC-14).
+    @Published var actionError: String?
     /// Déclencheur du sqLikePop sur le bouton Suivre.
     @Published var followPopTick = 0
 
@@ -54,7 +57,7 @@ final class UserProfileViewModel: ObservableObject {
             items.append(contentsOf: page.items.filter { !known.contains($0.id) })
             nextCursor = page.nextCursor
         } catch {
-            errorMessage = error.userFacingMessage
+            actionError = error.userFacingMessage
         }
     }
 
@@ -86,7 +89,7 @@ final class UserProfileViewModel: ObservableObject {
                     reverted.followersCount = max(0, reverted.followersCount + (reverted.isFollowing ? 1 : -1))
                     profile = reverted
                 }
-                errorMessage = error.userFacingMessage
+                actionError = error.userFacingMessage
                 Haptics.error()
             }
         }
@@ -109,7 +112,7 @@ final class UserProfileViewModel: ObservableObject {
                 applyReactionResponse(itemId: item.id, response: response)
             } catch {
                 restore(previous)
-                errorMessage = error.userFacingMessage
+                actionError = error.userFacingMessage
             }
         }
         Haptics.light()
@@ -130,7 +133,7 @@ final class UserProfileViewModel: ObservableObject {
                 applyReactionResponse(itemId: item.id, response: response)
             } catch {
                 restore(previous)
-                errorMessage = error.userFacingMessage
+                actionError = error.userFacingMessage
             }
         }
         Haptics.medium()
@@ -151,7 +154,7 @@ final class UserProfileViewModel: ObservableObject {
                 applyReactionResponse(itemId: item.id, response: response)
             } catch {
                 restore(previous)
-                errorMessage = error.userFacingMessage
+                actionError = error.userFacingMessage
             }
         }
     }
@@ -239,6 +242,7 @@ final class UserProfileViewModel: ObservableObject {
 struct UserProfileView: View {
     @StateObject private var model: UserProfileViewModel
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @EnvironmentObject private var router: AppRouter
     @Environment(\.dismiss) private var dismiss
 
@@ -311,8 +315,13 @@ struct UserProfileView: View {
             if model.profile == nil { await model.load() }
         }
         .refreshable { await model.load() }
+        .onChangeCompat(of: model.actionError) { _, message in
+            guard let message else { return }
+            inAppNotifications.showError(message)
+            model.actionError = nil
+        }
         .confirmationDialog(
-            "Bloquer \(model.profile?.displayName ?? "cet utilisateur") ?",
+            "Bloquer \(model.profile?.displayName ?? String(localized: "cet utilisateur")) ?",
             isPresented: $showBlockConfirm,
             titleVisibility: .visible
         ) {
@@ -348,7 +357,7 @@ struct UserProfileView: View {
                 )
             case .comments(let item):
                 CommentsSheet(service: services.comments, postId: item.backendPostId,
-                              profileService: services.feed)
+                              profileService: services.feed, reports: services.reports)
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
             case .reportUser:
@@ -406,7 +415,7 @@ struct UserProfileView: View {
         ) {
             Button("Retirer des amis", role: .destructive) { Task { await removeFriend() } }
         } message: {
-            Text("Vous ne partagerez plus vos positions ni vos mesures. Tu pourras renvoyer une demande plus tard.")
+            Text("Vos positions et vos mesures ne seront plus partagées entre vous deux. Tu pourras lui renvoyer une demande plus tard.")
         }
     }
 
@@ -419,7 +428,7 @@ struct UserProfileView: View {
             Haptics.success()
             await model.load()
         } catch {
-            model.errorMessage = error.localizedDescription
+            model.actionError = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -433,7 +442,7 @@ struct UserProfileView: View {
             friendRequestSent = true
             Haptics.success()
         } catch {
-            model.errorMessage = error.localizedDescription
+            model.actionError = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -447,7 +456,7 @@ struct UserProfileView: View {
             Haptics.success()
             dismiss()
         } catch {
-            model.errorMessage = error.localizedDescription
+            model.actionError = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -760,21 +769,31 @@ struct UserProfileView: View {
         let profile = model.profile
         let stats = profile?.stats
         FlowLayoutCompat(spacing: SQSpace.sm) {
+            // Libellés traduits, singulier compris : les pastilles étaient des
+            // chaînes brutes, en français dans l'app anglaise (SOC-28).
             if let level = stats?.level {
-                secondaryChip("Niveau \(level)", systemImage: "chevron.up.circle", accented: true)
+                secondaryChip(String(localized: "Niveau \(level)"), systemImage: "chevron.up.circle", accented: true)
             }
-            secondaryChip(
-                "\(SignalFormatters.count(profile?.followersCount)) abonnés",
-                systemImage: "person.2"
-            )
-            secondaryChip(
-                "\(SignalFormatters.count(profile?.followingCount)) abonnements",
-                systemImage: "person.crop.circle.badge.checkmark"
-            )
+            secondaryChip(followersLabel(profile?.followersCount), systemImage: "person.2")
+            secondaryChip(followingLabel(profile?.followingCount), systemImage: "person.crop.circle.badge.checkmark")
             if let photos = stats?.photos, photos > 0 {
-                secondaryChip("\(SignalFormatters.count(photos)) photos", systemImage: "photo")
+                let value = SignalFormatters.count(photos)
+                secondaryChip(
+                    photos == 1 ? String(localized: "\(value) photo") : String(localized: "\(value) photos"),
+                    systemImage: "photo"
+                )
             }
         }
+    }
+
+    private func followersLabel(_ count: Int?) -> String {
+        let value = SignalFormatters.count(count)
+        return count == 1 ? String(localized: "\(value) abonné") : String(localized: "\(value) abonnés")
+    }
+
+    private func followingLabel(_ count: Int?) -> String {
+        let value = SignalFormatters.count(count)
+        return count == 1 ? String(localized: "\(value) abonnement") : String(localized: "\(value) abonnements")
     }
 
     private func secondaryChip(_ title: String, systemImage: String, accented: Bool = false) -> some View {

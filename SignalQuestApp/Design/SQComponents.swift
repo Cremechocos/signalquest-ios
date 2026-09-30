@@ -114,12 +114,17 @@ struct StoryBubble: View {
                         SQStoryRing(lineWidth: 3)
                     }
                 }
+            // Largeur du cercle : en très grand texte, les prénoms débordaient et
+            // se chevauchaient (UI-15). Deux lignes centrées et une réduction
+            // modérée plutôt qu'une troncature ; VoiceOver lit le nom entier.
             Text(story.author.displayName)
                 .font(.footnote)
                 .foregroundStyle(SQColor.label)
+                .multilineTextAlignment(.center)
                 .lineLimit(2)
+                .minimumScaleFactor(0.7)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(minWidth: 70)
+                .frame(width: 72)
                 .accessibilityIdentifier("feed.story.name")
         }
         .accessibilityElement(children: .combine)

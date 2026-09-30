@@ -64,6 +64,7 @@ struct SpeedtestCardView: View {
                         .lineSpacing(3)
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("feed.post.text")
                 }
 
                 CardActionsBar(

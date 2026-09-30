@@ -33,6 +33,40 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertNil(router.openUserProfileId)
     }
 
+    /// Types réellement émis par le serveur (préfixés).
+    func testServerMessageTypesOpenTheConversation() {
+        for type in ["message_new", "message_reaction", "message_mention"] {
+            let router = AppRouter()
+            router.handle(type: type, conversationId: "conv-9", postId: nil)
+            XCTAssertEqual(router.openConversationId, "conv-9", type)
+        }
+    }
+
+    func testServerSocialTypesOpenThePost() {
+        for type in ["social_reaction", "social_comment", "social_repost", "social_mention"] {
+            let router = AppRouter()
+            router.handle(type: type, conversationId: nil, postId: "post-9")
+            XCTAssertEqual(router.openPostId, "post-9", type)
+        }
+    }
+
+    func testStoryMentionWithoutPostOpensCommunity() {
+        let router = AppRouter()
+        router.selectedTab = .map
+        router.handle(type: "social_mention", conversationId: nil, postId: nil, userId: "actor-1")
+        XCTAssertEqual(router.selectedTab, .community)
+        XCTAssertNil(router.openPostId)
+        XCTAssertNil(router.openUserProfileId)
+    }
+
+    func testFollowAndAcceptedFriendOpenTheProfile() {
+        for type in ["social_follow", "friend_accepted"] {
+            let router = AppRouter()
+            router.handle(type: type, conversationId: nil, postId: nil, userId: "user-7")
+            XCTAssertEqual(router.openUserProfileId, "user-7", type)
+        }
+    }
+
     func testStoryOpensCommunity() {
         let router = AppRouter()
         router.selectedTab = .map

@@ -244,9 +244,14 @@ struct ProfileView: View {
                 .monospacedDigit()
                 .foregroundStyle(accent ? SQColor.brandRed : SQColor.label)
                 .contentTransition(.numericText())
+                .accessibilityIdentifier("profile.stat.value")
+            // Encre pleine : `labelSecondary` sous 13 pt perd environ 23 % de
+            // contraste au rendu (anti-crénelage) et passait sous 4,5:1 (TRX-12).
+            // La hiérarchie reste portée par la taille du chiffre.
             Text(LocalizedStringKey(label))
-                .font(SQFont.body(11.5))
-                .foregroundStyle(SQColor.labelSecondary)
+                .font(SQFont.body(12.5, relativeTo: .caption))
+                .foregroundStyle(SQColor.label)
+                .accessibilityIdentifier("profile.stat.label")
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
@@ -271,22 +276,26 @@ struct ProfileView: View {
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         Text("Niveau \(level)")
                             .font(SQFont.body(12.5, .medium))
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .foregroundStyle(SQColor.label)
+                            .accessibilityIdentifier("profile.progression.level")
                         Text("\(inLevel.formatted()) / \(goal.formatted()) pts")
                             .font(SQFont.body(12.5, .medium))
                             .monospacedDigit()
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .foregroundStyle(SQColor.label)
+                            .accessibilityIdentifier("profile.progression.points")
                     }
                 } else {
                     HStack {
                         Text("Niveau \(level)")
                             .font(SQFont.body(12.5, .medium))
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .foregroundStyle(SQColor.label)
+                            .accessibilityIdentifier("profile.progression.level")
                         Spacer()
                         Text("\(inLevel.formatted()) / \(goal.formatted()) pts")
                             .font(SQFont.body(12.5, .medium))
                             .monospacedDigit()
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .foregroundStyle(SQColor.label)
+                            .accessibilityIdentifier("profile.progression.points")
                     }
                 }
             }
@@ -516,6 +525,15 @@ struct ProfileView: View {
     // MARK: - Données
 
     private func loadStats() async {
+        // Démonstration : pas d'appel réseau avec la session factice, qui
+        // affichait « Stats indisponibles — Session expirée » dans les captures.
+        if AppEnvironment.usesDemoData {
+            stats = UserStats(totalSpeedtests: 128, totalPhotos: 14, totalValidations: 37,
+                              totalCoverageSessions: 6, totalPoints: 4250, level: 12)
+            statsError = nil
+            progression = .demo
+            return
+        }
         // Progression (niveau / points / palier) : même source de données que
         // GamificationView (service existant) ; en cas d'échec, la carte de
         // progression est simplement omise.

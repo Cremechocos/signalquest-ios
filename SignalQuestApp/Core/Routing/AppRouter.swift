@@ -169,7 +169,11 @@ final class AppRouter: ObservableObject {
         e2eeDeviceApprovalId: String? = nil
     ) {
         switch rawType?.lowercased() {
-        case "message", "conversation", "call", "dm", "e2ee_v2_envelope":
+        // Types réellement émis par le serveur : préfixés `message_*` et
+        // `social_*` (confirmé le 30/09) ; les noms nus restent pour les
+        // anciennes notifications.
+        case "message", "conversation", "call", "dm", "e2ee_v2_envelope",
+             "message_new", "message_reaction", "message_mention":
             route(toConversation: conversationId)
         // Réaction ou mention sur un MESSAGE : elle porte sa conversation, pas
         // un post ; elle ouvrait le fil sur rien (SOC-25).
@@ -177,7 +181,12 @@ final class AppRouter: ObservableObject {
             route(toConversation: conversationId)
         case "mention" where conversationId != nil && postId == nil:
             route(toConversation: conversationId)
-        case "post", "reaction", "comment", "like", "favorite", "repost", "mention":
+        // Mention dans une story : ni post ni story dans la charge, seulement
+        // le lien du fil ; le rail des stories est en tête de Communauté.
+        case "social_mention" where postId == nil:
+            selectedTab = .community
+        case "post", "reaction", "comment", "like", "favorite", "repost", "mention",
+             "social_reaction", "social_comment", "social_repost", "social_mention":
             route(toPost: postId)
         // Pas d'écran dédié aux stories : leur rail est en tête de Communauté.
         case "story":
@@ -185,7 +194,7 @@ final class AppRouter: ObservableObject {
         case "friend_request":
             selectedTab = .community
             openFriendRequests = true
-        case "follow", "friend", "profile":
+        case "follow", "friend", "profile", "social_follow", "friend_accepted":
             route(toUserProfile: userId)
         case "antenna_report_reply", "antenna_report", "site_report":
             route(toAntennaReport: reportId)

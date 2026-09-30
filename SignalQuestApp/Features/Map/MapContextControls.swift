@@ -102,6 +102,7 @@ private struct MapAntennaKeyControl: View {
                 Text("Antennes")
                     .font(SQFont.body(13, .semibold))
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("map.antenna.legend.label")
                 Image(systemName: "chevron.up")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(SQColor.labelSecondary)

@@ -445,8 +445,16 @@ private struct AddFriendSheet: View {
                                 }
                             }
                             Spacer()
+                            // L'état d'amitié était décodé puis ignoré : le bouton
+                            // « ajouter » s'affichait pour un ami (SOC-44).
                             if busyId == user.id {
                                 ProgressView().tint(SQColor.brandRed)
+                            } else if user.isFriend == true {
+                                friendStatus("Ami", systemImage: "person.fill.checkmark")
+                            } else if user.hasPendingRequest == true {
+                                friendStatus("Demande envoyée", systemImage: "clock")
+                            } else if user.blockedByMe == true || user.blockedMe == true {
+                                friendStatus("Indisponible", systemImage: "nosign")
                             } else {
                                 Button { Task { await send(user) } } label: {
                                     Image(systemName: "person.badge.plus")
@@ -502,7 +510,22 @@ private struct AddFriendSheet: View {
     private func search() async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { results = []; return }
-        results = (try? await messages.searchUsers(query: trimmed)) ?? []
+        // Une recherche en échec affichait « aucun résultat » (SOC-44).
+        do {
+            results = try await messages.searchUsers(query: trimmed)
+            errorMessage = nil
+        } catch {
+            guard !error.isCancellation else { return }
+            results = []
+            errorMessage = error.userFacingMessage
+        }
+    }
+
+    private func friendStatus(_ title: LocalizedStringKey, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(SQType.caption.weight(.semibold))
+            .foregroundStyle(SQColor.labelSecondary)
+            .labelStyle(.titleAndIcon)
     }
 
     private func send(_ user: MessageSearchUser) async {

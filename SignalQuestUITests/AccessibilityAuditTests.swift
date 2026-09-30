@@ -139,7 +139,12 @@ final class AccessibilityAuditTests: XCTestCase {
                 // relatifs ; `testAuditMessagingAtAccessibilityTextSize` et
                 // `testAuditCallEndAtAccessibilityTextSize` les rendent en AX XXL.
                 "message.", "messages.row.", "conversation.title", "conversation.status",
-                "liveshare.", "call.end.caption"
+                "liveshare.", "call.end.caption",
+                // Lot 4f : texte des cartes du fil, pastille de légende et message
+                // d'état de la Carte (`.subheadline`), statistiques du Profil
+                // (rendues en AX XXL dans la passe dédiée).
+                "feed.post.text", "map.antenna.legend.label", "map.status.text",
+                "profile.stat.", "profile.progression."
             ]
             if issue.auditType == .dynamicType,
                semanticDynamicIdentifiers.contains(where: name.hasPrefix) {
@@ -168,7 +173,13 @@ final class AccessibilityAuditTests: XCTestCase {
                 // (`testBodyTextTokensMeetAA`, `testSemanticTokensMeetAA`,
                 // `testOnAccentIsReadableOnBrandSurface`).
                 "message.text", "message.time", "messages.row.", "liveshare.",
-                "conversation.stamp", "conversation.status"
+                "conversation.stamp", "conversation.status",
+                // Lot 4f : `label` sur la carte du fil, sur la pastille de légende
+                // de la Carte et sur la carte du Profil (libellés et progression
+                // passés de `labelSecondary` à `label`, qui échouait au rendu sous
+                // 13 pt) ; chiffre brique en 22 pt gras, grand texte
+                // (`testBrandTokensMeetGraphicThreshold`).
+                "feed.post.text", "map.antenna.legend.label", "profile.stat.", "profile.progression."
             ]
             if issue.auditType == .contrast,
                provenContrastIdentifiers.contains(where: name.hasPrefix) {
