@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.3**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.3.1**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -42,6 +42,9 @@
 >     - jalons A et B (§16) ;
 >     - tickets du jalon A (annexe C) ;
 >     - estimation mise à jour (annexe B).
+> - v0.3.1 (30/09/2026) : questions 6 à 10 du §18 tranchées. Elles portent
+>   sur les anciennes conversations, l'app sans v2, l'outil de modération,
+>   l'origine statique du web (après la bêta) et la taille des médias.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -241,8 +244,9 @@ conversations chiffrées **sur demande seulement**.
   récupération.
 - Le client web DEVRAIT être servi depuis une origine statique distincte, avec
   une CSP stricte, l'intégrité des sous-ressources (SRI) et des bundles
-  reproductibles publiés. C'est un chantier d'infrastructure à part. Savoir
-  s'il est un prérequis du jalon A est une question ouverte (§18).
+  reproductibles publiés. C'est un chantier d'infrastructure à part.
+  Décision du 30/09 : il suit la bêta du jalon A et n'en est pas un prérequis,
+  puisque l'accès des navigateurs reste sur demande.
 
 ### 2.8 Récupération
 
@@ -507,8 +511,9 @@ affichage**, et dans l'outil de modération.
 - Transférer un fichier vers une autre conversation le **rechiffre** avec une
   nouvelle clé de média.
 - Limites :
-  - 512 Mio par blob et 1 Gio par message, à revoir avec le budget de
-    stockage (§18) ;
+  - 100 Mio par fichier et 200 Mio par message, plus un quota par compte fixé
+    avec la capacité disque (décision du 30/09). Le format admet jusqu'à
+    512 Mio (annexe A.5) ;
   - au-delà de 50 Mio en données mobiles, une confirmation est demandée ;
   - en itinérance, quand la plateforme sait la détecter (Android), le
     téléchargement automatique se fait en Wi-Fi seulement, par défaut ;
@@ -717,11 +722,15 @@ conversation, et sans permettre un faux signalement ni un message insignalable.
 - **API** : elle vérifie chaque `serverTag` avec `Ks`, et que le signaleur
   était membre au moment des messages (historique, §2.5). Elle gèle les blobs
   cités. La clé privée de modération n'est **jamais** dans son environnement.
-- **Outil de modération**, isolé et seul détenteur de la clé privée :
-  - il ouvre la partie scellée et vérifie que son `info` correspond à la
-    partie en clair ;
-  - il recalcule chaque `frankTag` à partir de `fk` et de la charge ;
-  - il vérifie les condensats des blobs, puis affiche.
+- **Outil de modération**, isolé et seul détenteur de la clé privée. Décision
+  du 30/09 : c'est un outil en ligne de commande, hors ligne, sur le poste de
+  l'administrateur. La clé privée y reste, avec une sauvegarde hors ligne.
+  Signalements et blobs gelés sont gardés 90 jours après la décision de
+  modération. L'outil :
+  - ouvre la partie scellée et vérifie que son `info` correspond à la partie
+    en clair ;
+  - recalcule chaque `frankTag` à partir de `fk` et de la charge ;
+  - vérifie les condensats des blobs, puis affiche.
 - Les implémentations HPKE, y compris un sous-ensemble maison (Android, qui
   n'a pas d'HPKE public avant son API minimale 29), DOIVENT passer les
   vecteurs de la RFC 9180 pour cette suite.
@@ -811,8 +820,8 @@ refuse l'écriture en clair. Sont concernées :
 
 La garde porte sur la version de protocole de la conversation (≥ 2), sans
 nouveau type de message. La transcription est refusée aussi dans les
-conversations v1. Pour les autres refus, le calendrier dans les conversations
-v1 suit la version minimale des apps (§18).
+conversations v1. Les autres refus y arrivent avec la hausse de version
+minimale qui accompagne la bêta du jalon A (décision du 30/09).
 
 ---
 
@@ -830,8 +839,8 @@ v1 suit la version minimale des apps (§18).
 4. Quand la v2 est activée, le serveur cesse toute génération de clé v1.
    Décision du 30/09 : au jalon A, donc avant la prochaine bêta TestFlight.
 5. Une app sans v2 face à une conversation v2 ne reçoit pas les messages v2.
-   Proposition, à confirmer (§18) : elle affiche « Cette conversation utilise
-   un chiffrement plus récent : mets à jour SignalQuest ».
+   Décision du 30/09 : elle affiche « Cette conversation utilise un
+   chiffrement plus récent : mets à jour SignalQuest ».
 6. Appels d'une conversation v1 : §10.0.
 
 ---
@@ -994,25 +1003,19 @@ Tranchées le 30/09 (décisions produit) :
 3. Revue externe ciblée : non (§17).
 4. Navigateurs : sur demande, approuvés depuis un téléphone (§2.7).
 5. Messages programmés : désactivés au départ dans les conversations v2 (§13).
+6. Refus du §13 dans les conversations v1 : la transcription tout de suite,
+   les autres avec la hausse de version minimale de la bêta du jalon A (§13).
+7. App sans v2 face à une conversation v2 : invitation à mettre à jour
+   (§14.5).
+8. Outil de modération : en ligne de commande, hors ligne, sur le poste de
+   l'administrateur, seul détenteur de la clé privée ; 90 jours de
+   conservation après la décision (§11).
+9. Origine statique du client web : après la bêta du jalon A (§2.7).
+10. Médias chiffrés (jalon B) : 100 Mio par fichier, 200 Mio par message,
+    quota par compte (§6.4).
 
-Ouvertes, avec une proposition :
+Ouverte :
 
-6. **Refus du §13 dans les conversations v1** : proposition : la
-   transcription est refusée tout de suite, et les autres refus arrivent avec
-   la hausse de version minimale qui accompagnera la bêta du jalon A.
-7. **App sans v2 face à une conversation v2** : proposition du §14.5.
-8. **Outil de modération** : proposition :
-   - un outil en ligne de commande, hors ligne, sur le poste de
-     l'administrateur ;
-   - il est le seul détenteur de la clé privée, avec une sauvegarde hors
-     ligne ;
-   - signalements et blobs gelés sont gardés 90 jours après la décision.
-9. **Origine statique du client web** (§2.7) : prérequis des appels chiffrés
-   depuis le web, donc de la bêta ? Ou chantier qui suit, puisque l'accès web
-   reste sur demande ? Proposition : qui suit.
-10. **Budget de stockage des médias chiffrés** (jalon B) : proposition :
-    limites de départ plus basses (100 Mio par fichier, 200 Mio par message),
-    plus un quota par compte, à revoir avec la capacité disque.
 11. Évaluer MLS (RFC 9420, OpenMLS) pour une v3.
 
 ---
@@ -1224,7 +1227,7 @@ serveur porte aussi le web.
     l'appartenance ;
   - gel des blobs cités ;
   - nouvelle paire de modération P-256 ;
-  - outil de modération (§18, question 8).
+  - outil de modération en ligne de commande, hors ligne (§11).
 - **SRV-A7** Surfaces (§13) :
   - refus en conversation v2 ;
   - transcription refusée aussi en v1 ;
@@ -1303,8 +1306,7 @@ serveur porte aussi le web.
   piste rendue seulement à l'état « OK » (§10).
 - **WEB-CALL-2** Preuve de jonction (§10.4).
 - **WEB-CALL-3** Règles d'usage (§10.0), dont la confirmation en v1.
-- **WEB-A4** Origine statique (§2.7), selon la réponse à la question 9 du
-  §18.
+- **WEB-A4** (après le jalon A) Origine statique (§2.7).
 
 **Croisé**
 
