@@ -60,7 +60,7 @@ struct SentinelleFollowersCard: View {
                                 .font(SQFont.body(14, .medium))
                                 .foregroundStyle(SQColor.label)
                             Text("depuis le \(shortDate(follower.since))")
-                                .font(SQFont.body(11))
+                                .font(SQFont.body(12))
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                         Spacer()
@@ -81,7 +81,7 @@ struct SentinelleFollowersCard: View {
                 Text(past.count == 1
                      ? "Un accès a été retiré par le passé."
                      : "\(past.count) accès ont été retirés par le passé.")
-                    .font(SQFont.body(11))
+                    .font(SQFont.body(12))
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(.top, SQSpace.xs)
             }
@@ -107,7 +107,7 @@ struct SentinelleFollowersCard: View {
                     Text(isShared
                          ? "Qui a le lien et un compte peut suivre cette connexion."
                          : "Personne ne peut suivre cette connexion.")
-                        .font(SQFont.body(11))
+                        .font(SQFont.body(12))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             }
@@ -120,7 +120,7 @@ struct SentinelleFollowersCard: View {
             if isShared, let url = shareURL {
                 HStack(spacing: SQSpace.sm) {
                     Text(url.absoluteString)
-                        .font(SQFont.body(11))
+                        .font(SQFont.body(12))
                         .monospaced()
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -153,7 +153,7 @@ struct SentinelleFollowersCard: View {
             // reviendrait à fixer l'échéance de quelque chose qui n'existe pas.
             if isShared {
                 Text("Durée du lien")
-                    .font(SQFont.body(11))
+                    .font(SQFont.body(12))
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(.top, SQSpace.xs)
 

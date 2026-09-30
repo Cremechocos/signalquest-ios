@@ -168,7 +168,7 @@ struct SpeedtestServerPicker: View {
                                 .foregroundStyle(SQColor.label)
 
                             Text("\(group.targets.count)")
-                                .font(SQFont.body(11, .semibold))
+                                .font(SQFont.body(12, .semibold))
                                 .foregroundStyle(SQColor.labelSecondary)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
@@ -305,7 +305,7 @@ struct SpeedtestServerPicker: View {
                             .font(SQFont.body(14, .semibold))
                             .foregroundStyle(SQColor.label)
                         Text("\(catalogOnlyServers.count)")
-                            .font(SQFont.body(11, .semibold))
+                            .font(SQFont.body(12, .semibold))
                             .foregroundStyle(SQColor.labelSecondary)
                             .padding(.horizontal, 7).padding(.vertical, 2)
                             .background(SQColor.fill, in: Capsule(style: .continuous))
@@ -334,7 +334,7 @@ struct SpeedtestServerPicker: View {
                             // chaîne à traduire, et c'est le repère utile quand on
                             // cherche un POP proche.
                             Text(group.country)
-                                .font(SQFont.body(11, .semibold))
+                                .font(SQFont.body(12, .semibold))
                                 .foregroundStyle(SQColor.labelTertiary)
                                 .padding(.top, 4)
                                 .accessibilityLabel("Pays : \(group.country)")
@@ -433,7 +433,7 @@ struct SpeedtestServerPicker: View {
                         .font(SQFont.body(14, .semibold))
                         .foregroundStyle(SQColor.label)
                     Text("\(libreSpeedServers.count)")
-                        .font(SQFont.body(11, .semibold))
+                        .font(SQFont.body(12, .semibold))
                         .foregroundStyle(SQColor.labelSecondary)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(SQColor.fill, in: Capsule(style: .continuous))

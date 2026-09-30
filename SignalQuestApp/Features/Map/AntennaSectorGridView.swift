@@ -88,7 +88,7 @@ struct AntennaSectorGridView: View {
         FlowLayout(spacing: 5) {
             ForEach(technologies, id: \.self) { tech in
                 Text(tech)
-                    .font(SQFont.body(11, .bold))
+                    .font(SQFont.body(12, .bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -96,7 +96,7 @@ struct AntennaSectorGridView: View {
             }
             if let antennaHeightMeters {
                 Text("\(Int(antennaHeightMeters.rounded())) m")
-                    .font(SQFont.body(11, .semibold))
+                    .font(SQFont.body(12, .semibold))
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -110,7 +110,7 @@ struct AntennaSectorGridView: View {
         FlowLayout(spacing: 5) {
             ForEach(rows, id: \.self) { band in
                 Text(band)
-                    .font(SQFont.body(11, .semibold))
+                    .font(SQFont.body(12, .semibold))
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -169,7 +169,7 @@ struct AntennaSectorGridView: View {
             ForEach(rows, id: \.self) { band in
                 HStack(spacing: 0) {
                     Text(band)
-                        .font(SQFont.body(11.5))
+                        .font(SQFont.body(12))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -290,7 +290,7 @@ struct AntennaSectorGridView: View {
                     Text(fhBeams.count == 1
                          ? String(localized: "Faisceau hertzien")
                          : String(localized: "\(fhBeams.count) faisceaux hertziens"))
-                        .font(SQFont.body(11.5, .semibold))
+                        .font(SQFont.body(12, .semibold))
                         .foregroundStyle(SQColor.label)
                 }
 

@@ -140,7 +140,22 @@ struct SignalDetailSheet: View {
                 authorBlock
             }
             Spacer()
-            SQEditorialTag(text: signal?.technology ?? item.kind.uppercased(), color: accent)
+            if let tag = signal?.technology ?? kindTag {
+                SQEditorialTag(text: tag, color: accent)
+            }
+        }
+    }
+
+    /// Nature de la publication, en mots : jamais le type brut (« DRIVE_TEST »,
+    /// TRX-26). Une publication simple n'a pas d'étiquette, comme sur les
+    /// cartes du fil.
+    private var kindTag: String? {
+        switch item.kind.lowercased() {
+        case "speedtest": return String(localized: "Speedtest")
+        case "coverage", "session", "drive_test": return String(localized: "Couverture")
+        case "outage": return String(localized: "Panne")
+        case "photo", "antenna_photo": return String(localized: "Photo")
+        default: return nil
         }
     }
 

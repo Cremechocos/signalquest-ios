@@ -97,10 +97,10 @@ struct ValidationsSheet: View {
                             .foregroundStyle(SQColor.label)
                         Spacer()
                         Label("\(entry.validations)", systemImage: "hand.thumbsup.fill")
-                            .font(SQFont.body(11.5, .medium, relativeTo: .caption2))
+                            .font(SQFont.body(12, .medium, relativeTo: .caption2))
                             .foregroundStyle(SQColor.success)
                         Label("\(entry.rejections)", systemImage: "hand.thumbsdown.fill")
-                            .font(SQFont.body(11.5, .medium, relativeTo: .caption2))
+                            .font(SQFont.body(12, .medium, relativeTo: .caption2))
                             .foregroundStyle(SQColor.danger)
                         if model.pendingVote == "\(type)-\(entry.value)" {
                             ProgressView().tint(SQColor.brandRed)

@@ -462,7 +462,7 @@ struct PhotosView: View {
                         .lineLimit(2)
                     if let address = photo.siteAddress, !address.isEmpty {
                         Label(address, systemImage: "mappin")
-                            .font(SQFont.body(11, .medium))
+                            .font(SQFont.body(12, .medium))
                             .foregroundStyle(.white.opacity(0.78))
                             .lineLimit(1)
                     }
@@ -523,7 +523,7 @@ struct PhotosView: View {
                         .frame(width: 6, height: 6)
                     if let op = photo.operator, !op.isEmpty {
                         Text(op)
-                            .font(SQFont.body(11, .medium))
+                            .font(SQFont.body(12, .medium))
                             .foregroundStyle(.white.opacity(0.82))
                             .lineLimit(1)
                     }
@@ -532,7 +532,7 @@ struct PhotosView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(isLiked ? SQColor.like : .white.opacity(0.9))
                     Text("\(photo.likeCount ?? photo.likes ?? 0)")
-                        .font(SQFont.body(11, .semibold))
+                        .font(SQFont.body(12, .semibold))
                         .foregroundStyle(.white.opacity(0.9))
                 }
             }

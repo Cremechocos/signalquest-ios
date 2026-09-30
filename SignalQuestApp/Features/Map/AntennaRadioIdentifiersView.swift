@@ -99,7 +99,7 @@ struct AntennaRadioIdentifiersView: View {
                         Spacer(minLength: 0)
                         ForEach(sector.technologies, id: \.self) { tech in
                             Text(tech)
-                                .font(SQFont.body(10, .bold))
+                                .font(SQFont.body(12, .bold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
@@ -161,7 +161,7 @@ struct AntennaRadioIdentifiersView: View {
                 }
                 if cell.ci != nil {
                     Text("ECI \(cell.value)")
-                        .font(SQFont.body(11))
+                        .font(SQFont.body(12))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -302,7 +302,7 @@ struct FlowChips: View {
         FlowLayout(spacing: 5) {
             ForEach(items, id: \.self) { item in
                 Text(item)
-                    .font(SQFont.body(10.5, .semibold))
+                    .font(SQFont.body(12, .semibold))
                     .monospacedDigit()
                     .foregroundStyle(tint)
                     .padding(.horizontal, 7)

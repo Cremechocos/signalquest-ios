@@ -243,7 +243,7 @@ struct SignatureSpeedDial: View {
                     value: pulsing
                 )
             Text("en cours")
-                .font(SQFont.body(11, .semibold))
+                .font(SQFont.body(12, .semibold))
                 .foregroundStyle(SQColor.labelSecondary)
         }
         .padding(.horizontal, 9)
@@ -256,7 +256,7 @@ struct SignatureSpeedDial: View {
 
     func dialBadge(_ text: String, color: Color, background: Color) -> some View {
         Text(text)
-            .font(SQFont.body(11, .semibold))
+            .font(SQFont.body(12, .semibold))
             .foregroundStyle(color)
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
