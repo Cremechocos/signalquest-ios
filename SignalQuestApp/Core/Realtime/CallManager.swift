@@ -166,6 +166,23 @@ struct CallLifecyclePolicy {
     }
 }
 
+/// Un appel chiffré garde l'époque de son descripteur : l'index de clé des
+/// médias n'est pas pilotable sur tous les SDK. Quand la conversation passe à
+/// une époque plus récente (membre ou appareil retiré), l'appel prend fin et
+/// peut être relancé sous la nouvelle clé (spec §10.3).
+enum E2EEV2CallEpochPolicy {
+    static func endsCall(
+        conversationId: String?,
+        callEpochNumber: Int?,
+        requiresE2EE: Bool,
+        advance: E2EEV2EpochEvents.Advance
+    ) -> Bool {
+        guard requiresE2EE, let conversationId, conversationId == advance.conversationId,
+              let callEpochNumber else { return false }
+        return advance.epochNumber > callEpochNumber
+    }
+}
+
 enum IncomingCallE2EEExpectation: Equatable {
     case unresolved
     case legacy
@@ -268,6 +285,7 @@ final class CallManager: NSObject, ObservableObject {
     private var voipRegistry: PKPushRegistry?
     private var incomingReconciliationTask: Task<Void, Never>?
     private var recentlyTerminatedCallIDs: [String: Date] = [:]
+    private var epochObserver: NSObjectProtocol?
     private let deviceID = InstallationIdentity().deviceID()
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "CallKit")
 
@@ -291,6 +309,14 @@ final class CallManager: NSObject, ObservableObject {
         // room fermée, ou réseau tombé), LiveKit le signale → on clôt l'appel.
         liveKit.onRemoteDisconnect = { [weak self] in self?.handleRemoteDisconnect() }
         liveKit.onE2EETrustLost = { [weak self] in self?.handleE2EETrustLost() }
+        epochObserver = NotificationCenter.default.addObserver(
+            forName: E2EEV2EpochEvents.didAdvance, object: nil, queue: .main
+        ) { [weak self] note in
+            // `Notification` n'est pas Sendable : on en extrait la valeur avant
+            // de passer sur le MainActor.
+            guard let advance = E2EEV2EpochEvents.advance(from: note) else { return }
+            Task { @MainActor in self?.handleEpochAdvance(advance) }
+        }
     }
 
     /// Registers for VoIP pushes. Safe to call multiple times.
@@ -857,6 +883,33 @@ final class CallManager: NSObject, ObservableObject {
             requiresE2EE: call.requiresE2EE == true
         ) : nil
         reportCallEnded(call.id, reason: unanswered ? .unanswered : .remoteEnded)
+        Task {
+            await notifyBackendCallTerminated(call)
+            await tearDown(notice: notice)
+        }
+    }
+
+    /// La conversation a changé de clé pendant un appel chiffré : il prend fin,
+    /// et « Rappeler » le relance sous la nouvelle époque (spec §10.3).
+    private func handleEpochAdvance(_ advance: E2EEV2EpochEvents.Advance) {
+        guard let call = activeCall, !call.isEnding,
+              advance.ownerNamespace == LocalAccountScope.storageNamespace,
+              E2EEV2CallEpochPolicy.endsCall(
+                  conversationId: call.conversationId,
+                  callEpochNumber: call.e2eeDescriptor?.epochNumber,
+                  requiresE2EE: call.requiresE2EE == true,
+                  advance: advance
+              ) else { return }
+        activeCall?.isEnding = true
+        reportCallEnded(call.id, reason: .failed)
+        let notice = EndNotice(
+            title: String(localized: "Appel terminé"),
+            message: String(localized: "L’appel a pris fin : la conversation a changé de clé."),
+            handle: call.handle,
+            conversationId: call.conversationId,
+            hasVideo: call.hasVideo,
+            requiresE2EE: true
+        )
         Task {
             await notifyBackendCallTerminated(call)
             await tearDown(notice: notice)

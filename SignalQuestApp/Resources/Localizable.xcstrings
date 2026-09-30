@@ -23380,6 +23380,22 @@
         }
       }
     },
+    "L’appel a pris fin : la conversation a changé de clé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The call ended because the conversation’s key changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’appel a pris fin : la conversation a changé de clé."
+          }
+        }
+      }
+    },
     "L'appel s'est terminé pendant la connexion." : {
       "localizations" : {
         "en" : {

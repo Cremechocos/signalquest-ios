@@ -4307,6 +4307,17 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
               try E2EEV2EpochCrypto.keyCommitment(epochKey) == recordInput.keyCommitmentB64 else {
             return false
         }
+        // Annoncé une fois le verrou rendu : un observateur peut relire le coffre.
+        var advanced = false
+        defer {
+            if advanced {
+                E2EEV2EpochEvents.postAdvance(
+                    conversationId: recordInput.conversationId,
+                    epochNumber: recordInput.epochNumber,
+                    ownerNamespace: ownerNamespace
+                )
+            }
+        }
         lock.lock()
         defer { lock.unlock() }
 
@@ -4377,6 +4388,7 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
         try publish(value, key: historicalKey, expectedSession: expectedSession)
         if current == nil || recordInput.epochNumber > current!.epochNumber {
             try publish(value, key: currentKey, expectedSession: expectedSession)
+            advanced = true
         }
         return true
     }
@@ -5629,6 +5641,35 @@ actor E2EEV2RotationDrain {
 
     func request(session: LocalAccountSession, backlog: E2EEV2RotationBacklog, resetRetry: Bool = false) throws {
         try backlog.request(session, conversations: [], resetRetry: resetRetry)
+    }
+}
+
+/// L'époque courante d'une conversation a avancé dans le coffre de ce compte.
+/// Un appel chiffré garde l'époque de son descripteur (spec §10.3) : il prend
+/// fin quand la conversation change de clé.
+enum E2EEV2EpochEvents {
+    static let didAdvance = Notification.Name("SignalQuest.E2EEV2.EpochDidAdvance.v1")
+
+    struct Advance: Equatable, Sendable {
+        let conversationId: String
+        let epochNumber: Int
+        let ownerNamespace: String
+    }
+
+    static func postAdvance(conversationId: String, epochNumber: Int, ownerNamespace: String) {
+        NotificationCenter.default.post(name: didAdvance, object: nil, userInfo: [
+            "conversationId": conversationId,
+            "epochNumber": epochNumber,
+            "ownerNamespace": ownerNamespace,
+        ])
+    }
+
+    static func advance(from notification: Notification) -> Advance? {
+        guard let info = notification.userInfo,
+              let conversationId = info["conversationId"] as? String,
+              let epochNumber = info["epochNumber"] as? Int,
+              let ownerNamespace = info["ownerNamespace"] as? String else { return nil }
+        return Advance(conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace)
     }
 }
 
