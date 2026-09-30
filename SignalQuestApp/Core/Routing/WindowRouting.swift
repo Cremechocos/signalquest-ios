@@ -65,6 +65,20 @@ struct SignalQuestCommands: Commands {
             shortcut("Communauté", tab: .community, key: "4")
             shortcut("Profil", tab: .profile, key: "5")
         }
+        // Plan 3, vague 1 : actions courantes, et la palette ⌘K pour tout le reste.
+        CommandMenu("Actions") {
+            ForEach(SQKeyboardAction.menu) { action in
+                Button(action.title) {
+                    if let router { action.perform(on: router) }
+                }
+                .keyboardShortcut(action.shortcut)
+                .disabled(router == nil)
+            }
+            Divider()
+            Button("Rechercher une action") { router?.showsCommandPalette = true }
+                .keyboardShortcut("k", modifiers: .command)
+                .disabled(router == nil)
+        }
     }
 
     private func shortcut(_ title: LocalizedStringKey, tab: AppRouter.AppTab, key: KeyEquivalent) -> some View {

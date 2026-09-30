@@ -662,6 +662,9 @@ struct MainTabView: View {
     /// l'app en arrière-plan, pas après un arrêt forcé par l'utilisateur.
     @SceneStorage("sq.lastTab") private var lastTab = ""
     @State private var didRestoreTab = false
+    /// Action choisie dans la palette ⌘K : jouée à sa fermeture, pour qu'une
+    /// feuille qu'elle ouvre (publication, conversation) ne rate pas sa présentation.
+    @State private var pendingPaletteAction: SQKeyboardAction?
 
     init(user: AuthUser?) {
         self.user = user
@@ -686,6 +689,16 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $showGuestReceipts) {
             NavigationStack { GuestSpeedtestReceiptsView() }
+        }
+        .sheet(isPresented: $router.showsCommandPalette, onDismiss: {
+            guard let action = pendingPaletteAction else { return }
+            pendingPaletteAction = nil
+            action.perform(on: router)
+        }) {
+            SQCommandPalette { action in
+                pendingPaletteAction = action
+                router.showsCommandPalette = false
+            }
         }
         .onChangeCompat(of: scenePhase) { _, phase in
             if phase == .active {

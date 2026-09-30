@@ -8078,6 +8078,22 @@
         }
       }
     },
+    "Aucune action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No actions"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune action"
+          }
+        }
+      }
+    },
     "Aucune adresse connue pour l’instant : la première résolution arrive au prochain cycle de sonde." : {
       "localizations" : {
         "en" : {
@@ -30943,6 +30959,22 @@
         }
       }
     },
+    "Nouvelle publication" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New post"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle publication"
+          }
+        }
+      }
+    },
     "Nouvelle réaction" : {
       "localizations" : {
         "en" : {
@@ -36924,6 +36956,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réception max"
+          }
+        }
+      }
+    },
+    "Rechercher sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher sur la carte"
+          }
+        }
+      }
+    },
+    "Rechercher une action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search for an action"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher une action"
           }
         }
       }

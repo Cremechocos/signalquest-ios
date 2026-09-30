@@ -1928,6 +1928,11 @@ struct MapExplorerView: View {
         .onReceive(NotificationCenter.default.publisher(for: RecentlyViewedStore.didChange)) { _ in
             recentItems = RecentlyViewedStore.items()
         }
+        // ⌘F sur iPad : la recherche prend le clavier, carte déjà ouverte ou non.
+        .onAppear { focusSearchIfRequested() }
+        .onChangeCompat(of: router.focusMapSearch) { _, requested in
+            if requested { focusSearchIfRequested() }
+        }
         // Test de l'historique : cadre la carte sur le lieu de la mesure.
         .onChangeCompat(of: router.pendingMapFocus) { _, _ in focusFromRouterIfNeeded() }
         // Ligne de « Pannes signalées » : ouvre la feuille de la panne demandée.
@@ -2739,6 +2744,12 @@ struct MapExplorerView: View {
             .padding(.top, SQSpace.xs)
         }
         .frame(maxHeight: 280)
+    }
+
+    private func focusSearchIfRequested() {
+        guard router.focusMapSearch else { return }
+        router.focusMapSearch = false
+        searchFieldFocused = true
     }
 
     /// La fiche complète si le site est déjà chargé ; sinon celle rebâtie

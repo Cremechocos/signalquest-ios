@@ -386,8 +386,10 @@ final class CallsService: CallsServicing {
         let _: SuccessResponse = try await api.requestJSON("/api/calls/reject", body: ["callId": callId])
     }
 
+    /// `/api/calls/leave`, comme Android et le web : `/api/calls/end` en est
+    /// l'alias déprécié. Un second départ répond 200 (`alreadyClosed`).
     func end(callId: String) async throws {
-        let _: SuccessResponse = try await api.requestJSON("/api/calls/end", body: ["callId": callId])
+        let _: SuccessResponse = try await api.requestJSON("/api/calls/leave", body: ["callId": callId])
     }
 
     func pending() async throws -> [CallSession] {

@@ -89,6 +89,12 @@ final class AppRouter: ObservableObject {
     /// Test demandé par Siri, un raccourci ou le contrôle iOS 18 : l'onglet
     /// Tester le propose aussitôt, avec confirmation (MES-34).
     @Published var pendingSpeedtestStart = false
+    /// Demandes du clavier de l'iPad (⌘N, ⌘⇧N, ⌘F, ⌘K), consommées par
+    /// l'écran concerné quand il s'affiche.
+    @Published var openNewConversation = false
+    @Published var openPostComposer = false
+    @Published var focusMapSearch = false
+    @Published var showsCommandPalette = false
     /// Masque le dock flottant (conversation ouverte : le composer prend le bas).
     /// Posé par les écrans plein-bas (ConversationDetailView) à l'apparition.
     @Published var isDockHidden = false
@@ -244,6 +250,12 @@ final class AppRouter: ObservableObject {
     func requestSpeedtestStart() {
         selectedTab = .speed
         pendingSpeedtestStart = true
+    }
+
+    /// Drive Test demandé depuis le clavier de l'iPad ou la palette ⌘K.
+    func requestDriveTest() {
+        selectedTab = .speed
+        pendingDriveTest = true
     }
 
     /// Préférences de notifications de l'app, depuis les Réglages d'iOS (TRX-21).

@@ -181,6 +181,8 @@ struct MessageComposerBar: View {
                     .sqShadowAccent()
             }
             .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending || !canSend)
+            // ⌘↩ au clavier de l'iPad ; Retour seul garde le saut de ligne.
+            .keyboardShortcut(.return, modifiers: .command)
             .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer le message")
             }
         }

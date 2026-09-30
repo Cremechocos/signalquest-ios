@@ -177,6 +177,7 @@ struct MessagesView: View {
             await reloadDrafts()
             if model.conversations.isEmpty { await model.load() }
             await maybePresentE2EEUnlock()
+            openNewConversationIfRequested()
             await model.decryptPreviews(e2ee: e2ee)
             await openRoutedConversationIfNeeded()
         }
@@ -219,12 +220,15 @@ struct MessagesView: View {
         .onChangeCompat(of: router.openConversationId) { _, _ in
             Task { await openRoutedConversationIfNeeded() }
         }
+        .onChangeCompat(of: router.openNewConversation) { _, requested in
+            if requested { openNewConversationIfRequested() }
+        }
         .sheet(isPresented: $showNewConversation) {
             NewConversationSheet(service: service) {
                 await model.refreshAfterCreate()
             }
         }
-        .sheet(isPresented: $showE2EEUnlock) {
+        .sheet(isPresented: $showE2EEUnlock, onDismiss: openNewConversationIfRequested) {
             if let e2ee = e2ee, case .authenticated(let user) = session.state {
                 E2EEUnlockSheet(userId: user.id, service: e2ee) {
                     Task {
@@ -269,6 +273,14 @@ struct MessagesView: View {
         if model.conversations.contains(where: { $0.id == id }) {
             routedConversationId = id
         }
+    }
+
+    /// ⌘N sur iPad : la messagerie s'ouvre sur une nouvelle conversation, une
+    /// fois l'éventuel déverrouillage du chiffrement passé.
+    private func openNewConversationIfRequested() {
+        guard router.openNewConversation, !showE2EEUnlock else { return }
+        router.openNewConversation = false
+        showNewConversation = true
     }
 
     /// En-tête custom (pas de gros titre nav système) : retour 40 pt circulaire,

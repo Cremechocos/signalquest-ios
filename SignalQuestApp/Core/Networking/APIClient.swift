@@ -363,6 +363,22 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         return "\(version) (\(build))"
     }
 
+    private static let osVersionLabel: String = {
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        var label = "\(osVersion.majorVersion).\(osVersion.minorVersion)"
+        if osVersion.patchVersion > 0 { label += ".\(osVersion.patchVersion)" }
+        return label
+    }()
+
+    /// « SignalQuest-iOS/1.0 (160; iOS 27.0) ». Les gardes du serveur
+    /// reconnaissent le préfixe « SignalQuest-iOS/ », pas la chaîne exacte
+    /// (vérifié avec la session serveur le 30/09).
+    static let userAgent: String = {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        return "SignalQuest-iOS/\(version) (\(build); iOS \(osVersionLabel))"
+    }()
+
     /// En-têtes d'identité client (X-Client-*) joints à chaque requête 1re partie,
     /// pour que le registre des sessions affiche « iPhone15,3 · iOS 18 » au lieu de
     /// « Navigateur ». Calculés une seule fois (valeurs constantes). On évite UIKit
@@ -374,10 +390,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             ClientProtocolContract.protocolVersionHeader: String(ClientProtocolContract.currentProtocolVersion),
             ClientProtocolContract.capabilitiesHeaderName: ClientProtocolContract.capabilitiesHeader,
         ]
-        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
-        var osLabel = "iOS \(osVersion.majorVersion).\(osVersion.minorVersion)"
-        if osVersion.patchVersion > 0 { osLabel += ".\(osVersion.patchVersion)" }
-        headers["X-Client-Os"] = osLabel
+        headers["X-Client-Os"] = "iOS \(osVersionLabel)"
         if let model = hardwareModelIdentifier(), !model.isEmpty {
             headers["X-Client-Model"] = model
         }
@@ -423,7 +436,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         request.httpBody = endpoint.body
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("SignalQuest-iOS/1", forHTTPHeaderField: "User-Agent")
+        request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         for (key, value) in Self.clientInfoHeaders {
             request.setValue(value, forHTTPHeaderField: key)
         }

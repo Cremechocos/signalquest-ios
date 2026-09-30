@@ -75,8 +75,12 @@ struct OnboardingView: View {
     private var isLastPage: Bool { page == pages.count - 1 }
 
     var body: some View {
+        // La dernière page reste dans le pager : la sortir remplaçait toute la
+        // vue au passage, et la 3e slide arrivait d'un coup, sans glisser. Ses
+        // trois choix réduisent la hauteur de la slide, qui défile alors
+        // d'elle-même (`fittedContent`).
         Group {
-            if dynamicTypeSize.isAccessibilitySize || isLastPage {
+            if dynamicTypeSize.isAccessibilitySize {
                 scrollingPage
             } else {
                 pagedBody
@@ -91,7 +95,7 @@ struct OnboardingView: View {
                     VStack(spacing: 0) {
                         header
                         OnboardingSlideView(page: pages[page], isActive: true)
-                        footer
+                        footer(reservingChoices: false)
                     }
                     .frame(minHeight: geometry.size.height, alignment: .top)
                     .id("onboarding.top")
@@ -135,10 +139,10 @@ struct OnboardingView: View {
                     }
                 }
 
-                footer
+                footer(reservingChoices: true)
             }
         }
-        // Les tailles accessibilité et le choix final utilisent scrollingPage.
+        // Les tailles accessibilité utilisent scrollingPage.
     }
 
     // MARK: Header
@@ -153,19 +157,24 @@ struct OnboardingView: View {
             Spacer()
             // « Passer » mène au dernier écran et à ses trois choix : sauter
             // l'introduction ne doit pas décider à la place de l'utilisateur
-            // entre compte et découverte (TRX-19).
-            Button { goTo(pages.count - 1) } label: {
-                Text(verbatim: OnboardingCopy.skip.localized(locale))
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+            // entre compte et découverte (TRX-19). Retiré du dernier écran, pas
+            // seulement masqué : l'en-tête y reste désormais le même, et un
+            // bouton transparent y restait lu par VoiceOver.
+            ZStack {
+                if !isLastPage {
+                    Button { goTo(pages.count - 1) } label: {
+                        Text(verbatim: OnboardingCopy.skip.localized(locale))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
+                    .tint(SQColor.labelSecondary)
+                    .accessibilityIdentifier("onboarding.skip")
+                    .transition(.opacity)
+                }
             }
-                .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
-                .tint(SQColor.labelSecondary)
-                .opacity(isLastPage ? 0 : 1)
-                .disabled(isLastPage)
-                .accessibilityHidden(isLastPage)
-                .accessibilityIdentifier("onboarding.skip")
-                .animation(.easeOut(duration: 0.18), value: isLastPage)
+            .frame(minWidth: 44, minHeight: 44)
+            .animation(.easeOut(duration: 0.18), value: isLastPage)
         }
         .padding(.horizontal, SQSpace.xl)
         .padding(.vertical, SQSpace.md)
@@ -173,34 +182,21 @@ struct OnboardingView: View {
 
     // MARK: Footer (indicateur + CTA)
 
-    private var footer: some View {
+    /// Dans le pager, les trois choix réservent leur place dès la première
+    /// page : la hauteur des slides ne change plus en arrivant sur la
+    /// dernière, qui glisse alors comme les autres au lieu d'apparaître sur
+    /// place. Seul le contenu du pied de page passe en fondu. Le défilement des
+    /// tailles d'accessibilité n'anime rien : il ne réserve pas cette place.
+    private func footer(reservingChoices: Bool) -> some View {
         VStack(spacing: SQSpace.xl) {
             OnboardingPageIndicator(count: pages.count, current: page) { goTo($0) }
-            if isLastPage {
-                VStack(spacing: SQSpace.sm) {
-                    GradientButton(OnboardingCopy.createAccount.localized(locale), systemImage: "person.badge.plus", allowsMultiline: true) {
-                        onFinish(.signUp)
-                    }
-                    .accessibilityIdentifier("onboarding.createAccount")
-                    GradientButton(OnboardingCopy.signIn.localized(locale), systemImage: "person.crop.circle", style: .secondary, allowsMultiline: true) {
-                        onFinish(.signIn)
-                    }
-                    .accessibilityIdentifier("onboarding.signIn")
-                    // Découvrir sans compte reste possible, sans rivaliser
-                    // avec les deux actions principales.
-                    Button { onFinish(.guest) } label: {
-                        Text(verbatim: OnboardingCopy.continueAsGuest.localized(locale))
-                            .font(SQType.subhead)
-                            .foregroundStyle(SQColor.accentInk)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("onboarding.continueAsGuest")
+            ZStack(alignment: .bottom) {
+                if isLastPage {
+                    choices
+                } else {
+                    if reservingChoices { choices.hidden() }
+                    OnboardingCTA(isLastPage: false) { goTo(page + 1) }
                 }
-            } else {
-                OnboardingCTA(isLastPage: false) { goTo(page + 1) }
             }
         }
         .padding(.horizontal, SQSpace.xl)
@@ -208,6 +204,31 @@ struct OnboardingView: View {
         .padding(.bottom, SQSpace.xl)
         // iPad : les boutons ne s'étirent plus sur toute la largeur sous un texte étroit.
         .sqReadableWidth(560)
+    }
+
+    private var choices: some View {
+        VStack(spacing: SQSpace.sm) {
+            GradientButton(OnboardingCopy.createAccount.localized(locale), systemImage: "person.badge.plus", allowsMultiline: true) {
+                onFinish(.signUp)
+            }
+            .accessibilityIdentifier("onboarding.createAccount")
+            GradientButton(OnboardingCopy.signIn.localized(locale), systemImage: "person.crop.circle", style: .secondary, allowsMultiline: true) {
+                onFinish(.signIn)
+            }
+            .accessibilityIdentifier("onboarding.signIn")
+            // Découvrir sans compte reste possible, sans rivaliser
+            // avec les deux actions principales.
+            Button { onFinish(.guest) } label: {
+                Text(verbatim: OnboardingCopy.continueAsGuest.localized(locale))
+                    .font(SQType.subhead)
+                    .foregroundStyle(SQColor.accentInk)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("onboarding.continueAsGuest")
+        }
     }
 
     // MARK: Navigation
@@ -327,18 +348,22 @@ private struct OnboardingSlideView: View {
     @State private var revealed = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @ViewBuilder
     var body: some View {
-        if isActive {
-            fittedContent
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(Text(verbatim: "\(page.title.localized(locale)). \(page.body.localized(locale))"))
-                .accessibilityIdentifier("onboarding.slide.\(page.scene.rawValue)")
-        } else {
-            // Le pager conserve la slide voisine pour l'animation, mais elle
-            // n'existe pas comme élément accessible tant qu'elle est hors écran.
-            fittedContent.accessibilityHidden(true)
-        }
+        // Le visuel garde une seule identité : alterner deux branches selon
+        // `isActive` remplaçait la slide à chaque page, et le pager fondait
+        // les textes l'un sur l'autre au lieu de glisser. Seul un calque
+        // invisible, présent sur la slide active, porte l'élément lu par
+        // VoiceOver : la voisine, gardée pour l'animation, n'en a pas.
+        fittedContent
+            .accessibilityHidden(true)
+            .overlay {
+                if isActive {
+                    Color.clear
+                        .accessibilityElement()
+                        .accessibilityLabel(Text(verbatim: "\(page.title.localized(locale)). \(page.body.localized(locale))"))
+                        .accessibilityIdentifier("onboarding.slide.\(page.scene.rawValue)")
+                }
+            }
     }
 
     private var fittedContent: some View {

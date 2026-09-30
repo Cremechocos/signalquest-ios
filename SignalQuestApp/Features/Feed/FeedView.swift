@@ -768,6 +768,11 @@ struct FeedView: View {
         .onChangeCompat(of: router.openMessagesInbox) { _, shouldOpen in
             if shouldOpen { presentMessagesIfNeeded() }
         }
+        // ⌘⇧N sur iPad : sans attendre le chargement du fil.
+        .onAppear { openComposerIfRequested() }
+        .onChangeCompat(of: router.openPostComposer) { _, requested in
+            if requested { openComposerIfRequested() }
+        }
         .sheet(item: $editingPost) { post in
             // Même composer qu'à la création : deux écrans divergeraient
             // dès la première évolution de la saisie.
@@ -990,6 +995,12 @@ struct FeedView: View {
                 failedRoutedPostID = id
             }
         }
+    }
+
+    private func openComposerIfRequested() {
+        guard router.openPostComposer else { return }
+        router.openPostComposer = false
+        showComposer = true
     }
 
     private func presentMessagesIfNeeded() {
