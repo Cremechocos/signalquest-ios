@@ -1,0 +1,39 @@
+#if canImport(LiveKit)
+import LiveKit
+import XCTest
+@testable import SignalQuest
+
+/// COM-1 (plan 3, jalon A) : les réglages de chiffrement des appels sont posés
+/// un par un, tels que la spec les fige (§10.3), et non laissés aux défauts du
+/// SDK, qui diffèrent entre iOS, Android et le web.
+final class LiveKitCallSettingsTests: XCTestCase {
+    func testKeyProviderOptionsAreTheSpecifiedOnes() {
+        let options = E2EEV2LiveKitSession.keyProviderOptions
+        XCTAssertTrue(options.sharedKey)
+        XCTAssertEqual(options.ratchetSalt, Data("LKFrameEncryptionKey".utf8))
+        XCTAssertEqual(options.ratchetWindowSize, 0, "Pas de ratchet : une clé par appel")
+        XCTAssertEqual(options.uncryptedMagicBytes, Data("LK-ROCKS".utf8))
+        XCTAssertEqual(options.failureTolerance, 10)
+        XCTAssertEqual(options.keyRingSize, 16)
+        XCTAssertTrue(options.discardFrameWhenCryptorNotReady, "Aucune trame avant que la clé soit posée")
+        XCTAssertEqual(options.keyDerivationAlgorithm, .pbkdf2)
+    }
+
+    func testSessionInstallsTheBase64PassphraseAsKeyZeroWithGCM() throws {
+        let epochKey = Data((0..<32).map { UInt8($0) })
+        let context = E2EEV2CallFrameKeyContext(
+            conversationId: "conv_0123456789abcdef", epochNumber: 1, callId: "call_0123456789abcdef"
+        )
+        let session = try E2EEV2LiveKitSession.make(epochKey: epochKey, context: context)
+        XCTAssertEqual(session.encryptionOptions.encryptionType, .gcm)
+        XCTAssertEqual(session.keyProvider.options, E2EEV2LiveKitSession.keyProviderOptions)
+        XCTAssertEqual(session.keyProvider.getCurrentKeyIndex(), 0)
+
+        // La clé posée est la CHAÎNE base64 de la clé de trame, comme
+        // `setSharedKey(String)` sous Android et une chaîne sous le web.
+        let frameKey = try E2EEV2CallFrameKey.derive(epochKey: epochKey, context: context)
+        let passphrase = try E2EEV2CallFrameKey.liveKitSharedPassphrase(frameKey: frameKey)
+        XCTAssertEqual(session.keyProvider.exportKey(index: 0), Data(passphrase.utf8))
+    }
+}
+#endif

@@ -244,6 +244,7 @@
 		523C31F38FEC5EFE05662838 /* SSEClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E64A098BE39CEC609740776 /* SSEClient.swift */; };
 		52F6F1D7A3BCF1650C6BEEF5 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 389490B290AB8281D5C364D0 /* AppServices.swift */; };
 		53124BA53C789E7595979D54 /* ReportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5886D2D8C4F18B7D0DE4C671 /* ReportSheet.swift */; };
+		5360984FF40767C2DBFF4DBD /* LiveKitCallSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81DBD896295D1CABACD61CEC /* LiveKitCallSettingsTests.swift */; };
 		53C2F8D7E0BE624F1C800C35 /* CrashHardeningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 067D3AF65AE57675EBBE798B /* CrashHardeningTests.swift */; };
 		543116391555BF3BE77EDA7F /* LeaderboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 554B78FC0A0A68C411BAD689 /* LeaderboardModels.swift */; };
 		54B3626831A12A084975529B /* AppPrivacyShieldTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25F94D47D298C312AC9B49C3 /* AppPrivacyShieldTests.swift */; };
@@ -1135,6 +1136,7 @@
 		805212969955D9E456D8238A /* ANFRStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRStatsView.swift; sourceTree = "<group>"; };
 		8057CE38296284A6ABDE6B60 /* SpeedtestPublicationSettingsQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestPublicationSettingsQATests.swift; sourceTree = "<group>"; };
 		808A687924991326F85D1C6F /* OutageReportDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutageReportDraftStore.swift; sourceTree = "<group>"; };
+		81DBD896295D1CABACD61CEC /* LiveKitCallSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitCallSettingsTests.swift; sourceTree = "<group>"; };
 		81FB8B7245C8C64D14F46655 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		8285E18A8C25FEC98790A174 /* PhotosView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosView.swift; sourceTree = "<group>"; };
 		830D7ECFA820F2E774487EC0 /* AuthCookieStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthCookieStoreTests.swift; sourceTree = "<group>"; };
@@ -2529,6 +2531,7 @@
 				16C9E5FDD182F8B718FA3F0A /* JSONDateParsingTests.swift */,
 				6C417B0E3A5B8BAEA89F18C7 /* LastSpeedtestResultIntentTests.swift */,
 				B9A16EBE21BA07C588250672 /* LeaderboardRequestOrderingTests.swift */,
+				81DBD896295D1CABACD61CEC /* LiveKitCallSettingsTests.swift */,
 				E375079277F78FD8BC4EDC5A /* LivePresenceServiceTests.swift */,
 				5DAD6827B7954D8DA96CF665 /* LiveShareLocationFreshnessTests.swift */,
 				91F51AC70BDC8F2F1EF5BC5A /* LiveSharePreflightTransportTests.swift */,
@@ -3664,6 +3667,7 @@
 				4E5AFE32AFF929E8AE4E94D7 /* JSONDateParsingTests.swift in Sources */,
 				C5E03A6DD21C83DD18C57E47 /* LastSpeedtestResultIntentTests.swift in Sources */,
 				E283DEFD873FF58AD753DF08 /* LeaderboardRequestOrderingTests.swift in Sources */,
+				5360984FF40767C2DBFF4DBD /* LiveKitCallSettingsTests.swift in Sources */,
 				4C08B3D8538380EDD221B5B1 /* LivePresenceServiceTests.swift in Sources */,
 				75228C3698799B371D41A038 /* LiveShareLocationFreshnessTests.swift in Sources */,
 				EE09E8F383D3C47DF4E3ADB1 /* LiveSharePreflightTransportTests.swift in Sources */,
@@ -4594,7 +4598,7 @@
 			repositoryURL = "https://github.com/livekit/client-sdk-swift.git";
 			requirement = {
 				kind = exactVersion;
-				version = 2.14.0;
+				version = 2.17.0;
 			};
 		};
 		59BFF4E1C888AF084679F42B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {

@@ -361,6 +361,7 @@ final class LiveKitClient: ObservableObject {
                 )
             )
             try await liveRoom.connect(url: url.absoluteString, token: token)
+            e2eeSession?.neutralizeServerInjectedFrames()
             // Un raccrochage est survenu pendant le connect : fermer la room orpheline
             // au lieu de la marquer connectée (CALL-RTC-05).
             if myGeneration != connectGeneration {
@@ -1171,13 +1172,43 @@ final class E2EEV2LiveKitVerification: @unchecked Sendable {
 
 struct E2EEV2LiveKitSession {
     let encryptionOptions: EncryptionOptions
+    let keyProvider: BaseKeyProvider
     fileprivate let verification = E2EEV2LiveKitVerification()
+
+    /// Réglages figés par la spec (§10.3), posés un par un sur les trois SDK :
+    /// leurs défauts diffèrent. Pas de fenêtre de ratchet (une clé par appel),
+    /// et aucune trame lue ni envoyée avant que la clé soit posée.
+    static let keyProviderOptions = KeyProviderOptions(
+        sharedKey: true,
+        ratchetSalt: Data("LKFrameEncryptionKey".utf8),
+        ratchetWindowSize: 0,
+        uncryptedMagicBytes: Data("LK-ROCKS".utf8),
+        failureTolerance: failureTolerance,
+        keyRingSize: 16,
+        discardFrameWhenCryptorNotReady: true,
+        keyDerivationAlgorithm: .pbkdf2
+    )
+
+    /// Échecs de déchiffrement consécutifs tolérés avant l'état d'échec ; même
+    /// valeur sur les trois plateformes (COM-1).
+    static let failureTolerance: Int32 = 10
 
     static func make(epochKey: Data, context: E2EEV2CallFrameKeyContext) throws -> E2EEV2LiveKitSession {
         var frameKey = try E2EEV2CallFrameKey.derive(epochKey: epochKey, context: context)
         defer { frameKey.resetBytes(in: 0..<frameKey.count) }
         let passphrase = try E2EEV2CallFrameKey.liveKitSharedPassphrase(frameKey: frameKey)
-        return E2EEV2LiveKitSession(encryptionOptions: .sharedKey(passphrase))
+        let keyProvider = BaseKeyProvider(options: keyProviderOptions)
+        keyProvider.setKey(key: passphrase, index: 0)
+        return E2EEV2LiveKitSession(
+            encryptionOptions: EncryptionOptions(keyProvider: keyProvider, encryptionType: .gcm),
+            keyProvider: keyProvider
+        )
+    }
+
+    /// Le SDK pose le marqueur SIF envoyé par le serveur à la jonction : une
+    /// trame qui le porte passerait sans déchiffrement. Il est vidé aussitôt.
+    func neutralizeServerInjectedFrames() {
+        keyProvider.setSifTrailer(trailer: Data())
     }
 }
 #endif

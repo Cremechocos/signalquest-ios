@@ -631,9 +631,10 @@ affichage**, et dans l'outil de modération.
 
 ### 10.3 Réglages LiveKit figés, sur les trois SDK
 
-SDK de référence : `client-sdk-swift` 2.14.0, `livekit-android` 2.27.0,
-`livekit-client` (JS) 2.18.x. Chaque changement de version refait le vecteur
-et l'appel croisé.
+SDK de référence : `client-sdk-swift` 2.17.0 (2.15.0 au moins, première
+version qui expose `discardFrameWhenCryptorNotReady` et
+`keyDerivationAlgorithm`), `livekit-android` 2.27.0, `livekit-client` (JS)
+2.18.x. Chaque changement de version refait le vecteur et l'appel croisé.
 
 - **Tous les réglages sont posés explicitement**, jamais laissés aux défauts,
   qui diffèrent d'un SDK à l'autre.
@@ -646,7 +647,11 @@ et l'appel croisé.
   produisent (export de la clé), le web le vérifie par l'appel croisé.
 - `ratchetWindowSize = 0`, `keyRingSize = 16`, `encryptionType = gcm`,
   `discardFrameWhenCryptorNotReady = true`, et `failureTolerance` à une même
-  valeur explicite partout, fixée par le ticket COM-1 (annexe C).
+  valeur explicite partout : 10, proposée par iOS dans le ticket COM-1
+  (annexe C) et confirmée par Android (même code natif, même sens), à
+  confirmer par le web. Les défauts d'Android diffèrent sur trois points
+  (`ratchetWindowSize` 16, `failureTolerance` -1,
+  `discardFrameWhenCryptorNotReady` faux) : d'où la règle de tout poser.
 - **Marqueur « non chiffré »** (`uncryptedMagicBytes`) et **SIF** :
   - selon l'implémentation, un marqueur vide peut désactiver le passage en
     clair, ou au contraire faire passer toute trame pour non chiffrée ;
@@ -667,9 +672,10 @@ et l'appel croisé.
 - **Canal de données chiffré** sur les trois SDK. Un paquet non chiffré est
   refusé. La preuve de jonction y passe.
 - Un SDK qui ne permet pas ces réglages n'offre pas d'appel chiffré : il est
-  monté de version ou corrigé. En Swift 2.14.0,
-  `discardFrameWhenCryptorNotReady` et `keyDerivationAlgorithm` ne sont pas
-  encore exposés (COM-1).
+  monté de version ou corrigé. En Swift, les deux derniers réglages existent
+  depuis 2.15.0 ; iOS est passé à 2.17.0, qui corrige aussi le chiffrement du
+  canal de données (COM-1). Le marqueur SIF reçu à la jonction y est vidé
+  dès la jonction terminée.
 
 ### 10.4 Vérification et fermeture par défaut
 
