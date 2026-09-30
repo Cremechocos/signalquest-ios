@@ -769,7 +769,8 @@ enum E2EEV2VaultBoundary {
                     "epoch-v2-owner-index:\(namespace)", "rotation-work-v1:\(namespace)"] {
             try store.remove(key)
         }
-        for prefix in ["epoch-v2:\(namespace):", "epoch-v2-history:\(namespace):", "epoch-v2-index:\(namespace):"] {
+        for prefix in ["epoch-v2:\(namespace):", "epoch-v2-history:\(namespace):", "epoch-v2-index:\(namespace):",
+                       E2EEV2TrustPinStore.prefix(ownerNamespace: namespace)] {
             for key in try store.keys(withPrefix: prefix) { try store.remove(key) }
         }
         for key in try store.keys(withPrefix: "e2ee_v2_live_share_") {

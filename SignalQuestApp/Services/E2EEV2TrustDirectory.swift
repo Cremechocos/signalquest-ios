@@ -1,0 +1,112 @@
+import CryptoKit
+import Foundation
+
+/// Appareils certifiés des membres d'une conversation, figés pour un appel ou
+/// un envoi (spec §2.2, §10, §12). Les vérifications synchrones — preuve de
+/// jonction, descripteur d'appel, destinataires d'une époque — s'y lisent
+/// sans réseau.
+struct E2EEV2CertifiedDeviceSet: Equatable, Sendable {
+    let devicesByUser: [String: [E2EEV2CertifiedDevice]]
+    /// Comptes dont le paquet de confiance a été refusé (UIK changée, liste
+    /// invalide ou en recul) : aucun de leurs appareils n'est cru.
+    let refusals: [String: E2EEV2IdentityVerification.Failure]
+
+    func device(userId: String, deviceId: String) -> E2EEV2CertifiedDevice? {
+        devicesByUser[userId]?.first { $0.deviceId == deviceId }
+    }
+
+    /// L'appareil appelant d'un descripteur n'est désigné que par son
+    /// identifiant d'appareil.
+    func device(deviceId: String) -> E2EEV2CertifiedDevice? {
+        devicesByUser.values.lazy.flatMap { $0 }.first { $0.deviceId == deviceId }
+    }
+
+    func signingKey(userId: String, deviceId: String) -> P256.Signing.PublicKey? {
+        device(userId: userId, deviceId: deviceId)?.signingKey
+    }
+
+    /// §10.0 et §12 : tous les appareils certifiés et non mis à l'écart des
+    /// membres ont la capacité « appels vérifiés ». Un membre sans appareil
+    /// certifié ne compte pas ; un appareil mis à l'écart non plus.
+    func supportsVerifiedCalls(nowMs: Int64) -> Bool {
+        let active = devicesByUser.values.flatMap { $0 }.filter { !$0.isSidelined(nowMs: nowMs) }
+        return !active.isEmpty && active.allSatisfy { $0.supports("calls", nowMs: nowMs) }
+    }
+}
+
+/// Ce que cet appareil a épinglé de chaque compte (§2.1, §2.2), dans le coffre
+/// E2EE du compte courant. Rien de secret, mais son intégrité compte : une UIK
+/// remplacée ici ferait croire un faux appareil.
+final class E2EEV2TrustPinStore: @unchecked Sendable {
+    static let keyPrefix = "trust-pin-v1"
+
+    private let tokenStore: TokenStore
+
+    init(tokenStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee")) {
+        self.tokenStore = tokenStore
+    }
+
+    func pin(userId: String, ownerNamespace: String) throws -> E2EEV2TrustPin? {
+        guard let raw = try tokenStore.string(for: key(userId: userId, ownerNamespace: ownerNamespace)),
+              let data = raw.data(using: .utf8) else { return nil }
+        return try JSONDecoder().decode(E2EEV2TrustPin.self, from: data)
+    }
+
+    func save(_ pin: E2EEV2TrustPin, userId: String, ownerNamespace: String) throws {
+        let data = try JSONEncoder().encode(pin)
+        guard let value = String(data: data, encoding: .utf8) else { throw CocoaError(.fileWriteUnknown) }
+        try tokenStore.set(value, for: key(userId: userId, ownerNamespace: ownerNamespace), accessibility: .afterFirstUnlock)
+    }
+
+    static func prefix(ownerNamespace: String) -> String {
+        "\(keyPrefix):\(ownerNamespace):"
+    }
+
+    private func key(userId: String, ownerNamespace: String) -> String {
+        Self.prefix(ownerNamespace: ownerNamespace) + userId
+    }
+}
+
+/// Lit, vérifie et épingle le paquet de confiance de chaque membre (E.1), puis
+/// rend les appareils certifiés. Un paquet refusé retire ce membre sans faire
+/// échouer les autres ; une erreur réseau fait échouer l'ensemble.
+actor E2EEV2TrustDirectory {
+    enum Failure: Error, Equatable {
+        case malformedResponse(userId: String)
+    }
+
+    private let ownerNamespace: String
+    private let pins: E2EEV2TrustPinStore
+    private let fetch: @Sendable (_ userId: String) async throws -> Data
+
+    init(
+        ownerNamespace: String,
+        pins: E2EEV2TrustPinStore = E2EEV2TrustPinStore(),
+        fetch: @escaping @Sendable (_ userId: String) async throws -> Data
+    ) {
+        self.ownerNamespace = ownerNamespace
+        self.pins = pins
+        self.fetch = fetch
+    }
+
+    func certifiedDevices(for userIds: [String]) async throws -> E2EEV2CertifiedDeviceSet {
+        var devices: [String: [E2EEV2CertifiedDevice]] = [:]
+        var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
+        for userId in Set(userIds).sorted() {
+            let data = try await fetch(userId)
+            guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let bundle = E2EEV2IdentityBundle.parse(object, userId: userId) else {
+                throw Failure.malformedResponse(userId: userId)
+            }
+            let pinned = try pins.pin(userId: userId, ownerNamespace: ownerNamespace)
+            switch E2EEV2IdentityVerification.verify(bundle, pinned: pinned) {
+            case .success(let outcome):
+                try pins.save(outcome.pin, userId: userId, ownerNamespace: ownerNamespace)
+                devices[userId] = outcome.devices
+            case .failure(let refusal):
+                refusals[userId] = refusal
+            }
+        }
+        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals)
+    }
+}
