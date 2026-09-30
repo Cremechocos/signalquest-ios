@@ -16,7 +16,7 @@ final class MessagesViewModel: ObservableObject {
 
     func load() async {
         if AppEnvironment.usesDemoData {
-            conversations = .demo
+            conversations = Array.demo.inDisplayOrder()
             errorMessage = nil
             return
         }
@@ -26,7 +26,7 @@ final class MessagesViewModel: ObservableObject {
             try? await Task.sleep(for: .seconds(4))
         }
         do {
-            conversations = try await service.conversations()
+            conversations = try await service.conversations().inDisplayOrder()
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.localizedDescription }
@@ -50,12 +50,53 @@ final class MessagesViewModel: ObservableObject {
         await load()
     }
 
-    /// Marque la conversation comme lue (swipe). Recharge ensuite la liste pour
-    /// rafraîchir l'état lu/non-lu.
+    /// Marque la conversation comme lue (balayage ou appui long). L'état change
+    /// tout de suite et revient si le serveur refuse.
     func markRead(_ conversation: MessageConversation) async {
         guard let lastMessageId = conversation.lastMessage?.id else { return }
-        try? await service.markRead(conversationId: conversation.id, lastMessageId: lastMessageId)
-        await load()
+        let previous = conversation.lastReadAt
+        update(conversation.id) { $0.with(lastReadAt: conversation.lastMessageAt ?? Date()) }
+        do {
+            try await service.markRead(conversationId: conversation.id, lastMessageId: lastMessageId)
+        } catch {
+            update(conversation.id) { $0.with(lastReadAt: previous) }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
+        }
+    }
+
+    /// Remet en non lu (plan 3, vague 2) : le serveur ramène la lecture au tout
+    /// début, la pastille et le badge reviennent.
+    func markUnread(_ conversation: MessageConversation) async {
+        let previous = conversation.lastReadAt
+        update(conversation.id) { $0.with(lastReadAt: Date(timeIntervalSince1970: 0)) }
+        do {
+            try await service.markUnread(conversationId: conversation.id)
+        } catch {
+            update(conversation.id) { $0.with(lastReadAt: previous) }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
+        }
+    }
+
+    /// Épingle ou désépingle (plan 3, vague 2) : les épinglées passent en tête.
+    func setPinned(_ pinned: Bool, _ conversation: MessageConversation) async {
+        let previous = conversation.pinnedAt
+        update(conversation.id) { $0.with(pinnedAt: pinned ? Date() : nil) }
+        do {
+            _ = try await service.setConversationPinned(pinned, conversationId: conversation.id)
+        } catch {
+            update(conversation.id) { $0.with(pinnedAt: previous) }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
+        }
+    }
+
+    /// Change une conversation, puis remet la liste dans son ordre d'affichage.
+    private func update(_ id: String, _ transform: (MessageConversation) -> MessageConversation) {
+        guard let index = conversations.firstIndex(where: { $0.id == id }) else { return }
+        var updated = conversations
+        updated[index] = transform(updated[index])
+        withAnimation(SQMotion.resolve(SQMotion.standard, UIAccessibility.isReduceMotionEnabled)) {
+            conversations = updated.inDisplayOrder()
+        }
     }
 
     /// Quitte la conversation (swipe) et la retire de la liste localement.
@@ -127,14 +168,39 @@ struct MessagesView: View {
                 .listRowSeparator(.hidden)
                 .listRowInsets(cardRowInsets)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    Button {
-                        Task { await model.markRead(conversation); await services.refreshInboxBadge(force: true) }
-                    } label: {
-                        Label("Lu", systemImage: "checkmark.message")
+                    if isUnread(conversation) {
+                        Button { setRead(true, conversation) } label: {
+                            Label("Lu", systemImage: "checkmark.message")
+                        }
+                        .tint(SQColor.brandRed)
+                    } else if conversation.canMarkUnread(currentUserId: currentUserId) {
+                        Button { setRead(false, conversation) } label: {
+                            Label("Non lu", systemImage: "message.badge")
+                        }
+                        .tint(SQColor.brandRed)
                     }
-                    .tint(SQColor.brandRed)
+                    pinButton(conversation)
+                        .tint(SQColor.info)
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        pendingLeave = conversation
+                    } label: {
+                        Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                }
+                // Mêmes actions à l'appui long, et au clic secondaire sur iPad.
+                .contextMenu {
+                    pinButton(conversation)
+                    if isUnread(conversation) {
+                        Button { setRead(true, conversation) } label: {
+                            Label("Marquer comme lu", systemImage: "checkmark.message")
+                        }
+                    } else if conversation.canMarkUnread(currentUserId: currentUserId) {
+                        Button { setRead(false, conversation) } label: {
+                            Label("Marquer comme non lu", systemImage: "message.badge")
+                        }
+                    }
                     Button(role: .destructive) {
                         pendingLeave = conversation
                     } label: {
@@ -429,12 +495,21 @@ struct MessagesView: View {
             }
             Spacer(minLength: SQSpace.sm)
             VStack(alignment: .trailing, spacing: 5) {
-                if let date = conversation.lastMessageAt ?? conversation.updatedAt {
-                    // `accentInk` : la brique n'est garantie que pour le grand texte.
-                    Text(verbatim: ConversationListDate.label(for: date))
-                        .font(SQFont.body(12, .medium))
-                        .foregroundStyle(unread ? SQColor.accentInk : SQColor.labelSecondary)
-                        .accessibilityIdentifier("messages.row.date")
+                HStack(spacing: 4) {
+                    if conversation.pinnedAt != nil {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityLabel("Épinglée")
+                            .accessibilityIdentifier("messages.row.pinned")
+                    }
+                    if let date = conversation.listDate {
+                        // `accentInk` : la brique n'est garantie que pour le grand texte.
+                        Text(verbatim: ConversationListDate.label(for: date))
+                            .font(SQFont.body(12, .medium))
+                            .foregroundStyle(unread ? SQColor.accentInk : SQColor.labelSecondary)
+                            .accessibilityIdentifier("messages.row.date")
+                    }
                 }
                 if unread {
                     Circle()
@@ -448,6 +523,23 @@ struct MessagesView: View {
         .padding(.horizontal, SQSpace.lg)
         .sqCardBackground()
         .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+    }
+
+    private func pinButton(_ conversation: MessageConversation) -> some View {
+        let pinned = conversation.pinnedAt != nil
+        return Button {
+            Haptics.light()
+            Task { await model.setPinned(!pinned, conversation) }
+        } label: {
+            Label(pinned ? "Désépingler" : "Épingler", systemImage: pinned ? "pin.slash" : "pin")
+        }
+    }
+
+    private func setRead(_ read: Bool, _ conversation: MessageConversation) {
+        Task {
+            if read { await model.markRead(conversation) } else { await model.markUnread(conversation) }
+            await services.refreshInboxBadge(force: true)
+        }
     }
 
     /// Pastille de présence : au moins un autre participant est en ligne.
@@ -645,7 +737,8 @@ extension Array where Element == MessageConversation {
                 groupPhotoUrl: nil,
                 createdAt: Date(),
                 updatedAt: Date(),
-                lastMessageAt: Date(),
+                // Une heure plus tôt : la liste se trie par date affichée.
+                lastMessageAt: Date().addingTimeInterval(-3_600),
                 lastReadAt: nil,
                 pinnedAt: nil,
                 // Deux personnes, comme une vraie conversation chiffrée : sans

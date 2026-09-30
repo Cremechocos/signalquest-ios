@@ -412,6 +412,46 @@ extension MessageConversation {
         if let read = lastReadAt { return lastAt > read }
         return true
     }
+
+    /// « Non lu » ne se propose que sur un dernier message reçu et déjà lu :
+    /// son propre message ne compte jamais comme non lu.
+    func canMarkUnread(currentUserId: String?) -> Bool {
+        guard let last = lastMessage, last.senderId != currentUserId, lastMessageAt != nil else { return false }
+        return !isUnread(currentUserId: currentUserId)
+    }
+
+    /// Date montrée sur la rangée de la liste.
+    var listDate: Date? { lastMessageAt ?? updatedAt }
+
+    func with(lastReadAt: Date?) -> MessageConversation { copy(lastReadAt: lastReadAt, pinnedAt: pinnedAt) }
+
+    func with(pinnedAt: Date?) -> MessageConversation { copy(lastReadAt: lastReadAt, pinnedAt: pinnedAt) }
+
+    private func copy(lastReadAt: Date?, pinnedAt: Date?) -> MessageConversation {
+        MessageConversation(
+            id: id, title: title, isGroup: isGroup, e2eeEnabled: e2eeEnabled, groupPhotoUrl: groupPhotoUrl,
+            createdAt: createdAt, updatedAt: updatedAt, lastMessageAt: lastMessageAt,
+            lastReadAt: lastReadAt, pinnedAt: pinnedAt, participants: participants, lastMessage: lastMessage
+        )
+    }
+}
+
+extension Array where Element == MessageConversation {
+    /// Épinglées d'abord, la dernière épinglée en tête, puis les autres par
+    /// date affichée : les dates de la liste restent dans l'ordre, et une
+    /// conversation désépinglée retrouve sa place sans recharger. L'ordre est
+    /// calculé ici, sans dépendre de celui du serveur.
+    func inDisplayOrder() -> [MessageConversation] {
+        func newestFirst(_ items: [(offset: Int, element: MessageConversation)], by key: (MessageConversation) -> Date?) -> [MessageConversation] {
+            items.sorted { lhs, rhs in
+                let left = key(lhs.element) ?? .distantPast, right = key(rhs.element) ?? .distantPast
+                return left != right ? left > right : lhs.offset < rhs.offset
+            }.map(\.element)
+        }
+        let indexed = Array<(offset: Int, element: MessageConversation)>(enumerated())
+        return newestFirst(indexed.filter { $0.element.pinnedAt != nil }, by: \.pinnedAt)
+            + newestFirst(indexed.filter { $0.element.pinnedAt == nil }, by: \.listDate)
+    }
 }
 
 struct MessageItem: Decodable, Identifiable, Equatable {

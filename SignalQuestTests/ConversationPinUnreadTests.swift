@@ -1,0 +1,143 @@
+import XCTest
+@testable import SignalQuest
+
+/// Plan 3, vague 2 : épingler une conversation et la marquer non lue, avec les
+/// routes déjà servies par le serveur.
+final class ConversationPinUnreadTests: XCTestCase {
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        super.tearDown()
+    }
+
+    func testPinnedConversationsComeFirstThenTheOthersByDate() {
+        let now = Date()
+        let list = [
+            conversation("ancienne", lastMessageAt: now.addingTimeInterval(-3_600)),
+            conversation("épinglée-avant", lastMessageAt: now.addingTimeInterval(-86_400), pinnedAt: now.addingTimeInterval(-600)),
+            conversation("récente", lastMessageAt: now),
+            conversation("épinglée-dernière", lastMessageAt: now.addingTimeInterval(-7_200), pinnedAt: now),
+            conversation("sans-message", lastMessageAt: nil, updatedAt: now.addingTimeInterval(-60))
+        ]
+
+        XCTAssertEqual(
+            list.inDisplayOrder().map(\.id),
+            ["épinglée-dernière", "épinglée-avant", "récente", "sans-message", "ancienne"]
+        )
+    }
+
+    func testEqualDatesKeepTheServerOrder() {
+        let date = Date()
+        let list = ["a", "b", "c"].map { conversation($0, lastMessageAt: date) }
+        XCTAssertEqual(list.inDisplayOrder().map(\.id), ["a", "b", "c"])
+    }
+
+    func testUnpinnedConversationFindsItsPlaceByDate() {
+        let now = Date()
+        let pinned = conversation("x", lastMessageAt: now.addingTimeInterval(-7_200), pinnedAt: now)
+        let list = [pinned, conversation("y", lastMessageAt: now), conversation("z", lastMessageAt: now.addingTimeInterval(-86_400))]
+        let unpinned = list.map { $0.id == "x" ? $0.with(pinnedAt: nil) : $0 }
+        XCTAssertEqual(unpinned.inDisplayOrder().map(\.id), ["y", "x", "z"])
+    }
+
+    func testMarkingUnreadIsOfferedOnlyOnAReadMessageFromSomeoneElse() {
+        let now = Date()
+        let read = conversation("c", lastMessageAt: now, lastReadAt: now, senderId: "other")
+        XCTAssertTrue(read.canMarkUnread(currentUserId: "me"))
+        XCTAssertFalse(read.isUnread(currentUserId: "me"))
+
+        // Le serveur ramène la lecture au 1er janvier 1970 : la pastille revient.
+        let unread = read.with(lastReadAt: Date(timeIntervalSince1970: 0))
+        XCTAssertTrue(unread.isUnread(currentUserId: "me"))
+        XCTAssertFalse(unread.canMarkUnread(currentUserId: "me"), "Déjà non lue : c'est « Lu » qui se propose")
+
+        let mine = conversation("c", lastMessageAt: now, lastReadAt: now, senderId: "me")
+        XCTAssertFalse(mine.canMarkUnread(currentUserId: "me"), "Son propre message ne compte jamais comme non lu")
+        XCTAssertFalse(conversation("c", lastMessageAt: nil).canMarkUnread(currentUserId: "me"))
+    }
+
+    func testCopiesKeepEverythingElse() {
+        let original = conversation("c", lastMessageAt: Date(), lastReadAt: Date(), senderId: "other")
+        let pinned = original.with(pinnedAt: Date())
+        XCTAssertEqual(pinned.id, original.id)
+        XCTAssertEqual(pinned.lastReadAt, original.lastReadAt)
+        XCTAssertEqual(pinned.lastMessage, original.lastMessage)
+        XCTAssertEqual(pinned.participants, original.participants)
+        XCTAssertEqual(pinned.with(pinnedAt: nil), original)
+    }
+
+    func testPinAndUnreadUseTheServerRoutes() async throws {
+        var calls: [(method: String?, path: String?, body: [String: Any])] = []
+        MockURLProtocol.requestHandler = { request in
+            let body = (try? JSONSerialization.jsonObject(with: Self.requestBody(request) ?? Data())) as? [String: Any] ?? [:]
+            calls.append((request.httpMethod, request.url?.path, body))
+            let json = request.url?.path.hasSuffix("/pin") == true
+                ? #"{"success":true,"pinned":true,"pinnedAt":"2026-09-30T16:12:03.512Z"}"#
+                : #"{"success":true,"state":"unread","lastReadAt":"1970-01-01T00:00:00.000Z","changed":true}"#
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(json.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("pin-unread-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let service = MessagesService(api: api)
+
+        let pinnedAt = try await service.setConversationPinned(true, conversationId: "conv-1")
+        try await service.markUnread(conversationId: "conv-1")
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let expected = try XCTUnwrap(formatter.date(from: "2026-09-30T16:12:03.512Z"))
+        XCTAssertEqual(try XCTUnwrap(pinnedAt).timeIntervalSince1970, expected.timeIntervalSince1970, accuracy: 0.001)
+        XCTAssertEqual(calls.count, 2)
+        XCTAssertEqual(calls[0].method, "PATCH")
+        XCTAssertEqual(calls[0].path, "/api/messages/conversations/conv-1/pin")
+        XCTAssertEqual(calls[0].body["pinned"] as? Bool, true)
+        XCTAssertEqual(calls[1].method, "PATCH")
+        XCTAssertEqual(calls[1].path, "/api/messages/conversations/conv-1/read-state")
+        XCTAssertEqual(calls[1].body["state"] as? String, "unread")
+        XCTAssertNil(calls[1].body["lastMessageId"], "Sans état explicite, le serveur comprendrait « lu »")
+    }
+
+    private func conversation(
+        _ id: String,
+        lastMessageAt: Date?,
+        updatedAt: Date? = nil,
+        lastReadAt: Date? = nil,
+        pinnedAt: Date? = nil,
+        senderId: String = "other"
+    ) -> MessageConversation {
+        let message = lastMessageAt.map { date in
+            MessageItem(
+                id: "m-\(id)", conversationId: id, senderId: senderId, kind: "TEXT", content: "Salut",
+                e2eeVersion: nil, e2eeIvB64: nil, e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil,
+                createdAt: date, editedAt: nil, deletedAt: nil, replyToId: nil, threadReplyCount: 0,
+                sender: nil, attachments: [], reactions: []
+            )
+        }
+        return MessageConversation(
+            id: id, title: id, isGroup: false, e2eeEnabled: false, groupPhotoUrl: nil,
+            createdAt: nil, updatedAt: updatedAt, lastMessageAt: lastMessageAt,
+            lastReadAt: lastReadAt, pinnedAt: pinnedAt, participants: [], lastMessage: message
+        )
+    }
+
+    private static func requestBody(_ request: URLRequest) -> Data? {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var result = Data()
+        var buffer = [UInt8](repeating: 0, count: 4_096)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            if count <= 0 { break }
+            result.append(buffer, count: count)
+        }
+        return result
+    }
+}

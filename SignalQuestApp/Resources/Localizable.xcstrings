@@ -19997,6 +19997,22 @@
         }
       }
     },
+    "Épinglée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pinned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Épinglée"
+          }
+        }
+      }
+    },
     "Erreur" : {
       "localizations" : {
         "en" : {
@@ -27706,6 +27722,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’écart entre le signal utile et le bruit ambiant, en dB. Plus il est élevé, plus le téléphone peut monter en débit."
+          }
+        }
+      }
+    },
+    "Marquer comme lu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mark as read"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marquer comme lu"
+          }
+        }
+      }
+    },
+    "Marquer comme non lu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mark as unread"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marquer comme non lu"
           }
         }
       }

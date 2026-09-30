@@ -64,6 +64,10 @@ protocol MessagesServicing: Sendable {
     ) async throws -> MessageItem
     func retryPendingAttachments() async
     func markRead(conversationId: String, lastMessageId: String) async throws
+    /// Remet la conversation en non lu pour soi (plan 3, vague 2).
+    func markUnread(conversationId: String) async throws
+    /// Épingle ou désépingle la conversation pour soi ; renvoie la date d'épinglage.
+    func setConversationPinned(_ pinned: Bool, conversationId: String) async throws -> Date?
     func react(messageId: String, emoji: String, in conversation: MessageConversation) async throws
     func removeReaction(messageId: String, emoji: String, in conversation: MessageConversation) async throws
     func editMessage(messageId: String, text: String, in conversation: MessageConversation, e2ee: E2EEServicing?) async throws
@@ -913,11 +917,34 @@ final class MessagesService: MessagesServicing {
     }
 
     func markRead(conversationId: String, lastMessageId: String) async throws {
+        if AppEnvironment.usesDemoData { return }
         let _: SuccessResponse = try await api.requestJSON(
             "/api/messages/conversations/\(conversationId)/read-state",
             method: .patch,
             body: ["lastMessageId": lastMessageId]
         )
+    }
+
+    /// Le serveur ramène la lecture au tout début : la conversation compte de
+    /// nouveau comme non lue, dans la liste comme dans le badge.
+    func markUnread(conversationId: String) async throws {
+        if AppEnvironment.usesDemoData { return }
+        let _: SuccessResponse = try await api.requestJSON(
+            "/api/messages/conversations/\(conversationId)/read-state",
+            method: .patch,
+            body: ["state": "unread"]
+        )
+    }
+
+    func setConversationPinned(_ pinned: Bool, conversationId: String) async throws -> Date? {
+        if AppEnvironment.usesDemoData { return pinned ? Date() : nil }
+        struct Response: Decodable { let pinnedAt: Date? }
+        let response: Response = try await api.requestJSON(
+            "/api/messages/conversations/\(conversationId)/pin",
+            method: .patch,
+            body: ["pinned": pinned]
+        )
+        return response.pinnedAt
     }
 
     func react(messageId: String, emoji: String, in conversation: MessageConversation) async throws {
