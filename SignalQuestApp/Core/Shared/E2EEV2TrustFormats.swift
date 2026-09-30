@@ -274,6 +274,26 @@ struct E2EEV2DeviceList: Equatable, Sendable {
         uik: P256.Signing.PublicKey,
         previousCanonical: String?
     ) throws -> E2EEV2DeviceList {
+        try verify(signed, entries: entries, uik: uik, expectedPrevious: previousCanonical.map(digest(of:)) ?? "-")
+    }
+
+    /// Même contrôle quand la liste précédente n'est pas connue ici (versions
+    /// manquées) : le chaînage ne peut pas être vérifié ; la signature de
+    /// l'UIK et la version croissante, contrôlée par l'appelant, suffisent.
+    static func verifyWithoutChain(
+        _ signed: E2EEV2SignedString,
+        entries: [String],
+        uik: P256.Signing.PublicKey
+    ) throws -> E2EEV2DeviceList {
+        try verify(signed, entries: entries, uik: uik, expectedPrevious: nil)
+    }
+
+    private static func verify(
+        _ signed: E2EEV2SignedString,
+        entries: [String],
+        uik: P256.Signing.PublicKey,
+        expectedPrevious: String?
+    ) throws -> E2EEV2DeviceList {
         guard signed.verify(with: uik) else { throw E2EEV2TrustFormatError.invalidSignature }
         guard let f = E2EEV2Canonical.split(signed.canonical, tag: tag, version: "1", fieldCount: 8),
               E2EEV2Canonical.isOpaque(f[2]),
@@ -282,8 +302,7 @@ struct E2EEV2DeviceList: Equatable, Sendable {
               E2EEV2Canonical.isDecimal(f[7]), let issuedAt = Int64(f[7]) else {
             throw E2EEV2TrustFormatError.invalidField
         }
-        let expectedPrevious = previousCanonical.map(digest(of:)) ?? "-"
-        guard f[4] == expectedPrevious, (version == 1) == (f[4] == "-") else {
+        guard expectedPrevious.map({ f[4] == $0 }) ?? true, (version == 1) == (f[4] == "-") else {
             throw E2EEV2TrustFormatError.digestMismatch
         }
         guard count == entries.count,
