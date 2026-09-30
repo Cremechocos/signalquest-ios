@@ -187,6 +187,7 @@
 		4062FC76DAFABCDD6E5C6901 /* AntennasService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB24C8F6F0931F6D99B18115 /* AntennasService.swift */; };
 		40ADB14D3FEDE7371042A6BA /* CustomSitesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C44E54A806F05156B150F1 /* CustomSitesService.swift */; };
 		410070C7BCF48B0D6C417526 /* SmokeTourQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB7D271F7EF3536DB6B7C1A1 /* SmokeTourQATests.swift */; };
+		4149DEB9094ABCA8284F4972 /* CallDescriptorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BA09C22CDA05CC8388C3907 /* CallDescriptorTests.swift */; };
 		416E530A51D50131F275D2E4 /* FeedContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CDCE02F16F705D9A8F45953 /* FeedContextTests.swift */; };
 		41CCD76BD13F09EF27F0904C /* SpeedtestLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761DCC23E9E837925496D61E /* SpeedtestLiveActivityController.swift */; };
 		42674A52A1A2D1256895CEB9 /* CarPlaySceneManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5723505E7140ACE78C7A67FA /* CarPlaySceneManifestTests.swift */; };
@@ -370,6 +371,7 @@
 		7CB3792B4DF37AA80E3E1A1E /* FavoritesBackendInteropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1C6D2BE5C0DA657640E95A8 /* FavoritesBackendInteropTests.swift */; };
 		7D0BE4AFA8C517809583BFB1 /* IdentifyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C43EF0BBA838F55D6E4EF78 /* IdentifyService.swift */; };
 		7D587A943F3C2B6675722262 /* SignalQuestUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230A19DCE27F22F952273493 /* SignalQuestUITests.swift */; };
+		7DA100D5653B6369B9DA114A /* E2EEV2CallDescriptorRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D739E9DEF31C10C0FF092D3 /* E2EEV2CallDescriptorRuntime.swift */; };
 		7DC00F26E17E3572AD6AC560 /* OnboardingAnimationQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E85A770CF60ED550C4CCFE /* OnboardingAnimationQATests.swift */; };
 		7DE9EBCF7A592DBA4BB5EE35 /* VoiceNoteViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E569663F0441B4DA32B4BF6 /* VoiceNoteViews.swift */; };
 		7E2820CB7B8E811E8AB2881A /* PasswordResetLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7FA8662B2C47A117D383F0 /* PasswordResetLink.swift */; };
@@ -892,6 +894,7 @@
 		2B232040433517E5FB6B7A30 /* radio-world-scenarios-v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "radio-world-scenarios-v1.json"; sourceTree = "<group>"; };
 		2B47BDB4D6F4BC76820FA3D2 /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
 		2B85E1A27AE9738AE746C7CE /* AntennaSightViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaSightViewModel.swift; sourceTree = "<group>"; };
+		2BA09C22CDA05CC8388C3907 /* CallDescriptorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallDescriptorTests.swift; sourceTree = "<group>"; };
 		2C4AC30BD45A05B230CB8559 /* CarPlayImageFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayImageFactory.swift; sourceTree = "<group>"; };
 		2C51010FA360E6C3806F7179 /* MapSnapshotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSnapshotService.swift; sourceTree = "<group>"; };
 		2C527B3C2A1021E22E74D4D2 /* ANFRMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ANFRMapView.swift; sourceTree = "<group>"; };
@@ -1129,6 +1132,7 @@
 		7C9E358E4CCFBBA103516C71 /* CarPlayRouteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayRouteService.swift; sourceTree = "<group>"; };
 		7D0616550E274CD9D726FFF1 /* AntennaReportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaReportSheet.swift; sourceTree = "<group>"; };
 		7D44DAFE7F9710386A49F29C /* SSEFrameParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEFrameParserTests.swift; sourceTree = "<group>"; };
+		7D739E9DEF31C10C0FF092D3 /* E2EEV2CallDescriptorRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2CallDescriptorRuntime.swift; sourceTree = "<group>"; };
 		7DA8C938A4852ED844A5CBC1 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		7DA994FD16C75058CC013488 /* PendingQueueFlusherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingQueueFlusherTests.swift; sourceTree = "<group>"; };
 		7DAB8EA7B350B181429EE0A5 /* SpeedtestVisibilityViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestVisibilityViewModelTests.swift; sourceTree = "<group>"; };
@@ -2486,6 +2490,7 @@
 				1B7D91FD53A512C0A154BCFB /* AutoRefreshTests.swift */,
 				E3C35085148C3D31C62F37F3 /* AzimuthBeamGroupingTests.swift */,
 				389D21260C9885B53E70B525 /* BackgroundLifecycleTests.swift */,
+				2BA09C22CDA05CC8388C3907 /* CallDescriptorTests.swift */,
 				01FE02A0F087D4A16982BBDA /* CallDiscretionTests.swift */,
 				F5941927D1B65E89840417BE /* CallEpochChangeTests.swift */,
 				564C8C434BB8A4A59B717BA1 /* CallFailureMessageTests.swift */,
@@ -2798,6 +2803,7 @@
 			isa = PBXGroup;
 			children = (
 				B3E12C14EC03895F48D39245 /* CallManager.swift */,
+				7D739E9DEF31C10C0FF092D3 /* E2EEV2CallDescriptorRuntime.swift */,
 				D174296793C9CB23700F4C6B /* E2EEV2CallJoinVerifier.swift */,
 				E91AD5F784D0FCE84CBC6FC8 /* LiveKitClient.swift */,
 				0E64A098BE39CEC609740776 /* SSEClient.swift */,
@@ -3220,6 +3226,7 @@
 				F5B1F063472CD474A7C9E2A1 /* E2EEBiometric.swift in Sources */,
 				2A75C227B62E74818271FE0A /* E2EEService.swift in Sources */,
 				505D859D72F614CC8E5C784C /* E2EEUnlockSheet.swift in Sources */,
+				7DA100D5653B6369B9DA114A /* E2EEV2CallDescriptorRuntime.swift in Sources */,
 				29CED9BFB56E57B89BA55FBF /* E2EEV2CallFormats.swift in Sources */,
 				EF26E3AE408F4AF530EB09EA /* E2EEV2CallJoinVerifier.swift in Sources */,
 				EEE8A3E6276DB8B7B111C9E8 /* E2EEV2Canonical.swift in Sources */,
@@ -3629,6 +3636,7 @@
 				5F7AF0A6DEEB9A788A1199E7 /* AutoRefreshTests.swift in Sources */,
 				F8990AF87CBFD65EE0F0EF56 /* AzimuthBeamGroupingTests.swift in Sources */,
 				05B7E7D7DB5CC95AFF2328E5 /* BackgroundLifecycleTests.swift in Sources */,
+				4149DEB9094ABCA8284F4972 /* CallDescriptorTests.swift in Sources */,
 				A85F00548FFFAFCA8E9F8AFD /* CallDiscretionTests.swift in Sources */,
 				3AE8F8F6C26BF8C83E847DDA /* CallEpochChangeTests.swift in Sources */,
 				7726551D38316139EA77A8EB /* CallFailureMessageTests.swift in Sources */,

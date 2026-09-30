@@ -1390,6 +1390,31 @@ struct E2EEV2LiveKitSession {
         var frameKey = try E2EEV2CallFrameKey.derive(epochKey: epochKey, context: context)
         defer { frameKey.resetBytes(in: 0..<frameKey.count) }
         let passphrase = try E2EEV2CallFrameKey.liveKitSharedPassphrase(frameKey: frameKey)
+        return session(passphrase: passphrase, join: join)
+    }
+
+    /// Clé de trame v2 (§10.2) : dérivée de la clé de l'époque que le
+    /// descripteur signé désigne, et de son `callNonce`.
+    static func make(
+        epochKey: Data,
+        descriptor: E2EEV2CallDescriptor,
+        join: E2EEV2CallJoinConfiguration?
+    ) throws -> E2EEV2LiveKitSession {
+        guard try E2EEV2EpochCrypto.keyCommitment(epochKey) == descriptor.keyCommitmentB64 else {
+            throw E2EEV2CallFormatError.invalidField
+        }
+        var frameKey = try E2EEV2CallFrameKeyV2.derive(
+            epochKey: epochKey,
+            conversationId: descriptor.conversationId,
+            epochNumber: descriptor.epochNumber,
+            callId: descriptor.callId,
+            callNonceB64: descriptor.callNonceB64
+        )
+        defer { frameKey.resetBytes(in: 0..<frameKey.count) }
+        return session(passphrase: E2EEV2CallFrameKeyV2.livekitPassphrase(frameKey), join: join)
+    }
+
+    private static func session(passphrase: String, join: E2EEV2CallJoinConfiguration?) -> E2EEV2LiveKitSession {
         let keyProvider = BaseKeyProvider(options: keyProviderOptions)
         keyProvider.setKey(key: passphrase, index: 0)
         return E2EEV2LiveKitSession(
