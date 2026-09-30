@@ -70,7 +70,7 @@ final class ANFRMapViewModel: ObservableObject {
             sites = snapshot.sites
             lastUpdate = snapshot.lastUpdate
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 

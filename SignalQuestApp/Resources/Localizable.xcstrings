@@ -18737,6 +18737,22 @@
         }
       }
     },
+    "Échec : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec : %@"
+          }
+        }
+      }
+    },
     "ECI %@" : {
       "localizations" : {
         "en" : {

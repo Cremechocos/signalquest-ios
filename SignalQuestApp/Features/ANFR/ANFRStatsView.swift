@@ -55,7 +55,7 @@ final class ANFRStatsViewModel: ObservableObject {
         do {
             stats = try await service.stats()
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 
@@ -70,7 +70,7 @@ final class ANFRStatsViewModel: ObservableObject {
             stats = try await service.stats()
             errorMessage = nil
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 

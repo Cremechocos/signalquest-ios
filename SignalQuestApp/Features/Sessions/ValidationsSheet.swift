@@ -24,7 +24,7 @@ final class ValidationsViewModel: ObservableObject {
         do {
             validations = try await service.validations(siteId: siteId)
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 

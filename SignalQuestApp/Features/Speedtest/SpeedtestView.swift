@@ -1202,8 +1202,8 @@ struct SpeedtestView: View {
                 guard runSessionID == sessionID else { return }
                 liveActivity.cancel()
                 runErrorMessage = error.userFacingMessage
-                phase = .failed(error.localizedDescription)
-                liveProgress = SpeedtestLiveProgress(phase: .failed(error.localizedDescription))
+                phase = .failed(error.userFacingMessage)
+                liveProgress = SpeedtestLiveProgress(phase: .failed(error.userFacingMessage))
                 Haptics.warning()
             }
             guard runSessionID == sessionID else { return }

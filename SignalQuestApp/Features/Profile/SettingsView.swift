@@ -1418,7 +1418,7 @@ final class SettingsViewModel: ObservableObject {
         do {
             return try await userService.requestAccountDeletionEmailCode()
         } catch {
-            if !error.isCancellation { deletionError = error.localizedDescription }
+            if !error.isCancellation { deletionError = error.userFacingMessage }
             return nil
         }
     }
@@ -1433,7 +1433,7 @@ final class SettingsViewModel: ObservableObject {
             deletedOwnerScopeId = expectedSession.ownerScopeId
             return true
         } catch {
-            if !error.isCancellation { deletionError = error.localizedDescription }
+            if !error.isCancellation { deletionError = error.userFacingMessage }
             return false
         }
     }
@@ -1834,7 +1834,7 @@ struct SettingsView: View {
                         try session.acknowledgeTwoFactorState(enabled: false,
                             expectedUserID: operation.scope.userID, isCurrent: operation.isCurrent)
                     } catch {
-                        if operation.isCurrent() { model.errorMessage = error.localizedDescription }
+                        if operation.isCurrent() { model.errorMessage = error.userFacingMessage }
                     }
                 }
             }

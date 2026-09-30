@@ -501,7 +501,7 @@ struct GuestSpeedtestReceiptsView: View {
             refresh()
             Haptics.success()
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
             Haptics.error()
         }
     }

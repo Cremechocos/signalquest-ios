@@ -31,7 +31,7 @@ final class CallHistoryViewModel: ObservableObject {
             hasMore = fresh.count >= pageSize
         } catch {
             // Ne montrer l'erreur que si on n'a rien à afficher (sinon on garde le cache).
-            if !error.isCancellation && calls.isEmpty { errorMessage = error.localizedDescription }
+            if !error.isCancellation && calls.isEmpty { errorMessage = error.userFacingMessage }
         }
     }
 

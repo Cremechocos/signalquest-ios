@@ -94,7 +94,7 @@ final class SessionsListViewModel: ObservableObject {
             offset = page.sessions.count
         } catch {
             guard requestGeneration == generation else { return }
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 
@@ -114,7 +114,7 @@ final class SessionsListViewModel: ObservableObject {
             offset += page.sessions.count
         } catch {
             guard requestGeneration == generation else { return }
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 }

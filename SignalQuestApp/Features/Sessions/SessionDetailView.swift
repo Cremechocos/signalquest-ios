@@ -67,7 +67,7 @@ final class SessionDetailViewModel: ObservableObject {
         do {
             detail = try await service.sessionDetail(id: session.id)
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 
@@ -122,7 +122,7 @@ final class SessionDetailViewModel: ObservableObject {
             identifyResult = result.success ? "Site identifié ✓" : (result.message ?? "Identification non confirmée")
             Haptics.success()
         } catch {
-            identifyResult = "Échec : \(error.localizedDescription)"
+            identifyResult = String(localized: "Échec : \(error.userFacingMessage)")
             Haptics.error()
         }
     }

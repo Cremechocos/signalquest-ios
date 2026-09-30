@@ -101,7 +101,7 @@ struct WeeklyRecapSheet: View {
             stats = try await service.weeklyRecap()
             errorMessage = nil
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 
@@ -116,7 +116,7 @@ struct WeeklyRecapSheet: View {
                 ? "Ton bilan de la semaine est déjà en story."
                 : "Bilan publié en story."
         } catch {
-            if !error.isCancellation { publishNotice = error.localizedDescription }
+            if !error.isCancellation { publishNotice = error.userFacingMessage }
         }
     }
 }

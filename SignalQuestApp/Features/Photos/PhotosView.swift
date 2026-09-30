@@ -1605,7 +1605,7 @@ struct AntennaSitePickerSheet: View {
             sites = merged
             errorMessage = nil
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 }

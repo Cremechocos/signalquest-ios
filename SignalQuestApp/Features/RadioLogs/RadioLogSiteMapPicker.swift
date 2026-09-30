@@ -667,7 +667,7 @@ struct RadioLogSiteMapPicker: View {
             // à ce qui a réellement échoué.
             loadError = nil
         } catch {
-            if !error.isCancellation { loadError = error.localizedDescription }
+            if !error.isCancellation { loadError = error.userFacingMessage }
         }
     }
 

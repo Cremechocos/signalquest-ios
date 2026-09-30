@@ -161,7 +161,7 @@ final class SentinelleViewModel: ObservableObject {
             errorMessage = nil
         } catch {
             guard loadGeneration == generation, !Task.isCancelled, !error.isCancellation else { return }
-            if !silently { errorMessage = error.localizedDescription }
+            if !silently { errorMessage = error.userFacingMessage }
         }
     }
 

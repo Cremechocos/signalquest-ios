@@ -811,7 +811,7 @@ private struct EmailVerificationCard: View {
             return
         } catch {
             guard isCurrentAccount else { return }
-            feedback = error.localizedDescription
+            feedback = error.userFacingMessage
             feedbackIsError = true
         }
     }

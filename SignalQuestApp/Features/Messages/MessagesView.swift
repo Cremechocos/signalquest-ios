@@ -29,7 +29,7 @@ final class MessagesViewModel: ObservableObject {
             conversations = try await service.conversations().inDisplayOrder()
             errorMessage = nil
         } catch {
-            if !error.isCancellation { errorMessage = error.localizedDescription }
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 
