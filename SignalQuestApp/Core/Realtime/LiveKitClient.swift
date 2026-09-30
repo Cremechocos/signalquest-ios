@@ -302,7 +302,16 @@ final class LiveKitClient: ObservableObject {
                     let verified = e2eeSession?.verification.isVerified ?? false
                     Task { @MainActor in self?.isE2EEVerified = verified }
                 },
-                onCryptorExpected: { [weak self] participantID, trackID in
+                onCryptorExpected: { [weak self] participantID, trackID, encryptionType in
+                    // Une piste publiée ou reçue en clair dans un appel chiffré
+                    // y met fin : le micro ne part pas, rien n'est rendu.
+                    guard E2EEV2CallMediaPolicy.accepts(
+                        requiresE2EE: e2eeSession != nil, encryptionType: encryptionType
+                    ) else {
+                        e2eeSession?.verification.failGlobally()
+                        Task { @MainActor in self?.handleE2EETrustLoss() }
+                        return
+                    }
                     e2eeSession?.verification.expect(participantID: participantID, trackID: trackID)
                     let verified = e2eeSession?.verification.isVerified ?? false
                     Task { @MainActor in self?.isE2EEVerified = verified }
@@ -319,6 +328,8 @@ final class LiveKitClient: ObservableObject {
                     Task { @MainActor in
                         self?.isE2EEVerified = verified
                         if terminal { self?.handleE2EETrustLoss() }
+                        // Une piste n'est montrée qu'une fois déchiffrée (« OK »).
+                        self?.refreshRemoteMedia()
                     }
                 },
                 onCryptorGlobalFailure: { [weak self] in
@@ -809,12 +820,20 @@ final class LiveKitClient: ObservableObject {
             refreshPictureInPictureTrack()
             return
         }
+        // Appel chiffré : une piste n'est montrée qu'une fois déchiffrée avec la
+        // clé de l'appel (spec §10.4) ; avant, elle n'existe pas pour l'interface.
+        let verification = activeE2eeSession?.verification
+        func shown(_ publication: TrackPublication?) -> Bool {
+            guard let verification else { return true }
+            guard let publication else { return false }
+            return verification.isTrackVerified(publication.sid.stringValue)
+        }
         remoteAudios = room.remoteParticipants.values.flatMap { participant -> [RemoteAudio] in
             let participantID = participant.identity?.stringValue
                 ?? participant.sid?.stringValue
                 ?? "participant"
             return participant.audioTracks.compactMap { publication in
-                guard let track = publication.track as? any AudioTrack else { return nil }
+                guard shown(publication), let track = publication.track as? any AudioTrack else { return nil }
                 return RemoteAudio(
                     id: "\(participantID):\(publication.sid.stringValue)",
                     participantID: participantID,
@@ -831,6 +850,7 @@ final class LiveKitClient: ObservableObject {
                 let displayName = participant.name ?? "Participant"
                 var videos: [RemoteVideo] = []
                 if SQFeatures.callScreenSharingEnabled,
+                   shown(participant.firstScreenSharePublication),
                    let track = participant.firstScreenShareVideoTrack {
                     videos.append(RemoteVideo(
                         id: "\(participantID):screen",
@@ -840,7 +860,7 @@ final class LiveKitClient: ObservableObject {
                         isScreenShare: true
                     ))
                 }
-                if let track = participant.firstCameraVideoTrack {
+                if shown(participant.firstCameraPublication), let track = participant.firstCameraVideoTrack {
                     videos.append(RemoteVideo(
                         id: "\(participantID):camera",
                         participantID: participantID,
@@ -905,7 +925,7 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
     private let onMediaChanged: @Sendable () -> Void
     private let onParticipantExpected: @Sendable (String) -> Void
     private let onParticipantRemoved: @Sendable (String) -> Void
-    private let onCryptorExpected: @Sendable (String, String) -> Void
+    private let onCryptorExpected: @Sendable (String, String, EncryptionType) -> Void
     private let onCryptorRemoved: @Sendable (String, String) -> Void
     private let onCryptorState: @Sendable (String, E2EEState) -> Void
     private let onCryptorGlobalFailure: @Sendable () -> Void
@@ -918,7 +938,7 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
         onMediaChanged: @escaping @Sendable () -> Void,
         onParticipantExpected: @escaping @Sendable (String) -> Void,
         onParticipantRemoved: @escaping @Sendable (String) -> Void,
-        onCryptorExpected: @escaping @Sendable (String, String) -> Void,
+        onCryptorExpected: @escaping @Sendable (String, String, EncryptionType) -> Void,
         onCryptorRemoved: @escaping @Sendable (String, String) -> Void,
         onCryptorState: @escaping @Sendable (String, E2EEState) -> Void,
         onCryptorGlobalFailure: @escaping @Sendable () -> Void,
@@ -969,7 +989,7 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
             onCryptorGlobalFailure()
             return
         }
-        onCryptorExpected(identity, publication.sid.stringValue)
+        onCryptorExpected(identity, publication.sid.stringValue, publication.encryptionType)
         onMediaChanged()
     }
     func room(_ room: Room, participant: RemoteParticipant, didUnsubscribeTrack publication: RemoteTrackPublication) {
@@ -985,7 +1005,7 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
             onCryptorGlobalFailure()
             return
         }
-        onCryptorExpected(identity, publication.sid.stringValue)
+        onCryptorExpected(identity, publication.sid.stringValue, publication.encryptionType)
     }
     func room(_ room: Room, participant: LocalParticipant, didUnpublishTrack publication: LocalTrackPublication) {
         guard let identity = participant.identity?.stringValue else {
@@ -1028,19 +1048,30 @@ enum E2EEV2CallDataPolicy {
 }
 
 enum E2EEV2CallCryptorPolicy {
+    /// Seul « OK » prouve un déchiffrement avec la clé de l'appel. Personne ne
+    /// fait de ratchet (fenêtre à 0, `ratchetKey` interdit, spec §10.3) :
+    /// « key_ratcheted » signale une clé qui a bougé, donc un échec.
     static func isVerified(_ state: E2EEState) -> Bool {
-        state == .ok || state == .key_ratcheted
+        state == .ok
     }
 
     static func isTerminalFailure(_ state: E2EEState) -> Bool {
         switch state {
-        case .missing_key, .encryption_failed, .decryption_failed, .internal_error:
+        case .missing_key, .encryption_failed, .decryption_failed, .internal_error, .key_ratcheted:
             return true
-        case .new, .ok, .key_ratcheted:
+        case .new, .ok:
             return false
         @unknown default:
             return true
         }
+    }
+}
+
+enum E2EEV2CallMediaPolicy {
+    /// Dans un appel chiffré, une piste n'existe que chiffrée en GCM, publiée
+    /// comme reçue (spec §10.4) : toute autre met fin à l'appel.
+    static func accepts(requiresE2EE: Bool, encryptionType: EncryptionType) -> Bool {
+        !requiresE2EE || encryptionType == .gcm
     }
 }
 
@@ -1135,6 +1166,14 @@ final class E2EEV2LiveKitVerification: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         globalFailure = true
+    }
+
+    /// Piste déchiffrée avec la clé de l'appel : la seule qu'on montre.
+    func isTrackVerified(_ trackID: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !globalFailure, let state = states[trackID] else { return false }
+        return E2EEV2CallCryptorPolicy.isVerified(state)
     }
 
     func reset() {

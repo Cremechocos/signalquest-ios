@@ -303,7 +303,7 @@ final class CallReliabilityTests: XCTestCase {
         #endif
     }
 
-    func testE2EECryptorAcceptsRatchetAndRejectsRevokedOrMissingKeys() {
+    func testE2EECryptorRejectsRatchetRevokedOrMissingKeys() {
         #if canImport(LiveKit)
         let verification = E2EEV2LiveKitVerification()
         verification.expectParticipant("local")
@@ -313,18 +313,39 @@ final class CallReliabilityTests: XCTestCase {
         verification.update("local-audio", state: .ok)
         verification.update("remote-audio", state: .ok)
         XCTAssertTrue(verification.isVerified)
+        XCTAssertTrue(verification.isTrackVerified("remote-audio"))
 
         verification.markAllPending()
         XCTAssertFalse(verification.isVerified)
+        XCTAssertFalse(verification.isTrackVerified("remote-audio"), "Rien n'est montré avant « OK »")
+        // Spec §10.3 : pas de ratchet, une clé par appel. Une clé qui bouge
+        // est un échec, pas une rotation acceptable.
         verification.update("local-audio", state: .key_ratcheted)
         verification.update("remote-audio", state: .key_ratcheted)
-        XCTAssertTrue(verification.isVerified, "Une rotation LiveKit ratchetée reste une preuve valide")
+        XCTAssertFalse(verification.isVerified)
+        XCTAssertTrue(E2EEV2CallCryptorPolicy.isTerminalFailure(.key_ratcheted))
 
         verification.update("remote-audio", state: .missing_key)
         XCTAssertFalse(verification.isVerified)
         XCTAssertTrue(E2EEV2CallCryptorPolicy.isTerminalFailure(.missing_key))
         XCTAssertTrue(E2EEV2CallCryptorPolicy.isTerminalFailure(.decryption_failed))
-        XCTAssertFalse(E2EEV2CallCryptorPolicy.isTerminalFailure(.key_ratcheted))
+        XCTAssertFalse(E2EEV2CallCryptorPolicy.isTerminalFailure(.new))
+        XCTAssertFalse(E2EEV2CallCryptorPolicy.isTerminalFailure(.ok))
+
+        verification.update("local-audio", state: .ok)
+        verification.failGlobally()
+        XCTAssertFalse(verification.isTrackVerified("local-audio"), "Un échec global cache tout")
+        #endif
+    }
+
+    func testEncryptedCallAcceptsOnlyGCMTracks() {
+        #if canImport(LiveKit)
+        XCTAssertTrue(E2EEV2CallMediaPolicy.accepts(requiresE2EE: true, encryptionType: .gcm))
+        XCTAssertFalse(E2EEV2CallMediaPolicy.accepts(requiresE2EE: true, encryptionType: .none),
+                       "Une piste en clair met fin à un appel chiffré")
+        XCTAssertFalse(E2EEV2CallMediaPolicy.accepts(requiresE2EE: true, encryptionType: .custom))
+        XCTAssertTrue(E2EEV2CallMediaPolicy.accepts(requiresE2EE: false, encryptionType: .none),
+                      "Un appel non chiffré garde ses pistes")
         #endif
     }
 

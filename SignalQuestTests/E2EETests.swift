@@ -2183,6 +2183,8 @@ final class E2EETests: XCTestCase {
         verification.expect(participantID: "remote-participant", trackID: "remote-track")
         XCTAssertFalse(verification.isVerified)
         verification.update("remote-track", state: .key_ratcheted)
+        XCTAssertFalse(verification.isVerified, "Personne ne fait de ratchet : une clé qui bouge ne prouve rien")
+        verification.update("remote-track", state: .ok)
         XCTAssertTrue(verification.isVerified)
         verification.expect(participantID: "remote-participant", trackID: "remote-video")
         XCTAssertFalse(verification.isVerified)
