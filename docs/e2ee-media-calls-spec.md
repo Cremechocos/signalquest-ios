@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.3**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.4**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -78,6 +78,14 @@
 >     (§10.4).
 >   - Preuve rediffusée à 0, 1, 2, 4 et 7 secondes, et paquet chiffré d'un
 >     émetteur pas encore annoncé ignoré, après le banc local (§10.4).
+> - v0.4.4 (01/10/2026) : réponses aux seize questions du serveur sur son
+>   chiffrage du jalon A (annexe E, §12, §14). Corps des requêtes d'appel,
+>   contrôles du descripteur par le serveur, capacités par document signé
+>   seulement, jetons push liés à l'appareil, retrait de l'appareil approuvé,
+>   liste des messages v2, rapports pour l'outil hors ligne, genèse d'une
+>   conversation migrée, apps publiées face à la v2. Proposés, en attente de
+>   la décision d'Alexandre : transfert d'un appel chiffré indisponible au
+>   jalon A.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -871,6 +879,12 @@ conversation, et sans permettre un faux signalement ni un message insignalable.
   - Vecteur : `device-capabilities-v1`.
 - **Capacité d'une conversation** = intersection des capacités des appareils
   certifiés des membres dont le dernier document a moins de 90 jours.
+  - Seul le document signé compte, pour les clients comme pour le serveur.
+    L'en-tête `X-SQ-Capabilities` ne compte plus pour la v2.
+  - Appareils pris en compte : certifiés, non révoqués et non mis à l'écart,
+    des membres actuels. Un navigateur compte seulement s'il est approuvé et
+    si `excludesWeb` n'est pas actif. Un membre sans appareil certifié ne
+    compte pas (§10.0).
 - Un appareil sans document récent est **mis à l'écart** : il sort de
   l'intersection et des nouvelles époques (§3.3), jusqu'à ce qu'il publie un
   document à jour. Cette mise à l'écart, décidée par les clients, remplace
@@ -943,6 +957,12 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
 2. À la première ouverture par un client v2, si tous les membres ont un appareil
    certifié, ce client crée l'époque 1 v2 : la conversation est alors v2 pour
    toujours (§12).
+   - **Genèse de l'historique d'appartenance** (D.4) : ce client signe un
+     `ADD` par membre actuel, lui compris, dans l'ordre des `userId` (octets
+     UTF-8). Dans un groupe, il signe ensuite un `ROLE_ADMIN` pour chaque
+     propriétaire ou administrateur v1 : « propriétaire » disparaît en v2.
+   - Le serveur refuse une genèse qui ne reproduit pas exactement les membres
+     et les administrateurs v1.
 3. La recopie de l'historique en v2 est facultative. Elle est faite par un
    appareil (vecteur `history-migration-v1.json`), jamais par le serveur. Les
    messages recopiés portent « importé par <appareil> » et n'héritent d'aucune
@@ -952,6 +972,15 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
 5. Une app sans v2 face à une conversation v2 ne reçoit pas les messages v2.
    Décision du 30/09 : elle affiche « Cette conversation utilise un
    chiffrement plus récent : mets à jour SignalQuest ».
+   - Les apps publiées ne savent pas le faire seules. Le serveur leur sert ce
+     texte en message système en clair, en dernier message et dans la liste.
+     Il les reconnaît à leur User-Agent et à l'absence d'appareil v2.
+   - Créer une conversation chiffrée depuis une telle app, une fois la
+     clé v1 arrêtée : `409 E2EE_UPDATE_REQUIRED`, avec `error` =
+     « Mets à jour SignalQuest pour créer une conversation chiffrée. ». Les
+     builds 159 et 160 affichent ce texte tel quel.
+   - Un tête-à-tête v2 déjà existant est renvoyé tel quel, avec ce message
+     système.
 6. Appels d'une conversation v1 : §10.0.
 
 ---
@@ -1726,7 +1755,13 @@ version publiée qui ouvre les verrous.
   - `E2EE_CERTIFICATE_INVALID` (422) : certificat qui ne se vérifie pas
     jusqu'à l'UIK ;
   - `CONVERSATION_ID_TAKEN` et `CALL_ID_TAKEN` (409) : identifiant choisi par
-    le client déjà utilisé.
+    le client déjà utilisé ;
+  - `CALL_NONCE_TAKEN` (409) : `callNonce` déjà enregistré (§10.1) ;
+  - `E2EE_UPDATE_REQUIRED` (409) : écriture d'une app sans v2 dans ce qui
+    exige la v2 (§14). `error` porte le texte à afficher, que les apps
+    publiées montrent tel quel.
+- Une erreur peut porter des `details` (objet) ; les clients ignorent les
+  clés qu'ils ne connaissent pas.
 - **Vérification serveur** : le serveur vérifie ce qu'il peut, c'est-à-dire
   signatures, chaînages, condensats et comparaisons-échanges. Les clients
   revérifient toujours : le serveur n'est jamais une source de confiance
@@ -1760,6 +1795,15 @@ version publiée qui ouvre les verrous.
   `{deviceList}`, la nouvelle liste sans l'appareil, signée par l'UIK.
 - **`PUT /api/e2ee/v2/devices/{deviceId}/capabilities`**. Corps :
   `{document, signatureB64}`. Refus si `sequence` n'augmente pas.
+- **`GET /api/e2ee/v2/device-approvals/{id}`**, signé par l'appareil en
+  attente : une fois l'approbation faite, il y retire `uikWrap`, son
+  certificat et la `deviceList`. Idempotent jusqu'à consommation ou
+  expiration.
+- **`PUT /api/e2ee/v2/devices/{deviceId}/push-tokens`**, signé par
+  l'appareil : `{apnsVoipToken?, apnsToken?, fcmToken?, environment}`. Il lie
+  les jetons push à l'appareil v2. La sonnerie d'un appel chiffré ne cible
+  que ces jetons ; l'enregistrement actuel par installation reste pour le
+  reste.
 - **`POST /api/e2ee/v2/identity/reset`**, étendu. Corps :
   - `reset` : `{reset, signatureB64}` (D.14) ;
   - `certificate` et `deviceList` (version 1) du nouvel ensemble.
@@ -1784,8 +1828,8 @@ version publiée qui ouvre les verrous.
   - `manifest` ;
   - `envelopes`.
 
-  En cas de conflit : 409 `E2EE_EPOCH_STALE`, avec `currentEpoch` au format
-  de `epochs/current`.
+  En cas de conflit : 409 `E2EE_EPOCH_STALE`, avec
+  `details.currentEpoch` au format de `epochs/current`.
 - **`GET /api/e2ee/v2/conversations/{id}/epochs/current`**, étendu. La
   réponse ajoute le manifeste signé, avec sa liste de destinataires.
 - **`POST /api/e2ee/v2/conversations/{id}/epochs/{epochNumber}/ack`**, accusé
@@ -1805,16 +1849,38 @@ version publiée qui ouvre les verrous.
   - réponse : `envelopeId`, `serverTagB64`, `serverTimeMs` et `keyId` (§11).
 - **`GET /api/e2ee/v2/envelopes/{id}/fetch`**, étendu : ajoute
   `serverTagB64`, `serverTimeMs` et `keyId`.
+- **`GET /api/e2ee/v2/conversations/{id}/messages?after=<curseur>&limit=`**,
+  la liste des messages v2 : enveloppes opaques, `serverTagB64`,
+  `serverTimeMs` et séquence serveur, dans l'ordre de la séquence.
 - **`POST /api/e2ee/v2/reports`**. Corps :
   `{clear, encB64, sealedB64, moderationKeyId}` (D.10).
   - Le serveur vérifie les `serverTag` et l'appartenance du signaleur, puis
-    gèle les blobs cités.
+    gèle les blobs cités. Au jalon A, les messages v2 ne sont que du texte :
+    le gel des blobs arrive avec le jalon B.
   - Réponse : `{reportId}`.
+- **`GET /api/admin/e2ee/reports?after=<curseur>`**, réservée à
+  l'administration : la partie claire et la partie scellée de chaque
+  rapport. L'outil de modération, sur le Mac d'Alexandre, les déchiffre
+  localement avec la clé de modération (§11).
 
 ### E.4 Appels
 
-- **`POST /api/calls/initiate`**. Dans une conversation v2, le corps ajoute
-  `callId` (choisi par l'appelant) et `e2eeV2` (D.11).
+- **`POST /api/calls/initiate`**, en requête signée par l'appareil (A.2).
+  Dans une conversation v2, le corps est
+  `{conversationId, type, callId, e2eeV2}` (D.11).
+- **`POST /api/calls/answer`**, en requête signée : `{callId}`, rien de plus.
+- **Contrôles du serveur sur le descripteur** : conversation v2 ; appareil
+  appelant certifié, avec la capacité « appels vérifiés » ; signature en
+  forme low-S ; époque = l'époque active courante (`epochId`, `epochNumber`,
+  `keyCommitmentB64`) ; `callId` et `callNonce` uniques. Pas de fenêtre de
+  temps : les 60 secondes d'une sonnerie sont vérifiées par l'appelé contre
+  son horloge, et l'unicité empêche le rejeu.
+- La réponse peut porter `livekitIdentity`, à titre informatif : aucun
+  client ne s'y fie pour vérifier. Le `callNonce` n'existe que dans le
+  descripteur signé, jamais en champ séparé.
+- **Au jalon A** (proposé, en attente de décision) : une réponse par compte
+  suffit, et le transfert d'un appel chiffré est refusé
+  (`409 CALL_TRANSFER_E2EE_UNSUPPORTED`), bouton masqué côté clients.
 - **Réponses et notifications** : la réponse d'initiation,
   `/api/calls/pending`, l'événement `incoming` du flux SSE
   `/api/calls/stream`, et les notifications VoIP et FCM (appel et transfert)
