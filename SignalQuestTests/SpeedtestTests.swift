@@ -966,6 +966,12 @@ final class SpeedtestTests: XCTestCase {
         let groups = libreSpeedPickerGroups()
         XCTAssertEqual(groups.first?.region, "Europe")
         XCTAssertEqual(groups.flatMap { $0.servers }.count, libreSpeedServers.count)
+        // Ordre porté par le continent, pas par son libellé traduit (TRX-06) :
+        // l'app anglaise rangeait l'Amérique du Nord après l'Asie.
+        let kinds = groups.compactMap { $0.servers.first?.continentKind }
+        XCTAssertEqual(kinds.map(\.rawValue), kinds.map(\.rawValue).sorted())
+        XCTAssertEqual(Set(kinds).count, kinds.count)
+        XCTAssertEqual(libreSpeedServers.first { $0.countryCode == "US" }?.continentKind, .northAmerica)
         // Choix manuel : le hostname persisté encode/décode (rétro-compat).
         let manual = SpeedtestRunSettings(downloadTarget: .libreSpeed, durationSeconds: 14,
                                           streams: 6, reliabilityMode: true,

@@ -263,9 +263,12 @@ struct RadioLogsView: View {
     }
 
     private var tallySubtitle: String {
-        var parts = ["\(model.logCount.formatted()) relevés"]
+        // Traduit, et au singulier jusqu'à 1 (« 0 relevé ») : la ligne
+        // s'affichait telle quelle, en français dans l'app anglaise.
+        let count = model.logCount.formatted()
+        var parts = [model.logCount <= 1 ? String(localized: "\(count) relevé") : String(localized: "\(count) relevés")]
         if let lastSyncedAt = model.lastSyncedAt {
-            parts.append("synchronisé \(lastSyncedAt.formatted(.relative(presentation: .named)))")
+            parts.append(String(localized: "synchronisé \(lastSyncedAt.formatted(.relative(presentation: .named)))"))
         }
         return parts.joined(separator: " · ")
     }

@@ -171,7 +171,7 @@
         }
       }
     },
-    "Ouvrez SignalQuest pour afficher le message.": {
+    "Ouvre SignalQuest pour afficher le message.": {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -183,7 +183,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvrez SignalQuest pour afficher le message."
+            "value" : "Ouvre SignalQuest pour afficher le message."
           }
         }
       }

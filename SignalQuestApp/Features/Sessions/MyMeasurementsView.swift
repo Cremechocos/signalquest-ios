@@ -248,13 +248,14 @@ struct MyMeasurementsView: View {
         if !model.points.isEmpty {
             VStack(spacing: SQSpace.xxs) {
                 HStack(spacing: SQSpace.xs) {
-                    Text(verbatim: "\(model.points.count)")
-                    Text("Points affichés")
+                    // « points » est réservé au jeu (lexique) ; nombre groupé (UI-09).
+                    Text(verbatim: model.points.count.formatted())
+                    Text("mesures affichées")
                 }
                 if let summary = model.pointSummary, summary.isSampled {
                     HStack(spacing: SQSpace.xs) {
                         Text("Échantillon")
-                        Text(verbatim: "\(model.points.count) / \(summary.locatedCount)")
+                        Text(verbatim: "\(model.points.count.formatted()) / \(summary.locatedCount.formatted())")
                             .monospacedDigit()
                     }
                     .font(SQType.caption)

@@ -44,7 +44,7 @@ struct SpeedtestCardView: View {
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
                     CardMetricTile(label: "Réception", value: SignalFormatters.speed(signal?.downloadMbps), highlight: true)
                     CardMetricTile(label: "Envoi", value: SignalFormatters.speed(signal?.uploadMbps))
-                    CardMetricTile(label: "Ping", value: SignalFormatters.ms(signal?.pingMs))
+                    CardMetricTile(label: "Latence", value: SignalFormatters.ms(signal?.pingMs))
                     CardMetricTile(
                         label: signal?.rsrp == nil ? "Technologie" : "RSRP",
                         value: signal?.rsrp == nil ? (signal?.technology ?? "—") : SignalFormatters.dbm(signal?.rsrp)

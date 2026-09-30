@@ -92,8 +92,7 @@ final class SentinelleViewModel: ObservableObject {
                 sharedInvite = (box.isFollowing || box.isOwner) ? nil : box
             } catch {
                 guard inviteSlug == slug, pendingShareSlug == nil, !Task.isCancelled, !error.isCancellation else { return }
-                shareLinkError = "Ce lien de partage n’est plus valide. "
-                    + "Demandez-en un nouveau à la personne qui vous l’a envoyé."
+                shareLinkError = String(localized: "Ce lien de partage n’est plus valide. Demandes-en un nouveau à la personne qui te l’a envoyé.")
             }
         }
 
@@ -299,8 +298,7 @@ struct SentinelleView: View {
             } else if model.targets.isEmpty && model.following.isEmpty {
                 EmptyStateView(
                     title: "Aucune connexion surveillée",
-                    message: "Ajoutez l’adresse publique de votre box : Sentinelle l’interrogera "
-                        + "chaque minute depuis nos serveurs, téléphone éteint compris.",
+                    message: "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera chaque minute depuis nos serveurs, téléphone éteint compris.",
                     systemImage: "wifi.router"
                 )
                 .padding(SQSpace.lg)
@@ -562,8 +560,7 @@ struct SentinelleView: View {
         VStack(spacing: SQSpace.lg) {
             EmptyStateView(
                 title: "Réservé aux membres Premium",
-                message: "Sentinelle surveille votre connexion en continu : disponibilité, "
-                    + "latence, perte de paquets et historique daté de chaque coupure.",
+                message: "Sentinelle surveille ta connexion en continu : disponibilité, latence, perte de paquets et historique daté de chaque coupure.",
                 systemImage: "crown.fill"
             )
             GradientButton("Découvrir Premium", systemImage: "crown.fill") {
@@ -679,7 +676,7 @@ struct SentinelleSuspendedNote: View {
 
     var body: some View {
         if target.suspendedReason != nil {
-            Text("Surveillance suspendue : l’adresse a changé de réseau. Vérifiez depuis le site qu’elle vous appartient toujours.")
+            Text("Surveillance suspendue : l’adresse a changé de réseau. Vérifie depuis le site qu’elle t’appartient toujours.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.dangerInk)
                 .fixedSize(horizontal: false, vertical: true)

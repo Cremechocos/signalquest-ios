@@ -355,7 +355,7 @@ struct SentinelleBoxView: View {
                 Text("Suivie en \(family.other.label) seulement")
                     .font(SQFont.body(14, .semibold))
                     .foregroundStyle(SQColor.label)
-                Text("Son \(family.label) tomberait sans que vous le sachiez.")
+                Text("Son \(family.label) tomberait sans que tu le saches.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -394,7 +394,7 @@ struct SentinelleBoxView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 SentinelleSectionTitle(title: "À qui appartient cette connexion", systemImage: "person.crop.circle")
-                Text("Sert à parler juste sur un lien partagé : « Votre connexion » y serait faux.")
+                Text("Sert à parler juste sur un lien partagé : « Ta connexion » y serait faux.")
                     .font(SQFont.body(12))
                     .foregroundStyle(SQColor.labelSecondary)
 

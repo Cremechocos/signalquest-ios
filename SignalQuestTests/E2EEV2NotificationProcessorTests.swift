@@ -443,7 +443,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         ]
         for (name, width, size, scheme) in cases {
             let error = name == "error"
-                ? String(localized: "Impossible de modifier les aperçus. Réessayez ou désactivez les notifications dans les Réglages iOS.")
+                ? String(localized: "Impossible de modifier les aperçus. Réessaie ou désactive les notifications dans les Réglages iOS.")
                 : nil
             let content = E2EEV2NotificationPreviewNoticeContent(selected: .full, errorMessage: error, onChoose: { _ in })
                 .padding(SQSpace.xl).frame(width: width)

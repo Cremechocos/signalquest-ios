@@ -197,10 +197,26 @@ final class AccessibilityAuditTests: XCTestCase {
             // moment de l'audit) : seule une rangée à pictogramme masqué dépassait
             // sous le verre du dock ; chaque texte visible a son propre nom et un
             // couple de jetons prouvé. Intermittent selon la hauteur du défilement.
+            // Lot 7 (30/09) : même nœud intermittent, selon la hauteur de défilement,
+            // sur la liste de la messagerie et le Drive Test en très grand texte.
             if element == nil, name == "sans nom", issue.auditType == .contrast,
                screen.hasPrefix("Communauté") || screen.hasPrefix("Profil") || screen.hasPrefix("Accueil")
-                || screen == "Réglages" || screen == "Notifications" {
+                || screen == "Réglages" || screen == "Notifications"
+                || screen.hasPrefix("Messagerie") || screen.hasPrefix("Drive Test") {
                 return exclude("fond décoratif sans élément ni action ; texte testé séparément", name, issue.auditType)
+            }
+            // Champ du composeur : la capsule de 176×51 pt est touchable partout,
+            // son fond donne le focus (Lot 4e). L'auditeur ne mesure que la vue
+            // texte interne, haute d'une ligne (constant sur deux passes, 30/09).
+            if issue.auditType == .hitRegion, name == "composer.field" {
+                return exclude("capsule entièrement touchable ; vue texte interne d’une ligne", name, issue.auditType)
+            }
+            // Pied de la section Apple des Réglages : style relatif (`SQType.caption`),
+            // rendu plus grand en XXL au tour du 30/09. L'auditeur lui prête le
+            // bouton natif « Continuer avec Apple », dont le libellé ne suit pas
+            // Dynamic Type par conception.
+            if issue.auditType == .dynamicType, name == "settings.apple.footer" {
+                return exclude("texte relatif vérifié en XXL ; bouton Apple natif voisin", name, issue.auditType)
             }
             // Ces avertissements sont des prédictions à taille normale. Ils ne
             // sont ignorés que pour les composants rendus de nouveau dans la

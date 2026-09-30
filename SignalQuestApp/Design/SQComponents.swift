@@ -254,7 +254,7 @@ struct MapItemSheet: View {
                     Text(SignalFormatters.speed(downloadAverage))
                         .font(SQType.display)
                         .foregroundStyle(speedColor(downloadAverage))
-                    Text("Speed Test")
+                    Text("Speedtest")
                         .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -262,13 +262,14 @@ struct MapItemSheet: View {
                 TechBadge(text: tech ?? "Speedtest", color: SQColor.brandBlue)
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-                CardMetricTile(label: "DL moyen", value: SignalFormatters.speed(downloadAverage), highlight: true, accent: speedColor(downloadAverage))
-                CardMetricTile(label: "DL max", value: SignalFormatters.speed(downloadMax))
-                CardMetricTile(label: "UL moyen", value: SignalFormatters.speed(uploadAverage))
-                CardMetricTile(label: "UL max", value: SignalFormatters.speed(uploadMax))
-                CardMetricTile(label: "Ping min", value: SignalFormatters.ms(pingMin))
-                CardMetricTile(label: "Ping moy.", value: SignalFormatters.ms(pingAverage))
-                CardMetricTile(label: "Jitter", value: SignalFormatters.ms(detail?.jitter))
+                // Vocabulaire du lexique (MES-24) : plus de « DL/UL » ni de « Ping ».
+                CardMetricTile(label: "Réception moy.", value: SignalFormatters.speed(downloadAverage), highlight: true, accent: speedColor(downloadAverage))
+                CardMetricTile(label: "Réception max", value: SignalFormatters.speed(downloadMax))
+                CardMetricTile(label: "Envoi moy.", value: SignalFormatters.speed(uploadAverage))
+                CardMetricTile(label: "Envoi max", value: SignalFormatters.speed(uploadMax))
+                CardMetricTile(label: "Latence min", value: SignalFormatters.ms(pingMin))
+                CardMetricTile(label: "Latence moy.", value: SignalFormatters.ms(pingAverage))
+                CardMetricTile(label: "Gigue", value: SignalFormatters.ms(detail?.jitter))
                 CardMetricTile(label: "Réseau", value: network.isEmpty ? (tech ?? "—") : network)
             }
             detailRows([

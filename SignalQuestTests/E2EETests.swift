@@ -3628,7 +3628,7 @@ final class E2EEV2LiveShareTransportTests: XCTestCase {
             "New private content"
         )
         XCTAssertEqual(
-            english.localizedString(forKey: "Ouvrez SignalQuest pour afficher le message.", value: nil, table: nil),
+            english.localizedString(forKey: "Ouvre SignalQuest pour afficher le message.", value: nil, table: nil),
             "Open SignalQuest to view the message."
         )
         XCTAssertEqual(

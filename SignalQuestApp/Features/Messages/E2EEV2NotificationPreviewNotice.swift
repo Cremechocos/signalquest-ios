@@ -16,7 +16,7 @@ struct E2EEV2NotificationPreviewNotice: View {
                     selected: selected, errorMessage: errorMessage, onChoose: choose
                 )
             } else if showReminder && selected == .full {
-                Text("Le contenu complet est affiché par défaut. Il peut être visible par toute personne ayant accès à votre écran verrouillé.")
+                Text("Le contenu complet est affiché par défaut. Il peut être visible par toute personne ayant accès à ton écran verrouillé.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -35,7 +35,7 @@ struct E2EEV2NotificationPreviewNotice: View {
 
     private func choose(_ privacy: E2EEV2NotificationPrivacy) {
         guard E2EEV2NotificationPrivacyStore.acknowledgeNotice(privacy: privacy, ownerScopeId: ownerScopeId) else {
-            errorMessage = String(localized: "Impossible de modifier les aperçus. Réessayez ou désactivez les notifications dans les Réglages iOS.")
+            errorMessage = String(localized: "Impossible de modifier les aperçus. Réessaie ou désactive les notifications dans les Réglages iOS.")
             return
         }
         errorMessage = nil

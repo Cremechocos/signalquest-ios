@@ -255,7 +255,7 @@ struct ProfileView: View {
                     statCell(label: "Tests", value: stats.totalSpeedtests.map { $0.formatted() } ?? "—")
                     if let validations = stats.totalValidations {
                         Divider().overlay(SQColor.separator)
-                        statCell(label: "Valid.", value: validations.formatted())
+                        statCell(label: "Validations", value: validations.formatted())
                     }
                 }
             } else {
@@ -265,7 +265,7 @@ struct ProfileView: View {
                     statCell(label: "Tests", value: stats.totalSpeedtests.map { $0.formatted() } ?? "—")
                     if let validations = stats.totalValidations {
                         statDivider
-                        statCell(label: "Valid.", value: validations.formatted())
+                        statCell(label: "Validations", value: validations.formatted())
                     }
                 }
             }
@@ -606,18 +606,22 @@ struct ProfileView: View {
         Rectangle()
             .fill(SQColor.separator)
             .frame(height: 1)
-            .padding(.leading, 65)
+            .padding(.leading, dynamicTypeSize.isAccessibilitySize ? SQSpace.lg : 65)
             .accessibilityHidden(true)
     }
 
     private func menuRow(title: String, icon: String) -> some View {
         HStack(spacing: SQSpace.md + 1) {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(Color.primary)
-                .frame(width: 36, height: 36)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .accessibilityHidden(true)
+            // En très grand texte, l'icône cède sa place au titre : « Sentinelle »
+            // se coupait en « Senti-/nelle » (tour AX5, 30/09).
+            if !dynamicTypeSize.isAccessibilitySize {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(Color.primary)
+                    .frame(width: 36, height: 36)
+                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .accessibilityHidden(true)
+            }
             Text(LocalizedStringKey(title))
                 .font(.body.weight(.medium))
                 .foregroundStyle(Color.primary)

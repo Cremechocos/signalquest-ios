@@ -309,7 +309,7 @@ struct RadioLogIdentifyChainView: View {
     private func metaLine(for site: RadioLogSite) -> String {
         [site.operatorName ?? String(localized: "Opérateur inconnu"),
          site.compositionLabel,
-         site.logCount <= 1 ? "\(site.logCount) relevé" : "\(site.logCount) relevés"]
+         site.logCount <= 1 ? String(localized: "\(site.logCount) relevé") : String(localized: "\(site.logCount) relevés")]
             .joined(separator: " · ")
     }
 

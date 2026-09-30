@@ -41,8 +41,7 @@ struct SentinelleFollowersCard: View {
                 .font(SQFont.display(16, .bold))
                 .foregroundStyle(SQColor.label)
 
-            Text("Ils voient son état et ses coupures. Ni son adresse, ni le chemin réseau — "
-                 + "dont le dernier maillon est justement votre box.")
+            Text("Ils voient son état et ses coupures. Ni son adresse, ni le chemin réseau — dont le dernier maillon est justement ta box.")
                 .font(SQFont.body(12))
                 .foregroundStyle(SQColor.labelSecondary)
 

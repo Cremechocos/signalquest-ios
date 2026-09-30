@@ -81,7 +81,7 @@ struct FriendLiveSheet: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: SQSpace.sm) {
                 ForEach(tiles, id: \.label) { tile in
                     VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                        Text(tile.label)
+                        Text(LocalizedStringKey(tile.label))
                             .font(SQFont.archivo(11, .semibold))
                             .foregroundStyle(SQColor.labelSecondary)
                         Text(tile.value)

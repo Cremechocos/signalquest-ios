@@ -588,10 +588,13 @@ final class MapExplorerViewModel: ObservableObject {
     }
 
     func operatorShortLabel(_ key: String) -> String {
+        // « Tous » d'abord : le registre le nomme en français, et la pastille
+        // restait « Tous » dans l'app anglaise (TRX-06).
+        if key.uppercased() == "ALL" { return String(localized: "Tous") }
         if let entry = currentMarketEntry?.operatorEntry(forKey: key) {
             return entry.shortLabel
         }
-        return key.uppercased() == "ALL" ? String(localized: "Tous") : key
+        return key
     }
 
     func operatorLabel(_ key: String) -> String {
@@ -2352,6 +2355,10 @@ struct MapExplorerView: View {
                         // Retour y insère un saut au lieu de lancer la recherche.
                         if newValue.contains("\n") {
                             model.searchQuery = newValue.replacingOccurrences(of: "\n", with: "")
+                            // « Rechercher » referme le clavier, comme ailleurs sur iOS :
+                            // rien d'autre ne le fermait avant le choix d'un résultat,
+                            // et il cachait la barre d'onglets.
+                            searchFieldFocused = false
                             Task { await model.search() }
                             return
                         }

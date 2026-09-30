@@ -106,8 +106,9 @@ struct SentinelleAlertSettingsSheet: View {
             } header: {
                 Text("Notifications")
             } footer: {
-                Text("Une coupure plus courte que ce seuil est enregistrée dans l’historique "
-                     + "sans déclencher d’alerte.")
+                // Un seul littéral : deux morceaux concaténés s'affichaient tels quels,
+                // en français dans l'app anglaise (TRX-06).
+                Text("Une coupure plus courte que ce seuil est enregistrée dans l’historique sans déclencher d’alerte.")
             }
             .listRowBackground(SQColor.surface)
 
@@ -161,8 +162,7 @@ struct SentinelleAlertSettingsSheet: View {
             } header: {
                 Text("Webhook")
             } footer: {
-                Text("Discord, Slack et ntfy sont reconnus à leur adresse et reçoivent leur format. "
-                     + "Les autres destinataires reçoivent un appel signé.")
+                Text("Discord, Slack et ntfy sont reconnus à leur adresse et reçoivent leur format. Les autres destinataires reçoivent un appel signé.")
             }
             .listRowBackground(SQColor.surface)
         }

@@ -33,7 +33,7 @@ final class TwoFactorErrorQATests: XCTestCase {
         XCTAssertTrue(profile.waitForExistence(timeout: 30)); profile.tap()
         let settings = app.staticTexts[locale == "fr" ? "Réglages" : "Settings"].firstMatch
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(settings, in: app)); settings.tap()
-        let activation = app.buttons[locale == "fr" ? "Activer la 2FA" : "Enable 2FA"].firstMatch
+        let activation = app.buttons[locale == "fr" ? "Activer la double authentification" : "Enable two-factor authentication"].firstMatch
         XCTAssertTrue(activation.waitForExistence(timeout: 10)); activation.tap()
         let error = app.descendants(matching: .any).matching(identifier: "two-factor.setup.error").firstMatch
         let retry = app.buttons["two-factor.setup.retry"]
@@ -79,7 +79,7 @@ final class TwoFactorSuccessQATests: XCTestCase {
         XCTAssertTrue(profile.waitForExistence(timeout: 30)); profile.tap()
         let settings = app.staticTexts[locale == "fr" ? "Réglages" : "Settings"].firstMatch
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(settings, in: app)); settings.tap()
-        let activation = app.buttons[locale == "fr" ? "Activer la 2FA" : "Enable 2FA"].firstMatch
+        let activation = app.buttons[locale == "fr" ? "Activer la double authentification" : "Enable two-factor authentication"].firstMatch
         XCTAssertTrue(activation.waitForExistence(timeout: 10)); activation.tap()
 
         let secret = app.descendants(matching: .any)["two-factor.setup.secret"].firstMatch

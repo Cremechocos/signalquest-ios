@@ -1292,7 +1292,10 @@ struct ConversationDetailView: View {
                     }
                 }
             }
-            if message.hasVoiceNote, transcriptions[message.id] == nil {
+            // Pas de transcription dans une conversation chiffrée : elle suppose
+            // que le serveur écoute l'audio (spec E2EE §13, refusée côté serveur
+            // aussi). Un vocal peut y arriver en clair depuis une ancienne app.
+            if message.hasVoiceNote, !isE2EE, transcriptions[message.id] == nil {
                 Button {
                     Task { await requestTranscription(message: message) }
                 } label: {

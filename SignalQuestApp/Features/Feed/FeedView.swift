@@ -624,7 +624,7 @@ struct FeedView: View {
                         .padding(.horizontal, -SQSpace.lg)
                     }
                     if let error = model.errorMessage {
-                        ErrorStateView(title: "Feed indisponible", message: error) {
+                        ErrorStateView(title: "Fil indisponible", message: error) {
                             Task { await model.load() }
                         }
                     }

@@ -33,6 +33,22 @@
         }
       }
     },
+    " à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " in %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " à %@"
+          }
+        }
+      }
+    },
     " La hauteur de l'antenne étant inconnue, 25 m ont été supposés." : {
       "localizations" : {
         "en" : {
@@ -77,6 +93,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : " Les hauteurs sont à l'échelle du graphe, dont l'axe vertical est dilaté pour rester lisible."
+          }
+        }
+      }
+    },
+    " sur %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " sur %@"
           }
         }
       }
@@ -142,6 +174,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "#%lld"
+          }
+        }
+      }
+    },
+    "%@ relevé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ measurement"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ relevé"
+          }
+        }
+      }
+    },
+    "%@ relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ measurements"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ relevés"
           }
         }
       }
@@ -1293,6 +1357,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld / 500"
+          }
+        }
+      }
+    },
+    "%lld antennes compatibles avec tes anneaux TA. Touche pour afficher les %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld sites compatible with your timing advance rings. Tap to show all %lld."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld antennes compatibles avec tes anneaux TA. Touche pour afficher les %lld."
+          }
+        }
+      }
+    },
+    "%lld antennes affichées. Touche pour ne garder que les %lld compatibles avec tes anneaux TA." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld sites shown. Tap to keep only the %lld compatible with your timing advance rings."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld antennes affichées. Touche pour ne garder que les %lld compatibles avec tes anneaux TA."
+          }
+        }
+      }
+    },
+    "%lld Mbps en download%@, ping %@, %@ — mesuré avec SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Mbps download%@, ping %@, %@ — measured with SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Mbps en download%@, ping %@, %@ — mesuré avec SignalQuest."
           }
         }
       }
@@ -3846,6 +3958,40 @@
         }
       }
     },
+    "Activer la double authentification" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable two-factor authentication"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer la double authentification"
+          }
+        }
+      }
+    },
+    "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera chaque minute depuis nos serveurs, téléphone éteint compris." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your router’s public address: Sentinel will check it every minute from our servers, even with your phone off."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera chaque minute depuis nos serveurs, téléphone éteint compris."
+          }
+        }
+      }
+    },
     "ANFR" : {
       "localizations" : {
         "en" : {
@@ -3915,7 +4061,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Subscribed"
+            "value" : "Following"
           }
         },
         "fr" : {
@@ -6374,6 +6520,23 @@
         }
       }
     },
+    "Appareil" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil"
+          }
+        }
+      }
+    },
     "Appareils" : {
       "localizations" : {
         "en" : {
@@ -6996,6 +7159,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Arrêté"
+          }
+        }
+      }
+    },
+    "Asie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Asia"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Asie"
           }
         }
       }
@@ -8981,6 +9160,22 @@
         }
       }
     },
+    "Autres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autres"
+          }
+        }
+      }
+    },
     "Autres cellules à proximité" : {
       "localizations" : {
         "en" : {
@@ -9920,6 +10115,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bâtiment"
+          }
+        }
+      }
+    },
+    "Choisis une preuve temporaire à transmettre à un appareil déjà approuvé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a temporary proof to send to an already approved device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis une preuve temporaire à transmettre à un appareil déjà approuvé."
+          }
+        }
+      }
+    },
+    "Ce lien de partage n’est plus valide. Demandes-en un nouveau à la personne qui te l’a envoyé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This share link is no longer valid. Ask the person who sent it for a new one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce lien de partage n’est plus valide. Demandes-en un nouveau à la personne qui te l’a envoyé."
           }
         }
       }
@@ -12689,6 +12916,22 @@
         }
       }
     },
+    "Clé de récupération de 256 bits affichée. Utilise le bouton Copier pour la sauvegarder." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "256-bit recovery key displayed. Use the Copy button to save it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé de récupération de 256 bits affichée. Utilise le bouton Copier pour la sauvegarder."
+          }
+        }
+      }
+    },
     "Clocher" : {
       "localizations" : {
         "en" : {
@@ -13157,6 +13400,54 @@
         }
       }
     },
+    "Colle le contenu du QR SignalQuest ou saisis le code affiché sur le nouvel appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste the contents of the SignalQuest QR code or enter the code shown on the new device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colle le contenu du QR SignalQuest ou saisis le code affiché sur le nouvel appareil."
+          }
+        }
+      }
+    },
+    "Colle le lien qu’on t’a envoyé. Tu verras l’état de la connexion et ses coupures — jamais son adresse. Son propriétaire saura que tu la suis et pourra retirer cet accès." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste the link you received. You’ll see the connection status and outages — never its address. Its owner will know you follow it and can revoke access."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colle le lien qu’on t’a envoyé. Tu verras l’état de la connexion et ses coupures — jamais son adresse. Son propriétaire saura que tu la suis et pourra retirer cet accès."
+          }
+        }
+      }
+    },
+    "Colle le lien qu’on t’a partagé. Aucun abonnement requis : c’est le propriétaire qui paie la surveillance." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste the link someone shared with you. No subscription needed: the owner pays for the monitoring."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colle le lien qu’on t’a partagé. Aucun abonnement requis : c’est le propriétaire qui paie la surveillance."
+          }
+        }
+      }
+    },
     "Coller un lien" : {
       "localizations" : {
         "en" : {
@@ -13349,6 +13640,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Commentaires indisponibles"
+          }
+        }
+      }
+    },
+    "Commente en premier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Be the first to comment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commente en premier"
           }
         }
       }
@@ -13941,6 +14248,22 @@
         }
       }
     },
+    "Connecte-toi pour la suivre et la retrouver ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to follow this connection and find it here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi pour la suivre et la retrouver ici."
+          }
+        }
+      }
+    },
     "Connecte-toi pour signaler une panne ou donner ton avis." : {
       "localizations" : {
         "en" : {
@@ -14097,6 +14420,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connexion indisponible"
+          }
+        }
+      }
+    },
+    "Connexion partagée avec toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection shared with you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion partagée avec toi"
           }
         }
       }
@@ -15517,6 +15856,71 @@
         }
       }
     },
+    "Déduite de la connexion depuis laquelle tu consultes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inferred from the connection you are currently using."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déduite de la connexion depuis laquelle tu consultes."
+          }
+        }
+      }
+    },
+    "Depuis ta box, cherche son adresse %@ publique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From your router’s connection, find its public %@ address."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depuis ta box, cherche son adresse %@ publique."
+          }
+        }
+      }
+    },
+    "Désactiver la double authentification" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable two-factor authentication"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactiver la double authentification"
+          }
+        }
+      }
+    },
+    "Discord, Slack et ntfy sont reconnus à leur adresse et reçoivent leur format. Les autres destinataires reçoivent un appel signé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discord, Slack and ntfy are recognized by their address and get their own format. Other recipients receive a signed call."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discord, Slack et ntfy sont reconnus à leur adresse et reçoivent leur format. Les autres destinataires reçoivent un appel signé."
+          }
+        }
+      }
+    },
     "DL max" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16832,6 +17236,7 @@
       }
     },
     "Durée" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -19009,6 +19414,40 @@
         }
       }
     },
+    "Envoi moy." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avg upload"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi moy."
+          }
+        }
+      }
+    },
+    "Envoi max" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Max upload"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi max"
+          }
+        }
+      }
+    },
     "Envoi non confirmé. Réessaie." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19427,6 +19866,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Et %lld autre(s) commentaire(s)"
+          }
+        }
+      }
+    },
+    "Europe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Europe"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Europe"
           }
         }
       }
@@ -21347,6 +21802,22 @@
         }
       }
     },
+    "Ils voient son état et ses coupures. Ni son adresse, ni le chemin réseau — dont le dernier maillon est justement ta box." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "They see its status and outages. Not its address, nor the network path — whose last hop is precisely your router."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ils voient son état et ses coupures. Ni son adresse, ni le chemin réseau — dont le dernier maillon est justement ta box."
+          }
+        }
+      }
+    },
     "Imagerie aérienne Apple (native)" : {
       "localizations" : {
         "en" : {
@@ -21575,6 +22046,22 @@
         }
       }
     },
+    "Impossible de créer la demande d’approbation. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t create the approval request. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de créer la demande d’approbation. Réessaie."
+          }
+        }
+      }
+    },
     "Impossible de créer le reçu de suppression local. Le speedtest invité n’a pas été envoyé. Réessaie." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -21693,7 +22180,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Couldn't change previews. Try again or turn off notifications in iOS Settings."
+            "value" : "Unable to change previews. Try again or turn off notifications in iOS Settings."
           }
         },
         "fr" : {
@@ -22409,6 +22896,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "J’aime et commentaires sur mes photos"
+          }
+        }
+      }
+    },
+    "L’adresse IPv6 de cet appareil change régulièrement : la surveiller reviendrait à déclencher une fausse alerte dès demain. Nous proposons l’adresse habituelle de ta box sur le même préfixe — corrige-la si la tienne diffère." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device’s IPv6 address changes regularly: monitoring it would trigger a false alert as soon as tomorrow. We suggest your router’s usual address on the same prefix — correct it if yours differs."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adresse IPv6 de cet appareil change régulièrement : la surveiller reviendrait à déclencher une fausse alerte dès demain. Nous proposons l’adresse habituelle de ta box sur le même préfixe — corrige-la si la tienne diffère."
           }
         }
       }
@@ -23322,6 +23825,38 @@
         }
       }
     },
+    "La session a changé. Reconnecte-toi avant de gérer les appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your session has changed. Sign in again before managing devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session a changé. Reconnecte-toi avant de gérer les appareils."
+          }
+        }
+      }
+    },
+    "La session a changé. Reconnecte-toi puis réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your session has changed. Sign in again, then retry."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session a changé. Reconnecte-toi puis réessaie."
+          }
+        }
+      }
+    },
     "La session a changé. Reconnectez-vous avant de gérer les appareils." : {
       "localizations" : {
         "en" : {
@@ -23928,6 +24463,74 @@
         }
       }
     },
+    "Latence médiane" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median latency"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latence médiane"
+          }
+        }
+      }
+    },
+    "Latence max" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Max latency"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latence max"
+          }
+        }
+      }
+    },
+    "Latence min" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Min latency"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latence min"
+          }
+        }
+      }
+    },
+    "Latence moy." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avg latency"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latence moy."
+          }
+        }
+      }
+    },
     "Latence moyenne" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -23990,6 +24593,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Latitude"
+          }
+        }
+      }
+    },
+    "Le chemin jusqu’à toi" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The path to you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chemin jusqu’à toi"
+          }
+        }
+      }
+    },
+    "Le contenu complet est affiché par défaut. Il peut être visible par toute personne ayant accès à ton écran verrouillé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full content is shown by default. It may be visible to anyone who can see your lock screen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le contenu complet est affiché par défaut. Il peut être visible par toute personne ayant accès à ton écran verrouillé."
           }
         }
       }
@@ -24410,6 +25046,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le mot de passe doit faire au moins 8 caractères."
+          }
+        }
+      }
+    },
+    "Le nom commercial, jamais l’identifiant technique." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The commercial name, never the technical identifier."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nom commercial, jamais l’identifiant technique."
           }
         }
       }
@@ -24959,6 +25612,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le serveur réellement utilisé par le test."
+          }
+        }
+      }
+    },
+    "Le service est temporairement indisponible. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The service is temporarily unavailable. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le service est temporairement indisponible. Réessaie."
           }
         }
       }
@@ -28214,6 +28883,22 @@
         }
       }
     },
+    "mesures affichées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "measurements shown"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mesures affichées"
+          }
+        }
+      }
+    },
     "Mesures publiques" : {
       "localizations" : {
         "en" : {
@@ -29208,6 +29893,22 @@
         }
       }
     },
+    "Ni adresse ni chemin réseau : c’est ce qui distingue une connexion suivie d’une box à soi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No address and no network path: that’s what sets a followed connection apart from your own router."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ni adresse ni chemin réseau : c’est ce qui distingue une connexion suivie d’une box à soi."
+          }
+        }
+      }
+    },
     "Niv. %lld" : {
       "localizations" : {
         "en" : {
@@ -30133,6 +30834,23 @@
         }
       }
     },
+    "Ouvre SignalQuest pour afficher le message." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open SignalQuest to view the message."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre SignalQuest pour afficher le message."
+          }
+        }
+      }
+    },
     "OVH · US-EAST · États-Unis" : {
       "localizations" : {
         "en" : {
@@ -30183,7 +30901,7 @@
       }
     },
     "Octets envoi" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -33739,7 +34457,7 @@
       }
     },
     "Position" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -35964,6 +36682,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Qu’est-ce que « %@ » ?"
+          }
+        }
+      }
+    },
+    "Réception moy." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avg download"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réception moy."
+          }
+        }
+      }
+    },
+    "Réception max" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Max download"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réception max"
+          }
+        }
+      }
+    },
+    "Renouvellement des clés différé. Réessaie à la reconnexion." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key renewal is postponed. Retry after reconnecting."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renouvellement des clés différé. Réessaie à la reconnexion."
           }
         }
       }
@@ -38927,6 +39695,7 @@
       }
     },
     "Réseau" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -39266,7 +40035,7 @@
       }
     },
     "Réseau utilisé" : {
-      "extractionState" : "stale",
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -39575,6 +40344,39 @@
         }
       }
     },
+    "Sert à parler juste sur un lien partagé : « Ta connexion » y serait faux." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ensures shared links use accurate wording: “Your connection” would be incorrect there."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sert à parler juste sur un lien partagé : « Ta connexion » y serait faux."
+          }
+        }
+      }
+    },
+    "Sentinelle surveille ta connexion en continu : disponibilité, latence, perte de paquets et historique daté de chaque coupure." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinel monitors your connection around the clock: availability, latency, packet loss and a dated history of every outage."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinelle surveille ta connexion en continu : disponibilité, latence, perte de paquets et historique daté de chaque coupure."
+          }
+        }
+      }
+    },
     "SIM %@" : {
       "localizations" : {
         "en" : {
@@ -39655,6 +40457,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "SNR moy."
+          }
+        }
+      }
+    },
+    "Son %@ tomberait sans que tu le saches." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its %@ could go down without you knowing."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Son %@ tomberait sans que tu le saches."
           }
         }
       }
@@ -42953,13 +43771,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deployed supports"
+            "value" : "Deployed masts"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supports déployés"
+          }
+        }
+      }
+    },
+    "Supports opérationnels, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operational masts, %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports opérationnels, %@"
           }
         }
       }
@@ -43558,6 +44392,22 @@
         }
       }
     },
+    "Surveillance suspendue : l’adresse a changé de réseau. Vérifie depuis le site qu’elle t’appartient toujours." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monitoring paused: the address has moved to another network. Check on the website that it still belongs to you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surveillance suspendue : l’adresse a changé de réseau. Vérifie depuis le site qu’elle t’appartient toujours."
+          }
+        }
+      }
+    },
     "Surveillance suspendue : l’adresse a changé de réseau. Vérifiez depuis le site qu’elle vous appartient toujours." : {
       "localizations" : {
         "en" : {
@@ -43650,6 +44500,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Synchronisation en attente"
+          }
+        }
+      }
+    },
+    "synchronisé %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "synced %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "synchronisé %@"
           }
         }
       }
@@ -43779,6 +44645,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "S’inscrire avec Apple"
+          }
+        }
+      }
+    },
+    "Ta connexion répond plus vite que %lld %% des %lld lignes comparables du même opérateur." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your connection responds faster than %lld %% of the %lld comparable connections from the same operator."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta connexion répond plus vite que %lld %% des %lld lignes comparables du même opérateur."
+          }
+        }
+      }
+    },
+    "Ta connexion actuelle n’est pas joignable depuis l’extérieur." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your current connection cannot be reached from outside."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta connexion actuelle n’est pas joignable depuis l’extérieur."
+          }
+        }
+      }
+    },
+    "Ta connexion actuelle n’est pas joignable de l’extérieur — saisis l’adresse." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your current connection cannot be reached from outside — enter the address."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta connexion actuelle n’est pas joignable de l’extérieur — saisis l’adresse."
+          }
+        }
+      }
+    },
+    "ta connexion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "your connection"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ta connexion"
           }
         }
       }
@@ -44976,6 +45906,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Total : %@ s"
+          }
+        }
+      }
+    },
+    "Total opérationnel + projeté, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operational + projected total, %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total opérationnel + projeté, %@"
           }
         }
       }
@@ -46988,6 +47934,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Une carte qui se construit ensemble"
+          }
+        }
+      }
+    },
+    "Une coupure plus courte que ce seuil est enregistrée dans l’historique sans déclencher d’alerte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An outage shorter than this threshold is recorded in the history without triggering an alert."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une coupure plus courte que ce seuil est enregistrée dans l’historique sans déclencher d’alerte."
           }
         }
       }

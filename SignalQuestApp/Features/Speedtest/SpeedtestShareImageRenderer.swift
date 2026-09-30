@@ -18,20 +18,20 @@ enum SpeedtestShareImageRenderer {
         let ping = (result.primaryPingMs).map { "\(Int($0.rounded())) ms" } ?? "--"
         var context = ""
         if options.includeNetworkContext {
-            let net = result.networkShareDisplayName.trimmedNonEmpty ?? "réseau mobile"
-            context += " sur \(net)"
+            let net = result.networkShareDisplayName.trimmedNonEmpty ?? String(localized: "réseau mobile")
+            context += String(localized: " sur \(net)")
         }
         if options.includeApproximateLocation, let place = result.city?.trimmedNonEmpty {
-            context += " à \(place)"
+            context += String(localized: " à \(place)")
         }
         if options.includeServerDetails,
            let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmpty {
             context += " via \(server)"
         }
-        return """
-        \(download) Mbps en download\(context), ping \(ping), \(upload) — mesuré avec SignalQuest.
-        #SignalQuest · signalquest.fr
-        """
+        // Dans la langue de l'app : l'app anglaise partageait un texte en
+        // français (TRX-06).
+        return String(localized: "\(download) Mbps en download\(context), ping \(ping), \(upload) — mesuré avec SignalQuest.")
+            + "\n#SignalQuest · signalquest.fr"
     }
 
     // Conservé pour la dérivation de localisation (tests).

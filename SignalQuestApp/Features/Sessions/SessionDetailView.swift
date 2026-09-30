@@ -174,7 +174,7 @@ struct SessionDetailView: View {
             .sqReadableWidth()
         }
         .background(SQColor.bg.ignoresSafeArea())
-        .navigationTitle(model.session.name ?? (model.session.isDriveTest ? "Drive-test" : "Couverture"))
+        .navigationTitle(model.session.name ?? (model.session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")))
         .toolbarTitleInlineCompat()
         .overlay {
             if model.isLoading && model.detail == nil { ProgressView().tint(SQColor.brandRed) }
@@ -415,9 +415,10 @@ struct SessionDetailView: View {
                 }
                 if let sum = model.speedtestSummary {
                     HStack(spacing: SQSpace.sm) {
-                        speedStat("↓ moy", sum.avgDown, "Mbps", SQColor.info)
-                        speedStat("↑ moy", sum.avgUp, "Mbps", SQColor.brandGreen)
-                        speedStat("Ping", sum.avgPing, "ms", SQColor.label)
+                        // Lexique : Réception / Envoi / Latence, unité selon la langue (valeurs en Mbit/s).
+                        speedStat("Réception moy.", sum.avgDown, String(localized: "Mbit/s"), SQColor.info)
+                        speedStat("Envoi moy.", sum.avgUp, String(localized: "Mbit/s"), SQColor.brandGreen)
+                        speedStat("Latence moy.", sum.avgPing, "ms", SQColor.label)
                     }
                     .padding(.bottom, SQSpace.xs)
                 }

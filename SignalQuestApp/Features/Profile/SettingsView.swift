@@ -134,7 +134,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         case .success(let approval):
             generatedApproval = approval
         case .failed:
-            approvalErrorMessage = "Impossible de créer la demande d’approbation. Réessayez."
+            approvalErrorMessage = String(localized: "Impossible de créer la demande d’approbation. Réessaie.")
         }
     }
 
@@ -228,9 +228,9 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     ) -> String {
         switch failure.kind {
         case .authentication:
-            return String(localized: "La session a changé. Reconnectez-vous avant de gérer les appareils.")
+            return String(localized: "La session a changé. Reconnecte-toi avant de gérer les appareils.")
         case .retryable:
-            return String(localized: "Le service est temporairement indisponible. Réessayez.")
+            return String(localized: "Le service est temporairement indisponible. Réessaie.")
         case .activationBlocked:
             return String(localized: "La gestion E2EE v2 reste verrouillée jusqu’à la fin de la revue de sécurité.")
         case .permanent, .localState:
@@ -334,7 +334,7 @@ struct E2EEV2TrustedDevicesView: View {
                currentDevice.status == .pending,
                model.identityEstablished {
                 Section {
-                    Text("Choisissez une preuve temporaire à transmettre à un appareil déjà approuvé.")
+                    Text("Choisis une preuve temporaire à transmettre à un appareil déjà approuvé.")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
                     if let approval = model.generatedApproval {
@@ -371,7 +371,7 @@ struct E2EEV2TrustedDevicesView: View {
 
             if model.currentDeviceCanRevoke {
                 Section {
-                    Text("Collez le contenu du QR SignalQuest ou saisissez le code affiché sur le nouvel appareil.")
+                    Text("Colle le contenu du QR SignalQuest ou saisis le code affiché sur le nouvel appareil.")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
                     if let detail = model.approvalDetail {
@@ -720,7 +720,7 @@ private struct E2EEV2RotationStatusSection: View {
         switch runtime.state.phase {
         case .complete: return String(localized: "Les clés des conversations sont à jour.")
         case .waitingAuthorization: return String(localized: "Renouvellement des clés en attente de l’autorisation de sécurité.")
-        case .retryPending, .needsAttention: return String(localized: "Renouvellement des clés différé. Réessayez à la reconnexion.")
+        case .retryPending, .needsAttention: return String(localized: "Renouvellement des clés différé. Réessaie à la reconnexion.")
         default: return String(localized: "Renouvellement des clés en attente.")
         }
     }
@@ -1004,9 +1004,9 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
     ) -> String {
         switch failure.kind {
         case .authentication:
-            return String(localized: "La session a changé. Reconnectez-vous puis réessayez.")
+            return String(localized: "La session a changé. Reconnecte-toi puis réessaie.")
         case .retryable:
-            return String(localized: "Le service est temporairement indisponible. Réessayez.")
+            return String(localized: "Le service est temporairement indisponible. Réessaie.")
         case .activationBlocked:
             return String(localized: "Ces actions restent verrouillées jusqu’à la fin de la revue de sécurité.")
         case .permanent, .localState:
@@ -1277,7 +1277,7 @@ private struct E2EEV2RecoveryResetView: View {
                     .font(.caption.monospaced())
                     .textSelection(.enabled)
                     .privacySensitive()
-                    .accessibilityLabel("Clé de récupération de 256 bits affichée. Utilisez le bouton Copier pour la sauvegarder.")
+                    .accessibilityLabel("Clé de récupération de 256 bits affichée. Utilise le bouton Copier pour la sauvegarder.")
                 Button {
                     UIPasteboard.general.setItems(
                         [["public.utf8-plain-text": model.recoveryKeyText]],
@@ -1508,7 +1508,7 @@ struct SettingsView: View {
                         twoFactorDisable = operation
                         show2FADisable = true
                     } label: {
-                        settingsLabel("Désactiver la 2FA", systemImage: "lock.open")
+                        settingsLabel("Désactiver la double authentification", systemImage: "lock.open")
                     }
                     .disabled(isDisabling2FA)
                 } else {
@@ -1520,7 +1520,7 @@ struct SettingsView: View {
                         }
                         twoFactorEnrollment = enrollment
                     } label: {
-                        settingsLabel("Activer la 2FA", systemImage: "lock.shield")
+                        settingsLabel("Activer la double authentification", systemImage: "lock.shield")
                     }
                 }
                 NavigationLink {
@@ -1566,6 +1566,7 @@ struct SettingsView: View {
                      ? "Tu peux te connecter avec Apple, même en masquant ton e-mail."
                      : "Associe ton Apple ID pour te connecter en un geste, même avec « Masquer mon e-mail ».")
                     .font(SQType.caption)
+                    .accessibilityIdentifier("settings.apple.footer")
             }
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)

@@ -417,11 +417,10 @@ struct CommentsSheet: View {
                     Button {
                         Task { await model.toggleReplies(for: comment) }
                     } label: {
-                        HStack(spacing: SQSpace.xs) {
-                            Text("Réponses")
-                            Text(verbatim: "\(count)").monospacedDigit()
-                        }
-                        .frame(minHeight: 44)
+                        // « 21 réponses » (pluriel du catalogue) plutôt que « Réponses 21 ».
+                        Text("\(count) réponse")
+                            .monospacedDigit()
+                            .frame(minHeight: 44)
                     }
                     .accessibilityIdentifier("comments.replies.\(comment.id)")
                 }

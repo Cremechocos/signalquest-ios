@@ -351,7 +351,7 @@ final class RadioLogsTests: XCTestCase {
         XCTAssertEqual(item.lat, 50.6292)
         XCTAssertEqual(item.lng, 3.0573)
 
-        let query = try await captureHypothesisQuery(for: site)
+        let query = try await captureHypothesisFields(for: site)
         XCTAssertEqual(query["observedPlmn"], "20810")
         XCTAssertEqual(query["enb"], "6506")
         XCTAssertNil(query["gnb"])
@@ -1040,12 +1040,17 @@ final class RadioLogsTests: XCTestCase {
         return try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
     }
 
-    private func captureHypothesisQuery(for site: RadioLogSite) async throws -> [String: String] {
+    /// Champs envoyés à `identify/quick` : dans le corps JSON d'un POST, jamais
+    /// dans l'URL, où la position finirait dans les journaux des proxys.
+    private func captureHypothesisFields(for site: RadioLogSite) async throws -> [String: String] {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
         let captured = CapturedURL()
+        let capturedBody = CapturedBody()
         MockURLProtocol.requestHandler = { request in
             captured.url = request.url
+            captured.method = request.httpMethod
+            capturedBody.data = request.httpBody ?? request.httpBodyStream.map(Self.readAll)
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Data(#"{"found":false,"resolutionMode":"unresolved"}"#.utf8))
         }
@@ -1056,11 +1061,11 @@ final class RadioLogsTests: XCTestCase {
         )
         _ = await service.hypothesis(for: site)
         let url = try XCTUnwrap(captured.url, "Aucune requête quick-identify capturée")
-        return Dictionary(
-            uniqueKeysWithValues: URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?
-                .compactMap { item in item.value.map { (item.name, $0) } } ?? []
-        )
+        XCTAssertEqual(url.path, "/api/android/map/identify/quick")
+        XCTAssertEqual(captured.method, "POST")
+        XCTAssertNil(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems, "paramètres dans l'URL")
+        let body = try XCTUnwrap(capturedBody.data, "Aucun corps HTTP capturé")
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: String])
     }
 
     private final class CapturedBody: @unchecked Sendable {
@@ -1069,6 +1074,7 @@ final class RadioLogsTests: XCTestCase {
 
     private final class CapturedURL: @unchecked Sendable {
         var url: URL?
+        var method: String?
     }
 
     private static func readAll(_ stream: InputStream) -> Data {

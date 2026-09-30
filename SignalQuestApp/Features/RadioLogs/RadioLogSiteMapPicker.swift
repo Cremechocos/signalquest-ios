@@ -343,8 +343,8 @@ struct RadioLogSiteMapPicker: View {
                     }
                     // Le libellé complet dit le POURQUOI, que le compte seul ne porte pas.
                     .accessibilityLabel(showOnlyPlausible
-                        ? "\(plausible.count) antennes compatibles avec vos anneaux TA. Toucher pour afficher les \(visible.count)."
-                        : "\(visible.count) antennes affichées. Toucher pour ne garder que les \(plausible.count) compatibles avec vos anneaux TA.")
+                        ? String(localized: "\(plausible.count) antennes compatibles avec tes anneaux TA. Touche pour afficher les \(visible.count).")
+                        : String(localized: "\(visible.count) antennes affichées. Touche pour ne garder que les \(plausible.count) compatibles avec tes anneaux TA."))
                     .accessibilityAddTraits(showOnlyPlausible ? [.isSelected] : [])
                     .padding(.trailing, SQSpace.md)
                     .padding(.top, SQSpace.md)

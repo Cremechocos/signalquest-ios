@@ -347,7 +347,7 @@ struct SentinelleAddressView: View {
     private func diagnosticCard(_ address: SentinelleAddress) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.md) {
-                SentinelleSectionTitle(title: "Le chemin jusqu’à vous", systemImage: "point.topleft.down.curvedto.point.bottomright.up")
+                SentinelleSectionTitle(title: "Le chemin jusqu’à toi", systemImage: "point.topleft.down.curvedto.point.bottomright.up")
 
                 if diagnosticFailed {
                     unavailable
@@ -427,7 +427,7 @@ struct SentinelleAddressView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let peers = trends.peers, let betterThan = peers.betterThanPct {
-                        Text("Votre connexion répond plus vite que \(betterThan) % des \(peers.peerCount) lignes comparables du même opérateur.")
+                        Text("Ta connexion répond plus vite que \(betterThan) % des \(peers.peerCount) lignes comparables du même opérateur.")
                             .font(SQType.body)
                             .foregroundStyle(SQColor.label)
                             .fixedSize(horizontal: false, vertical: true)

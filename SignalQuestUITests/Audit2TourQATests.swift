@@ -238,8 +238,7 @@ final class Audit2TourQATests: XCTestCase {
         snap("profil-bas")
         for (french, english, shot) in [
             ("Récompenses", "Rewards", "recompenses"),
-            ("Classements", "Leaderboards", "classements"),
-            ("Territoires", "Territories", "territoires")
+            ("Classements", "Leaderboards", "classements")
         ] {
             goTab(t("Profil", "Profile"), in: app)
             app.swipeDown(); app.swipeDown()
@@ -254,9 +253,13 @@ final class Audit2TourQATests: XCTestCase {
                 back(app)
             }
         }
-        // Les titres du menu Profil ne sont pas localisés (TRX-06) : on cherche
-        // le libellé français, puis l'anglais.
+        // Menu réorganisé au lot 4g : Sentinelle et antennes suivies remontées,
+        // Territoires en ligne, écrans Android seulement avec des données Android.
+        // On cherche le libellé français, puis l'anglais.
         let rows: [(String, String, String)] = [
+            ("Sentinelle", "Sentinel", "sentinelle"),
+            ("Antennes suivies", "Followed antennas", "antennes-suivies"),
+            ("Territoires", "Territories", "territoires"),
             ("Mes enregistrements de trajet", "My trip recordings", "trajets"),
             ("Mes mesures", "My measurements", "mes-mesures"),
             ("Logs antennes", "Antenna logs", "logs-antennes"),
@@ -266,7 +269,8 @@ final class Audit2TourQATests: XCTestCase {
             ("Photos", "Photos", "photos"),
             ("Abonnements", "Subscriptions", "abonnements"),
             ("Confidentialité", "Privacy", "confidentialite"),
-            ("Réglages", "Settings", "reglages")
+            ("Réglages", "Settings", "reglages"),
+            ("Aide et glossaire", "Help and glossary", "glossaire")
         ]
         for (french, english, shot) in rows {
             goTab(t("Profil", "Profile"), in: app)

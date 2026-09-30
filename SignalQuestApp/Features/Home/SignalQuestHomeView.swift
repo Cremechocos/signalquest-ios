@@ -485,7 +485,9 @@ struct SignalQuestHomeView: View {
                         // plein. La hiérarchie tient déjà par la taille (16,5
                         // semi-gras contre 12,5 normal).
                         .foregroundStyle(accented ? SQColor.onAccent : Color.primary)
-                        .lineLimit(2)
+                        // Trois lignes : en texte XXL, « Signalées par la communauté »
+                        // se coupait (tour du 30/09).
+                        .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("home.action.subtitle.\(identifier)")
                 }

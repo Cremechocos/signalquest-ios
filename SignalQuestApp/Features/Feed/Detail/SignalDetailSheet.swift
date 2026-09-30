@@ -196,8 +196,8 @@ struct SignalDetailSheet: View {
             let detail = speedtestDetail
             tiles.append(.init(label: "Réception", value: SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg ?? signal.downloadMbps), highlight: true, accent: accent))
             tiles.append(.init(label: "Envoi", value: SignalFormatters.speed(detail?.uploadAvg ?? signal.uploadMbps)))
-            tiles.append(.init(label: "Ping min", value: SignalFormatters.ms(detail?.pingMin ?? detail?.ping ?? signal.pingMs)))
-            tiles.append(.init(label: "Jitter", value: SignalFormatters.ms(detail?.jitter ?? signal.jitterMs)))
+            tiles.append(.init(label: "Latence min", value: SignalFormatters.ms(detail?.pingMin ?? detail?.ping ?? signal.pingMs)))
+            tiles.append(.init(label: "Gigue", value: SignalFormatters.ms(detail?.jitter ?? signal.jitterMs)))
         case "validation":
             tiles.append(.init(label: "Identifiant", value: signal.identifierValue ?? "—", highlight: true, accent: accent))
             tiles.append(.init(label: "Type", value: signal.identifierType?.uppercased() ?? "—"))
@@ -247,9 +247,9 @@ struct SignalDetailSheet: View {
                 ("SIM", signal.isRoaming == true ? signal.simOperator ?? "" : ""),
                 ("Appareil", [detail.deviceType, detail.deviceModel].compactMap { $0 }.joined(separator: " ")),
                 ("Durée", SignalFormatters.duration(detail.testDuration)),
-                ("Ping moyen", SignalFormatters.ms(detail.pingAvg)),
-                ("Ping médian", SignalFormatters.ms(detail.pingMedian)),
-                ("Ping max", SignalFormatters.ms(detail.pingMax)),
+                ("Latence moyenne", SignalFormatters.ms(detail.pingAvg)),
+                ("Latence médiane", SignalFormatters.ms(detail.pingMedian)),
+                ("Latence max", SignalFormatters.ms(detail.pingMax)),
                 ("Octets envoi", uploadSource == "tcp-acknowledged"
                     ? SpeedtestDetailContent.byteSourceLabel("tcp-acknowledged") : ""),
                 ("Position", coordinatesText(lat: detail.latitude, lon: detail.longitude))
@@ -268,7 +268,8 @@ struct SignalDetailSheet: View {
                     .foregroundStyle(SQColor.label)
                 ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
                     HStack {
-                        Text(pair.0).foregroundStyle(SQColor.labelSecondary)
+                        // Clé traduite à l'affichage : le libellé passait tel quel (TRX-06).
+                        Text(LocalizedStringKey(pair.0)).foregroundStyle(SQColor.labelSecondary)
                         Spacer()
                         Text(pair.1).foregroundStyle(SQColor.label)
                     }

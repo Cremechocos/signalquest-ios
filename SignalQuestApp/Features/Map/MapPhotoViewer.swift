@@ -193,7 +193,7 @@ struct MapPhotoViewer: View {
             if isLoading {
                 ProgressView().tint(SQColor.label).frame(maxWidth: .infinity)
             } else if comments.isEmpty {
-                Text("Soyez le premier à commenter")
+                Text("Commente en premier")
                     .font(SQFont.body(13, .regular))
                     .foregroundStyle(SQColor.labelSecondary)
             } else {

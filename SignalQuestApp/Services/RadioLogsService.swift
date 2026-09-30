@@ -450,9 +450,16 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         if let cellId = cell?.eciCellId { query.append(URLQueryItem(name: "cellId", value: cellId)) }
         if let ci = cell?.ci { query.append(URLQueryItem(name: "ci", value: String(ci))) }
 
-        guard let resolution = try? await api.request(
-            APIEndpoint(path: "/api/android/map/identify/quick", query: query),
-            as: QuickIdentifyResolution.self
+        // Les champs partent dans le corps d'un POST, pas dans l'URL : la position
+        // ne finit plus dans les journaux des proxys (PRIV-06 serveur, 30/09).
+        // Même réponse que le GET, gardé pour les versions déjà diffusées.
+        let fields = Dictionary(
+            query.compactMap { item in item.value.map { (item.name, $0) } },
+            uniquingKeysWith: { first, _ in first }
+        )
+        guard let resolution: QuickIdentifyResolution = try? await api.requestJSON(
+            "/api/android/map/identify/quick",
+            body: fields
         ) else { return nil }
 
         guard resolution.found == true,

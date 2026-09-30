@@ -37,6 +37,9 @@ struct SpeedtestView: View {
     /// privées) : on le dit une fois, au-dessus de l'historique où l'on masque un test.
     @AppStorage("speedtest_map_publication_notice_seen_v1") private var mapPublicationNoticeSeen = false
     @State private var phase: SpeedtestPhase = .idle
+    /// Hauteur visible de l'écran : sur iPhone SE ou 8, le cadran pleine taille
+    /// repoussait « Lancer le test » sous la barre d'onglets (UI-01).
+    @State private var viewportHeight: CGFloat = 0
     @State private var result: SpeedtestRunResult?
     @State private var liveProgress = SpeedtestLiveProgress(phase: .idle)
     @State private var liveMbps: Double = 0
@@ -146,13 +149,20 @@ struct SpeedtestView: View {
                     VPNWarningBanner()
                 }
 
-                ViewThatFits(in: .horizontal) {
+                if viewportHeight > 0, viewportHeight < 640 {
                     signatureDial
-                    signatureDial
-                        .scaleEffect(0.9)
-                        .frame(width: 279, height: 279)
+                        .scaleEffect(0.8)
+                        .frame(width: 248, height: 248)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        signatureDial
+                        signatureDial
+                            .scaleEffect(0.9)
+                            .frame(width: 279, height: 279)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
 
                 SpeedtestTriMetric(
                     activePhase: phase,
@@ -247,6 +257,13 @@ struct SpeedtestView: View {
             Button("Annuler", role: .cancel) {}
         } message: {
             Text("Demandé depuis Siri, un raccourci ou le Centre de contrôle.")
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { viewportHeight = proxy.size.height }
+                    .onChangeCompat(of: proxy.size.height) { _, height in viewportHeight = height }
+            }
         }
         .signalQuestBackground()
         .sheet(item: $detailResult) { item in

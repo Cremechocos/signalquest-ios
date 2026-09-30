@@ -29,6 +29,27 @@ final class MapSearchFieldQATests: XCTestCase {
         XCTAssertFalse(label.exists, "Le libellé compact reste visible après effacement")
     }
 
+    /// « Rechercher » referme le clavier : le champ est multiligne, et rien d'autre
+    /// ne le fermait avant le choix d'un résultat ; il cachait la barre d'onglets
+    /// (tour « après » du 30/09).
+    func testSearchKeyClosesTheKeyboard() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "fr")
+        defer { app.terminate() }
+
+        let map = SignalQuestUITestSupport.tab(named: "Carte", in: app)
+        XCTAssertTrue(map.waitForExistence(timeout: 15))
+        map.tap()
+        let input = app.descendants(matching: .any)["map.search.input"].firstMatch
+        XCTAssertTrue(input.waitForExistence(timeout: 15))
+        input.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        input.typeText("\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Clavier encore ouvert après « Rechercher »")
+        XCTAssertTrue(map.isHittable, "Barre d'onglets encore cachée")
+    }
+
     func testEnglishSearchKeepsItsLabelAtLargeTextSize() {
         continueAfterFailure = false
         let app = XCUIApplication()

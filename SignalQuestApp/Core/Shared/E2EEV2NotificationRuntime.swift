@@ -63,7 +63,7 @@ enum E2EEV2NotificationPresentationPolicy {
 
     static let placeholder = E2EEV2NotificationPresentation(
         title: String(localized: "Nouveau message chiffré"),
-        body: String(localized: "Ouvrez SignalQuest pour afficher le message."),
+        body: String(localized: "Ouvre SignalQuest pour afficher le message."),
         privacy: .hidden
     )
 }

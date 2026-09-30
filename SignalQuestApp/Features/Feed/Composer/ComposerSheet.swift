@@ -867,7 +867,7 @@ struct PostPreviewCard: View {
                 HStack(spacing: SQSpace.sm) {
                     if let down = speedtest.downloadSpeed {
                         CardMetricTile(
-                            label: "Download",
+                            label: "Réception",
                             value: SignalFormatters.speed(down),
                             highlight: true,
                             accent: SQColor.brandRed
@@ -875,7 +875,7 @@ struct PostPreviewCard: View {
                     }
                     if let ping = speedtest.ping {
                         CardMetricTile(
-                            label: "Ping",
+                            label: "Latence",
                             value: SignalFormatters.ms(ping)
                         )
                     }

@@ -333,8 +333,8 @@ struct ANFRStatsView: View {
     private var heroCard: some View {
         let filterLabel = model.selectedFilter.label
         let subtext = model.showProjected
-            ? "Total opérationnel + projeté, \(filterLabel)"
-            : "Supports opérationnels, \(filterLabel)"
+            ? String(localized: "Total opérationnel + projeté, \(filterLabel)")
+            : String(localized: "Supports opérationnels, \(filterLabel)")
             
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Supports déployés")

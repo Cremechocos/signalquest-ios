@@ -342,7 +342,7 @@ struct SentinelleCreateSheet: View {
         // Derrière un CGNAT, l'adresse vue par le serveur n'est pas joignable de
         // l'extérieur : le dire vaut mieux que de laisser créer une cible morte.
         return detected.message
-            ?? String(localized: "Votre connexion actuelle n’est pas joignable depuis l’extérieur.")
+            ?? String(localized: "Ta connexion actuelle n’est pas joignable depuis l’extérieur.")
     }
 }
 
@@ -423,12 +423,12 @@ struct SentinelleAddressSheet: View {
 
     private func hint(usable: SentinelleCurrentIp?) -> String {
         if usable != nil {
-            return String(localized: "Déduite de la connexion depuis laquelle vous consultez.")
+            return String(localized: "Déduite de la connexion depuis laquelle tu consultes.")
         }
         if detected?.usable == false {
-            return String(localized: "Votre connexion actuelle n’est pas joignable de l’extérieur — saisissez l’adresse.")
+            return String(localized: "Ta connexion actuelle n’est pas joignable de l’extérieur — saisis l’adresse.")
         }
-        return String(localized: "Depuis votre box, cherchez son adresse \(family.label) publique.")
+        return String(localized: "Depuis ta box, cherche son adresse \(family.label) publique.")
     }
 }
 
@@ -493,7 +493,7 @@ enum SentinelleWording {
 
     static func cause(_ incident: SentinelleIncident) -> String {
         switch incident.cause {
-        case "local": return String(localized: "votre connexion")
+        case "local": return String(localized: "ta connexion")
         case "isp": return String(localized: "réseau opérateur")
         case "transit": return String(localized: "transit")
         default:

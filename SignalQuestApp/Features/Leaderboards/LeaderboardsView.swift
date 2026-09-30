@@ -177,6 +177,7 @@ struct LeaderboardsView: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: LeaderboardsViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Membre dont on ouvre le profil depuis une ligne du classement (SOC-44).
     @State private var profileAuthor: SocialFeedAuthor?
     private let gamification: GamificationServicing?
@@ -264,7 +265,12 @@ struct LeaderboardsView: View {
     // MARK: Filtres — une seule ligne : menus capsules + toggle Amis
 
     private var filters: some View {
-        HStack(spacing: SQSpace.sm) {
+        // En très grand texte, les filtres s'empilent : sur une seule ligne,
+        // « Semaine » et « Réception » se coupaient en syllabes (tour AX5, 30/09).
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm))
+            : AnyLayout(HStackLayout(spacing: SQSpace.sm))
+        return layout {
             // Période : menu natif dans une capsule (Semaine / Mois / Toujours).
             LeaderboardMenuPill(
                 icon: "calendar",
@@ -282,7 +288,8 @@ struct LeaderboardsView: View {
                 }
             }
 
-            // Métrique (uniquement pour Vitesse) : Download / Upload / Sessions.
+            // Métrique (uniquement pour Vitesse) : Réception / Envoi / Sessions
+            // (lexique : « Download » reste le mot anglais).
             if model.tab == .speed {
                 LeaderboardMenuPill(
                     icon: "speedometer",
@@ -290,10 +297,10 @@ struct LeaderboardsView: View {
                     accessibility: String(localized: "Métrique du classement")
                 ) {
                     Button { model.setCategory("download") } label: {
-                        if model.category == "download" { Label("Download", systemImage: "checkmark") } else { Text("Download") }
+                        if model.category == "download" { Label("Réception", systemImage: "checkmark") } else { Text("Réception") }
                     }
                     Button { model.setCategory("upload") } label: {
-                        if model.category == "upload" { Label("Upload", systemImage: "checkmark") } else { Text("Upload") }
+                        if model.category == "upload" { Label("Envoi", systemImage: "checkmark") } else { Text("Envoi") }
                     }
                     Button { model.setCategory("sessions") } label: {
                         if model.category == "sessions" { Label("Sessions", systemImage: "checkmark") } else { Text("Sessions") }
@@ -322,9 +329,9 @@ struct LeaderboardsView: View {
 
     private var categoryLabel: String {
         switch model.category {
-        case "upload": return "Upload"
-        case "sessions": return "Sessions"
-        default: return "Download"
+        case "upload": return String(localized: "Envoi")
+        case "sessions": return String(localized: "Sessions")
+        default: return String(localized: "Réception")
         }
     }
 

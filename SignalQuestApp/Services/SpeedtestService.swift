@@ -4394,22 +4394,40 @@ func nearestLibreSpeedServer(to location: Coordinates?) -> LibreSpeedServer {
     } ?? libreSpeedServers[0]
 }
 
-extension LibreSpeedServer {
-    /// Continent (pour le regroupement du sélecteur).
-    var continent: String {
-        switch countryCode {
-        case "FR", "DE", "NL", "GB", "CZ", "PL", "FI", "GR", "IT", "ES", "CH", "SE", "NO", "DK", "AT", "BE", "IE", "PT":
-            return "Europe"
-        case "US", "CA": return String(localized: "Amérique du Nord")
-        case "BR", "AR", "CL", "CO", "PE", "UY": return String(localized: "Amérique du Sud")
-        case "JP", "CN", "KR", "IN", "SG", "HK", "TW", "TH", "VN", "MY", "ID": return "Asie"
-        case "AU", "NZ": return String(localized: "Océanie")
-        default: return "Autres"
+/// Continent d'un POP LibreSpeed. L'ordre du sélecteur vient de l'énumération
+/// et le libellé n'est traduit qu'à l'affichage : le rang était lu dans un
+/// dictionnaire à clés françaises, et l'app anglaise rangeait l'Amérique ou
+/// l'Océanie en dernier, sous des titres restés en français (TRX-06).
+enum LibreSpeedContinent: Int {
+    case europe, northAmerica, southAmerica, asia, oceania, other
+
+    var label: String {
+        switch self {
+        case .europe: return String(localized: "Europe")
+        case .northAmerica: return String(localized: "Amérique du Nord")
+        case .southAmerica: return String(localized: "Amérique du Sud")
+        case .asia: return String(localized: "Asie")
+        case .oceania: return String(localized: "Océanie")
+        case .other: return String(localized: "Autres")
         }
     }
-    var continentRank: Int {
-        ["Europe": 0, "Amérique du Nord": 1, "Amérique du Sud": 2, "Asie": 3, "Océanie": 4][continent] ?? 5
+}
+
+extension LibreSpeedServer {
+    var continentKind: LibreSpeedContinent {
+        switch countryCode {
+        case "FR", "DE", "NL", "GB", "CZ", "PL", "FI", "GR", "IT", "ES", "CH", "SE", "NO", "DK", "AT", "BE", "IE", "PT":
+            return .europe
+        case "US", "CA": return .northAmerica
+        case "BR", "AR", "CL", "CO", "PE", "UY": return .southAmerica
+        case "JP", "CN", "KR", "IN", "SG", "HK", "TW", "TH", "VN", "MY", "ID": return .asia
+        case "AU", "NZ": return .oceania
+        default: return .other
+        }
     }
+    /// Continent affiché (pour le regroupement du sélecteur).
+    var continent: String { continentKind.label }
+    var continentRank: Int { continentKind.rawValue }
     /// Sous-titre du sélecteur : « Pays · hostname ».
     var pickerSubtitle: String { "\(countryCode) · \(hostname)" }
 }

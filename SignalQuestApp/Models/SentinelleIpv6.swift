@@ -144,7 +144,7 @@ enum SentinelleIpv6 {
             // Littéral d'un seul tenant : `String(localized:)` attend une
             // `LocalizationValue`, et deux littéraux concaténés par `+` donnent
             // une `String` — la clé serait perdue pour le catalogue.
-            warning: String(localized: "L’adresse IPv6 de cet appareil change régulièrement : la surveiller reviendrait à déclencher une fausse alerte dès demain. Nous proposons l’adresse habituelle de votre box sur le même préfixe — corrigez-la si la vôtre diffère.")
+            warning: String(localized: "L’adresse IPv6 de cet appareil change régulièrement : la surveiller reviendrait à déclencher une fausse alerte dès demain. Nous proposons l’adresse habituelle de ta box sur le même préfixe — corrige-la si la tienne diffère.")
         )
     }
 

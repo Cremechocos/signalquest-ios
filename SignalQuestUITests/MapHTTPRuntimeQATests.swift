@@ -379,7 +379,7 @@ final class MapHTTPRuntimeQATests: XCTestCase {
 
         let selectedMeasure = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 200 Mbps")).firstMatch
         try tap(selectedMeasure, in: app)
-        XCTAssertTrue(app.staticTexts["Speed Test"].waitForExistence(timeout: 10), "Tapping the visible measurement must open its detail")
+        XCTAssertTrue(app.staticTexts["Speedtest"].waitForExistence(timeout: 10), "Tapping the visible measurement must open its detail")
         capture(app, name: "map-speedtest-touch-selection")
         app.terminate()
     }

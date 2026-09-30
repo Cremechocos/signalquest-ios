@@ -29,7 +29,7 @@ final class SessionsListViewModel: ObservableObject {
         var label: String {
             switch self {
             case .all: return "Toutes"
-            case .driveTest: return "Drive-test"
+            case .driveTest: return "Drive Test"
             case .coverage: return "Couverture"
             }
         }
@@ -220,7 +220,7 @@ struct SessionsListView: View {
             .sqReadableWidth()
         }
         .signalQuestBackground()
-        .navigationTitle("Mes sessions")
+        .navigationTitle("Mes enregistrements de trajet")
         .toolbarTitleInlineCompat()
         .refreshable {
             await archiveModel.reload()
@@ -330,7 +330,7 @@ private struct SessionRow: View {
                 .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(session.name ?? (session.isDriveTest ? "Drive-test" : "Couverture"))
+                Text(session.name ?? (session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")))
                     .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)

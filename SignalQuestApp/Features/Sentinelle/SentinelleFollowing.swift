@@ -112,8 +112,7 @@ struct SentinelleFollowedCard: View {
                         }
                     }
 
-                    Text("Ni adresse ni chemin réseau : c’est ce qui distingue une connexion "
-                        + "suivie d’une box à soi.")
+                    Text("Ni adresse ni chemin réseau : c’est ce qui distingue une connexion suivie d’une box à soi.")
                         .font(SQFont.body(11))
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -201,7 +200,7 @@ struct SentinelleFollowSheet: View {
     var body: some View {
         SentinelleSheetShell(
             title: String(localized: "Suivre une connexion partagée"),
-            subtitle: String(localized: "Collez le lien qu’on vous a envoyé. Vous verrez l’état de la connexion et ses coupures — jamais son adresse. Son propriétaire saura que vous la suivez et pourra retirer cet accès.")
+            subtitle: String(localized: "Colle le lien qu’on t’a envoyé. Tu verras l’état de la connexion et ses coupures — jamais son adresse. Son propriétaire saura que tu la suis et pourra retirer cet accès.")
         ) {
             SentinelleField(
                 title: "Lien de partage",
@@ -242,8 +241,7 @@ struct SentinelleFollowInvite: View {
                 Text("Suivre la connexion d’un proche")
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
-                Text("Collez le lien qu’on vous a partagé. Aucun abonnement requis : c’est le "
-                    + "propriétaire qui paie la surveillance.")
+                Text("Colle le lien qu’on t’a partagé. Aucun abonnement requis : c’est le propriétaire qui paie la surveillance.")
                     .font(SQFont.body(13))
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -273,7 +271,7 @@ struct SentinelleShareInvite: View {
     var body: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                Text("Connexion partagée avec vous")
+                Text("Connexion partagée avec toi")
                     .font(SQFont.body(12))
                     .foregroundStyle(SQColor.labelSecondary)
 
@@ -306,7 +304,7 @@ struct SentinelleShareInvite: View {
                 } else {
                     // Un bouton qui répondrait « connectez-vous » après coup
                     // serait une fausse promesse : on le dit avant.
-                    Text("Connectez-vous pour la suivre et la retrouver ici.")
+                    Text("Connecte-toi pour la suivre et la retrouver ici.")
                         .font(SQFont.body(13))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
