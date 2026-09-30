@@ -246,7 +246,7 @@ enum E2EEV2NotificationProcessor {
             deviceId: context.descriptor.deviceId,
             timestampMs: timestamp,
             nonce: nonce,
-            signatureB64: try signing.signature(for: canonical).derRepresentation.base64EncodedString()
+            signatureB64: try E2EEV2LowS.sign(canonical, with: signing).base64EncodedString()
         )
         var result = URLRequest(url: apiBaseURL.appendingPathComponent(String(path.dropFirst())))
         result.httpMethod = "POST"

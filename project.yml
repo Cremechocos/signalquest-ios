@@ -180,6 +180,8 @@ targets:
       - path: SignalQuestNotificationService/PrivacyInfo.xcprivacy
         buildPhase: resources
       - path: SignalQuestApp/Core/Shared/E2EEV2NotificationContracts.swift
+      # Signatures low-S et JSON canonique des formats v2 (spec §15).
+      - path: SignalQuestApp/Core/Shared/E2EEV2Canonical.swift
       - path: SignalQuestApp/Core/Shared/E2EEV2NotificationRuntime.swift
       - path: SignalQuestApp/Core/Shared/E2EEV2NotificationProcessor.swift
       - path: SignalQuestApp/Core/Shared/E2EEV2NotificationContextStore.swift

@@ -25358,18 +25358,18 @@
         }
       }
     },
-    "Le registre v2 est consultable, mais aucun message n’est présenté comme E2EE v2 avant la fin de la revue de sécurité externe." : {
+    "Le registre v2 est consultable, mais aucun message n’est présenté comme E2EE v2 avant la validation du chiffrement sur iOS, Android et le web." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The v2 registry can be viewed, but no message is presented as E2EE v2 until the external security review is complete."
+            "value" : "The v2 registry can be viewed, but no message is presented as E2EE v2 until encryption is validated on iOS, Android and the web."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le registre v2 est consultable, mais aucun message n’est présenté comme E2EE v2 avant la fin de la revue de sécurité externe."
+            "value" : "Le registre v2 est consultable, mais aucun message n’est présenté comme E2EE v2 avant la validation du chiffrement sur iOS, Android et le web."
           }
         }
       }

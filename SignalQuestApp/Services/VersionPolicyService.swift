@@ -64,7 +64,9 @@ enum ClientProtocolContract {
 
 enum E2EEV2ActivationDecision: Equatable, Sendable {
     enum Reason: Equatable, Sendable {
-        case securityReviewRequired
+        /// Critères de sortie du jalon A non remplis (spec §17) : vecteurs,
+        /// tests croisés, tests d'attaque et relectures indépendantes.
+        case milestoneACriteriaRequired
         case protocolVersionRequired
         case capabilityMissing
     }
@@ -94,13 +96,13 @@ enum E2EEV2ActivationPolicy {
 
     static func evaluate(
         policy: ClientProtocolPolicy,
-        securityReviewApproved: Bool,
+        milestoneACriteriaMet: Bool,
         requiredCapabilities: Set<String> = requiredWriteCapabilities,
         clientProtocolVersion: Int = ClientProtocolContract.currentProtocolVersion,
         clientCapabilities: Set<String> = ClientProtocolContract.capabilities
     ) -> E2EEV2ActivationDecision {
-        guard securityReviewApproved else {
-            return .disabled(reason: .securityReviewRequired, missingCapabilities: [])
+        guard milestoneACriteriaMet else {
+            return .disabled(reason: .milestoneACriteriaRequired, missingCapabilities: [])
         }
         guard clientProtocolVersion >= protocolVersion,
               policy.serverProtocolVersion >= protocolVersion else {

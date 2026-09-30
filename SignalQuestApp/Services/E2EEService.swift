@@ -831,7 +831,8 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         let record = try requiredRecord(ownerNamespace: LocalAccountScope.storageNamespace)
         let privateData = try decoded(record.signingPrivateRawB64)
         let privateKey = try P256.Signing.PrivateKey(rawRepresentation: privateData)
-        return try privateKey.signature(for: canonicalRequest).derRepresentation
+        // Forme low-S obligatoire (spec §4.1 et §15) : CryptoKit peut produire du high-S.
+        return try E2EEV2LowS.sign(canonicalRequest, with: privateKey)
     }
 
     func reset() throws {
@@ -911,7 +912,8 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         let privateKey = try P256.Signing.PrivateKey(
             rawRepresentation: decoded(record.signingPrivateRawB64)
         )
-        return try privateKey.signature(for: canonicalRequest).derRepresentation
+        // Forme low-S obligatoire (spec §4.1 et §15) : CryptoKit peut produire du high-S.
+        return try E2EEV2LowS.sign(canonicalRequest, with: privateKey)
     }
 
     /// Restart-safe local commit after a strictly validated server response.
@@ -964,7 +966,8 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         let privateKey = try P256.Signing.PrivateKey(
             rawRepresentation: decoded(record.signingPrivateRawB64)
         )
-        return try privateKey.signature(for: canonicalRequest).derRepresentation
+        // Forme low-S obligatoire (spec §4.1 et §15) : CryptoKit peut produire du high-S.
+        return try E2EEV2LowS.sign(canonicalRequest, with: privateKey)
     }
 
     /// Explicit preview mirror only: original keys retain whenUnlocked protection.
@@ -1059,12 +1062,13 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         let signingPrivate = try P256.Signing.PrivateKey(
             rawRepresentation: decoded(record.signingPrivateRawB64)
         )
-        let signature = try signingPrivate.signature(
-            for: E2EEV2EpochCrypto.signatureCanonical(
+        let signature = try E2EEV2LowS.sign(
+            E2EEV2EpochCrypto.signatureCanonical(
                 context: context,
                 keyCommitmentB64: E2EEV2EpochCrypto.keyCommitment(epochKey),
                 envelope: envelope
-            )
+            ),
+            with: signingPrivate
         )
         return E2EEV2SignedEpochEnvelope(
             recipientDeviceId: envelope.recipientDeviceId,
@@ -1073,7 +1077,7 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
             wrappedEpochKeyB64: envelope.wrappedEpochKeyB64,
             nonceB64: envelope.nonceB64,
             aadB64: envelope.aadB64,
-            signatureB64: signature.derRepresentation.base64EncodedString()
+            signatureB64: signature.base64EncodedString()
         )
     }
 
@@ -1107,12 +1111,13 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         let signingPrivate = try P256.Signing.PrivateKey(
             rawRepresentation: decoded(record.signingPrivateRawB64)
         )
-        let signature = try signingPrivate.signature(
-            for: E2EEV2RecoveryEpochCrypto.signatureCanonical(
+        let signature = try E2EEV2LowS.sign(
+            E2EEV2RecoveryEpochCrypto.signatureCanonical(
                 context: context,
                 keyCommitmentB64: keyCommitmentB64,
                 envelope: unsigned
-            )
+            ),
+            with: signingPrivate
         )
         return E2EEV2RecoveryEpochEnvelope(
             recipientUserId: unsigned.recipientUserId,
@@ -1122,7 +1127,7 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
             wrappedEpochKeyB64: unsigned.wrappedEpochKeyB64,
             nonceB64: unsigned.nonceB64,
             aadB64: unsigned.aadB64,
-            signatureB64: signature.derRepresentation.base64EncodedString()
+            signatureB64: signature.base64EncodedString()
         )
     }
 
@@ -1883,8 +1888,9 @@ final class E2EEV2APITransport: @unchecked Sendable {
     }
 }
 
-/// L'écriture publique reste fermée tant que la revue externe traçable et les
-/// capacités serveur correspondantes ne sont pas toutes validées.
+/// L'écriture publique reste fermée tant que les critères de sortie du jalon A
+/// (spec §17 : vecteurs, tests croisés, tests d'attaque, relectures
+/// indépendantes) et les capacités serveur correspondantes ne sont pas réunis.
 enum E2EEV2RuntimeWriteGate {
     static let enabled = false
 }
@@ -3464,8 +3470,7 @@ enum E2EEV2RecoveryV2Crypto {
         privateSigningKey: P256.Signing.PrivateKey,
         challenge: E2EEV2RecoveryChallengeV2
     ) throws -> String {
-        try privateSigningKey.signature(for: proofCanonical(challenge))
-            .derRepresentation.base64EncodedString()
+        try E2EEV2LowS.sign(proofCanonical(challenge), with: privateSigningKey).base64EncodedString()
     }
 
     static func bundleHash(_ bundle: E2EEV2RecoveryBundleV2) -> String {
@@ -4856,13 +4861,12 @@ enum E2EEV2RecoveryEpochParser {
             )
             guard suppliedAAD == expectedAAD else { return nil }
             let signingPublic = try P256.Signing.PublicKey(x963Representation: signingPublicData)
-            let signature = try P256.Signing.ECDSASignature(derRepresentation: signatureData)
             let canonical = try E2EEV2RecoveryEpochCrypto.signatureCanonical(
                 context: context,
                 keyCommitmentB64: metadata.keyCommitmentB64,
                 envelope: response.envelope
             )
-            return signingPublic.isValidSignature(signature, for: canonical) ? delivery : nil
+            return E2EEV2LowS.verify(derSignature: signatureData, message: canonical, publicKey: signingPublic) ? delivery : nil
         } catch {
             return nil
         }
@@ -7397,7 +7401,7 @@ enum E2EEV2MessagePreparationResult: Equatable {
 }
 
 /// Assemble une enveloppe opaque sans effectuer d'appel réseau ni écrire dans
-/// l'outbox. Le runtime reste fermé jusqu'à la revue externe traçable.
+/// l'outbox. Le runtime reste fermé jusqu'aux critères de sortie du jalon A (spec §17).
 enum E2EEV2MessageComposer {
     static func prepareRuntime(
         input: E2EEV2MessagePreparationInput,
@@ -7498,8 +7502,7 @@ enum E2EEV2MessageComposer {
         defer { signature.resetBytes(in: 0..<signature.count) }
         guard let publicKeyData = Data(base64Encoded: device.publicSigningKeyB64),
               let publicKey = try? P256.Signing.PublicKey(x963Representation: publicKeyData),
-              let parsedSignature = try? P256.Signing.ECDSASignature(derRepresentation: signature),
-              publicKey.isValidSignature(parsedSignature, for: canonicalSignature) else {
+              E2EEV2LowS.verify(derSignature: signature, message: canonicalSignature, publicKey: publicKey) else {
             throw E2EEV2MessageCryptoError.invalidEnvelope
         }
         return E2EEV2SignedMessageEnvelope(
@@ -10540,7 +10543,8 @@ enum E2EEV2PortableExportCoordinator {
 }
 
 /// Client dormant : le verrou est vérifié avant identité, fichier ou réseau.
-/// L'écran d'export ne sera raccordé qu'après revue externe et interopérabilité.
+/// L'écran d'export ne sera raccordé qu'après les critères de sortie du jalon A
+/// (spec §17) et l'interopérabilité.
 final class E2EEV2PortableExportClient: @unchecked Sendable {
     private let identityStore: E2EEV2DeviceIdentityStore
     private let transport: E2EEV2APITransport

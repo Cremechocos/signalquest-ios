@@ -216,8 +216,8 @@ final class VersionPolicyTests: XCTestCase {
             writeStatus: .current
         )
         XCTAssertEqual(
-            E2EEV2ActivationPolicy.evaluate(policy: policy, securityReviewApproved: false),
-            .disabled(reason: .securityReviewRequired, missingCapabilities: [])
+            E2EEV2ActivationPolicy.evaluate(policy: policy, milestoneACriteriaMet: false),
+            .disabled(reason: .milestoneACriteriaRequired, missingCapabilities: [])
         )
         XCTAssertFalse(
             ClientProtocolContract.capabilities.contains(E2EEV2ActivationPolicy.contractPreviewCapability)
@@ -235,7 +235,7 @@ final class VersionPolicyTests: XCTestCase {
         )
         guard case let .disabled(reason, missing) = E2EEV2ActivationPolicy.evaluate(
             policy: incompletePolicy,
-            securityReviewApproved: true,
+            milestoneACriteriaMet: true,
             requiredCapabilities: required,
             clientProtocolVersion: 2,
             clientCapabilities: required
@@ -255,7 +255,7 @@ final class VersionPolicyTests: XCTestCase {
         XCTAssertEqual(
             E2EEV2ActivationPolicy.evaluate(
                 policy: completePolicy,
-                securityReviewApproved: true,
+                milestoneACriteriaMet: true,
                 requiredCapabilities: required,
                 clientProtocolVersion: 2,
                 clientCapabilities: required

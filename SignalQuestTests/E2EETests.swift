@@ -1054,9 +1054,13 @@ final class E2EETests: XCTestCase {
         let publicData = try XCTUnwrap(Data(base64Encoded: fixture.publicSigningKeyB64))
         let signatureData = try XCTUnwrap(Data(base64Encoded: fixture.signatureDerB64))
         let publicKey = try P256.Signing.PublicKey(x963Representation: publicData)
-        let signature = try P256.Signing.ECDSASignature(derRepresentation: signatureData)
+        let canonical = Data(fixture.canonicalRequestUtf8.utf8)
 
-        XCTAssertTrue(publicKey.isValidSignature(signature, for: Data(fixture.canonicalRequestUtf8.utf8)))
+        // Vecteur réémis en forme low-S (spec §15) : accepté ; sa variante high-S,
+        // que CryptoKit accepterait, est refusée.
+        XCTAssertTrue(E2EEV2LowS.verify(derSignature: signatureData, message: canonical, publicKey: publicKey))
+        let highS = try E2EEV2LowS.highSVariant(der: signatureData)
+        XCTAssertFalse(E2EEV2LowS.verify(derSignature: highS, message: canonical, publicKey: publicKey))
     }
 
     func testV2RecoveryHKDFAndAESGCMMatchCrossPlatformFixture() throws {
@@ -2619,7 +2623,7 @@ final class E2EETests: XCTestCase {
         XCTAssertTrue(source.contains("acknowledgesRecoveryReplacement"))
         XCTAssertTrue(source.contains("Date().addingTimeInterval(60)"))
         XCTAssertTrue(source.contains("resetCode.count != 6"))
-        XCTAssertTrue(source.contains("revue de sécurité externe"))
+        XCTAssertTrue(source.contains("validation du chiffrement sur iOS, Android et le web"))
         XCTAssertFalse(source.contains("/api/e2ee/trusted-devices"))
         XCTAssertFalse(source.contains("Tout révoquer"))
     }
@@ -2880,7 +2884,7 @@ final class E2EEV2MessageComposerTests: XCTestCase {
             device: device,
             epoch: epoch,
             nonce: nonce,
-            signer: { try signingKey.signature(for: $0).derRepresentation }
+            signer: { try E2EEV2LowS.sign($0, with: signingKey) }
         )
         let envelope = unsigned(signed)
         let context = E2EEV2MessageContext(
@@ -2962,7 +2966,7 @@ final class E2EEV2MessageComposerTests: XCTestCase {
             nonce: Data(repeating: 0, count: 12),
             signer: {
                 signatures += 1
-                return try signingKey.signature(for: $0).derRepresentation
+                return try E2EEV2LowS.sign($0, with: signingKey)
             }
         ))
         XCTAssertEqual(signatures, 0)
@@ -2976,7 +2980,7 @@ final class E2EEV2MessageComposerTests: XCTestCase {
             device: device(expectedKey),
             epoch: storedEpoch(Data(repeating: 5, count: 32)),
             nonce: Data(repeating: 0, count: 12),
-            signer: { try wrongKey.signature(for: $0).derRepresentation }
+            signer: { try E2EEV2LowS.sign($0, with: wrongKey) }
         )) { error in
             XCTAssertEqual(error as? E2EEV2MessageCryptoError, .invalidEnvelope)
         }
@@ -3086,7 +3090,7 @@ final class E2EEV2MessageReceiverTests: XCTestCase {
             device: device,
             epoch: epoch,
             nonce: Data((10...21).map(UInt8.init)),
-            signer: { try signingKey.signature(for: $0).derRepresentation }
+            signer: { try E2EEV2LowS.sign($0, with: signingKey) }
         )
         let envelopeData = try JSONEncoder().encode(signed)
         let originalEnvelopeData = envelopeData
@@ -3145,7 +3149,7 @@ final class E2EEV2MessageReceiverTests: XCTestCase {
             device: device,
             epoch: epoch,
             nonce: Data(repeating: 0, count: 12),
-            signer: { try signingKey.signature(for: $0).derRepresentation }
+            signer: { try E2EEV2LowS.sign($0, with: signingKey) }
         )
 
         XCTAssertThrowsError(try E2EEV2MessageReceiver.decryptContractPreview(
@@ -3187,7 +3191,7 @@ final class E2EEV2MessageReceiverTests: XCTestCase {
             envelope: unsigned
         )
         defer { canonical.resetBytes(in: 0..<canonical.count) }
-        var signature = try signingKey.signature(for: canonical).derRepresentation
+        var signature = try E2EEV2LowS.sign(canonical, with: signingKey)
         defer { signature.resetBytes(in: 0..<signature.count) }
         let signed = E2EEV2SignedMessageEnvelope(
             envelope: unsigned,
@@ -3215,7 +3219,7 @@ final class E2EEV2MessageReceiverTests: XCTestCase {
             device: device,
             epoch: epoch,
             nonce: Data(repeating: 0, count: 12),
-            signer: { try signingKey.signature(for: $0).derRepresentation }
+            signer: { try E2EEV2LowS.sign($0, with: signingKey) }
         )
         var root = try XCTUnwrap(
             JSONSerialization.jsonObject(with: JSONEncoder().encode(signed)) as? [String: Any]
@@ -4115,11 +4119,11 @@ final class E2EEV2PortableExportTests: XCTestCase {
             context: epochContext
         )
         let commitment = try E2EEV2EpochCrypto.keyCommitment(epochKey)
-        let epochSignature = try epochSigningKey.signature(for: E2EEV2EpochCrypto.signatureCanonical(
+        let epochSignature = try E2EEV2LowS.sign(E2EEV2EpochCrypto.signatureCanonical(
             context: epochContext,
             keyCommitmentB64: commitment,
             envelope: wrapped
-        )).derRepresentation.base64EncodedString()
+        ), with: epochSigningKey).base64EncodedString()
 
         let messageSigningKey = P256.Signing.PrivateKey()
         let content = textContent("Export portable vérifié")
@@ -4138,9 +4142,10 @@ final class E2EEV2PortableExportTests: XCTestCase {
             nonce: Data(repeating: 9, count: 12),
             context: messageContext
         )
-        let messageSignature = try messageSigningKey.signature(
-            for: E2EEV2MessageCrypto.signatureCanonical(context: messageContext, envelope: unsigned)
-        ).derRepresentation.base64EncodedString()
+        let messageSignature = try E2EEV2LowS.sign(
+            E2EEV2MessageCrypto.signatureCanonical(context: messageContext, envelope: unsigned),
+            with: messageSigningKey
+        ).base64EncodedString()
         let response: [String: Any] = [
             "envelope": [
                 "id": envelopeId,

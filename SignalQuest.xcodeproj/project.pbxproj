@@ -631,6 +631,7 @@
 		F2820BE04436D4C594CC0C28 /* MapFilterSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7FBE82FA919B1973379ED38 /* MapFilterSelection.swift */; };
 		F2C6455F39565642CFC5EA48 /* NearbyNetworkQualityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02B8E44000E7F6CDC6104D82 /* NearbyNetworkQualityService.swift */; };
 		F300004EE2D7F728BA2547BF /* TwoFactorLoginFieldQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97931562EA09A31FFFA313C5 /* TwoFactorLoginFieldQATests.swift */; };
+		F311908034CFAD542F7AFB0C /* E2EEV2Canonical.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD60066B1E713E61E7749EF1 /* E2EEV2Canonical.swift */; };
 		F38CCC8B26C990891C8186C7 /* NetworkPulseHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = C82A89658CFF511C4133BD31 /* NetworkPulseHero.swift */; };
 		F4149C49F813EAD60AA866FB /* OnboardingEntryStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 440E878D61BA0300BB278A3A /* OnboardingEntryStateTests.swift */; };
 		F46CF63B7602E5C1CF0B7320 /* MapLegacySelectionFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61474C1113C1F3A1A7D73011 /* MapLegacySelectionFixture.swift */; };
@@ -3586,6 +3587,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F311908034CFAD542F7AFB0C /* E2EEV2Canonical.swift in Sources */,
 				8A1CFEFFEBB5A68BCAB3E8D4 /* E2EEV2NotificationContextStore.swift in Sources */,
 				E041B970C5ECFC01BF35E64F /* E2EEV2NotificationContracts.swift in Sources */,
 				F754C1E3217B9C664A9C343B /* E2EEV2NotificationProcessor.swift in Sources */,

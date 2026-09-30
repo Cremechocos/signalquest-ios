@@ -270,7 +270,7 @@ struct E2EEV2TrustedDevicesView: View {
                     .disabled(model.isActing)
                 } else if !model.activationEnabled {
                     Label {
-                        Text("Le registre v2 est consultable, mais aucun message n’est présenté comme E2EE v2 avant la fin de la revue de sécurité externe.")
+                        Text("Le registre v2 est consultable, mais aucun message n’est présenté comme E2EE v2 avant la validation du chiffrement sur iOS, Android et le web.")
                             .font(SQType.body)
                     } icon: {
                         Image(systemName: "lock.trianglebadge.exclamationmark")

@@ -524,9 +524,10 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
             ephemeralPrivateKey: P256.KeyAgreement.PrivateKey(rawRepresentation: Data(repeating: 5, count: 32)),
             nonce: Data(repeating: 6, count: 12), context: epochContext
         )
-        let epochSignature = try senderSigning.signature(for: E2EEV2EpochCrypto.signatureCanonical(
+        // Forme low-S, comme en production (spec §15) : le récepteur refuse le high-S.
+        let epochSignature = try E2EEV2LowS.sign(E2EEV2EpochCrypto.signatureCanonical(
             context: epochContext, keyCommitmentB64: commitment, envelope: wrapped
-        )).derRepresentation.base64EncodedString()
+        ), with: senderSigning).base64EncodedString()
         let content = try E2EEV2ContentContract.encode([
             "schema": E2EEV2ContentContract.schema, "version": 1, "kind": "TEXT",
             "replyToId": NSNull(), "mentions": [], "body": ["text": "Contenu privé de test"],
@@ -535,9 +536,9 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
             senderDeviceId: senderDeviceId, clientRequestId: "request_notification_fixture", ttlSeconds: 60, encryptedBlobIds: [])
         let encrypted = try E2EEV2MessageCrypto.encrypt(cleartext: content, epochKey: epochKey,
             nonce: Data(repeating: 8, count: 12), context: messageContext)
-        let signature = try senderSigning.signature(for: E2EEV2MessageCrypto.signatureCanonical(
+        let signature = try E2EEV2LowS.sign(E2EEV2MessageCrypto.signatureCanonical(
             context: messageContext, envelope: encrypted
-        )).derRepresentation.base64EncodedString()
+        ), with: senderSigning).base64EncodedString()
         let created = createdAt ?? now
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

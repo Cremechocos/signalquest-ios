@@ -520,13 +520,13 @@ enum E2EEV2EpochDeliveryContract {
             )
             guard suppliedAAD == expectedAAD else { return nil }
             let signingPublic = try P256.Signing.PublicKey(x963Representation: signingPublicData)
-            let signature = try P256.Signing.ECDSASignature(derRepresentation: signatureData)
             let canonical = try E2EEV2EpochCrypto.signatureCanonical(
                 context: delivery.epochContext,
                 keyCommitmentB64: delivery.keyCommitmentB64,
                 envelope: delivery.envelope.cryptoEnvelope
             )
-            return signingPublic.isValidSignature(signature, for: canonical) ? delivery : nil
+            // Forme low-S exigée (spec §15) : CryptoKit accepterait le high-S.
+            return E2EEV2LowS.verify(derSignature: signatureData, message: canonical, publicKey: signingPublic) ? delivery : nil
         } catch {
             return nil
         }
@@ -1307,7 +1307,8 @@ enum E2EEV2MessageDecryptionResult {
 }
 
 /// Récepteur local strict. Aucun réseau ni cache n'est muté ici et le runtime
-/// reste fermé jusqu'à la revue externe et la matrice d'interopérabilité.
+/// reste fermé jusqu'aux critères de sortie du jalon A (spec §17) et à la
+/// matrice d'interopérabilité.
 enum E2EEV2MessageReceiver {
     private static let maxEnvelopeBytes = 512 * 1_024
     private static let maxCiphertextBytes = E2EEV2ContentContract.maxBytes + 16
@@ -1387,8 +1388,7 @@ enum E2EEV2MessageReceiver {
         publicSigningKeyData = decodedPublicKey
         signatureData = decodedSignature
         guard let publicKey = try? P256.Signing.PublicKey(x963Representation: publicSigningKeyData),
-              let signature = try? P256.Signing.ECDSASignature(derRepresentation: signatureData),
-              publicKey.isValidSignature(signature, for: canonicalSignature) else {
+              E2EEV2LowS.verify(derSignature: signatureData, message: canonicalSignature, publicKey: publicKey) else {
             throw E2EEV2MessageCryptoError.invalidEnvelope
         }
         cleartext = try E2EEV2MessageCrypto.decrypt(
