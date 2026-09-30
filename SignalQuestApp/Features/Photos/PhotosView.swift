@@ -1035,6 +1035,10 @@ struct PhotoUploadView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var image: UIImage?
     @State private var imageData: Data?
+    /// Zones à flouter (plan 3, vague 1), appliquées à l'envoi sur l'original
+    /// réduit : ses métadonnées (position, date) restent celles de l'original.
+    @State private var blurRegions: [CGRect] = []
+    @State private var showBlurEditor = false
     @State private var isUploading = false
     @State private var uploadError: String?
     @State private var selectedSite: AntennaSite?
@@ -1057,6 +1061,10 @@ struct PhotoUploadView: View {
                                 .frame(height: 260)
                                 .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
                                 .sqShadowCard()
+                                .overlay(alignment: .topLeading) {
+                                    PhotoBlurButton { showBlurEditor = true }
+                                        .accessibilityIdentifier("photoUpload.blur")
+                                }
                         } else {
                             RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
                                 .fill(SQColor.surfaceMuted)
@@ -1097,6 +1105,17 @@ struct PhotoUploadView: View {
                                   let loaded = ImagePipeline.downsample(data: data, maxPixel: 1600) else { return }
                             imageData = data
                             image = loaded
+                            blurRegions = []
+                        }
+                    }
+                    .sheet(isPresented: $showBlurEditor) {
+                        if let image {
+                            PhotoBlurEditor(image: image) { blurred, regions in
+                                // L'aperçu flouté sert de base à une nouvelle retouche :
+                                // mêmes proportions, les zones s'additionnent.
+                                self.image = blurred
+                                blurRegions.append(contentsOf: regions)
+                            }
                         }
                     }
 
@@ -1168,12 +1187,13 @@ struct PhotoUploadView: View {
 
                     GradientButton("Uploader", systemImage: "arrow.up.circle", isBusy: isUploading) {
                         guard let original = imageData, let site = selectedSite else { return }
+                        let regions = blurRegions
                         Task {
                             isUploading = true
                             uploadError = nil
                             // Extraction EXIF + downscale hors du main thread (PHOTO-PERF-01/SEC-01).
                             let prepared = await Task.detached(priority: .userInitiated) {
-                                PhotoUploadPreparation.prepare(from: original)
+                                PhotoUploadPreparation.prepare(from: original, blurRegions: regions)
                             }.value
                             guard let prepared else {
                                 isUploading = false

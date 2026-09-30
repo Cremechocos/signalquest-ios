@@ -185,4 +185,7 @@ enum AppEnvironment {
     /// Écran de fin d'appel (« Pas de réponse ») pour la relecture au
     /// simulateur, où aucun vrai appel n'aboutit.
     static var showsCallEndQA: Bool { hasArgument("--qa-call-ended") }
+    /// Éditeur « Flouter » sur une image générée : le sélecteur de photos du
+    /// système ne se pilote pas de façon fiable en test d'interface.
+    static var showsBlurEditorQA: Bool { hasArgument("--qa-blur-editor") }
 }

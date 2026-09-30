@@ -22,10 +22,39 @@ final class AntennaDetailViewModel: ObservableObject {
         }
     }
 
+    /// Photo choisie, avant envoi : l'original, un aperçu réduit et les
+    /// visages qu'on y repère (plan 3, vague 1).
+    struct PendingPhoto {
+        let raw: Data
+        let preview: UIImage
+        let faces: [CGRect]
+    }
+
+    /// Charge la photo choisie et y cherche des visages, sur l'appareil.
+    func loadPhotoForUpload(item: PhotosPickerItem) async -> PendingPhoto? {
+        isUploadingPhoto = true
+        photoUploadMessage = nil
+        defer { isUploadingPhoto = false }
+        do {
+            guard let raw = try await item.loadTransferable(type: Data.self),
+                  let preview = ImagePipeline.downsample(data: raw, maxPixel: 1600) else {
+                photoUploadMessage = "Image illisible."
+                return nil
+            }
+            return PendingPhoto(raw: raw, preview: preview, faces: await PhotoBlur.detectFaces(in: preview))
+        } catch {
+            Haptics.error()
+            photoUploadMessage = error.userFacingMessage
+            return nil
+        }
+    }
+
     /// Envoie une photo sur le site via `PhotoService`, puis recharge la fiche
-    /// (la photo peut être en attente de modération côté serveur).
+    /// (la photo peut être en attente de modération côté serveur). Les zones
+    /// floutées sont cuites avant l'encodage ; l'EXIF vient de l'original.
     func uploadPhoto(
-        item: PhotosPickerItem,
+        raw: Data,
+        blurRegions: [CGRect],
         photos: PhotoServicing,
         siteId: String,
         anfrCode: String?,
@@ -36,13 +65,9 @@ final class AntennaDetailViewModel: ObservableObject {
         photoUploadMessage = nil
         defer { isUploadingPhoto = false }
         do {
-            guard let raw = try await item.loadTransferable(type: Data.self) else {
-                photoUploadMessage = "Image illisible."
-                return
-            }
             // Extraction EXIF + recompression hors du main thread (UI non gelée).
             guard let prepared = await Task.detached(priority: .userInitiated, operation: {
-                PhotoUploadPreparation.prepare(from: raw)
+                PhotoUploadPreparation.prepare(from: raw, blurRegions: blurRegions)
             }).value else {
                 photoUploadMessage = "Image illisible."
                 return
@@ -89,6 +114,14 @@ struct AntennaDetailSheet: View {
     /// L'image est conservée quelques instants le temps de choisir sa facette
     /// sur un support mutualisé. Aucun upload ne part avant ce choix.
     @State private var pendingPhotoUploadItem: PhotosPickerItem?
+    /// Photo où des visages ont été repérés, en attente de l'éditeur « Flouter ».
+    @State private var photoToBlur: BlurRequest?
+
+    private struct BlurRequest: Identifiable {
+        let id = UUID()
+        let photo: AntennaDetailViewModel.PendingPhoto
+        let operatorName: String
+    }
     @State private var showPhotoOperatorPicker = false
     @State private var showReportSheet = false
     /// Type présélectionné à l'ouverture du signalement (lien « opérateur porteur »).
@@ -304,6 +337,16 @@ struct AntennaDetailSheet: View {
         } message: {
             Text("Le support est partagé. Choisis le réseau réellement visible sur la photo.")
         }
+        // Visages repérés : flouter avant l'envoi, ou envoyer sans flou.
+        .sheet(item: $photoToBlur) { request in
+            PhotoBlurEditor(
+                image: request.photo.preview,
+                confirmTitle: "Flouter et envoyer",
+                emptyConfirmTitle: "Envoyer sans flou"
+            ) { _, regions in
+                Task { await sendPhoto(request.photo.raw, blurRegions: regions, operatorName: request.operatorName) }
+            }
+        }
     }
 
     /// « Ajouter une photo » : disponible quelle que soit la présence de photos
@@ -348,18 +391,30 @@ struct AntennaDetailSheet: View {
         MarketRegistryEntry.operatorLabel(key, in: marketEntry)
     }
 
+    /// Des visages sur la photo : l'éditeur « Flouter » s'ouvre avant l'envoi,
+    /// qu'on peut aussi faire sans flou. Sans visage, l'envoi part directement.
     private func submitPhotoUpload(_ item: PhotosPickerItem, operatorName: String) {
         Task {
-            await model.uploadPhoto(
-                item: item,
-                photos: services.photos,
-                siteId: site.siteId ?? site.id,
-                anfrCode: site.anfrCode,
-                operatorName: operatorName,
-                market: market
-            )
-            photoPickerItem = nil
+            defer { photoPickerItem = nil }
+            guard let pending = await model.loadPhotoForUpload(item: item) else { return }
+            if pending.faces.isEmpty {
+                await sendPhoto(pending.raw, blurRegions: [], operatorName: operatorName)
+            } else {
+                photoToBlur = BlurRequest(photo: pending, operatorName: operatorName)
+            }
         }
+    }
+
+    private func sendPhoto(_ raw: Data, blurRegions: [CGRect], operatorName: String) async {
+        await model.uploadPhoto(
+            raw: raw,
+            blurRegions: blurRegions,
+            photos: services.photos,
+            siteId: site.siteId ?? site.id,
+            anfrCode: site.anfrCode,
+            operatorName: operatorName,
+            market: market
+        )
     }
 
     /// Deux gestes qu'on veut faire une fois sur place — ou avant d'y aller :

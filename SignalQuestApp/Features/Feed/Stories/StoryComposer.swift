@@ -101,6 +101,14 @@ final class StoryComposerViewModel: ObservableObject {
         }
     }
 
+    /// Photo floutée avant publication (plan 3, vague 1) : elle remplace
+    /// l'originale, et c'est elle qui part.
+    func applyBlurredImage(_ image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.92) else { return }
+        previewImage = image
+        pickedImageData = data
+    }
+
     /// Persiste la liste d'amis proches (PUT). Appelé à la fermeture de l'éditeur.
     func saveCloseFriends() async {
         do { _ = try await service.setCloseFriends(userIds: Array(closeFriendIds)) }
@@ -158,6 +166,8 @@ struct StoryComposer: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @State private var showPremiumPaywall = false
+    /// Éditeur « Flouter » de la photo (plan 3, vague 1).
+    @State private var showBlurEditor = false
 
     private let onPublished: (SocialStory) -> Void
 
@@ -201,8 +211,21 @@ struct StoryComposer: View {
                         .sqShadowCard()
                     }
                     .buttonStyle(SQPressButtonStyle())
+                    // Posé sur le sélecteur, pas dans son étiquette : un bouton
+                    // imbriqué n'y recevrait pas le toucher.
+                    .overlay(alignment: .topLeading) {
+                        if previewImage != nil {
+                            PhotoBlurButton { showBlurEditor = true }
+                                .accessibilityIdentifier("story.blur")
+                        }
+                    }
                     .onChangeCompat(of: model.selectedItem) { _, _ in
                         Task { await model.loadPickerImage() }
+                    }
+                    .sheet(isPresented: $showBlurEditor) {
+                        if let image = model.previewImage {
+                            PhotoBlurEditor(image: image) { blurred, _ in model.applyBlurredImage(blurred) }
+                        }
                     }
 
                     // Champ capsule « Crème » : SurfaceMuted, sans bordure.

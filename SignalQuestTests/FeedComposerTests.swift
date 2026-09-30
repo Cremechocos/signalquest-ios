@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 @testable import SignalQuest
 
@@ -22,6 +23,24 @@ final class FeedComposerTests: XCTestCase {
         model.pollOptions[1].text = "SFR"
         XCTAssertTrue(model.canPublish)
         XCTAssertEqual(model.fallbackBody, "Meilleur réseau à Lyon ?")
+    }
+
+    /// Une photo retirée ne part plus avec la publication ; une photo floutée
+    /// remplace l'originale (plan 3, vague 1).
+    func testRemovedPhotoIsNotPublishedAndBlurredPhotoReplacesIt() throws {
+        let model = ComposerViewModel(service: ComposerFeedFixture())
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let photo = UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20), format: format).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 20, height: 20))
+        }
+        model.applyBlurredImage(photo)
+        XCTAssertEqual(model.imageDataForUpload, photo.jpegData(compressionQuality: 0.92))
+        XCTAssertTrue(model.previewImage === photo)
+        model.removeImage()
+        XCTAssertNil(model.imageDataForUpload, "La photo retirée partait encore avec la publication")
+        XCTAssertNil(model.previewImage)
     }
 
     /// Modifier un post ne remplace pas le brouillon en cours de rédaction.

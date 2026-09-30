@@ -17,9 +17,14 @@ enum PhotoUploadPreparation {
     }
 
     /// Extrait les métadonnées PUIS re-encode (à exécuter hors du thread principal).
-    static func prepare(from original: Data, maxSide: CGFloat = 1600, quality: CGFloat = 0.85) -> Prepared? {
+    /// Les zones floutées (normalisées, image droite) sont cuites dans les pixels
+    /// avant l'encodage ; les métadonnées, elles, viennent de l'original.
+    static func prepare(
+        from original: Data, maxSide: CGFloat = 1600, quality: CGFloat = 0.85, blurRegions: [CGRect] = []
+    ) -> Prepared? {
         let exif = extractMetadata(from: original)
-        guard let jpeg = downscaledJPEG(from: original, maxSide: maxSide, quality: quality) else { return nil }
+        guard let jpeg = downscaledJPEG(from: original, maxSide: maxSide, quality: quality, blurRegions: blurRegions)
+        else { return nil }
         let json = exif.flatMap { dict -> String? in
             guard let data = try? JSONSerialization.data(withJSONObject: dict),
                   let string = String(data: data, encoding: .utf8) else { return nil }
@@ -81,7 +86,9 @@ enum PhotoUploadPreparation {
 
     /// Downscale + re-encode JPEG via UIGraphicsImageRenderer (qui n'embarque AUCUNE
     /// métadonnée), bornant le plus grand côté à `maxSide`.
-    static func downscaledJPEG(from data: Data, maxSide: CGFloat, quality: CGFloat) -> Data? {
+    static func downscaledJPEG(
+        from data: Data, maxSide: CGFloat, quality: CGFloat, blurRegions: [CGRect] = []
+    ) -> Data? {
         guard let image = UIImage(data: data) else { return nil }
         let largest = max(image.size.width, image.size.height)
         let scale = largest > maxSide ? maxSide / largest : 1
@@ -93,7 +100,9 @@ enum PhotoUploadPreparation {
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(size: target, format: format)
         let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: target)) }
-        return resized.jpegData(compressionQuality: quality)
+        // Flou avant publication (plan 3, vague 1) : cuit avant l'encodage.
+        let output = blurRegions.isEmpty ? resized : PhotoBlur.render(resized, regions: blurRegions)
+        return output.jpegData(compressionQuality: quality)
     }
 
     private static func mimeType(of source: CGImageSource) -> String {

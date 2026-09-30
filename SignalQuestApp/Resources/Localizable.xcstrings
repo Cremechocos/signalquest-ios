@@ -6258,6 +6258,22 @@
         }
       }
     },
+    "Antenne suivie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Followed antenna"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenne suivie"
+          }
+        }
+      }
+    },
     "Antenne, %@" : {
       "localizations" : {
         "en" : {
@@ -6482,6 +6498,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aperçu de l’image Speedtest à partager"
+          }
+        }
+      }
+    },
+    "Aperçu de la carte du trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trip card preview"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aperçu de la carte du trajet"
           }
         }
       }
@@ -8074,6 +8106,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun test pour l’instant. Lance un speedtest dans SignalQuest."
+          }
+        }
+      }
+    },
+    "Aucun visage repéré. Glisse le doigt sur la photo pour flouter une zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No faces found. Drag your finger across the photo to blur an area."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun visage repéré. Glisse le doigt sur la photo pour flouter une zone."
           }
         }
       }
@@ -19853,6 +19901,22 @@
         }
       }
     },
+    "Envoyer sans flou" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send without blurring"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer sans flou"
+          }
+        }
+      }
+    },
     "Envoyer un message d’essai" : {
       "localizations" : {
         "en" : {
@@ -20585,6 +20649,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Finalisation"
+          }
+        }
+      }
+    },
+    "Flouter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blur"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flouter"
+          }
+        }
+      }
+    },
+    "Flouter et envoyer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blur and send"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flouter et envoyer"
           }
         }
       }
@@ -25984,6 +26080,22 @@
         }
       }
     },
+    "Le tracé est dessiné sans fond de carte. Retirer le départ et l’arrivée enlève 500 m à chaque bout." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The route is drawn without a map background. Hiding the start and the end removes 500 m at each end."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le tracé est dessiné sans fond de carte. Retirer le départ et l’arrivée enlève 500 m à chaque bout."
+          }
+        }
+      }
+    },
     "Le verrouillage n’a pas été activé. Réessaie avec la biométrie ou le code de l’appareil." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -27594,6 +27706,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’écart entre le signal utile et le bruit ambiant, en dB. Plus il est élevé, plus le téléphone peut monter en débit."
+          }
+        }
+      }
+    },
+    "Masquer le départ et l’arrivée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide the start and the end"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer le départ et l’arrivée"
           }
         }
       }
@@ -29640,6 +29768,38 @@
         }
       }
     },
+    "Montrer le tracé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show the route"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montrer le tracé"
+          }
+        }
+      }
+    },
+    "Montrer l’opérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show the operator"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Montrer l’opérateur"
+          }
+        }
+      }
+    },
     "Mot de passe" : {
       "localizations" : {
         "en" : {
@@ -31074,6 +31234,22 @@
         }
       }
     },
+    "Ouvre la fiche d’une antenne que tu suis, sur la carte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the sheet of an antenna you follow, on the map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre la fiche d’une antenne que tu suis, sur la carte."
+          }
+        }
+      }
+    },
     "Ouvre SignalQuest pour afficher le message." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -31087,6 +31263,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvre SignalQuest pour afficher le message."
+          }
+        }
+      }
+    },
+    "Ouvrir une antenne suivie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a followed antenna"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir une antenne suivie"
           }
         }
       }
@@ -32343,6 +32535,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Où est l'antenne ?"
+          }
+        }
+      }
+    },
+    "Partager le trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share the trip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager le trajet"
           }
         }
       }
@@ -36960,6 +37168,22 @@
         }
       }
     },
+    "Recherche des visages…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for faces…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recherche des visages…"
+          }
+        }
+      }
+    },
     "Rechercher sur la carte" : {
       "localizations" : {
         "en" : {
@@ -37004,6 +37228,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Renouvellement des clés différé. Réessaie à la reconnexion."
+          }
+        }
+      }
+    },
+    "Retirer la zone %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove area %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer la zone %lld"
           }
         }
       }
@@ -46833,6 +47073,38 @@
         }
       }
     },
+    "Tracé masqué" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route hidden"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tracé masqué"
+          }
+        }
+      }
+    },
+    "Tracé indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tracé indisponible"
+          }
+        }
+      }
+    },
     "Trait : direction d’un secteur" : {
       "localizations" : {
         "en" : {
@@ -46894,6 +47166,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trajet suivi"
+          }
+        }
+      }
+    },
+    "Trajet trop court pour montrer le tracé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trip too short to show the route"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trajet trop court pour montrer le tracé"
           }
         }
       }
@@ -49994,6 +50282,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Y aller"
+          }
+        }
+      }
+    },
+    "Zones à flouter : %lld. Glisse le doigt pour en ajouter, touche la croix pour en retirer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Areas to blur: %lld. Drag to add one, tap the cross to remove one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zones à flouter : %lld. Glisse le doigt pour en ajouter, touche la croix pour en retirer."
           }
         }
       }

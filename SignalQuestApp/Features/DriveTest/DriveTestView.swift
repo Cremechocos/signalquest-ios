@@ -96,6 +96,12 @@ final class DriveTestViewModel: ObservableObject {
         let bytes: Int
         let stoppedByDataCap: Bool
         let vpnActive: Bool
+        /// Pour la carte de partage (plan 3, vague 1). Optionnels : un résumé
+        /// enregistré avant eux se relit sans eux. Aucune position ici.
+        var startedAt: Date? = nil
+        var averageDownloadMbps: Double? = nil
+        var maxDownloadMbps: Double? = nil
+        var operatorLabel: String? = nil
 
         var summaryLine: String {
             [String(localized: "\(SQUnits.distance(meters: distanceMeters)) parcourus"),
@@ -126,6 +132,10 @@ final class DriveTestViewModel: ObservableObject {
     }
 
     @Published private(set) var lastSessionRecap: SessionRecap?
+    /// Tracé du dernier trajet, pour sa carte de partage : en mémoire
+    /// seulement, jamais écrit sur le disque avec le résumé.
+    @Published private(set) var lastSessionTrace: DriveShareTrace?
+    private var sessionStartedAt: Date?
 
     /// Opérateurs du marché courant : alimente la palette de couleurs des marqueurs.
     @Published private(set) var availableOperators: [MarketRegistryOperator] = []
@@ -297,7 +307,11 @@ final class DriveTestViewModel: ObservableObject {
         }
         userLocation = demoTrace[demoTrace.count / 2]
         lastSessionRecap = SessionRecap(endedAt: now.addingTimeInterval(-3_600), distanceMeters: 2_140, testCount: stops.count,
-                                        bytes: 612_000_000, stoppedByDataCap: false, vpnActive: false)
+                                        bytes: 612_000_000, stoppedByDataCap: false, vpnActive: false,
+                                        startedAt: now.addingTimeInterval(-3_600 - 1_380),
+                                        averageDownloadMbps: stops.map(\.down).reduce(0, +) / Double(stops.count),
+                                        maxDownloadMbps: stops.map(\.down).max(), operatorLabel: "Orange")
+        lastSessionTrace = makeShareTrace()
     }
     #endif
 
@@ -407,6 +421,8 @@ final class DriveTestViewModel: ObservableObject {
         sessionBytes = 0
         stoppedByDataCap = false
         lastSessionRecap = nil
+        lastSessionTrace = nil
+        sessionStartedAt = Date()
         distanceMeters = 0
         lastTestCoordinate = nil
         manualTestRequested = false
@@ -453,6 +469,7 @@ final class DriveTestViewModel: ObservableObject {
             if recap.isWorthKeeping {
                 recap.save()
                 lastSessionRecap = recap
+                lastSessionTrace = makeShareTrace()
             } else {
                 // Trajet vide (arrêt aussitôt, pause Wi-Fi) : il n'efface pas le
                 // dernier vrai trajet, qui reste affiché.
@@ -981,7 +998,23 @@ final class DriveTestViewModel: ObservableObject {
     private func makeSessionRecap() -> SessionRecap {
         SessionRecap(endedAt: Date(), distanceMeters: distanceMeters, testCount: accumulator.count,
                      bytes: sessionBytes, stoppedByDataCap: stoppedByDataCap,
-                     vpnActive: !stoppedByDataCap && VPNDetector.isActive())
+                     vpnActive: !stoppedByDataCap && VPNDetector.isActive(),
+                     startedAt: sessionStartedAt,
+                     averageDownloadMbps: accumulator.count > 0 ? summary?.avgDownload : nil,
+                     maxDownloadMbps: accumulator.count > 0 ? summary?.maxDownload : nil,
+                     operatorLabel: simOperatorLabel)
+    }
+
+    /// Tracé et mesures du trajet, pour la carte de partage.
+    private func makeShareTrace() -> DriveShareTrace {
+        DriveShareTrace(route: trace, measures: speedtestTrail.map { point in
+            DriveShareTrace.Measure(
+                coordinate: point.coordinate,
+                downloadMbps: point.result.downloadAverageMbps,
+                qualityRatio: point.result.downloadAverageMbps
+                    / max(SpeedtestGaugeScale.maxSpeed(for: point.result, upload: false), 1)
+            )
+        })
     }
 
     private func refreshSessionBytes() {
@@ -1201,6 +1234,8 @@ struct DriveTestView: View {
     @State private var selectedAntenna: AntennaSite?
     @State private var selectedSpeedtest: DriveSpeedtestPoint?
     @State private var showMapLegend = false
+    /// Carte de partage du dernier trajet (plan 3, vague 1).
+    @State private var showDriveShare = false
     /// Information « ce qu'un Drive Test partage », une seule fois avant le premier
     /// trajet. Présentée à l'ouverture de l'écran plutôt qu'au tap sur Démarrer :
     /// on informe AVANT que l'utilisateur ait décidé de partir, pas après.
@@ -1471,7 +1506,22 @@ struct DriveTestView: View {
                 // Une session vient de se terminer : dire ce qu'elle a produit avant
                 // de reproposer un démarrage. Sans ce récapitulatif, l'écran
                 // revenait au choix du mode et tout le trajet disparaissait de vue.
-                if let recap = model.lastSessionRecap { sessionRecapCard(recap) }
+                if let recap = model.lastSessionRecap {
+                    sessionRecapCard(recap)
+                    // Hors de la carte : elle est lue d'un bloc par VoiceOver.
+                    Button { showDriveShare = true } label: {
+                        Label("Partager le trajet", systemImage: "square.and.arrow.up")
+                            .font(SQFont.body(14, .semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("drivetest.lastTrip.share")
+                    .sheet(isPresented: $showDriveShare) {
+                        DriveShareSheet(recap: recap, trace: model.lastSessionTrace)
+                    }
+                }
                 // Panneau complet avant démarrage : mode + secteur (si opérateur identifié).
                 driveTestPurpose
                 if model.displayedOperatorLabel != nil { sectorBanner }

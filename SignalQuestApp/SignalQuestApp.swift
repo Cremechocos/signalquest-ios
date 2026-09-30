@@ -665,6 +665,9 @@ struct MainTabView: View {
     /// Action choisie dans la palette ⌘K : jouée à sa fermeture, pour qu'une
     /// feuille qu'elle ouvre (publication, conversation) ne rate pas sa présentation.
     @State private var pendingPaletteAction: SQKeyboardAction?
+    #if DEBUG
+    @State private var showsBlurEditorQA = false
+    #endif
 
     init(user: AuthUser?) {
         self.user = user
@@ -679,6 +682,7 @@ struct MainTabView: View {
             restoreLastTabIfNeeded()
             #if DEBUG
             if AppEnvironment.showsCallEndQA { services.callManager.presentQAEndNotice() }
+            if AppEnvironment.showsBlurEditorQA { showsBlurEditorQA = true }
             #endif
             guard let user else { return }
             await services.refreshInboxBadge()
@@ -690,6 +694,11 @@ struct MainTabView: View {
         .sheet(isPresented: $showGuestReceipts) {
             NavigationStack { GuestSpeedtestReceiptsView() }
         }
+        #if DEBUG
+        .sheet(isPresented: $showsBlurEditorQA) {
+            PhotoBlurEditor(image: PhotoBlur.qaSample()) { _, _ in }
+        }
+        #endif
         .sheet(isPresented: $router.showsCommandPalette, onDismiss: {
             guard let action = pendingPaletteAction else { return }
             pendingPaletteAction = nil

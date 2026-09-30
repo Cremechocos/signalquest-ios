@@ -274,8 +274,23 @@ final class ComposerViewModel: ObservableObject {
 
     /// Le service d'upload applique le contrat commun : orientation rendue dans
     /// les pixels, downscale et suppression EXIF avant tout envoi réseau.
-    private func preparedImageData() -> Data? {
-        pickedImageData
+    /// Rien sans aperçu : une photo retirée partait encore avec la publication.
+    var imageDataForUpload: Data? {
+        previewImage == nil ? nil : pickedImageData
+    }
+
+    func removeImage() {
+        previewImage = nil
+        selectedItem = nil
+        pickedImageData = nil
+    }
+
+    /// Photo floutée avant publication (plan 3, vague 1) : elle remplace
+    /// l'originale, et c'est elle qui part.
+    func applyBlurredImage(_ image: UIImage) {
+        guard let data = image.jpegData(compressionQuality: 0.92) else { return }
+        previewImage = image
+        pickedImageData = data
     }
 
     /// Prépare le composer pour une ÉDITION.
@@ -340,7 +355,7 @@ final class ComposerViewModel: ObservableObject {
         do {
             // Le service ré-encode, réduit et retire les EXIF hors du main thread,
             // puis conserve le brouillon dans son outbox jusqu'à l'accusé serveur.
-            let imageData = preparedImageData()
+            let imageData = imageDataForUpload
             let safeBody = body.isEmpty ? fallbackBody : body
             _ = try await service.publishPost(
                 text: safeBody,
@@ -367,6 +382,8 @@ struct ComposerSheet: View {
     @StateObject private var model: ComposerViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var selectedMode: ComposerMode = .edit
+    /// Éditeur « Flouter » de la photo jointe (plan 3, vague 1).
+    @State private var showBlurEditor = false
     @FocusState private var isInputFocused: Bool
 
     /// `editing` bascule le composer en édition et précharge le post.
@@ -481,8 +498,7 @@ struct ComposerSheet: View {
                                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                                     .overlay(alignment: .topTrailing) {
                                         Button {
-                                            model.previewImage = nil
-                                            model.selectedItem = nil
+                                            model.removeImage()
                                             Haptics.medium()
                                         } label: {
                                             Image(systemName: "xmark.circle.fill")
@@ -492,6 +508,10 @@ struct ComposerSheet: View {
                                         }
                                         .buttonStyle(SQPressButtonStyle())
                                         .accessibilityLabel("Retirer l’image")
+                                    }
+                                    .overlay(alignment: .topLeading) {
+                                        PhotoBlurButton { showBlurEditor = true }
+                                            .accessibilityIdentifier("composer.blur")
                                     }
                                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                             }
@@ -626,6 +646,11 @@ struct ComposerSheet: View {
                     .sqShadowSoft()
             }
             .accessibilityLabel("Ajouter une photo")
+            .sheet(isPresented: $showBlurEditor) {
+                if let image = model.previewImage {
+                    PhotoBlurEditor(image: image) { blurred, _ in model.applyBlurredImage(blurred) }
+                }
+            }
             .onChangeCompat(of: model.selectedItem) { _, _ in
                 Task { await model.loadPickerImage() }
             }

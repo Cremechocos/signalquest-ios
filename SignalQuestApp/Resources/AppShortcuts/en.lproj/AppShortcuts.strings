@@ -9,3 +9,5 @@
 "Démarre un drive test ${applicationName}" = "Begin a ${applicationName} drive test";
 "Quel est mon dernier débit ${applicationName}" = "What's my latest speed in ${applicationName}";
 "Mon dernier speedtest ${applicationName}" = "My latest ${applicationName} speedtest";
+"Ouvre une antenne suivie avec ${applicationName}" = "Open a followed antenna with ${applicationName}";
+"Mes antennes suivies ${applicationName}" = "My followed antennas in ${applicationName}";

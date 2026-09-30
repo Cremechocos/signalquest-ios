@@ -130,6 +130,15 @@ struct SignalQuestShortcuts: AppShortcutsProvider {
             shortTitle: "Dernier résultat",
             systemImageName: "gauge.with.dots.needle.67percent"
         )
+        AppShortcut(
+            intent: OpenFollowedAntennaIntent(),
+            phrases: [
+                "Ouvre une antenne suivie avec \(.applicationName)",
+                "Mes antennes suivies \(.applicationName)"
+            ],
+            shortTitle: "Antenne suivie",
+            systemImageName: "star.fill"
+        )
     }
 }
 
