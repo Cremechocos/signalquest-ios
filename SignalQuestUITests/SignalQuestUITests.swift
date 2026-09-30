@@ -381,7 +381,10 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(bubble.waitForExistence(timeout: 5))
     }
 
-    func testEncryptedConversationExplainsUnavailableCall() {
+    /// Décision du 30/09 (E2E-02) : l'appel est permis dans une conversation
+    /// chiffrée, mais jamais en silence — une confirmation dit qu'il n'est pas
+    /// encore chiffré de bout en bout.
+    func testEncryptedConversationAsksBeforeUnencryptedCall() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "fr")
         defer { app.terminate() }
@@ -394,18 +397,25 @@ final class SignalQuestUITests: XCTestCase {
         XCTAssertTrue(conversation.waitForExistence(timeout: 5))
         conversation.tap()
 
-        let callMenu = app.buttons["Appels chiffrés indisponibles pour cette conversation"]
+        let callMenu = app.buttons["Appeler"]
         XCTAssertTrue(callMenu.waitForExistence(timeout: 5))
         callMenu.tap()
-        let explanation = app.alerts["Appels chiffrés indisponibles pour cette conversation"]
-        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
-        XCTAssertTrue(explanation.staticTexts["Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé."].exists)
-        XCTAssertFalse(app.buttons["Appel audio"].exists)
-        XCTAssertFalse(app.buttons["Appel vidéo"].exists)
-        explanation.buttons["OK"].tap()
+        let audio = app.buttons["Appel audio"]
+        XCTAssertTrue(audio.waitForExistence(timeout: 5))
+        audio.tap()
+        let confirmation = app.alerts["Appel non chiffré de bout en bout"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        // Plus de 128 caractères : XCUIElementQuery refuse l'indice direct.
+        XCTAssertTrue(confirmation.staticTexts.matching(NSPredicate(
+            format: "label == %@",
+            "Les messages de cette conversation restent chiffrés de bout en bout. L’appel, lui, ne l’est pas encore : il est protégé pendant le transport et passe par nos serveurs."
+        )).firstMatch.exists)
+        XCTAssertTrue(confirmation.buttons["Appeler quand même"].exists)
+        confirmation.buttons["Annuler"].tap()
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 5))
     }
 
-    func testEnglishEncryptedCallExplainsGate() {
+    func testEnglishEncryptedCallAsksBeforeUnencryptedCall() {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"], locale: "en")
         defer { app.terminate() }
@@ -421,13 +431,21 @@ final class SignalQuestUITests: XCTestCase {
         ).firstMatch
         XCTAssertTrue(encrypted.waitForExistence(timeout: 5))
         encrypted.tap()
-        let gatedCall = app.buttons["Encrypted calls are unavailable in this conversation"]
-        XCTAssertTrue(gatedCall.waitForExistence(timeout: 5))
-        gatedCall.tap()
-        let explanation = app.alerts["Encrypted calls are unavailable in this conversation"]
-        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
-        XCTAssertTrue(explanation.staticTexts["Calls are not yet available in an encrypted conversation. No less-protected call will be started."].exists)
-        explanation.buttons["OK"].tap()
+        let callMenu = app.buttons["Call"]
+        XCTAssertTrue(callMenu.waitForExistence(timeout: 5))
+        callMenu.tap()
+        let audio = app.buttons["Audio call"]
+        XCTAssertTrue(audio.waitForExistence(timeout: 5))
+        audio.tap()
+        let confirmation = app.alerts["Call not end-to-end encrypted"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        XCTAssertTrue(confirmation.staticTexts.matching(NSPredicate(
+            format: "label == %@",
+            "Messages in this conversation stay end-to-end encrypted. The call isn’t yet: it is protected in transit and goes through our servers."
+        )).firstMatch.exists)
+        XCTAssertTrue(confirmation.buttons["Call anyway"].exists)
+        confirmation.buttons["Cancel"].tap()
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 5))
     }
 
     func testPlainConversationCallMenuKeepsAudioAndVideo() {

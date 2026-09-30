@@ -6729,6 +6729,22 @@
         }
       }
     },
+    "Appeler quand même" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Call anyway"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appeler quand même"
+          }
+        }
+      }
+    },
     "Appels" : {
       "localizations" : {
         "en" : {
@@ -6757,22 +6773,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appels : ne pas déranger"
-          }
-        }
-      }
-    },
-    "Appels chiffrés indisponibles pour cette conversation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encrypted calls are unavailable in this conversation"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Appels chiffrés indisponibles pour cette conversation"
           }
         }
       }
@@ -11415,22 +11415,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet appareil n’a pas encore d’identité locale E2EE v2."
-          }
-        }
-      }
-    },
-    "Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calls are not yet available in an encrypted conversation. No less-protected call will be started."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé."
           }
         }
       }
@@ -26021,22 +26005,6 @@
         }
       }
     },
-    "Les appels ne sont pas encore chiffrés de bout en bout : aucun appel n’a été lancé dans cette conversation chiffrée." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calls aren’t end-to-end encrypted yet: no call was started in this encrypted conversation."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les appels ne sont pas encore chiffrés de bout en bout : aucun appel n’a été lancé dans cette conversation chiffrée."
-          }
-        }
-      }
-    },
     "Les changements en attente restent sur cet appareil. Ils ne sont confirmés sur le compte qu’après synchronisation." : {
       "localizations" : {
         "en" : {
@@ -26228,6 +26196,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les longs trajets peuvent être allégés."
+          }
+        }
+      }
+    },
+    "Les messages de cette conversation restent chiffrés de bout en bout. L’appel, lui, ne l’est pas encore : il est protégé pendant le transport et passe par nos serveurs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages in this conversation stay end-to-end encrypted. The call isn’t yet: it is protected in transit and goes through our servers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les messages de cette conversation restent chiffrés de bout en bout. L’appel, lui, ne l’est pas encore : il est protégé pendant le transport et passe par nos serveurs."
           }
         }
       }

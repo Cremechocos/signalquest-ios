@@ -40,7 +40,9 @@ struct ConversationDetailView: View {
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @State private var isSending = false
     @State private var showUnlockSheet = false
-    @State private var showE2EECallUnavailable = false
+    /// Appel demandé dans une conversation chiffrée alors que la v2 n'est pas
+    /// prête : on attend la confirmation « Appeler quand même » (mode audio/vidéo).
+    @State private var pendingTransportOnlyCall: String?
     @State private var syncTask: Task<Void, Never>?
     /// Vrai entre l'apparition et la disparition de l'écran : ni la synchro ni la
     /// présence ne démarrent pour une conversation qui n'est plus affichée (SOC-03).
@@ -620,39 +622,38 @@ struct ConversationDetailView: View {
             // CALL-SCOPE-17 : kill-switch de repli — masque toute initiation
             // d'appel quand SQFeatures.callsEnabled est false.
             if SQFeatures.callsEnabled {
-                if e2eeCallReady {
-                    Menu {
-                        Button { startCall(mode: "audio") } label: {
-                            Label("Appel audio", systemImage: "phone.fill")
-                        }
-                        Button { startCall(mode: "video") } label: {
-                            Label("Appel vidéo", systemImage: "video.fill")
-                        }
-                    } label: {
-                        Image(systemName: "phone")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(networkPath.isOnline ? SQColor.label : SQColor.labelTertiary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                Menu {
+                    Button { startCall(mode: "audio") } label: {
+                        Label("Appel audio", systemImage: "phone.fill")
                     }
-                    // CALL-OFFLINE-21 : grisé + désactivé hors-ligne (un appel
-                    // lancé sans réseau échouerait et ferait flasher l'écran).
-                    .disabled(!networkPath.isOnline)
-                    .accessibilityLabel("Appeler")
-                } else {
-                    Button { showE2EECallUnavailable = true } label: {
-                        Image(systemName: "phone")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(SQColor.labelTertiary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                    Button { startCall(mode: "video") } label: {
+                        Label("Appel vidéo", systemImage: "video.fill")
                     }
-                    .accessibilityLabel("Appels chiffrés indisponibles pour cette conversation")
-                    .alert("Appels chiffrés indisponibles pour cette conversation", isPresented: $showE2EECallUnavailable) {
-                        Button("OK", role: .cancel) {}
-                    } message: {
-                        Text("Cet appel n’est pas encore disponible pour une conversation chiffrée. Aucun appel moins protégé ne sera lancé.")
+                } label: {
+                    Image(systemName: "phone")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(networkPath.isOnline ? SQColor.label : SQColor.labelTertiary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                // CALL-OFFLINE-21 : grisé + désactivé hors-ligne (un appel
+                // lancé sans réseau échouerait et ferait flasher l'écran).
+                .disabled(!networkPath.isOnline)
+                .accessibilityLabel("Appeler")
+                .alert(
+                    "Appel non chiffré de bout en bout",
+                    isPresented: Binding(
+                        get: { pendingTransportOnlyCall != nil },
+                        set: { if !$0 { pendingTransportOnlyCall = nil } }
+                    )
+                ) {
+                    Button("Appeler quand même") {
+                        if let mode = pendingTransportOnlyCall { launchCall(mode: mode, endToEnd: false) }
+                        pendingTransportOnlyCall = nil
                     }
+                    Button("Annuler", role: .cancel) { pendingTransportOnlyCall = nil }
+                } message: {
+                    Text("Les messages de cette conversation restent chiffrés de bout en bout. L’appel, lui, ne l’est pas encore : il est protégé pendant le transport et passe par nos serveurs.")
                 }
             }
 
@@ -2529,14 +2530,6 @@ struct ConversationDetailView: View {
         } else {
             verifiedV2 = true
         }
-        guard CallLifecyclePolicy.canUseE2EECall(
-            conversationE2EE: isE2EE,
-            verifiedV2: verifiedV2
-        ) else {
-            showActionError(String(localized: "Les appels ne sont pas encore chiffrés de bout en bout : aucun appel n’a été lancé dans cette conversation chiffrée."))
-            Haptics.error()
-            return
-        }
         guard conversation.participants.count >= 2 else {
             showActionError(String(localized: "Aucun autre participant n’est disponible pour cet appel."))
             Haptics.error()
@@ -2547,20 +2540,20 @@ struct ConversationDetailView: View {
             Haptics.error()
             return
         }
+        switch CallLifecyclePolicy.outgoingCallMode(conversationE2EE: isE2EE, verifiedV2: verifiedV2) {
+        case .standard: launchCall(mode: mode, endToEnd: false)
+        case .endToEnd: launchCall(mode: mode, endToEnd: true)
+        case .confirmTransportOnly: pendingTransportOnlyCall = mode
+        }
+    }
+
+    private func launchCall(mode: String, endToEnd: Bool) {
         services.callManager.startOutgoingCall(
             conversationId: conversation.id,
             mode: mode,
             displayName: conversationTitle,
-            requiresE2EE: isE2EE
+            requiresE2EE: endToEnd
         )
-    }
-
-    private var e2eeCallReady: Bool {
-        guard isE2EE else { return true }
-        if case .prepared = E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversation.id) {
-            return true
-        }
-        return false
     }
 
     private var otherParticipantId: String? {

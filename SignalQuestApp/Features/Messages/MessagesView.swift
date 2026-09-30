@@ -607,7 +607,26 @@ extension Array where Element == MessageConversation {
                 lastMessageAt: Date(),
                 lastReadAt: nil,
                 pinnedAt: nil,
-                participants: [],
+                // Deux personnes, comme une vraie conversation chiffrée : sans
+                // elles, « Appeler » s'arrête sur « Aucun autre participant ».
+                participants: [
+                    ConversationParticipant(
+                        userId: "mock-user",
+                        role: "member",
+                        joinedAt: Date(),
+                        lastReadAt: nil,
+                        user: MessageUser(id: "mock-user", name: "SignalQuest iOS", email: "ios@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    ),
+                    ConversationParticipant(
+                        userId: "demo-user-2",
+                        role: "member",
+                        joinedAt: Date(),
+                        lastReadAt: nil,
+                        user: MessageUser(id: "demo-user-2", name: "Léa", email: "lea@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    )
+                ],
                 lastMessage: nil
             )
         ]

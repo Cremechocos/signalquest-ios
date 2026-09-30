@@ -133,11 +133,21 @@ struct CallLifecyclePolicy {
         (2...maximumParticipants).contains(participantCount)
     }
 
-    /// An E2EE conversation must never fall back silently to transport-only
-    /// SRTP. This becomes true only after the audited v2 epoch/cryptor contract
-    /// is negotiated on every participant device.
-    static func canUseE2EECall(conversationE2EE: Bool, verifiedV2: Bool) -> Bool {
-        !conversationE2EE || verifiedV2
+    /// Mode d'un appel lancé depuis une conversation. Dans une conversation
+    /// chiffrée, l'appel n'est chiffré de bout en bout qu'une fois le contrat v2
+    /// (époques, cryptor LiveKit) négocié. D'ici là, il part protégé pendant le
+    /// transport seulement, jamais en silence : après confirmation, avec la
+    /// mention « Appel non chiffré de bout en bout » à l'écran, comme les appels
+    /// venus d'Android et du web (décision du 30/09, E2E-02).
+    enum OutgoingCallMode: Equatable {
+        case standard
+        case endToEnd
+        case confirmTransportOnly
+    }
+
+    static func outgoingCallMode(conversationE2EE: Bool, verifiedV2: Bool) -> OutgoingCallMode {
+        guard conversationE2EE else { return .standard }
+        return verifiedV2 ? .endToEnd : .confirmTransportOnly
     }
 
     /// Stable mapping so the same backend call cannot create several CallKit

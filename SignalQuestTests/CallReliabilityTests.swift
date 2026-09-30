@@ -191,10 +191,12 @@ final class CallReliabilityTests: XCTestCase {
         XCTAssertEqual(reloaded.pending(ownerScopeId: "user:bob", now: now).map(\.callId), ["call-b"])
     }
 
-    func testE2EEConversationCannotFallBackToTransportOnlyCall() {
-        XCTAssertTrue(CallLifecyclePolicy.canUseE2EECall(conversationE2EE: false, verifiedV2: false))
-        XCTAssertFalse(CallLifecyclePolicy.canUseE2EECall(conversationE2EE: true, verifiedV2: false))
-        XCTAssertTrue(CallLifecyclePolicy.canUseE2EECall(conversationE2EE: true, verifiedV2: true))
+    /// Dans une conversation chiffrée, un appel sans v2 n'est jamais silencieux :
+    /// il demande une confirmation (décision du 30/09, E2E-02).
+    func testEncryptedConversationAsksBeforeTransportOnlyCall() {
+        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: false, verifiedV2: false), .standard)
+        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: true, verifiedV2: false), .confirmTransportOnly)
+        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: true, verifiedV2: true), .endToEnd)
     }
 
     func testE2EECallQAGateRequiresExplicitDebugFlagAndStrictLoopbackEndpoints() throws {
