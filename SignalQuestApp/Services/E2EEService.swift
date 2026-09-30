@@ -1038,6 +1038,26 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         )
     }
 
+    /// Opens the account identity key handed over at approval (D.1) without
+    /// exporting the private ECDH key outside this Keychain-backed store.
+    func unwrapAccountIdentityKey(
+        _ wrap: E2EEV2UIKWrap,
+        approverSigningKey: P256.Signing.PublicKey,
+        expectedUIKB64: String,
+        ownerNamespace: String
+    ) throws -> P256.Signing.PrivateKey {
+        let record = try requiredRecord(ownerNamespace: ownerNamespace)
+        guard record.descriptor.deviceId == wrap.newDeviceId else {
+            throw E2EEV2DeviceIdentityError.invalidRecord
+        }
+        return try E2EEV2UIKWrapCrypto.unwrap(
+            wrap,
+            newDeviceAgreementKey: P256.KeyAgreement.PrivateKey(rawRepresentation: decoded(record.identityPrivateRawB64)),
+            approverSigningKey: approverSigningKey,
+            expectedUIKB64: expectedUIKB64
+        )
+    }
+
     /// Creates and signs one epoch envelope without exporting the long-lived
     /// device private keys beyond this Keychain-backed store.
     func createSignedEpochEnvelope(
@@ -2226,9 +2246,20 @@ enum E2EEV2DeviceApprovalContract {
         )
     }
 
-    static func approvalCompletionData(_ detail: E2EEV2ApprovalDetail) throws -> Data {
+    /// `trust` : certificat, liste suivante et UIK chiffrée du nouvel appareil
+    /// (E.1), ajoutés seulement quand le serveur les accepte.
+    static func approvalCompletionData(
+        _ detail: E2EEV2ApprovalDetail,
+        trust: E2EEV2DeviceApprovalTrust.Artifacts? = nil
+    ) throws -> Data {
         guard detail.approval.status == .pending else { throw E2EEV2DeviceIdentityError.invalidRecord }
         var object: [String: Any] = ["pendingDeviceId": detail.approval.pendingDeviceId]
+        if let trust {
+            guard trust.uikWrap.newDeviceId == detail.approval.pendingDeviceId else {
+                throw E2EEV2DeviceIdentityError.invalidRecord
+            }
+            object.merge(trust.approveFields) { current, _ in current }
+        }
         switch detail.approval.method {
         case .proximityCode:
             guard let code = normalizeProximityCode(detail.approval.proximityCode) else {
@@ -2251,12 +2282,21 @@ enum E2EEV2DeviceApprovalContract {
         return try JSONSerialization.data(withJSONObject: ["proximityCode": code], options: [.sortedKeys])
     }
 
-    static func revocationData(reason: String) throws -> Data {
+    /// `trust` : la liste suivante sans l'appareil (E.1), ajoutée seulement
+    /// quand le serveur l'accepte.
+    static func revocationData(
+        reason: String,
+        trust: E2EEV2DeviceRevocationTrust.Artifacts? = nil
+    ) throws -> Data {
         let normalized = reason.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard revocationReasons.contains(normalized) else {
             throw E2EEV2DeviceIdentityError.invalidRecord
         }
-        return try JSONSerialization.data(withJSONObject: ["version": 1, "reason": normalized], options: [.sortedKeys])
+        var object: [String: Any] = ["version": 1, "reason": normalized]
+        if let trust {
+            object.merge(trust.revokeFields) { current, _ in current }
+        }
+        return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
 
     static func bootstrapEmailChallengeData(deviceId: String) throws -> Data {

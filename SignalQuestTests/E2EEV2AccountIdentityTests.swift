@@ -5,8 +5,8 @@ import XCTest
 /// IOS-A1 (plan 3, jalon A) : clé de compte (UIK) créée au premier appareil,
 /// et objets signés du bootstrap étendu (spec §2.1, §2.2, §12 et E.1).
 final class E2EEV2AccountIdentityTests: XCTestCase {
-    private let now: Int64 = 1_790_000_000_000
-    private let userId = "user_alice_01J7ABCD2345"
+    fileprivate let now: Int64 = 1_790_000_000_000
+    fileprivate let userId = "user_alice_01J7ABCD2345"
     private let namespace = "ns-alice"
 
     func testTheAccountKeyIsCreatedOnceAndStaysInItsAccount() throws {
@@ -118,9 +118,213 @@ final class E2EEV2AccountIdentityTests: XCTestCase {
         XCTAssertEqual(Set(trust.capabilitiesBody.keys), ["document", "signatureB64"])
     }
 
+    // MARK: - Approbation d'un nouvel appareil (§2.3, D.1, E.1)
+
+    /// Le nouvel appareil entre dans la liste suivante, chaînée à la
+    /// précédente, et reçoit l'UIK du compte, lisible par lui seul.
+    func testApprovalCertifiesTheNewDeviceAndHandsItTheAccountKey() throws {
+        let first = try FirstDevice(test: self)
+        let pinV1 = try E2EEV2IdentityVerification.verify(first.bundle(), pinned: nil).get().pin
+
+        let tokens = InMemoryTokenStore()
+        let newStore = E2EEV2DeviceIdentityStore(tokenStore: tokens, allowsOwner: { _ in true }, identityChanged: { _ in })
+        let second = try newStore.loadOrCreate(ownerNamespace: "ns-new")
+        let approval = try first.approve(second)
+
+        let bundleV2 = try first.bundle(
+            list: approval.deviceList, entries: approval.deviceEntries,
+            extraCertificates: [approval.certificate]
+        )
+        let outcome = try E2EEV2IdentityVerification.verify(bundleV2, pinned: pinV1).get()
+        XCTAssertEqual(outcome.pin.listVersion, 2, "Liste suivante, chaînée à la v1 épinglée")
+        XCTAssertEqual(Set(outcome.devices.map(\.deviceId)), [first.device.deviceId, second.deviceId])
+
+        let uik = try E2EEV2DeviceApprovalTrust.accept(
+            approval.uikWrap, account: outcome, userId: userId, device: second
+        ) { wrap, approverKey, expected in
+            try newStore.unwrapAccountIdentityKey(
+                wrap, approverSigningKey: approverKey, expectedUIKB64: expected, ownerNamespace: "ns-new"
+            )
+        }
+        XCTAssertEqual(uik.rawRepresentation, first.uik.rawRepresentation)
+    }
+
+    func testApprovalSignsOnlyWhatTheUserCompared() throws {
+        let first = try FirstDevice(test: self)
+        let newcomer = descriptor(signing: P256.Signing.PrivateKey(), deviceId: "device_alice_web_01J7ABCD")
+        XCTAssertThrowsError(try first.approve(newcomer, expectedFingerprint: "empreinte-affichée-ailleurs")) {
+            XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .fingerprintMismatch)
+        }
+        XCTAssertThrowsError(try first.approve(first.device)) {
+            XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .alreadyListed)
+        }
+        XCTAssertThrowsError(try first.approve(newcomer, uik: P256.Signing.PrivateKey())) {
+            XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .foreignList, "Liste d'un autre compte")
+        }
+        XCTAssertThrowsError(try first.approve(newcomer, approverDeviceId: "device_alice_ipad_01J7ABCD")) {
+            XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .approverNotListed)
+        }
+    }
+
+    func testTheNewDeviceTakesTheKeyOnlyFromACertifiedApprover() throws {
+        let first = try FirstDevice(test: self)
+        let newStore = E2EEV2DeviceIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true }, identityChanged: { _ in })
+        let second = try newStore.loadOrCreate(ownerNamespace: "ns-new")
+        let approval = try first.approve(second)
+        let unwrap: (E2EEV2UIKWrap, P256.Signing.PublicKey, String) throws -> P256.Signing.PrivateKey = {
+            try newStore.unwrapAccountIdentityKey($0, approverSigningKey: $1, expectedUIKB64: $2, ownerNamespace: "ns-new")
+        }
+
+        // Paquet encore à la v1 : le compte ne certifie pas (encore) ce nouvel appareil.
+        let v1 = try E2EEV2IdentityVerification.verify(first.bundle(), pinned: nil).get()
+        XCTAssertThrowsError(try E2EEV2DeviceApprovalTrust.accept(approval.uikWrap, account: v1, userId: userId, device: second, unwrap: unwrap)) {
+            XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .notCertified)
+        }
+
+        // Un « approbateur » que le compte ne connaît pas.
+        let outcome = try E2EEV2IdentityVerification.verify(
+            first.bundle(list: approval.deviceList, entries: approval.deviceEntries, extraCertificates: [approval.certificate]),
+            pinned: nil
+        ).get()
+        let stranger = try E2EEV2UIKWrapCrypto.wrap(
+            uik: first.uik, userId: userId, approverDeviceId: "device_mallory_ios_01J7ABCD", newDeviceId: second.deviceId,
+            newDeviceAgreementKey: P256.KeyAgreement.PublicKey(x963Representation: XCTUnwrap(Data(base64Encoded: second.publicIdentityKeyB64))),
+            approverSigningKey: P256.Signing.PrivateKey(), nonce: Data(repeating: 7, count: 12)
+        )
+        XCTAssertThrowsError(try E2EEV2DeviceApprovalTrust.accept(stranger, account: outcome, userId: userId, device: second, unwrap: unwrap)) {
+            XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .approverNotListed)
+        }
+    }
+
+    func testTheApprovalBodyGainsTheTrustFieldsOnlyWhenGiven() throws {
+        let first = try FirstDevice(test: self)
+        let newcomer = descriptor(signing: P256.Signing.PrivateKey(), deviceId: "device_alice_web_01J7ABCD")
+        let approval = try first.approve(newcomer)
+        func detail(pendingDeviceId: String) -> E2EEV2ApprovalDetail {
+            E2EEV2ApprovalDetail(
+                approval: .init(id: "approval_alice_00001", pendingDeviceId: pendingDeviceId, method: .qr,
+                    challengeB64URL: String(repeating: "A", count: 43), proximityCode: nil, status: .pending,
+                    expiresAt: "2026-10-01T02:00:00.000Z", createdAt: "2026-10-01T01:55:00.000Z"),
+                pendingDevice: .init(descriptor: newcomer, status: .pending, approvedAt: nil, revokedAt: nil,
+                    lastSeenAt: nil, createdAt: "2026-10-01T01:55:00.000Z")
+            )
+        }
+        func keys(_ data: Data) throws -> Set<String> {
+            Set(try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any]).keys)
+        }
+        XCTAssertEqual(try keys(E2EEV2DeviceApprovalContract.approvalCompletionData(detail(pendingDeviceId: newcomer.deviceId))),
+                       ["pendingDeviceId", "challengeB64Url"], "Corps actuel inchangé")
+        let body = try E2EEV2DeviceApprovalContract.approvalCompletionData(detail(pendingDeviceId: newcomer.deviceId), trust: approval)
+        XCTAssertEqual(try keys(body), ["pendingDeviceId", "challengeB64Url", "certificate", "deviceList", "uikWrap"])
+        let wrap = try XCTUnwrap((try JSONSerialization.jsonObject(with: body) as? [String: Any])?["uikWrap"] as? [String: Any])
+        XCTAssertEqual(Set(wrap.keys), [
+            "userId", "approverDeviceId", "newDeviceId", "uikPublicKeyB64", "ephemeralPublicKeyB64",
+            "nonceB64", "aadB64", "wrappedUikB64", "signatureB64",
+        ])
+        XCTAssertThrowsError(try E2EEV2DeviceApprovalContract.approvalCompletionData(
+            detail(pendingDeviceId: "device_alice_other_01J7ABCD"), trust: approval
+        ), "Une approbation ne porte que les objets de son appareil")
+    }
+
+    /// Révocation : la liste suivante ne contient plus l'appareil, et reste
+    /// chaînée à la précédente.
+    func testRevocationListDropsOnlyTheRevokedDevice() throws {
+        let first = try FirstDevice(test: self)
+        let second = descriptor(signing: P256.Signing.PrivateKey(), deviceId: "device_alice_web_01J7ABCD")
+        let approval = try first.approve(second)
+        let pinV2 = try E2EEV2IdentityVerification.verify(
+            first.bundle(list: approval.deviceList, entries: approval.deviceEntries, extraCertificates: [approval.certificate]),
+            pinned: nil
+        ).get().pin
+
+        let revocation = try E2EEV2DeviceRevocationTrust.make(
+            userId: userId, revokedDeviceId: second.deviceId, currentList: approval.deviceList,
+            currentEntries: approval.deviceEntries, uik: first.uik, nowMs: now + 120_000
+        )
+        XCTAssertEqual(revocation.deviceEntries, first.trust.deviceEntries)
+        let outcome = try E2EEV2IdentityVerification.verify(
+            first.bundle(list: revocation.deviceList, entries: revocation.deviceEntries), pinned: pinV2
+        ).get()
+        XCTAssertEqual(outcome.pin.listVersion, 3)
+        XCTAssertEqual(outcome.devices.map(\.deviceId), [first.device.deviceId])
+
+        XCTAssertThrowsError(try E2EEV2DeviceRevocationTrust.make(
+            userId: userId, revokedDeviceId: "device_alice_ipad_01J7ABCD", currentList: approval.deviceList,
+            currentEntries: approval.deviceEntries, uik: first.uik, nowMs: now
+        ), "Appareil absent de la liste")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: E2EEV2DeviceApprovalContract.revocationData(reason: "USER_REQUEST", trust: revocation)
+        ) as? [String: Any])
+        XCTAssertEqual(Set(body.keys), ["version", "reason", "deviceList"])
+        XCTAssertEqual(Set(try XCTUnwrap(JSONSerialization.jsonObject(
+            with: E2EEV2DeviceApprovalContract.revocationData(reason: "USER_REQUEST")
+        ) as? [String: Any]).keys), ["version", "reason"], "Corps actuel inchangé")
+    }
+
+    /// Premier appareil d'Alice : son UIK, ses clés et ses objets signés (v1).
+    private struct FirstDevice {
+        let userId: String
+        let now: Int64
+        let uik = P256.Signing.PrivateKey()
+        let signing = P256.Signing.PrivateKey()
+        let device: E2EEV2DeviceDescriptor
+        let trust: E2EEV2InitialTrust.Artifacts
+
+        init(test: E2EEV2AccountIdentityTests) throws {
+            userId = test.userId
+            now = test.now
+            device = test.descriptor(signing: signing)
+            let signing = self.signing
+            trust = try E2EEV2InitialTrust.make(
+                userId: userId, device: device, uik: uik,
+                signWithDevice: { try E2EEV2LowS.sign($0, with: signing) },
+                kinds: ["TEXT"], features: ["calls"], nowMs: now
+            )
+        }
+
+        func approve(
+            _ newcomer: E2EEV2DeviceDescriptor,
+            expectedFingerprint: String? = nil,
+            uik: P256.Signing.PrivateKey? = nil,
+            approverDeviceId: String? = nil
+        ) throws -> E2EEV2DeviceApprovalTrust.Artifacts {
+            let fingerprint = E2EEV2Canonical.deviceFingerprint(
+                identityKeyX963: Data(base64Encoded: newcomer.publicIdentityKeyB64) ?? Data(),
+                signingKeyX963: Data(base64Encoded: newcomer.publicSigningKeyB64) ?? Data()
+            )
+            let signing = self.signing
+            return try E2EEV2DeviceApprovalTrust.make(
+                userId: userId, currentList: trust.deviceList, currentEntries: trust.deviceEntries,
+                newDevice: newcomer, expectedFingerprint: expectedFingerprint ?? fingerprint,
+                uik: uik ?? self.uik, approverDeviceId: approverDeviceId ?? device.deviceId,
+                signWithApprover: { try E2EEV2LowS.sign($0, with: signing) },
+                nonce: Data(repeating: 9, count: 12), nowMs: now + 60_000
+            )
+        }
+
+        /// Paquet E.1 du compte, tel que le serveur le servirait.
+        func bundle(
+            list: E2EEV2SignedString? = nil,
+            entries: [String]? = nil,
+            extraCertificates: [E2EEV2SignedString] = []
+        ) throws -> E2EEV2IdentityBundle {
+            let list = list ?? trust.deviceList
+            let object: [String: Any] = [
+                "accountIdentityKeyB64": trust.accountIdentityKeyB64,
+                "deviceList": ["list": list.canonical, "signatureB64": list.signatureB64, "devices": entries ?? trust.deviceEntries],
+                "certificates": ([trust.certificate] + extraCertificates).map {
+                    ["certificate": $0.canonical, "signatureB64": $0.signatureB64]
+                },
+                "capabilities": [trust.capabilitiesBody],
+                "pendingIdentityReset": NSNull(),
+            ]
+            return try XCTUnwrap(E2EEV2IdentityBundle.parse(object, userId: userId))
+        }
+    }
+
     // MARK: - Outils
 
-    private func descriptor(
+    fileprivate func descriptor(
         signing: P256.Signing.PrivateKey,
         deviceId: String = "device_alice_ios_01J7ABCD",
         keyVersion: Int = 1

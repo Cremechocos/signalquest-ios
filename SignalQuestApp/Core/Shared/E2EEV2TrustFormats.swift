@@ -91,6 +91,26 @@ enum E2EEV2UIKWrapCrypto {
         ephemeral: P256.KeyAgreement.PrivateKey = P256.KeyAgreement.PrivateKey(),
         nonce: Data
     ) throws -> E2EEV2UIKWrap {
+        try wrap(
+            uik: uik, userId: userId, approverDeviceId: approverDeviceId, newDeviceId: newDeviceId,
+            newDeviceAgreementKey: newDeviceAgreementKey,
+            signWithApprover: { try E2EEV2LowS.sign($0, with: approverSigningKey) },
+            ephemeral: ephemeral, nonce: nonce
+        )
+    }
+
+    /// Même transport, signé par l'approbateur sans que sa clé privée quitte
+    /// son magasin : `signWithApprover` rend une signature DER low-S.
+    static func wrap(
+        uik: P256.Signing.PrivateKey,
+        userId: String,
+        approverDeviceId: String,
+        newDeviceId: String,
+        newDeviceAgreementKey: P256.KeyAgreement.PublicKey,
+        signWithApprover: (Data) throws -> Data,
+        ephemeral: P256.KeyAgreement.PrivateKey = P256.KeyAgreement.PrivateKey(),
+        nonce: Data
+    ) throws -> E2EEV2UIKWrap {
         guard [userId, approverDeviceId, newDeviceId].allSatisfy(E2EEV2Canonical.isOpaque),
               nonce.count == 12 else {
             throw E2EEV2TrustFormatError.invalidField
@@ -118,7 +138,7 @@ enum E2EEV2UIKWrapCrypto {
             nonceB64: nonce.base64EncodedString(), aadB64: wrapAAD.base64EncodedString(),
             wrappedUikB64: (sealed.ciphertext + sealed.tag).base64EncodedString(), signatureB64: ""
         )
-        let signature = try E2EEV2LowS.sign(Data(signatureCanonical(unsigned).utf8), with: approverSigningKey)
+        let signature = try signWithApprover(Data(signatureCanonical(unsigned).utf8))
         return E2EEV2UIKWrap(
             userId: userId, approverDeviceId: approverDeviceId, newDeviceId: newDeviceId,
             uikPublicKeyB64: uikB64, ephemeralPublicKeyB64: ephemeralB64,
