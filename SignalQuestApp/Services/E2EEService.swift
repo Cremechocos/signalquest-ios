@@ -766,7 +766,8 @@ enum E2EEV2VaultBoundary {
         guard ownerScopeId.hasPrefix("user:"), ownerScopeId.count > 5 else { return }
         let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
         for key in ["device-v2:\(namespace)", "device-v2-reset-candidate:\(namespace)",
-                    "epoch-v2-owner-index:\(namespace)", "rotation-work-v1:\(namespace)"] {
+                    "epoch-v2-owner-index:\(namespace)", "rotation-work-v1:\(namespace)",
+                    E2EEV2AccountIdentityStore.key(ownerNamespace: namespace)] {
             try store.remove(key)
         }
         for prefix in ["epoch-v2:\(namespace):", "epoch-v2-history:\(namespace):", "epoch-v2-index:\(namespace):",
@@ -2266,19 +2267,23 @@ enum E2EEV2DeviceApprovalContract {
         )
     }
 
+    /// `trust` : UIK, certificat et liste v1 du premier appareil (E.1), ajoutés
+    /// seulement quand le serveur les accepte ; sans eux, le corps est inchangé.
     static func initialBootstrapData(
         deviceId: String,
-        reauthentication: E2EEV2BootstrapReauthentication
+        reauthentication: E2EEV2BootstrapReauthentication,
+        trust: E2EEV2InitialTrust.Artifacts? = nil
     ) throws -> Data {
         guard validOpaqueId(deviceId) else { throw E2EEV2DeviceIdentityError.invalidRecord }
-        return try JSONSerialization.data(
-            withJSONObject: [
-                "version": 1,
-                "deviceId": deviceId,
-                "reauthentication": try reauthenticationObject(reauthentication),
-            ],
-            options: [.sortedKeys]
-        )
+        var body: [String: Any] = [
+            "version": 1,
+            "deviceId": deviceId,
+            "reauthentication": try reauthenticationObject(reauthentication),
+        ]
+        if let trust {
+            body.merge(trust.bootstrapFields) { current, _ in current }
+        }
+        return try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
     }
 
     static func identityResetEmailChallengeData(
