@@ -9,7 +9,7 @@ final class CallJoinProofTests: XCTestCase {
     private let conversationId = "conversation_01J7ABCD23456789"
     private let callId = "call_01J7ABCD23456789XY"
     private let callNonceB64 = "kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8="
-    private let identity = "lk_user_bruno_01J7ABCD23456789"
+    private let identity = "user_bruno_01J7ABCD23456789.device_bruno_android_01J7ABCD"
     private let userId = "user_bruno_01J7ABCD23456789"
     private let deviceId = "device_bruno_android_01J7ABCD"
 
@@ -60,16 +60,26 @@ final class CallJoinProofTests: XCTestCase {
         )
     }
 
-    func testIdentityNeverSwitchesDeviceDuringTheCall() throws {
+    func testIdentityCarriesItsDevice() throws {
         let vector = try loadVector()
         let tabletKey = P256.Signing.PrivateKey()
         let tabletId = "device_bruno_tablet_01J7ABCD"
-        let tablet = makeVerifier(localUserId: userId, localDeviceId: tabletId, signingKey: tabletKey, keys: [:])
-        let tabletProof = try tablet.localProof(livekitIdentity: identity, joinedAtMs: 1_790_000_003_000)
+        // Preuve bien signée par la tablette, sous l'identité du téléphone.
+        let borrowed = E2EEV2CallJoinProof(
+            conversationId: conversationId, callId: callId, callNonceB64: callNonceB64,
+            livekitIdentity: identity, userId: userId, deviceId: tabletId, joinedAtMs: 1_790_000_003_000
+        )
+        let message = E2EEV2CallJoinProof.message(try E2EEV2SignedString.sign(borrowed.canonical, with: tabletKey))
 
         let verifier = makeVerifier(keys: [owner(deviceId): vector.publicKey, owner(tabletId): tabletKey.publicKey])
         XCTAssertEqual(verifier.receive(vector.message, from: identity), .proven)
-        XCTAssertEqual(verifier.receive(tabletProof, from: identity), .rejected)
+        XCTAssertEqual(verifier.receive(message, from: identity), .rejected, "L'identité nomme un autre appareil")
+
+        let tablet = makeVerifier(localUserId: userId, localDeviceId: tabletId, signingKey: tabletKey, keys: [:])
+        XCTAssertThrowsError(
+            try tablet.localProof(livekitIdentity: identity, joinedAtMs: 1_790_000_003_000),
+            "Un jeton émis sous une autre identité que <userId>.<deviceId> : aucune preuve ne part"
+        )
     }
 
     func testLocalProofIsAcceptedByTheOtherParticipants() throws {
@@ -77,17 +87,20 @@ final class CallJoinProofTests: XCTestCase {
         let aliceUser = "user_alice_01J7ABCD23456789"
         let aliceDevice = "device_alice_ios_01J7ABCD2345"
         let alice = makeVerifier(localUserId: aliceUser, localDeviceId: aliceDevice, signingKey: aliceKey, keys: [:])
-        let message = try alice.localProof(livekitIdentity: "lk_user_alice_01J7ABCD23456789", joinedAtMs: 1_790_000_001_000)
+        let aliceIdentity = E2EEV2CallJoinProof.livekitIdentity(userId: aliceUser, deviceId: aliceDevice)
+        let message = try alice.localProof(livekitIdentity: aliceIdentity, joinedAtMs: 1_790_000_001_000)
 
         let signed = try E2EEV2CallJoinProof.readMessage(message)
         XCTAssertEqual(E2EEV2CallJoinProof.message(signed), message, "JSON canonique, deux clés")
         let bruno = makeVerifier(localDeviceId: deviceId, keys: ["\(aliceUser)/\(aliceDevice)": aliceKey.publicKey])
-        XCTAssertEqual(bruno.receive(message, from: "lk_user_alice_01J7ABCD23456789"), .proven)
+        XCTAssertEqual(bruno.receive(message, from: aliceIdentity), .proven)
 
-        XCTAssertThrowsError(
-            try alice.localProof(livekitIdentity: "", joinedAtMs: 1_790_000_001_000),
-            "Jamais de preuve que les autres refuseraient"
-        )
+        for wrong in ["", aliceUser, "lk_user_alice_01J7ABCD23456789"] {
+            XCTAssertThrowsError(
+                try alice.localProof(livekitIdentity: wrong, joinedAtMs: 1_790_000_001_000),
+                "Jamais de preuve que les autres refuseraient : « \(wrong) »"
+            )
+        }
     }
 
     func testMissingProofTenSecondsAfterAnArrivalEndsTheCall() throws {

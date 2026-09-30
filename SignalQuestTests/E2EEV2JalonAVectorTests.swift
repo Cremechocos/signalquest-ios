@@ -926,13 +926,16 @@ private extension E2EEV2JalonAVectorTests {
     func buildJoinProof() throws -> VJ {
         let signing = try signingKey(0x33)
         let nonce = Data((0..<32).map { UInt8(0x90 + $0) }).base64EncodedString()
+        let identity = E2EEV2CallJoinProof.livekitIdentity(userId: userB, deviceId: deviceB1)
         let proof = E2EEV2CallJoinProof(
             conversationId: conversationId, callId: "call_01J7ABCD23456789XY", callNonceB64: nonce,
-            livekitIdentity: "lk_\(userB)", userId: userB, deviceId: deviceB1, joinedAtMs: createdAtMs + 2_000
+            livekitIdentity: identity, userId: userB, deviceId: deviceB1, joinedAtMs: createdAtMs + 2_000
         )
         let signed = try E2EEV2SignedString.sign(proof.canonical, with: signing)
         let message = String(decoding: E2EEV2CallJoinProof.message(signed), as: UTF8.self)
-        let emptyIdentity = proof.canonical.replacingOccurrences(of: "\nlk_\(userB)\n", with: "\n\n")
+        let emptyIdentity = proof.canonical.replacingOccurrences(of: "\n\(identity)\n", with: "\n\n")
+        // Identité du compte seul : c'était celle des appels avant la v0.4.3.
+        let accountIdentity = proof.canonical.replacingOccurrences(of: "\n\(identity)\n", with: "\n\(userB)\n")
         let highSMessage = String(decoding: E2EEV2CallJoinProof.message(E2EEV2SignedString(canonical: proof.canonical, signatureB64: try highS(signed.signatureB64))), as: UTF8.self)
         return .o([
             ("fixtureVersion", .s("1")),
@@ -944,6 +947,7 @@ private extension E2EEV2JalonAVectorTests {
             ("negative", .a([
                 .o([("case", .s("highS")), ("messageUtf8", .s(highSMessage))]),
                 .o([("case", .s("emptyIdentity")), ("messageUtf8", .s(String(decoding: E2EEV2CallJoinProof.message(try E2EEV2SignedString.sign(emptyIdentity, with: signing)), as: UTF8.self)))]),
+                .o([("case", .s("identityIsNotTheDevice")), ("messageUtf8", .s(String(decoding: E2EEV2CallJoinProof.message(try E2EEV2SignedString.sign(accountIdentity, with: signing)), as: UTF8.self)))]),
                 .o([("case", .s("extraKey")), ("messageUtf8", .s(message.replacingOccurrences(of: "{\"proof\"", with: "{\"a\":null,\"proof\"")))]),
             ])),
         ])

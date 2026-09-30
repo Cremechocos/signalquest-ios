@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.2**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.3**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -64,6 +64,20 @@
 >   (renvoi aux nouveaux arrivants, vérifications, preuve invalide, lien entre
 >   identité et appareil) ; fin d'un appel au plus tard à l'enregistrement
 >   d'une époque plus récente (§10.3, §10.4).
+> - v0.4.3 (30/09/2026) : après la relecture du code serveur et du SDK
+>   Android.
+>   - L'identité LiveKit d'un appel chiffré est celle de l'appareil,
+>     `<userId>.<deviceId>`, et non plus celle du compte (§10.4, D.11).
+>   - `409 CALL_NONCE_TAKEN` pour un `callNonce` déjà vu (§10.1).
+>   - Relais de `e2eeV2` précisé : chaîne JSON dans FCM, flux SSE des appels,
+>     notification de transfert (E.4).
+>   - Vecteur `call-join-proof-v1` réémis avec une identité d'appareil.
+>   - Adressage des preuves : une optimisation seulement, les paquets chiffrés
+>     étant diffusés (§10.4).
+>   - Limite écrite : l'émetteur d'un paquet chiffré est déclaré par lui-même
+>     (§10.4).
+>   - Preuve rediffusée à 0, 1, 2, 4 et 7 secondes, et paquet chiffré d'un
+>     émetteur pas encore annoncé ignoré, après le banc local (§10.4).
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -622,7 +636,8 @@ affichage**, et dans l'outil de modération.
   - pour une sonnerie, un descripteur de plus de 60 secondes. Pour une
     jonction tardive ou un transfert, le descripteur est accepté tant que le
     serveur donne l'appel pour actif, sous la même règle d'époque ;
-  - un `callNonce` déjà vu pour un autre `callId`.
+  - un `callNonce` déjà vu pour un autre `callId`. Le serveur refuse lui
+    aussi un `callNonce` déjà enregistré (`409 CALL_NONCE_TAKEN`).
 
 ### 10.2 Clé de trame
 
@@ -704,6 +719,12 @@ version qui expose `discardFrameWhenCryptorNotReady` et
   - `NEW` attend l'état « OK ».
   - `KEY_RATCHETED` ne doit pas survenir, puisque le ratchet est interdit. Il
     est traité comme une erreur.
+- **Identité LiveKit** : dans un appel chiffré, le serveur émet le jeton pour
+  un appareil certifié, authentifié par requête signée, jamais pour le compte
+  seul. L'identité vaut `<userId>.<deviceId>` ; le « . » est hors de
+  l'alphabet opaque (A.1), la découpe est donc sans ambiguïté. Deux appareils
+  d'un même compte peuvent ainsi rejoindre le même appel sans s'éjecter. Les
+  appels en clair gardent l'identité du compte, pour les apps installées.
 - **Preuve de jonction** : à la jonction, chaque participant envoie une
   preuve signée par son appareil, qui lie son identité LiveKit à son appareil
   certifié.
@@ -713,20 +734,38 @@ version qui expose `discardFrameWhenCryptorNotReady` et
     (§10.3), sujet `sq.e2ee.join`, en paquet fiable (annexe D.11). Android :
     `DataPacketCryptorManager`.
   - Un nouvel arrivant n'a pas reçu les preuves déjà envoyées. Chaque
-    participant lui adresse donc la sienne, à lui seul : à son arrivée, puis
-    en réponse à sa première preuve valide, qui montre que son canal
-    fonctionne. Après une reconnexion complète, le participant diffuse de
-    nouveau sa preuve. `joinedAtMs` reste celui de sa jonction ; une preuve
-    reçue deux fois est sans effet.
+    participant lui adresse donc la sienne : à son arrivée, puis en réponse à
+    sa première preuve valide, qui montre que son canal fonctionne. Après une
+    reconnexion complète, le participant diffuse de nouveau sa preuve.
+    `joinedAtMs` reste celui de sa jonction ; une preuve reçue deux fois est
+    sans effet.
+  - Le serveur peut perdre un paquet envoyé avant d'avoir annoncé un
+    participant, ce qui prend jusqu'à environ 3 secondes (constaté avec
+    livekit-server 1.13.7). Chacun diffuse donc sa preuve à sa jonction et à
+    chaque arrivée annoncée, puis la rediffuse 1, 2, 4 et 7 secondes plus
+    tard. Les doublons sont sans effet.
+  - Un paquet chiffré dont le serveur n'a pas encore annoncé l'émetteur est
+    ignoré : ni accepté, ni motif de coupure. Un paquet en clair coupe
+    l'appel, même d'un émetteur inconnu.
+  - L'adressage n'est qu'une optimisation. Chiffré, un paquet porte ses
+    destinataires dans sa charge : le SFU ne les voit pas et le diffuse à
+    toute la salle (constaté dans Swift 2.17.0 et Android 2.27.0). Chacun
+    traite donc toute preuve valide reçue, adressée ou non. On ne répond qu'à
+    la première preuve valide d'une identité, ce qui borne les échanges.
+  - La preuve passe, comme toute donnée d'un appel chiffré, par le canal de
+    données chiffré, jamais en clair. Chaque plateforme active ce chiffrement
+    (Android 2.27.0 : `dataChannelEncryptionEnabled = true`) et pose la clé
+    avant la jonction : aucun arrivant n'attend la clé.
   - Le destinataire vérifie :
     - l'appel : `conversationId`, `callId` et `callNonceB64` ;
-    - `livekitIdentity`, égale à l'identité de l'émetteur du paquet ;
+    - `livekitIdentity`, égale à l'identité de l'émetteur du paquet et à
+      `<userId>.<deviceId>` de la preuve (une preuve où elle diffère est mal
+      formée) ;
     - un appareil certifié d'un membre, doté de la capacité « appels
       vérifiés » (§12), jamais l'appareil local ;
     - la signature, en forme low-S.
-  - Une preuve invalide met fin à l'appel aussitôt. Une identité ne change
-    jamais d'appareil en cours d'appel : une seconde preuve valide d'un autre
-    appareil pour la même identité y met fin aussi.
+  - Une preuve invalide met fin à l'appel aussitôt. L'identité portant
+    l'appareil, elle n'en change jamais en cours d'appel.
   - Un participant sans preuve valide 10 secondes après son arrivée met fin
     à l'appel, avec « Appel chiffré impossible ».
   - Tant qu'un participant n'a pas prouvé son appareil, rien de lui n'est
@@ -740,6 +779,15 @@ version qui expose `discardFrameWhenCryptorNotReady` et
   écouter, y compris depuis un participant caché (jeton `hidden`). La clé ne
   sort pas du cercle des membres, mais n'authentifie pas l'émetteur d'une
   trame.
+- Même limite pour les données : après déchiffrement, les SDK (Swift 2.17.0,
+  Android 2.27.0) donnent comme émetteur l'identité écrite par l'émetteur
+  lui-même dans le paquet chiffré. Un membre qui détient la clé peut donc
+  attribuer un paquet à un autre participant.
+  - Il ne peut pas usurper un appareil : la preuve est signée, et l'identité
+    porte l'appareil.
+  - Il peut faire échouer l'appel, par une preuve invalide attribuée à un
+    autre comme par une trame mal chiffrée. La fermeture par défaut est
+    gardée : un membre peut de toute façon interrompre un appel.
 
 ### 10.5 Discrétion
 
@@ -1323,10 +1371,11 @@ serveur porte aussi le web.
   l'initiation, de la notification VoIP et FCM, et de `/api/calls/pending` ;
   jamais les anciennes clés `e2ee` et `e2eeRequired` (§10.1).
 - **SRV-CALL-3** Enregistrement de l'appel chiffré : descripteur, signature,
-  appareil appelant, `callNonce` unique. Statut « actif » servi pour la
-  jonction tardive et le transfert (§10.1).
+  appareil appelant, `callNonce` unique (`409 CALL_NONCE_TAKEN`). Statut
+  « actif » servi pour la jonction tardive et le transfert (§10.1).
 - **SRV-CALL-4** Sonnerie et jeton LiveKit réservés aux appareils certifiés
-  qui ont la capacité « appels vérifiés » (§10.1).
+  qui ont la capacité « appels vérifiés » (§10.1). Identité LiveKit
+  `<userId>.<deviceId>` (§10.4).
 - **SRV-CALL-5** Notification d'appel d'une conversation v2 sans nom ni titre
   (§10.5).
 - **SRV-CALL-6** Ni enregistrement composite, ni transcription, ni résumé pour
@@ -1595,7 +1644,8 @@ Format au §11. Le vecteur `franking-v1` donne `fk`, la charge, `frankTag`,
   `callNonceB64` : 32 octets en b64 standard.
 - **Preuve de jonction** : message du canal de données chiffré, de sujet
   `sq.e2ee.join`. Son contenu est le JSON canonique
-  `{"proof": "<chaîne du §10.4>", "signatureB64": "…"}`.
+  `{"proof": "<chaîne du §10.4>", "signatureB64": "…"}`. Dans la chaîne,
+  `<livekitIdentity>` vaut exactement `<userId>.<deviceId>`.
 
 ### D.12 Numéro de sécurité (`safety-number-v1`)
 
@@ -1766,5 +1816,12 @@ version publiée qui ouvre les verrous.
 - **`POST /api/calls/initiate`**. Dans une conversation v2, le corps ajoute
   `callId` (choisi par l'appelant) et `e2eeV2` (D.11).
 - **Réponses et notifications** : la réponse d'initiation,
-  `/api/calls/pending` et la notification VoIP ou FCM relaient `e2eeV2` tel
-  quel. Les anciennes clés `e2ee` et `e2eeRequired` restent vides (§10.1).
+  `/api/calls/pending`, l'événement `incoming` du flux SSE
+  `/api/calls/stream`, et les notifications VoIP et FCM (appel et transfert)
+  relaient `e2eeV2` tel quel.
+  - VoIP (APNs) : objet JSON.
+  - FCM : les valeurs de `data` sont des chaînes, donc `e2eeV2` y voyage en
+    chaîne JSON sérialisée, relue strictement.
+  - Les anciennes clés `e2ee` et `e2eeRequired` restent vides (§10.1).
+- **Jeton LiveKit d'un appel chiffré** : émis pour l'appareil qui le demande
+  par requête signée, sous l'identité `<userId>.<deviceId>` (§10.4).

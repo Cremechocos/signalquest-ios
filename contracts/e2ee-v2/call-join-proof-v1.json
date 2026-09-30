@@ -3,21 +3,25 @@
   "signingPrivateRawB64": "MzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVI=",
   "signingPublicX963B64": "BJ2No1cMFx9s8n54VYRjz7XGcSAh/fZ8FSC1kjrPNdCNfPxc6VpsFcxAGrDbo+eGu3AOchOscKQjTXyy8F0LVpQ=",
   "topic": "sq.e2ee.join",
-  "proofUtf8": "SQ-E2EE-V2-CALL-JOIN\n1\nconversation_01J7ABCD23456789\ncall_01J7ABCD23456789XY\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\nlk_user_bruno_01J7ABCD23456789\nuser_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\n1790000002000",
-  "signatureDerB64": "MEUCIQDBFJSumOOwTi1jnbcgwQiitfPUxx3KFU3VIwWApkcc8QIgAq5pza7anIrOGnUMW4OxVmPXmeSef/y96f3uBV6I5yM=",
-  "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nlk_user_bruno_01J7ABCD23456789\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEUCIQDBFJSumOOwTi1jnbcgwQiitfPUxx3KFU3VIwWApkcc8QIgAq5pza7anIrOGnUMW4OxVmPXmeSef/y96f3uBV6I5yM=\"}",
+  "proofUtf8": "SQ-E2EE-V2-CALL-JOIN\n1\nconversation_01J7ABCD23456789\ncall_01J7ABCD23456789XY\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\nuser_bruno_01J7ABCD23456789.device_bruno_android_01J7ABCD\nuser_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\n1790000002000",
+  "signatureDerB64": "MEUCIQCOA5XZ0BQsJPfODLeHG8V6xC9tm07bX+/FUaRNCMbXpAIgQOmbLK3m60EAvja46BdFYnMABzJ2rdRJUDwuRNw35yU=",
+  "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nuser_bruno_01J7ABCD23456789.device_bruno_android_01J7ABCD\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEUCIQCOA5XZ0BQsJPfODLeHG8V6xC9tm07bX+/FUaRNCMbXpAIgQOmbLK3m60EAvja46BdFYnMABzJ2rdRJUDwuRNw35yU=\"}",
   "negative": [
     {
       "case": "highS",
-      "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nlk_user_bruno_01J7ABCD23456789\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEYCIQDBFJSumOOwTi1jnbcgwQiitfPUxx3KFU3VIwWApkcc8QIhAP1RljFRJWN2MeWK86R8TqlZD2DJCJehxwm73L2d2j4u\"}"
+      "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nuser_bruno_01J7ABCD23456789.device_bruno_android_01J7ABCD\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEYCIQCOA5XZ0BQsJPfODLeHG8V6xC9tm07bX+/FUaRNCMbXpAIhAL8WZNJSGRS//0HJRxfoup1J5vN7MGnKO6N9nH4gKz4s\"}"
     },
     {
       "case": "emptyIdentity",
-      "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\n\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEQCIG7EwxTiN+/fuA/U0cQiJ0q3yEqg6MdzBQl8YSTGMT/LAiAwJwYWfS6Zw2kRSxIN4xXNZz7rzw96/mhl+D7wAFhUcg==\"}"
+      "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\n\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEUCIQDg+lYGvV5+eAphBk6QFz+oPJEC0sOPWBwm8vSb91q/hAIgZOvmC0fE7y49nPxBZLGtwRnxm6AlMf+B512kOaQTVBQ=\"}"
+    },
+    {
+      "case": "identityIsNotTheDevice",
+      "messageUtf8": "{\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nuser_bruno_01J7ABCD23456789\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEUCIQDdVWdOj+txWUdPBHM9KOzviES+ADHOmgYwhtEvrjwftgIgcOF2MRVvJNMlhg8eH2i8CDiRgi6fXUcAjKIhHDjrxSk=\"}"
     },
     {
       "case": "extraKey",
-      "messageUtf8": "{\"a\":null,\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nlk_user_bruno_01J7ABCD23456789\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEUCIQDBFJSumOOwTi1jnbcgwQiitfPUxx3KFU3VIwWApkcc8QIgAq5pza7anIrOGnUMW4OxVmPXmeSef/y96f3uBV6I5yM=\"}"
+      "messageUtf8": "{\"a\":null,\"proof\":\"SQ-E2EE-V2-CALL-JOIN\\n1\\nconversation_01J7ABCD23456789\\ncall_01J7ABCD23456789XY\\nkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8=\\nuser_bruno_01J7ABCD23456789.device_bruno_android_01J7ABCD\\nuser_bruno_01J7ABCD23456789\\ndevice_bruno_android_01J7ABCD\\n1790000002000\",\"signatureB64\":\"MEUCIQCOA5XZ0BQsJPfODLeHG8V6xC9tm07bX+/FUaRNCMbXpAIgQOmbLK3m60EAvja46BdFYnMABzJ2rdRJUDwuRNw35yU=\"}"
     }
   ]
 }

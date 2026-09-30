@@ -299,7 +299,7 @@ final class LiveKitClient: ObservableObject {
                         self?.setReconnecting(reconnecting)
                         // Après une reconnexion complète, les autres nous voient
                         // arriver de nouveau et attendent notre preuve.
-                        if !reconnecting { await self?.sendJoinProof() }
+                        if !reconnecting { self?.broadcastJoinProofOnSchedule() }
                     }
                 },
                 onMediaChanged: { [weak self] in
@@ -314,7 +314,7 @@ final class LiveKitClient: ObservableObject {
                         guard e2eeSession?.joinVerifier != nil else { return }
                         self?.scheduleJoinProofDeadline()
                         // Le nouvel arrivant n'a pas reçu notre preuve de jonction.
-                        await self?.sendJoinProof(to: participantID)
+                        self?.broadcastJoinProofOnSchedule()
                     }
                 },
                 onParticipantRemoved: { [weak self] participantID in
@@ -364,14 +364,22 @@ final class LiveKitClient: ObservableObject {
                     }
                 },
                 onDataReceived: { [weak self] senderIdentity, data, topic, encryptionType in
-                    guard E2EEV2CallDataPolicy.accepts(
+                    switch E2EEV2CallDataPolicy.verdict(
                         requiresE2EE: e2eeSession != nil,
                         senderIdentity: senderIdentity,
                         encryptionType: encryptionType
-                    ) else {
+                    ) {
+                    case .endCall:
                         e2eeSession?.verification.failGlobally()
-                        Task { @MainActor in self?.handleE2EETrustLoss() }
+                        Task { @MainActor in
+                            self?.logger.error("Data packet refused: not encrypted")
+                            self?.handleE2EETrustLoss()
+                        }
                         return
+                    case .ignore:
+                        return
+                    case .accept:
+                        break
                     }
                     if let joinVerifier = e2eeSession?.joinVerifier {
                         // Appel prouvé (§10.4) : seule une preuve de jonction
@@ -382,7 +390,10 @@ final class LiveKitClient: ObservableObject {
                             let outcome = joinVerifier.receive(data, from: senderIdentity)
                             guard outcome != .rejected else {
                                 e2eeSession?.verification.failGlobally()
-                                Task { @MainActor in self?.handleE2EETrustLoss(.joinProof) }
+                                Task { @MainActor in
+                                    self?.logger.error("Join proof rejected: the call ends")
+                                    self?.handleE2EETrustLoss(.joinProof)
+                                }
                                 return
                             }
                             e2eeSession?.verification.markJoinProven(senderIdentity)
@@ -517,7 +528,7 @@ final class LiveKitClient: ObservableObject {
             state = .connected
             // Notre preuve de jonction part dès que l'appel est établi (§10.4).
             if e2eeSession?.joinVerifier != nil {
-                Task { [weak self] in await self?.sendJoinProof() }
+                broadcastJoinProofOnSchedule()
             }
 #else
             throw LiveKitUnavailableError()
@@ -642,6 +653,7 @@ final class LiveKitClient: ObservableObject {
               let joinVerifier = session.joinVerifier else { return }
         guard room.e2eeManager?.dataChannelEncryptionType == .gcm,
               let identity = room.localParticipant.identity?.stringValue else {
+            logger.error("Join proof not sent: data channel not encrypted")
             session.verification.failGlobally()
             handleE2EETrustLoss(.joinProof)
             return
@@ -659,11 +671,28 @@ final class LiveKitClient: ObservableObject {
             session.verification.markJoinProven(identity)
             isE2EEVerified = session.verification.isVerified
         } catch {
+            logger.error("Join proof not sent: \(String(describing: error), privacy: .public)")
             guard state == .connected else { return }
             session.verification.failGlobally()
             handleE2EETrustLoss(.joinProof)
         }
 #endif
+    }
+
+    /// Diffuse notre preuve tout de suite, puis 1, 2, 4 et 7 secondes plus tard
+    /// (§10.4) : le serveur perd un paquet envoyé avant d'avoir annoncé un
+    /// participant, ce qui prend jusqu'à environ 3 secondes. Les doublons sont
+    /// sans effet chez les autres.
+    private func broadcastJoinProofOnSchedule() {
+        let generation = connectGeneration
+        Task { [weak self] in
+            await self?.sendJoinProof()
+            for pause in [1, 1, 2, 3] {
+                try? await Task.sleep(for: .seconds(pause))
+                guard let self, generation == self.connectGeneration else { return }
+                await self.sendJoinProof()
+            }
+        }
     }
 
     /// Contrôle, 10 secondes après une arrivée, que chacun a prouvé son appareil.
@@ -1142,16 +1171,29 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
 }
 
 enum E2EEV2CallDataPolicy {
+    enum Verdict: Equatable {
+        case accept
+        /// Émetteur pas encore annoncé par le serveur : rien n'est conclu.
+        case ignore
+        case endCall
+    }
+
     static func canPublish(requiresE2EE: Bool, cryptorsVerified: Bool) -> Bool {
         !requiresE2EE || cryptorsVerified
     }
 
-    static func accepts(
+    /// Un paquet en clair dans un appel chiffré y met fin. Un paquet chiffré
+    /// peut arriver avant que le serveur annonce son émetteur (jusqu'à environ
+    /// 3 secondes après sa jonction) : il est ignoré, sans couper l'appel.
+    static func verdict(
         requiresE2EE: Bool,
         senderIdentity: String?,
         encryptionType: EncryptionType
-    ) -> Bool {
-        !requiresE2EE || (senderIdentity?.isEmpty == false && encryptionType == .gcm)
+    ) -> Verdict {
+        guard requiresE2EE else { return .accept }
+        guard encryptionType == .gcm else { return .endCall }
+        guard senderIdentity?.isEmpty == false else { return .ignore }
+        return .accept
     }
 }
 

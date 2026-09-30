@@ -52,7 +52,8 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
     }
 
     /// Preuve de l'appareil local, envoyée à la jonction puis à chaque
-    /// nouvel arrivant, toujours avec la même heure de jonction.
+    /// nouvel arrivant, toujours avec la même heure de jonction. Le serveur doit
+    /// avoir émis le jeton sous l'identité `<userId>.<deviceId>` de cet appareil.
     func localProof(livekitIdentity: String, joinedAtMs: Int64) throws -> Data {
         let context = configuration.context
         let proof = E2EEV2CallJoinProof(
@@ -110,7 +111,7 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         if let known = devices[senderIdentity] {
-            // Une identité ne change jamais d'appareil en cours d'appel.
+            // L'identité porte l'appareil : elle n'en change jamais.
             return known == device ? .confirmed : .rejected
         }
         devices[senderIdentity] = device

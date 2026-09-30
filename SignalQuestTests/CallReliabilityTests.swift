@@ -285,21 +285,31 @@ final class CallReliabilityTests: XCTestCase {
             requiresE2EE: true,
             cryptorsVerified: true
         ))
-        XCTAssertFalse(E2EEV2CallDataPolicy.accepts(
+        XCTAssertEqual(E2EEV2CallDataPolicy.verdict(
             requiresE2EE: true,
             senderIdentity: "remote",
             encryptionType: .none
-        ))
-        XCTAssertFalse(E2EEV2CallDataPolicy.accepts(
+        ), .endCall)
+        XCTAssertEqual(E2EEV2CallDataPolicy.verdict(
+            requiresE2EE: true,
+            senderIdentity: nil,
+            encryptionType: .none
+        ), .endCall, "En clair, même d'un émetteur inconnu")
+        XCTAssertEqual(E2EEV2CallDataPolicy.verdict(
             requiresE2EE: true,
             senderIdentity: nil,
             encryptionType: .gcm
-        ))
-        XCTAssertTrue(E2EEV2CallDataPolicy.accepts(
+        ), .ignore, "Émetteur pas encore annoncé par le serveur : ni accepté, ni motif de coupure")
+        XCTAssertEqual(E2EEV2CallDataPolicy.verdict(
             requiresE2EE: true,
             senderIdentity: "remote",
             encryptionType: .gcm
-        ))
+        ), .accept)
+        XCTAssertEqual(E2EEV2CallDataPolicy.verdict(
+            requiresE2EE: false,
+            senderIdentity: nil,
+            encryptionType: .none
+        ), .accept, "Appel en clair : inchangé")
         #endif
     }
 

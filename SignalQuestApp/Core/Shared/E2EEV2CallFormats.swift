@@ -131,12 +131,18 @@ struct E2EEV2CallJoinProof: Equatable, Sendable {
         ].joined(separator: "\n")
     }
 
+    /// Identité LiveKit d'un appareil dans un appel chiffré (§10.4) : le « . »
+    /// est hors de l'alphabet opaque, la découpe est donc sans ambiguïté.
+    static func livekitIdentity(userId: String, deviceId: String) -> String {
+        "\(userId).\(deviceId)"
+    }
+
     static func parse(_ canonical: String) throws -> E2EEV2CallJoinProof {
         guard let f = E2EEV2Canonical.split(canonical, tag: tag, version: "1", fieldCount: 9),
               E2EEV2Canonical.isOpaque(f[2]), E2EEV2Canonical.isOpaque(f[3]),
               Data(base64Encoded: f[4])?.count == 32,
-              !f[5].isEmpty, f[5].utf8.count <= 256, !f[5].contains("\n"),
               E2EEV2Canonical.isOpaque(f[6]), E2EEV2Canonical.isOpaque(f[7]),
+              f[5] == livekitIdentity(userId: f[6], deviceId: f[7]),
               E2EEV2Canonical.isDecimal(f[8]), let joinedAt = Int64(f[8]) else {
             throw E2EEV2CallFormatError.invalidField
         }
