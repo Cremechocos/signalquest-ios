@@ -534,6 +534,8 @@ struct FeedView: View {
     /// Post en cours d'édition — ouvre le composer en mode édition.
     @State private var editingPost: UnifiedSocialFeedItem?
     @State private var presentedStoryStart: Int?
+    /// Auteurs dont les stories sont masquées sur cet appareil.
+    @State private var hiddenStoryAuthorIds = HiddenStoryAuthorsStore.hiddenIds()
     @State private var showStoryComposer = false
     @State private var showComposer = false
     @State private var showExplore = false
@@ -608,7 +610,7 @@ struct FeedView: View {
                     // Rail visible dès que la page est chargée, même sans story
                     // amie (fidèle au prototype : « Ta story » reste le point
                     // d'entrée de création).
-                    if let stories = model.page?.stories {
+                    if let stories = visibleStories {
                         StoriesBar(
                             stories: stories,
                             currentUser: nil,
@@ -617,7 +619,8 @@ struct FeedView: View {
                                 if let idx = stories.firstIndex(where: { $0.id == story.id }) {
                                     presentedStoryStart = idx
                                 }
-                            }
+                            },
+                            onHide: { hideStories(of: $0) }
                         )
                         // Rail débordant : annule le padding écran pour que le
                         // scroll fuie sous les bords (1re bulle alignée à 20 pt).
@@ -714,7 +717,7 @@ struct FeedView: View {
             UserProfileView(
                 userId: author.id,
                 prefill: author,
-                hasActiveStory: (model.page?.stories.contains(where: { $0.author.id == author.id })) ?? false,
+                hasActiveStory: (visibleStories?.contains(where: { $0.author.id == author.id })) ?? false,
                 service: services.feed
             )
         }
@@ -847,7 +850,7 @@ struct FeedView: View {
             get: { presentedStoryStart.map { _ in StoriesPresentation() } },
             set: { if $0 == nil { presentedStoryStart = nil } }
         )) { _ in
-            if let stories = model.page?.stories, !stories.isEmpty, let start = presentedStoryStart {
+            if let stories = visibleStories, !stories.isEmpty, let start = presentedStoryStart {
                 StoryViewer(stories: Array(stories[min(start, stories.count - 1)...]),
                             onMarkViewed: { story in
                                 Task { try? await services.stories.markViewed(story.id) }
@@ -874,7 +877,8 @@ struct FeedView: View {
                             viewersProvider: { story in
                                 (try? await services.stories.viewers(storyId: story.id)) ?? []
                             },
-                            reports: services.reports)
+                            reports: services.reports,
+                            onHideAuthor: { hideStories(of: $0) })
             }
         }
         .sheet(isPresented: $showStoryComposer) {
@@ -885,6 +889,33 @@ struct FeedView: View {
         .sheet(isPresented: $showComposer) {
             ComposerSheet(service: services.feed, userService: services.users)
                 .onDisappear { Task { await model.load() } }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: HiddenStoryAuthorsStore.didChange)) { _ in
+            hiddenStoryAuthorIds = HiddenStoryAuthorsStore.hiddenIds()
+        }
+    }
+
+    /// Stories du fil, sans celles des membres masqués sur cet appareil.
+    private var visibleStories: [SocialStory]? {
+        model.page?.stories.filter { !hiddenStoryAuthorIds.contains($0.author.id) }
+    }
+
+    /// Masque les stories d'un membre, sans le bloquer ni toucher à ses
+    /// publications. Réversible tout de suite, puis depuis les Préférences du fil.
+    private func hideStories(of story: SocialStory) {
+        let author = story.author
+        HiddenStoryAuthorsStore.hide(authorId: author.id, displayName: author.displayName)
+        // Sans compte local (démo), le magasin refuse : le masquage vaut alors
+        // pour la session seulement.
+        hiddenStoryAuthorIds.insert(author.id)
+        presentedStoryStart = nil
+        Haptics.light()
+        inAppNotifications.showUndo(
+            body: String(localized: "Tu ne verras plus les stories de \(author.displayName)."),
+            actionLabel: String(localized: "Annuler")
+        ) {
+            HiddenStoryAuthorsStore.unhide(authorId: author.id)
+            hiddenStoryAuthorIds.remove(author.id)
         }
     }
 

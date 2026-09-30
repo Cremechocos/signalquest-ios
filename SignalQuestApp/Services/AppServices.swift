@@ -136,6 +136,20 @@ final class AppServices: ObservableObject {
     /// à jour forcée, sans plus rien pour l'arrêter : GPS, tests, Live Activity
     /// et écran allumé continuaient.
     lazy var driveTest = DriveTestViewModel(services: self)
+    /// Renvoi groupé des envois en attente, au retour du réseau et au premier plan.
+    lazy var pendingQueues: PendingQueueFlusher = makePendingQueues()
+
+    /// Construit dans une méthode : Swift 6 refuse des fermetures `@MainActor`
+    /// asynchrones écrites directement dans l'initialiseur d'une `lazy var`.
+    private func makePendingQueues() -> PendingQueueFlusher {
+        PendingQueueFlusher(steps: [
+            { [weak self] in await self?.speedtest.retryPendingSaves() },
+            { [weak self] in await self?.feed.retryPendingPosts() },
+            { [weak self] in await self?.messages.retryPendingTextMessages() },
+            { [weak self] in await self?.messages.retryPendingAttachments() },
+            { [weak self] in await self?.customSites.retryPending() },
+        ])
+    }
 
     /// Nombre de conversations non lues — alimente le badge de l'onglet Messages.
     @Published var unreadConversations = 0
@@ -441,7 +455,10 @@ final class AppServices: ObservableObject {
     /// Retour au premier plan : la diffusion reprend si les réglages de partage
     /// et le mode l'autorisent (`reevaluate()` tranche).
     func enterForeground() {
-        if networkPath.isOnline { epochRotations.resume() }
+        if networkPath.isOnline {
+            epochRotations.resume()
+            pendingQueues.flush()
+        }
         location.setAppActive(true)
         livePresence.setAppActive(true)
         liveShare.setAppActive(true)

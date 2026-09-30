@@ -366,6 +366,7 @@ final class AuthService: AuthServicing {
               api.credentials.accessToken() == token else { return }
         if let ownerScopeId = closing?.ownerScopeId {
             OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
+            HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
@@ -392,6 +393,7 @@ final class AuthService: AuthServicing {
               api.credentials.accessToken() == token else { return }
         if let ownerScopeId = closing?.ownerScopeId {
             OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
+            HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()

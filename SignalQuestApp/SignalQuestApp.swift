@@ -460,10 +460,11 @@ struct RootView: View {
             guard online, case .authenticated = session.state else { return }
             services.epochRotations.resume()
             services.refreshFavoritesForCurrentAccount()
+            // Tout ce qui attendait le réseau repart, pas seulement les sites.
+            services.pendingQueues.flush()
             Task {
                 await callManager.retryVoIPTokenRegistrationIfNeeded()
                 await callManager.retryPendingCallTerminations()
-                await services.customSites.retryPending()
             }
         }
     }
@@ -657,6 +658,10 @@ struct MainTabView: View {
     let user: AuthUser?
     @State private var showHandleGate = false
     @State private var showGuestReceipts = false
+    /// Dernier onglet de cette fenêtre. @SceneStorage le rend quand iOS a fermé
+    /// l'app en arrière-plan, pas après un arrêt forcé par l'utilisateur.
+    @SceneStorage("sq.lastTab") private var lastTab = ""
+    @State private var didRestoreTab = false
 
     init(user: AuthUser?) {
         self.user = user
@@ -666,7 +671,9 @@ struct MainTabView: View {
         tabContainer
         .focusedSceneObject(router)
         .task(id: user?.id) {
+            SQQuickActions.install(signedIn: user != nil)
             consumeIntentRoutes()
+            restoreLastTabIfNeeded()
             #if DEBUG
             if AppEnvironment.showsCallEndQA { services.callManager.presentQAEndNotice() }
             #endif
@@ -692,6 +699,7 @@ struct MainTabView: View {
             }
         }
         .onChangeCompat(of: router.selectedTab) { _, tab in
+            lastTab = tab.rawValue
             // Changement d'onglet (tap, deep-link, intent) : dock redéployé.
             withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { router.isDockMinimized = false }
             // Le @pseudo sert aux mentions : il se propose en entrant dans
@@ -884,6 +892,17 @@ struct MainTabView: View {
     }
 
     /// Applique une route demandée par un App Intent / raccourci Siri (onglet Speed/Carte).
+    /// « Reprendre où j'en étais » : une seule fois par fenêtre, et seulement si
+    /// rien d'autre n'a choisi l'onglet (lien, intent, fin d'introduction, QA).
+    private func restoreLastTabIfNeeded() {
+        guard !didRestoreTab else { return }
+        didRestoreTab = true
+        guard !AppEnvironment.usesDemoData || AppEnvironment.restoresLastTabQA,
+              router.selectedTab == .home, !router.hasPendingContentRoute,
+              let tab = AppRouter.AppTab(rawValue: lastTab), tab != .home else { return }
+        router.selectedTab = tab
+    }
+
     private func consumeIntentRoutes() {
         if SQIntentRoute.consumeSpeedtest() {
             router.requestSpeedtestStart()

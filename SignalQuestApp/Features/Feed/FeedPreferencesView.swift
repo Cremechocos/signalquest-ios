@@ -14,6 +14,8 @@ struct FeedPreferencesView: View {
     @State private var errorMessage: String?
     @State private var newMutedTag = ""
     @State private var newMutedWord = ""
+    /// Stories masquées : préférence locale à cet appareil (pas de route serveur).
+    @State private var hiddenStoryAuthors = HiddenStoryAuthorsStore.entries()
 
     var body: some View {
         List {
@@ -83,6 +85,31 @@ struct FeedPreferencesView: View {
                 Text("Les publications contenant ces mots n'apparaîtront plus dans ton fil.")
             }
             .listRowBackground(SQColor.surface)
+
+            Section {
+                if hiddenStoryAuthors.isEmpty {
+                    Text("Depuis une story, « Masquer les stories de… » les retire de ton fil sans bloquer la personne.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                } else {
+                    ForEach(hiddenStoryAuthors) { entry in
+                        HStack {
+                            Text(verbatim: entry.displayName)
+                            Spacer()
+                            Button("Afficher de nouveau") {
+                                HiddenStoryAuthorsStore.unhide(authorId: entry.authorId)
+                            }
+                            .font(SQFont.body(13, .medium))
+                            .foregroundStyle(SQColor.accentInk)
+                        }
+                    }
+                }
+            } header: {
+                Text("Stories masquées")
+            } footer: {
+                Text("Seulement sur cet appareil. Leurs publications restent dans ton fil.")
+            }
+            .listRowBackground(SQColor.surface)
         }
         .scrollContentBackground(.hidden)
         .background(SQColor.bg)
@@ -92,6 +119,9 @@ struct FeedPreferencesView: View {
             if isLoading { ProgressView().tint(SQColor.brandRed) }
         }
         .task { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: HiddenStoryAuthorsStore.didChange)) { _ in
+            hiddenStoryAuthors = HiddenStoryAuthorsStore.entries()
+        }
     }
 
     private func addRow(placeholder: String, text: Binding<String>, action: @escaping () -> Void) -> some View {

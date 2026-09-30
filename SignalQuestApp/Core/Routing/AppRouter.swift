@@ -35,7 +35,7 @@ enum PostDeepLink {
 /// notification tap always lands somewhere sensible instead of nowhere.
 @MainActor
 final class AppRouter: ObservableObject {
-    enum AppTab: Hashable { case home, map, speed, community, profile }
+    enum AppTab: String, Hashable { case home, map, speed, community, profile }
 
     @Published var selectedTab: AppTab
     /// Set to request opening a specific conversation on the Messages tab.

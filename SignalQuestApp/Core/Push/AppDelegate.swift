@@ -58,6 +58,26 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
 
+    /// Toutes les scènes passent par ici. CarPlay garde la configuration de
+    /// l'Info.plist (même nom) ; les fenêtres de l'app reçoivent le délégué qui
+    /// traite les actions rapides de l'icône. Au démarrage à froid, l'action
+    /// choisie arrive dans `options` : on pose sa route tout de suite.
+    func application(_ application: UIApplication,
+                     configurationForConnecting connectingSceneSession: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(
+            name: connectingSceneSession.configuration.name,
+            sessionRole: connectingSceneSession.role
+        )
+        if connectingSceneSession.role == .windowApplication {
+            configuration.delegateClass = SQWindowSceneDelegate.self
+            if let shortcutItem = options.shortcutItem {
+                SQQuickActions.handle(shortcutItem)
+            }
+        }
+        return configuration
+    }
+
     /// Push silencieux `e2ee_sync` : un destinataire (ex. un appareil Android
     /// fraîchement configuré) demande le re-partage de la clé de conversation.
     /// Best-effort : le matériel E2EE est stocké en Keychain `whenUnlocked`

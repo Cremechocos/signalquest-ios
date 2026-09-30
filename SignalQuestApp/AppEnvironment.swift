@@ -171,6 +171,9 @@ enum AppEnvironment {
     static var opensMessagesTab: Bool { hasArgument("--qa-tab-messages") }
     static var startsOnProfileQA: Bool { hasArgument("--qa-tab-profile") }
     static var startsOnCommunityQA: Bool { hasArgument("--qa-tab-community") }
+    /// La démo ne restaure pas le dernier onglet (chaque test d'interface part de
+    /// l'Accueil), sauf pour le test de « Reprendre où j'en étais ».
+    static var restoresLastTabQA: Bool { hasArgument("--qa-restore-tab") }
     static var opensANFRMap: Bool { hasArgument("--qa-anfr-map") }
     static var opensANFRStats: Bool { hasArgument("--qa-anfr-stats") }
     static var usesLegacyDock: Bool { hasArgument("--qa-legacy-dock") }

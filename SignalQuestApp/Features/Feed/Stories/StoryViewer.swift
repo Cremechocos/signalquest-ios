@@ -60,6 +60,8 @@ struct StoryViewer: View {
     var viewersProvider: (SocialStory) async -> [StoryViewerEntry] = { _ in [] }
     /// Signalement des stories des autres (règle 1.2, SOC-12).
     var reports: ReportsServicing? = nil
+    /// Masquer les stories de l'auteur sur cet appareil, sans le bloquer.
+    var onHideAuthor: ((SocialStory) -> Void)? = nil
 
     @StateObject private var replySubmission = StoryReplySubmission()
     @FocusState private var replyFocused: Bool
@@ -270,7 +272,7 @@ struct StoryViewer: View {
             Spacer()
             // Feuille d'actions plutôt qu'un menu : son ouverture se voit, et la
             // story reste en pause pendant le choix.
-            if let story = currentStory, story.isMine != true, reports != nil {
+            if let story = currentStory, story.isMine != true, reports != nil || onHideAuthor != nil {
                 Button {
                     showStoryActions = true
                 } label: {
@@ -283,7 +285,12 @@ struct StoryViewer: View {
                 .accessibilityLabel("Plus d’options")
                 .accessibilityIdentifier("story.more")
                 .confirmationDialog("Story de \(story.author.displayName)", isPresented: $showStoryActions, titleVisibility: .hidden) {
-                    Button("Signaler la story", role: .destructive) { reportedStory = story }
+                    if let onHideAuthor {
+                        Button("Masquer les stories de \(story.author.displayName)") { onHideAuthor(story) }
+                    }
+                    if reports != nil {
+                        Button("Signaler la story", role: .destructive) { reportedStory = story }
+                    }
                     Button("Annuler", role: .cancel) {}
                 }
             }

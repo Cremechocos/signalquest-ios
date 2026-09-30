@@ -5,6 +5,8 @@ struct StoriesBar: View {
     let currentUser: AuthUser?
     var onCompose: () -> Void
     var onSelect: (SocialStory) -> Void
+    /// Masquer les stories d'un membre, sans le bloquer (appui long sur sa bulle).
+    var onHide: ((SocialStory) -> Void)? = nil
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -22,6 +24,15 @@ struct StoriesBar: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Story de \(story.author.displayName)")
+                    .contextMenu {
+                        if story.isMine != true, let onHide {
+                            Button {
+                                onHide(story)
+                            } label: {
+                                Label("Masquer les stories de \(story.author.displayName)", systemImage: "eye.slash")
+                            }
+                        }
+                    }
                 }
             }
             .padding(.horizontal)

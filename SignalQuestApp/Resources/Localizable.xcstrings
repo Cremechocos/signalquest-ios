@@ -3975,6 +3975,22 @@
         }
       }
     },
+    "Afficher de nouveau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show again"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher de nouveau"
+          }
+        }
+      }
+    },
     "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera chaque minute depuis nos serveurs, téléphone éteint compris." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15872,6 +15888,22 @@
         }
       }
     },
+    "Depuis une story, « Masquer les stories de… » les retire de ton fil sans bloquer la personne." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From a story, “Hide … stories” removes them from your feed without blocking the person."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depuis une story, « Masquer les stories de… » les retire de ton fil sans bloquer la personne."
+          }
+        }
+      }
+    },
     "Désactiver la double authentification" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -24331,6 +24363,22 @@
         }
       }
     },
+    "Lancer un test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run a test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lancer un test"
+          }
+        }
+      }
+    },
     "Lancer un test de débit ?" : {
       "localizations" : {
         "en" : {
@@ -27370,6 +27418,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’écart entre le signal utile et le bruit ambiant, en dB. Plus il est élevé, plus le téléphone peut monter en débit."
+          }
+        }
+      }
+    },
+    "Masquer les stories de %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide %@’s stories"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer les stories de %@"
           }
         }
       }
@@ -40361,6 +40425,22 @@
         }
       }
     },
+    "Seulement sur cet appareil. Leurs publications restent dans ton fil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this device only. Their posts stay in your feed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seulement sur cet appareil. Leurs publications restent dans ton fil."
+          }
+        }
+      }
+    },
     "SIM %@" : {
       "localizations" : {
         "en" : {
@@ -43439,6 +43519,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Statut prévisionnel"
+          }
+        }
+      }
+    },
+    "Stories masquées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hidden stories"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stories masquées"
           }
         }
       }
@@ -47135,6 +47231,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tu ne suis encore personne. Explore les profils pour remplir cet onglet."
+          }
+        }
+      }
+    },
+    "Tu ne verras plus les stories de %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You won’t see %@’s stories anymore."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ne verras plus les stories de %@."
           }
         }
       }
