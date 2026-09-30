@@ -619,6 +619,7 @@
 		D794EE40CF5E7B73E5E675FB /* RemoteVoiceNoteBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650E578A11F7C683E4ABFCA9 /* RemoteVoiceNoteBubble.swift */; };
 		D7A64FBC491AB29258026F4B /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B47BDB4D6F4BC76820FA3D2 /* RemoteImage.swift */; };
 		D7FC5454189D8C3F20258AD3 /* nci-provenance-v1.json in Resources */ = {isa = PBXBuildFile; fileRef = BE36E5E28521B4EE522771A1 /* nci-provenance-v1.json */; };
+		D896252223AB17FB003282CB /* LiveKitJoinProofLoopbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55ED3B258F3FC986B9699440 /* LiveKitJoinProofLoopbackTests.swift */; };
 		D8AD5FB9FEAB46EDF3F3C0D3 /* NotificationPrimingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DFB198B09AAD5F71460EDC1 /* NotificationPrimingTests.swift */; };
 		D8B502074515888EFFA296B9 /* GroupSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2756E12B4DD8420E4E6FC4 /* GroupSettingsView.swift */; };
 		D8D71CD3AB926175688AD739 /* ScheduledMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA71E3F29A86476A36C8900F /* ScheduledMessagesView.swift */; };
@@ -1012,6 +1013,7 @@
 		5536589482E8FCA7F50D5797 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		554B78FC0A0A68C411BAD689 /* LeaderboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardModels.swift; sourceTree = "<group>"; };
 		55CF1B9AC2B2537FE31D0FED /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
+		55ED3B258F3FC986B9699440 /* LiveKitJoinProofLoopbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveKitJoinProofLoopbackTests.swift; sourceTree = "<group>"; };
 		55FD59340CD7E3743D7EF4B9 /* AntennaProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaProfileView.swift; sourceTree = "<group>"; };
 		564C8C434BB8A4A59B717BA1 /* CallFailureMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallFailureMessageTests.swift; sourceTree = "<group>"; };
 		5668B2D20BD77FACF98E80BB /* RedesignTourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedesignTourQATests.swift; sourceTree = "<group>"; };
@@ -2551,6 +2553,7 @@
 				6C417B0E3A5B8BAEA89F18C7 /* LastSpeedtestResultIntentTests.swift */,
 				B9A16EBE21BA07C588250672 /* LeaderboardRequestOrderingTests.swift */,
 				81DBD896295D1CABACD61CEC /* LiveKitCallSettingsTests.swift */,
+				55ED3B258F3FC986B9699440 /* LiveKitJoinProofLoopbackTests.swift */,
 				E375079277F78FD8BC4EDC5A /* LivePresenceServiceTests.swift */,
 				5DAD6827B7954D8DA96CF665 /* LiveShareLocationFreshnessTests.swift */,
 				91F51AC70BDC8F2F1EF5BC5A /* LiveSharePreflightTransportTests.swift */,
@@ -3696,6 +3699,7 @@
 				C5E03A6DD21C83DD18C57E47 /* LastSpeedtestResultIntentTests.swift in Sources */,
 				E283DEFD873FF58AD753DF08 /* LeaderboardRequestOrderingTests.swift in Sources */,
 				5360984FF40767C2DBFF4DBD /* LiveKitCallSettingsTests.swift in Sources */,
+				D896252223AB17FB003282CB /* LiveKitJoinProofLoopbackTests.swift in Sources */,
 				4C08B3D8538380EDD221B5B1 /* LivePresenceServiceTests.swift in Sources */,
 				75228C3698799B371D41A038 /* LiveShareLocationFreshnessTests.swift in Sources */,
 				EE09E8F383D3C47DF4E3ADB1 /* LiveSharePreflightTransportTests.swift in Sources */,
