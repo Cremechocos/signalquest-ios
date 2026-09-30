@@ -6729,6 +6729,22 @@
         }
       }
     },
+    "Appel chiffré impossible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted call failed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel chiffré impossible"
+          }
+        }
+      }
+    },
     "Appel en cours avec %@" : {
       "localizations" : {
         "en" : {
@@ -48698,6 +48714,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un Drive Test sert à cartographier le réseau. Ce que tu enregistres est publié sur la carte communautaire — c'est le principe, il n'y a pas de réglage pour l'en empêcher."
+          }
+        }
+      }
+    },
+    "Un participant n’a pas pu prouver l’appareil avec lequel il a rejoint l’appel." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A participant couldn’t prove which device they joined the call from."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un participant n’a pas pu prouver l’appareil avec lequel il a rejoint l’appel."
           }
         }
       }

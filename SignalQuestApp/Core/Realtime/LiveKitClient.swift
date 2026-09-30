@@ -30,6 +30,14 @@ enum CallBackgroundMediaPolicy {
     static let suspendLocalVideoTracks = true
 }
 
+/// Pourquoi un appel chiffré a été coupé, pour le dire à l'écran.
+enum E2EEV2CallTrustLoss: Equatable, Sendable {
+    /// Clé, chiffrement ou déchiffrement en échec.
+    case verification
+    /// Preuve de jonction invalide, ou absente 10 secondes après une arrivée.
+    case joinProof
+}
+
 @MainActor
 final class LiveKitClient: ObservableObject {
     enum State: Equatable { case idle, connecting, connected, failed(String), ended }
@@ -120,7 +128,7 @@ final class LiveKitClient: ObservableObject {
     var onRemoteDisconnect: (@MainActor () -> Void)?
     /// A verified E2EE call encountered a terminal cryptor/revocation failure.
     /// CallManager closes CallKit and queues the participant leave fail-closed.
-    var onE2EETrustLost: (@MainActor () -> Void)?
+    var onE2EETrustLost: (@MainActor (E2EEV2CallTrustLoss) -> Void)?
     /// Point d'extension minimal pour les données d'appel (réactions, radio QA).
     /// Le SDK a déjà déchiffré `data` avant cet appel ; les paquets non-GCM sont
     /// refusés lorsque la session exige E2EE v2.
@@ -152,6 +160,8 @@ final class LiveKitClient: ObservableObject {
     /// sur une room morte (« appel fantôme »). Réinitialisé à chaque connect().
     private var didDisconnectDuringConnect = false
     private var didE2EEFailDuringConnect = false
+    /// Heure de jonction de notre preuve, identique à chaque renvoi.
+    private var localJoinedAtMs: Int64 = 0
     private var callHasVideo = false
     private var userSpeakerOverride: Bool?
     private var emptyRoomTask: Task<Void, Never>?
@@ -287,6 +297,9 @@ final class LiveKitClient: ObservableObject {
                     Task { @MainActor in
                         if reconnecting { self?.isE2EEVerified = false }
                         self?.setReconnecting(reconnecting)
+                        // Après une reconnexion complète, les autres nous voient
+                        // arriver de nouveau et attendent notre preuve.
+                        if !reconnecting { await self?.sendJoinProof() }
                     }
                 },
                 onMediaChanged: { [weak self] in
@@ -294,10 +307,18 @@ final class LiveKitClient: ObservableObject {
                 },
                 onParticipantExpected: { [weak self] participantID in
                     e2eeSession?.verification.expectParticipant(participantID)
+                    e2eeSession?.joinVerifier?.expect(participantID, at: Date())
                     let verified = e2eeSession?.verification.isVerified ?? false
-                    Task { @MainActor in self?.isE2EEVerified = verified }
+                    Task { @MainActor in
+                        self?.isE2EEVerified = verified
+                        guard e2eeSession?.joinVerifier != nil else { return }
+                        self?.scheduleJoinProofDeadline()
+                        // Le nouvel arrivant n'a pas reçu notre preuve de jonction.
+                        await self?.sendJoinProof(to: participantID)
+                    }
                 },
                 onParticipantRemoved: { [weak self] participantID in
+                    e2eeSession?.joinVerifier?.remove(participantID)
                     e2eeSession?.verification.removeParticipant(participantID)
                     let verified = e2eeSession?.verification.isVerified ?? false
                     Task { @MainActor in self?.isE2EEVerified = verified }
@@ -352,7 +373,31 @@ final class LiveKitClient: ObservableObject {
                         Task { @MainActor in self?.handleE2EETrustLoss() }
                         return
                     }
-                    if let senderIdentity {
+                    if let joinVerifier = e2eeSession?.joinVerifier {
+                        // Appel prouvé (§10.4) : seule une preuve de jonction
+                        // valide atteste un participant, et rien d'un
+                        // participant non prouvé n'atteint l'app.
+                        guard let senderIdentity else { return }
+                        if topic == E2EEV2CallJoinProof.topic {
+                            let outcome = joinVerifier.receive(data, from: senderIdentity)
+                            guard outcome != .rejected else {
+                                e2eeSession?.verification.failGlobally()
+                                Task { @MainActor in self?.handleE2EETrustLoss(.joinProof) }
+                                return
+                            }
+                            e2eeSession?.verification.markJoinProven(senderIdentity)
+                            let verified = e2eeSession?.verification.isVerified ?? false
+                            Task { @MainActor in
+                                self?.isE2EEVerified = verified
+                                self?.refreshRemoteMedia()
+                                // Réponse à sa première preuve : notre preuve lui
+                                // parvient même s'il n'était pas prêt à son arrivée.
+                                if outcome == .proven { await self?.sendJoinProof(to: senderIdentity) }
+                            }
+                            return
+                        }
+                        guard joinVerifier.isProven(senderIdentity) else { return }
+                    } else if let senderIdentity {
                         e2eeSession?.verification.markDataVerified(senderIdentity)
                     }
                     let verified = e2eeSession?.verification.isVerified ?? false
@@ -418,13 +463,17 @@ final class LiveKitClient: ObservableObject {
             } else if e2eeSession != nil {
                 e2eeSession?.verification.failGlobally()
             }
+            let joinedAt = Date()
             liveRoom.remoteParticipants.values.forEach { participant in
                 if let identity = participant.identity?.stringValue {
                     e2eeSession?.verification.expectParticipant(identity)
+                    e2eeSession?.joinVerifier?.expect(identity, at: joinedAt)
                 } else if e2eeSession != nil {
                     e2eeSession?.verification.failGlobally()
                 }
             }
+            localJoinedAtMs = Int64(joinedAt.timeIntervalSince1970 * 1_000)
+            if e2eeSession?.joinVerifier != nil { scheduleJoinProofDeadline() }
             isE2EEVerified = e2eeSession?.verification.isVerified ?? false
             // CALL-RTC-09 : isMicMuted / isCameraOn dérivent de l'état RÉEL du SDK
             // (et non d'un toggle optimiste) → l'UI et CallKit restent honnêtes même
@@ -466,11 +515,16 @@ final class LiveKitClient: ObservableObject {
                 return
             }
             state = .connected
+            // Notre preuve de jonction part dès que l'appel est établi (§10.4).
+            if e2eeSession?.joinVerifier != nil {
+                Task { [weak self] in await self?.sendJoinProof() }
+            }
 #else
             throw LiveKitUnavailableError()
 #endif
         } catch {
             activeE2eeSession?.verification.reset()
+            activeE2eeSession?.joinVerifier?.reset()
             activeE2eeSession = nil
             isE2EEVerified = false
             restoreLocalQAAudioEngineIfNeeded()
@@ -497,7 +551,9 @@ final class LiveKitClient: ObservableObject {
         localMedia = nil
         roomObserver = nil
         activeE2eeSession?.verification.reset()
+        activeE2eeSession?.joinVerifier?.reset()
         activeE2eeSession = nil
+        localJoinedAtMs = 0
         remoteVideos = []
         remoteAudios = []
         localVideoTrack = nil
@@ -554,7 +610,7 @@ final class LiveKitClient: ObservableObject {
         }
     }
 
-    private func handleE2EETrustLoss() {
+    private func handleE2EETrustLoss(_ reason: E2EEV2CallTrustLoss = .verification) {
 #if canImport(LiveKit)
         guard activeE2eeSession != nil else { return }
         isE2EEVerified = false
@@ -570,10 +626,62 @@ final class LiveKitClient: ObservableObject {
             if allowsLocalQADataBootstrap, onE2EETrustLost == nil { break }
             #endif
             state = .ended
-            onE2EETrustLost?()
+            onE2EETrustLost?(reason)
         default:
             break
         }
+#endif
+    }
+
+    /// Envoie notre preuve de jonction sur le canal de données chiffré, à tous
+    /// ou au seul `destination` (§10.4). Sans canal chiffré, ou si l'envoi
+    /// échoue, l'appel prend fin : les autres le couperaient sous 10 secondes.
+    private func sendJoinProof(to destination: String? = nil) async {
+#if canImport(LiveKit)
+        guard state == .connected, let room, let session = activeE2eeSession,
+              let joinVerifier = session.joinVerifier else { return }
+        guard room.e2eeManager?.dataChannelEncryptionType == .gcm,
+              let identity = room.localParticipant.identity?.stringValue else {
+            session.verification.failGlobally()
+            handleE2EETrustLoss(.joinProof)
+            return
+        }
+        do {
+            let message = try joinVerifier.localProof(livekitIdentity: identity, joinedAtMs: localJoinedAtMs)
+            try await room.localParticipant.publish(
+                data: message,
+                options: DataPublishOptions(
+                    destinationIdentities: destination.map { [Participant.Identity(from: $0)] } ?? [],
+                    topic: E2EEV2CallJoinProof.topic,
+                    reliable: true
+                )
+            )
+            session.verification.markJoinProven(identity)
+            isE2EEVerified = session.verification.isVerified
+        } catch {
+            guard state == .connected else { return }
+            session.verification.failGlobally()
+            handleE2EETrustLoss(.joinProof)
+        }
+#endif
+    }
+
+    /// Contrôle, 10 secondes après une arrivée, que chacun a prouvé son appareil.
+    private func scheduleJoinProofDeadline() {
+        let generation = connectGeneration
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(E2EEV2CallJoinVerifier.deadline) + .milliseconds(250))
+            self?.enforceJoinProofDeadline(generation: generation)
+        }
+    }
+
+    private func enforceJoinProofDeadline(generation: Int) {
+#if canImport(LiveKit)
+        guard generation == connectGeneration, let session = activeE2eeSession,
+              let joinVerifier = session.joinVerifier,
+              !joinVerifier.overdue(at: Date()).isEmpty else { return }
+        session.verification.failGlobally()
+        handleE2EETrustLoss(.joinProof)
 #endif
     }
 
@@ -1076,12 +1184,22 @@ enum E2EEV2CallMediaPolicy {
 }
 
 final class E2EEV2LiveKitVerification: @unchecked Sendable {
+    /// Appel prouvé (§10.4) : chaque participant, nous compris, doit avoir
+    /// prouvé son appareil par une preuve de jonction.
+    let requiresJoinProof: Bool
+
     private let lock = NSLock()
     private var expectedParticipants = Set<String>()
     private var trackOwners: [String: String] = [:]
     private var states: [String: E2EEState] = [:]
     private var dataVerifiedParticipants = Set<String>()
+    /// Gardées à la reconnexion : l'appareil d'une identité ne change pas.
+    private var provenParticipants = Set<String>()
     private var globalFailure = false
+
+    init(requiresJoinProof: Bool = false) {
+        self.requiresJoinProof = requiresJoinProof
+    }
 
     func expectParticipant(_ participantID: String) {
         lock.lock()
@@ -1098,6 +1216,7 @@ final class E2EEV2LiveKitVerification: @unchecked Sendable {
         defer { lock.unlock() }
         expectedParticipants.remove(participantID)
         dataVerifiedParticipants.remove(participantID)
+        provenParticipants.remove(participantID)
         let removedTracks = trackOwners.compactMap { trackID, owner in
             owner == participantID ? trackID : nil
         }
@@ -1162,17 +1281,33 @@ final class E2EEV2LiveKitVerification: @unchecked Sendable {
         dataVerifiedParticipants.insert(participantID)
     }
 
+    /// Preuve de jonction valide de ce participant, ou envoi de la nôtre.
+    func markJoinProven(_ participantID: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard validIdentifier(participantID) else {
+            globalFailure = true
+            return
+        }
+        expectedParticipants.insert(participantID)
+        provenParticipants.insert(participantID)
+    }
+
     func failGlobally() {
         lock.lock()
         defer { lock.unlock() }
         globalFailure = true
     }
 
-    /// Piste déchiffrée avec la clé de l'appel : la seule qu'on montre.
+    /// Piste déchiffrée avec la clé de l'appel, d'un participant prouvé quand
+    /// l'appel l'exige : la seule qu'on montre.
     func isTrackVerified(_ trackID: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         guard !globalFailure, let state = states[trackID] else { return false }
+        if requiresJoinProof {
+            guard let owner = trackOwners[trackID], provenParticipants.contains(owner) else { return false }
+        }
         return E2EEV2CallCryptorPolicy.isVerified(state)
     }
 
@@ -1183,6 +1318,7 @@ final class E2EEV2LiveKitVerification: @unchecked Sendable {
         trackOwners.removeAll()
         states.removeAll()
         dataVerifiedParticipants.removeAll()
+        provenParticipants.removeAll()
         globalFailure = false
     }
 
@@ -1191,11 +1327,12 @@ final class E2EEV2LiveKitVerification: @unchecked Sendable {
         defer { lock.unlock() }
         guard !globalFailure, expectedParticipants.count >= 2 else { return false }
         return expectedParticipants.allSatisfy { participantID in
+            if requiresJoinProof, !provenParticipants.contains(participantID) { return false }
             let participantTracks = trackOwners.compactMap { trackID, owner in
                 owner == participantID ? trackID : nil
             }
             if participantTracks.isEmpty {
-                return dataVerifiedParticipants.contains(participantID)
+                return requiresJoinProof || dataVerifiedParticipants.contains(participantID)
             }
             return participantTracks.allSatisfy { trackID in
                 guard let state = states[trackID] else { return false }
@@ -1212,7 +1349,20 @@ final class E2EEV2LiveKitVerification: @unchecked Sendable {
 struct E2EEV2LiveKitSession {
     let encryptionOptions: EncryptionOptions
     let keyProvider: BaseKeyProvider
-    fileprivate let verification = E2EEV2LiveKitVerification()
+    /// Preuves de jonction (§10.4) ; nil pour le contrat d'appel v1 et le banc QA.
+    let joinVerifier: E2EEV2CallJoinVerifier?
+    fileprivate let verification: E2EEV2LiveKitVerification
+
+    init(
+        encryptionOptions: EncryptionOptions,
+        keyProvider: BaseKeyProvider,
+        joinVerifier: E2EEV2CallJoinVerifier? = nil
+    ) {
+        self.encryptionOptions = encryptionOptions
+        self.keyProvider = keyProvider
+        self.joinVerifier = joinVerifier
+        verification = E2EEV2LiveKitVerification(requiresJoinProof: joinVerifier != nil)
+    }
 
     /// Réglages figés par la spec (§10.3), posés un par un sur les trois SDK :
     /// leurs défauts diffèrent. Pas de fenêtre de ratchet (une clé par appel),
@@ -1232,7 +1382,11 @@ struct E2EEV2LiveKitSession {
     /// valeur sur les trois plateformes (COM-1).
     static let failureTolerance: Int32 = 10
 
-    static func make(epochKey: Data, context: E2EEV2CallFrameKeyContext) throws -> E2EEV2LiveKitSession {
+    static func make(
+        epochKey: Data,
+        context: E2EEV2CallFrameKeyContext,
+        join: E2EEV2CallJoinConfiguration? = nil
+    ) throws -> E2EEV2LiveKitSession {
         var frameKey = try E2EEV2CallFrameKey.derive(epochKey: epochKey, context: context)
         defer { frameKey.resetBytes(in: 0..<frameKey.count) }
         let passphrase = try E2EEV2CallFrameKey.liveKitSharedPassphrase(frameKey: frameKey)
@@ -1240,7 +1394,8 @@ struct E2EEV2LiveKitSession {
         keyProvider.setKey(key: passphrase, index: 0)
         return E2EEV2LiveKitSession(
             encryptionOptions: EncryptionOptions(keyProvider: keyProvider, encryptionType: .gcm),
-            keyProvider: keyProvider
+            keyProvider: keyProvider,
+            joinVerifier: join.map(E2EEV2CallJoinVerifier.init(configuration:))
         )
     }
 

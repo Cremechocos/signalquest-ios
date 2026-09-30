@@ -308,7 +308,7 @@ final class CallManager: NSObject, ObservableObject {
         // CALL-RTC-01 : quand le média se termine côté distant (l'autre raccroche,
         // room fermée, ou réseau tombé), LiveKit le signale → on clôt l'appel.
         liveKit.onRemoteDisconnect = { [weak self] in self?.handleRemoteDisconnect() }
-        liveKit.onE2EETrustLost = { [weak self] in self?.handleE2EETrustLost() }
+        liveKit.onE2EETrustLost = { [weak self] reason in self?.handleE2EETrustLost(reason) }
         epochObserver = NotificationCenter.default.addObserver(
             forName: E2EEV2EpochEvents.didAdvance, object: nil, queue: .main
         ) { [weak self] note in
@@ -916,11 +916,25 @@ final class CallManager: NSObject, ObservableObject {
         }
     }
 
-    private func handleE2EETrustLost() {
+    private func handleE2EETrustLost(_ reason: E2EEV2CallTrustLoss) {
         guard let call = activeCall, !call.isEnding else { return }
         activeCall?.isEnding = true
         reportCallEnded(call.id, reason: .failed)
-        let notice = failureNotice(message: String(localized: "L’appel a été coupé : la vérification du chiffrement a échoué."))
+        let notice: EndNotice?
+        switch reason {
+        case .verification:
+            notice = failureNotice(message: String(localized: "L’appel a été coupé : la vérification du chiffrement a échoué."))
+        case .joinProof:
+            // Spec §10.4 : un participant sans preuve de jonction valide.
+            notice = EndNotice(
+                title: String(localized: "Appel chiffré impossible"),
+                message: String(localized: "Un participant n’a pas pu prouver l’appareil avec lequel il a rejoint l’appel."),
+                handle: call.handle,
+                conversationId: call.conversationId,
+                hasVideo: call.hasVideo,
+                requiresE2EE: call.isOutgoing && call.requiresE2EE == true
+            )
+        }
         Task {
             await notifyBackendCallTerminated(call)
             await tearDown(notice: notice)

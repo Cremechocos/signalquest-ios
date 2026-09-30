@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.1**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.2**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -60,6 +60,10 @@
 >   - `e2eeV2.signatureB64` au lieu de `signature`.
 > - v0.4.1 (30/09/2026) : routes du jalon A proposées (annexe E), à valider
 >   par la session serveur ; empreintes de référence des vecteurs.
+> - v0.4.2 (30/09/2026) : preuve de jonction précisée pour l'interopérabilité
+>   (renvoi aux nouveaux arrivants, vérifications, preuve invalide, lien entre
+>   identité et appareil) ; fin d'un appel au plus tard à l'enregistrement
+>   d'une époque plus récente (§10.3, §10.4).
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -663,7 +667,9 @@ version qui expose `discardFrameWhenCryptorNotReady` et
   pendant un appel.
   - Un changement qui imposerait une nouvelle époque met fin à l'appel :
     membre ou appareil retiré, révoqué ou mis à l'écart. L'app affiche
-    « L'appel a pris fin : la conversation a changé de clé ».
+    « L'appel a pris fin : la conversation a changé de clé ». Au plus tard,
+    le client y met fin dès qu'il enregistre une époque plus récente pour la
+    conversation de l'appel.
   - L'appel peut être relancé sous la nouvelle époque.
   - `ratchetKey` est interdit.
 - **SIF** : un SDK peut appliquer d'office celui du serveur (c'est le cas
@@ -704,10 +710,27 @@ version qui expose `discardFrameWhenCryptorNotReady` et
   - Chaîne signée :
     `SQ-E2EE-V2-CALL-JOIN\n1\n<conversationId>\n<callId>\n<callNonceB64>\n<livekitIdentity>\n<userId>\n<deviceId>\n<joinedAtMs>`.
   - Elle est envoyée dès la jonction, sur le canal de données chiffré
-    (§10.3), sujet `sq.e2ee.join` (annexe D.11). Android :
+    (§10.3), sujet `sq.e2ee.join`, en paquet fiable (annexe D.11). Android :
     `DataPacketCryptorManager`.
-  - Un participant sans preuve valide après 10 secondes met fin à l'appel,
-    avec « Appel chiffré impossible ».
+  - Un nouvel arrivant n'a pas reçu les preuves déjà envoyées. Chaque
+    participant lui adresse donc la sienne, à lui seul : à son arrivée, puis
+    en réponse à sa première preuve valide, qui montre que son canal
+    fonctionne. Après une reconnexion complète, le participant diffuse de
+    nouveau sa preuve. `joinedAtMs` reste celui de sa jonction ; une preuve
+    reçue deux fois est sans effet.
+  - Le destinataire vérifie :
+    - l'appel : `conversationId`, `callId` et `callNonceB64` ;
+    - `livekitIdentity`, égale à l'identité de l'émetteur du paquet ;
+    - un appareil certifié d'un membre, doté de la capacité « appels
+      vérifiés » (§12), jamais l'appareil local ;
+    - la signature, en forme low-S.
+  - Une preuve invalide met fin à l'appel aussitôt. Une identité ne change
+    jamais d'appareil en cours d'appel : une seconde preuve valide d'un autre
+    appareil pour la même identité y met fin aussi.
+  - Un participant sans preuve valide 10 secondes après son arrivée met fin
+    à l'appel, avec « Appel chiffré impossible ».
+  - Tant qu'un participant n'a pas prouvé son appareil, rien de lui n'est
+    rendu ni remis à l'app, et le cadenas reste absent.
   - Vecteur : `call-join-proof-v1`.
 - Les états d'erreur (clé manquante, échec de chiffrement ou de
   déchiffrement, erreur interne) retirent le cadenas et l'annoncent.
