@@ -125,6 +125,48 @@ final class LiveKitJoinProofLoopbackTests: XCTestCase {
         XCTAssertEqual(aliceClient.state, .ended)
     }
 
+    /// Un arrivant tardif dans un appel à deux déjà prouvé : les trois se
+    /// prouvent, grâce aux rediffusions, sans couper l'appel.
+    @MainActor
+    func testLateJoinerIsProvenByEveryone() async throws {
+        let url = try loopbackURL()
+        let call = try makeCall()
+        let alice = device("alice"), bruno = device("bruno"), carla = device("carla")
+        let directory = [alice, bruno, carla]
+
+        let (aliceClient, aliceLog) = try await join(url, call, as: alice, trusting: directory)
+        let (brunoClient, brunoLog) = try await join(url, call, as: bruno, trusting: directory)
+        try await waitUntil("appel à deux prouvé") { aliceClient.isE2EEVerified && brunoClient.isE2EEVerified }
+        try await Task.sleep(for: .seconds(3))
+
+        let (carlaClient, carlaLog) = try await join(url, call, as: carla, trusting: directory)
+        try await waitUntil("appel à trois prouvé", timeout: 15) {
+            aliceClient.isE2EEVerified && brunoClient.isE2EEVerified && carlaClient.isE2EEVerified
+        }
+        XCTAssertEqual(aliceLog.losses + brunoLog.losses + carlaLog.losses, [], "Aucune coupure")
+    }
+
+    /// Deux appareils du même compte dans le même appel : l'identité porte
+    /// l'appareil, aucun n'éjecte l'autre (spec v0.4.3).
+    @MainActor
+    func testTwoDevicesOfTheSameAccountShareTheCall() async throws {
+        let url = try loopbackURL()
+        let call = try makeCall()
+        let alice = device("alice")
+        let brunoPhone = Device(userId: "user_bruno_01J7ABCD", deviceId: "device_bruno_ios_01J7ABCD", key: P256.Signing.PrivateKey())
+        let brunoTablet = Device(userId: "user_bruno_01J7ABCD", deviceId: "device_bruno_ipad_01J7ABCD", key: P256.Signing.PrivateKey())
+        let directory = [alice, brunoPhone, brunoTablet]
+
+        let (aliceClient, aliceLog) = try await join(url, call, as: alice, trusting: directory)
+        let (phoneClient, _) = try await join(url, call, as: brunoPhone, trusting: directory)
+        let (tabletClient, _) = try await join(url, call, as: brunoTablet, trusting: directory)
+        try await waitUntil("trois appareils prouvés", timeout: 15) {
+            aliceClient.isE2EEVerified && phoneClient.isE2EEVerified && tabletClient.isE2EEVerified
+        }
+        XCTAssertEqual(aliceLog.losses, [])
+        XCTAssertEqual(phoneClient.state, .connected, "Le téléphone n'a pas été éjecté par la tablette")
+    }
+
     /// Diagnostic du banc : deux `Room` LiveKit nues, sans le client de l'app,
     /// avec puis sans chiffrement du canal de données.
     @MainActor
