@@ -125,11 +125,12 @@ enum WidgetPalette {
     static let labelTertiary = Color(lightHex: 0x6B6457, darkHex: 0xAA9F89)
     static let separator = Color(lightHex: 0xC4BCA6, darkHex: 0x4C4636)
     static let fill = Color(lightHex: 0xECE7D8, darkHex: 0x2E2A20)
-    // Marque.
-    static let brand = Color(lightHex: 0xE2001A, darkHex: 0xFF414F)       // BrandRed
-    static let brandDeep = Color(lightHex: 0xC00017, darkHex: 0xFF2438)   // BrandRedDeep (= envoi)
-    // Latence / gigue (cyan codé en dur dans l'app).
-    static let cyan = Color(hex: 0x06B6D4)
+    // Marque « Crème & Terre cuite » : mêmes valeurs que les assets de l'app
+    // (MES-12). L'ancien rouge vif #E2001A n'est plus la marque.
+    static let brand = Color(lightHex: 0xB04A3C, darkHex: 0xD97A66)       // BrandRed
+    static let brandDeep = Color(lightHex: 0xA64437, darkHex: 0xE08A78)   // AccentInk (= envoi)
+    // Latence / gigue : ocre de l'app (Warning) plutôt qu'un cyan système.
+    static let latency = Color(lightHex: 0x85602B, darkHex: 0xDCA95E)
     // Fond (SurfaceElevated → BackgroundPrimary).
     static let surfaceTop = Color(lightHex: 0xFBF9F3, darkHex: 0x26221A)
     static let surfaceBottom = Color(lightHex: 0xF4F0E6, darkHex: 0x100E0A)
@@ -250,9 +251,8 @@ struct SpeedDialView: View {
                     .foregroundStyle(WidgetPalette.labelSecondary)
                     .lineLimit(1)
                 if showQuality, value > 0 {
-                    Text(speedQualityLabel(value).uppercased())
-                        .font(.system(size: 9.5, weight: .heavy))
-                        .tracking(0.6)
+                    Text(speedQualityLabel(value))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(tint)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -276,10 +276,10 @@ struct NetworkChip: View {
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: networkSymbol(network))
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(WidgetPalette.brand)
             Text(networkShort(network))
-                .font(.system(size: 9.5, weight: .heavy))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(WidgetPalette.labelSecondary)
                 .lineLimit(1)
         }
@@ -300,9 +300,8 @@ struct BrandMark: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(WidgetPalette.brand)
             if showWordmark {
-                Text("SIGNALQUEST")
-                    .font(.system(size: 9, weight: .heavy))
-                    .tracking(0.8)
+                Text(verbatim: "SignalQuest")
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(WidgetPalette.labelSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -315,9 +314,9 @@ struct BrandMark: View {
 /// Ligne de métrique (medium) : icône teintée + libellé + valeur.
 private struct MetricRow: View {
     let icon: String
-    let label: String
+    let label: LocalizedStringKey
     let value: String
-    let unit: String
+    let unit: LocalizedStringKey
     let tint: Color
 
     var body: some View {
@@ -340,7 +339,7 @@ private struct MetricRow: View {
                     .monospacedDigit()
                     .lineLimit(1)
                 Text(unit)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(WidgetPalette.labelSecondary)
             }
             .fixedSize()
@@ -357,7 +356,7 @@ private struct CompactMetric: View {
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(tint)
             Text(value)
                 .font(.system(size: 11.5, weight: .bold, design: .rounded))
@@ -457,7 +456,7 @@ struct SpeedtestWidgetEntryView: View {
                 Spacer(minLength: 6)
                 HStack(spacing: 14) {
                     CompactMetric(icon: "arrow.up", value: s.uploadMbps.map { "\(Int($0.rounded()))" } ?? "—", tint: WidgetPalette.brandDeep)
-                    CompactMetric(icon: "bolt.fill", value: s.pingMs.map { "\(Int($0.rounded())) ms" } ?? "—", tint: WidgetPalette.cyan)
+                    CompactMetric(icon: "bolt.fill", value: s.pingMs.map { "\(Int($0.rounded())) ms" } ?? "—", tint: WidgetPalette.latency)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -474,8 +473,8 @@ struct SpeedtestWidgetEntryView: View {
                     BrandMark()
                     Spacer(minLength: 4)
                     Text(s.date, style: .relative)
-                        .font(.system(size: 9.5, weight: .medium))
-                        .foregroundStyle(WidgetPalette.labelTertiary)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(WidgetPalette.labelSecondary)
                         .lineLimit(1)
                         .fixedSize()
                 }
@@ -486,10 +485,10 @@ struct SpeedtestWidgetEntryView: View {
                               unit: "Mbps", tint: WidgetPalette.brandDeep)
                     MetricRow(icon: "bolt.fill", label: "Latence",
                               value: s.pingMs.map { "\(Int($0.rounded()))" } ?? "—",
-                              unit: "ms", tint: WidgetPalette.cyan)
+                              unit: "ms", tint: WidgetPalette.latency)
                     if let jitter = s.jitterMs {
                         MetricRow(icon: "waveform.path", label: "Gigue",
-                                  value: "\(Int(jitter.rounded()))", unit: "ms", tint: WidgetPalette.cyan)
+                                  value: "\(Int(jitter.rounded()))", unit: "ms", tint: WidgetPalette.latency)
                     }
                 }
                 Spacer(minLength: 6)

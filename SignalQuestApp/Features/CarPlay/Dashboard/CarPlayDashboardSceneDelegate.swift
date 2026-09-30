@@ -107,9 +107,11 @@ final class CarPlayDashboardSceneDelegate: UIResponder, CPTemplateApplicationDas
         }
         lastLoadedCenter = coordinate
         guard let controller = mapController, layers != nil else { return }
-        // Cadre lu MAINTENANT : le calculer dans la tâche obligerait à retenir le
-        // contrôleur le temps de la requête.
-        let bounds = SQMapProjection.bounds(of: controller.mapView.region)
+        // Cadre calculé MAINTENANT : le calculer dans la tâche obligerait à
+        // retenir le contrôleur le temps de la requête. Centré sur le véhicule
+        // et non sur la région de la carte, qui reste la région par défaut tant
+        // que le suivi ne l'a pas recentrée (CAR-04).
+        let bounds = SQMapProjection.bounds(of: controller.region(around: coordinate, zoom: Self.dashboardZoom))
 
         loadTask?.cancel()
         // Captures faibles : `controller` et `layers` étaient retenus FORTEMENT

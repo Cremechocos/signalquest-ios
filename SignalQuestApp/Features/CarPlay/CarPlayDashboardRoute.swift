@@ -13,9 +13,13 @@ import Foundation
 /// pressé la veille n'aurait aucun intérêt.
 @MainActor
 enum CarPlayDashboardRoute {
-    enum Destination {
+    enum Destination: Equatable {
         case map
         case here
+        /// Itinéraire demandé sur l'iPhone (« Y aller », Plan) : guidé sur notre
+        /// carte quand le véhicule l'affiche. `.map` seul ne portait pas la
+        /// destination, et la voiture ne faisait rien (CAR-03).
+        case navigate(title: String, latitude: Double, longitude: Double)
     }
 
     private static var pending: Destination?

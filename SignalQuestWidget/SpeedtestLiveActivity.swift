@@ -18,7 +18,7 @@ struct SpeedtestLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     IslandMetric(
                         value: Int(context.state.downloadMbps.rounded()),
-                        label: "DL",
+                        label: "Réception",
                         unit: "Mbps",
                         tint: speedColor(context.state.downloadMbps),
                         icon: "arrow.down"
@@ -29,7 +29,7 @@ struct SpeedtestLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.trailing) {
                     IslandMetric(
                         value: Int(context.state.uploadMbps.rounded()),
-                        label: "UL",
+                        label: "Envoi",
                         unit: "Mbps",
                         tint: SpeedtestLiveStyle.upload,
                         icon: "arrow.up"
@@ -88,13 +88,14 @@ private struct LockScreenSpeedtestActivity: View {
     private var progress: Double { clamped(state.progress) }
     private var tint: Color { state.finished ? SpeedtestLiveStyle.success : speedColor(state.downloadMbps) }
 
-    private var compactPhaseLabel: String {
-        if state.finished { return "OK" }
+    // En mots (MES-12) : « UL / DL / Sync » ne disaient rien à un débutant.
+    private var compactPhaseLabel: LocalizedStringKey {
+        if state.finished { return "Terminé" }
         let label = state.phaseLabel.lowercased()
-        if label.contains("ping") { return "Ping" }
-        if label.contains("upload") || label.contains("envoi") { return "UL" }
-        if label.contains("download") || label.contains("réception") || label.contains("reception") { return "DL" }
-        if label.contains("sauvegarde") || label.contains("saving") || label.contains("sync") { return "Sync" }
+        if label.contains("ping") { return "Latence" }
+        if label.contains("upload") || label.contains("envoi") { return "Envoi" }
+        if label.contains("download") || label.contains("réception") || label.contains("reception") { return "Réception" }
+        if label.contains("sauvegarde") || label.contains("saving") || label.contains("sync") { return "Enregistrement" }
         if state.isBurst { return "Test \(state.runIndex)/\(state.runTotal)" }
         return "Test"
     }
@@ -120,8 +121,8 @@ private struct LockScreenSpeedtestActivity: View {
                 .frame(height: 7)
 
             HStack(spacing: 14) {
-                InlineMetric(label: "Upload", value: "\(uploadValue)", numericValue: Double(uploadValue), unit: "Mbps", icon: "arrow.up", tint: SpeedtestLiveStyle.upload)
-                InlineMetric(label: "Ping", value: state.pingMs > 0 ? "\(pingValue)" : "-", numericValue: Double(pingValue), unit: "ms", icon: "bolt.fill", tint: SpeedtestLiveStyle.ping)
+                InlineMetric(label: "Envoi", value: "\(uploadValue)", numericValue: Double(uploadValue), unit: "Mbps", icon: "arrow.up", tint: SpeedtestLiveStyle.upload)
+                InlineMetric(label: "Latence", value: state.pingMs > 0 ? "\(pingValue)" : "-", numericValue: Double(pingValue), unit: "ms", icon: "bolt.fill", tint: SpeedtestLiveStyle.ping)
 
                 if state.isBurst {
                     InlineMetric(label: "Rafale", value: "\(state.runIndex)", numericValue: Double(state.runIndex), unit: "/\(state.runTotal)", icon: "repeat", tint: SpeedtestLiveStyle.warning)
@@ -193,10 +194,10 @@ private struct LiveProgressBar: View {
 
 @available(iOS 16.1, *)
 private struct InlineMetric: View {
-    let label: String
+    let label: LocalizedStringKey
     let value: String
     let numericValue: Double
-    let unit: String
+    let unit: LocalizedStringKey
     let icon: String
     let tint: Color
 
@@ -209,7 +210,7 @@ private struct InlineMetric: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(value)
@@ -218,7 +219,7 @@ private struct InlineMetric: View {
                         .monospacedDigit()
                         .stableNumericTransition(numericValue)
                     Text(unit)
-                        .font(.system(size: 8, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -247,8 +248,9 @@ private struct AnimatedNumber: View {
 @available(iOS 16.1, *)
 private struct IslandMetric: View {
     let value: Int
-    let label: String
-    let unit: String
+    /// Lu par VoiceOver ; la flèche dit déjà le sens à l'écran.
+    let label: LocalizedStringKey
+    let unit: LocalizedStringKey
     let tint: Color
     let icon: String
 
@@ -266,16 +268,14 @@ private struct IslandMetric: View {
                         .monospacedDigit()
                         .stableNumericTransition(Double(value))
                     Text(unit)
-                        .font(.system(size: 7, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.7))
                 }
-
-                Text(label)
-                    .font(.system(size: 7, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.5))
             }
         }
         .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(label))
     }
 }
 
@@ -285,13 +285,14 @@ private struct IslandStatus: View {
 
     private var tint: Color { state.finished ? SpeedtestLiveStyle.success : speedColor(state.downloadMbps) }
 
-    private var compactPhaseLabel: String {
-        if state.finished { return "OK" }
+    // En mots (MES-12) : « UL / DL / Sync » ne disaient rien à un débutant.
+    private var compactPhaseLabel: LocalizedStringKey {
+        if state.finished { return "Terminé" }
         let label = state.phaseLabel.lowercased()
-        if label.contains("ping") { return "Ping" }
-        if label.contains("upload") || label.contains("envoi") { return "UL" }
-        if label.contains("download") || label.contains("réception") || label.contains("reception") { return "DL" }
-        if label.contains("sauvegarde") || label.contains("saving") || label.contains("sync") { return "Sync" }
+        if label.contains("ping") { return "Latence" }
+        if label.contains("upload") || label.contains("envoi") { return "Envoi" }
+        if label.contains("download") || label.contains("réception") || label.contains("reception") { return "Réception" }
+        if label.contains("sauvegarde") || label.contains("saving") || label.contains("sync") { return "Enregistrement" }
         if state.isBurst { return "Test \(state.runIndex)/\(state.runTotal)" }
         return "Test"
     }
@@ -312,7 +313,7 @@ private struct IslandStatus: View {
 
             if state.pingMs > 0 {
                 Text("\(Int(state.pingMs.rounded())) ms")
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.55))
                     .monospacedDigit()
                     .stableNumericTransition(state.pingMs)
@@ -339,10 +340,16 @@ private struct CompactGlyph: View {
 
 @available(iOS 16.1, *)
 private enum SpeedtestLiveStyle {
-    static let upload = Color(red: 0.28, green: 0.56, blue: 0.96)
-    static let ping = Color(red: 0.0, green: 0.58, blue: 0.66)
-    static let warning = Color(red: 0.92, green: 0.52, blue: 0.08)
-    static let success = Color(red: 0.12, green: 0.62, blue: 0.3)
+    // Mêmes jetons que l'app et le widget (MES-12) : encre d'accent pour
+    // l'envoi, ocre pour la latence et la rafale, vert olive pour « terminé ».
+    static let upload = WidgetPalette.brandDeep
+    static let ping = WidgetPalette.latency
+    static let warning = WidgetPalette.latency
+    static let success = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0xA3 / 255, green: 0xB3 / 255, blue: 0x7A / 255, alpha: 1)
+            : UIColor(red: 0x60 / 255, green: 0x6B / 255, blue: 0x46 / 255, alpha: 1)
+    })
 }
 
 @available(iOS 16.1, *)

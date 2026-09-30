@@ -373,6 +373,12 @@ final class DriveTestViewModel: ObservableObject {
     func start() {
         guard !isRunning else { return }
         errorMessage = nil
+        // Un test lancé depuis la voiture ou l'onglet Tester mesure déjà : deux
+        // mesures simultanées se faussent (CAR-05).
+        if services.speedtest.isRunning {
+            errorMessage = SpeedtestBusyError.alreadyRunning.errorDescription
+            return
+        }
         // Sans position, les speedtests ne peuvent pas être placés sur le trajet.
         // Expliquer le blocage et renvoyer vers les Réglages si l'accès est refusé.
         switch services.location.authorizationStatus {

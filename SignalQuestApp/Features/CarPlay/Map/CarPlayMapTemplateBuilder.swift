@@ -19,16 +19,13 @@ enum CarPlayMapTemplateBuilder {
         var showNearby: () -> Void
         var stopGuidance: () -> Void
         var showSpeedtest: () -> Void
+        var showPanning: () -> Void = {}
+        var dismissPanning: () -> Void = {}
     }
 
     static func make(actions: Actions) -> CPMapTemplate {
         let template = CPMapTemplate()
-        template.mapButtons = [
-            mapButton(systemName: "location.fill", handler: actions.recenter),
-            mapButton(systemName: "plus.magnifyingglass", handler: actions.zoomIn),
-            mapButton(systemName: "minus.magnifyingglass", handler: actions.zoomOut),
-            mapButton(systemName: "square.3.layers.3d", handler: actions.showLayers),
-        ]
+        template.mapButtons = mapButtons(isFollowingUser: true, actions: actions)
         // Deux boutons à gauche, le maximum autorisé par CarPlay. Le speedtest
         // atterrit ici parce que les quatre boutons de carte et le côté droit de
         // la barre sont déjà pris — et parce qu'il relève de la même question
@@ -44,6 +41,25 @@ enum CarPlayMapTemplateBuilder {
         return template
     }
 
+    /// Les quatre boutons de carte, le maximum de CarPlay. Le premier change de
+    /// rôle : « Déplacer la carte » quand elle suit le véhicule, « Recentrer »
+    /// une fois déplacée. Le panoramique est exigé des apps de navigation — sur
+    /// un véhicule sans écran tactile, c'est le seul moyen d'explorer — et
+    /// recentrer ne sert qu'une fois la carte déplacée (CAR-03).
+    ///
+    /// En mode panoramique, CarPlay n'en garde que deux, pris en tête :
+    /// recentrer et zoomer.
+    static func mapButtons(isFollowingUser: Bool, actions: Actions) -> [CPMapButton] {
+        [
+            isFollowingUser
+                ? mapButton(systemName: "arrow.up.and.down.and.arrow.left.and.right", handler: actions.showPanning)
+                : mapButton(systemName: "location.fill", handler: actions.recenter),
+            mapButton(systemName: "plus.magnifyingglass", handler: actions.zoomIn),
+            mapButton(systemName: "minus.magnifyingglass", handler: actions.zoomOut),
+            mapButton(systemName: "square.3.layers.3d", handler: actions.showLayers),
+        ]
+    }
+
     /// Boutons de droite, recomposés selon qu'un guidage est en cours.
     ///
     /// CarPlay plafonne à deux boutons par côté, et « Arrêter » n'a de sens que
@@ -52,13 +68,19 @@ enum CarPlayMapTemplateBuilder {
     /// pas interrompre depuis l'écran du véhicule est un motif de rejet en revue
     /// — et une vraie gêne : personne ne va décrocher son iPhone en roulant pour
     /// arrêter un itinéraire.
-    static func trailingButtons(isGuiding: Bool, actions: Actions) -> [CPBarButton] {
+    static func trailingButtons(isGuiding: Bool, isPanning: Bool = false, actions: Actions) -> [CPBarButton] {
+        let stop = CPBarButton(title: String(localized: "Arrêter")) { _ in actions.stopGuidance() }
+        if isPanning {
+            // CarPlay ne fournit aucun bouton pour quitter le panoramique :
+            // c'est à l'app de le poser dans la barre.
+            let done = CPBarButton(title: String(localized: "Terminé")) { _ in actions.dismissPanning() }
+            return isGuiding ? [done, stop] : [done]
+        }
         // « Autour » n'est pas un doublon de la carte : sur les véhicules pilotés
         // à la molette, viser un marqueur est impossible et cette liste est le
         // seul accès aux fiches.
         let nearby = CPBarButton(title: String(localized: "Autour")) { _ in actions.showNearby() }
         guard isGuiding else { return [nearby] }
-        let stop = CPBarButton(title: String(localized: "Arrêter")) { _ in actions.stopGuidance() }
         // « Arrêter » en dernier, donc le plus à droite : c'est l'action la plus
         // recherchée pendant un trajet, et le bord est le plus facile à viser.
         return [nearby, stop]

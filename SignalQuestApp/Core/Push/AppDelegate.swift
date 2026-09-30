@@ -124,6 +124,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     /// ouvre la carte de l'app sur le point demandé.
     func application(_ app: UIApplication, open url: URL,
                      options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        Self.routeDirectionsRequest(url)
+    }
+
+    /// Demande d'itinéraire (Plans, « Y aller » d'une autre app). Une app SwiftUI
+    /// à scènes reçoit ces liens par `onOpenURL`, pas par l'AppDelegate : sans
+    /// cet appel depuis la scène, ils étaient perdus (CAR-02).
+    @MainActor @discardableResult
+    static func routeDirectionsRequest(_ url: URL) -> Bool {
         guard let destination = DirectionsRequestHandler.destination(from: url) else { return false }
         CarPlayDestinationStore.record(title: destination.name, coordinate: destination.coordinate)
         // Passe par le holder plutôt qu'une statique de plus : le graphe est déjà
@@ -138,7 +146,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // pousser vers la scène CarPlay afficherait une liste d'antennes en
         // réponse à une demande d'itinéraire.
         if services.isCarPlayGuidanceAvailable {
-            CarPlayDashboardRoute.request(.map)
+            CarPlayDashboardRoute.request(.navigate(title: destination.name,
+                                                    latitude: destination.coordinate.latitude,
+                                                    longitude: destination.coordinate.longitude))
         }
         return true
     }

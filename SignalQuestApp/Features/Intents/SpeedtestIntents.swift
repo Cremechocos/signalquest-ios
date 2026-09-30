@@ -2,15 +2,17 @@ import AppIntents
 import Foundation
 
 /// Raccourci Siri / Spotlight / Action « Lancer un Speedtest ». Ouvre l'app sur
-/// l'onglet Speed (un test de débit nécessite le runtime de mesure de l'app).
+/// l'onglet Tester, qui propose aussitôt le test avec confirmation (MES-34).
 struct RunSpeedtestIntent: AppIntent {
     static let title: LocalizedStringResource = "Lancer un Speedtest"
-    static let description = IntentDescription("Ouvre SignalQuest sur l'onglet Speed pour lancer un test de débit.")
+    static let description = IntentDescription("Ouvre SignalQuest et propose de lancer un test de débit.")
     static let openAppWhenRun = true
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        SQIntentRoute.requestSpeedtest()
+        // Directement sur le routeur : le drapeau lu au passage au premier plan
+        // ne partait pas quand l'app était déjà ouverte (MES-34).
+        AppServicesHolder.services.router.requestSpeedtestStart()
         return .result()
     }
 }

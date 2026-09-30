@@ -62,6 +62,8 @@ struct SpeedtestView: View {
     /// Avertissement « données mobiles » accepté pour ce lancement (MES-08).
     @MainActor private static var dataWarningAccepted = false
     @State private var showDataWarning = false
+    /// Test demandé par Siri, un raccourci ou le Centre de contrôle (MES-34).
+    @State private var confirmExternalStart = false
     /// Octets échangés par le dernier test, mesurés par `SpeedtestDataMeter`.
     @State private var lastRunBytes: Int?
     @State private var history: [SpeedtestRunResult] = []
@@ -243,6 +245,19 @@ struct SpeedtestView: View {
                 showDriveTest = true
                 services.router.pendingDriveTest = false
             }
+        }
+        // Siri, raccourci ou contrôle iOS 18 : proposer le test tout de suite,
+        // mais le lancer seulement sur confirmation (MES-34).
+        .onReceive(services.router.$pendingSpeedtestStart) { pending in
+            guard pending else { return }
+            services.router.pendingSpeedtestStart = false
+            confirmExternalStart = true
+        }
+        .confirmationDialog("Lancer un test de débit ?", isPresented: $confirmExternalStart, titleVisibility: .visible) {
+            Button("Lancer le test") { start() }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Demandé depuis Siri, un raccourci ou le Centre de contrôle.")
         }
         .signalQuestBackground()
         .sheet(item: $detailResult) { item in
@@ -1044,6 +1059,11 @@ struct SpeedtestView: View {
         // bande passante et se fausseraient l'un l'autre (MES-18).
         if services.driveTest.isRunning {
             errorMessage = String(localized: "Un Drive Test est en cours : ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple.")
+            return
+        }
+        // Un test lancé depuis la voiture mesure déjà (CAR-05).
+        if services.speedtest.isRunning {
+            errorMessage = SpeedtestBusyError.alreadyRunning.errorDescription
             return
         }
         // Réseau mobile ou Mode données réduites : un test peut consommer

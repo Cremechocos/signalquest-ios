@@ -83,14 +83,15 @@ struct SpeedtestTrendEntryView: View {
                 Image(systemName: "chart.bar.xaxis")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(speedColor(best))
-                Text("TENDANCE DÉBIT")
-                    .font(.system(size: 9.5, weight: .heavy))
-                    .tracking(0.6)
+                // Casse normale, 11 pt : la DA Crème proscrit les micro-libellés
+                // en capitales espacées (MES-12).
+                Text("Tendance du débit")
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(WidgetPalette.labelSecondary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 Text("\(entry.recent.count) tests")
-                    .font(.system(size: 9.5, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(WidgetPalette.labelSecondary)
                     .monospacedDigit()
                     .lineLimit(1)
@@ -103,13 +104,13 @@ struct SpeedtestTrendEntryView: View {
                 stat("Moy.", avg)
                 stat("Record", best)
                 Text("Mbps")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(WidgetPalette.labelTertiary)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WidgetPalette.labelSecondary)
                 Spacer(minLength: 4)
                 if let last = entry.recent.first {
                     Text(last.date, style: .relative)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(WidgetPalette.labelTertiary)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(WidgetPalette.labelSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .layoutPriority(-1)
@@ -165,10 +166,10 @@ struct SpeedtestTrendEntryView: View {
         .frame(maxHeight: .infinity)
     }
 
-    private func stat(_ label: String, _ value: Double) -> some View {
+    private func stat(_ label: LocalizedStringKey, _ value: Double) -> some View {
         HStack(spacing: 4) {
             Text(label)
-                .font(.system(size: 9.5, weight: .bold))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(WidgetPalette.labelSecondary)
             Text("\(Int(value.rounded()))")
                 .font(.system(size: 15, weight: .heavy, design: .rounded))

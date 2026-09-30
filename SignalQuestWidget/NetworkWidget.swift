@@ -3,7 +3,8 @@ import SwiftUI
 
 /// F8 — Widget d'accueil « réseau autour de moi » : opérateur résolu, génération,
 /// antenne la plus proche connue et dernier débit. Alimenté par l'app via l'App
-/// Group (`WidgetSharedStore.networkGlance`), écrit pendant le Drive Test. Cible
+/// Group (`WidgetSharedStore.networkGlance`), écrit après chaque test mobile et
+/// pendant le Drive Test (qui seul connaît l'antenne la plus proche). Cible
 /// widget isolée : couleurs codées en dur (pas d'accès au design system de l'app).
 struct NetworkGlanceEntry: TimelineEntry {
     let date: Date
@@ -68,7 +69,7 @@ struct NetworkWidgetEntryView: View {
                     Text("Mbps").font(.caption2).foregroundStyle(.secondary)
                 }
             } else {
-                Text("Lance un Drive Test").font(.caption2).foregroundStyle(.secondary)
+                Text("Lance un test pour voir ton réseau").font(.caption2).foregroundStyle(.secondary)
             }
             if let distanceText {
                 Label("Antenne à \(distanceText)", systemImage: "mappin.and.ellipse")

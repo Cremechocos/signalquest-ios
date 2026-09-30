@@ -51,6 +51,12 @@ final class FakeCarPlayInterface: CarPlayInterfaceControlling {
         completion?(popped, nil)
     }
 
+    func popToRoot(animated: Bool, completion: CarPlayNavigationCompletion?) {
+        let popped = stack.count > 1
+        stack = Array(stack.prefix(1))
+        completion?(popped, nil)
+    }
+
     func present(_ template: CPTemplate, animated: Bool, completion: CarPlayNavigationCompletion?) {
         presented = template
         completion?(true, nil)
@@ -121,9 +127,20 @@ final class CarPlayCoordinatorTests: XCTestCase {
                        "en mode liste, aucun guidage n'est possible")
     }
 
+    /// Localisation refusée : alerte immédiate, sans invite d'autorisation — elle
+    /// s'afficherait sur l'iPhone, hors de la vue du conducteur. Et « Y aller »
+    /// ramène à la racine, pas seulement un écran plus haut (CAR-04).
     func testNavigationWithoutLocationShowsAnActionableAlert() {
+        let driver = LocationTestDriver()
+        driver.authorizationStatus = .denied
+        let location = LocationService(manager: driver, makeOneShotManager: { LocationTestDriver() })
         let interface = FakeCarPlayInterface()
-        let coordinator = makeCoordinator(interface: interface)
+        interface.maximumDepth = 3
+        let coordinator = makeCoordinator(interface: interface,
+                                          services: AppServices(config: .test, location: location))
+        interface.setRoot(CPListTemplate(title: "Racine", sections: []), animated: false)
+        interface.push(CPListTemplate(title: "Autour", sections: []), animated: false)
+        interface.push(CPListTemplate(title: "Fiche", sections: []), animated: false)
 
         coordinator.startNavigation(
             to: CLLocationCoordinate2D(latitude: 48.8566, longitude: 2.3522),
@@ -131,6 +148,8 @@ final class CarPlayCoordinatorTests: XCTestCase {
         )
 
         XCTAssertTrue(interface.presented is CPAlertTemplate)
+        XCTAssertEqual(interface.templateCount, 1, "Toute la pile doit être dépilée")
+        XCTAssertEqual(driver.authorizationRequests, 0)
     }
 
     // MARK: - Alertes de couverture

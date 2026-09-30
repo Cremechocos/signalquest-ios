@@ -17519,6 +17519,22 @@
         }
       }
     },
+    "Demandé depuis Siri, un raccourci ou le Centre de contrôle." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requested from Siri, a shortcut or Control Center."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandé depuis Siri, un raccourci ou le Centre de contrôle."
+          }
+        }
+      }
+    },
     "Demande envoyée" : {
       "localizations" : {
         "en" : {
@@ -27200,6 +27216,22 @@
         }
       }
     },
+    "Lancer un test de débit ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run a speed test?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lancer un test de débit ?"
+          }
+        }
+      }
+    },
     "Latence" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -34901,6 +34933,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvre SignalQuest et démarre le mode Drive Test (mesure en continu)."
+          }
+        }
+      }
+    },
+    "Ouvre SignalQuest et propose de lancer un test de débit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens SignalQuest and offers to run a speed test."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre SignalQuest et propose de lancer un test de débit."
           }
         }
       }
@@ -50839,6 +50887,22 @@
         }
       }
     },
+    "Tu es à destination." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have arrived."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu es à destination."
+          }
+        }
+      }
+    },
     "Tu es au-dessus de l'antenne : il faudrait la relever de %@° pour te viser." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -51617,6 +51681,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "un site après l'autre, sortie à tout moment"
+          }
+        }
+      }
+    },
+    "Un test de débit est déjà en cours. Attends sa fin avant d’en lancer un autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A speed test is already running. Wait for it to finish before starting another one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un test de débit est déjà en cours. Attends sa fin avant d’en lancer un autre."
           }
         }
       }
@@ -53342,22 +53422,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre connexion répond plus vite que %1$lld %% des %2$lld lignes comparables du même opérateur."
-          }
-        }
-      }
-    },
-    "Vous êtes arrivé." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have arrived."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vous êtes arrivé."
           }
         }
       }

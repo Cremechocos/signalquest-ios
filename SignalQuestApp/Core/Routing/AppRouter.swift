@@ -86,6 +86,9 @@ final class AppRouter: ObservableObject {
     /// Demande de présentation du mode Drive Test (posée par l'App Intent F4 ;
     /// consommée par SpeedtestView une fois l'onglet Speed actif).
     @Published var pendingDriveTest = false
+    /// Test demandé par Siri, un raccourci ou le contrôle iOS 18 : l'onglet
+    /// Tester le propose aussitôt, avec confirmation (MES-34).
+    @Published var pendingSpeedtestStart = false
     /// Masque le dock flottant (conversation ouverte : le composer prend le bas).
     /// Posé par les écrans plein-bas (ConversationDetailView) à l'apparition.
     @Published var isDockHidden = false
@@ -101,7 +104,7 @@ final class AppRouter: ObservableObject {
             || openCommunityOutageId != nil || openAntennaReportId != nil
             || openE2EEDeviceApprovalId != nil || openSentinelleTargetId != nil
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
-            || pendingMapFocus != nil || pendingDriveTest
+            || pendingMapFocus != nil || pendingDriveTest || pendingSpeedtestStart
     }
 
     @discardableResult
@@ -235,6 +238,12 @@ final class AppRouter: ObservableObject {
         selectedTab = .profile
         openSentinelleTargetId = id
         openSentinelle = true
+    }
+
+    /// Test demandé hors de l'app (Siri, raccourci, contrôle iOS 18).
+    func requestSpeedtestStart() {
+        selectedTab = .speed
+        pendingSpeedtestStart = true
     }
 
     /// Préférences de notifications de l'app, depuis les Réglages d'iOS (TRX-21).

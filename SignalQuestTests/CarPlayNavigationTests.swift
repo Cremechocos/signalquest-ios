@@ -1,3 +1,4 @@
+import CarPlay
 import CoreLocation
 import XCTest
 @testable import SignalQuest
@@ -198,7 +199,8 @@ final class CarPlayNavigationTests: XCTestCase {
 
     private func mapActions(onStop: @escaping () -> Void = {}) -> CarPlayMapTemplateBuilder.Actions {
         .init(recenter: {}, zoomIn: {}, zoomOut: {}, showLayers: {},
-              showHere: {}, showNearby: {}, stopGuidance: onStop, showSpeedtest: {})
+              showHere: {}, showNearby: {}, stopGuidance: onStop, showSpeedtest: {},
+              showPanning: {}, dismissPanning: {})
     }
 
     /// Un guidage qu'on ne peut pas interrompre depuis l'écran du véhicule est
@@ -227,4 +229,141 @@ final class CarPlayNavigationTests: XCTestCase {
     // Pas de test d'invocation du handler : `CPBarButton` ne l'expose qu'à
     // l'init, il n'est pas relisible. Le câblage effectif de `stopGuidance` se
     // vérifie donc en voiture (ou au simulateur CarPlay), pas ici.
+
+    // MARK: - Manœuvre ratée (CAR-04)
+
+    /// Itinéraire en L : ~445 m vers le nord, virage à droite, ~290 m vers l'est.
+    private func lShapedPlan() -> RoutePlan {
+        let corner = CLLocationCoordinate2D(latitude: 48.854, longitude: 2.35)
+        let end = CLLocationCoordinate2D(latitude: 48.854, longitude: 2.354)
+        let polyline = [
+            CLLocationCoordinate2D(latitude: 48.85, longitude: 2.35),
+            CLLocationCoordinate2D(latitude: 48.852, longitude: 2.35),
+            corner,
+            CLLocationCoordinate2D(latitude: 48.854, longitude: 2.352),
+            end,
+        ]
+        return RoutePlan(
+            polyline: polyline,
+            steps: [
+                RoutePlan.Step(instruction: "Tournez à droite", distanceMeters: 445, maneuverCoordinate: corner),
+                RoutePlan.Step(instruction: "Vous êtes arrivé", distanceMeters: 293, maneuverCoordinate: end),
+            ],
+            totalDistanceMeters: 738,
+            expectedTravelTime: 120
+        )
+    }
+
+    /// Virage pris sans jamais passer à 25 m de son point (GPS décalé) : une
+    /// fois sur la route suivante, le guidage passe à l'étape d'après au lieu
+    /// de rester figé sur « Tournez à droite ».
+    func testMissedManeuverAdvancesOnceOnTheNextRoad() {
+        let tracker = RouteProgressTracker(plan: lShapedPlan())
+        // 60 m après le virage, 12 m au nord de la route (≈ 61 m du point).
+        let progress = tracker.update(with: CLLocation(latitude: 48.854108, longitude: 2.350819))
+        XCTAssertEqual(progress.stepIndex, 1)
+        XCTAssertFalse(progress.isOffRoute)
+    }
+
+    /// À l'arrêt 30 m avant le virage, la dérive du GPS ne doit pas faire
+    /// annoncer la manœuvre suivante.
+    func testWaitingBeforeTheTurnDoesNotAdvance() {
+        let tracker = RouteProgressTracker(plan: lShapedPlan())
+        for longitude in [2.35, 2.35008, 2.34992] {
+            let progress = tracker.update(with: CLLocation(latitude: 48.85373, longitude: longitude))
+            XCTAssertEqual(progress.stepIndex, 0)
+        }
+    }
+
+    /// Le temps restant suit la distance, au lieu d'un zéro permanent.
+    func testTimeRemainingIsProportionalToDistance() {
+        let plan = lShapedPlan()
+        XCTAssertEqual(ManeuverMapper.timeRemaining(forDistance: 369, in: plan), 60, accuracy: 0.001)
+        XCTAssertEqual(ManeuverMapper.timeRemaining(forDistance: -5, in: plan), 0)
+    }
+
+    // MARK: - Pictogrammes en anglais (CAR-04)
+
+    func testEnglishInstructionsGetTheirArrow() {
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Turn right onto Main Street"), "arrow.turn.up.right")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Keep left at the fork"), "arrow.up.left")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Make a U-turn"), "arrow.uturn.left")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Enter the roundabout"), "arrow.triangle.turn.up.right.circle")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Tournez à gauche sur la rue de Rivoli"), "arrow.turn.up.left")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Continuez tout droit"), "arrow.up")
+    }
+
+    /// Le nom de la voie ne décide jamais du sens : « Wright » n'est pas « right ».
+    func testStreetNameNeverFlipsTheArrow() {
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Turn left onto Wright Street"), "arrow.turn.up.left")
+        XCTAssertEqual(ManeuverMapper.symbolName(for: "Head toward Wrightsville"), "arrow.up")
+        XCTAssertEqual(ManeuverMapper.instructionVariants(for: "Turn left onto Wright Street").last, "Turn left")
+    }
+
+    // MARK: - Voix
+
+    /// La voix parle la langue des annonces, avec l'accent de l'appareil quand
+    /// il parle la même langue.
+    func testVoiceFollowsTheAppLanguage() {
+        XCTAssertEqual(CarPlayVoiceGuide.voiceLanguage(appLanguage: "en", deviceLanguage: "fr-FR"), "en-US")
+        XCTAssertEqual(CarPlayVoiceGuide.voiceLanguage(appLanguage: "fr", deviceLanguage: "fr-CA"), "fr-CA")
+        XCTAssertEqual(CarPlayVoiceGuide.voiceLanguage(appLanguage: "en", deviceLanguage: "en-GB"), "en-GB")
+        XCTAssertEqual(CarPlayVoiceGuide.voiceLanguage(appLanguage: "fr", deviceLanguage: "de-DE"), "fr-FR")
+    }
+
+    // MARK: - Carte : panoramique et délégué (CAR-03)
+
+    /// Quatre boutons au plus ; le premier déplace la carte quand elle suit le
+    /// véhicule, et la recentre une fois déplacée.
+    func testFirstMapButtonSwitchesBetweenPanAndRecenter() {
+        let following = CarPlayMapTemplateBuilder.mapButtons(isFollowingUser: true, actions: mapActions())
+        let moved = CarPlayMapTemplateBuilder.mapButtons(isFollowingUser: false, actions: mapActions())
+        XCTAssertEqual(following.count, 4)
+        XCTAssertEqual(moved.count, 4)
+        // Comparées au rendu : deux `UIImage` du même symbole ne sont pas
+        // forcément le même objet.
+        let pan = UIImage(systemName: "arrow.up.and.down.and.arrow.left.and.right")?.pngData()
+        let recenter = UIImage(systemName: "location.fill")?.pngData()
+        XCTAssertNotNil(pan)
+        XCTAssertEqual(following.first?.image?.pngData(), pan)
+        XCTAssertEqual(moved.first?.image?.pngData(), recenter)
+    }
+
+    /// CarPlay ne fournit aucun bouton pour sortir du panoramique ; « Arrêter »
+    /// reste accessible pendant un trajet.
+    func testPanningBarOffersDoneAndKeepsStop() {
+        let idle = CarPlayMapTemplateBuilder.trailingButtons(isGuiding: false, isPanning: true, actions: mapActions())
+        let guiding = CarPlayMapTemplateBuilder.trailingButtons(isGuiding: true, isPanning: true, actions: mapActions())
+        XCTAssertEqual(idle.map(\.title), [String(localized: "Terminé")])
+        XCTAssertEqual(guiding.map(\.title), [String(localized: "Terminé"), String(localized: "Arrêter")])
+    }
+
+    /// Le système transmet la translation cumulée du geste ; la carte reçoit
+    /// des incréments, repartis de zéro à chaque nouveau geste.
+    func testPanGestureIsForwardedAsIncrements() {
+        let delegate = CarPlayMapTemplateDelegate()
+        var deltas: [CGPoint] = []
+        delegate.onPanGesture = { deltas.append($0) }
+        let template = CPMapTemplate()
+
+        delegate.mapTemplateDidBeginPanGesture(template)
+        delegate.mapTemplate(template, didUpdatePanGestureWithTranslation: CGPoint(x: 10, y: 0), velocity: .zero)
+        delegate.mapTemplate(template, didUpdatePanGestureWithTranslation: CGPoint(x: 25, y: -5), velocity: .zero)
+        delegate.mapTemplateDidBeginPanGesture(template)
+        delegate.mapTemplate(template, didUpdatePanGestureWithTranslation: CGPoint(x: 4, y: 4), velocity: .zero)
+
+        XCTAssertEqual(deltas, [CGPoint(x: 10, y: 0), CGPoint(x: 15, y: -5), CGPoint(x: 4, y: 4)])
+    }
+
+    /// Navigation native du véhicule ou autre app de guidage : le système
+    /// annule notre trajet, et il faut le savoir pour couper voix et GPS.
+    func testSystemCancellationIsForwarded() {
+        let delegate = CarPlayMapTemplateDelegate()
+        var cancelled = 0
+        delegate.onNavigationCancelledBySystem = { cancelled += 1 }
+        delegate.mapTemplateDidCancelNavigation(CPMapTemplate())
+        XCTAssertEqual(cancelled, 1)
+        XCTAssertTrue(delegate.mapTemplate(CPMapTemplate(), shouldShowNotificationFor: CPManeuver()),
+                      "La manœuvre s'affiche en bannière quand l'écran montre une autre app")
+    }
 }

@@ -241,7 +241,9 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             manager.allowsBackgroundLocationUpdates = background
         }
         manager.showsBackgroundLocationIndicator = background
-        manager.activityType = explicitTrackingRequested ? .automotiveNavigation : .other
+        // Profil « navigation automobile » du suivi lancé, étendu aux sessions
+        // CarPlay : le guidage roule forcément en voiture (CAR-04).
+        manager.activityType = background ? .automotiveNavigation : .other
         let processInfo = ProcessInfo.processInfo
         let constrained = processInfo.isLowPowerModeEnabled
             || processInfo.thermalState == .serious || processInfo.thermalState == .critical

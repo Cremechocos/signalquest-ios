@@ -24,9 +24,13 @@ final class CarPlayRouteService {
     /// dépendre de l'heure réelle.
     private let now: () -> Date
     private var lastRequestAt: Date?
+    /// Calcul remplaçable en test, où `MKDirections` demanderait le réseau.
+    typealias Calculate = @MainActor (CLLocationCoordinate2D, CLLocationCoordinate2D) async throws -> RoutePlan
+    private let calculate: Calculate?
 
-    init(now: @escaping () -> Date = Date.init) {
+    init(now: @escaping () -> Date = Date.init, calculate: Calculate? = nil) {
         self.now = now
+        self.calculate = calculate
     }
 
     /// Le recalcul est-il autorisé maintenant ?
@@ -49,6 +53,7 @@ final class CarPlayRouteService {
                isRecalculation: Bool = false) async throws -> RoutePlan {
         if isRecalculation, !canRecalculate() { throw RouteError.throttled }
         noteRequest()
+        if let calculate { return try await calculate(origin, destination) }
 
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))

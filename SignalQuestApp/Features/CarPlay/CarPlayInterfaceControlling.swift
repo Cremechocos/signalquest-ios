@@ -31,6 +31,7 @@ protocol CarPlayInterfaceControlling: AnyObject {
     func setRoot(_ template: CPTemplate, animated: Bool, completion: CarPlayNavigationCompletion?)
     func push(_ template: CPTemplate, animated: Bool, completion: CarPlayNavigationCompletion?)
     func pop(animated: Bool, completion: CarPlayNavigationCompletion?)
+    func popToRoot(animated: Bool, completion: CarPlayNavigationCompletion?)
     func present(_ template: CPTemplate, animated: Bool, completion: CarPlayNavigationCompletion?)
     func dismiss(animated: Bool, completion: CarPlayNavigationCompletion?)
 
@@ -55,6 +56,10 @@ extension CarPlayInterfaceControlling {
 
     func pop(animated: Bool) {
         pop(animated: animated, completion: nil)
+    }
+
+    func popToRoot(animated: Bool) {
+        popToRoot(animated: animated, completion: nil)
     }
 
     func present(_ template: CPTemplate, animated: Bool) {
@@ -88,6 +93,13 @@ extension CPInterfaceController: CarPlayInterfaceControlling {
     func pop(animated: Bool, completion: CarPlayNavigationCompletion?) {
         popTemplate(animated: animated) { success, error in
             CarPlayNavigationLog.record("pop", target: "—", success: success, error: error)
+            completion?(success, error)
+        }
+    }
+
+    func popToRoot(animated: Bool, completion: CarPlayNavigationCompletion?) {
+        popToRootTemplate(animated: animated) { success, error in
+            CarPlayNavigationLog.record("popToRoot", target: "—", success: success, error: error)
             completion?(success, error)
         }
     }

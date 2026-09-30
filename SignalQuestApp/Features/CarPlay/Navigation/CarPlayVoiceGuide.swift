@@ -44,17 +44,23 @@ enum VoiceAnnouncementPolicy {
 /// `.duckOthers` — mais se TAIRE pendant un appel, sinon il parle par-dessus
 /// l'interlocuteur.
 @MainActor
-final class CarPlayVoiceGuide {
+final class CarPlayVoiceGuide: NSObject, AVSpeechSynthesizerDelegate {
     private let synthesizer = AVSpeechSynthesizer()
     /// Injecté par le coordinateur : le guide n'a pas à connaître `CallManager`.
     private let isCallActive: () -> Bool
     private var lastAnnouncedThreshold: CLLocationDistance?
     private var lastStepIndex: Int?
+    /// Annonces encore en file, par identité : la session audio n'est rendue
+    /// qu'après la dernière, et une annonce coupée qui se signale en retard ne
+    /// la rend pas au milieu de la suivante.
+    private var pendingUtterances: Set<ObjectIdentifier> = []
 
     var isEnabled = true
 
     init(isCallActive: @escaping () -> Bool) {
         self.isCallActive = isCallActive
+        super.init()
+        synthesizer.delegate = self
     }
 
     /// À appeler à chaque mise à jour de progression.
@@ -82,20 +88,68 @@ final class CarPlayVoiceGuide {
 
     func announceArrival() {
         guard isEnabled, !isCallActive() else { return }
-        speak(String(localized: "Vous êtes arrivé."))
+        speak(String(localized: "Tu es à destination."))
     }
 
-    func reset() {
+    /// Fin de trajet. Arrivé, l'annonce en cours va jusqu'au bout — elle était
+    /// coupée net au moment même où elle commençait. Arrêté par le conducteur,
+    /// la voix se tait tout de suite.
+    func endTrip(interrupting: Bool) {
         lastAnnouncedThreshold = nil
         lastStepIndex = nil
+        guard interrupting else { return }
         synthesizer.stopSpeaking(at: .immediate)
+        // Les annonces en file ne rappellent pas toutes le délégué une fois
+        // coupées : on rend la session sans les attendre.
+        pendingUtterances.removeAll()
+        releaseSession()
     }
 
     private func speak(_ text: String) {
         activateDuckedSession()
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
+        utterance.voice = AVSpeechSynthesisVoice(language: Self.voiceLanguage(
+            appLanguage: Bundle.main.preferredLocalizations.first ?? "fr",
+            deviceLanguage: AVSpeechSynthesisVoice.currentLanguageCode()
+        ))
+        pendingUtterances.insert(ObjectIdentifier(utterance))
         synthesizer.speak(utterance)
+    }
+
+    /// Langue de la voix : celle de l'app, puisque les annonces sont traduites
+    /// dans cette langue, avec l'accent de l'appareil quand il parle la même
+    /// (fr-CA reste fr-CA). Une voix française figée lisait « In 300 meters »
+    /// avec l'accent français.
+    nonisolated static func voiceLanguage(appLanguage: String, deviceLanguage: String) -> String {
+        let app = appLanguage.lowercased().prefix { $0.isLetter }
+        let device = deviceLanguage.lowercased().prefix { $0.isLetter }
+        if !app.isEmpty, app == device { return deviceLanguage }
+        return app == "en" ? "en-US" : "fr-FR"
+    }
+
+    // MARK: - AVSpeechSynthesizerDelegate
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor [weak self] in self?.utteranceDidEnd(id) }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor [weak self] in self?.utteranceDidEnd(id) }
+    }
+
+    private func utteranceDidEnd(_ id: ObjectIdentifier) {
+        guard pendingUtterances.remove(id) != nil, pendingUtterances.isEmpty else { return }
+        releaseSession()
+    }
+
+    /// Rend le son aux autres apps une fois l'annonce dite : la session restait
+    /// active, et la musique baissée pendant tout le trajet (CAR-04). Jamais
+    /// pendant un appel, dont la session audio est la même.
+    private func releaseSession() {
+        guard !isCallActive() else { return }
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     /// Session audio ouverte au moment de parler, et pas à la construction :

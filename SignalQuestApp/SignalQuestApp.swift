@@ -315,6 +315,9 @@ struct AppRootView: View {
     }
 
     private func receiveAccountOrPostURL(_ url: URL) {
+        // Itinéraire demandé par Plans (schéma geo-navigation) : l'AppDelegate
+        // ne le reçoit jamais dans une app à scènes (CAR-02).
+        if AppDelegate.routeDirectionsRequest(url) { return }
         // Le routeur survit à l'onboarding et à la connexion : un lien ouvert à
         // froid reste disponible quand le fil Communauté est enfin monté.
         if let postID = PostDeepLink.postID(
@@ -861,7 +864,7 @@ struct MainTabView: View {
     /// Applique une route demandée par un App Intent / raccourci Siri (onglet Speed/Carte).
     private func consumeIntentRoutes() {
         if SQIntentRoute.consumeSpeedtest() {
-            router.selectedTab = .speed
+            router.requestSpeedtestStart()
         } else if SQIntentRoute.consumeMap() {
             router.selectedTab = .map
         } else if SQIntentRoute.consumeMessages() {
@@ -888,7 +891,10 @@ struct MainTabView: View {
 
         guard url.scheme == SQSharedConfiguration.urlScheme else { return }
         switch url.host {
-        case "speedtest", "speed": router.selectedTab = .speed
+        // Le contrôle iOS 18 « Speedtest » ouvre ce lien : il lance le test,
+        // après confirmation, au lieu de seulement ouvrir l'onglet (MES-34).
+        case "speedtest": router.requestSpeedtestStart()
+        case "speed": router.selectedTab = .speed
         case "map", "carte": router.selectedTab = .map
         case "messages", "community", "communaute": router.route(toConversation: nil)
         default: break

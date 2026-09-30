@@ -96,5 +96,3 @@ final class CarPlayTemplateTests: XCTestCase {
         XCTAssertNil(CarPlayDashboardRoute.consume())
     }
 }
-
-extension CarPlayDashboardRoute.Destination: Equatable {}

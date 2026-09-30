@@ -26,6 +26,12 @@ final class CarPlayMapController: UIViewController, MKMapViewDelegate {
     /// vers les fiches.
     var onSelect: ((MapAnnotationPayload) -> Void)?
 
+    /// La carte suit (ou ne suit plus) le véhicule : le bouton « Recentrer »
+    /// n'apparaît que lorsqu'il sert.
+    var onFollowChange: ((Bool) -> Void)?
+
+    var isFollowingUser: Bool { mapView.userTrackingMode != .none }
+
     private var annotationsById: [String: SQMapKitAnnotation] = [:]
     private var payloadsById: [String: MapAnnotationPayload] = [:]
     private var coverageOverlay: SQMapKitDotsOverlay?
@@ -194,10 +200,41 @@ final class CarPlayMapController: UIViewController, MKMapViewDelegate {
     func zoomIn() { setZoom(currentZoom + 1) }
     func zoomOut() { setZoom(currentZoom - 1) }
 
+    /// Région de `zoom` centrée sur un point, à la largeur de l'écran du véhicule.
+    func region(around coordinate: CLLocationCoordinate2D, zoom: Double) -> MKCoordinateRegion {
+        MKCoordinateRegion(center: coordinate, span: SQMapProjection.span(forZoom: zoom, width: effectiveWidth))
+    }
+
+    /// Flèches du mode panoramique (molette, pavé tactile) : un tiers de l'écran
+    /// par appui, assez pour explorer sans perdre le repère.
+    func pan(_ direction: CPMapTemplate.PanDirection) {
+        mapView.userTrackingMode = .none
+        var center = mapView.centerCoordinate
+        let span = mapView.region.span
+        if direction.contains(.left) { center.longitude -= span.longitudeDelta / 3 }
+        if direction.contains(.right) { center.longitude += span.longitudeDelta / 3 }
+        if direction.contains(.up) { center.latitude += span.latitudeDelta / 3 }
+        if direction.contains(.down) { center.latitude -= span.latitudeDelta / 3 }
+        mapView.setCenter(center, animated: true)
+    }
+
+    /// Glissé du doigt sur un écran tactile, que CarPlay transmet au délégué du
+    /// template et non à la vue : la carte suit le doigt.
+    func pan(by translation: CGPoint) {
+        mapView.userTrackingMode = .none
+        let target = CGPoint(x: mapView.bounds.midX - translation.x,
+                             y: mapView.bounds.midY - translation.y)
+        mapView.setCenter(mapView.convert(target, toCoordinateFrom: mapView), animated: false)
+    }
+
     // MARK: - MKMapViewDelegate
 
     func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
         onRegionChange?(SQMapProjection.bounds(of: mapView.region), currentZoom)
+    }
+
+    func mapView(_ mapView: MKMapView, didChange mode: MKUserTrackingMode, animated: Bool) {
+        onFollowChange?(mode != .none)
     }
 
     func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {

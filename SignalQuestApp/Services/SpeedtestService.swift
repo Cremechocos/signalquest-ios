@@ -12,6 +12,8 @@ import SwiftData
 protocol SpeedtestServicing: Sendable {
     func run(pathStatus: NetworkPathStatus, location: Coordinates?, settings: SpeedtestRunSettings) async throws -> SpeedtestRunResult
     func run(pathStatus: NetworkPathStatus, location: Coordinates?, settings: SpeedtestRunSettings, progress: SpeedtestProgressHandler?) async throws -> SpeedtestRunResult
+    /// Un test est en cours, lancé d'où que ce soit (CAR-05).
+    var isRunning: Bool { get }
     func save(_ result: SpeedtestRunResult) async throws
     func save(_ result: SpeedtestRunResult, streams: Int) async throws
     func save(_ result: SpeedtestRunResult, streams: Int, publishToMap: Bool) async throws
@@ -323,6 +325,41 @@ private enum SpeedtestEngineConfig {
     static let graphWindowMs: Double = 250
 }
 
+extension SpeedtestServicing {
+    var isRunning: Bool { false }
+}
+
+/// Un seul test de débit à la fois, quelle que soit son origine (onglet
+/// Tester, rafale, Drive Test, CarPlay, Siri) : deux mesures simultanées se
+/// partagent la bande passante et se faussent l'une l'autre (CAR-05, MES-18).
+enum SpeedtestBusyError: LocalizedError, Equatable {
+    case alreadyRunning
+
+    var errorDescription: String? {
+        String(localized: "Un test de débit est déjà en cours. Attends sa fin avant d’en lancer un autre.")
+    }
+}
+
+/// Verrou « un seul test à la fois », isolé pour être testé.
+final class SpeedtestRunGate: @unchecked Sendable {
+    private let busy = OSAllocatedUnfairLock(initialState: false)
+
+    var isBusy: Bool { busy.withLock { $0 } }
+
+    /// `false` si un test est déjà en cours.
+    func tryAcquire() -> Bool {
+        busy.withLock { value -> Bool in
+            guard !value else { return false }
+            value = true
+            return true
+        }
+    }
+
+    func release() {
+        busy.withLock { $0 = false }
+    }
+}
+
 private enum SpeedtestEngineError: LocalizedError {
     case pingFailed
     case noServerReachable
@@ -389,6 +426,9 @@ private struct CloudflareSpeedtestFailure: LocalizedError {
 // MARK: - Service implementation
 
 final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
+    /// Verrou du test en cours (CAR-05).
+    private let runGate = SpeedtestRunGate()
+    var isRunning: Bool { runGate.isBusy }
     private let api: APIClient
     private let markets: MarketRegistryServicing
     private let networkOperator: NetworkOperatorServicing
@@ -483,6 +523,8 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         settings: SpeedtestRunSettings,
         progress: SpeedtestProgressHandler?
     ) async throws -> SpeedtestRunResult {
+        guard runGate.tryAcquire() else { throw SpeedtestBusyError.alreadyRunning }
+        defer { runGate.release() }
         let recorder = SpeedtestTraceRecorder()
         return try await SpeedtestTraceScope.$current.withValue(recorder) {
             try await runScoped(pathStatus: pathStatus, location: location, settings: settings, progress: progress)
@@ -2561,11 +2603,24 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             uploadMbps: result.uploadMbps,
             pingMs: result.primaryPingMs,
             jitterMs: result.jitterMs,
-            network: result.networkOperatorName ?? result.wifiSSID ?? "Réseau",
+            network: result.networkOperatorName ?? result.wifiSSID ?? String(localized: "Réseau"),
             label: result.label,
             date: result.createdAt
         )
         WidgetSharedStore.saveLastSpeedtest(snapshot)
+        // « Réseau autour de moi » : nourri après chaque test mobile, plus
+        // seulement pendant un Drive Test (décision du 29/09). L'antenne la plus
+        // proche n'est pas connue ici : mieux vaut aucune qu'une distance périmée.
+        if result.connectionType == .cellular {
+            WidgetSharedStore.saveNetworkGlance(NetworkGlanceSnapshot(
+                operatorLabel: result.networkOperatorName,
+                generation: result.cellularTechnology?.rawValue,
+                nearestDistanceMeters: nil,
+                nearestOperator: nil,
+                lastDownloadMbps: result.downloadMbps,
+                date: result.createdAt
+            ))
+        }
         WidgetCenter.shared.reloadAllTimelines()
         SQSpotlight.donateLastSpeedtest(snapshot)
     }

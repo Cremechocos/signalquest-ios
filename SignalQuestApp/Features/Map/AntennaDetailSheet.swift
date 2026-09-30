@@ -415,7 +415,9 @@ struct AntennaDetailSheet: View {
         Haptics.light()
         if services.isCarPlayGuidanceAvailable {
             CarPlayDestinationStore.record(title: headerTitle, coordinate: coordinate)
-            CarPlayDashboardRoute.request(.map)
+            CarPlayDashboardRoute.request(.navigate(title: headerTitle,
+                                                    latitude: coordinate.latitude,
+                                                    longitude: coordinate.longitude))
             return
         }
         let placemark = MKPlacemark(coordinate: coordinate)
