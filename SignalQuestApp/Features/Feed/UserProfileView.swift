@@ -333,6 +333,7 @@ struct UserProfileView: View {
             if model.profile == nil { await model.load() }
         }
         .refreshable { await model.load() }
+        .onChangeCompat(of: model.profile?.id) { _, _ in recordVisit() }
         .onChangeCompat(of: model.actionError) { _, message in
             guard let message else { return }
             inAppNotifications.showError(message)
@@ -465,12 +466,21 @@ struct UserProfileView: View {
         }
     }
 
+    /// Historique local des profils consultés, proposé dans Explorer.
+    private func recordVisit() {
+        guard let profile = model.profile, !profile.isSelf else { return }
+        RecentlyViewedStore.record(.profile(
+            id: profile.id, name: profile.displayName, handle: profile.handle, avatarURL: profile.avatarUrl
+        ))
+    }
+
     /// Bloque l'utilisateur consulté (Guideline 1.2) puis ferme l'écran : son
     /// contenu disparaît immédiatement de la pile de navigation courante.
     private func blockUser() async {
         guard let id = model.profile?.id else { return }
         do {
             try await services.friends.block(userId: id)
+            RecentlyViewedStore.remove(.profile, targetId: id)
             Haptics.success()
             dismiss()
         } catch {

@@ -57,6 +57,32 @@ struct RunDriveTestIntent: AppIntent {
     }
 }
 
+/// « Dernier résultat » (plan 3, vague 1) : Siri ou un raccourci donnent le
+/// débit du dernier test sans ouvrir l'app. Lu dans l'instantané des widgets,
+/// effacé à la déconnexion avec eux (MES-13).
+struct LastSpeedtestResultIntent: AppIntent {
+    static let title: LocalizedStringResource = "Dernier résultat SignalQuest"
+    static let description = IntentDescription("Donne le débit de ton dernier speedtest.")
+
+    func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
+        let answer = WidgetSharedStore.lastSpeedtest().map { Self.summary(of: $0, now: Date()) }
+            ?? String(localized: "Aucun test pour l’instant. Lance un speedtest dans SignalQuest.")
+        return .result(value: answer, dialog: IntentDialog(stringLiteral: answer))
+    }
+
+    static func summary(of snapshot: SpeedtestWidgetSnapshot, now: Date) -> String {
+        var measures = [String(localized: "\(Int(snapshot.downloadMbps.rounded())) Mbps en réception")]
+        if let upload = snapshot.uploadMbps {
+            measures.append(String(localized: "\(Int(upload.rounded())) Mbps en envoi"))
+        }
+        if let ping = snapshot.pingMs {
+            measures.append(String(localized: "latence \(Int(ping.rounded())) ms"))
+        }
+        let when = RelativeDateTimeFormatter().localizedString(for: snapshot.date, relativeTo: now)
+        return String(localized: "Dernier test \(when) sur \(snapshot.network) : \(measures.joined(separator: ", ")).")
+    }
+}
+
 struct SignalQuestShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -94,6 +120,15 @@ struct SignalQuestShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Drive Test",
             systemImageName: "location.north.line.fill"
+        )
+        AppShortcut(
+            intent: LastSpeedtestResultIntent(),
+            phrases: [
+                "Quel est mon dernier débit \(.applicationName)",
+                "Mon dernier speedtest \(.applicationName)"
+            ],
+            shortTitle: "Dernier résultat",
+            systemImageName: "gauge.with.dots.needle.67percent"
         )
     }
 }

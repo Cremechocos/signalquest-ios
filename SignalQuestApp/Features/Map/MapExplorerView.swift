@@ -1562,6 +1562,9 @@ struct MapExplorerView: View {
     @AppStorage("map_coverage_by_generation") private var coverageByGeneration = false
     @State private var selectedItem: MapDisplayItem?
     @State private var selectedAntenna: AntennaSite?
+    /// Sites et lieux consultés récemment, proposés quand on touche la
+    /// recherche sans rien saisir (plan 3, vague 1).
+    @State private var recentItems: [RecentlyViewedStore.Item] = []
     @State private var selectedPhoto: MapPhotoTarget?
     @State private var selectedOutage: OutageSiteLive?
     /// Panne signalée par la communauté ouverte depuis la carte. Distincte de
@@ -1681,6 +1684,8 @@ struct MapExplorerView: View {
                 sightOrigin: sightOrigin,
                 onIsolateCoverage: { focus in isolateCoverage(focus) }
             )
+            // Tous les chemins mènent ici : recherche, carte, lien, historique.
+            .onAppear { RecentlyViewedStore.record(.site(site, market: model.marketFilter)) }
         }
         .fullScreenCover(item: $selectedPhoto) { target in
             MapPhotoViewer(
@@ -1917,6 +1922,12 @@ struct MapExplorerView: View {
         }
         // Notification/deep link antenne : ouvre la fiche du site demandé.
         .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
+        .onChangeCompat(of: searchFieldFocused) { _, focused in
+            if focused { recentItems = RecentlyViewedStore.items() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: RecentlyViewedStore.didChange)) { _ in
+            recentItems = RecentlyViewedStore.items()
+        }
         // Test de l'historique : cadre la carte sur le lieu de la mesure.
         .onChangeCompat(of: router.pendingMapFocus) { _, _ in focusFromRouterIfNeeded() }
         // Ligne de « Pannes signalées » : ouvre la feuille de la panne demandée.
@@ -2052,6 +2063,9 @@ struct MapExplorerView: View {
                     // requête faite d'un seul retour ouvrait le panneau sur « Aucun résultat ».
                     if !model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         searchSuggestions
+                            .padding(.horizontal, SQSpace.md)
+                    } else if searchFieldFocused, !recentSearchResults.isEmpty {
+                        recentsPanel
                             .padding(.horizontal, SQSpace.md)
                     }
                 }
@@ -2669,6 +2683,75 @@ struct MapExplorerView: View {
         .frame(maxHeight: 240)
     }
 
+    /// Sites et lieux consultés récemment. Les sites du pays affiché
+    /// seulement : leur fiche se charge dans ce pays.
+    private var recentSearchResults: [MapSearchResult] {
+        recentItems.compactMap { item in
+            switch item.kind {
+            case .place:
+                return item.placeResult.map(MapSearchResult.place)
+            case .site:
+                guard item.market?.caseInsensitiveCompare(model.marketFilter) == .orderedSame else { return nil }
+                return item.antennaSite.map(MapSearchResult.antenna)
+            case .profile:
+                return nil
+            }
+        }
+    }
+
+    private var recentsPanel: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+                HStack(spacing: SQSpace.sm) {
+                    Text("Récents")
+                        .font(SQFont.body(14, .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    Button {
+                        Haptics.light()
+                        RecentlyViewedStore.clear([.site, .place])
+                    } label: {
+                        Text("Effacer")
+                            .font(SQFont.body(14, .semibold))
+                            .foregroundStyle(SQColor.brandRed)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityLabel("Effacer les récents")
+                    .accessibilityIdentifier("map.recents.clear")
+                }
+                .padding(.leading, SQSpace.md + 2)
+                .padding(.trailing, SQSpace.sm)
+                .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+                .sqShadowSoft()
+                ForEach(recentSearchResults) { result in
+                    Button { openRecent(result) } label: {
+                        searchResultRow(result)
+                    }
+                    .accessibilityIdentifier("map.recent.\(result.id)")
+                    .buttonStyle(SQPressButtonStyle())
+                    .foregroundStyle(SQColor.label)
+                }
+            }
+            .padding(.horizontal, SQSpace.xs)
+            .padding(.top, SQSpace.xs)
+        }
+        .frame(maxHeight: 280)
+    }
+
+    /// La fiche complète si le site est déjà chargé ; sinon celle rebâtie
+    /// depuis l'historique, dont le détail se recharge à l'ouverture.
+    private func openRecent(_ result: MapSearchResult) {
+        if case .antenna(let stored) = result,
+           let loaded = model.antennas.first(where: { $0.id == stored.id }) {
+            selectSearchResult(.antenna(loaded))
+        } else {
+            selectSearchResult(result)
+        }
+    }
+
     /// Rangée « aucun résultat » / « recherche indisponible » (rien pendant la
     /// recherche : le spinner de la barre suffit). Distingue vide d'erreur.
     @ViewBuilder
@@ -2780,6 +2863,7 @@ struct MapExplorerView: View {
             setSearchPin(place)
             mapCenter = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
             mapZoom = 14
+            RecentlyViewedStore.record(.place(place))
         case .antenna(let site):
             if site.hasValidCoordinate, let lat = site.latitude, let lng = site.longitude {
                 mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)

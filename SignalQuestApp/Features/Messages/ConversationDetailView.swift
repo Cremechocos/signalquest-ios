@@ -34,6 +34,8 @@ struct ConversationDetailView: View {
     @State private var composerSeed = ""
     @State private var composerSeedToken = 0
     @State private var scheduleSeedText = ""
+    /// Brouillon de la conversation, chiffré sur l'appareil (plan 3, vague 1).
+    @State private var draftAutosaver: MessageDraftAutosaver?
     @State private var replyTarget: MessageItem?
     @State private var editTarget: MessageItem?
     @State private var errorMessage: String?
@@ -479,6 +481,7 @@ struct ConversationDetailView: View {
             isOnScreen = true
         }
         .task {
+            await restoreDraftIfNeeded()
             // SwiftUI annule cette tâche quand on quitte l'écran, mais les appels
             // en cours finissent quand même : sans ces gardes, une sortie rapide
             // démarrait ensuite la synchro et la présence que plus rien n'arrêtait
@@ -505,6 +508,7 @@ struct ConversationDetailView: View {
             router.isDockHidden = false
             stopSync()
             stopActivePing(sendLeave: true)
+            if let draftAutosaver { Task { await draftAutosaver.flush() } }
         }
         .onChangeCompat(of: scenePhase) { _, phase in
             // Le flux SSE ne survit pas à la mise en arrière-plan : on le coupe
@@ -518,6 +522,7 @@ struct ConversationDetailView: View {
             } else {
                 stopSync()
                 stopActivePing(sendLeave: true)
+                if let draftAutosaver { Task { await draftAutosaver.flush() } }
             }
         }
         .sheet(isPresented: $showUnlockSheet) {
@@ -729,7 +734,7 @@ struct ConversationDetailView: View {
             if let editTarget {
                 quoteBar(title: "Modifier le message", text: displayedContent(for: editTarget)) {
                     self.editTarget = nil
-                    clearComposer()
+                    restoreComposerAfterEdit()
                 }
             }
             if ephemeralEnabled {
@@ -756,6 +761,8 @@ struct ConversationDetailView: View {
                 seedToken: composerSeedToken,
                 ephemeralEnabled: $ephemeralEnabled,
                 onTyping: { newValue in
+                    // Le texte d'un message qu'on modifie n'est pas un brouillon.
+                    if editTarget == nil { draftAutosaver?.textChanged(newValue) }
                     guard !newValue.isEmpty, canSend else { return }
                     signalTypingIfNeeded()
                 },
@@ -1238,7 +1245,12 @@ struct ConversationDetailView: View {
             Divider()
         }
         Button {
-            editTarget = nil
+            // Quitter une modification pour répondre : le texte du message
+            // modifié ne devient pas la réponse, le brouillon revient.
+            if editTarget != nil {
+                editTarget = nil
+                restoreComposerAfterEdit()
+            }
             replyTarget = message
         } label: {
             Label("Répondre", systemImage: "arrowshape.turn.up.left")
@@ -2128,6 +2140,21 @@ struct ConversationDetailView: View {
         composerSeedToken &+= 1
     }
 
+    /// Remet le brouillon de la conversation dans le champ, à l'ouverture.
+    private func restoreDraftIfNeeded() async {
+        guard draftAutosaver == nil else { return }
+        let autosaver = MessageDraftAutosaver(conversationId: conversation.id)
+        draftAutosaver = autosaver
+        if let draft = await autosaver.load(), editTarget == nil {
+            seedComposer(draft)
+        }
+    }
+
+    /// Fin d'une modification : le brouillon d'avant revient dans le champ.
+    private func restoreComposerAfterEdit() {
+        seedComposer(draftAutosaver?.text ?? "")
+    }
+
     private func send(_ rawText: String) async {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
@@ -2141,7 +2168,7 @@ struct ConversationDetailView: View {
                 try await service.editMessage(messageId: editTarget.id, text: text, in: conversation, e2ee: e2ee)
                 decryptedMessages[editTarget.id] = text
                 self.editTarget = nil
-                clearComposer()
+                restoreComposerAfterEdit()
                 await load()
                 Haptics.success()
             } catch {
@@ -2162,6 +2189,7 @@ struct ConversationDetailView: View {
         pendingSends[localId] = PendingSend(text: text, replyToId: replyToId, idempotencyKey: UUID().uuidString, ttlSeconds: ttl)
         sendStatus[localId] = .sending
         messages = Self.normalized(messages + [optimistic])
+        draftAutosaver?.discard()
         clearComposer()
         replyTarget = nil
         Haptics.light()
@@ -2339,6 +2367,8 @@ struct ConversationDetailView: View {
             if sent.isEncrypted, !caption.isEmpty {
                 decryptedMessages[sent.id] = caption
             }
+            // La légende envoyée ne doit pas revenir comme brouillon.
+            draftAutosaver?.discard()
             clearComposer()
             replyTarget = nil
             Haptics.success()

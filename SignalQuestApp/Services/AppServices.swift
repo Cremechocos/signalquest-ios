@@ -433,6 +433,8 @@ final class AppServices: ObservableObject {
         // même pendant un drive test ou un appel, sinon le dernier lot meurt
         // avec l'app. C'est un seul POST, sans incidence sur la batterie.
         Task { [feedSignals] in await feedSignals.flushNow() }
+        // Envois restés en attente : iOS réveillera l'app pour les renvoyer.
+        PendingQueueBackgroundTasks.schedule()
         // Le live-share de conversation est volontairement « premier plan » :
         // il doit relâcher son observateur GPS AVANT la garde `wantsTracking`,
         // sinon cet observateur serait pris à tort pour un Drive Test explicite

@@ -82,6 +82,8 @@ struct MessagesView: View {
     @State private var routedConversationId: String?
     /// Quitter se confirme : le balayage suffisait à perdre la conversation (SOC-22).
     @State private var pendingLeave: MessageConversation?
+    /// Brouillons par conversation, lus sur l'appareil (plan 3, vague 1).
+    @State private var drafts: [String: String] = [:]
 
     /// Insets des rangées : gap vertical de 14 pt entre cartes (2 × 7),
     /// marge d'écran 20 pt.
@@ -172,6 +174,7 @@ struct MessagesView: View {
         .sqKeepsSwipeBack()
         .signalQuestBackground()
         .task {
+            await reloadDrafts()
             if model.conversations.isEmpty { await model.load() }
             await maybePresentE2EEUnlock()
             await model.decryptPreviews(e2ee: e2ee)
@@ -190,6 +193,9 @@ struct MessagesView: View {
         .refreshable {
             await model.load()
             await model.decryptPreviews(e2ee: e2ee)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: MessageDraftStore.didChange)) { _ in
+            Task { await reloadDrafts() }
         }
         .confirmationDialog(
             "Quitter cette conversation ?",
@@ -310,9 +316,13 @@ struct MessagesView: View {
     /// Aperçu du dernier message : déchiffré quand la clé E2EE est disponible,
     /// cadenas sinon ; mention explicite pour les pièces jointes. Le cadenas des
     /// conversations chiffrées est rendu en icône (12 pt) devant l'aperçu.
+    /// Les replis passent par `String(localized:)` : rendus en `Text(String)`,
+    /// ils restaient en français dans l'app anglaise.
     private func lastMessagePreview(_ conversation: MessageConversation) -> String {
         guard let last = conversation.lastMessage else {
-            return conversation.e2eeEnabled == true ? "Conversation chiffrée" : "Aucun message"
+            return conversation.e2eeEnabled == true
+                ? String(localized: "Conversation chiffrée")
+                : String(localized: "Aucun message")
         }
         if last.deletedAt != nil { return String(localized: "Message supprimé") }
         let attachmentHint = last.attachments.isEmpty ? "" : "📎 "
@@ -320,12 +330,27 @@ struct MessagesView: View {
             if let plain = model.decryptedPreviews[conversation.id], !plain.isEmpty {
                 return attachmentHint + plain
             }
-            return attachmentHint.isEmpty ? "Message chiffré" : "📎 Pièce jointe"
+            return attachmentHint.isEmpty ? String(localized: "Message chiffré") : String(localized: "📎 Pièce jointe")
         }
         if let content = last.content, !content.isEmpty {
             return attachmentHint + content
         }
-        return last.attachments.isEmpty ? "Aucun message" : "📎 Pièce jointe"
+        return last.attachments.isEmpty ? String(localized: "Aucun message") : String(localized: "📎 Pièce jointe")
+    }
+
+    private func reloadDrafts() async {
+        drafts = await MessageDraftStore.shared.all(ownerScopeId: LocalAccountScope.currentOwnerScopeId)
+    }
+
+    /// « Brouillon · … » à la place du dernier message, comme dans les
+    /// messageries courantes : on retrouve ce qu'on avait commencé.
+    private func draftPreview(_ draft: String) -> some View {
+        (Text("Brouillon").foregroundColor(SQColor.accentInk)
+            + Text(verbatim: " · " + draft.replacingOccurrences(of: "\n", with: " ")))
+            .font(SQFont.body(13.5))
+            .foregroundStyle(SQColor.labelSecondary)
+            .lineLimit(1)
+            .accessibilityIdentifier("messages.row.draft")
     }
 
     private var currentUserId: String? {
@@ -379,11 +404,15 @@ struct MessagesView: View {
                             .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
                             .accessibilityLabel("Conversation chiffrée")
                     }
-                    Text(lastMessagePreview(conversation))
-                        .font(unread ? SQFont.body(13.5, .medium) : SQFont.body(13.5))
-                        .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
-                        .lineLimit(1)
-                        .accessibilityIdentifier("messages.row.preview")
+                    if let draft = drafts[conversation.id] {
+                        draftPreview(draft)
+                    } else {
+                        Text(lastMessagePreview(conversation))
+                            .font(unread ? SQFont.body(13.5, .medium) : SQFont.body(13.5))
+                            .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
+                            .lineLimit(1)
+                            .accessibilityIdentifier("messages.row.preview")
+                    }
                 }
             }
             Spacer(minLength: SQSpace.sm)

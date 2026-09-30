@@ -5,6 +5,7 @@ import SwiftUI
 struct SignalQuestWidgetBundle: WidgetBundle {
     var body: some Widget {
         SpeedtestWidget()
+        SpeedtestLauncherWidget()
         SpeedtestTrendWidget()
         NetworkWidget()
         if #available(iOS 16.1, *) {

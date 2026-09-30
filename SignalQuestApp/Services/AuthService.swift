@@ -367,12 +367,17 @@ final class AuthService: AuthServicing {
         if let ownerScopeId = closing?.ownerScopeId {
             OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
             HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
+            RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         Self.clearDeviceSurfaces()
         api.credentials.clearAll()
         try? sessionStore.remove(Self.cachedUserKey)
+        // En dernier : aucune suspension au milieu de la fermeture de session.
+        if let ownerScopeId = closing?.ownerScopeId {
+            await MessageDraftStore.shared.purge(ownerScopeId: ownerScopeId)
+        }
     }
 
     /// Ce que l'app expose HORS de l'app (widgets, Spotlight) appartient au compte
@@ -394,12 +399,17 @@ final class AuthService: AuthServicing {
         if let ownerScopeId = closing?.ownerScopeId {
             OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
             HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
+            RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         Self.clearDeviceSurfaces()
         api.credentials.clearAll()
         try? sessionStore.remove(Self.cachedUserKey)
+        // En dernier : aucune suspension au milieu de la fermeture de session.
+        if let ownerScopeId = closing?.ownerScopeId {
+            await MessageDraftStore.shared.purge(ownerScopeId: ownerScopeId)
+        }
     }
 
     func clearLocalSessionForDebugQA() async {
@@ -415,7 +425,11 @@ final class AuthService: AuthServicing {
     func cacheUser(_ user: AuthUser) {
         let previousUserId = LocalAccountScope.currentUserId
         if let previousUserId, previousUserId != user.id {
-            OutageReportDraftStore.purge(ownerScopeId: "user:\(previousUserId)")
+            let previousScope = "user:\(previousUserId)"
+            OutageReportDraftStore.purge(ownerScopeId: previousScope)
+            HiddenStoryAuthorsStore.purge(ownerScopeId: previousScope)
+            RecentlyViewedStore.purge(ownerScopeId: previousScope)
+            Task { await MessageDraftStore.shared.purge(ownerScopeId: previousScope) }
         }
         LocalAccountScope.activate(userId: user.id)
         if previousUserId != user.id {

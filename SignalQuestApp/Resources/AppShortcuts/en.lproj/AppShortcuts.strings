@@ -7,3 +7,5 @@
 "Ouvre mes messages ${applicationName}" = "Open my messages in ${applicationName}";
 "Lance un drive test avec ${applicationName}" = "Start a drive test with ${applicationName}";
 "Démarre un drive test ${applicationName}" = "Begin a ${applicationName} drive test";
+"Quel est mon dernier débit ${applicationName}" = "What's my latest speed in ${applicationName}";
+"Mon dernier speedtest ${applicationName}" = "My latest ${applicationName} speedtest";

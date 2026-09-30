@@ -1,6 +1,18 @@
 {
   "sourceLanguage": "fr",
   "strings": {
+    "Lancer un test": {
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Lancer un test" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Run a test" } }
+      }
+    },
+    "Un toucher pour lancer un speedtest.": {
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Un toucher pour lancer un speedtest." } },
+        "en": { "stringUnit": { "state": "translated", "value": "One tap to run a speedtest." } }
+      }
+    },
     "Tendance du débit": {
       "localizations" : {
         "en" : {

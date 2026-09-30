@@ -219,6 +219,9 @@ struct ExploreView: View {
 
     @State private var profileAuthor: SocialFeedAuthor?
     @State private var detailItem: UnifiedSocialFeedItem?
+    /// Profils consultés récemment sur cet appareil (plan 3, vague 1).
+    @State private var recentProfiles: [RecentlyViewedStore.Item] = []
+    @ScaledMetric(relativeTo: .caption) private var recentTileWidth: CGFloat = 76
 
     init(service: SocialFeedServicing) {
         self.service = service
@@ -251,6 +254,9 @@ struct ExploreView: View {
                 } else if model.isLoading && model.trending.isEmpty && model.suggestions.isEmpty {
                     LoadingSkeleton().sqShimmer()
                 } else {
+                    if model.selectedHashtag == nil, !recentProfiles.isEmpty {
+                        recentProfilesSection
+                    }
                     trendingSection
                     if model.selectedHashtag != nil {
                         hashtagFeedSection
@@ -270,6 +276,10 @@ struct ExploreView: View {
             if model.trending.isEmpty && model.suggestions.isEmpty { await model.load() }
         }
         .refreshable { await model.load() }
+        .onAppear { recentProfiles = Self.storedRecentProfiles() }
+        .onReceive(NotificationCenter.default.publisher(for: RecentlyViewedStore.didChange)) { _ in
+            recentProfiles = Self.storedRecentProfiles()
+        }
         .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(userId: author.id, prefill: author, service: service)
         }
@@ -294,6 +304,61 @@ struct ExploreView: View {
             let updated = item.applying(response)
             if detailItem?.id == updated.id { detailItem = updated }
             model.accept(updated)
+        }
+    }
+
+    // MARK: Récents
+
+    private static func storedRecentProfiles() -> [RecentlyViewedStore.Item] {
+        RecentlyViewedStore.items().filter { $0.kind == .profile }
+    }
+
+    /// Profils consultés récemment, le plus récent d'abord.
+    private var recentProfilesSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            SQSectionHeader("Récents") {
+                Button("Effacer") {
+                    Haptics.selection()
+                    RecentlyViewedStore.clear([.profile])
+                }
+                .font(SQType.caption)
+                .tint(SQColor.brandRed)
+                .frame(minHeight: 44)
+                .accessibilityLabel("Effacer les récents")
+                .accessibilityIdentifier("explore.recents.clear")
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: SQSpace.md) {
+                    ForEach(recentProfiles) { item in
+                        Button {
+                            Haptics.light()
+                            profileAuthor = SocialFeedAuthor(
+                                id: item.targetId,
+                                name: item.title,
+                                handle: item.handle,
+                                avatarUrl: item.avatarURL,
+                                isFriend: nil,
+                                isFollowing: nil,
+                                liveRadio: nil
+                            )
+                        } label: {
+                            VStack(spacing: SQSpace.xs) {
+                                SQAvatar(url: item.avatarURL, name: item.title, size: 52)
+                                Text(item.title)
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.label)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(width: recentTileWidth)
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                        .accessibilityLabel("Voir le profil de \(item.title)")
+                        .accessibilityIdentifier("explore.recent.profile.\(item.targetId)")
+                    }
+                }
+                .padding(.vertical, SQSpace.xxs)
+            }
         }
     }
 

@@ -1409,6 +1409,38 @@
         }
       }
     },
+    "%lld Mbps en réception" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Mbps download"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Mbps en réception"
+          }
+        }
+      }
+    },
+    "%lld Mbps en envoi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Mbps upload"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Mbps en envoi"
+          }
+        }
+      }
+    },
     "%lld MHz — plus la fréquence monte, plus le fuseau s'affine" : {
       "localizations" : {
         "en" : {
@@ -8030,6 +8062,22 @@
         }
       }
     },
+    "Aucun test pour l’instant. Lance un speedtest dans SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No test yet. Run a speedtest in SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun test pour l’instant. Lance un speedtest dans SignalQuest."
+          }
+        }
+      }
+    },
     "Aucune adresse connue pour l’instant : la première résolution arrive au prochain cycle de sonde." : {
       "localizations" : {
         "en" : {
@@ -10049,6 +10097,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Boussole pointant l'antenne, relèvement %lld degrés"
+          }
+        }
+      }
+    },
+    "Brouillon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draft"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brouillon"
           }
         }
       }
@@ -15904,6 +15968,54 @@
         }
       }
     },
+    "Dernier résultat SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest latest result"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier résultat SignalQuest"
+          }
+        }
+      }
+    },
+    "Dernier test %@ sur %@ : %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest test %1$@ on %2$@: %3$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier test %@ sur %@ : %@."
+          }
+        }
+      }
+    },
+    "Dernier résultat" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest result"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier résultat"
+          }
+        }
+      }
+    },
     "Désactiver la double authentification" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17018,6 +17130,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Domicile"
+          }
+        }
+      }
+    },
+    "Donne le débit de ton dernier speedtest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gives the speed of your latest speedtest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Donne le débit de ton dernier speedtest."
           }
         }
       }
@@ -18541,6 +18669,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Effacer la recherche"
+          }
+        }
+      }
+    },
+    "Effacer les récents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear recent items"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer les récents"
           }
         }
       }
@@ -24441,6 +24585,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Latence (ping)"
+          }
+        }
+      }
+    },
+    "latence %lld ms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ms latency"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "latence %lld ms"
           }
         }
       }
