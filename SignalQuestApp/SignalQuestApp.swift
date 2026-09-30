@@ -70,6 +70,7 @@ struct SignalQuestApp: App {
         return WindowGroup { @Sendable in
             AppRootView(services: services, session: session, appLock: appLock, onboardingEntry: onboardingEntry)
         }
+        .commands { SignalQuestCommands() }
     }
 }
 
@@ -107,6 +108,8 @@ struct AppRootView: View {
     @ObservedObject var appLock: AppLockController
     @ObservedObject var onboardingEntry: OnboardingEntryState
     @StateObject private var onboardingScene = OnboardingSceneContext()
+    /// Routeur de CETTE fenêtre : deux fenêtres iPad ne se copient plus (TRX-08).
+    @StateObject private var windowRouterStore = WindowRouterStore()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.locale) private var locale
     @State private var passwordResetRoute: PasswordResetRoute?
@@ -159,7 +162,7 @@ struct AppRootView: View {
             .environmentObject(onboardingEntry)
             .environmentObject(services)
             .environmentObject(session)
-            .environmentObject(services.router)
+            .environmentObject(windowRouter)
             .environmentObject(services.callManager)
             .environmentObject(services.networkPath)
             .environmentObject(unitsStore)
@@ -265,6 +268,8 @@ struct AppRootView: View {
                 if phase != .active { onboardingEntry.releaseGuestScene(onboardingScene.id) }
                 switch phase {
                 case .active:
+                    // Les routes venues de l'extérieur vont à cette fenêtre.
+                    services.routing.activate(windowRouter)
                     UNUserNotificationCenter.current().setBadgeCountCompat(0)
                     // Verrouillage / déconnexion par inactivité au retour au 1er plan.
                     if case .authenticated = session.state, appLock.willEnterForeground() {
@@ -302,6 +307,10 @@ struct AppRootView: View {
                 }
             }
     }
+    private var windowRouter: AppRouter {
+        windowRouterStore.router(claimingFrom: services.routing)
+    }
+
     private var mustDismissPasswordReset: Bool {
         if services.versionPolicy.state.blocksApp || !hasCompletedOnboarding { return true }
         if case .requires2FA = session.state { return true }
@@ -325,7 +334,7 @@ struct AppRootView: View {
             appOrigin: AppConfig.current.appBaseURL,
             appScheme: SQSharedConfiguration.urlScheme
         ) {
-            services.router.route(toPost: postID)
+            windowRouter.route(toPost: postID)
             return
         }
         // Le web a consommé le jeton de confirmation. L'app ne se déclare pas
@@ -574,16 +583,27 @@ struct OfflineBanner: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
                 }
-                .foregroundStyle(.white)
+                // Bouton encre du design system : nuit en clair, crème en sombre.
+                .foregroundStyle(SQColor.onInk)
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm)
                 .frame(maxWidth: .infinity)
-                .background(Color(hex: 0x18150F).opacity(0.94))
+                .background(SQColor.label.opacity(0.94))
                 .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 .accessibilityAddTraits(.isStaticText)
             }
         }
         .animation(reduceMotion ? nil : SQMotion.smooth, value: isVisible)
+        // Un bandeau qui apparaît en haut de l'écran passe inaperçu avec
+        // VoiceOver : on l'annonce, et le retour du réseau aussi (TRX-16).
+        .onChangeCompat(of: isVisible) { _, offline in
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: offline
+                    ? String(localized: "Hors ligne — certaines actions sont indisponibles")
+                    : String(localized: "Connexion rétablie")
+            )
+        }
     }
 }
 
@@ -633,6 +653,7 @@ struct MainTabView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let user: AuthUser?
     @State private var showHandleGate = false
     @State private var showGuestReceipts = false
@@ -643,6 +664,7 @@ struct MainTabView: View {
 
     var body: some View {
         tabContainer
+        .focusedSceneObject(router)
         .task(id: user?.id) {
             consumeIntentRoutes()
             #if DEBUG
@@ -671,7 +693,7 @@ struct MainTabView: View {
         }
         .onChangeCompat(of: router.selectedTab) { _, tab in
             // Changement d'onglet (tap, deep-link, intent) : dock redéployé.
-            withAnimation(SQMotion.snappy) { router.isDockMinimized = false }
+            withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { router.isDockMinimized = false }
             // Le @pseudo sert aux mentions : il se propose en entrant dans
             // Communauté, pas à l'arrivée (TRX-20). Un lien vers un contenu passe
             // avant la feuille.
@@ -850,7 +872,7 @@ struct MainTabView: View {
                     communityBadge: user == nil ? 0 : services.unreadConversations,
                     minimized: router.isDockMinimized,
                     onExpand: {
-                        withAnimation(SQMotion.snappy) { router.isDockMinimized = false }
+                        withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { router.isDockMinimized = false }
                     }
                 )
                 .padding(.bottom, SQDock.bottomGap)
@@ -858,7 +880,7 @@ struct MainTabView: View {
             }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
-        .animation(SQMotion.standard, value: router.isDockHidden)
+        .sqAnimation(SQMotion.standard, value: router.isDockHidden)
     }
 
     /// Applique une route demandée par un App Intent / raccourci Siri (onglet Speed/Carte).

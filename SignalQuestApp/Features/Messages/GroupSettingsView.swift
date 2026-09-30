@@ -13,6 +13,7 @@ struct GroupSettingsView: View {
     var onLeft: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var session: AuthSessionViewModel
 
     @State private var title: String
@@ -344,14 +345,14 @@ struct GroupSettingsView: View {
         // Aperçu optimiste immédiat, puis upload ; on confirme avec l'URL renvoyée.
         // On conserve l'aperçu local en cas de succès (il EST la photo uploadée)
         // pour éviter un flash le temps que l'image distante se charge.
-        withAnimation(.snappy) { pickedPreview = image }
+        withAnimation(SQMotion.resolve(.snappy, reduceMotion)) { pickedPreview = image }
         await run {
             if let uploadedURL = try await service.uploadGroupPhoto(conversationId: conversation.id, data: jpeg) {
                 groupPhotoURL = uploadedURL
             }
         }
         // En cas d'échec, on retire l'aperçu pour revenir à l'état réel.
-        if errorMessage != nil { withAnimation { pickedPreview = nil } }
+        if errorMessage != nil { withAnimation(SQMotion.resolve(.default, reduceMotion)) { pickedPreview = nil } }
     }
 
     private func leave() async {

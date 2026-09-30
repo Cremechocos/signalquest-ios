@@ -87,7 +87,7 @@ final class TwoFactorSuccessQATests: XCTestCase {
         let submit = app.buttons["two-factor.setup.confirm"]
         XCTAssertTrue(secret.waitForExistence(timeout: 20), "A real setup response must expose manual enrollment")
         XCTAssertTrue(codeField.exists)
-        XCTAssertEqual(codeField.label, locale == "fr" ? "Code TOTP à 6 chiffres" : "6-digit TOTP code")
+        XCTAssertEqual(codeField.label, locale == "fr" ? "Code à 6 chiffres de ton app d’authentification" : "6-digit code from your authenticator app")
         XCTAssertFalse(submit.isEnabled)
 
         let current: Code = try await control("/__qa/code", fixture: fixture, method: "POST", body: ["scenarioId": scenario.id])

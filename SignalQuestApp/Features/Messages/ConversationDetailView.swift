@@ -254,7 +254,7 @@ struct ConversationDetailView: View {
                                 RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
                                     .fill(SQColor.brandRed.opacity(highlightedMessageId == message.id ? 0.14 : 0))
                             )
-                            .animation(SQMotion.standard, value: highlightedMessageId)
+                            .sqAnimation(SQMotion.standard, value: highlightedMessageId)
                         }
                         readReceiptFooter
                         Color.clear
@@ -278,7 +278,7 @@ struct ConversationDetailView: View {
                     guard let last = messages.last else { return }
                     let mine = last.id.hasPrefix("local-") || last.senderId == currentUserId
                     if isNearBottom || mine {
-                        withAnimation(SQMotion.standard) { proxy.scrollTo(last.id, anchor: .bottom) }
+                        withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
                     } else {
                         hasUnseenMessages = true
                     }
@@ -288,7 +288,7 @@ struct ConversationDetailView: View {
                         Button {
                             Haptics.selection()
                             hasUnseenMessages = false
-                            if let last = messages.last { withAnimation(SQMotion.standard) { proxy.scrollTo(last.id, anchor: .bottom) } }
+                            if let last = messages.last { withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) } }
                         } label: {
                             Label("Nouveaux messages", systemImage: "arrow.down")
                                 .font(SQFont.body(13, .semibold))
@@ -316,7 +316,7 @@ struct ConversationDetailView: View {
                 }
                 .onChangeCompat(of: scrollTargetId) { _, target in
                     guard let target else { return }
-                    withAnimation(SQMotion.standard) { proxy.scrollTo(target, anchor: .center) }
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(target, anchor: .center) }
                     scrollTargetId = nil
                 }
             }
@@ -1670,12 +1670,12 @@ struct ConversationDetailView: View {
     }
 
     private func highlightMessage(_ id: String) {
-        withAnimation(SQMotion.fast) { highlightedMessageId = id }
+        withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { highlightedMessageId = id }
         Task {
             try? await Task.sleep(nanoseconds: 850_000_000)
             await MainActor.run {
                 if highlightedMessageId == id {
-                    withAnimation(SQMotion.standard) { highlightedMessageId = nil }
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { highlightedMessageId = nil }
                 }
             }
         }
@@ -1851,7 +1851,7 @@ struct ConversationDetailView: View {
                 switch trigger {
                 case .typingEvent:
                     await MainActor.run {
-                        withAnimation(SQMotion.fast) { typingUntil = Date().addingTimeInterval(5) }
+                        withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { typingUntil = Date().addingTimeInterval(5) }
                     }
                 case .viewingEvent:
                     await refreshViewers()
@@ -1897,7 +1897,7 @@ struct ConversationDetailView: View {
     private func refreshViewers() async {
         let viewers = await service.conversationViewers(conversationId: conversation.id)
         await MainActor.run {
-            withAnimation(SQMotion.fast) { conversationViewers = viewers }
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { conversationViewers = viewers }
         }
     }
 
@@ -2200,7 +2200,7 @@ struct ConversationDetailView: View {
             // On conserve la bulle et les données de rejeu : l'utilisateur peut
             // réessayer d'un tap. Pas de bannière d'erreur globale ici — le
             // feedback est porté par la bulle elle-même.
-            withAnimation(SQMotion.fast) { sendStatus[localId] = .failed }
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
             Haptics.error()
         }
     }
@@ -2235,7 +2235,7 @@ struct ConversationDetailView: View {
         }
         pendingSends[localId] = nil
         sendStatus[localId] = nil
-        withAnimation(SQMotion.fast) { messages.removeAll { $0.id == localId } }
+        withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { messages.removeAll { $0.id == localId } }
     }
 
     private func makeOptimisticMessage(id: String, text: String, replyToId: String?, ttlSeconds: Int = 0, createdAt: Date = Date()) -> MessageItem {
@@ -2614,7 +2614,7 @@ struct ConversationDetailView: View {
         } catch let error as E2EEError where error == .staleKey {
             // E2EE-UX-04 : clé tournée côté autre plateforme → bandeau de resync
             // au lieu de bulles muettes définitives.
-            withAnimation(SQMotion.fast) { needsKeyResync = true }
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { needsKeyResync = true }
             return
         } catch {
             MessageSyncLog.logger.error("decrypt \(pending[0].id, privacy: .public) erreur: \(error.localizedDescription, privacy: .private)")

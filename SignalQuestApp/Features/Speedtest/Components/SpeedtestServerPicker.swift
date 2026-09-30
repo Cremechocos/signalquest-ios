@@ -105,8 +105,8 @@ struct SpeedtestServerPicker: View {
             }
         }
         // Animation de hauteur/layout uniquement — fluide dans un ScrollView.
-        .animation(.easeInOut(duration: 0.25), value: expandedRegion)
-        .animation(.easeInOut(duration: 0.25), value: sortByDistance)
+        .sqAnimation(.easeInOut(duration: 0.25), value: expandedRegion)
+        .sqAnimation(.easeInOut(duration: 0.25), value: sortByDistance)
         .onAppear {
             expandGroup(containing: selection)
         }
@@ -161,7 +161,7 @@ struct SpeedtestServerPicker: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(SQColor.labelTertiary)
                                 .frame(width: 12)
-                                .animation(.easeInOut(duration: 0.22), value: isExpanded)
+                                .sqAnimation(.easeInOut(duration: 0.22), value: isExpanded)
 
                             Text(group.region)
                                 .font(SQFont.body(14, .semibold))

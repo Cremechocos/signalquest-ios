@@ -631,6 +631,7 @@ struct ANFRStatsView: View {
             Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
+                .sqHeader()
         }
     }
 
@@ -711,7 +712,9 @@ private struct ANFRTrendChart: View {
             withAnimation(.easeInOut(duration: 0.9)) { drawn = true }
         }
         .onChangeCompat(of: points.map(\.id)) { _, _ in
-            // Nouveau jeu de données (changement d'opérateur) : re-trace.
+            // Nouveau jeu de données (changement d'opérateur) : re-trace, sauf
+            // sous « Réduire les animations » où la courbe reste tracée.
+            guard animate else { return }
             drawn = false
             withAnimation(.easeInOut(duration: 0.7)) { drawn = true }
         }

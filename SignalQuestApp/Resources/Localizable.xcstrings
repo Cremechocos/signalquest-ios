@@ -6199,6 +6199,22 @@
         }
       }
     },
+    "Aller à" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aller à"
+          }
+        }
+      }
+    },
     "Altitude de départ" : {
       "localizations" : {
         "en" : {
@@ -13189,6 +13205,22 @@
         }
       }
     },
+    "Choisir le site %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose site %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir le site %@"
+          }
+        }
+      }
+    },
     "Choisir les couleurs et consulter la légende" : {
       "localizations" : {
         "en" : {
@@ -13925,6 +13957,22 @@
         }
       }
     },
+    "Code à 6 chiffres de ton app d’authentification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6-digit code from your authenticator app"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code à 6 chiffres de ton app d’authentification"
+          }
+        }
+      }
+    },
     "Code ANFR" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14084,22 +14132,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code reçu"
-          }
-        }
-      }
-    },
-    "Code TOTP à 6 chiffres" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "6-digit TOTP code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code TOTP à 6 chiffres"
           }
         }
       }
@@ -15188,6 +15220,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connexion requise"
+          }
+        }
+      }
+    },
+    "Connexion rétablie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back online"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion rétablie"
           }
         }
       }

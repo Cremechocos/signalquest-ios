@@ -1415,6 +1415,7 @@ private struct AntennaSectionHeader: View {
             .font(SQType.heading)
             .foregroundStyle(SQColor.label)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .sqHeader()
     }
 }
 

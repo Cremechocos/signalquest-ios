@@ -115,7 +115,12 @@ final class AppServices: ObservableObject {
     let push: PushNotificationService
     /// Explication des notifications au bon moment (TRX-01).
     let notificationPriming: NotificationPrimingCoordinator
-    let router: AppRouter
+    /// Routeurs des fenêtres (TRX-08).
+    let routing: WindowRouting
+    /// Routeur de la fenêtre au premier plan : cible des routes venues de
+    /// l'extérieur (notification, Siri, Plans). Une vue lit plutôt celui de SA
+    /// fenêtre, dans l'environnement.
+    var router: AppRouter { routing.active }
     let callManager: CallManager
     let sse: SSEClient
     let location: LocationService
@@ -143,8 +148,8 @@ final class AppServices: ObservableObject {
         let credentials = CredentialStore()
         let api = APIClient(config: config, credentials: credentials)
         self.api = api
-        let appRouter = AppRouter()
-        router = appRouter
+        let windowRouting = WindowRouting(initial: AppRouter())
+        routing = windowRouting
         let e2eeService = E2EEService(api: api)
         e2ee = e2eeService
         epochRotations = E2EEV2EpochRotationRuntime(api: api)
@@ -224,7 +229,7 @@ final class AppServices: ObservableObject {
             api: api,
             synchronizer: AppStoreTransactionSynchronizer(api: api)
         )
-        let pushService = PushNotificationService(api: api, router: appRouter)
+        let pushService = PushNotificationService(api: api, routing: windowRouting)
         push = pushService
         notificationPriming = NotificationPrimingCoordinator(presentSheet: { reason in
             TopSheetPresenter.present { dismiss in

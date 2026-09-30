@@ -10,6 +10,7 @@ struct FriendLiveSheet: View {
     let userLocation: CLLocation?
 
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.dismiss) private var dismiss
     @State private var openingConversation = false
 
@@ -191,7 +192,7 @@ struct FriendLiveSheet: View {
 
             Button {
                 dismiss()
-                services.router.route(toUserProfile: friend.id)
+                router.route(toUserProfile: friend.id)
             } label: {
                 actionLabel(icon: "person.crop.circle", title: "Profil", filled: false)
             }
@@ -224,7 +225,7 @@ struct FriendLiveSheet: View {
             participantIds: [friend.id], title: nil, e2ee: true
         ) else { return }
         dismiss()
-        services.router.route(toConversation: response.conversationId)
+        router.route(toConversation: response.conversationId)
     }
 
     // MARK: Présence

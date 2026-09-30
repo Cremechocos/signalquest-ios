@@ -21,6 +21,7 @@ struct SentinelleFollowedCard: View {
 
     @State private var points: [SentinelleSeriesPoint] = []
     @State private var window: SentinelleWindow = .h24
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var confirming = false
     // Le détail s'ouvre au TAP sur la carte, comme une box à soi : un bouton
@@ -56,13 +57,13 @@ struct SentinelleFollowedCard: View {
                 // entière, il refermait le détail dès qu'on glissait sur le
                 // graphe pour y lire une valeur.
                 .contentShape(Rectangle())
-                .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { open.toggle() } }
+                .onTapGesture { withAnimation(SQMotion.resolve(.easeOut(duration: 0.18), reduceMotion)) { open.toggle() } }
                 .frame(minHeight: 44)
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isButton)
                 .accessibilityHint(open ? "Réduit les détails" : "Affiche les détails")
                 .accessibilityAction {
-                    withAnimation(.easeOut(duration: 0.18)) { open.toggle() }
+                    withAnimation(SQMotion.resolve(.easeOut(duration: 0.18), reduceMotion)) { open.toggle() }
                 }
 
                 if open {

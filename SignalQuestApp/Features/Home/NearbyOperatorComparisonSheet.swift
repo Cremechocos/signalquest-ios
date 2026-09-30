@@ -12,6 +12,7 @@ struct NearbyOperatorComparisonSheet: View {
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var stats: [OperatorMetricStat] = []
     @State private var loaded = false
     @State private var animate = false
@@ -71,7 +72,7 @@ struct NearbyOperatorComparisonSheet: View {
             metric: metric, latitude: latitude, longitude: longitude, maxAge: 90
         )
         loaded = true
-        withAnimation(.easeOut(duration: 0.55)) { animate = true }
+        withAnimation(SQMotion.resolve(.easeOut(duration: 0.55), reduceMotion)) { animate = true }
     }
 
     private var intro: some View {

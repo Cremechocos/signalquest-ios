@@ -285,7 +285,7 @@ struct MapPhotoViewer: View {
         // Optimisme : bascule immédiate puis réconciliation serveur.
         let previousLiked = liked
         let previousCount = likeCount
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+        withAnimation(SQMotion.resolve(.spring(response: 0.3, dampingFraction: 0.6), reduceMotion)) {
             liked.toggle()
             likeCount = max(0, likeCount + (liked ? 1 : -1))
         }
@@ -313,7 +313,7 @@ struct MapPhotoViewer: View {
         do {
             if let created = try await service.addComment(photoId: photoId, content: content) {
                 await MainActor.run {
-                    withAnimation { comments.append(created) }
+                    withAnimation(SQMotion.resolve(.default, reduceMotion)) { comments.append(created) }
                     commentDraft = ""
                 }
             } else {

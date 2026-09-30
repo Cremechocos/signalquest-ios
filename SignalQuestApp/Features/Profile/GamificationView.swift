@@ -217,7 +217,7 @@ struct GamificationView: View {
 
     private var badgesGrid: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
-            Text("Badges").font(SQType.title).foregroundStyle(SQColor.label)
+            Text("Badges").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.md), count: 3), spacing: SQSpace.md) {
                 ForEach(badgeList) { badge in
                     badgeTile(badge)
@@ -256,7 +256,7 @@ struct GamificationView: View {
 
     private func questsSection(_ quests: [GamificationV2Quest]) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
-            Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label)
+            Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             ForEach(questGroups(quests), id: \.cadence) { group in
                 // sqFadeUp par groupe (hauteur < viewport) — JAMAIS sur le bloc
                 // entier, sinon la section reste estompée en permanence.
@@ -310,7 +310,7 @@ struct GamificationView: View {
 
     private var questsSkeleton: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
-            Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label)
+            Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: SQSpace.md) {
                     questCardSkeleton
@@ -347,7 +347,7 @@ struct GamificationView: View {
 
     private var lockedAchievementsSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
-            Text("Succès à débloquer").font(SQType.title).foregroundStyle(SQColor.label)
+            Text("Succès à débloquer").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             ForEach(lockedBadges) { badge in
                 HStack(spacing: SQSpace.md) {
                     Group {
@@ -416,7 +416,7 @@ struct GamificationView: View {
 
     private var eventsList: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
-            Text("Activité").font(SQType.title).foregroundStyle(SQColor.label)
+            Text("Activité").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             ForEach(model.events) { event in
                 let display = GamificationEventDisplay(kind: event.kind)
                 HStack(spacing: SQSpace.md) {

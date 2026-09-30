@@ -235,8 +235,12 @@ struct LeaderboardsView: View {
                     .frame(width: 40, height: 40)
                     .background(SQColor.surface, in: Circle())
                     .sqShadowSoft()
+                    // Cible de 44 pt sans grossir le rond de la maquette.
+                    .padding(2)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(SQPressButtonStyle())
+            .padding(-2)
             .accessibilityLabel("Retour")
             Text("Classements")
                 .font(SQFont.display(24, .bold))

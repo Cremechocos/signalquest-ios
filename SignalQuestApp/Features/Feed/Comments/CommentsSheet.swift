@@ -146,7 +146,7 @@ final class CommentsViewModel: ObservableObject {
         defer { isSending = false }
         do {
             let comment = try await service.add(postId: postId, text: text, parentId: parentID)
-            withAnimation(SQMotion.bouncy) {
+            withAnimation(SQMotion.resolve(SQMotion.bouncy, UIAccessibility.isReduceMotionEnabled)) {
                 if let parentID {
                     var page = repliesByParent[parentID] ?? ReplyPage()
                     if !page.comments.contains(where: { $0.id == comment.id }),
@@ -209,7 +209,7 @@ final class CommentsViewModel: ObservableObject {
     func delete(_ comment: SocialComment) async {
         do {
             try await service.delete(postId: postId, commentId: comment.id)
-            withAnimation(SQMotion.standard) {
+            withAnimation(SQMotion.resolve(SQMotion.standard, UIAccessibility.isReduceMotionEnabled)) {
                 comments.removeAll { $0.id == comment.id }
                 for parentID in Array(repliesByParent.keys) {
                     repliesByParent[parentID]?.comments.removeAll { $0.id == comment.id }

@@ -16,6 +16,7 @@ struct AntennaRadioIdentifiersView: View {
 
     @State private var expandedSector: Int?
     @State private var copiedValue: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -86,7 +87,7 @@ struct AntennaRadioIdentifiersView: View {
         return VStack(alignment: .leading, spacing: isExpanded ? 10 : 0) {
             Button {
                 Haptics.light()
-                withAnimation(SQMotion.standard) {
+                withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
                     expandedSector = isExpanded ? nil : sector.id
                 }
             } label: {
@@ -266,11 +267,11 @@ struct AntennaRadioIdentifiersView: View {
     private func copy(_ value: String) {
         UIPasteboard.general.string = value
         Haptics.success()
-        withAnimation(SQMotion.snappy) { copiedValue = value }
+        withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { copiedValue = value }
         Task {
             try? await Task.sleep(nanoseconds: 1_600_000_000)
             await MainActor.run {
-                withAnimation(SQMotion.standard) {
+                withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
                     if copiedValue == value { copiedValue = nil }
                 }
             }

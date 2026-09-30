@@ -27,6 +27,7 @@ struct OutageThreadSection: View {
     let commentCount: Int
 
     @EnvironmentObject private var services: AppServices
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var comments: [SocialComment] = []
     @State private var draft = ""
@@ -324,8 +325,8 @@ struct OutageThreadSection: View {
                 Image(systemName: liked ? "heart.fill" : "heart")
                     .font(.system(size: compact ? 13 : 14, weight: .semibold))
                     // Le rebond dit « c'est parti » avant même que le serveur ne réponde.
-                    .scaleEffect(liked ? 1.12 : 1)
-                    .animation(SQMotion.bouncy, value: liked)
+                    .scaleEffect(liked && !reduceMotion ? 1.12 : 1)
+                    .sqAnimation(SQMotion.bouncy, value: liked)
                 // Un zéro ne s'écrit pas : « 0 » invite à croire que le compteur est cassé.
                 if let likes = comment.likes, likes > 0 {
                     Text("\(likes)")

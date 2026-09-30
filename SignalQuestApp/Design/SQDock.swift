@@ -185,6 +185,7 @@ private struct SQDockPressStyle: ButtonStyle {
 /// racine de chaque onglet. iOS 18+ (API scroll geometry) ; no-op avant.
 private struct SQDockAutoMinimize: ViewModifier {
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Distance cumulée dans la direction courante : hystérésis pour qu'un
     /// tremblement de 1-2 pt ne fasse pas clignoter le dock.
@@ -241,7 +242,6 @@ private struct SQDockAutoMinimize: ViewModifier {
     }
 
     private func setMinimized(_ value: Bool) {
-        let router = services.router
         guard router.isDockMinimized != value else { return }
         withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
             router.isDockMinimized = value

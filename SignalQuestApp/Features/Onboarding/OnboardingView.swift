@@ -361,7 +361,7 @@ private struct OnboardingSlideView: View {
             OnboardingSceneView(scene: page.scene, active: isActive && revealed)
                 .frame(height: 240)
                 .opacity(revealed ? 1 : 0.35)
-                .scaleEffect(revealed ? 1 : 0.96)
+                .scaleEffect(!revealed && !reduceMotion ? 0.96 : 1)
                 .animation(entrance(delay: 0), value: revealed)
                 .accessibilityHidden(true)
 
@@ -689,7 +689,7 @@ private struct LiveMapScene: View {
             Circle()
                 .fill(isContribution ? SQColor.brandRed : SQColor.labelTertiary.opacity(0.4))
                 .frame(width: isContribution ? 10 : 6, height: isContribution ? 10 : 6)
-                .scaleEffect(isContribution && !lit ? 0.1 : 1)
+                .scaleEffect(isContribution && !lit && !reduceMotion ? 0.1 : 1)
                 .opacity(isContribution && !lit ? 0 : 1)
                 .animation(
                     reduceMotion

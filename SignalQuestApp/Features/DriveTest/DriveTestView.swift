@@ -1196,6 +1196,7 @@ final class DriveTestViewModel: ObservableObject {
 struct DriveTestView: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var router: AppRouter
     @ObservedObject private var model: DriveTestViewModel
     @State private var selectedAntenna: AntennaSite?
     @State private var selectedSpeedtest: DriveSpeedtestPoint?
@@ -1273,7 +1274,7 @@ struct DriveTestView: View {
         }
         // L'onglet Tester encore sélectionné = on a quitté l'écran (retour) ;
         // un autre onglet = l'écran est seulement masqué, la session continue.
-        .onDisappear { model.onDisappear(isLeavingScreen: services.router.selectedTab == .speed) }
+        .onDisappear { model.onDisappear(isLeavingScreen: router.selectedTab == .speed) }
         // Détails antenne au tap — la session speedtest continue en arrière-plan.
         .sheet(item: $selectedAntenna) { site in
             AntennaDetailSheet(
@@ -1300,7 +1301,7 @@ struct DriveTestView: View {
     private var mapLegendControl: some View {
         VStack(alignment: .trailing, spacing: SQSpace.xs) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) { showMapLegend.toggle() }
+                withAnimation(SQMotion.resolve(.easeInOut(duration: 0.2), reduceMotion)) { showMapLegend.toggle() }
             } label: {
                 Image(systemName: showMapLegend ? "xmark" : "list.bullet")
                     .font(.system(size: 15, weight: .semibold))

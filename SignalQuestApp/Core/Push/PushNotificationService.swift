@@ -402,7 +402,8 @@ enum PushRecipientPolicy {
 /// `/api/user/fcm-token`.
 final class PushNotificationService: NSObject, @unchecked Sendable {
     private let api: APIClient
-    private let router: AppRouter
+    /// Les routes vont à la fenêtre au premier plan (TRX-08).
+    private let routing: WindowRouting
     private let identity: InstallationIdentity
     private let deviceID: String
     private let e2eeV2Delivery: E2EEV2MessageDeliveryClient
@@ -413,13 +414,22 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
     /// (callback APNs) tandis que `unregister` est appelé depuis une tâche async.
     private let lastToken = OSAllocatedUnfairLock<String?>(initialState: nil)
 
-    init(
+    /// Un seul routeur, pour les tests.
+    convenience init(
         api: APIClient,
         router: AppRouter,
         identity: InstallationIdentity = InstallationIdentity()
     ) {
+        self.init(api: api, routing: WindowRouting(initial: router), identity: identity)
+    }
+
+    init(
+        api: APIClient,
+        routing: WindowRouting,
+        identity: InstallationIdentity = InstallationIdentity()
+    ) {
         self.api = api
-        self.router = router
+        self.routing = routing
         self.identity = identity
         deviceID = identity.deviceID()
         e2eeV2Delivery = E2EEV2MessageDeliveryClient(api: api)
@@ -845,7 +855,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         // Ce lien vient des Réglages d'iOS : y renvoyer faisait une boucle
         // (TRX-21). Il ouvre désormais l'écran Notifications de l'app.
         Task { @MainActor [weak self] in
-            self?.router.routeToNotificationSettings()
+            self?.routing.active.routeToNotificationSettings()
         }
     }
 
@@ -883,7 +893,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
                 _ = await self?.acknowledgeOutageNotification(id: receipt.id, payload: receipt.payload)
             }
             await MainActor.run {
-                self?.router.handle(
+                self?.routing.active.handle(
                     type: type,
                     conversationId: conversationId,
                     postId: postId,

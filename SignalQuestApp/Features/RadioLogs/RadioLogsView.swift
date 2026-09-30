@@ -107,7 +107,7 @@ struct RadioLogsView: View {
             Text("Les \(model.logCount) relevés synchronisés seront effacés du serveur et de cet appareil. Les identifications que tu as faites, elles, sont conservées.")
         }
         .overlay(alignment: .bottom) { toastOverlay }
-        .animation(SQMotion.standard, value: model.expandedSiteId)
+        .sqAnimation(SQMotion.standard, value: model.expandedSiteId)
     }
 
     // MARK: - Barre supérieure

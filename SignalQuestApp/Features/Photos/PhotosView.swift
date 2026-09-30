@@ -1421,8 +1421,12 @@ struct AntennaSitePickerSheet: View {
                                     .font(.caption.weight(.bold))
                                     .foregroundStyle(.white)
                             }
+                            // Cible de 44 pt autour du repère de 28 pt (TRX-14).
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(String(localized: "Choisir le site \(site.siteId ?? site.id)"))
                     }
                 }
                 .ignoresSafeArea(edges: .bottom)

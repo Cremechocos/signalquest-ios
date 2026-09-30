@@ -240,17 +240,17 @@ struct SpeedtestView: View {
         }
         // F4 : « Lance un Drive Test » (Siri/Raccourcis) → présente Drive Test
         // une fois l'onglet Speed actif.
-        .onReceive(services.router.$pendingDriveTest) { pending in
+        .onReceive(router.$pendingDriveTest) { pending in
             if pending {
                 showDriveTest = true
-                services.router.pendingDriveTest = false
+                router.pendingDriveTest = false
             }
         }
         // Siri, raccourci ou contrôle iOS 18 : proposer le test tout de suite,
         // mais le lancer seulement sur confirmation (MES-34).
-        .onReceive(services.router.$pendingSpeedtestStart) { pending in
+        .onReceive(router.$pendingSpeedtestStart) { pending in
             guard pending else { return }
-            services.router.pendingSpeedtestStart = false
+            router.pendingSpeedtestStart = false
             confirmExternalStart = true
         }
         .confirmationDialog("Lancer un test de débit ?", isPresented: $confirmExternalStart, titleVisibility: .visible) {
@@ -379,6 +379,7 @@ struct SpeedtestView: View {
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .sqHeader()
                     .layoutPriority(1)
                 headerButton(systemImage: "slider.horizontal.3", label: "Réglages du test") {
                     showSettings = true
@@ -911,6 +912,7 @@ struct SpeedtestView: View {
                 Text("Sur ton compte")
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
+                    .sqHeader()
                 Text("Tes tests faits sur un autre appareil ou avant une réinstallation.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

@@ -23,6 +23,7 @@ struct DriveTestDisclosureView: View {
                         Text("Ce qu'un Drive Test partage")
                             .font(SQType.title)
                             .foregroundStyle(SQColor.label)
+                            .sqHeader()
                         Text("Le Drive Test enchaîne des tests de débit pendant ton trajet, selon la distance et le plafond de données choisis.")
                             .font(SQFont.body(14))
                             .foregroundStyle(SQColor.labelSecondary)

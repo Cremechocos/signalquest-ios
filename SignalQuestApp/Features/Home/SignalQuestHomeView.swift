@@ -545,6 +545,7 @@ struct SignalQuestHomeView: View {
                     Text("Le réseau autour de toi")
                         .font(SQType.heading)
                         .foregroundStyle(SQColor.label)
+                        .sqHeader()
                     Text(status == .denied
                          ? "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour voir les mesures et les pannes à moins d’un kilomètre."
                          : "Autorise la localisation pour voir les mesures, les pannes et l’opérateur le plus rapide à moins d’un kilomètre.")

@@ -201,6 +201,7 @@ struct ANFRSiteDetailSheet: View {
             Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
+                .sqHeader()
         }
     }
 

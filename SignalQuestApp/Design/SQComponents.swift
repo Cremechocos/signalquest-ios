@@ -839,6 +839,7 @@ struct SQSectionHeader<Trailing: View>: View {
             Text(LocalizedStringKey(title))
                 .font(SQType.title)
                 .foregroundStyle(SQColor.label)
+                .sqHeader()
             Spacer()
             trailing()
         }

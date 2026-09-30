@@ -120,7 +120,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
         let images = pendingImages.map(\.dataURL)
         do {
             let comment = try await service.addComment(reportId: reportId, content: text, images: images)
-            withAnimation(SQMotion.bouncy) { comments.append(comment) }
+            withAnimation(SQMotion.resolve(SQMotion.bouncy, UIAccessibility.isReduceMotionEnabled)) { comments.append(comment) }
             draft = ""
             pendingImages = []
             Haptics.success()
@@ -155,6 +155,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
 /// cas `onClose` fournit le bouton « Fermer ».
 struct AntennaReportThreadView: View {
     @StateObject private var model: AntennaReportThreadViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var onClose: (() -> Void)?
 
     @State private var viewerImage: AntennaReportImage?
@@ -222,7 +223,7 @@ struct AntennaReportThreadView: View {
                 }
                 .onChangeCompat(of: model.comments.count) { _, _ in
                     guard let last = model.comments.last else { return }
-                    withAnimation(SQMotion.snappy) { proxy.scrollTo(last.id, anchor: .bottom) }
+                    withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
                 }
             }
         }

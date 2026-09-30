@@ -66,6 +66,7 @@ struct RadioLogSiteMapPicker: View {
     /// connaît rien ici. `nil` retire simplement le bouton.
     var customSites: CustomSitesServicing?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var region: MKCoordinateRegion
     @State private var visible: [AntennaSite] = []
@@ -317,7 +318,7 @@ struct RadioLogSiteMapPicker: View {
                 HStack {
                     Spacer()
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { showOnlyPlausible.toggle() }
+                        withAnimation(SQMotion.resolve(.easeInOut(duration: 0.2), reduceMotion)) { showOnlyPlausible.toggle() }
                     } label: {
                         HStack(spacing: SQSpace.xs) {
                             Image(systemName: showOnlyPlausible
