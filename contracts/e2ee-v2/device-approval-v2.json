@@ -1,12 +1,39 @@
 {
-  "fixtureVersion": "1",
+  "fixtureVersion": "2",
   "userId": "user_alice_01J7ABCD23456789",
   "approvalId": "approval_0000000000000002",
   "pendingDeviceId": "device_alice_web_01J7ABCD2345",
+  "platform": "web",
   "fingerprint": "BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
   "challengeB64Url": "AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0",
   "expiresAtMs": "1790000300000",
-  "qrPayload": "SQE2EE2|2|approval_0000000000000002|device_alice_web_01J7ABCD2345|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000",
-  "sasCanonicalUtf8": "SQ-E2EE-V2-APPROVAL-SAS\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y\napproval_0000000000000002\nAAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0",
-  "sas": "841594"
+  "qrPayload": "SQE2EE2|3|approval_0000000000000002|device_alice_web_01J7ABCD2345|web|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000",
+  "sasCanonicalUtf8": "SQ-E2EE-V2-APPROVAL-SAS\n2\nuser_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y\napproval_0000000000000002\nAAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0",
+  "sas": "841428",
+  "negative": [
+    {
+      "case": "sevenFields",
+      "qrPayload": "SQE2EE2|3|approval_0000000000000002|device_alice_web_01J7ABCD2345|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000"
+    },
+    {
+      "case": "version2",
+      "qrPayload": "SQE2EE2|2|approval_0000000000000002|device_alice_web_01J7ABCD2345|web|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000"
+    },
+    {
+      "case": "uppercasePlatform",
+      "qrPayload": "SQE2EE2|3|approval_0000000000000002|device_alice_web_01J7ABCD2345|WEB|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000"
+    },
+    {
+      "case": "emptyPlatform",
+      "qrPayload": "SQE2EE2|3|approval_0000000000000002|device_alice_web_01J7ABCD2345||BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000"
+    },
+    {
+      "case": "unknownPlatform",
+      "qrPayload": "SQE2EE2|3|approval_0000000000000002|device_alice_web_01J7ABCD2345|desktop|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000"
+    },
+    {
+      "case": "extraField",
+      "qrPayload": "SQE2EE2|3|approval_0000000000000002|device_alice_web_01J7ABCD2345|web|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000|x"
+    }
+  ]
 }

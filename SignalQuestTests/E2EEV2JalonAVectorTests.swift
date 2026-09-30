@@ -444,14 +444,20 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
 
     func testApprovalV2Vector() throws {
         let v = try load("device-approval-v2")
-        XCTAssertEqual(
-            E2EEV2ApprovalV2.qrPayload(approvalId: try str(v, "approvalId"), pendingDeviceId: try str(v, "pendingDeviceId"), fingerprint: try str(v, "fingerprint"), challengeB64Url: try str(v, "challengeB64Url"), expiresAtMs: try int64(v, "expiresAtMs")),
-            try str(v, "qrPayload")
+        let qr = E2EEV2ApprovalV2.QR(
+            approvalId: try str(v, "approvalId"), pendingDeviceId: try str(v, "pendingDeviceId"),
+            platform: try str(v, "platform"), fingerprint: try str(v, "fingerprint"),
+            challengeB64Url: try str(v, "challengeB64Url"), expiresAtMs: try int64(v, "expiresAtMs")
         )
+        XCTAssertEqual(qr.payload, try str(v, "qrPayload"))
+        XCTAssertEqual(E2EEV2ApprovalV2.QR.parse(try str(v, "qrPayload")), qr)
         XCTAssertEqual(
-            E2EEV2ApprovalV2.sas(userId: try str(v, "userId"), pendingDeviceId: try str(v, "pendingDeviceId"), fingerprint: try str(v, "fingerprint"), approvalId: try str(v, "approvalId"), challengeB64Url: try str(v, "challengeB64Url")),
+            E2EEV2ApprovalV2.sas(userId: try str(v, "userId"), pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"), fingerprint: try str(v, "fingerprint"), approvalId: try str(v, "approvalId"), challengeB64Url: try str(v, "challengeB64Url")),
             try str(v, "sas")
         )
+        try forEachNegative(v) { neg in
+            XCTAssertNil(E2EEV2ApprovalV2.QR.parse(try str(neg, "qrPayload")), caseName(neg))
+        }
     }
 
     func testSafetyNumberVector() throws {
@@ -957,13 +963,28 @@ private extension E2EEV2JalonAVectorTests {
         let fingerprint = try deviceFingerprint(identitySeed: 0x22, signingSeed: 0x32)
         let challenge = Data((0..<32).map { UInt8($0 * 3) }).base64URLEncodedNoPadding()
         let expires = createdAtMs + 300_000
+        let approvalId = "approval_0000000000000002"
+        let qr = E2EEV2ApprovalV2.QR(
+            approvalId: approvalId, pendingDeviceId: deviceA2, platform: "web", fingerprint: fingerprint,
+            challengeB64Url: challenge, expiresAtMs: expires
+        )
+        func payload(_ fields: [String]) -> VJ { .s(fields.joined(separator: "|")) }
+        let fields = qr.payload.components(separatedBy: "|")
         return .o([
-            ("fixtureVersion", .s("1")), ("userId", .s(userA)), ("approvalId", .s("approval_0000000000000002")),
-            ("pendingDeviceId", .s(deviceA2)), ("fingerprint", .s(fingerprint)), ("challengeB64Url", .s(challenge)),
-            ("expiresAtMs", .s(String(expires))),
-            ("qrPayload", .s(E2EEV2ApprovalV2.qrPayload(approvalId: "approval_0000000000000002", pendingDeviceId: deviceA2, fingerprint: fingerprint, challengeB64Url: challenge, expiresAtMs: expires))),
-            ("sasCanonicalUtf8", .s(["SQ-E2EE-V2-APPROVAL-SAS", "1", userA, deviceA2, fingerprint, "approval_0000000000000002", challenge].joined(separator: "\n"))),
-            ("sas", .s(E2EEV2ApprovalV2.sas(userId: userA, pendingDeviceId: deviceA2, fingerprint: fingerprint, approvalId: "approval_0000000000000002", challengeB64Url: challenge))),
+            ("fixtureVersion", .s("2")), ("userId", .s(userA)), ("approvalId", .s(approvalId)),
+            ("pendingDeviceId", .s(deviceA2)), ("platform", .s("web")), ("fingerprint", .s(fingerprint)),
+            ("challengeB64Url", .s(challenge)), ("expiresAtMs", .s(String(expires))),
+            ("qrPayload", .s(qr.payload)),
+            ("sasCanonicalUtf8", .s(["SQ-E2EE-V2-APPROVAL-SAS", "2", userA, deviceA2, "web", fingerprint, approvalId, challenge].joined(separator: "\n"))),
+            ("sas", .s(E2EEV2ApprovalV2.sas(userId: userA, pendingDeviceId: deviceA2, platform: "web", fingerprint: fingerprint, approvalId: approvalId, challengeB64Url: challenge))),
+            ("negative", .a([
+                .o([("case", .s("sevenFields")), ("qrPayload", payload(fields.enumerated().filter { $0.offset != 4 }.map(\.element)))]),
+                .o([("case", .s("version2")), ("qrPayload", payload(["SQE2EE2", "2"] + fields.dropFirst(2)))]),
+                .o([("case", .s("uppercasePlatform")), ("qrPayload", payload(fields.enumerated().map { $0.offset == 4 ? "WEB" : $0.element }))]),
+                .o([("case", .s("emptyPlatform")), ("qrPayload", payload(fields.enumerated().map { $0.offset == 4 ? "" : $0.element }))]),
+                .o([("case", .s("unknownPlatform")), ("qrPayload", payload(fields.enumerated().map { $0.offset == 4 ? "desktop" : $0.element }))]),
+                .o([("case", .s("extraField")), ("qrPayload", payload(fields + ["x"]))]),
+            ])),
         ])
     }
 

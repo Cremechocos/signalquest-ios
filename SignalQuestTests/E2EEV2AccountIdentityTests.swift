@@ -155,6 +155,10 @@ final class E2EEV2AccountIdentityTests: XCTestCase {
         XCTAssertThrowsError(try first.approve(newcomer, expectedFingerprint: "empreinte-affichée-ailleurs")) {
             XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .fingerprintMismatch)
         }
+        XCTAssertThrowsError(try first.approve(newcomer, comparedPlatform: "web")) {
+            XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .platformMismatch,
+                           "Le serveur annonce un iPhone, l'utilisateur a vu un navigateur")
+        }
         XCTAssertThrowsError(try first.approve(first.device)) {
             XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .alreadyListed)
         }
@@ -285,6 +289,7 @@ final class E2EEV2AccountIdentityTests: XCTestCase {
         func approve(
             _ newcomer: E2EEV2DeviceDescriptor,
             expectedFingerprint: String? = nil,
+            comparedPlatform: String? = nil,
             uik: P256.Signing.PrivateKey? = nil,
             approverDeviceId: String? = nil
         ) throws -> E2EEV2DeviceApprovalTrust.Artifacts {
@@ -296,6 +301,7 @@ final class E2EEV2AccountIdentityTests: XCTestCase {
             return try E2EEV2DeviceApprovalTrust.make(
                 userId: userId, currentList: trust.deviceList, currentEntries: trust.deviceEntries,
                 newDevice: newcomer, expectedFingerprint: expectedFingerprint ?? fingerprint,
+                comparedPlatform: comparedPlatform ?? newcomer.platform,
                 uik: uik ?? self.uik, approverDeviceId: approverDeviceId ?? device.deviceId,
                 signWithApprover: { try E2EEV2LowS.sign($0, with: signing) },
                 nonce: Data(repeating: 9, count: 12), nowMs: now + 60_000

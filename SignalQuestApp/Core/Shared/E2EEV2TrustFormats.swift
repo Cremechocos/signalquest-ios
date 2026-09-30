@@ -597,31 +597,65 @@ enum E2EEV2SafetyNumber {
 // MARK: D.13 Approbation v2
 
 enum E2EEV2ApprovalV2 {
-    static func qrPayload(
-        approvalId: String,
-        pendingDeviceId: String,
-        fingerprint: String,
-        challengeB64Url: String,
-        expiresAtMs: Int64
-    ) -> String {
-        ["SQE2EE2", "2", approvalId, pendingDeviceId, fingerprint, challengeB64Url, String(expiresAtMs)]
-            .joined(separator: "|")
+    /// QR affiché par l'appareil en attente, version 3 (v0.4.5) : la plateforme
+    /// fait partie de ce que l'approbateur compare, avec l'empreinte.
+    struct QR: Equatable, Sendable {
+        static let version = "3"
+
+        let approvalId: String
+        let pendingDeviceId: String
+        let platform: String
+        let fingerprint: String
+        let challengeB64Url: String
+        let expiresAtMs: Int64
+
+        var payload: String {
+            [
+                "SQE2EE2", Self.version, approvalId, pendingDeviceId, platform, fingerprint, challengeB64Url,
+                String(expiresAtMs),
+            ].joined(separator: "|")
+        }
+
+        /// Lecture stricte : exactement 8 champs, version 3 seulement, plateforme
+        /// de l'ensemble fermé (D.2), sans normalisation.
+        static func parse(_ payload: String) -> QR? {
+            let f = payload.components(separatedBy: "|")
+            guard f.count == 8, f[0] == "SQE2EE2", f[1] == version,
+                  E2EEV2Canonical.isOpaque(f[2]), E2EEV2Canonical.isOpaque(f[3]),
+                  E2EEV2DeviceCertificate.platforms.contains(f[4]),
+                  E2EEV2ApprovalV2.isDigest(f[5]), E2EEV2ApprovalV2.isDigest(f[6]),
+                  E2EEV2Canonical.isDecimal(f[7]), let expiresAtMs = Int64(f[7]) else {
+                return nil
+            }
+            return QR(
+                approvalId: f[2], pendingDeviceId: f[3], platform: f[4], fingerprint: f[5],
+                challengeB64Url: f[6], expiresAtMs: expiresAtMs
+            )
+        }
     }
 
-    /// Code de comparaison à 6 chiffres, calculé des deux côtés.
+    /// Code de comparaison à 6 chiffres, calculé des deux côtés. Il couvre la
+    /// plateforme du nouvel appareil (v0.4.5).
     static func sas(
         userId: String,
         pendingDeviceId: String,
+        platform: String,
         fingerprint: String,
         approvalId: String,
         challengeB64Url: String
     ) -> String {
         let hash = Data(SHA256.hash(data: E2EEV2Canonical.line([
-            "SQ-E2EE-V2-APPROVAL-SAS", "1", userId, pendingDeviceId, fingerprint, approvalId, challengeB64Url,
+            "SQ-E2EE-V2-APPROVAL-SAS", "2", userId, pendingDeviceId, platform, fingerprint, approvalId,
+            challengeB64Url,
         ])))
         let value = hash.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) } % 1_000_000
         let text = String(value)
         return String(repeating: "0", count: 6 - text.count) + text
+    }
+
+    /// 32 octets en base64url canonique, sans bourrage.
+    static func isDigest(_ value: String) -> Bool {
+        value.range(of: #"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"#, options: .regularExpression) != nil
     }
 }
 

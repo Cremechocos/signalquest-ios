@@ -164,6 +164,9 @@ enum E2EEV2DeviceApprovalTrust {
         /// Les clés reçues ne sont pas celles que l'utilisateur a comparées
         /// (QR, code de proximité ou code SAS).
         case fingerprintMismatch
+        /// Le serveur déclare une autre plateforme que celle que l'utilisateur
+        /// a vue (D.13) : « Plateforme différente de celle affichée ».
+        case platformMismatch
         case invalidDevice
         /// Le compte ne certifie pas cet appareil avec ses propres clés.
         case notCertified
@@ -197,13 +200,16 @@ enum E2EEV2DeviceApprovalTrust {
     }
 
     /// Côté approbateur. `currentList` et `currentEntries` viennent du paquet
-    /// de confiance de son propre compte, déjà vérifié.
+    /// de confiance de son propre compte, déjà vérifié. `expectedFingerprint`
+    /// et `comparedPlatform` sont ce que l'utilisateur a comparé (QR v3, SAS
+    /// ou code de proximité confirmé), jamais ce que déclare le serveur.
     static func make(
         userId: String,
         currentList: E2EEV2SignedString,
         currentEntries: [String],
         newDevice: E2EEV2DeviceDescriptor,
         expectedFingerprint: String,
+        comparedPlatform: String,
         uik: P256.Signing.PrivateKey,
         approverDeviceId: String,
         signWithApprover: (Data) throws -> Data,
@@ -224,6 +230,7 @@ enum E2EEV2DeviceApprovalTrust {
         }
         let fingerprint = E2EEV2Canonical.deviceFingerprint(identityKeyX963: identityKey, signingKeyX963: signingKey)
         guard fingerprint == expectedFingerprint else { throw Failure.fingerprintMismatch }
+        guard newDevice.platform == comparedPlatform else { throw Failure.platformMismatch }
         let certificate = E2EEV2DeviceCertificate(
             userId: userId,
             deviceId: newDevice.deviceId,

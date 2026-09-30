@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.4**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.5**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -86,6 +86,10 @@
 >   conversation migrée, apps publiées face à la v2. Proposés, en attente de
 >   la décision d'Alexandre : transfert d'un appel chiffré indisponible au
 >   jalon A.
+> - v0.4.5 (01/10/2026) : la plateforme du nouvel appareil entre dans ce que
+>   l'utilisateur compare à l'approbation (QR v3, code SAS), ensemble fermé des
+>   plateformes, refus par l'approbateur et par le serveur (§2.3, D.2, D.13,
+>   E.0). Accord des sessions serveur, Android et web.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -207,6 +211,9 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
 - Le **QR** et le **code de proximité** contiennent l'empreinte complète
   `SHA-256(identityKey ‖ signingKey)` du nouvel appareil, et l'approbateur la
   compare automatiquement.
+- La **plateforme** du nouvel appareil fait partie de ce que l'utilisateur
+  compare (QR et code SAS, D.13). L'approbateur signe le certificat avec la
+  plateforme que l'utilisateur a vue, jamais avec celle que déclare le serveur.
 - L'approbation **par notification** exige un code de comparaison (SAS) de six
   chiffres, affiché sur les deux écrans et confirmé par l'utilisateur.
 - Tout ajout d'appareil est annoncé aux contacts dans les conversations
@@ -1535,8 +1542,10 @@ L'appareil approbateur envoie l'UIK au nouvel appareil, pour sa clé d'accord.
 
 ### D.2 Certificat d'appareil (`device-cert-v1`)
 
-- Chaîne du §2.2, en 9 lignes. `keyVersion` vaut au moins 1 ; `platform` ∈
-  {`ios`, `android`, `web`}.
+- Chaîne du §2.2, en 9 lignes. `keyVersion` vaut au moins 1.
+- `platform` appartient à un ensemble fermé, en ASCII minuscule : `ios`,
+  `android` ou `web`. Aucune normalisation (casse, espaces) : toute autre
+  valeur est refusée, au bootstrap comme à la lecture.
 - Signée par l'UIK.
 - JSON : `{"certificate": "<chaîne>", "signatureB64": "…"}`.
 
@@ -1693,14 +1702,30 @@ Format au §11. Le vecteur `franking-v1` donne `fk`, la charge, `frankTag`,
 
 ### D.13 Approbation v2 (`device-approval-v2`)
 
-- **QR** : `SQE2EE2|2|<approvalId>|<pendingDeviceId>|<empreinte>|<challengeB64Url>|<expiresAtMs>`.
-  L'approbateur compare `<empreinte>` à celle du certificat en attente.
+- **QR**, version 3 :
+  `SQE2EE2|3|<approvalId>|<pendingDeviceId>|<platform>|<empreinte>|<challengeB64Url>|<expiresAtMs>`.
+  - Exactement 8 champs. Une autre version (2, 4…) est refusée, jamais
+    devinée.
+  - `<platform>` suit D.2. Elle ne peut contenir ni `|` ni retour à la ligne.
+  - L'approbateur compare `<empreinte>` à celle du descripteur en attente, et
+    `<platform>` à la plateforme qu'il déclare.
 - **Code SAS** (approbation par notification) : on prend
-  `SHA-256("SQ-E2EE-V2-APPROVAL-SAS\n1\n<userId>\n<pendingDeviceId>\n<empreinte>\n<approvalId>\n<challengeB64Url>")`.
+  `SHA-256("SQ-E2EE-V2-APPROVAL-SAS\n2\n<userId>\n<pendingDeviceId>\n<platform>\n<empreinte>\n<approvalId>\n<challengeB64Url>")`.
   Ses 4 premiers octets, en entier big-endian modulo 1 000 000, donnent un
   code de 6 chiffres.
 - **Code de proximité** : celui de `device-approval-v1`, auquel on joint
-  l'empreinte complète.
+  l'empreinte complète. L'approbateur affiche la plateforme déclarée, et
+  l'utilisateur la confirme avant d'approuver.
+- **Plateforme affichée** : un libellé traduit de la plateforme lue dans le
+  QR ou couverte par le SAS, jamais de celle du serveur. La comparaison porte
+  sur la valeur canonique. Pour un navigateur, l'avertissement sur les
+  conversations qui excluent les navigateurs (§2.7) vient avant la
+  confirmation.
+- **Refus** : si le serveur déclare une autre plateforme, l'approbateur
+  refuse sans rien envoyer, avec le message « Plateforme différente de celle
+  affichée, approbation refusée. » (code de journal `platformMismatch`). Le
+  serveur refuse aussi un certificat dont la plateforme n'est pas celle du
+  descripteur en attente (E.0).
 
 ### D.14 Réinitialisation d'identité (`identity-reset-v1`)
 
@@ -1754,6 +1779,8 @@ version publiée qui ouvre les verrous.
     contenu (§12) ;
   - `E2EE_CERTIFICATE_INVALID` (422) : certificat qui ne se vérifie pas
     jusqu'à l'UIK ;
+  - `E2EE_CERT_PLATFORM_MISMATCH` (409) : la plateforme du certificat n'est
+    pas exactement celle du descripteur en attente (D.13) ;
   - `CONVERSATION_ID_TAKEN` et `CALL_ID_TAKEN` (409) : identifiant choisi par
     le client déjà utilisé ;
   - `CALL_NONCE_TAKEN` (409) : `callNonce` déjà enregistré (§10.1) ;
