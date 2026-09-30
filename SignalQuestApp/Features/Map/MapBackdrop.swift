@@ -36,10 +36,10 @@ enum MapBackdrop: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .carto: return "Plan Apple"
-        case .applePlan: return "Plan Apple"
+        case .carto: return String(localized: "Plan Apple")
+        case .applePlan: return String(localized: "Plan Apple")
         case .osm: return "OpenStreetMap"
-        case .topo: return "Relief (OpenTopoMap)"
+        case .topo: return String(localized: "Relief (OpenTopoMap)")
         case .satellite: return "Satellite"
         }
     }

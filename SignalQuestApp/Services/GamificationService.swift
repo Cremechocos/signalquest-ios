@@ -102,7 +102,6 @@ protocol GamificationServicing: Sendable {
     func profile() async throws -> GamificationProfile
     func catalog() async throws -> [GamificationBadge]
     func events() async throws -> [GamificationEvent]
-    func claimEasterEgg(eggId: String) async throws
     /// Grille de territoires sur une bbox. Le serveur agrège en SQL et complète
     /// les cellules vides — c'est lui qui décide de la taille de maille.
     func territories(
@@ -129,11 +128,6 @@ final class GamificationService: GamificationServicing {
         struct Response: Decodable { let events: [GamificationEvent]?; let items: [GamificationEvent]? }
         let r: Response = try await api.request(APIEndpoint(path: "/api/gamification/events"), as: Response.self)
         return r.events ?? r.items ?? []
-    }
-
-    func claimEasterEgg(eggId: String) async throws {
-        // Le backend valide la clé `eggId` (et NON `code`) contre sa liste d'eggs.
-        let _: SuccessResponse = try await api.requestJSON("/api/gamification/easter-eggs/claim", body: ["eggId": eggId])
     }
 
     func territories(

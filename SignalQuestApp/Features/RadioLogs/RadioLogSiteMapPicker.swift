@@ -698,7 +698,7 @@ struct RadioLogSiteMapPicker: View {
     private var operatorLabel: String {
         let keys = queriedOperatorKeys
         if keys == ["ALL"] { return String(localized: "Toutes") }
-        if keys.first == "ZB" { return "Zone blanche" }
+        if keys.first == "ZB" { return String(localized: "Zone blanche") }
         return (site.operatorName ?? keys.first ?? "").capitalized
     }
 

@@ -30,16 +30,9 @@ struct SpeedtestView: View {
     /// part de la cible, comme `libreSpeedHost` : la cible dit QUEL moteur, celui-ci
     /// dit LEQUEL de ses serveurs.
     @AppStorage("speedtest_iperf_server_id") private var iperfServerId = ""
-    /// Nombre de tests enchaînés en rafale (1 = test simple).
+    /// Nombre de tests enchaînés en rafale (1 = test simple). La distance entre
+    /// tests et le plafond de données se règlent dans le Drive Test lui-même.
     @AppStorage("speedtest_burst_count") private var burstCount = 1
-    /// Distance à parcourir entre deux speedtests d'un Drive Test. Espacer par la
-    /// distance plutôt que par le temps répartit les mesures le long du trajet
-    /// au lieu de les entasser là où l'on roule lentement.
-    @AppStorage("speedtest_drive_interval_meters") private var driveIntervalMeters = 500
-    /// Plafond de données d'une session Drive Test, en Mo (0 = illimité).
-    /// Un test vaut débit × durée : à 300 Mb/s sur 10 s, c'est ~375 Mo. Sans
-    /// plafond une session pouvait engloutir des dizaines de gigaoctets.
-    @AppStorage("speedtest_drive_data_cap_mb") private var driveDataCapMB = 5_000
     /// Les anciens speedtests cellulaires sont publiés à leur tour (hors zones
     /// privées) : on le dit une fois, au-dessus de l'historique où l'on masque un test.
     @AppStorage("speedtest_map_publication_notice_seen_v1") private var mapPublicationNoticeSeen = false
@@ -50,12 +43,8 @@ struct SpeedtestView: View {
     @State private var liveActivity = SpeedtestLiveActivityController()
     @State private var background = BackgroundTaskScope()
     /// Progression d'une rafale (test courant, total) — nil hors rafale.
-    /// `total == 0` ⇒ session continue illimitée (drive test).
     @State private var burstProgress: (index: Int, total: Int)?
     @State private var burstSummary: SpeedtestBurstSummary?
-    /// Vrai pendant une session continue (∞) : adapte les libellés (pill, résumé).
-    /// Sentinelle `burstCount` = mode continu illimité (drive test).
-    private static let continuousBurst = 0
     /// La feuille « localisation désactivée » ne s'affiche qu'une fois par
     /// lancement de l'app (MES-09).
     @MainActor private static var deniedLocationSheetShown = false
@@ -298,6 +287,8 @@ struct SpeedtestView: View {
         .task(id: result?.id) { await loadTypicalNearby(for: result) }
         .task {
             DriveTestViewModel.migrateLegacyDataCap()
+            // Ancienne option « Trajet » (0) : un test simple désormais.
+            if burstCount < 1 { burstCount = 1 }
             if await presentSpeedtestSharePreviewQAIfNeeded() { return }
             // L'historique est local : l'afficher tout de suite, avant les appels
             // réseau ci-dessous qui peuvent traîner hors couverture (MES-04).
@@ -472,45 +463,32 @@ struct SpeedtestView: View {
     }
 
     private var primaryButtonTitle: String {
-        if burstCount == Self.continuousBurst {
-            return String(localized: "Ouvrir le Drive Test")
-        }
+        // Traduits ici : « ×3 » n'était pas une clé du catalogue, et l'app
+        // anglaise affichait « Lancer la rafale ×3 » (TRX-06).
         if burstCount > 1 {
-            return result == nil ? "Lancer la rafale ×\(burstCount)" : "Relancer la rafale ×\(burstCount)"
+            return result == nil
+                ? String(localized: "Lancer la rafale ×\(burstCount)")
+                : String(localized: "Relancer la rafale ×\(burstCount)")
         }
-        return result == nil ? "Lancer le test" : "Relancer le test"
+        return result == nil ? String(localized: "Lancer le test") : String(localized: "Relancer le test")
     }
 
     private var primaryButtonIcon: String? {
-        if burstCount == Self.continuousBurst { return "infinity" }
-        return burstCount > 1 ? "bolt.fill" : nil
+        burstCount > 1 ? "bolt.fill" : nil
     }
 
     @ViewBuilder
     private func burstRunningPill(index: Int, total: Int) -> some View {
         HStack(spacing: SQSpace.sm) {
-            if total == 0 {
-                // Session continue (drive test) : pas de total, progression indéterminée.
-                Image(systemName: "infinity")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                Text("Continu · test \(index)")
-                    .font(SQFont.body(12, .semibold))
-                    .foregroundStyle(SQColor.label)
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(SQColor.brandRed)
-            } else {
-                Image(systemName: "bolt.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                Text("Rafale · test \(index)/\(total)")
-                    .font(SQFont.body(12, .semibold))
-                    .foregroundStyle(SQColor.label)
-                ProgressView(value: Double(index), total: Double(total))
-                    .frame(width: 90)
-                    .tint(SQColor.brandRed)
-            }
+            Image(systemName: "bolt.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(SQColor.brandRed)
+            Text("Rafale · test \(index)/\(total)")
+                .font(SQFont.body(12, .semibold))
+                .foregroundStyle(SQColor.label)
+            ProgressView(value: Double(index), total: Double(total))
+                .frame(width: 90)
+                .tint(SQColor.brandRed)
         }
         .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
         .background(SQColor.surface, in: Capsule(style: .continuous))
@@ -677,62 +655,6 @@ struct SpeedtestView: View {
         .sqCardBackground()
     }
 
-    // MARK: - Réglages Drive Test (cadence + budget de données)
-
-    /// Deux réglages qui n'existaient pas et dont l'absence coûtait cher : la
-    /// boucle enchaînait les tests avec 800 ms de pause, sans aucun plafond.
-    private var driveTestBudgetSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            Text("Drive Test")
-                .font(SQFont.archivo(15, .bold))
-                .foregroundStyle(SQColor.label)
-
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                chipRow(
-                    title: "Un test tous les",
-                    options: [(250, "250 m"), (500, "500 m"), (1_000, "1 km"), (2_000, "2 km")],
-                    accessibilityContext: String(localized: "Un test tous les"),
-                    selection: $driveIntervalMeters
-                )
-                Text("Prochain test après la distance choisie ou 30 s. « Tester maintenant » le lance aussitôt.")
-                    .font(.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                chipRow(
-                    title: "Plafond de données",
-                    options: [(500, String(localized: "500 Mo")), (2_000, String(localized: "2 Go")), (5_000, String(localized: "5 Go")), (0, String(localized: "Sans limite"))],
-                    accessibilityContext: String(localized: "Plafond de données"),
-                    selection: $driveDataCapMB
-                )
-                Text("Le volume dépend du débit et de la durée du test. La session s'arrête après le test qui atteint le plafond ; ce test peut le dépasser.")
-                    .font(.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    /// Les libellés restent au-dessus des choix pour ne pas comprimer les capsules.
-    private func chipRow(
-        title: LocalizedStringKey,
-        options: [(value: Int, label: String)],
-        accessibilityContext: String,
-        selection: Binding<Int>
-    ) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(title).foregroundStyle(SQColor.label)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: SQSpace.sm) {
-                    chipButtons(options: options, accessibilityContext: accessibilityContext, selection: selection)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
     private func chipButtons(
         options: [(value: Int, label: String)],
         accessibilityContext: String,
@@ -772,23 +694,18 @@ struct SpeedtestView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: SQSpace.sm) {
                                     chipButtons(
-                                        options: [(1, "1"), (3, "3"), (5, "5"), (10, "10"),
-                                            (Self.continuousBurst, String(localized: "Trajet"))],
+                                        options: [(1, "1"), (3, "3"), (5, "5"), (10, "10")],
                                         accessibilityContext: String(localized: "Nombre de tests"),
                                         selection: $burstCount
                                     )
                                 }
                             }
                         }
-                        Text(burstCount == Self.continuousBurst
-                             ? String(localized: "Trajet : un test après la distance choisie ou 30 s, jusqu’à l’arrêt ou au plafond de données.")
-                             : String(localized: "Un seul test, ou plusieurs tests à la suite. Choisis Trajet pour les espacer selon la distance."))
+                        // L'option « Trajet » ouvrait le Drive Test, qui a ses propres
+                        // réglages de distance et de plafond : elle faisait doublon.
+                        Text("Un seul test, ou plusieurs tests à la suite. Pour mesurer en roulant, utilise le Drive Test.")
                             .font(.caption).foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        if burstCount == Self.continuousBurst {
-                            driveTestBudgetSection
-                                .accessibilityIdentifier("speedtest.settings.route")
-                        }
                         DisclosureGroup("Serveur et durée") {
                         Text("Serveur de test")
                             .font(SQFont.archivo(15, .bold))
@@ -1053,10 +970,6 @@ struct SpeedtestView: View {
     // MARK: - Lifecycle
 
     private func start() {
-        if burstCount == Self.continuousBurst {
-            showDriveTest = true
-            return
-        }
         // Un Drive Test mesure déjà : deux tests simultanés se partageraient la
         // bande passante et se fausseraient l'un l'autre (MES-18).
         if services.driveTest.isRunning {
@@ -1101,9 +1014,7 @@ struct SpeedtestView: View {
     /// aussi par les callbacks du priming localisation, qui appelaient auparavant
     /// `performRun` en dur — ignorant la config rafale/continu au 1er test (UXP-07).
     private func dispatchConfiguredRun(requestLocation: Bool) {
-        if burstCount == Self.continuousBurst {
-            showDriveTest = true
-        } else if burstCount > 1 {
+        if burstCount > 1 {
             performBurst(count: burstCount, requestLocation: requestLocation)
         } else {
             performRun(requestLocation: requestLocation)

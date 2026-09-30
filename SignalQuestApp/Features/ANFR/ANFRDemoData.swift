@@ -1,5 +1,7 @@
 import Foundation
 
+// Données de démonstration : absentes des builds Release (MES-33).
+#if DEBUG
 /// Données de démonstration ANFR pour le mode `--mock-auth`
 /// (`AppEnvironment.usesDemoData`) : permet aux vues de s'afficher sans réseau.
 /// Les chiffres sont représentatifs des ordres de grandeur réels (juin 2026).
@@ -211,3 +213,4 @@ enum ANFRDemoData {
         ]
     }()
 }
+#endif

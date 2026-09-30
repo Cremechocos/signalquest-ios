@@ -1261,14 +1261,14 @@ struct AndroidCustomSiteMarker: Decodable, Identifiable, Equatable, Sendable {
     var typeLabel: String? {
         guard let raw = type?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
         switch raw.uppercased() {
-        case "PYLONE", "PYLON": return "Pylône"
-        case "TOIT", "ROOFTOP", "TOITURE": return "Toit-terrasse"
-        case "CHATEAU_EAU", "WATER_TOWER": return "Château d'eau"
-        case "MAT", "MAST": return "Mât"
-        case "EGLISE", "CHURCH": return "Clocher"
+        case "PYLONE", "PYLON": return String(localized: "Pylône")
+        case "TOIT", "ROOFTOP", "TOITURE": return String(localized: "Toit-terrasse")
+        case "CHATEAU_EAU", "WATER_TOWER": return String(localized: "Château d'eau")
+        case "MAT", "MAST": return String(localized: "Mât")
+        case "EGLISE", "CHURCH": return String(localized: "Clocher")
         case "SILO": return "Silo"
-        case "IMMEUBLE", "BUILDING": return "Immeuble"
-        case "AUTRE", "OTHER": return "Autre"
+        case "IMMEUBLE", "BUILDING": return String(localized: "Immeuble")
+        case "AUTRE", "OTHER": return String(localized: "Autre")
         default:
             // Type inconnu : on rend la constante lisible plutôt que de la masquer.
             return raw.replacingOccurrences(of: "_", with: " ").capitalized

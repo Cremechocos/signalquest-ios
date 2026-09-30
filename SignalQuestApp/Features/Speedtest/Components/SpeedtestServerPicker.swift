@@ -409,8 +409,8 @@ struct SpeedtestServerPicker: View {
     // MARK: LibreSpeed — section data-driven (Auto + choix manuel du POP mondial)
 
     var libreSpeedCurrentLabel: String {
-        if libreSpeedHost.isEmpty { return "Le plus proche" }
-        return libreSpeedServers.first { $0.hostname == libreSpeedHost }?.name ?? "Le plus proche"
+        if libreSpeedHost.isEmpty { return String(localized: "Le plus proche") }
+        return libreSpeedServers.first { $0.hostname == libreSpeedHost }?.name ?? String(localized: "Le plus proche")
     }
 
     @ViewBuilder private var libreSpeedSection: some View {

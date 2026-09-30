@@ -61,7 +61,7 @@ struct PrivacySettingsView: View {
             } footer: {
                 Text(model.shareLiveLocationWithFriends
                      ? model.liveShareMode.detail
-                     : "Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées.")
+                     : String(localized: "Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées."))
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)

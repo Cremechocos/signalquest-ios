@@ -413,17 +413,10 @@ protocol SessionsServicing: Sendable {
     /// session (~5,5 Mo pièce, contre quatre champs utiles).
     func sessions(offset: Int, limit: Int, mapPoints: Bool) async throws -> SessionsListResponse
     func sessionDetail(id: String) async throws -> CoverageSessionDetail
-    /// Écrit/remplace le brouillon atomique avant toute tentative réseau.
-    func persistCoverageDraft(_ session: CoverageSessionUpload) throws
-    /// Rend la session rejouable. Doit être appelé synchronement avant de lancer
-    /// la tâche réseau afin qu'un kill entre stop() et l'upload ne perde rien.
-    func finalizeCoverageDraft(_ session: CoverageSessionUpload) throws
-    func discardCoverageDraft(sessionId: UUID) throws
-    /// Téléverse une session finalisée, en la conservant si la requête échoue.
-    func createCoverageSession(_ session: CoverageSessionUpload) async throws -> CoverageImportResponse?
-    /// Reprend les brouillons interrompus et rejoue la file. Ne remonte pas l'erreur
-    /// à l'appelant de cycle de vie : les éléments restent sur disque.
-    func retryPendingCoverageSessions() async
+    // L'enregistrement de couverture est retiré d'iOS : les anciennes files
+    // restent sur l'appareil, en lecture seule (`LocalCoverageArchiveReader`).
+    // Ses méthodes d'écriture, qui ne faisaient plus que refuser, n'avaient
+    // plus d'appelant (MES-33).
 }
 
 /// Valeurs par défaut : une exigence de protocole ne peut pas en porter, et la
@@ -431,13 +424,6 @@ protocol SessionsServicing: Sendable {
 extension SessionsServicing {
     func sessions(offset: Int = 0, limit: Int = 30) async throws -> SessionsListResponse {
         try await sessions(offset: offset, limit: limit, mapPoints: false)
-    }
-}
-
-enum CoverageRecordingError: LocalizedError {
-    case retired
-    var errorDescription: String? {
-        String(localized: "L’enregistrement de couverture n’est plus disponible sur iOS.")
     }
 }
 
@@ -450,14 +436,6 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
         // Ne pas ouvrir ni migrer les anciennes files JSON/SwiftData : elles
         // restent conservées sur l’appareil, sans reprise automatique.
     }
-
-    func persistCoverageDraft(_ session: CoverageSessionUpload) throws { throw CoverageRecordingError.retired }
-    func finalizeCoverageDraft(_ session: CoverageSessionUpload) throws { throw CoverageRecordingError.retired }
-    func discardCoverageDraft(sessionId: UUID) throws { throw CoverageRecordingError.retired }
-    func createCoverageSession(_ session: CoverageSessionUpload) async throws -> CoverageImportResponse? {
-        throw CoverageRecordingError.retired
-    }
-    func retryPendingCoverageSessions() async { }
 
     func sessions(offset: Int = 0, limit: Int = 30, mapPoints: Bool = false) async throws -> SessionsListResponse {
         var query = [

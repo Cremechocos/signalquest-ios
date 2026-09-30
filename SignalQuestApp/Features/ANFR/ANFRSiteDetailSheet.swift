@@ -12,10 +12,12 @@ final class ANFRSiteDetailViewModel: ObservableObject {
     init(service: ANFRServicing) { self.service = service }
 
     func load(supId: String) async {
+        #if DEBUG
         if AppEnvironment.usesDemoData {
             history = ANFRDemoData.siteHistory
             return
         }
+        #endif
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }

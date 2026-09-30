@@ -204,7 +204,7 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .bhs: return "Beauharnois"
         case .us: return "Ashburn"
         case .clouviderAsh: return "Ashburn (Clouvider)"
-        case .leasewebMtl: return "Montréal"
+        case .leasewebMtl: return String(localized: "Montréal")
         case .bytelParisBbr: return "Paris · BBR"
         case .bytelParisCubic: return "Paris · CUBIC"
         case .bytelMrsBbr: return "Marseille · BBR"
@@ -225,14 +225,14 @@ enum SpeedtestDownloadTarget: String, Codable, CaseIterable, Identifiable {
         case .onlineNet6_90ms: return "Paris · IPv6 +90 ms"
         case .milkywan: return "Croissy-Beaubourg"
         case .mojiParis: return "Paris · Moji"
-        case .clouviderFra: return "Francfort · Clouvider"
+        case .clouviderFra: return String(localized: "Francfort · Clouvider")
         case .clouviderAsh: return "Ashburn · Clouvider"
         case .leasewebMtl: return "Montréal · Leaseweb"
         case .clouviderAms: return "Amsterdam · Clouvider"
-        case .clouviderLon: return "Londres · Clouvider"
+        case .clouviderLon: return String(localized: "Londres · Clouvider")
         case .clouviderMan: return "Manchester · Clouvider"
-        case .leasewebFra: return "Francfort · Leaseweb"
-        case .init7: return "Suisse · Init7"
+        case .leasewebFra: return String(localized: "Francfort · Leaseweb")
+        case .init7: return String(localized: "Suisse · Init7")
         case .cloudflare: return "Cloudflare"
         case .libreSpeed: return "LibreSpeed"
         case .iperfCatalog: return "Catalogue"

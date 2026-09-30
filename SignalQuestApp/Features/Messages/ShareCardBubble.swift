@@ -21,8 +21,8 @@ struct ShareCardBubble: View {
         case "speedtest": return "Speedtest"
         case "session": return "Session"
         case "signal_rating", "signal": return "Signal"
-        case "social_post": return "Publication"
-        default: return "Partage"
+        case "social_post": return String(localized: "Publication")
+        default: return String(localized: "Partage")
         }
     }
 

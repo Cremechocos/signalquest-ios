@@ -13,10 +13,10 @@ enum SocialPresenceStatus: String, Codable, Sendable, CaseIterable {
     /// Libellé humain (fiche ami, réglages).
     var label: String {
         switch self {
-        case .online: return "En ligne"
-        case .away: return "Absent"
+        case .online: return String(localized: "En ligne")
+        case .away: return String(localized: "Absent")
         case .dnd: return String(localized: "Ne pas déranger")
-        case .offline: return "Hors ligne"
+        case .offline: return String(localized: "Hors ligne")
         case .invisible: return "Invisible"
         }
     }

@@ -41,11 +41,13 @@ final class ANFRStatsViewModel: ObservableObject {
     init(service: ANFRServicing) { self.service = service }
 
     func load() async {
+        #if DEBUG
         if AppEnvironment.usesDemoData {
             stats = ANFRDemoData.stats
             errorMessage = nil
             return
         }
+        #endif
         guard stats == nil else { return }
         isLoading = true
         errorMessage = nil
@@ -58,10 +60,12 @@ final class ANFRStatsViewModel: ObservableObject {
     }
 
     func refresh() async {
+        #if DEBUG
         if AppEnvironment.usesDemoData {
             stats = ANFRDemoData.stats
             return
         }
+        #endif
         do {
             stats = try await service.stats()
             errorMessage = nil

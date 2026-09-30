@@ -1975,8 +1975,8 @@ struct DriveTestView: View {
     }
 
     private var sectorTitle: String {
-        guard model.nearestSite != nil else { return "Recherche d'antennes…" }
-        return model.inSector ? "Dans le secteur" : "Hors secteur"
+        guard model.nearestSite != nil else { return String(localized: "Recherche d'antennes…") }
+        return model.inSector ? String(localized: "Dans le secteur") : "Hors secteur"
     }
 
     private var sectorDetail: String? {
@@ -1985,7 +1985,7 @@ struct DriveTestView: View {
         if let offset = model.sectorOffsetDegrees {
             return String(localized: "Antenne la plus proche · \(distanceText) · écart \(Int(offset.rounded()))°")
         }
-        return "Antenne la plus proche · \(distanceText)"
+        return String(localized: "Antenne la plus proche · \(distanceText)")
     }
 }
 

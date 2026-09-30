@@ -10,7 +10,7 @@ enum LeaderboardTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .speed: return "Vitesse"
+        case .speed: return String(localized: "Vitesse")
         case .points: return "Points"
         }
     }
@@ -269,7 +269,7 @@ struct LeaderboardsView: View {
             LeaderboardMenuPill(
                 icon: "calendar",
                 label: periodLabel,
-                accessibility: "Période du classement"
+                accessibility: String(localized: "Période du classement")
             ) {
                 Button { model.setPeriod("week") } label: {
                     if model.period == "week" { Label("Semaine", systemImage: "checkmark") } else { Text("Semaine") }
@@ -287,7 +287,7 @@ struct LeaderboardsView: View {
                 LeaderboardMenuPill(
                     icon: "speedometer",
                     label: categoryLabel,
-                    accessibility: "Métrique du classement"
+                    accessibility: String(localized: "Métrique du classement")
                 ) {
                     Button { model.setCategory("download") } label: {
                         if model.category == "download" { Label("Download", systemImage: "checkmark") } else { Text("Download") }
@@ -314,9 +314,9 @@ struct LeaderboardsView: View {
 
     private var periodLabel: String {
         switch model.period {
-        case "week": return "Semaine"
-        case "month": return "Mois"
-        default: return "Toujours"
+        case "week": return String(localized: "Semaine")
+        case "month": return String(localized: "Mois")
+        default: return String(localized: "Toujours")
         }
     }
 

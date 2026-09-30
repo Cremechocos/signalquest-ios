@@ -22,7 +22,7 @@ enum DromRegion: String, CaseIterable, Equatable, Sendable {
         switch self {
         case .guadeloupe: return "Guadeloupe"
         case .martinique: return "Martinique"
-        case .guyane: return "Guyane"
+        case .guyane: return String(localized: "Guyane")
         case .reunion: return String(localized: "La Réunion")
         case .mayotte: return "Mayotte"
         }

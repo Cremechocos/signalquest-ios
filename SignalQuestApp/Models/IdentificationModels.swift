@@ -121,7 +121,7 @@ struct IdentifiedCell: Identifiable, Equatable {
         if let pci, !pci.isEmpty { return "PCI \(pci)" }
         if let cellId, !cellId.isEmpty { return "Cell \(cellId)" }
         if let ci, !ci.isEmpty { return "CI \(ci)" }
-        return "Cellule"
+        return String(localized: "Cellule")
     }
 }
 

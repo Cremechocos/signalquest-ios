@@ -1485,7 +1485,7 @@ struct ConversationDetailView: View {
                     .background(mine ? SQColor.onAccent.opacity(0.16) : SQColor.accentSoft, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(attachment.fileName ?? "Pièce jointe")
+                    Text(attachment.fileName ?? String(localized: "Pièce jointe"))
                         .font(SQFont.body(13, .semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(1)
@@ -1570,9 +1570,9 @@ struct ConversationDetailView: View {
 
     private func pinnedSnippet(_ pinned: PinnedMessage) -> String {
         guard let message = pinned.message else { return "Message" }
-        if message.isEncrypted { return decryptedMessages[message.id] ?? "🔒 Message chiffré" }
+        if message.isEncrypted { return decryptedMessages[message.id] ?? String(localized: "🔒 Message chiffré") }
         let value = message.content ?? ""
-        return value.isEmpty ? "Pièce jointe" : value
+        return value.isEmpty ? String(localized: "Pièce jointe") : value
     }
 
     @ViewBuilder
@@ -1699,7 +1699,7 @@ struct ConversationDetailView: View {
 
     private func displayedContent(for message: MessageItem) -> String {
         if message.deletedAt != nil { return "" }
-        if message.isEncrypted { return decryptedMessages[message.id] ?? "🔒 Message chiffré" }
+        if message.isEncrypted { return decryptedMessages[message.id] ?? String(localized: "🔒 Message chiffré") }
         return message.content ?? ""
     }
 

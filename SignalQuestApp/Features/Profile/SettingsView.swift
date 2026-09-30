@@ -228,11 +228,11 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     ) -> String {
         switch failure.kind {
         case .authentication:
-            return "La session a changé. Reconnectez-vous avant de gérer les appareils."
+            return String(localized: "La session a changé. Reconnectez-vous avant de gérer les appareils.")
         case .retryable:
-            return "Le service est temporairement indisponible. Réessayez."
+            return String(localized: "Le service est temporairement indisponible. Réessayez.")
         case .activationBlocked:
-            return "La gestion E2EE v2 reste verrouillée jusqu’à la fin de la revue de sécurité."
+            return String(localized: "La gestion E2EE v2 reste verrouillée jusqu’à la fin de la revue de sécurité.")
         case .permanent, .localState:
             return fallback
         }
@@ -657,9 +657,9 @@ struct E2EEV2TrustedDevicesView: View {
 
     private func statusLabel(_ status: E2EEV2RemoteDeviceStatus) -> String {
         switch status {
-        case .pending: return "En attente d’approbation"
-        case .approved: return "Approuvé"
-        case .revoked: return "Révoqué"
+        case .pending: return String(localized: "En attente d’approbation")
+        case .approved: return String(localized: "Approuvé")
+        case .revoked: return String(localized: "Révoqué")
         }
     }
 
@@ -682,8 +682,8 @@ struct E2EEV2TrustedDevicesView: View {
     private func platformName(_ platform: String) -> String {
         switch platform {
         case "android": return "Android"
-        case "web": return "Navigateur web"
-        default: return "iPhone ou iPad"
+        case "web": return String(localized: "Navigateur web")
+        default: return String(localized: "iPhone ou iPad")
         }
     }
 
@@ -1004,11 +1004,11 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
     ) -> String {
         switch failure.kind {
         case .authentication:
-            return "La session a changé. Reconnectez-vous puis réessayez."
+            return String(localized: "La session a changé. Reconnectez-vous puis réessayez.")
         case .retryable:
-            return "Le service est temporairement indisponible. Réessayez."
+            return String(localized: "Le service est temporairement indisponible. Réessayez.")
         case .activationBlocked:
-            return "Ces actions restent verrouillées jusqu’à la fin de la revue de sécurité."
+            return String(localized: "Ces actions restent verrouillées jusqu’à la fin de la revue de sécurité.")
         case .permanent, .localState:
             return fallback
         }

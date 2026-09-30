@@ -286,9 +286,8 @@ final class CoverageSessionQueueTests: XCTestCase {
                 XCTFail("Retired coverage must never reach the network")
                 throw URLError(.notConnectedToInternet)
             }
-            let service = SessionsService(api: makeAPIClient(), queueFileURL: fileURL)
-            await service.retryPendingCoverageSessions()
-            await SessionsService(api: makeAPIClient(), queueFileURL: fileURL).retryPendingCoverageSessions()
+            _ = SessionsService(api: makeAPIClient(), queueFileURL: fileURL)
+            _ = SessionsService(api: makeAPIClient(), queueFileURL: fileURL)
             XCTAssertEqual(try Data(contentsOf: fileURL), original, "Legacy data must remain byte-for-byte unchanged")
         }
     }
@@ -313,29 +312,14 @@ final class CoverageSessionQueueTests: XCTestCase {
             throw URLError(.notConnectedToInternet)
         }
 
-        let service = SessionsService(api: makeAPIClient(), queueFileURL: legacyURL)
-        await service.retryPendingCoverageSessions()
-        await SessionsService(api: makeAPIClient(), queueFileURL: legacyURL).retryPendingCoverageSessions()
-        do {
-            _ = try await service.createCoverageSession(queued)
-            XCTFail("Retired coverage accepted a new upload")
-        } catch CoverageRecordingError.retired {
-            // Expected: the old store stays available for a future explicit migration.
-        }
+        // Ouvrir le service ne reprend ni ne migre rien : l'ancien magasin reste
+        // disponible pour une migration explicite future.
+        _ = SessionsService(api: makeAPIClient(), queueFileURL: legacyURL)
+        _ = SessionsService(api: makeAPIClient(), queueFileURL: legacyURL)
 
         let reopened = try XCTUnwrap(SwiftDataCoverageSessionStore(storeURL: storeURL, legacyFileURL: legacyURL))
         XCTAssertEqual(try reopened.allPending(), before)
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacyURL.path))
-    }
-
-    func testRetiredCoverageRejectsNewDraftsWithoutCreatingAQueue() throws {
-        let fileURL = try makeTemporaryQueueURL()
-        let upload = makeSession(id: UUID(), startTime: 1_000, endTime: 2_000,
-            showOnMap: false, points: [makePoint(timestamp: 1_000), makePoint(timestamp: 2_000)])
-        let service = SessionsService(api: makeAPIClient(), queueFileURL: fileURL)
-        XCTAssertThrowsError(try service.persistCoverageDraft(upload))
-        XCTAssertThrowsError(try service.finalizeCoverageDraft(upload))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
     func testSwiftDataMigrationKeepsEarlierJSONBackup() throws {

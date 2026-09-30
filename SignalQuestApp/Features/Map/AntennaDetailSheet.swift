@@ -743,9 +743,9 @@ struct AntennaDetailSheet: View {
         let author = customSite?.createdByDisplayName
         let date = customSite?.createdAt.map { SignalFormatters.date($0) }
         switch (author, date) {
-        case let (author?, date?): return "Ajouté par \(author) le \(date)"
-        case let (author?, nil): return "Ajouté par \(author)"
-        case let (nil, date?): return "Ajouté le \(date)"
+        case let (author?, date?): return String(localized: "Ajouté par \(author) le \(date)")
+        case let (author?, nil): return String(localized: "Ajouté par \(author)")
+        case let (nil, date?): return String(localized: "Ajouté le \(date)")
         default: return nil
         }
     }
@@ -1192,16 +1192,16 @@ struct AntennaDetailSheet: View {
         // Un site relevé sur le terrain n'a pas de registre derrière lui : parler
         // du régulateur local ici serait faux.
         if core.isCustomSite || customSite != nil {
-            return "Site relevé sur le terrain par un membre : sa position et ses identifiants viennent d'un relevé, pas d'un registre. Hauteur, secteurs et azimuts ne sont donc pas connus."
+            return String(localized: "Site relevé sur le terrain par un membre : sa position et ses identifiants viennent d'un relevé, pas d'un registre. Hauteur, secteurs et azimuts ne sont donc pas connus.")
         }
         let registry: String
         switch core.market?.uppercased() {
-        case "BE": registry = "Le registre belge (BIPT)"
-        case "CH": registry = "Le registre suisse (OFCOM)"
-        case "CA": registry = "Le registre canadien (ISED)"
-        default: registry = "Le registre de ce pays"
+        case "BE": registry = String(localized: "Le registre belge (BIPT)")
+        case "CH": registry = String(localized: "Le registre suisse (OFCOM)")
+        case "CA": registry = String(localized: "Le registre canadien (ISED)")
+        default: registry = String(localized: "Le registre de ce pays")
         }
-        return "\(registry) publie la position et l'exploitant, mais ni hauteur, ni secteurs, ni azimuts : ces lignes resteront vides tant que la source ne les donnera pas."
+        return String(localized: "\(registry) publie la position et l'exploitant, mais ni hauteur, ni secteurs, ni azimuts : ces lignes resteront vides tant que la source ne les donnera pas.")
     }
 
     private func radioIdentifiersContent(_ core: AntennaCoreDetails) -> some View {

@@ -118,11 +118,11 @@ struct NetworkPathStatus: Equatable, Sendable {
         case .wifi:
             return "Wi‑Fi"
         case .cellular:
-            return cellularTechnology?.displayName ?? "Cellulaire"
+            return cellularTechnology?.displayName ?? String(localized: "Cellulaire")
         case .wired:
             return "Ethernet"
         case .other:
-            return "Autre"
+            return String(localized: "Autre")
         }
     }
 

@@ -483,9 +483,9 @@ enum QuestCadenceGroup: CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .daily: return "Quotidiennes"
-        case .weekly: return "Hebdo"
-        case .seasonal: return "Saison"
+        case .daily: return String(localized: "Quotidiennes")
+        case .weekly: return String(localized: "Hebdo")
+        case .seasonal: return String(localized: "Saison")
         case .event: return String(localized: "Évènement")
         case .other: return String(localized: "Autres quêtes")
         }

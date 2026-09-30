@@ -54,7 +54,7 @@ enum FeedTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .forYou: return "Pour toi"
         case .latest: return "Récent"
-        case .following: return "Abonnements"
+        case .following: return String(localized: "feed.tab.following", defaultValue: "Abonnements")
         case .friends: return "Amis"
         case .telecom: return "Réseau"
         case .photos: return "Photos"

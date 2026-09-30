@@ -10,7 +10,7 @@ enum SocialVisibility: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .publicWorld: return "Public"
-        case .friends: return "Amis"
+        case .friends: return String(localized: "Amis")
         case .privateOnly: return String(localized: "Privé")
         }
     }

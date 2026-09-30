@@ -185,9 +185,9 @@ enum CallsServiceError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .e2eeUnavailable:
-            return "L’appel chiffré de bout en bout n’est pas disponible sur cet appareil."
+            return String(localized: "L’appel chiffré de bout en bout n’est pas disponible sur cet appareil.")
         case .invalidE2EEResponse:
-            return "La vérification du chiffrement de l’appel a échoué."
+            return String(localized: "La vérification du chiffrement de l’appel a échoué.")
         }
     }
 }

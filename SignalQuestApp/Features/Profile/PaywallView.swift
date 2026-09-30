@@ -215,7 +215,7 @@ struct PaywallView: View {
                         .padding(.vertical, SQSpace.xs + 1)
                         .background(SQColor.onAccent, in: Capsule(style: .continuous))
                 } else {
-                    SQEditorialTag(text: "Soutien", color: SQColor.labelSecondary)
+                    SQEditorialTag(text: String(localized: "Soutien"), color: SQColor.labelSecondary)
                 }
             }
 
@@ -338,7 +338,7 @@ struct PaywallView: View {
             if store.localEntitlementTier != .free {
                 return String(localized: "Achat Apple détecté localement, confirmation serveur en attente.")
             }
-            return "Aucun abonnement actif."
+            return String(localized: "Aucun abonnement actif.")
         }
     }
 
@@ -385,7 +385,7 @@ struct PaywallView: View {
     private var operationMessage: String? {
         switch store.operation {
         case .pending:
-            return "L’achat est en attente de validation par l’App Store."
+            return String(localized: "L’achat est en attente de validation par l’App Store.")
         case .succeeded(let message), .failed(let message):
             return message
         case .idle, .purchasing, .restoring:
@@ -402,7 +402,7 @@ struct PaywallView: View {
         if isCurrentOrLower { return String(localized: "Déjà inclus dans ton offre") }
         if case .existingBackendEntitlement = store.eligibility { return String(localized: "Déjà abonné ailleurs") }
         if !store.eligibility.canPurchase { return String(localized: "Bientôt disponible sur iOS") }
-        return "Choisir \(tier.displayName)"
+        return String(localized: "Choisir \(tier.displayName)")
     }
 
     /// Avantages annoncés.

@@ -111,7 +111,7 @@ struct ValidationCardView: View {
         case "gnb": return "gNB"
         case "pci": return "PCI"
         case "cellid", "ci": return "Cell"
-        default: return "Ident."
+        default: return String(localized: "Ident.")
         }
     }
 
@@ -119,7 +119,7 @@ struct ValidationCardView: View {
     private var identifierMethodLabel: String? {
         switch signal?.identifierSource?.lowercased() {
         case "auto": return "Auto"
-        case "manual", "manuel": return "Manuel"
+        case "manual", "manuel": return String(localized: "Manuel")
         // Imports de logs externes (NetMonster, eNB Analytics…) : provenance honnête.
         case .some(let s) where s.contains("sync") || s.contains("import"): return "Import"
         default: return nil
@@ -139,7 +139,8 @@ struct ValidationCardView: View {
         // Méthode : auto-identifiée, déclarée manuellement, ou importée.
         if let method = identifierMethodLabel { parts.append(method) }
         if let sectors = signal?.sectors, !sectors.isEmpty {
-            parts.append("Secteurs " + sectors.prefix(3).map(String.init).joined(separator: " / "))
+            let list = sectors.prefix(3).map(String.init).joined(separator: " / ")
+            parts.append(String(localized: "Secteurs \(list)"))
         }
         if let count = signal?.validationCount { parts.append("\(count) confirmations") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")

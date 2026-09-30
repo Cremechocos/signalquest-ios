@@ -37,22 +37,6 @@
         }
       }
     },
-    "Export NetMonster" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Export NetMonster"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "NetMonster export"
-          }
-        }
-      }
-    },
     "NSCameraUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {

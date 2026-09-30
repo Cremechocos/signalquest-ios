@@ -164,25 +164,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UTImportedTypeDeclarations</key>
-	<array>
-		<dict>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>public.plain-text</string>
-			</array>
-			<key>UTTypeDescription</key>
-			<string>Export NetMonster</string>
-			<key>UTTypeIdentifier</key>
-			<string>fr.signalquest.ntm</string>
-			<key>UTTypeTagSpecification</key>
-			<dict>
-				<key>public.filename-extension</key>
-				<array>
-					<string>ntm</string>
-				</array>
-			</dict>
-		</dict>
-	</array>
 </dict>
 </plist>

@@ -123,7 +123,7 @@ struct NetworkPulseHero: View {
     /// « 7 derniers jours · 214 mesures · il y a 12 min » — la ligne qui donne son
     /// sens aux trois nombres du dessous.
     private var contextLine: String {
-        var parts: [String] = [windowLabel, "\(pulse.measurementsCount) mesures"]
+        var parts: [String] = [windowLabel, String(localized: "\(pulse.measurementsCount) mesures")]
         if let radius = pulse.radiusMeters { parts.append("rayon \(formatRadius(radius))") }
         if let freshness = freshnessLabel { parts.append(freshness) }
         return parts.joined(separator: " · ")
@@ -131,18 +131,18 @@ struct NetworkPulseHero: View {
 
     private var windowLabel: String {
         switch pulse.windowDays {
-        case ...7: return "7 derniers jours"
-        case ...30: return "30 derniers jours"
-        case ...90: return "3 derniers mois"
-        default: return "12 derniers mois"
+        case ...7: return String(localized: "7 derniers jours")
+        case ...30: return String(localized: "30 derniers jours")
+        case ...90: return String(localized: "3 derniers mois")
+        default: return String(localized: "12 derniers mois")
         }
     }
 
     private var trendText: String? {
         guard let trend = pulse.trend else { return nil }
-        if trend.deltaPercent > 2 { return "+\(trend.deltaPercent) % vs 30 jours précédents" }
-        if trend.deltaPercent < -2 { return "\(trend.deltaPercent) % vs 30 jours précédents" }
-        return "Stable vs 30 jours précédents"
+        if trend.deltaPercent > 2 { return String(localized: "+\(trend.deltaPercent) % vs 30 jours précédents") }
+        if trend.deltaPercent < -2 { return String(localized: "\(trend.deltaPercent) % vs 30 jours précédents") }
+        return String(localized: "Stable vs 30 jours précédents")
     }
 
     private var technologyLine: String? {

@@ -110,7 +110,7 @@ struct OutageDetailSheet: View {
         switch issueKey {
         case "maintenance": return String(localized: "Maintenance programmée")
         case "degraded": return String(localized: "Service dégradé")
-        default: return "Panne / hors service"
+        default: return String(localized: "Panne / hors service")
         }
     }
 
@@ -144,7 +144,7 @@ struct OutageDetailSheet: View {
 
     func serviceStatusLabel(_ status: String) -> String {
         switch status.uppercased() {
-        case "HS": return "Hors service"
+        case "HS": return String(localized: "Hors service")
         case "DE": return String(localized: "Dégradé")
         case "OK": return "OK"
         default: return status

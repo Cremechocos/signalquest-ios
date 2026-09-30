@@ -142,7 +142,7 @@ struct MapPhotoViewer: View {
         if let address = photo?.siteAddress, !address.isEmpty { return address }
         if let site = photo?.siteId, !site.isEmpty { return "Site \(site)" }
         if let enb = photo?.enb, !enb.isEmpty { return "eNB \(enb)" }
-        return "Antenne"
+        return String(localized: "Antenne")
     }
 
     private var siteSubtitle: String? {

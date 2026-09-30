@@ -499,19 +499,6 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(progress.serverName, "Paris")
     }
 
-    // L'image de partage est désormais rendue nativement (ImageRenderer) pour
-    // coller à l'OG du site. On valide les données dérivées + le rendu PNG.
-
-    @MainActor
-    func testShareImageRendersAtCardSize() {
-        // Paysage type nPerf/Ookla — dimension source de vérité : cardSize.
-        let result = makeSpeedtestResult(downloadSeries: [120, 180], uploadSeries: [40, 90])
-        let image = SpeedtestShareImageRenderer.renderImage(result)
-        XCTAssertNotNil(image)
-        XCTAssertEqual(image?.size.width ?? 0, SpeedtestShareImageRenderer.cardSize.width, accuracy: 1)
-        XCTAssertEqual(image?.size.height ?? 0, SpeedtestShareImageRenderer.cardSize.height, accuracy: 1)
-    }
-
     func testQualityPaletteRunsRedToGreen() {
         // Palette qualité (worst→best) : ratio bas = rouge, ratio haut = vert.
         let low = UIColor(SpeedtestQualityPalette.color(forRatio: 0.0))

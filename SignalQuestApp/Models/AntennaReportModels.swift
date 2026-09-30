@@ -24,17 +24,17 @@ enum AntennaReportType: String, CaseIterable, Identifiable, Codable {
     /// Libellé court affiché (chips de statut, en-têtes de fil).
     var label: String {
         switch self {
-        case .incorrectEnb: return "eNB incorrect"
-        case .incorrectGnb: return "gNB incorrect"
-        case .incorrectCellId: return "Cell ID incorrect"
-        case .incorrectPci: return "PCI incorrect"
-        case .incorrectSector: return "Secteur incorrect"
+        case .incorrectEnb: return String(localized: "eNB incorrect")
+        case .incorrectGnb: return String(localized: "gNB incorrect")
+        case .incorrectCellId: return String(localized: "Cell ID incorrect")
+        case .incorrectPci: return String(localized: "PCI incorrect")
+        case .incorrectSector: return String(localized: "Secteur incorrect")
         case .incorrectLeader: return String(localized: "Opérateur porteur incorrect")
-        case .wrongLocation: return "Mauvais emplacement"
-        case .duplicate: return "Doublon"
+        case .wrongLocation: return String(localized: "Mauvais emplacement")
+        case .duplicate: return String(localized: "Doublon")
         case .incorrectLocation: return String(localized: "Coordonnées incorrectes")
         case .incorrectOperator: return String(localized: "Opérateur incorrect")
-        case .incorrectTech: return "Technologie incorrecte"
+        case .incorrectTech: return String(localized: "Technologie incorrecte")
         case .other: return String(localized: "Autre problème")
         }
     }

@@ -19,7 +19,7 @@ enum SupporterTier: String, Codable, CaseIterable, Sendable {
 
     var displayName: String {
         switch self {
-        case .free: return "Gratuit"
+        case .free: return String(localized: "Gratuit")
         case .basic: return "Basic"
         case .premium: return "Premium"
         }
@@ -102,7 +102,7 @@ enum EntitlementSource: String, Codable, Sendable {
         case .stripe: return "SignalQuest Web"
         case .manual: return "SignalQuest"
         case .backend: return "SignalQuest"
-        case .unknown: return "une autre plateforme"
+        case .unknown: return String(localized: "une autre plateforme")
         }
     }
 }
@@ -225,7 +225,7 @@ enum PurchaseEligibility: Equatable, Sendable {
     var userMessage: String {
         switch self {
         case .allowed:
-            return "Achat disponible."
+            return String(localized: "Achat disponible.")
         case .checkingServer:
             return String(localized: "Vérification de tes droits en cours…")
         case .backendUnavailable:
@@ -316,11 +316,11 @@ enum EntitlementsError: LocalizedError {
         case .failedVerification:
             return String(localized: "La transaction App Store n'a pas pu être authentifiée.")
         case .productUnavailable:
-            return "Cette offre n'est pas disponible dans l'App Store."
+            return String(localized: "Cette offre n'est pas disponible dans l'App Store.")
         case .unexpectedProduct:
             return String(localized: "La transaction reçue ne correspond pas à l'offre choisie.")
         case .transactionDeliveryUnavailable:
-            return "La validation serveur App Store n'est pas encore disponible."
+            return String(localized: "La validation serveur App Store n'est pas encore disponible.")
         }
     }
 }
@@ -483,13 +483,13 @@ final class EntitlementsStore: ObservableObject {
                 publishServerState(.available(snapshot), for: accountSession)
                 await transaction.finish()
                 await refreshLocalEntitlements()
-                publishOperation(.succeeded("Abonnement \(snapshot.tier.displayName) activé sur ton compte."), for: accountSession)
+                publishOperation(.succeeded(String(localized: "Abonnement \(snapshot.tier.displayName) activé sur ton compte.")), for: accountSession)
             case .pending:
                 publishOperation(.pending, for: accountSession)
             case .userCancelled:
                 publishOperation(.idle, for: accountSession)
             @unknown default:
-                publishOperation(.failed("Réponse App Store inconnue. Réessaie plus tard."), for: accountSession)
+                publishOperation(.failed(String(localized: "Réponse App Store inconnue. Réessaie plus tard.")), for: accountSession)
             }
         } catch {
             publishOperation(.failed(error.localizedDescription), for: accountSession)
@@ -515,7 +515,7 @@ final class EntitlementsStore: ObservableObject {
             if localEntitlementTier != .free, !serverVerificationReady {
                 publishOperation(.failed(PurchaseEligibility.existingLocalAppStoreEntitlement(localEntitlementTier).userMessage), for: accountSession)
             } else {
-                publishOperation(.succeeded("Achats restaurés et droits vérifiés."), for: accountSession)
+                publishOperation(.succeeded(String(localized: "Achats restaurés et droits vérifiés.")), for: accountSession)
             }
         } catch {
             publishOperation(.failed(error.localizedDescription), for: accountSession)

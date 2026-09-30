@@ -272,7 +272,6 @@
 		6355B681F28A5EB94BEBF576 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3208FA15F4116CDD6FB4BF47 /* PrivacyInfo.xcprivacy */; };
 		63A197C5516EA15B55DF8942 /* FeedPoll.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B43802B3725DE1A21B9D53 /* FeedPoll.swift */; };
 		6487B42BE6FAE8031462A8A6 /* AntennaSightOriginTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A82FDDDBCE3DAE2BB286C11 /* AntennaSightOriginTests.swift */; };
-		6651F3A94F7A12751A676CC2 /* SpeedtestShareImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 879A6D651EB7605DE38CD230 /* SpeedtestShareImageTests.swift */; };
 		669A95D9E954E5641284B736 /* QualityScaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674E8D139E6A60F86CECDF3A /* QualityScaleTests.swift */; };
 		67B241EC2769C4066723D656 /* SpeedtestUploadStreamLadderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BB896FE06E7411B91CC373D /* SpeedtestUploadStreamLadderTests.swift */; };
 		6901C388200478D036F8CBFD /* Lot1ReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A69D9C832A579FB6D2CD5FF /* Lot1ReliabilityTests.swift */; };
@@ -1067,7 +1066,6 @@
 		86DE66430CD630753AC76945 /* NearbyOperatorComparisonSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbyOperatorComparisonSheet.swift; sourceTree = "<group>"; };
 		8738D9A09B93678F37E5A510 /* ValidationsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationsSheet.swift; sourceTree = "<group>"; };
 		87728CF52BF5ECDADDD60D2F /* SQShadow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQShadow.swift; sourceTree = "<group>"; };
-		879A6D651EB7605DE38CD230 /* SpeedtestShareImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedtestShareImageTests.swift; sourceTree = "<group>"; };
 		87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestDataBudgetTests.swift; sourceTree = "<group>"; };
 		885DAE78D34639CBB592A710 /* ValidationsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationsService.swift; sourceTree = "<group>"; };
 		896071B7533980CBAF23DA8A /* ICMPPingerLiveCallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICMPPingerLiveCallbackTests.swift; sourceTree = "<group>"; };
@@ -2441,7 +2439,6 @@
 				F8E5F3734600F0C6CC5DEEFF /* SpeedtestIcmpLiveProgressTests.swift */,
 				70F67E9701F2DA2ADA20F28E /* SpeedtestPeakWindowTests.swift */,
 				E25A183BF33413186E939C05 /* SpeedtestPublicationDefaultsTests.swift */,
-				879A6D651EB7605DE38CD230 /* SpeedtestShareImageTests.swift */,
 				70E4B6F01B0F4B916A069D31 /* SpeedtestTests.swift */,
 				6BB896FE06E7411B91CC373D /* SpeedtestUploadStreamLadderTests.swift */,
 				3600749CEADD6F7D35EA36F9 /* SpeedtestV6ContractTests.swift */,
@@ -3520,7 +3517,6 @@
 				AF5BAD69202B5C4F35BE1864 /* SpeedtestIcmpLiveProgressTests.swift in Sources */,
 				3D3F1BC367322F152B209083 /* SpeedtestPeakWindowTests.swift in Sources */,
 				C75435201188EE874D2166D2 /* SpeedtestPublicationDefaultsTests.swift in Sources */,
-				6651F3A94F7A12751A676CC2 /* SpeedtestShareImageTests.swift in Sources */,
 				323D3ADBAF7A05EE0C9EFA9B /* SpeedtestTests.swift in Sources */,
 				67B241EC2769C4066723D656 /* SpeedtestUploadStreamLadderTests.swift in Sources */,
 				F91E26E319032EE8A0FB5608 /* SpeedtestV6ContractTests.swift in Sources */,

@@ -105,33 +105,15 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
         XCTAssertFalse(app.staticTexts["speedtest.publication.info"].exists)
         assertNoPublicationSwitches(app)
 
-        // Les réglages du trajet ne doivent pas apparaître pour un test ponctuel.
-        let cap = app.staticTexts[locale == "fr" ? "Plafond de données" : "Data cap"]
-        XCTAssertFalse(cap.exists)
-        let route = app.buttons[locale == "fr" ? "Trajet" : "Route"]
-        let scroll = app.scrollViews["speedtest.settings.scroll"]
-        for _ in 0..<8 where !route.isHittable { scroll.swipeDown() }
-        XCTAssertTrue(route.isHittable)
-        route.tap()
-        XCTAssertTrue(cap.waitForExistence(timeout: 5))
-        let routeTiming = locale == "fr"
-            ? "Prochain test après la distance choisie ou 30 s. « Tester maintenant » le lance aussitôt."
-            : "Next test after the selected distance or 30 seconds. “Test now” starts it immediately."
-        XCTAssertTrue(app.staticTexts[routeTiming].waitForExistence(timeout: 5))
-        capture(app, name: "measurement-\(locale)-route-settings")
-        let single = app.buttons["1"].firstMatch
-        for _ in 0..<8 where !single.isHittable { scroll.swipeDown() }
-        single.tap()
-        XCTAssertFalse(cap.exists)
+        // Plus d'option « Trajet » ni de plafond ici : mesurer en roulant,
+        // c'est le Drive Test, qui a ses propres réglages.
+        XCTAssertFalse(app.buttons[locale == "fr" ? "Trajet" : "Route"].exists)
+        XCTAssertFalse(app.staticTexts[locale == "fr" ? "Plafond de données" : "Data cap"].exists)
         let advanced = app.buttons["speedtest.settings.advanced"].firstMatch
         XCTAssertTrue(advanced.isHittable)
         advanced.tap()
         XCTAssertTrue(app.buttons["Cloudflare"].waitForExistence(timeout: 5))
         capture(app, name: "measurement-\(locale)-advanced-settings")
-
-        for _ in 0..<8 where !route.isHittable { scroll.swipeDown() }
-        route.tap()
-        XCTAssertTrue(route.isSelected)
 
         // Confirm normal dismissal without touching any measurement action.
         let done = app.buttons["OK"].firstMatch
@@ -139,7 +121,7 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
         done.tap()
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         capture(app, name: "publication-\(locale)-guest-still-idle")
-        let openDrive = app.buttons[locale == "fr" ? "Ouvrir le Drive Test" : "Open Drive Test"]
+        let openDrive = app.descendants(matching: .any)["speedtest.driveTest"].firstMatch
         XCTAssertTrue(openDrive.waitForExistence(timeout: 5))
         openDrive.tap() // Opens the dedicated controller; never starts a measurement.
         let acknowledge = app.buttons[locale == "fr" ? "J'ai compris" : "Got it"]

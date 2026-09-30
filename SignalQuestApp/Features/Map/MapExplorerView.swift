@@ -700,7 +700,7 @@ final class MapExplorerViewModel: ObservableObject {
             if !region.allows(operatorKey: operatorFilter) {
                 operatorFilter = "ALL"
             }
-            showMarketNotice("Territoire : \(region.flag) \(region.shortName)")
+            showMarketNotice(String(localized: "Territoire : \(region.flag) \(region.shortName)"))
         }
     }
 

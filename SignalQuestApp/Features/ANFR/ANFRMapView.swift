@@ -39,6 +39,7 @@ final class ANFRMapViewModel: ObservableObject {
     }
 
     func load() async {
+        #if DEBUG
         if AppEnvironment.usesDemoData {
             sites = ANFRDemoData.mapSnapshot.sites
             lastUpdate = ANFRDemoData.mapSnapshot.lastUpdate
@@ -47,17 +48,20 @@ final class ANFRMapViewModel: ObservableObject {
             errorMessage = nil
             return
         }
+        #endif
         guard sites.isEmpty else { return }
         await loadSnapshot()
         await loadArchiveDates()
     }
 
     func loadSnapshot() async {
+        #if DEBUG
         if AppEnvironment.usesDemoData {
             sites = ANFRDemoData.mapSnapshot.sites
             lastUpdate = ANFRDemoData.mapSnapshot.lastUpdate
             return
         }
+        #endif
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
