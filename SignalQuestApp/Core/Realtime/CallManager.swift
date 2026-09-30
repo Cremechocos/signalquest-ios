@@ -183,11 +183,50 @@ enum E2EEV2CallEpochPolicy {
     }
 }
 
+/// Discrétion d'un appel (spec du chiffrement §10.5, IOS-CALL-5).
+enum CallDiscretionPolicy {
+    /// Un appel d'une conversation chiffrée ne va pas dans l'historique
+    /// d'appels d'iOS, que iCloud synchronise.
+    static func isDiscreet(requiresE2EE: Bool?, conversation: CallConversationDirectory.Entry?) -> Bool {
+        requiresE2EE == true || conversation?.isEncrypted == true
+    }
+
+    /// Nom affiché par CallKit. Pour un appel chiffré de bout en bout, il vient
+    /// de l'appareil seul : la notification n'en porte plus, et le serveur ne
+    /// doit pas pouvoir le choisir.
+    static func displayName(
+        payloadName: String?,
+        requiresE2EE: Bool?,
+        conversation: CallConversationDirectory.Entry?
+    ) -> String {
+        if requiresE2EE == true { return conversation?.title ?? fallbackName }
+        let trimmed = payloadName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? conversation?.title ?? fallbackName : trimmed
+    }
+
+    static var fallbackName: String { String(localized: "Appel SignalQuest") }
+
+    static func configuration(_ base: CXProviderConfiguration, discreet: Bool) -> CXProviderConfiguration {
+        base.includesCallsInRecents = !discreet
+        return base
+    }
+}
+
 enum IncomingCallE2EEExpectation: Equatable {
     case unresolved
     case legacy
     case required(E2EEV2CallSessionDescriptor)
     case invalid
+
+    /// Une notification invalide est traitée comme chiffrée : ni son nom ni
+    /// l'historique d'appels.
+    var requiresE2EE: Bool? {
+        switch self {
+        case .unresolved: return nil
+        case .legacy: return false
+        case .required, .invalid: return true
+        }
+    }
 }
 
 enum IncomingCallE2EEContract {
@@ -334,9 +373,14 @@ final class CallManager: NSObject, ObservableObject {
         conversationId: String,
         mode: String,
         displayName: String,
-        requiresE2EE: Bool = false
+        requiresE2EE: Bool = false,
+        isEncryptedConversation: Bool = false
     ) {
         guard activeCall == nil else { return }
+        updateDiscretion(isEncryptedConversation || CallDiscretionPolicy.isDiscreet(
+            requiresE2EE: requiresE2EE,
+            conversation: knownConversation(conversationId)
+        ))
         endNotice = nil
         liveKit.prepareForCall()
         let uuid = UUID()
@@ -469,6 +513,26 @@ final class CallManager: NSObject, ObservableObject {
         )
     }
 
+    // MARK: Discrétion
+
+    /// Conversation connue sur l'appareil, pour le nom et la discrétion d'un appel.
+    private func knownConversation(_ conversationId: String?) -> CallConversationDirectory.Entry? {
+        guard let conversationId, LocalAccountScope.currentUserId != nil else { return nil }
+        return CallConversationDirectory.shared.entry(
+            conversationId: conversationId,
+            ownerScopeId: LocalAccountScope.currentOwnerScopeId
+        )
+    }
+
+    /// Réglé avant de présenter un appel, gardé jusqu'au suivant. Pendant un
+    /// appel, sa discrétion n'est jamais relâchée par un second appel refusé.
+    private func updateDiscretion(_ discreet: Bool) {
+        guard activeCall == nil || discreet else { return }
+        let configuration = provider.configuration
+        guard configuration.includesCallsInRecents == discreet else { return }
+        provider.configuration = CallDiscretionPolicy.configuration(configuration, discreet: discreet)
+    }
+
     // MARK: Incoming
 
     private func reportInvalidIncomingPush(
@@ -477,6 +541,7 @@ final class CallManager: NSObject, ObservableObject {
         hasVideo: Bool,
         completion: (() -> Void)?
     ) {
+        updateDiscretion(true)
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: handle)
         update.localizedCallerName = handle
@@ -506,6 +571,10 @@ final class CallManager: NSObject, ObservableObject {
         e2eeDescriptor: E2EEV2CallSessionDescriptor? = nil,
         completion: (() -> Void)?
     ) {
+        updateDiscretion(CallDiscretionPolicy.isDiscreet(
+            requiresE2EE: requiresE2EE,
+            conversation: knownConversation(conversationId)
+        ))
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: handle)
         update.localizedCallerName = handle
@@ -679,7 +748,11 @@ final class CallManager: NSObject, ObservableObject {
             uuid: CallLifecyclePolicy.callKitUUID(callId: call.id),
             callId: call.id,
             conversationId: call.conversationId,
-            handle: call.displayName ?? call.participants?.first ?? "Appel SignalQuest",
+            handle: CallDiscretionPolicy.displayName(
+                payloadName: call.displayName ?? call.participants?.first,
+                requiresE2EE: call.e2eeRequired,
+                conversation: knownConversation(call.conversationId)
+            ),
             hasVideo: call.mode == "video",
             serverStatus: call.status,
             requiresE2EE: call.e2eeRequired,
@@ -1201,7 +1274,7 @@ extension CallManager: PKPushRegistryDelegate {
         let dict = payload.dictionaryPayload
         let callId = CallManager.string(dict, "callId", "call_id", "id")
         let conversationId = CallManager.string(dict, "conversationId", "conversation_id")
-        let handle = CallManager.string(dict, "caller", "callerName", "handle", "title") ?? "Appel SignalQuest"
+        let payloadName = CallManager.string(dict, "caller", "callerName", "handle", "title")
         let hasVideo = CallManager.string(dict, "mode", "type")?.lowercased() == "video"
         let e2eeExpectation = IncomingCallE2EEContract.parse(dict)
         // `callId` est l'identité canonique. Elle prime sur un UUID de push pour
@@ -1217,6 +1290,12 @@ extension CallManager: PKPushRegistryDelegate {
         // SYNCHRONEMENT via `assumeIsolated` au lieu d'un `Task` différé (ROB-06).
         let completionBox = UnsafeMainActorBox(value: completion)
         MainActor.assumeIsolated {
+            // Nom retrouvé sur l'appareil, lu de façon synchrone (§10.5).
+            let handle = CallDiscretionPolicy.displayName(
+                payloadName: payloadName,
+                requiresE2EE: e2eeExpectation.requiresE2EE,
+                conversation: self.knownConversation(conversationId)
+            )
             guard let callId else {
                 self.reportInvalidIncomingPush(uuid: uuid, handle: handle, hasVideo: hasVideo, completion: completionBox.value)
                 return

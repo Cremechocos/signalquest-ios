@@ -1,0 +1,143 @@
+import CallKit
+import XCTest
+@testable import SignalQuest
+
+/// IOS-CALL-5 (plan 3, jalon A) : un appel chiffré sonne avec le nom retrouvé
+/// sur l'appareil et reste hors de l'historique d'appels d'iOS (spec §10.5).
+final class CallDiscretionTests: XCTestCase {
+    private let alice = "user:" + String(repeating: "a", count: 24)
+    private let bruno = "user:" + String(repeating: "b", count: 24)
+
+    func testDirectoryKeepsTheNameShownInTheAppSealedAndPerAccount() throws {
+        let root = temporaryRoot()
+        let keys = InMemoryTokenStore()
+        let directory = CallConversationDirectory(rootURL: root, keyStore: keys)
+        directory.record(
+            [conversation("c1", title: nil, encrypted: true, members: [("u-alice", "Alice"), ("u-lea", "Léa")])],
+            currentUserId: "u-alice",
+            ownerScopeId: alice
+        )
+
+        XCTAssertEqual(directory.entry(conversationId: "c1", ownerScopeId: alice)?.title, "Léa", "Jamais son propre nom")
+        XCTAssertEqual(directory.entry(conversationId: "c1", ownerScopeId: alice)?.isEncrypted, true)
+        XCTAssertNil(directory.entry(conversationId: "c1", ownerScopeId: bruno))
+
+        let file = try XCTUnwrap(files(in: root).first)
+        let bytes = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+        XCTAssertFalse(bytes.contains("Léa"), "Scellé sur le disque")
+        XCTAssertFalse(bytes.contains("c1"))
+
+        // Nouvelle instance = réveil par PushKit : même fichier, même trousseau.
+        let relaunched = CallConversationDirectory(rootURL: root, keyStore: keys)
+        XCTAssertEqual(relaunched.entry(conversationId: "c1", ownerScopeId: alice)?.title, "Léa")
+
+        relaunched.purge(ownerScopeId: alice)
+        XCTAssertNil(relaunched.entry(conversationId: "c1", ownerScopeId: alice))
+        XCTAssertTrue(files(in: root).isEmpty, "Effacé avec le compte")
+    }
+
+    func testDirectoryFollowsRenamesAndDropsTheLeastRecentlySeen() {
+        let directory = CallConversationDirectory(rootURL: temporaryRoot(), keyStore: InMemoryTokenStore())
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        let many = (0..<CallConversationDirectory.maxEntries).map {
+            conversation("c\($0)", title: "Groupe \($0)", encrypted: false, members: [])
+        }
+        directory.record(many, currentUserId: nil, ownerScopeId: alice, now: start)
+        directory.record(
+            [conversation("c0", title: "Équipe terrain", encrypted: true, members: []),
+             conversation("new", title: "Nouveau", encrypted: false, members: [])],
+            currentUserId: nil,
+            ownerScopeId: alice,
+            now: start.addingTimeInterval(60)
+        )
+
+        XCTAssertEqual(directory.entry(conversationId: "c0", ownerScopeId: alice)?.title, "Équipe terrain")
+        XCTAssertEqual(directory.entry(conversationId: "c0", ownerScopeId: alice)?.isEncrypted, true)
+        XCTAssertEqual(directory.entry(conversationId: "new", ownerScopeId: alice)?.title, "Nouveau")
+        let kept = (0..<CallConversationDirectory.maxEntries).filter {
+            directory.entry(conversationId: "c\($0)", ownerScopeId: alice) != nil
+        }
+        XCTAssertEqual(kept.count, CallConversationDirectory.maxEntries - 1, "Plafonné : une conversation ancienne tombe")
+    }
+
+    func testEncryptedCallNameComesFromTheDeviceOnly() {
+        let known = CallConversationDirectory.Entry(title: "Léa", isEncrypted: true, seenAtMs: 0)
+        XCTAssertEqual(
+            CallDiscretionPolicy.displayName(payloadName: "Ta banque", requiresE2EE: true, conversation: known),
+            "Léa", "Le serveur ne choisit pas le nom d'un appel chiffré"
+        )
+        XCTAssertEqual(
+            CallDiscretionPolicy.displayName(payloadName: "Ta banque", requiresE2EE: true, conversation: nil),
+            CallDiscretionPolicy.fallbackName
+        )
+        XCTAssertEqual(
+            CallDiscretionPolicy.displayName(payloadName: "Camille", requiresE2EE: false, conversation: known),
+            "Camille", "Appel d'une conversation v1 : le nom de la notification reste"
+        )
+        XCTAssertEqual(
+            CallDiscretionPolicy.displayName(payloadName: "  ", requiresE2EE: nil, conversation: known),
+            "Léa"
+        )
+        XCTAssertEqual(IncomingCallE2EEExpectation.invalid.requiresE2EE, true, "Une notification invalide ne donne pas de nom")
+        XCTAssertNil(IncomingCallE2EEExpectation.unresolved.requiresE2EE)
+    }
+
+    func testEncryptedConversationCallsStayOutOfTheSystemRecents() {
+        let encrypted = CallConversationDirectory.Entry(title: "Léa", isEncrypted: true, seenAtMs: 0)
+        let plain = CallConversationDirectory.Entry(title: "Camille", isEncrypted: false, seenAtMs: 0)
+        XCTAssertTrue(CallDiscretionPolicy.isDiscreet(requiresE2EE: true, conversation: nil))
+        XCTAssertTrue(CallDiscretionPolicy.isDiscreet(requiresE2EE: false, conversation: encrypted), "Conversation v1 chiffrée")
+        XCTAssertFalse(CallDiscretionPolicy.isDiscreet(requiresE2EE: nil, conversation: plain))
+        XCTAssertFalse(CallDiscretionPolicy.isDiscreet(requiresE2EE: nil, conversation: nil))
+
+        let configuration = CXProviderConfiguration()
+        XCTAssertFalse(CallDiscretionPolicy.configuration(configuration, discreet: true).includesCallsInRecents)
+        XCTAssertTrue(CallDiscretionPolicy.configuration(configuration, discreet: false).includesCallsInRecents)
+    }
+
+    // MARK: - Outils
+
+    private func temporaryRoot() -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CallDiscretionTests-\(UUID().uuidString)", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        return root
+    }
+
+    private func files(in root: URL) -> [URL] {
+        (FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL } ?? [])
+            .filter { $0.lastPathComponent == "conversations.json.enc" }
+    }
+
+    private func conversation(
+        _ id: String,
+        title: String?,
+        encrypted: Bool,
+        members: [(id: String, name: String)]
+    ) -> MessageConversation {
+        MessageConversation(
+            id: id,
+            title: title,
+            isGroup: members.count > 2,
+            e2eeEnabled: encrypted,
+            groupPhotoUrl: nil,
+            createdAt: nil,
+            updatedAt: nil,
+            lastMessageAt: nil,
+            lastReadAt: nil,
+            pinnedAt: nil,
+            participants: members.map { member in
+                ConversationParticipant(
+                    userId: member.id,
+                    role: "member",
+                    joinedAt: nil,
+                    lastReadAt: nil,
+                    user: MessageUser(id: member.id, name: member.name, email: "\(member.id)@example.org", avatarUrl: nil),
+                    presence: nil
+                )
+            },
+            lastMessage: nil
+        )
+    }
+}

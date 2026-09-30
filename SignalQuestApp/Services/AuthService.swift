@@ -368,6 +368,7 @@ final class AuthService: AuthServicing {
             OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
             HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
             RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
+            CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
@@ -400,6 +401,7 @@ final class AuthService: AuthServicing {
             OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
             HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
             RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
+            CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()

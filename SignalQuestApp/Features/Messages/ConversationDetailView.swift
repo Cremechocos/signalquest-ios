@@ -2617,7 +2617,8 @@ struct ConversationDetailView: View {
             conversationId: conversation.id,
             mode: mode,
             displayName: conversationTitle,
-            requiresE2EE: endToEnd
+            requiresE2EE: endToEnd,
+            isEncryptedConversation: isE2EE
         )
     }
 

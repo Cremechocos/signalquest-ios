@@ -229,14 +229,33 @@ final class MessagesService: MessagesServicing {
     }
 
     func conversations() async throws -> [MessageConversation] {
-        try await api.request(APIEndpoint(path: "/api/messages/conversations"), as: ConversationsResponse.self).conversations
+        let session = LocalAccountScope.sessionSnapshot()
+        let conversations = try await api.request(
+            APIEndpoint(path: "/api/messages/conversations"), as: ConversationsResponse.self
+        ).conversations
+        rememberForCalls(conversations, session: session)
+        return conversations
     }
 
     func conversation(id: String) async throws -> MessageConversation {
         struct Response: Decodable { let conversation: MessageConversation }
-        return try await api.request(
+        let session = LocalAccountScope.sessionSnapshot()
+        let conversation = try await api.request(
             APIEndpoint(path: "/api/messages/conversations/\(id)"), as: Response.self
         ).conversation
+        rememberForCalls([conversation], session: session)
+        return conversation
+    }
+
+    /// Nom et discrétion gardés sur l'appareil pour l'écran d'appel d'iOS : la
+    /// notification d'un appel chiffré n'en porte plus (spec §10.5).
+    private func rememberForCalls(_ conversations: [MessageConversation], session: LocalAccountSession?) {
+        guard let session, session.isCurrent else { return }
+        CallConversationDirectory.shared.record(
+            conversations,
+            currentUserId: String(session.ownerScopeId.dropFirst("user:".count)),
+            ownerScopeId: session.ownerScopeId
+        )
     }
 
     func createConversation(participantIds: [String], title: String?, e2ee: Bool = true) async throws -> CreateConversationResponse {
