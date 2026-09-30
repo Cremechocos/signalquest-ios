@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.3.1**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -45,6 +45,19 @@
 > - v0.3.1 (30/09/2026) : questions 6 à 10 du §18 tranchées. Elles portent
 >   sur les anciennes conversations, l'app sans v2, l'outil de modération,
 >   l'origine statique du web (après la bêta) et la taille des médias.
+> - v0.4 (30/09/2026) : tous les formats du jalon A écrits à l'octet
+>   (annexe D), préalable aux vecteurs de référence. Ajustements imposés par
+>   les SDK LiveKit :
+>   - un appel garde son époque ;
+>   - aucune piste publiée ni rendue avant la vérification ;
+>   - canal de données chiffré obligatoire ;
+>   - SIF neutralisé.
+>
+>   Aussi :
+>   - trois vecteurs réémis en forme low-S ;
+>   - compatibilité des apps installées (§16) ;
+>   - critère d'ouverture des verrous (§17) ;
+>   - `e2eeV2.signatureB64` au lieu de `signature`.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -588,7 +601,7 @@ affichage**, et dans l'outil de modération.
   `SQ-E2EE-V2-CALL-DESCRIPTOR\n1\n<conversationId>\n<callId>\n<callerDeviceId>\n<epochId>\n<epochNumber>\n<keyCommitmentB64>\n<callNonceB64>\n<createdAtMs>`,
   où `callNonce` est un aléa de 32 octets.
 - Le serveur relaie le descripteur tel quel, dans une **nouvelle clé JSON**
-  `e2eeV2` (`descriptor`, `signature`, `callerDeviceId`) :
+  `e2eeV2` (`descriptor`, `signatureB64`, `callerDeviceId`, annexe D.11) :
   - dans la réponse d'initiation ;
   - dans la notification VoIP ou FCM ;
   - dans `/api/calls/pending`.
@@ -637,18 +650,37 @@ et l'appel croisé.
     clair, ou au contraire faire passer toute trame pour non chiffrée ;
   - la valeur n'est figée qu'après un test, sur chaque SDK, prouvant qu'une
     trame non chiffrée injectée n'est **jamais rendue** ;
-  - d'ici là, la valeur explicite est `LK-ROCKS`, et le SIF fourni par le
-    serveur est ignoré.
-- Nouvelle époque pendant l'appel : `setKey` à l'index
-  `epochNumber mod keyRingSize` ; l'émission bascule une fois la nouvelle époque
-  reçue par tous. `ratchetKey` est interdit.
-- Un SDK qui ne permet pas ces réglages n'offre pas d'appel chiffré.
+  - d'ici là, la valeur explicite est `LK-ROCKS`.
+- **Un appel garde l'époque de son descripteur.** L'index de clé des médias
+  n'est pas pilotable dans tous les SDK : on ne change donc pas de clé
+  pendant un appel.
+  - Un changement qui imposerait une nouvelle époque met fin à l'appel :
+    membre ou appareil retiré, révoqué ou mis à l'écart. L'app affiche
+    « L'appel a pris fin : la conversation a changé de clé ».
+  - L'appel peut être relancé sous la nouvelle époque.
+  - `ratchetKey` est interdit.
+- **SIF** : un SDK peut appliquer d'office celui du serveur (c'est le cas
+  en Swift). Il est neutralisé, par une valeur vide posée après la jonction
+  ou par un correctif du SDK, et le test négatif de COM-1 le prouve.
+- **Canal de données chiffré** sur les trois SDK. Un paquet non chiffré est
+  refusé. La preuve de jonction y passe.
+- Un SDK qui ne permet pas ces réglages n'offre pas d'appel chiffré : il est
+  monté de version ou corrigé. En Swift 2.14.0,
+  `discardFrameWhenCryptorNotReady` et `keyDerivationAlgorithm` ne sont pas
+  encore exposés (COM-1).
 
 ### 10.4 Vérification et fermeture par défaut
 
 - Un appel dans une conversation v2 **est** chiffré. Le client le vérifie
   localement (§12) : il ne rejoint jamais en clair une conversation qu'il sait
   chiffrée, quoi que dise le serveur.
+- **Ordre de démarrage** :
+  - aucune piste locale (micro, caméra) n'est publiée avant que la clé de
+    trame soit posée ;
+  - elle n'est publiée que chiffrée, avec `encryptionType` = `gcm` vérifié
+    sur la publication ;
+  - une piste locale que le serveur annonce non chiffrée est retirée
+    aussitôt, et l'appel se termine.
 - Toute piste distante non chiffrée est refusée : désabonnement et fin de
   l'appel.
 - Une piste n'est rendue que lorsque son cryptor est dans l'état « OK ».
@@ -663,9 +695,9 @@ et l'appel croisé.
   certifié.
   - Chaîne signée :
     `SQ-E2EE-V2-CALL-JOIN\n1\n<conversationId>\n<callId>\n<callNonceB64>\n<livekitIdentity>\n<userId>\n<deviceId>\n<joinedAtMs>`.
-  - Elle passe par le canal de données. Ce canal est chiffré quand le SDK le
-    permet (Android : `DataPacketCryptorManager`). Comme la preuve est signée,
-    un canal non chiffré suffit.
+  - Elle est envoyée dès la jonction, sur le canal de données chiffré
+    (§10.3), sujet `sq.e2ee.join` (annexe D.11). Android :
+    `DataPacketCryptorManager`.
   - Un participant sans preuve valide après 10 secondes met fin à l'appel,
     avec « Appel chiffré impossible ».
   - Vecteur : `call-join-proof-v1`.
@@ -867,10 +899,14 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
   - signatures ECDSA en DER, **forme low-S obligatoire** : le signataire
     normalise (le Keystore Android produit du high-S une fois sur deux
     environ) et le vérificateur rejette le high-S ;
+  - trois vecteurs existants portaient une signature high-S. Ils sont
+    réémis en forme low-S, avec le même contenu et `s` remplacé par `n − s` :
+    `epoch-envelope-v1`, `recovery-epoch-envelope-v1`, `signed-request-v1` ;
   - conversion depuis `r‖s` pour WebCrypto.
 - **Source unique des vecteurs** : `contracts/e2ee-v2/*.json`.
-  - Les 13 vecteurs existants sont identiques à l'octet près dans les dépôts
-    iOS, Android et serveur. Le serveur importe ceux qui lui manquent.
+  - Les 13 vecteurs existants, une fois réémis, sont identiques à l'octet
+    près dans les dépôts iOS, Android et serveur. Le serveur importe ceux qui
+    lui manquent.
   - La CI vérifie les condensats. Le web consomme les vecteurs du serveur.
 - **Vecteurs existants** :
   - `blob-chunks-v1`, `call-frame-key-v1`, `content-payload-v1` (cas
@@ -882,7 +918,8 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
     `signed-request-v1`.
 - **À créer** :
   - identités : `device-cert-v1` (avec `keyVersion`), `device-list-v1`,
-    `device-capabilities-v1`, `safety-number-v1`, `identity-reset-v1` ;
+    `device-capabilities-v1`, `uik-wrap-v1`, `device-approval-v2`,
+    `safety-number-v1`, `identity-reset-v1` ;
   - groupes et époques : `membership-change-v1`, `epoch-manifest-v1`,
     `capability-intersection-v1` ;
   - messages : `message-ref-v1`, `message-envelope-v2` (compteur, bourrage,
@@ -950,6 +987,15 @@ Les blobs et leur purge passent au jalon B.
 Activation conversation par conversation, via l'intersection des capacités. Un
 interrupteur ne peut que désactiver.
 
+**Compatibilité des apps installées.** Leurs analyseurs des contrats v2 exigent
+des clés exactes : le serveur n'ajoute jamais de champ à un contrat v2 déjà
+publié. Une nouveauté passe par l'un de ces moyens :
+
+- une nouvelle version de contrat ;
+- une nouvelle route ;
+- une nouvelle clé dans une réponse que les apps lisent de façon tolérante,
+  comme `e2eeV2` dans les réponses d'appel.
+
 Quotas (valeurs de départ, à ajuster) : 10 époques par conversation et par
 heure ; 5 approbations d'appareil par compte et par jour ; 20 signalements par
 compte et par jour.
@@ -972,6 +1018,10 @@ protocole, états des cryptors d'appel.
     code ;
   - vecteurs partagés, dont les vecteurs négatifs (§15) ;
   - fermeture par défaut tant qu'une preuve manque.
+- **Ouverture des verrous** du chiffrement v2 dans les apps : seulement quand
+  les critères de sortie du jalon A (§16) sont remplis. Ce sont les vecteurs,
+  les tests croisés, les tests d'attaque et les relectures indépendantes. Il
+  n'y a pas de revue externe.
 - **Tests croisés** sur deux comptes et trois plateformes : chaque type de
   contenu, dans les deux sens, en ligne et hors ligne, avec ajout, révocation et
   réinitialisation d'appareil.
@@ -1188,7 +1238,10 @@ serveur porte aussi le web.
     `device-list-v1`, `device-capabilities-v1`, `epoch-manifest-v1`,
     `membership-change-v1`, `message-ref-v1`, `message-envelope-v2`,
     `content-payload-v2` (texte), `franking-v1`, `report-v1`,
-    `call-descriptor-v1`, `call-frame-key-v2`, `call-join-proof-v1` ;
+    `call-descriptor-v1`, `call-frame-key-v2`, `call-join-proof-v1`,
+    `uik-wrap-v1`, `device-approval-v2`, `safety-number-v1`,
+    `identity-reset-v1`, ainsi que les trois vecteurs réémis en low-S
+    (annexe D) ;
   - import des vecteurs existants partout ;
   - CI par condensat (§15).
 - **COM-1** Réglages LiveKit, sur Swift 2.14.0, Android 2.27.0 et JS 2.18.x
@@ -1316,3 +1369,247 @@ serveur porte aussi le web.
   - tests d'attaque du §17 : descripteur rejoué, ancienne époque, trame non
     chiffrée injectée, navigateur non approuvé, appareil sans capacité.
 - **X-2** Relecture indépendante de chaque implémentation (§17).
+
+---
+
+## Annexe D — Formats du jalon A, à l'octet (v0.4)
+
+Ces formats sont nouveaux : aucune app publiée ne les produit encore. Les
+vecteurs de référence (§15, COM-0) les figent. En cas d'écart entre ce texte
+et un vecteur publié, on corrige le texte ou le vecteur, jamais une
+implémentation seule.
+
+### D.0 Conventions communes
+
+- **Chaîne canonique** :
+  - UTF-8, champs séparés par `\n`, sans `\n` final ni espace ajouté ;
+  - entiers en décimal, sans signe ni zéro initial (sauf `0`) ;
+  - identifiants au format opaque (A.1) ;
+  - `…Ms` en millisecondes depuis l'époque Unix.
+- **Clés** : clés publiques P-256 en X9.63 non compressé (65 octets), en b64
+  standard. Une clé privée transportée est son scalaire de 32 octets,
+  big-endian.
+- **Empreinte d'appareil** : `b64url(SHA-256(identityKey ‖ signingKey))`, sur
+  les deux clés X9.63 brutes.
+- **Signature** : ECDSA P-256 avec SHA-256, sur les octets UTF-8 de la chaîne
+  canonique, en DER, forme low-S, en b64 standard.
+- **Une chaîne signée voyage telle quelle**, dans un champ JSON texte, avec sa
+  signature. Le destinataire la découpe strictement, avec un nombre de champs
+  exact et chaque champ validé. Il ne la reconstruit jamais à partir de champs
+  séparés.
+- **JSON nouveau** : RFC 8785, analyseur strict, entiers en chaînes
+  décimales. Un document JSON signé voyage aussi tel quel. Le destinataire le
+  recanonicalise et rejette tout écart d'octet.
+- **Condensat de liste** : `b64url(SHA-256("<ÉTIQUETTE>\n1" ‖ ("\n" ‖ ligne)*))`.
+  Les lignes sont triées dans l'ordre des octets UTF-8, comme en A.4 et au
+  §3.5.
+
+### D.1 Transport de l'UIK à l'approbation (`uik-wrap-v1`)
+
+L'appareil approbateur envoie l'UIK au nouvel appareil, pour sa clé d'accord.
+
+- Clé éphémère P-256 `e` ; secret = ECDH(`e`, clé d'accord du nouvel appareil).
+- Sel : `SHA-256("SQ-E2EE-V2-UIK-WRAP-SALT\n1\n<userId>\n<approverDeviceId>\n<newDeviceId>")`.
+- Clé : HKDF-SHA256(secret, sel, info `signalquest-e2ee-v2-uik-wrap-v1`,
+  32 octets).
+- AAD : `SQ-E2EE-V2-UIK-WRAP\n1\n<userId>\n<approverDeviceId>\n<newDeviceId>\n<uikPublicKeyB64>\n<ephemeralPublicKeyB64>`.
+- Chiffrement :
+  - clair = scalaire privé de l'UIK (32 octets) ;
+  - AES-256-GCM, nonce aléatoire de 12 octets ;
+  - `wrappedUikB64` = chiffré ‖ tag.
+- Signature de l'approbateur, par sa clé de signature d'appareil, sur :
+  `SQ-E2EE-V2-UIK-WRAP-SIGNATURE\n1\n<userId>\n<approverDeviceId>\n<newDeviceId>\n<uikPublicKeyB64>\n<ephemeralPublicKeyB64>\n<nonceB64>\n<aadB64>\n<wrappedUikB64>`.
+- Le nouvel appareil vérifie :
+  - que la clé publique recalculée depuis le scalaire égale `uikPublicKeyB64` ;
+  - que cette clé est l'UIK attendue, épinglée ou comparée par QR (§2.3).
+
+### D.2 Certificat d'appareil (`device-cert-v1`)
+
+- Chaîne du §2.2, en 9 lignes. `keyVersion` vaut au moins 1 ; `platform` ∈
+  {`ios`, `android`, `web`}.
+- Signée par l'UIK.
+- JSON : `{"certificate": "<chaîne>", "signatureB64": "…"}`.
+
+### D.3 Liste d'appareils (`device-list-v1`)
+
+- Ligne d'appareil : `<deviceId>\n<keyVersion>\n<platform>\n<empreinte>`.
+- `devicesDigest` : condensat de liste d'étiquette
+  `SQ-E2EE-V2-DEVICE-LIST-ENTRIES`.
+- Chaîne signée par l'UIK :
+  `SQ-E2EE-V2-DEVICE-LIST\n1\n<userId>\n<version>\n<previousListDigest>\n<deviceCount>\n<devicesDigest>\n<issuedAtMs>`,
+  où `previousListDigest = b64url(SHA-256(chaîne de la liste précédente))`,
+  ou `-` pour la version 1.
+- JSON : `{"list": "<chaîne>", "signatureB64": "…", "devices": ["<ligne>", …]}`.
+- Un appareil révoqué est absent de la liste suivante.
+- Le serveur accepte une liste si `version` vaut la courante + 1 et si
+  `previousListDigest` est le condensat de la courante.
+
+### D.4 Changement de membre (`membership-change-v1`)
+
+- Chaîne signée par l'appareil de l'auteur :
+  `SQ-E2EE-V2-MEMBERSHIP\n1\n<conversationId>\n<changeNumber>\n<action>\n<targetUserId>\n<actorUserId>\n<actorDeviceId>\n<previousChangeDigest>\n<createdAtMs>`.
+- **`action`** ∈ `ADD`, `REMOVE`, `LEAVE`, `ROLE_ADMIN`, `ROLE_MEMBER`,
+  `EXCLUDE_WEB_ON`, `EXCLUDE_WEB_OFF`. Pour les deux dernières, `targetUserId`
+  vaut `-`.
+- **Chaînage** :
+  - `changeNumber` commence à 1 et croît de 1 ;
+  - `previousChangeDigest` = `b64url(SHA-256(chaîne précédente))`, ou `-`
+    pour le premier changement.
+- **Création** : le créateur signe un `ADD` par membre, lui compris. Dans un
+  groupe, il signe ensuite un `ROLE_ADMIN` pour lui.
+- **Autorisations**, vérifiées par les clients :
+  - dans un groupe, `ADD`, `REMOVE`, `ROLE_*` et `EXCLUDE_WEB_*` sont
+    réservés à un administrateur ;
+  - en tête-à-tête, `EXCLUDE_WEB_*` est ouvert aux deux membres ;
+  - `LEAVE` est fait par la personne elle-même.
+- JSON : `{"change": "<chaîne>", "signatureB64": "…"}`.
+- Le serveur garde les changements en ajout seul, en comparaison-échange sur
+  `changeNumber`.
+
+### D.5 Document de capacités (`device-capabilities-v1`)
+
+- Clés exactes, en chaînes ou tableaux de chaînes :
+  - `schema` = `signalquest.e2ee-capabilities`, `version` = `1` ;
+  - `userId`, `deviceId`, `sequence` (≥ 1), `issuedAtMs` ;
+  - `envelopeVersions` et `payloadVersions` : décimaux, triés, sans doublon ;
+  - `kinds` : noms de `kind`, triés, sans doublon ;
+  - `features` : parmi `blobs`, `calls`, `liveLocation`, `polls`,
+    `reactions` et `voice`, triés, sans doublon.
+- Chaîne signée par la clé de signature de l'appareil :
+  `SQ-E2EE-V2-DEVICE-CAPABILITIES\n1\n<b64url(SHA-256(document))>`.
+- JSON : `{"document": "<JSON canonique>", "signatureB64": "…"}`.
+
+### D.6 Manifeste d'époque (`epoch-manifest-v1`)
+
+Format au §3.5. JSON :
+`{"manifest": "<chaîne>", "signatureB64": "…", "recipients": ["<ligne>", …]}`.
+
+### D.7 Enveloppe de message v2 (`message-envelope-v2`)
+
+Mêmes routes et même type de contenu que la v1 (A.4), avec
+`envelopeVersion` = 2.
+
+- **Clair** : `fk (32 octets) ‖ charge ‖ 0x80 ‖ 0x00…`. La charge est le JSON
+  canonique de D.8, de 256 Kio au plus.
+- **Bourrage** : soit `L = 32 + longueur(charge) + 1`. Si `L` ≤ 4 096, la
+  longueur bourrée est le multiple de 256 supérieur ou égal à `L`. Sinon,
+  c'est la puissance de deux supérieure ou égale à `L`.
+- **`frankTag`** : §11, calculé sur la charge seule, sans `fk` ni bourrage.
+- **Sel** : `SHA-256("SQ-E2EE-V2-MESSAGE-SALT\n2\n<conv>\n<epochNumber>\n<senderDeviceId>\n<clientRequestId>")`.
+- **Clé** : HKDF-SHA256(cléÉpoque, sel, info
+  `signalquest-e2ee-v2-message-key-v2`, 32 octets).
+- **AAD** : `SQ-E2EE-V2-MESSAGE-ENVELOPE\n2\n<conv>\n<epochNumber>\n<senderDeviceId>\n<clientRequestId>\n<counter>\nAES_256_GCM_HKDF_SHA256\napplication/vnd.signalquest.e2ee-envelope+json\n<engagementB64>\n<ttlSeconds>\n<condensatBlobs>\n<frankTagB64>`.
+- **Signature de l'appareil** sur :
+  `SQ-E2EE-V2-MESSAGE-SIGNATURE\n2\n<conv>\n<epochNumber>\n<senderDeviceId>\n<clientRequestId>\n<counter>\nAES_256_GCM_HKDF_SHA256\napplication/vnd.signalquest.e2ee-envelope+json\n<engagementB64>\n<ttlSeconds>\n<condensatBlobs>\n<frankTagB64>\n<nonceB64>\n<aadB64>\n<ciphertextB64>`.
+- **Champs transportés** en plus de ceux de la v1 : `counter` (décimal) et
+  `frankTagB64`.
+- **Réception**, dans cet ordre :
+  1. certificat et signature ;
+  2. déchiffrement ;
+  3. bourrage : le dernier `0x80` n'est suivi que de `0x00`, sinon rejet ;
+  4. `fk` ;
+  5. `frankTag` recalculé ;
+  6. charge analysée strictement ;
+  7. `counter` de la charge égal à celui de l'AAD.
+
+### D.8 Charge v2, texte (`content-payload-v2`)
+
+- Racine, clés exactes :
+  - `schema` = `signalquest.e2ee-content`, `version` = `2`, `kind` ;
+  - `sentAtMs`, `counter` ;
+  - `replyToRef` (`messageRef` ou `null`) ;
+  - `mentions` (100 `userId` au plus) ;
+  - `body`.
+- `kind` du jalon A, et leur `body` :
+  - `TEXT` : `text` (1 à 65 536 octets UTF-8) ;
+  - `EDIT` : `targetRef`, `text` ;
+  - `DELETE` : `targetRef`.
+- Les autres `kind` (médias, vocal, réactions, sondages, positions, cartes)
+  arrivent au jalon B, chacun avec son vecteur.
+- `messageRef` : §4.2.
+
+### D.9 `serverTag`
+
+Format au §11. Le vecteur `franking-v1` donne `fk`, la charge, `frankTag`,
+`Ks`, les champs et `serverTag`.
+
+### D.10 Signalement (`report-v1`)
+
+- **Partie en clair**, JSON canonique, clés exactes :
+  - `schema` = `signalquest.e2ee-report`, `version` = `1` ;
+  - `reportId`, `conversationId` ;
+  - `reason` ∈ `SPAM`, `HARASSMENT`, `HATE`, `VIOLENCE`, `SEXUAL`, `ILLEGAL`,
+    `OTHER` ;
+  - `items` : 1 à 50, dans l'ordre des messages, chacun avec `envelopeId`,
+    `frankTagB64`, `serverTagB64` et `blobIds`.
+- **Partie scellée**, clair en JSON canonique :
+  - `schema` = `signalquest.e2ee-report-sealed`, `version` = `1` ;
+  - `items` dans le même ordre, chacun avec `envelopeId`, `payloadB64`,
+    `fkB64` et `mediaKeys` (liste de `{blobId, mediaKeyB64}`).
+- **HPKE** (RFC 9180), mode de base :
+  - suite `0x0010` (DHKEM P-256, HKDF-SHA256), `0x0001` (HKDF-SHA256),
+    `0x0002` (AES-256-GCM) ;
+  - `info` = `"SQ-E2EE-V2-REPORT\n1\n" ‖ b64url(SHA-256(partie en clair))` ;
+  - AAD vide, un seul `Seal`.
+- **JSON transporté** :
+  `{"clear": "<JSON canonique>", "encB64": "…", "sealedB64": "…", "moderationKeyId": "…"}`.
+- La clé publique de modération et son `moderationKeyId` sont embarqués dans
+  les apps. Changer de clé demande une mise à jour de l'app.
+
+### D.11 Appel
+
+- **`e2eeV2`** :
+  `{"descriptor": "<chaîne du §10.1>", "signatureB64": "…", "callerDeviceId": "…"}`.
+  `callNonceB64` : 32 octets en b64 standard.
+- **Preuve de jonction** : message du canal de données chiffré, de sujet
+  `sq.e2ee.join`. Son contenu est le JSON canonique
+  `{"proof": "<chaîne du §10.4>", "signatureB64": "…"}`.
+
+### D.12 Numéro de sécurité (`safety-number-v1`)
+
+- **Par utilisateur** :
+  - `h = SHA-512("SQ-E2EE-V2-SAFETY\n1\n" ‖ uik ‖ userId)`, puis 5 200 fois
+    `h = SHA-512(h ‖ uik)`. `uik` est la clé publique X9.63 brute, `userId`
+    est en UTF-8 ;
+  - on prend les 30 premiers octets, en 6 blocs de 5 octets ;
+  - chaque bloc, lu comme un entier big-endian modulo 100 000, donne 5
+    chiffres, avec des zéros à gauche ;
+  - soit 30 chiffres.
+- **Numéro affiché** pour deux personnes : leurs deux suites de 30 chiffres,
+  dans l'ordre des `userId` (octets UTF-8). Soit 60 chiffres en 12 groupes
+  de 5.
+- **QR** : `SQSN1|` suivi des 60 chiffres.
+
+### D.13 Approbation v2 (`device-approval-v2`)
+
+- **QR** : `SQE2EE2|2|<approvalId>|<pendingDeviceId>|<empreinte>|<challengeB64Url>|<expiresAtMs>`.
+  L'approbateur compare `<empreinte>` à celle du certificat en attente.
+- **Code SAS** (approbation par notification) : on prend
+  `SHA-256("SQ-E2EE-V2-APPROVAL-SAS\n1\n<userId>\n<pendingDeviceId>\n<empreinte>\n<approvalId>\n<challengeB64Url>")`.
+  Ses 4 premiers octets, en entier big-endian modulo 1 000 000, donnent un
+  code de 6 chiffres.
+- **Code de proximité** : celui de `device-approval-v1`, auquel on joint
+  l'empreinte complète.
+
+### D.14 Réinitialisation d'identité (`identity-reset-v1`)
+
+- Chaîne signée par la **nouvelle** UIK :
+  `SQ-E2EE-V2-IDENTITY-RESET\n1\n<userId>\n<newUikB64>\n<previousUikFingerprint>\n<requestedAtMs>\n<effectiveAtMs>`.
+  - `effectiveAtMs` = `requestedAtMs` + 72 heures ;
+  - `previousUikFingerprint` = `b64url(SHA-256(ancienne UIK))`, ou `-` s'il
+    n'y en avait pas.
+- **Opposition** : avant `effectiveAtMs`, un appareil certifié de l'ancienne
+  identité peut s'y opposer. Il signe, avec sa clé d'appareil :
+  `SQ-E2EE-V2-IDENTITY-RESET-OBJECTION\n1\n<userId>\n<newUikB64>\n<objectingDeviceId>\n<objectedAtMs>`.
+
+### D.15 Contenu des vecteurs
+
+Chaque vecteur donne ses entrées, avec les clés et les aléas fixés pour être
+reproductible, ses valeurs intermédiaires et ses sorties. Il comporte aussi
+une section `negative` : au moins un cas par règle de rejet, avec le motif
+attendu.
+
+Le générateur de référence est côté iOS (COM-0) ; chaque plateforme rejoue les
+vecteurs dans les deux sens. L'ECDSA étant aléatoire, une signature produite
+par une autre plateforme n'est pas identique à l'octet. On vérifie sa
+validité et sa forme low-S, jamais son égalité.
