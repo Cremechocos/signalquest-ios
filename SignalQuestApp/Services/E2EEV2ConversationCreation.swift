@@ -11,6 +11,7 @@ struct E2EEV2EpochProposal: Sendable {
     let manifest: E2EEV2SignedString
     let recipients: [String]
     let envelopes: [E2EEV2SignedEpochEnvelope]
+    let createdAtMs: Int64
 
     /// `{epochNumber, previousEpochNumber, manifest, envelopes}` (E.2), entiers
     /// en chaînes (D.0).
@@ -100,7 +101,7 @@ enum E2EEV2EpochProposals {
         }
         return E2EEV2EpochProposal(
             conversationId: conversationId, epochNumber: epochNumber, keyCommitmentB64: commitment,
-            manifest: signed, recipients: lines, envelopes: envelopes
+            manifest: signed, recipients: lines, envelopes: envelopes, createdAtMs: nowMs
         )
     }
 }
@@ -329,6 +330,18 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
                     manifestDigest: E2EEV2Canonical.sha256B64URL(Data(creation.epoch.manifest.canonical.utf8)),
                     membershipChangeNumber: creation.genesis.changeNumber,
                     recordedAtMs: Int64(now().timeIntervalSince1970 * 1_000)
+                ),
+                ownerNamespace: ownerNamespace
+            )
+            try stateStore.recordCurrentEpoch(
+                .init(
+                    conversationId: creation.conversationId, epochNumber: 1,
+                    membershipChangeNumber: creation.genesis.changeNumber,
+                    memberIds: creation.genesis.members.sorted(),
+                    recipientsDigest: E2EEV2Canonical.listDigest(
+                        tag: E2EEV2EpochManifest.recipientsTag, lines: creation.epoch.recipients
+                    ),
+                    excludesWeb: creation.genesis.excludesWeb, createdAtMs: creation.epoch.createdAtMs
                 ),
                 ownerNamespace: ownerNamespace
             )
