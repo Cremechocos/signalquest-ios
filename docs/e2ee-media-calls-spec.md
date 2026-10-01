@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.7**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.8**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -149,6 +149,13 @@
 >   « expéditeur seulement », dont les limites sont écrites ; lecture
 >   d'enveloppe réservée aux membres, sans effet de bord, jamais mise en
 >   cache (§2.6, E.3).
+> - v0.4.8 (01/10/2026) : accord du serveur sur la v0.4.6, la v0.4.7 et E.3,
+>   avec ses précisions : relais du SAS v3 à usage unique, navigateurs qui ne
+>   reçoivent ni n'émettent rien de la chaîne de confiance, bundle de
+>   récupération vérifié par le serveur, acceptation d'une époque et
+>   changement d'appartenance sérialisés, genèse idempotente à l'octet,
+>   portée du compteur et séquences de la liste (§2.7, §2.8, D.13, E.0 à
+>   E.3). Aucun vecteur ne change.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -432,7 +439,10 @@ conversations chiffrées **sur demande seulement**.
   `SQ-E2EE-V2-RECOVERY-BUNDLE\n1\n<userId>\n<bundleHash>\n<recoveryPublicIdentityKeyB64>`.
   Un appareil qui n'a pas créé le bundle vérifie cette signature avant
   d'envelopper. En attendant ce format, seul l'appareil qui a créé le bundle
-  sauvegarde l'historique.
+  sauvegarde l'historique. Le serveur garde le bundle tel quel et vérifie
+  aussi cette signature contre l'UIK publique enregistrée, en défense en
+  profondeur (`400 E2EE_RECOVERY_SIGNATURE_INVALID`) ; les clients ne s'y
+  fient jamais.
 - La clé de récupération ouvre tout l'historique **et** permet d'approuver un
   appareil. Son usage déclenche la même alerte qu'un nouvel appareil, puis une
   nouvelle clé de récupération est proposée.
@@ -2085,6 +2095,14 @@ Format au §11. Le vecteur `franking-v1` donne `fk`, la charge, `frankTag`,
   vaut un encodage par longueur. Une seule tentative : écart, révélation
   absente ou demande expirée ⇒ abandon, puis nouvelle demande. L'approbateur
   n'affiche le code qu'après avoir vérifié la mise en gage.
+
+  Relais du serveur (v0.4.8) : la mise en gage est fixée à la création de la
+  demande, puis immuable ; `nA` n'est accepté qu'une fois, par une requête
+  signée d'un appareil approuvé du même compte, jamais d'un navigateur ;
+  `nP` n'est accepté qu'une fois, et seulement après `nA` ; chaque partie
+  relit le tout par `GET device-approvals/{id}`. Une demande qui a révélé
+  `nP` sans être approuvée est terminale : une nouvelle tentative crée une
+  nouvelle demande.
 - **Code de proximité v2** : 16 caractères en base32 Crockford (80 bits), tirés
   des 10 premiers octets de
   `SHA-256("SQ-E2EE-V2-PROXIMITY\n1\n<userId>\n<approvalId>\n<pendingDeviceId>\n<platform>\n<empreinte>\n<challengeB64Url>")`.
@@ -2160,6 +2178,12 @@ version publiée qui ouvre les verrous.
     jusqu'à l'UIK ;
   - `E2EE_CERT_PLATFORM_MISMATCH` (409) : la plateforme du certificat n'est
     pas exactement celle du descripteur en attente (D.13) ;
+  - `E2EE_UIK_WRAP_FORBIDDEN_FOR_WEB` (409) : approbation d'un navigateur qui
+    porte un `uikWrap` (§2.7) ;
+  - `E2EE_WEB_DEVICE_NOT_ALLOWED` (403) : approbation, révocation ou
+    recertification émise par un navigateur (§2.7) ;
+  - `E2EE_RECOVERY_SIGNATURE_INVALID` (400) : bundle de récupération dont la
+    signature ne se vérifie pas contre l'UIK enregistrée (§2.8) ;
   - `CONVERSATION_ID_TAKEN` et `CALL_ID_TAKEN` (409) : identifiant choisi par
     le client déjà utilisé ;
   - `CALL_NONCE_TAKEN` (409) : `callNonce` déjà enregistré (§10.1) ;
@@ -2201,9 +2225,13 @@ version publiée qui ouvre les verrous.
 - **`POST /api/e2ee/v2/device-approvals/{id}/approve`**, étendu. Corps :
   - `certificate` du nouvel appareil ;
   - `deviceList` suivante ;
-  - `uikWrap` : l'objet de D.1, avec toutes ses clés.
+  - `uikWrap` : l'objet de D.1, avec toutes ses clés ; jamais pour un
+    navigateur (`platform` `web`), refusé sinon
+    (`409 E2EE_UIK_WRAP_FORBIDDEN_FOR_WEB`).
 
-  Le serveur enregistre les trois dans une seule transaction, ou rien.
+  Le serveur enregistre les trois dans une seule transaction, ou rien. Un
+  navigateur n'approuve, ne révoque ni ne recertifie aucun appareil
+  (`403 E2EE_WEB_DEVICE_NOT_ALLOWED`).
 - **`PUT /api/e2ee/v2/devices/{deviceId}/certificate`**, rotation de la clé
   d'accord (`keyVersion` + 1). Corps : `{certificate, deviceList}`.
 - **`POST /api/e2ee/v2/devices/{deviceId}/revoke`**, étendu. Corps :
@@ -2243,8 +2271,11 @@ version publiée qui ouvre les verrous.
   Comme pour toutes les réponses proposées ici, JSON strict (clés exactes,
   sans doublon) et entiers en chaînes décimales (D.0).
   Le client ne garde la clé de l'époque 1 et l'état « v2 » qu'à réception
-  de ce reçu, exact (§3.1). Sur `409 CONVERSATION_ID_TAKEN`, rien n'est
-  gardé ; une nouvelle tentative tire un autre identifiant.
+  de ce reçu, exact (§3.1). La genèse est idempotente à l'octet (v0.4.8) :
+  le même corps rend le même reçu, à la création comme à la migration, et
+  un reçu perdu se relit en renvoyant la même requête. Sur
+  `409 CONVERSATION_ID_TAKEN`, pour un autre corps, rien n'est gardé ; une
+  nouvelle tentative tire un autre identifiant.
 - **`POST /api/e2ee/v2/conversations/{id}/genesis`**, migration d'une
   conversation chiffrée v1 (§14.2), proposée par iOS. Corps :
   `{membership, epoch}`, de même forme qu'à la création. Le serveur refuse
@@ -2263,7 +2294,9 @@ version publiée qui ouvre les verrous.
   taille d'un corps d'erreur ; il vérifie l'époque acceptée comme un
   destinataire avant de l'adopter. Si le manifeste repose sur un état
   d'appartenance qui n'est plus le dernier : 409 `E2EE_MEMBERSHIP_STALE`,
-  avec l'état courant.
+  avec l'état courant. Le serveur sérialise par conversation l'acceptation
+  d'une époque et l'ajout d'un changement d'appartenance (v0.4.8) : aucun
+  changement ne passe entre son contrôle et son écriture.
 - **`GET /api/e2ee/v2/conversations/{id}/epochs/current`**, étendu.
   Réponse proposée par iOS :
   `{conversationId, epoch: {id, epochNumber, status, createdAt}, manifest: {manifest, signatureB64, recipients}, envelope}`,
@@ -2316,7 +2349,9 @@ version publiée qui ouvre les verrous.
     accusé, même si l'époque a tourné depuis ; une autre enveloppe pour une
     identité déjà acceptée est refusée (`409 E2EE_MESSAGE_CONFLICT`). Un
     couple (appareil, compteur) déjà pris par une autre identité est refusé
-    de même. Une enveloppe refusée ne compte pas ;
+    de même. Une enveloppe refusée ne compte pas. Le compteur est tenu par
+    (conversation, appareil), toutes époques confondues : aucune des deux
+    contraintes d'unicité ne porte l'époque (v0.4.8) ;
   - réponse : `{envelopeId, clientRequestId, serverTagB64, serverTimeMs, keyId}`,
     entiers en chaînes (§11) ;
   - **côté client** : l'enveloppe préparée est gardée avant le premier envoi
@@ -2349,7 +2384,11 @@ version publiée qui ouvre les verrous.
     `{envelopeId, sequence, senderUserId, senderDeviceId, envelope, serverTagB64, serverTimeMs, keyId}`,
     entiers en chaînes, `envelope` étant l'enveloppe transportée.
   - `after` est la séquence serveur du dernier message lu, `0` pour partir
-    du début. Séquences du serveur croissantes, toutes après `after`.
+    du début. Séquences du serveur croissantes, toutes après `after`. Un
+    trou est permis (message refusé ou retiré) ; jamais une séquence qui
+    deviendrait visible après une plus haute déjà servie, que le curseur
+    sauterait : le serveur l'attribue sous un verrou par conversation tenu
+    jusqu'à l'écriture (v0.4.8).
   - Une page tient en 512 Kio : le serveur s'arrête avant, avec `hasMore` à
     vrai. `hasMore` peut donc valoir vrai avec moins de `limit` messages ; le
     client continue tant qu'il vaut vrai. Une page vide n'annonce jamais de
