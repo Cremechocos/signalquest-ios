@@ -8,7 +8,7 @@ import UserNotifications
 /// une nuisance, au pire un danger. Personne ne doit découvrir cette
 /// fonctionnalité en sursautant au volant.
 enum CarPlayAlertSettings {
-    static let coverageAlertsKey = "sq.carplay.coverageAlerts"
+    static let coverageAlertsKey = "sq_carplay_coverageAlerts"
 
     static var coverageAlertsEnabled: Bool {
         UserDefaults.standard.bool(forKey: coverageAlertsKey)

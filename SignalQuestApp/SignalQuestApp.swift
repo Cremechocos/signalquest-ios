@@ -17,6 +17,9 @@ struct SignalQuestApp: App {
     @AppStorage(SQOledPalette.storageKey) private var pureBlack = false
 
     init() {
+        // Avant toute vue : les clés observées par @AppStorage perdent leur
+        // point, sans quoi toute écriture recalculait l'arbre entier (TRX-39).
+        SQObservedDefaultsKeys.migrate()
         MapBackdrop.migrateLegacyPreference()
         if AppEnvironment.resetsAuthOnLaunch {
             UserDefaults.standard.set(false, forKey: RootView.guestPreferenceKey)
@@ -25,7 +28,7 @@ struct SignalQuestApp: App {
         // ouverture, même après les autres parcours de la même suite. Ce flag
         // est éliminé des binaires Release par AppEnvironment.
         if AppEnvironment.resetsOnboardingOnLaunch {
-            UserDefaults.standard.set(false, forKey: "sq.hasCompletedOnboarding")
+            UserDefaults.standard.set(false, forKey: OnboardingEntryState.completionKey)
         }
         // Le graphe vient du holder plutôt que d'être construit ici : une scène
         // CarPlay peut se connecter AVANT cette fenêtre (app lancée en
@@ -114,7 +117,7 @@ struct AppRootView: View {
     @Environment(\.locale) private var locale
     @State private var passwordResetRoute: PasswordResetRoute?
     @State private var pendingEmailVerificationRefresh = false
-    @AppStorage("sq.hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage(OnboardingEntryState.completionKey) private var hasCompletedOnboarding = false
     /// Miroir observable de l'unité de distance. Détenu ICI, là où se fait
     /// l'injection : les vues s'y abonnent pour se rafraîchir au changement,
     /// les formateurs purs (`SQUnits`) lisent le `UserDefaults` derrière.
@@ -370,7 +373,7 @@ struct AppRootView: View {
 }
 
 struct RootView: View {
-    static let guestPreferenceKey = "sq.browseAsGuest"
+    nonisolated static let guestPreferenceKey = "sq_browseAsGuest"
     let onboardingSceneID: UUID
     let hasPriorityAuthRoute: Bool
     @AppStorage(RootView.guestPreferenceKey) private var guestBrowsing = false

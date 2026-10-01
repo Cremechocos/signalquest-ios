@@ -5,7 +5,7 @@ import SwiftUI
 /// Il ne remplace ni le thème ni les couleurs métier : il demande au système
 /// son contraste renforcé, une graisse plus lisible et des contrôles larges.
 enum SQFieldMode {
-    static let storageKey = "sq.fieldMode.enabled"
+    static let storageKey = "sq_fieldMode_enabled"
 
     /// Lu par les couleurs dynamiques UIKit. `@AppStorage` dans la racine
     /// provoque la recomposition ; le provider choisit alors les encres terrain.

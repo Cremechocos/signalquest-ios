@@ -6,7 +6,7 @@ import LocalAuthentication
 /// Face ID / Touch ID (SecAccessControl `.biometryCurrentSet`) pour déverrouiller
 /// la messagerie chiffrée sans le retaper. 100 % local, aucune dépendance backend.
 enum E2EEBiometric {
-    static let enabledKey = "sq.security.e2eeBiometricEnabled"
+    static let enabledKey = "sq_security_e2eeBiometricEnabled"
     private static let service = "fr.signalquest.ios.e2ee.biometric"
     private static let account = "e2eePassword"
 

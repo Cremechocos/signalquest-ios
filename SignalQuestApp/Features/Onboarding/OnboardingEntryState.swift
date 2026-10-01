@@ -19,7 +19,7 @@ struct OnboardingEntryRequest: Codable, Equatable, Identifiable, Sendable {
 /// service GPS ou droit de lancer une mesure.
 @MainActor
 final class OnboardingEntryState: ObservableObject {
-    static let completionKey = "sq.hasCompletedOnboarding"
+    nonisolated static let completionKey = "sq_hasCompletedOnboarding"
     static let pendingKey = "sq.onboarding.pendingEntry.v1"
 
     enum Access: Equatable { case checking, loggedOut, twoFactor, offline, authenticated }

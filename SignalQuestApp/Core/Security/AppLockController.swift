@@ -4,11 +4,11 @@ import SwiftUI
 /// Partagées entre `AppLockController` (lecture) et `SettingsView` (édition via
 /// `@AppStorage`).
 enum AppLockSettings {
-    static let enabledKey = "sq.security.appLockEnabled"
+    static let enabledKey = "sq_security_appLockEnabled"
     /// Inactivité (s) avant verrouillage. 0 = immédiat (verrouille dès la mise en arrière-plan).
-    static let lockGraceKey = "sq.security.appLockGraceSeconds"
+    static let lockGraceKey = "sq_security_appLockGraceSeconds"
     /// Inactivité (s) avant déconnexion complète. 0 = jamais.
-    static let autoLogoutKey = "sq.security.autoLogoutSeconds"
+    static let autoLogoutKey = "sq_security_autoLogoutSeconds"
 
     static var enabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
     static var lockGrace: TimeInterval { UserDefaults.standard.double(forKey: lockGraceKey) }
