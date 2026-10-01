@@ -134,7 +134,7 @@
 >   séquences bornés à 2⁵³ − 1, rechiffrement local d'un envoi dont l'époque
 >   a été remplacée, expiration des éphémères à l'heure signée de l'émetteur,
 >   membres partis acceptés seulement en vol, rotation dès un retrait ou un
->   départ, identités gardées à vie, époques sautées relues, signature
+>   départ connu, identités gardées à vie, époques sautées relues, signature
 >   vérifiée avant toute question d'époque, taille du signalement (§3.3, §3.4,
 >   D.7, D.8, D.10, E.2, E.3).
 >
@@ -435,8 +435,9 @@ Format de l'enveloppe : annexe A.3. Vecteur : `epoch-envelope-v1.json`.
   actuels, le client crée une époque avant tout envoi.
 - Déclencheurs :
   - appareil certifié ajouté, révoqué ou mis à l'écart (§12) ;
-  - membre ajouté ou retiré. Celui qui retire un membre, ou qui part, crée
-    l'époque suivante aussitôt, sans attendre un envoi ;
+  - membre ajouté ou retiré. Celui qui retire un membre crée l'époque
+    suivante aussitôt, sans attendre un envoi ; après un départ, le premier
+    membre restant qui l'apprend le fait ;
   - réglage « exclure les navigateurs » modifié ;
   - réinitialisation d'identité, usage de la récupération ;
   - au plus tard, 30 jours ou 10 000 messages par époque. Les 30 jours se
