@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.6**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.7**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -106,6 +106,15 @@
 >   aléatoires après chaque jonction, états des chiffreurs gardés à une
 >   reconnexion rapide (§10.1, §10.3, §10.4). Accord des sessions Android et
 >   web ; avis du serveur attendu.
+> - v0.4.7 (01/10/2026) : le manifeste d'époque passe au format 2 et engage
+>   l'état d'appartenance sur lequel repose sa liste de destinataires (§3.5,
+>   D.4, D.6). Il fixe ainsi la fin de la genèse, dont les règles
+>   d'autorisation ont besoin. Un seul manifeste d'époque 1 par conversation,
+>   synchronisation de la chaîne avant tout refus, numéro qui ne recule pas,
+>   destinataires membres de l'état, `409 E2EE_MEMBERSHIP_STALE` pour une
+>   époque fondée sur un état dépassé, genèse de migration dans la confiance
+>   v1 (§14). Précisions d'Android et du web ; avis du serveur attendu.
+>   Vecteurs `epoch-manifest-v2` et `epoch-binding-v1`.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -423,20 +432,55 @@ Un client rejette un message :
 
 ### 3.5 Manifeste d'époque
 
-Le manifeste permet à chaque destinataire de vérifier qui reçoit l'époque. Il
-permet aussi à un appareil qui n'a pas reçu l'époque, par exemple un nouvel
-appareil, de constater qu'une conversation est v2 (§12).
+Le manifeste permet à chaque destinataire de vérifier qui reçoit l'époque, et
+sur quel état d'appartenance repose cette liste. Il permet aussi à un appareil
+qui n'a pas reçu l'époque, par exemple un nouvel appareil, de constater qu'une
+conversation est v2 (§12).
 
 - Ligne de destinataire : `<userId>\n<deviceId>\n<platform>\n<empreinte>`, où
   `empreinte = b64url(SHA-256(identityKey ‖ signingKey))` (§2.3). Lignes triées
-  par `userId` puis `deviceId`, dans l'ordre des octets UTF-8.
+  par `userId` puis `deviceId`, dans l'ordre des octets UTF-8. Lecture
+  stricte : quatre champs, plateforme de l'ensemble fermé (D.2), empreinte au
+  format d'un condensat, un appareil par ligne, de 1 à 500 lignes.
 - `recipientsDigest = b64url(SHA-256("SQ-E2EE-V2-EPOCH-RECIPIENTS\n1" ‖ ("\n" ‖ ligne)*))`.
-- Chaîne signée par l'appareil créateur :
-  `SQ-E2EE-V2-EPOCH-MANIFEST\n1\n<conversationId>\n<epochNumber>\n<creatorUserId>\n<creatorDeviceId>\n<keyCommitmentB64>\n<recipientCount>\n<recipientsDigest>\n<excludesWeb>\n<createdAtMs>`,
-  où `excludesWeb` vaut `0` ou `1`.
+- Chaîne signée par l'appareil créateur, format 2 (v0.4.7) :
+  `SQ-E2EE-V2-EPOCH-MANIFEST\n2\n<conversationId>\n<epochNumber>\n<creatorUserId>\n<creatorDeviceId>\n<keyCommitmentB64>\n<recipientCount>\n<recipientsDigest>\n<excludesWeb>\n<membershipChangeNumber>\n<membershipDigest>\n<createdAtMs>`,
+  où `excludesWeb` vaut `0` ou `1`. Le format 1, sans état d'appartenance,
+  n'a jamais servi à l'exécution : il est retiré. Toute autre version est
+  refusée.
+- **État d'appartenance** (D.4) : `membershipChangeNumber` (au moins 1) est
+  le dernier changement pris en compte. `membershipDigest` est le
+  `previousChangeDigest` qu'aurait le changement suivant :
+  `b64url(SHA-256(octets UTF-8 de sa chaîne))`, sans saut de ligne final ni
+  remplissage (D.0). Les changements étant chaînés, ce condensat engage tout
+  le préfixe.
+- **Époque 1** : la genèse est exactement les changements 1 à
+  `membershipChangeNumber`, de la forme stricte de D.4. Ils sont tous signés
+  par `creatorDeviceId`, et `creatorUserId` fait partie des membres.
+  - Un appareil mémorise le premier manifeste d'époque 1 vérifié pour une
+    conversation, et refuse tout autre (§12).
+  - Sans manifeste d'époque 1, aucun changement n'est traité comme genèse :
+    le client échoue fermé. Le serveur sert ce manifeste à tout membre,
+    quelle que soit l'époque de son arrivée.
+- **Vérification par chaque destinataire** :
+  - il relit la chaîne d'appartenance jusqu'à `membershipChangeNumber`, après
+    avoir synchronisé une chaîne locale plus courte, puis compare le
+    condensat : un écart est refusé ;
+  - le numéro ne recule jamais d'une époque acceptée à la suivante ; il peut
+    rester égal (rotation d'appareil, 30 jours) ;
+  - le créateur et chaque destinataire sont membres à cet état ;
+  - `excludesWeb` égale l'état de la chaîne à ce numéro, et le manifeste n'a
+    aucune ligne `web` quand il vaut `1` ;
+  - un appareil certifié d'un membre absent de la liste est signalé, pas
+    refusé : sa certification a pu suivre la création de l'époque.
 - Le serveur stocke le manifeste, sa signature et la liste des lignes. Il les
   sert avec l'époque, y compris à un appareil qui n'en est pas destinataire.
-- Vecteur : `epoch-manifest-v1`.
+  Dans la transaction qui accepte une époque, il refuse un
+  `membershipChangeNumber` qui n'est pas le dernier changement accepté :
+  `409 E2EE_MEMBERSHIP_STALE`, avec l'état courant. Sinon, un membre tout
+  juste retiré recevrait encore la clé.
+- Vecteurs : `epoch-manifest-v2` (format) et `epoch-binding-v1` (liaison à
+  la chaîne, cas négatifs compris).
 
 ---
 
@@ -1041,6 +1085,9 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
      propriétaire ou administrateur v1 : « propriétaire » disparaît en v2.
    - Le serveur refuse une genèse qui ne reproduit pas exactement les membres
      et les administrateurs v1.
+   - Un client ne peut pas vérifier les administrateurs v1 : la genèse de
+     migration hérite de la confiance v1. L'app l'affiche en message système
+     vérifié : « X a migré la conversation ; administrateurs : … ».
 3. La recopie de l'historique en v2 est facultative. Elle est faite par un
    appareil (vecteur `history-migration-v1.json`), jamais par le serveur. Les
    messages recopiés portent « importé par <appareil> » et n'héritent d'aucune
@@ -1107,7 +1154,8 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
   - identités : `device-cert-v1` (avec `keyVersion`), `device-list-v1`,
     `device-capabilities-v1`, `uik-wrap-v1`, `device-approval-v2`,
     `safety-number-v1`, `identity-reset-v1` ;
-  - groupes et époques : `membership-change-v1`, `epoch-manifest-v1`,
+  - groupes et époques : `membership-change-v1`, `epoch-manifest-v2`,
+    `epoch-binding-v1`,
     `capability-intersection-v1` ;
   - messages : `message-ref-v1`, `message-envelope-v2` (compteur, bourrage,
     franking), `content-payload-v2` ;
@@ -1422,7 +1470,8 @@ serveur porte aussi le web.
 
 - **COM-0** Vecteurs du jalon A :
   - formats à publier dans `contracts/e2ee-v2/` : `device-cert-v1`,
-    `device-list-v1`, `device-capabilities-v1`, `epoch-manifest-v1`,
+    `device-list-v1`, `device-capabilities-v1`, `epoch-manifest-v2`,
+    `epoch-binding-v1`,
     `membership-change-v1`, `message-ref-v1`, `message-envelope-v2`,
     `content-payload-v2` (texte), `franking-v1`, `report-v1`,
     `call-descriptor-v1`, `call-frame-key-v2`, `call-join-proof-v1`,
@@ -1665,11 +1714,28 @@ certificat et la liste, sans `uikWrap` (§2.7).
     pour le premier changement.
 - **Création** : le créateur signe un `ADD` par membre, lui compris. Dans un
   groupe, il signe ensuite un `ROLE_ADMIN` pour lui.
+- **Genèse** (v0.4.7) : les changements 1 à `membershipChangeNumber` du
+  manifeste de l'époque 1 (§3.5), signés par un même appareil, dans cet
+  ordre :
+  - un `ADD` par membre, auteur compris, dans l'ordre des `userId` (octets
+    UTF-8) ;
+  - dans un groupe, au moins un `ROLE_ADMIN`, dans le même ordre, chacun
+    visant un membre ajouté ; aucun en tête-à-tête, qui a exactement deux
+    membres ;
+  - éventuellement, un `EXCLUDE_WEB_ON` final, qui exclut les navigateurs dès
+    l'époque 1.
+
+  La genèse échappe aux règles des administrateurs ; tout changement suivant
+  les respecte. Un vérificateur ne distingue pas création et migration : il
+  n'impose que cette forme. À la création, le client créateur et le serveur
+  imposent en plus que l'auteur figure parmi les `ROLE_ADMIN`.
 - **Autorisations**, vérifiées par les clients :
   - dans un groupe, `ADD`, `REMOVE`, `ROLE_*` et `EXCLUDE_WEB_*` sont
     réservés à un administrateur ;
   - en tête-à-tête, `EXCLUDE_WEB_*` est ouvert aux deux membres ;
-  - `LEAVE` est fait par la personne elle-même.
+  - `LEAVE` est fait par la personne elle-même ;
+  - l'auteur est membre à l'état précédent, et l'on part par `LEAVE`, jamais
+    en se visant par `REMOVE`.
 - JSON : `{"change": "<chaîne>", "signatureB64": "…"}`.
 - Le serveur garde les changements en ajout seul, en comparaison-échange sur
   `changeNumber`.
@@ -1687,10 +1753,13 @@ certificat et la liste, sans `uikWrap` (§2.7).
   `SQ-E2EE-V2-DEVICE-CAPABILITIES\n1\n<b64url(SHA-256(document))>`.
 - JSON : `{"document": "<JSON canonique>", "signatureB64": "…"}`.
 
-### D.6 Manifeste d'époque (`epoch-manifest-v1`)
+### D.6 Manifeste d'époque (`epoch-manifest-v2`)
 
-Format au §3.5. JSON :
+Format 2 au §3.5. JSON :
 `{"manifest": "<chaîne>", "signatureB64": "…", "recipients": ["<ligne>", …]}`.
+Vecteurs : `epoch-manifest-v2` pour le format, `epoch-binding-v1` pour la
+liaison à la chaîne d'appartenance (genèse, condensat, numéro qui recule,
+destinataire non membre, `excludesWeb` incohérent).
 
 ### D.7 Enveloppe de message v2 (`message-envelope-v2`)
 
@@ -1879,7 +1948,9 @@ version publiée qui ouvre les verrous.
     correspond pas ;
   - `E2EE_EPOCH_STALE` (409) : une autre époque a été acceptée, et la réponse
     la donne ;
-  - `E2EE_MEMBERSHIP_STALE` (409) : `changeNumber` n'est pas le suivant ;
+  - `E2EE_MEMBERSHIP_STALE` (409) : `changeNumber` n'est pas le suivant, ou
+    une époque repose sur un état d'appartenance qui n'est plus le dernier
+    (§3.5) ; la réponse donne l'état courant ;
   - `E2EE_CAPABILITY_MISSING` (409) : la conversation ne peut pas recevoir ce
     contenu (§12) ;
   - `E2EE_CERTIFICATE_INVALID` (422) : certificat qui ne se vérifie pas
@@ -1961,11 +2032,13 @@ version publiée qui ouvre les verrous.
   `e2eeProtocolVersion: 2`.
 - **`POST /api/e2ee/v2/conversations/{id}/epochs`**, étendu. Corps :
   - `previousEpochNumber`, `epochNumber` ;
-  - `manifest` ;
+  - `manifest`, au format 2 (§3.5) ;
   - `envelopes`.
 
   En cas de conflit : 409 `E2EE_EPOCH_STALE`, avec
-  `details.currentEpoch` au format de `epochs/current`.
+  `details.currentEpoch` au format de `epochs/current`. Si le manifeste
+  repose sur un état d'appartenance qui n'est plus le dernier : 409
+  `E2EE_MEMBERSHIP_STALE`, avec l'état courant.
 - **`GET /api/e2ee/v2/conversations/{id}/epochs/current`**, étendu. La
   réponse ajoute le manifeste signé, avec sa liste de destinataires.
 - **`POST /api/e2ee/v2/conversations/{id}/epochs/{epochNumber}/ack`**, accusé
