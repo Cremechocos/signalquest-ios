@@ -95,12 +95,118 @@ enum E2EEV2EpochContractV2 {
 
     /// Le manifeste ne porte que des chaînes et des tableaux : tout autre type
     /// devient `null`, que la lecture stricte refuse.
-    private static func json(_ value: Any?) -> E2EEV2JSON {
+    static func json(_ value: Any?) -> E2EEV2JSON {
         switch value {
         case let text as String: return .string(text)
         case let items as [Any]: return .array(items.map(json))
         case let object as [String: Any]: return .object(object.mapValues(json))
         default: return .null
+        }
+    }
+}
+
+/// Époque servie par le serveur, vérifiée comme un destinataire (§3.5) avant
+/// toute adoption : manifeste signé par un appareil certifié (clé lue dans
+/// l'annuaire), liaison à la chaîne relue, cet appareil parmi les
+/// destinataires, enveloppe signée par le créateur, engagement de la clé.
+enum E2EEV2EpochVerifierV2 {
+    enum Outcome {
+        case opened(epochKey: Data, manifest: E2EEV2EpochManifest, membership: E2EEV2MembershipState)
+        /// La chaîne locale n'atteint pas l'état sur lequel repose l'époque.
+        case needsMembershipSync
+        /// Époque valide, mais cet appareil n'en est pas destinataire.
+        case notRecipient
+        case invalid
+    }
+
+    static func open(
+        _ served: E2EEV2EpochContractV2.Current,
+        conversationId: String,
+        ownDeviceId: String,
+        previousMembershipChangeNumber: Int?,
+        devices: E2EEV2CertifiedDeviceSet,
+        membershipAt: (Int) -> E2EEV2MembershipState?,
+        unwrap: (E2EEV2EpochDelivery) throws -> Data
+    ) -> Outcome {
+        let fields = served.manifest.canonical.components(separatedBy: "\n")
+        guard fields.count == 13, let creatorKey = devices.signingKey(userId: fields[4], deviceId: fields[5]),
+              let manifest = try? E2EEV2EpochManifest.verify(
+                  served.manifest, recipients: served.recipients, creatorSigningKey: creatorKey
+              ),
+              manifest.conversationId == conversationId, manifest.epochNumber == served.accepted.epochNumber else {
+            return .invalid
+        }
+        guard let state = membershipAt(manifest.membershipChangeNumber) else { return .needsMembershipSync }
+        let context = E2EEV2EpochContext(
+            conversationId: conversationId, epochNumber: manifest.epochNumber,
+            senderDeviceId: manifest.creatorDeviceId, recipientDeviceId: ownDeviceId
+        )
+        do {
+            try E2EEV2EpochBinding.check(
+                manifest, recipients: served.recipients, state: state,
+                previousMembershipChangeNumber: previousMembershipChangeNumber
+            )
+            guard served.recipients.compactMap(E2EEV2EpochManifest.Recipient.parse).contains(where: { $0.deviceId == ownDeviceId })
+            else { return .notRecipient }
+            guard served.envelope.recipientDeviceId == ownDeviceId,
+                  let signature = Data(base64Encoded: served.envelope.signatureB64),
+                  E2EEV2LowS.verify(
+                      derSignature: signature,
+                      message: try E2EEV2EpochCrypto.signatureCanonical(
+                          context: context, keyCommitmentB64: manifest.keyCommitmentB64,
+                          envelope: served.envelope.cryptoEnvelope
+                      ),
+                      publicKey: creatorKey
+                  ) else {
+                return .invalid
+            }
+            let epochKey = try unwrap(E2EEV2EpochDelivery(
+                conversationId: conversationId, epochId: served.accepted.epochId,
+                epochNumber: manifest.epochNumber, keyCommitmentB64: manifest.keyCommitmentB64,
+                reason: "ROTATION", status: "active", createdAt: served.accepted.createdAt,
+                senderDeviceId: manifest.creatorDeviceId,
+                senderPublicSigningKeyB64: creatorKey.x963Representation.base64EncodedString(),
+                envelope: served.envelope
+            ))
+            return .opened(epochKey: epochKey, manifest: manifest, membership: state)
+        } catch {
+            return .invalid
+        }
+    }
+
+    /// Une époque ne sert qu'acceptée : clé gardée, puis époque courante avancée.
+    static func keep(
+        epochKey: Data,
+        accepted: E2EEV2EpochContractV2.Accepted,
+        conversationId: String,
+        commitment: String,
+        membership: E2EEV2MembershipState,
+        recipients: [String],
+        createdAtMs: Int64,
+        session: LocalAccountSession,
+        keyStore: E2EEV2EpochKeyStore,
+        stateStore: E2EEV2ConversationStateStore
+    ) -> Bool {
+        do {
+            guard try keyStore.put(
+                recordInput: .init(
+                    conversationId: conversationId, epochId: accepted.epochId,
+                    epochNumber: accepted.epochNumber, keyCommitmentB64: commitment
+                ),
+                epochKey: epochKey, ownerNamespace: session.ownerNamespace, expectedSession: session
+            ) else { return false }
+            try stateStore.recordCurrentEpoch(
+                .init(
+                    conversationId: conversationId, epochNumber: accepted.epochNumber,
+                    membershipChangeNumber: membership.changeNumber, memberIds: membership.members.sorted(),
+                    recipientsDigest: E2EEV2Canonical.listDigest(tag: E2EEV2EpochManifest.recipientsTag, lines: recipients),
+                    excludesWeb: membership.excludesWeb, createdAtMs: createdAtMs
+                ),
+                ownerNamespace: session.ownerNamespace
+            )
+            return true
+        } catch {
+            return false
         }
     }
 }
@@ -259,61 +365,26 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
               served.accepted.epochNumber > current.epochNumber else {
             return .failure(localError("invalid-e2ee-current-epoch"))
         }
-        // Le créateur se lit dans la chaîne signée, sa clé dans l'annuaire.
-        let fields = served.manifest.canonical.components(separatedBy: "\n")
-        guard fields.count == 13, let creatorKey = devices.signingKey(userId: fields[4], deviceId: fields[5]),
-              let manifest = try? E2EEV2EpochManifest.verify(
-                  served.manifest, recipients: served.recipients, creatorSigningKey: creatorKey
-              ),
-              manifest.conversationId == conversationId, manifest.epochNumber == served.accepted.epochNumber else {
+        switch E2EEV2EpochVerifierV2.open(
+            served, conversationId: conversationId, ownDeviceId: ownDeviceId,
+            previousMembershipChangeNumber: current.membershipChangeNumber, devices: devices,
+            membershipAt: membershipAt,
+            unwrap: { [identityStore] in try identityStore.unwrapEpochKey(delivery: $0, ownerNamespace: session.ownerNamespace) }
+        ) {
+        case .needsMembershipSync:
+            return .needsMembershipSync
+        case .notRecipient, .invalid:
             return .failure(localError("invalid-e2ee-current-epoch"))
+        case .opened(var epochKey, let manifest, let state):
+            defer { epochKey.resetBytes(in: 0..<epochKey.count) }
+            return keep(
+                epochKey: epochKey, accepted: served.accepted, conversationId: conversationId,
+                commitment: manifest.keyCommitmentB64, membership: state, recipients: served.recipients,
+                createdAtMs: manifest.createdAtMs, session: session
+            ) ? .adopted(epochNumber: manifest.epochNumber) : .failure(localError("e2ee-adopted-epoch-storage-failed"))
         }
-        guard let state = membershipAt(manifest.membershipChangeNumber) else { return .needsMembershipSync }
-        let context = E2EEV2EpochContext(
-            conversationId: conversationId, epochNumber: manifest.epochNumber,
-            senderDeviceId: manifest.creatorDeviceId, recipientDeviceId: ownDeviceId
-        )
-        var epochKey: Data
-        do {
-            try E2EEV2EpochBinding.check(
-                manifest, recipients: served.recipients, state: state,
-                previousMembershipChangeNumber: current.membershipChangeNumber
-            )
-            guard served.recipients.compactMap(E2EEV2EpochManifest.Recipient.parse).contains(where: { $0.deviceId == ownDeviceId }),
-                  served.envelope.recipientDeviceId == ownDeviceId,
-                  let signature = Data(base64Encoded: served.envelope.signatureB64),
-                  E2EEV2LowS.verify(
-                      derSignature: signature,
-                      message: try E2EEV2EpochCrypto.signatureCanonical(
-                          context: context, keyCommitmentB64: manifest.keyCommitmentB64,
-                          envelope: served.envelope.cryptoEnvelope
-                      ),
-                      publicKey: creatorKey
-                  ) else {
-                return .failure(localError("invalid-e2ee-current-epoch"))
-            }
-            epochKey = try identityStore.unwrapEpochKey(
-                delivery: E2EEV2EpochDelivery(
-                    conversationId: conversationId, epochId: served.accepted.epochId,
-                    epochNumber: manifest.epochNumber, keyCommitmentB64: manifest.keyCommitmentB64,
-                    reason: "ROTATION", status: "active", createdAt: served.accepted.createdAt,
-                    senderDeviceId: manifest.creatorDeviceId, senderPublicSigningKeyB64: creatorKey.x963Representation.base64EncodedString(),
-                    envelope: served.envelope
-                ),
-                ownerNamespace: session.ownerNamespace
-            )
-        } catch {
-            return .failure(localError("invalid-e2ee-current-epoch"))
-        }
-        defer { epochKey.resetBytes(in: 0..<epochKey.count) }
-        return keep(
-            epochKey: epochKey, accepted: served.accepted, conversationId: conversationId,
-            commitment: manifest.keyCommitmentB64, membership: state, recipients: served.recipients,
-            createdAtMs: manifest.createdAtMs, session: session
-        ) ? .adopted(epochNumber: manifest.epochNumber) : .failure(localError("e2ee-adopted-epoch-storage-failed"))
     }
 
-    /// Une époque ne sert qu'acceptée : clé gardée, puis époque courante avancée.
     private func keep(
         epochKey: Data,
         accepted: E2EEV2EpochContractV2.Accepted,
@@ -324,27 +395,11 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         createdAtMs: Int64,
         session: LocalAccountSession
     ) -> Bool {
-        do {
-            guard try keyStore.put(
-                recordInput: .init(
-                    conversationId: conversationId, epochId: accepted.epochId,
-                    epochNumber: accepted.epochNumber, keyCommitmentB64: commitment
-                ),
-                epochKey: epochKey, ownerNamespace: session.ownerNamespace, expectedSession: session
-            ) else { return false }
-            try stateStore.recordCurrentEpoch(
-                .init(
-                    conversationId: conversationId, epochNumber: accepted.epochNumber,
-                    membershipChangeNumber: membership.changeNumber, memberIds: membership.members.sorted(),
-                    recipientsDigest: E2EEV2Canonical.listDigest(tag: E2EEV2EpochManifest.recipientsTag, lines: recipients),
-                    excludesWeb: membership.excludesWeb, createdAtMs: createdAtMs
-                ),
-                ownerNamespace: session.ownerNamespace
-            )
-            return true
-        } catch {
-            return false
-        }
+        E2EEV2EpochVerifierV2.keep(
+            epochKey: epochKey, accepted: accepted, conversationId: conversationId, commitment: commitment,
+            membership: membership, recipients: recipients, createdAtMs: createdAtMs, session: session,
+            keyStore: keyStore, stateStore: stateStore
+        )
     }
 
     private func localError(_ message: String) -> E2EEV2TransportFailure {

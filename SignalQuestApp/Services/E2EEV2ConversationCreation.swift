@@ -438,6 +438,7 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
                 ),
                 ownerNamespace: ownerNamespace
             )
+            try stateStore.appendMembership(creation.membership, conversationId: creation.conversationId, ownerNamespace: ownerNamespace)
             try stateStore.recordCurrentEpoch(
                 .init(
                     conversationId: creation.conversationId, epochNumber: 1,

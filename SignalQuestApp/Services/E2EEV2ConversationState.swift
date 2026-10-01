@@ -119,8 +119,46 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         )
     }
 
+    /// Chaîne d'appartenance signée, telle que relue : rejouée pour vérifier une
+    /// époque fondée sur un état plus ancien que la tête (§3.5).
+    func membershipChain(conversationId: String, ownerNamespace: String) throws -> [E2EEV2SignedString] {
+        guard let raw = try tokenStore.string(for: chainKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
+        else { return [] }
+        guard let data = raw.data(using: .utf8),
+              let items = (try? E2EEV2CanonicalJSON.parseCanonical(String(decoding: data, as: UTF8.self)))?.arrayValue else {
+            throw Failure.invalidRecord
+        }
+        let chain = items.compactMap(E2EEV2MembershipChange.signed(from:))
+        guard chain.count == items.count else { throw Failure.invalidRecord }
+        return chain
+    }
+
+    /// Ajout seul : la suite doit prolonger la chaîne gardée, déjà vérifiée.
+    func appendMembership(_ changes: [E2EEV2SignedString], conversationId: String, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        guard !changes.isEmpty else { return }
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        let known = try membershipChain(conversationId: conversationId, ownerNamespace: ownerNamespace)
+        var previous = known.last?.canonical
+        for change in changes {
+            guard let parsed = try? E2EEV2MembershipChange.parse(change.canonical, previousCanonical: previous),
+                  parsed.conversationId == conversationId else { throw Failure.regressed }
+            previous = change.canonical
+        }
+        let value = E2EEV2CanonicalJSON.encodeString(.array((known + changes).map(E2EEV2MembershipChange.json)))
+        try tokenStore.set(
+            value, for: chainKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
+    }
+
     static func prefix(ownerNamespace: String) -> String {
         "\(keyPrefix):\(ownerNamespace):"
+    }
+
+    private func chainKey(conversationId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":chain"
     }
 
     private func key(conversationId: String, ownerNamespace: String) -> String {
