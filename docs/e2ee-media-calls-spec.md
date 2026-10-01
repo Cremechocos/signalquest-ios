@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.9**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.10**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -166,6 +166,16 @@
 >   précisée : environ 100 bits par personne. Le serveur ignore un
 >   `sinceVersion` qui dépasse la version courante de la liste (§2.4, E.1).
 >   Aucun vecteur ne change.
+> - v0.4.10 (01/10/2026), après les retours du web et du serveur :
+>   épinglage en comparaison-échange atomique, relu par chaque contexte d'un
+>   appareil (onglet, extension, processus) avant d'envoyer, de faire tourner
+>   ou de créer une époque ; dans un navigateur, une UIK changée ne s'accepte
+>   jamais sans vérification, et un premier contact y reste en confiance au
+>   premier usage (limite écrite au §0) ; épingles perdues avec les clés d'un
+>   navigateur effacé ; champ facultatif `memberListVersions` à la création et
+>   à la rotation d'une époque (§0, §2.4, §2.7, E.0, E.2). Question ouverte :
+>   épingles transmises au navigateur à son approbation (§18). Aucun vecteur
+>   ne change.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -210,7 +220,10 @@ réordonner des messages, et fournit le code du client web.
 - **Disponibilité** : le serveur peut retenir ou retarder. Les compteurs
   signés (§4.3) rendent les trous détectables, pas impossibles.
 - **Client web** : le serveur fournit le code qui manipule les clés. D'où
-  l'accès des navigateurs sur demande seulement (§2.7).
+  l'accès des navigateurs sur demande seulement (§2.7). Un navigateur ne
+  connaît pas les contacts que les téléphones du compte ont vérifiés : un
+  premier contact fait depuis lui repose sur la confiance au premier usage.
+  Comparer le numéro de sécurité le détecte (§2.4, v0.4.10).
 
 Un protocole de groupe standard (MLS, RFC 9420) offrirait la confidentialité
 persistante par message et la guérison continue. Il est à évaluer pour une v3.
@@ -332,7 +345,15 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
     `sinceVersion`, puisque la liste de la nouvelle identité repart de 1
     (D.14), et le vérifie comme au premier contact ;
   - une UIK vérifiée ne se remplace qu'avec une nouvelle vérification ; une
-    UIK non vérifiée s'accepte d'un geste.
+    UIK non vérifiée s'accepte d'un geste, sauf dans un navigateur, où toute
+    UIK changée demande une vérification (§2.7, v0.4.10) ;
+  - l'épinglage est une comparaison-échange atomique (v0.4.10) : le client
+    n'écrit une épingle que si elle vaut encore celle qu'il a lue avant la
+    lecture réseau ou avant d'afficher le numéro, sans autre opération entre
+    la vérification et l'écriture (sur le web, une seule transaction
+    IndexedDB en écriture). Chaque contexte d'un même appareil (onglet,
+    extension, processus) relit l'épingle avant d'envoyer, de faire tourner
+    une époque ou d'en créer une.
 
 ### 2.5 Membres des groupes
 
@@ -449,6 +470,12 @@ conversations chiffrées **sur demande seulement**.
   - un compte sans téléphone ne peut pas activer la v2 sur le web, puisque le
     premier appareil doit porter l'UIK ;
   - le web ne crée aucun bundle de récupération.
+- Le navigateur garde ses épingles de contacts avec ses clés d'appareil : un
+  stockage effacé perd les deux. Il redevient alors un nouvel appareil, à
+  réapprouver, et ne continue jamais avec des épingles oubliées (v0.4.10).
+- Il ne sait pas quels contacts les téléphones du compte ont vérifiés : une
+  UIK changée ne s'y accepte jamais sans vérification, même si elle avait été
+  épinglée au premier usage (§2.4, v0.4.10).
 - Le client web DEVRAIT être servi depuis une origine statique distincte, avec
   une CSP stricte, l'intégrité des sous-ressources (SRI) et des bundles
   reproductibles publiés. C'est un chantier d'infrastructure à part.
@@ -1438,6 +1465,15 @@ protocole, états des cryptors d'appel.
   l'`info` HPKE. Un serveur qui le change ne fait qu'empêcher l'ouverture du
   rapport ; le lier demanderait une version 2 de `report-v1`.
 
+- **Épingles d'un navigateur** (v0.4.10, pour la v0.5) : à l'approbation
+  par QR, le téléphone transmettrait au navigateur ses épingles de contacts,
+  vérifiées ou non, pour couvrir aussi le premier contact des contacts qu'il
+  connaît. Deux exigences du serveur : la signature d'approbation couvre
+  l'empreinte du paquet et un drapeau « épingles présentes », pour qu'il ne
+  puisse être ni retiré ni rejoué ; le scellement est lié au compte, à
+  l'identifiant du navigateur et au nonce du QR. Côté serveur, un champ
+  opaque de plus, à taille plafonnée.
+
 - **Pierres tombales des messages expirés** (v0.4.7) : un message éphémère
   purgé par le serveur laisse un trou dans les compteurs (E.3). Une pierre
   tombale (séquence, appareil, compteur, identité) éviterait la fausse
@@ -2195,7 +2231,10 @@ version publiée qui ouvre les verrous.
 - **Erreurs** : `{"error": "<message>", "code": "<CODE>"}`, avec le statut
   HTTP qui convient. Les codes propres au jalon A :
   - `E2EE_DEVICE_LIST_STALE` (409) : la version ou le condensat précédent ne
-    correspond pas ;
+    correspond pas ; ou bien une époque est proposée sur une liste d'appareils
+    qui n'est plus la courante (`memberListVersions`, E.2, v0.4.10), et
+    `details.userId` (le premier) et `details.userIds` (tous) nomment les
+    membres dont il faut relire l'identité ;
   - `E2EE_EPOCH_STALE` (409) : une autre époque a été acceptée, et la réponse
     la donne ;
   - `E2EE_MEMBERSHIP_STALE` (409) : `changeNumber` n'est pas le suivant, ou
@@ -2298,7 +2337,8 @@ version publiée qui ouvre les verrous.
   - `membership` : la genèse, liste de `{change, signatureB64}` (D.4) ;
   - `epoch` : `{epochNumber: "1", previousEpochNumber: "0", manifest, envelopes}`,
     où `manifest` est `{manifest, signatureB64, recipients}` (format 2,
-    §3.5) et `envelopes` suit la forme A.3.
+    §3.5) et `envelopes` suit la forme A.3 ;
+  - `memberListVersions`, facultatif (v0.4.10) : voir la rotation.
 
   La création est atomique. Réponse proposée par iOS :
   `{conversationId, epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
@@ -2319,7 +2359,20 @@ version publiée qui ouvre les verrous.
 - **`POST /api/e2ee/v2/conversations/{id}/epochs`**, étendu. Corps :
   - `previousEpochNumber`, `epochNumber` ;
   - `manifest`, au format 2 (§3.5) ;
-  - `envelopes`.
+  - `envelopes` ;
+  - `memberListVersions`, facultatif (v0.4.10) : `{userId: "<version>"}`,
+    la version de la liste d'appareils de chaque membre que le client a
+    utilisée (entiers en chaînes, D.0 ; au plus une entrée par membre). Le
+    client DEVRAIT l'envoyer. Absent, rien ne change ; un membre absent de
+    l'objet n'est pas contrôlé. Une version qui n'est plus la courante donne
+    409 `E2EE_DEVICE_LIST_STALE`, avec `details.userId` (le premier membre en
+    retard) et `details.userIds` (tous) : le client relit leurs paquets
+    d'identité. Une clé qui n'est plus membre donne 409
+    `E2EE_MEMBERSHIP_STALE`, prioritaire si les deux cas se présentent : le
+    client resynchronise l'appartenance, qui peut changer les membres à
+    relire. Puis il recommence. Ce contrôle évite une course entre appareils ; il ne protège
+    pas contre un serveur malveillant, dont la défense reste le manifeste
+    vérifié par chaque destinataire (§3.5).
 
   Reçu proposé par iOS : `{epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
   En cas de conflit : 409 `E2EE_EPOCH_STALE`, avec
