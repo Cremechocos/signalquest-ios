@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.10**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.11**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -176,6 +176,19 @@
 >   à la rotation d'une époque (§0, §2.4, §2.7, E.0, E.2). Question ouverte :
 >   épingles transmises au navigateur à son approbation (§18). Aucun vecteur
 >   ne change.
+> - v0.4.11 (01/10/2026), après deux relectures indépendantes du
+>   signalement iOS : la version affichée de chaque message signalé part
+>   toujours, puis son original et ses éditions intermédiaires tant que le
+>   rapport tient, pour que la modération lise ce que le signaleur a vu sans
+>   qu'un message trop modifié devienne insignalable ; un message supprimé
+>   par son auteur ou un éphémère expiré n'est plus signalable et part de
+>   l'appareil avec ses éditions, et une édition expirée cesse de compter ;
+>   la route d'administration rend les données d'envoi dont l'outil a besoin
+>   pour recalculer `frankTag`, et marque `unverifiable` une enveloppe qu'il ne
+>   retrouve pas ; quota de signalements sur 24 heures glissantes en 429
+>   `E2EE_REPORT_QUOTA`, rapport trop grand en 400 `E2EE_REPORT_TOO_LARGE`
+>   (§11, §16, D.8, E.0, E.3), après accord du serveur. Aucun vecteur ne
+>   change.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -1143,13 +1156,24 @@ conversation, et sans permettre un faux signalement ni un message insignalable.
   modération. L'outil :
   - ouvre la partie scellée et vérifie que son `info` correspond à la partie
     en clair ;
-  - recalcule chaque `frankTag` à partir de `fk` et de la charge ;
+  - recalcule chaque `frankTag` à partir de `fk`, de la charge, et de
+    `senderDeviceId` et `clientRequestId` rendus par la route
+    d'administration (E.3, v0.4.11) ;
   - vérifie les condensats des blobs, puis affiche.
 - Les implémentations HPKE, y compris un sous-ensemble maison (Android, qui
   n'a pas d'HPKE public avant son API minimale 29), DOIVENT passer les
   vecteurs de la RFC 9180 pour cette suite.
 - Contexte : le signaleur peut joindre des messages voisins, mais seulement
   des messages qu'il a lui-même reçus, chacun franké.
+- Un message modifié se signale dans sa version affichée, sa dernière
+  édition autorisée (même cible, même auteur), qui part toujours. Suivent,
+  tant que le rapport tient (50 éléments, 512 Kio), son original puis ses
+  éditions intermédiaires, de la plus récente à la plus ancienne, chacune
+  frankée : la modération lit ce que le signaleur a vu, et un message n'est
+  jamais insignalable parce qu'il a été trop modifié (v0.4.11).
+- Un message supprimé par son auteur, ou un message éphémère expiré, n'est
+  plus signalable : sa charge et celles de ses éditions sont effacées des
+  appareils. C'est une limite assumée (v0.4.11).
 - L'utilisateur est prévenu, avant d'envoyer, que les messages signalés seront
   lisibles par l'équipe de modération.
 - Vecteurs : `franking-v1` (`frankTag` et `serverTag`) et `report-v1`.
@@ -1414,7 +1438,9 @@ verrous, le serveur n'ajoute donc jamais de champ à un contrat v2 publié. Une 
 
 Quotas (valeurs de départ, à ajuster) : 10 époques par conversation et par
 heure ; 5 approbations d'appareil par compte et par jour ; 20 signalements par
-compte et par jour.
+compte signaleur, sur une fenêtre glissante de 24 heures, au-delà desquels la
+réponse est 429 `E2EE_REPORT_QUOTA` ; `Retry-After` donne les secondes avant
+que le plus ancien sorte de la fenêtre (v0.4.11).
 
 Outbox : un message préparé sous une époque qui change avant l'envoi est
 rechiffré, sa charge étant gardée dans le trousseau jusqu'à l'envoi. Un message
@@ -2077,7 +2103,9 @@ Mêmes routes et même type de contenu que la v1 (A.4), avec
   `sentAtMs + ttlSeconds × 1 000`, l'heure signée de son émetteur. L'heure du
   serveur n'y entre pas : il ne peut ni prolonger un éphémère, ni l'effacer
   en silence. Un éphémère expiré compte au registre sans s'afficher, et quitte
-  l'appareil qui le gardait.
+  l'appareil qui le gardait, avec ses éditions. Une édition expirée cesse de
+  compter : le texte affiché redevient celui de la version qui la précède
+  (v0.4.11).
 
 ### D.9 `serverTag`
 
@@ -2257,6 +2285,11 @@ version publiée qui ouvre les verrous.
   - `CALL_NONCE_TAKEN` (409) : `callNonce` déjà enregistré (§10.1) ;
   - `E2EE_MESSAGE_CONFLICT` (409) : une autre enveloppe a déjà été acceptée
     pour la même identité de message (§4.2) ;
+  - `E2EE_REPORT_QUOTA` (429) : quota de signalements atteint (§16), avec
+    `Retry-After` (v0.4.11). Un autre 429 reste un ralentissement passager ;
+  - `E2EE_REPORT_TOO_LARGE` (400) : plus de 50 éléments, ou un corps de plus
+    de 512 Kio (D.10, v0.4.11). Un client conforme ne le reçoit jamais : il
+    réduit la sélection avant d'envoyer (§11) ;
   - `E2EE_UPDATE_REQUIRED` (409) : écriture d'une app sans v2 dans ce qui
     exige la v2 (§14). `error` porte le texte à afficher, que les apps
     publiées montrent tel quel.
@@ -2507,13 +2540,21 @@ version publiée qui ouvre les verrous.
 - **`POST /api/e2ee/v2/reports`**. Corps :
   `{clear, encB64, sealedB64, moderationKeyId}` (D.10).
   - Le serveur vérifie les `serverTag` et l'appartenance du signaleur, puis
-    gèle les blobs cités. Au jalon A, les messages v2 ne sont que du texte :
+    gèle les blobs cités. Au-delà du quota du jour : 429
+    `E2EE_REPORT_QUOTA` (v0.4.11). Au jalon A, les messages v2 ne sont que du texte :
     le gel des blobs arrive avec le jalon B.
   - Réponse : `{reportId}`.
 - **`GET /api/admin/e2ee/reports?after=<curseur>`**, réservée à
   l'administration : la partie claire et la partie scellée de chaque
   rapport. L'outil de modération, sur le Mac d'Alexandre, les déchiffre
-  localement avec la clé de modération (§11).
+  localement avec la clé de modération (§11). Pour chaque message cité, la
+  réponse donne aussi, tirés des enregistrements du serveur, `senderUserId`,
+  `senderDeviceId`, `clientRequestId`, `serverTimeMs` et `keyId` : l'outil en
+  a besoin pour recalculer `frankTag` (v0.4.11). Ces valeurs viennent de ses
+  enregistrements, jamais du rapport. Une enveloppe introuvable, ou qui
+  n'appartient pas à la conversation du rapport, est marquée `unverifiable`
+  et l'outil ne recalcule rien pour elle ; un rapport ne fait jamais échouer
+  toute la liste.
 
 ### E.4 Appels
 
