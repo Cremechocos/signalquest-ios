@@ -1752,6 +1752,27 @@ final class E2EEV2APITransport: @unchecked Sendable {
         )
     }
 
+    /// Lecture par session, sans signature (E.0 : la requête signée vaut pour
+    /// les écritures) : lire le paquet de confiance d'un membre ne crée jamais
+    /// d'identité d'appareil ici.
+    func getSessionJSON(
+        path: String,
+        query: [URLQueryItem] = [],
+        expectedOwnerScopeId: String,
+        capabilitySet: E2EEV2RequestCapabilitySet
+    ) async -> E2EEV2TransportResult<Data> {
+        await execute(
+            path: path,
+            query: query,
+            method: .get,
+            body: nil,
+            contentType: nil,
+            expectedOwnerScopeId: expectedOwnerScopeId,
+            capabilitySet: capabilitySet,
+            signs: false
+        )
+    }
+
     func postJSON(
         path: String,
         body: Data,
@@ -1956,7 +1977,8 @@ final class E2EEV2APITransport: @unchecked Sendable {
         contentType: String?,
         expectedOwnerScopeId: String,
         capabilitySet: E2EEV2RequestCapabilitySet,
-        useResetCandidate: Bool = false
+        useResetCandidate: Bool = false,
+        signs: Bool = true
     ) async -> E2EEV2TransportResult<Data> {
         guard validPath(path), validOwner(expectedOwnerScopeId), E2EEV2SignedTarget.isEncodedPath(path) else {
             return localFailure("invalid-e2ee-request-scope")
@@ -1970,8 +1992,10 @@ final class E2EEV2APITransport: @unchecked Sendable {
         do {
             let ownerNamespace = LocalAccountScope.storageNamespace(for: expectedOwnerScopeId)
             let bodyHash = E2EEV2SignedRequest.bodySHA256Base64URL(body ?? Data())
-            let proof: E2EEV2SignedHeaders
-            if useResetCandidate {
+            let proof: E2EEV2SignedHeaders?
+            if !signs {
+                proof = nil
+            } else if useResetCandidate {
                 proof = try E2EEV2SignedRequest.signResetCandidateBodyHash(
                     method: method.rawValue,
                     path: signedPath,
@@ -2024,9 +2048,9 @@ final class E2EEV2APITransport: @unchecked Sendable {
     private func requestHeaders(
         contentType: String?,
         capabilitySet: E2EEV2RequestCapabilitySet,
-        proof: E2EEV2SignedHeaders
+        proof: E2EEV2SignedHeaders?
     ) -> [String: String] {
-        var headers = proof.values
+        var headers = proof?.values ?? [:]
         if let contentType { headers["Content-Type"] = contentType }
         headers[ClientProtocolContract.protocolVersionHeader] = String(E2EEV2ActivationPolicy.protocolVersion)
         headers[ClientProtocolContract.capabilitiesHeaderName] = capabilitySet.values.sorted().joined(separator: ",")

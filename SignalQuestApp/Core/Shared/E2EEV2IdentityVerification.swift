@@ -151,6 +151,9 @@ enum E2EEV2IdentityVerification {
         case deviceListRollback
         /// Un maillon manque entre la version épinglée et la courante (D.3).
         case deviceListGap
+        /// `E2EE_IDENTITY_NOT_FOUND` : pas d'identité v2, ou ce compte ne peut
+        /// pas être lu d'ici ; le serveur ne dit pas lequel (E.1).
+        case notFound
     }
 
     struct Outcome: Equatable, Sendable {

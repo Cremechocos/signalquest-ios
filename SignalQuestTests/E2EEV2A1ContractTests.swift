@@ -121,6 +121,49 @@ final class E2EEV2A1ContractTests: XCTestCase {
         XCTAssertFalse(E2EEV2SignedTarget.isEncodedPath("/api//identity"))
     }
 
+    /// E.1 : lecture par session, sans signature ; lire un membre ne crée
+    /// jamais d'identité d'appareil, et un 404 devient le refus de ce membre.
+    func testAnIdentityIsReadBySessionWithoutCreatingADevice() async throws {
+        let previousUserId = LocalAccountScope.currentUserId
+        LocalAccountScope.activate(userId: "a1-identity")
+        defer { if let previousUserId { LocalAccountScope.activate(userId: previousUserId) } else { LocalAccountScope.deactivate() } }
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let store = E2EEV2DeviceIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
+        let seen = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            seen.append(request, body: [:])
+            let notFound = request.url?.path.contains("user_hidden") == true
+            let body = try JSONSerialization.data(withJSONObject: notFound
+                ? ["error": "x", "code": "E2EE_IDENTITY_NOT_FOUND", "requestId": "r"]
+                : ["accountIdentityKeyB64": "x"])
+            return (HTTPURLResponse(url: request.url!, statusCode: notFound ? 404 : 200, httpVersion: nil, headerFields: nil)!, body)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("a1-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let fetch = E2EEV2TrustDirectory.identityFetch(
+            transport: E2EEV2APITransport(api: api, identityStore: store), ownerScopeId: session.ownerScopeId
+        )
+
+        _ = try await fetch("user_member_00000000001", 3)
+        let request = try XCTUnwrap(seen.first?.0)
+        XCTAssertEqual(request.url?.path, "/api/e2ee/v2/users/user_member_00000000001/identity")
+        XCTAssertEqual(request.url?.query, "sinceVersion=3")
+        XCTAssertNil(request.value(forHTTPHeaderField: E2EEV2SignedRequest.headerSignature), "Lecture par session")
+        XCTAssertNotNil(request.value(forHTTPHeaderField: ClientProtocolContract.capabilitiesHeaderName))
+        XCTAssertNil(try store.load(ownerNamespace: session.ownerNamespace), "Aucune identité créée par une lecture")
+
+        do {
+            _ = try await fetch("user_hidden_00000000001", nil)
+            XCTFail("404 attendu")
+        } catch {
+            XCTAssertEqual(error as? E2EEV2TrustDirectory.IdentityNotFound, E2EEV2TrustDirectory.IdentityNotFound())
+        }
+        XCTAssertNil(seen.all.last?.0.url?.query, "Sans pin, pas de sinceVersion")
+    }
+
     /// La requête part telle qu'elle est signée, et `E2EE_DEVICE_LIST_STALE`
     /// garde les membres dont relire l'identité.
     func testTheWireTargetMatchesTheSignatureAndStaleDetailsSurvive() async throws {

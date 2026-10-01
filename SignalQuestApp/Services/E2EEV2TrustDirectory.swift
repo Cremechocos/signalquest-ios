@@ -121,6 +121,34 @@ actor E2EEV2TrustDirectory {
         case concurrentChange(userId: String)
     }
 
+    /// `E2EE_IDENTITY_NOT_FOUND`, levé par `fetch` : refus de ce seul membre.
+    struct IdentityNotFound: Error, Equatable {}
+
+    /// E.1 en production : lecture par session (sans signature), la version
+    /// épinglée en `sinceVersion`.
+    static func identityFetch(
+        transport: E2EEV2APITransport,
+        ownerScopeId: String
+    ) -> @Sendable (_ userId: String, _ sinceVersion: Int?) async throws -> Data {
+        { userId, sinceVersion in
+            guard E2EEV2Canonical.isOpaque(userId) else { throw Failure.malformedResponse(userId: userId) }
+            let result = await transport.getSessionJSON(
+                path: "/api/e2ee/v2/users/\(userId)/identity",
+                query: sinceVersion.map { [URLQueryItem(name: "sinceVersion", value: String($0))] } ?? [],
+                expectedOwnerScopeId: ownerScopeId,
+                capabilitySet: .deviceLifecycle
+            )
+            switch result {
+            case .success(let value, _, _):
+                return value
+            case .failure(let failure) where failure.statusCode == 404 && failure.code == "E2EE_IDENTITY_NOT_FOUND":
+                throw IdentityNotFound()
+            case .failure(let failure):
+                throw failure
+            }
+        }
+    }
+
     private let ownerNamespace: String
     private let pins: E2EEV2TrustPinStore
     private let ownUserId: String?
@@ -154,7 +182,14 @@ actor E2EEV2TrustDirectory {
         var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
         for userId in Set(userIds).sorted() {
             let expected = userId == ownUserId ? ownAccountKey() : nil
-            switch try await read(userId: userId, expectedUIK: expected).result {
+            let read: Read
+            do {
+                read = try await self.read(userId: userId, expectedUIK: expected)
+            } catch is IdentityNotFound {
+                refusals[userId] = .notFound
+                continue
+            }
+            switch read.result {
             case .success(let outcome):
                 devices[userId] = outcome.devices
             case .failure(let refusal):
@@ -268,7 +303,12 @@ extension E2EEV2TrustDirectory: E2EEV2SafetyNumberTrusting {
     /// UIK d'un compte qui a changé, pour en montrer le numéro, sans la croire.
     func safetyNumberIdentity(userId: String) async throws -> E2EEV2SafetyNumberIdentity {
         try requireContact(userId)
-        let read = try await read(userId: userId, expectedUIK: nil)
+        let read: Read
+        do {
+            read = try await self.read(userId: userId, expectedUIK: nil)
+        } catch is IdentityNotFound {
+            throw SafetyNumberFailure.refused(.notFound)
+        }
         switch read.result {
         case .success:
             guard let pin = read.pin else { throw SafetyNumberFailure.numberChanged }
@@ -307,7 +347,12 @@ extension E2EEV2TrustDirectory: E2EEV2SafetyNumberTrusting {
             throw SafetyNumberFailure.numberChanged
         }
         if pinned.verified && !verified { throw SafetyNumberFailure.verificationRequired }
-        let bundle = try await bundle(userId: userId, sinceVersion: nil, pinnedUIK: nil)
+        let bundle: E2EEV2IdentityBundle
+        do {
+            bundle = try await self.bundle(userId: userId, sinceVersion: nil, pinnedUIK: nil)
+        } catch is IdentityNotFound {
+            throw SafetyNumberFailure.refused(.notFound)
+        }
         guard Self.sameKey(bundle.uikX963B64, uikX963B64) else { throw SafetyNumberFailure.numberChanged }
         // Pendant la lecture, le pin a pu changer : rien n'est écrasé. La
         // vérification et l'écriture suivent sans autre suspension.

@@ -77,6 +77,21 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         XCTAssertNotNil(rolledBack.device(deviceId: carla.deviceId), "Les autres membres restent certifiés")
     }
 
+    /// `E2EE_IDENTITY_NOT_FOUND` (A1) : seul ce membre est refusé.
+    func testAnUnreadableMemberIsRefusedAlone() async throws {
+        let bruno = Account("bruno"), carla = Account("carla")
+        let server = Server()
+        server.serve(try bundle(bruno, version: 1, features: ["calls"]), for: bruno.userId)
+        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())) { userId, _ in
+            if userId == carla.userId { throw E2EEV2TrustDirectory.IdentityNotFound() }
+            return try server.response(for: userId)
+        }
+        let set = try await directory.certifiedDevices(for: [bruno.userId, carla.userId])
+        XCTAssertEqual(set.refusals, [carla.userId: .notFound])
+        XCTAssertNotNil(set.device(deviceId: bruno.deviceId))
+        XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now, excludesWeb: false), "Un membre illisible rend l'appel indisponible")
+    }
+
     func testAChangedAccountKeyRemovesOnlyThatMember() async throws {
         let bruno = Account("bruno"), impostor = Account("bruno")
         let server = Server()
