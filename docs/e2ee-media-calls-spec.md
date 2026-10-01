@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.14**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.15**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -201,6 +201,14 @@
 >   de l'appareil est utilisable dès le premier déverrouillage après le
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
+>   vecteur ne change.
+> - v0.4.15 (02/10/2026), proposition : sept codes d'erreur que le serveur
+>   sert au jalon A (lot A1, PR serveur #259) entrent dans E.0 :
+>   `E2EE_DEVICE_LIST_INVALID`, `E2EE_UIK_WRAP_INVALID`,
+>   `E2EE_IDENTITY_STATE_REPAIR_REQUIRED`, `E2EE_APPROVAL_METHOD_UNSUPPORTED`,
+>   `E2EE_IDENTITY_NOT_FOUND`, `E2EE_IDENTITY_REQUEST_INVALID`,
+>   `E2EE_CERTIFICATE_REQUEST_INVALID`. La cible signée (A.2) encode en
+>   pourcentage tout ce qui n'est pas « non réservé » (RFC 3986). Aucun
 >   vecteur ne change.
 > - v0.4.14 (02/10/2026), proposition : sur iOS, la clé de signature de
 >   l'appareil vit dans la Secure Enclave, non extractable comme sur Android
@@ -1606,7 +1614,12 @@ bourrage.
 Chaîne signée (ECDSA P-256, DER) :
 `SQ-E2EE-V2\n<MÉTHODE>\n<cible>\n<timestampMs>\n<nonce>\n<b64url(SHA-256(corps))>`.
 
-`<cible>` est le chemin plus la requête brute, sans ré-encodage. Elle :
+`<cible>` est le chemin plus la requête, telle qu'elle part sur le fil et
+que le serveur la reçoit, sans autre ré-encodage. Tout octet hors des
+caractères « non réservés » de la RFC 3986 (`A-Z a-z 0-9 - . _ ~`, et les
+séparateurs `/` du chemin, `?`, `&` et `=` de la requête) y est encodé en
+pourcentage, en majuscules (`%2B`), par le client avant de signer : le serveur
+réencode l'espace, le non-ASCII et `'` (v0.4.15). Elle :
 
 - commence par `/` ;
 - fait au plus 512 octets ;
@@ -2326,7 +2339,26 @@ version publiée qui ouvre les verrous.
   - `E2EE_UIK_WRAP_FORBIDDEN_FOR_WEB` (409) : approbation d'un navigateur qui
     porte un `uikWrap` (§2.7) ;
   - `E2EE_WEB_DEVICE_NOT_ALLOWED` (403) : approbation, révocation ou
-    recertification émise par un navigateur (§2.7) ;
+    recertification émise par un navigateur (§2.7), ou amorçage d'un compte
+    depuis un navigateur ;
+  - `E2EE_DEVICE_LIST_INVALID` (422) : liste d'appareils signée qui ne se
+    vérifie pas contre l'UIK, ou mal formée (D.2) (v0.4.15) ;
+  - `E2EE_UIK_WRAP_INVALID` (422) : `uikWrap` mal formé ou dont la signature
+    ne se vérifie pas (§2.3) (v0.4.15) ;
+  - `E2EE_IDENTITY_STATE_REPAIR_REQUIRED` (409) : compte amorcé avant la
+    chaîne de confiance, sans UIK ; il passe par la réinitialisation (§2.4)
+    (v0.4.15) ;
+  - `E2EE_APPROVAL_METHOD_UNSUPPORTED` (409) : méthode d'approbation qui
+    n'est pas servie au jalon A (notification, code à 6 chiffres) ; QR v3
+    seulement (décision du 01/10) (v0.4.15) ;
+  - `E2EE_IDENTITY_NOT_FOUND` (404) : paquet de confiance d'un compte
+    illisible pour l'appelant ou inexistant, sans distinguer les deux
+    (v0.4.15) ;
+  - `E2EE_IDENTITY_REQUEST_INVALID` (400) : lecture du paquet de confiance
+    mal formée (`sinceVersion` non canonique, paramètre doublé ou inconnu)
+    (v0.4.15) ;
+  - `E2EE_CERTIFICATE_REQUEST_INVALID` (400) : demande de recertification
+    mal formée (v0.4.15) ;
   - `E2EE_RECOVERY_SIGNATURE_INVALID` (400) : bundle de récupération dont la
     signature ne se vérifie pas contre l'UIK enregistrée (§2.8) ;
   - `CONVERSATION_ID_TAKEN` et `CALL_ID_TAKEN` (409) : identifiant choisi par
