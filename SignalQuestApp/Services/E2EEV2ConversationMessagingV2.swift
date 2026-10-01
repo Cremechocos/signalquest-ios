@@ -40,8 +40,9 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
     private let sender: E2EEV2MessageSenderV2
     private let receiver: E2EEV2MessageReceiverV2
     private let writer: E2EEV2MembershipWriterV2
-    /// Entrées du miroir de notification (§2.6), mises à jour après chaque
-    /// relève, envoi ou changement.
+    /// Entrées du miroir de notification (§2.6) : retirées avant tout ce qui
+    /// peut changer l'état de la conversation, réécrites seulement après une
+    /// relève, un envoi ou un changement réussis.
     private let notificationMirror: E2EEV2NotificationMirrorWriter?
     private let expectedSession: LocalAccountSession?
     private let now: @Sendable () -> Date
@@ -100,6 +101,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
               session.ownerScopeId == expectedOwnerScopeId else {
             return .failure(localError("invalid-e2ee-refresh-scope"))
         }
+        let mirrorGeneration = notificationMirror?.invalidate(conversationId)
         let synced = await syncer.sync(
             conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
         )
@@ -195,7 +197,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
                     })
                 }
             }
-            notificationMirror?.update(conversationId: conversationId, devices: devices, ownerNamespace: session.ownerNamespace)
+            updateMirror(conversationId: conversationId, isGroup: isGroup, devices: devices, generation: mirrorGeneration)
             return .refreshed(E2EEV2MessagesV2(
                 snapshot: snapshot, unsupported: unsupported, missingByDevice: missing,
                 waitingForEpoch: synced == .waitingForEpoch
@@ -217,6 +219,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         devices: E2EEV2CertifiedDeviceSet,
         expectedOwnerScopeId: String
     ) async -> E2EEV2MessageSendResultV2 {
+        let mirrorGeneration = notificationMirror?.invalidate(conversationId)
         var last = E2EEV2MessageSendResultV2.needsEpoch
         for _ in 0..<Self.maxSendRounds {
             guard let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) else {
@@ -245,8 +248,10 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
                 if case .failure(let error) = await syncer.sync(
                     conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
                 ) { return .failure(error) }
+            case .sent, .alreadyAccepted:
+                updateMirror(conversationId: conversationId, isGroup: isGroup, devices: devices, generation: mirrorGeneration)
+                return last
             default:
-                updateMirror(conversationId: conversationId, devices: devices)
                 return last
             }
         }
@@ -266,6 +271,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         devices: E2EEV2CertifiedDeviceSet,
         expectedOwnerScopeId: String
     ) async -> E2EEV2MembershipWriteResultV2 {
+        let mirrorGeneration = notificationMirror?.invalidate(conversationId)
         var result = await writer.submit(change, conversationId: conversationId, isGroup: isGroup, expectedOwnerScopeId: expectedOwnerScopeId)
         if result == .needsSync {
             if case .failure(let error) = await syncer.sync(
@@ -285,7 +291,8 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         case .add, .leave, .promote, .demote:
             break
         }
-        updateMirror(conversationId: conversationId, devices: devices)
+        // Conversation quittée : son entrée et ce que l'extension en a montré partent.
+        updateMirror(conversationId: conversationId, isGroup: isGroup, devices: devices, generation: mirrorGeneration)
         return result
     }
 
@@ -326,9 +333,25 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         )
     }
 
-    private func updateMirror(conversationId: String, devices: E2EEV2CertifiedDeviceSet) {
-        guard let notificationMirror, let session = expectedSession ?? LocalAccountScope.sessionSnapshot() else { return }
-        notificationMirror.update(conversationId: conversationId, devices: devices, ownerNamespace: session.ownerNamespace)
+    /// Réécrit l'entrée du miroir après une opération réussie, tant que ce
+    /// compte est courant et membre, et qu'aucune opération n'a commencé
+    /// depuis ; sinon elle reste retirée, ou part avec ce que l'extension a
+    /// montré si la conversation est quittée.
+    private func updateMirror(conversationId: String, isGroup: Bool, devices: E2EEV2CertifiedDeviceSet, generation: UInt64?) {
+        guard let notificationMirror, let generation else { return }
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) else {
+            notificationMirror.remove(conversationId)
+            return
+        }
+        guard context.head.members.contains(ownUserId(session.ownerScopeId)) else {
+            notificationMirror.forget(conversationId)
+            return
+        }
+        notificationMirror.update(
+            conversationId: conversationId, devices: devices, latestMemberIds: context.head.members, session: session,
+            generation: generation
+        )
     }
 
     private func ownUserId(_ ownerScopeId: String) -> String {

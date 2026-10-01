@@ -260,11 +260,18 @@ struct E2EEV2NotificationScope: Equatable, Sendable {
         return published
     }
 
+    /// Une notification chiffrée, posée par l'app (`e2ee-v2:…`) ou par
+    /// l'extension, qui garde l'identifiant APNs mais marque son type.
+    static func isEncryptedNotification(identifier: String, userInfo: [AnyHashable: Any]) -> Bool {
+        identifier.hasPrefix("e2ee-v2:") || userInfo["type"] as? String == "e2ee_v2_envelope"
+    }
+
     static func clearPostedNotifications() {
         let center = UNUserNotificationCenter.current()
         center.getDeliveredNotifications { notifications in
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: notifications
-                .map(\.request.identifier).filter { $0.hasPrefix("e2ee-v2:") })
+                .filter { isEncryptedNotification(identifier: $0.request.identifier, userInfo: $0.request.content.userInfo) }
+                .map(\.request.identifier))
         }
         center.getPendingNotificationRequests { requests in
             UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: requests

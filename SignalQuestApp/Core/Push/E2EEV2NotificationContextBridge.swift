@@ -189,7 +189,7 @@ final class E2EEV2NotificationContextBridge: @unchecked Sendable {
     func refreshRuntime(reason: E2EEV2NotificationContextRefreshReason) async -> E2EEV2NotificationContextRefreshResult {
         guard E2EEV2RuntimeReadGate.enabled else { return .dormant }
         guard let store = E2EEV2NotificationContextStore.configured() else { return .unavailable }
-        return await coordinator.refreshRuntime(reason: reason, dependencies: .init(
+        let result = await coordinator.refreshRuntime(reason: reason, dependencies: .init(
             snapshot: { [self] in snapshot() },
             approval: { [self] in await approvedDevice(for: $0) },
             senderNames: { [self] in await senderNames(for: $0) },
@@ -208,6 +208,9 @@ final class E2EEV2NotificationContextBridge: @unchecked Sendable {
             persist: { try store.saveRuntime($0) },
             revoke: { try store.revoke() }
         ))
+        // Les entrées périmées partent, même sans relève de leur conversation.
+        if result == .ready || result == .unchanged { try? store.prune() }
+        return result
     }
 
     private func snapshot() -> E2EEV2NotificationAccountSnapshot? {

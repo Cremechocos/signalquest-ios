@@ -65,17 +65,25 @@ struct E2EEV2NotificationContext: Codable, Equatable, Sendable {
 }
 
 /// Ce que l'extension peut lire d'une conversation v2, écran verrouillé (§2.6) :
-/// les clés d'époque vérifiées (la courante, et celles remplacées depuis moins
-/// de 24 heures), leurs membres, et les clés publiques certifiées des appareils
-/// de ces membres. Écrite par l'app, jamais par le serveur.
+/// les époques vérifiées (la courante, et celles remplacées depuis moins de
+/// 24 heures), leurs membres, les clés publiques certifiées des appareils de
+/// ces membres, les membres actuels et les départs récents, et le plus haut
+/// compteur reçu de chaque appareil. Les clés d'époque seulement avec l'aperçu
+/// complet. Écrite par l'app pour un compte et une session, jamais par le
+/// serveur ; trop vieille, elle ne sert plus.
 struct E2EEV2NotificationConversation: Codable, Equatable, Sendable {
     static let currentVersion = 1
     static let maxEpochs = 16
     static let maxSigningKeys = 512
+    /// Au-delà, l'extension ne s'en sert plus : l'app la réécrit à chaque
+    /// relève. Une révocation ou un retrait postérieurs à l'écriture ne valent
+    /// qu'à la suivante, donc jamais plus tard que cela.
+    static let maxAgeMs: Int64 = 24 * 60 * 60 * 1_000
 
     struct Epoch: Codable, Equatable, Sendable {
         let epochNumber: Int
-        let keyB64: String
+        /// Absente en mode « expéditeur seulement » : rien n'y est déchiffré.
+        let keyB64: String?
         let memberIds: [String]
         /// Heure locale de son remplacement ; nil pour l'époque courante.
         let replacedAtMs: Int64?
@@ -83,29 +91,62 @@ struct E2EEV2NotificationConversation: Codable, Equatable, Sendable {
 
     let version: Int
     let conversationId: String
+    /// Compte et session du contexte pour lequel l'app l'a écrite.
+    let ownerScopeId: String
+    let sessionId: String
+    let writtenAtMs: Int64
     let epochs: [Epoch]
+    /// Membres actuels (tête de la chaîne) et départs appris depuis moins de
+    /// 24 heures, à l'horloge de l'appareil (§3.4).
+    let latestMemberIds: [String]
+    let departures: [String: Int64]
+    /// Plus haut compteur reçu par l'app, par appareil émetteur (§4.2) : rien
+    /// à ce compteur ou en dessous ne s'affiche.
+    let counters: [String: Int]
     /// « userId deviceId » → clé publique de signature certifiée (X9.63, b64).
     let signingKeys: [String: String]
 
     static func signingKeyName(userId: String, deviceId: String) -> String { "\(userId) \(deviceId)" }
 
+    var hasEpochKeys: Bool { epochs.allSatisfy { $0.keyB64 != nil } }
+
     var isStructurallyValid: Bool {
-        version == Self.currentVersion &&
-            E2EEV2Canonical.isOpaque(conversationId) &&
+        let opaque = { (value: String) in E2EEV2Canonical.isOpaque(value) }
+        return version == Self.currentVersion &&
+            opaque(conversationId) &&
+            ownerScopeId.range(of: #"^user:[a-f0-9]{64}\z"#, options: .regularExpression) != nil &&
+            UUID(uuidString: sessionId) != nil &&
+            writtenAtMs > 0 &&
             (1...Self.maxEpochs).contains(epochs.count) &&
             Set(epochs.map(\.epochNumber)).count == epochs.count &&
             epochs.filter({ $0.replacedAtMs == nil }).count == 1 &&
+            // La courante est la plus récente.
+            epochs.first(where: { $0.replacedAtMs == nil })?.epochNumber == epochs.map(\.epochNumber).max() &&
+            // Toutes les clés, ou aucune.
+            (hasEpochKeys || epochs.allSatisfy { $0.keyB64 == nil }) &&
             epochs.allSatisfy { epoch in
                 (1...E2EEV2Canonical.maxSequenceNumber).contains(epoch.epochNumber) &&
-                    Data(base64Encoded: epoch.keyB64)?.count == 32 &&
-                    !epoch.memberIds.isEmpty && epoch.memberIds.allSatisfy(E2EEV2Canonical.isOpaque)
+                    epoch.keyB64.map { Data(base64Encoded: $0)?.count == 32 } ?? true &&
+                    epoch.replacedAtMs.map { $0 > 0 } ?? true &&
+                    !epoch.memberIds.isEmpty && epoch.memberIds.count <= Self.maxSigningKeys &&
+                    epoch.memberIds.allSatisfy(opaque)
             } &&
+            latestMemberIds.count <= Self.maxSigningKeys && latestMemberIds.allSatisfy(opaque) &&
+            departures.count <= Self.maxSigningKeys && departures.allSatisfy { opaque($0.key) && $0.value > 0 } &&
+            counters.count <= Self.maxSigningKeys &&
+            counters.allSatisfy { opaque($0.key) && (1...E2EEV2Canonical.maxSequenceNumber).contains($0.value) } &&
             signingKeys.count <= Self.maxSigningKeys &&
             signingKeys.allSatisfy { name, key in
                 let parts = name.split(separator: " ", omittingEmptySubsequences: false)
-                return parts.count == 2 && parts.allSatisfy { E2EEV2Canonical.isOpaque(String($0)) }
+                return parts.count == 2 && parts.allSatisfy { opaque(String($0)) }
                     && E2EEV2Canonical.isX963PublicKey(key)
             }
+    }
+
+    /// Écrite depuis moins de 24 heures, et pas dans le futur.
+    func isFresh(nowMs: Int64) -> Bool {
+        nowMs - writtenAtMs <= Self.maxAgeMs &&
+            writtenAtMs - nowMs <= E2EEV2NotificationProcessor.allowedClockSkewMs
     }
 }
 
@@ -116,6 +157,10 @@ enum E2EEV2NotificationFallbackReason: Equatable, Sendable {
     case staleContext
     case invalidDelivery
     case expired
+    /// Déjà reçu par l'app ou déjà montré par l'extension (§4.2).
+    case replayed
+    /// Signé il y a plus de 48 heures, ou daté du futur.
+    case outdated
     case transport
     case cancelled
 }
@@ -138,13 +183,21 @@ struct E2EEV2NotificationProcessorDependencies: Sendable {
     let loadContext: @Sendable () throws -> E2EEV2NotificationContext?
     let isCurrent: @Sendable (E2EEV2NotificationContext) throws -> Bool
     let loadConversation: @Sendable (String) throws -> E2EEV2NotificationConversation?
+    /// Retient d'un seul geste un message à montrer : (conversation, appareil,
+    /// compteur, plancher reçu par l'app) ; faux s'il a déjà été montré.
+    let claimShown: @Sendable (String, String, Int, Int) throws -> Bool
     let fetch: @Sendable (URLRequest) async throws -> Data
     var now: @Sendable () -> Date = { Date() }
 }
 
 enum E2EEV2NotificationProcessor {
-    /// Fenêtre d'une époque remplacée, comme dans l'app (§3.4).
+    /// Fenêtre d'une époque remplacée et d'un départ, comme dans l'app (§3.4).
     static let replacedEpochWindowMs: Int64 = 24 * 60 * 60 * 1_000
+    /// Un message signé plus tôt ne s'affiche plus : l'app, qui tient le
+    /// registre, le montrera.
+    static let maxMessageAgeMs: Int64 = 48 * 60 * 60 * 1_000
+    /// Avance tolérée d'une horloge sur l'autre.
+    static let allowedClockSkewMs: Int64 = 10 * 60 * 1_000
 
     static func processRuntime(
         request: E2EEV2OpaqueNotificationRequest,
@@ -163,8 +216,9 @@ enum E2EEV2NotificationProcessor {
     }
 
     /// Lecture de l'enveloppe avec le seul cookie de session (E.0, E.3), puis,
-    /// comme l'app : appareil certifié, membre de l'époque, signature avant
-    /// tout déchiffrement, franking et charge. Aucune clé privée d'appareil.
+    /// comme l'app : appareil certifié, signature avant tout déchiffrement,
+    /// époque, membre et départs, compteur jamais vu, franking et charge.
+    /// Aucune clé privée d'appareil.
     /// Contract tests use this entry point; production enters only through processRuntime.
     static func processContractPreview(
         request: E2EEV2OpaqueNotificationRequest,
@@ -190,40 +244,79 @@ enum E2EEV2NotificationProcessor {
                 return .generic(.invalidDelivery)
             }
             let (conversationId, message) = fetched
+            let nowMs = Int64(dependencies.now().timeIntervalSince1970 * 1_000)
+            // Entrée du même compte et de la même session, encore fraîche.
             guard let conversation = try dependencies.loadConversation(conversationId),
-                  conversation.conversationId == conversationId, conversation.isStructurallyValid else {
+                  conversation.conversationId == conversationId, conversation.isStructurallyValid,
+                  conversation.ownerScopeId == context.ownerScopeId, conversation.sessionId == context.sessionId,
+                  conversation.isFresh(nowMs: nowMs) else {
                 return .generic(.contextUnavailable)
             }
             let envelope = message.signed.envelope
-            let nowMs = Int64(dependencies.now().timeIntervalSince1970 * 1_000)
+            let senderUserId = message.senderUserId, senderDeviceId = message.senderDeviceId
+            // Comme l'app : appareil certifié, signature avant tout, époque
+            // connue, membre de l'époque, et pas parti depuis plus de 24 heures.
             guard let keyB64 = conversation.signingKeys[E2EEV2NotificationConversation.signingKeyName(
-                      userId: message.senderUserId, deviceId: message.senderDeviceId
+                      userId: senderUserId, deviceId: senderDeviceId
                   )],
                   let keyData = Data(base64Encoded: keyB64),
-                  let senderKey = try? P256.Signing.PublicKey(x963Representation: keyData),
-                  let epoch = conversation.epochs.first(where: { $0.epochNumber == envelope.epochNumber }),
-                  epoch.replacedAtMs.map({ nowMs - $0 <= replacedEpochWindowMs }) ?? true,
-                  epoch.memberIds.contains(message.senderUserId) else {
+                  let senderKey = try? P256.Signing.PublicKey(x963Representation: keyData) else {
                 return .generic(.invalidDelivery)
             }
-            let messageContext = message.signed.context(conversationId: conversationId, senderDeviceId: message.senderDeviceId)
+            let messageContext = message.signed.context(conversationId: conversationId, senderDeviceId: senderDeviceId)
             try E2EEV2MessageCryptoV2.verifySignature(
                 context: messageContext, envelope: envelope, signatureDerB64: message.signed.senderSignatureB64,
                 senderSigningKey: senderKey
             )
-            guard var epochKey = Data(base64Encoded: epoch.keyB64) else { return .generic(.contextUnavailable) }
-            defer { epochKey.resetBytes(in: 0..<epochKey.count) }
-            let opened = try E2EEV2MessageCryptoV2.decrypt(envelope: envelope, epochKey: epochKey, context: messageContext)
-            if envelope.ttlSeconds > 0, opened.payload.sentAtMs + Int64(envelope.ttlSeconds) * 1_000 <= nowMs {
-                return .generic(.expired)
+            guard let epoch = conversation.epochs.first(where: { $0.epochNumber == envelope.epochNumber }),
+                  epoch.replacedAtMs.map({ nowMs - $0 <= replacedEpochWindowMs }) ?? true,
+                  epoch.memberIds.contains(senderUserId),
+                  conversation.latestMemberIds.contains(senderUserId) ||
+                    conversation.departures[senderUserId].map({ nowMs - $0 <= replacedEpochWindowMs }) == true,
+                  // Jalon A : aucun blob.
+                  envelope.encryptedBlobIds.isEmpty else {
+                return .generic(.invalidDelivery)
+            }
+            // Jamais ce que l'app a déjà reçu (§4.2) ; ce que l'extension a
+            // déjà montré est écarté plus bas, d'un seul geste avec sa retenue.
+            let counter = Int(envelope.counter)
+            let floor = conversation.counters[senderDeviceId] ?? 0
+            guard counter > floor else { return .generic(.replayed) }
+            let presentation: E2EEV2NotificationPresentation
+            switch context.privacy {
+            case .full:
+                guard let encodedKey = epoch.keyB64, var epochKey = Data(base64Encoded: encodedKey) else {
+                    return .generic(.contextUnavailable)
+                }
+                defer { epochKey.resetBytes(in: 0..<epochKey.count) }
+                let opened = try E2EEV2MessageCryptoV2.decrypt(envelope: envelope, epochKey: epochKey, context: messageContext)
+                let sentAtMs = opened.payload.sentAtMs
+                if envelope.ttlSeconds > 0, sentAtMs + Int64(envelope.ttlSeconds) * 1_000 <= nowMs {
+                    return .generic(.expired)
+                }
+                guard nowMs - sentAtMs <= maxMessageAgeMs, sentAtMs - nowMs <= allowedClockSkewMs else {
+                    return .generic(.outdated)
+                }
+                presentation = E2EEV2NotificationPresentationPolicy.present(
+                    opened.payload, ephemeral: envelope.ttlSeconds > 0, privacy: .full,
+                    senderName: context.senderNames[senderUserId]
+                )
+            case .senderOnly:
+                // L'expéditeur est authentifié par sa signature : rien à déchiffrer.
+                presentation = E2EEV2NotificationPresentationPolicy.presentSender(
+                    privacy: .senderOnly, senderName: context.senderNames[senderUserId]
+                )
+            case .hidden:
+                return .generic(.contextUnavailable)
             }
             guard try dependencies.isCurrent(context), !Task.isCancelled else {
                 return .generic(.staleContext)
             }
+            guard try dependencies.claimShown(conversationId, senderDeviceId, counter, floor) else {
+                return .generic(.replayed)
+            }
             return .preview(.init(
-                presentation: E2EEV2NotificationPresentationPolicy.present(
-                    opened.payload, privacy: context.privacy, senderName: context.senderNames[message.senderUserId]
-                ),
+                presentation: presentation,
                 envelopeId: request.envelopeId,
                 conversationId: conversationId,
                 ownerScopeId: context.ownerScopeId,
@@ -286,8 +379,10 @@ private final class E2EEV2NotificationNoRedirectDelegate: NSObject, URLSessionTa
 }
 
 enum E2EEV2NotificationNetwork {
-    static func fetch(_ request: URLRequest) async throws -> Data {
+    /// `protocolClasses` : tests seulement (faux serveur).
+    static func fetch(_ request: URLRequest, protocolClasses: [AnyClass]? = nil) async throws -> Data {
         let configuration = URLSessionConfiguration.ephemeral
+        if let protocolClasses { configuration.protocolClasses = protocolClasses }
         configuration.httpCookieStorage = nil
         configuration.urlCache = nil
         configuration.timeoutIntervalForResource = 20

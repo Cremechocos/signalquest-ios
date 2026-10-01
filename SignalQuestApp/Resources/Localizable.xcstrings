@@ -29149,6 +29149,40 @@
         }
       }
     },
+    "Message chiffré supprimé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted message deleted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message chiffré supprimé"
+          }
+        }
+      }
+    },
+    "Message éphémère chiffré" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted disappearing message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message éphémère chiffré"
+          }
+        }
+      }
+    },
     "Message chiffré non envoyé" : {
       "localizations" : {
         "en" : {

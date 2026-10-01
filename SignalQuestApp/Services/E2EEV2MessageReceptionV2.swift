@@ -178,6 +178,20 @@ final class E2EEV2MessageLedgerStore: @unchecked Sendable {
         return result
     }
 
+    /// Le registre tel qu'il est, sans le réécrire : vide s'il n'existe pas,
+    /// une erreur s'il ne se lit pas (le miroir de notification ne s'écrit
+    /// pas sans lui).
+    func read(conversationId: String, ownerScopeId: String) throws -> E2EEV2MessageLedgerV2 {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        let file = baseDirectory.appendingPathComponent(Self.digest(ownerScopeId), isDirectory: true)
+            .appendingPathComponent(Self.digest(conversationId) + ".json")
+        guard fileManager.fileExists(atPath: file.path) else { return E2EEV2MessageLedgerV2() }
+        let decoded = try JSONDecoder().decode(E2EEV2MessageLedgerV2.self, from: Data(contentsOf: file))
+        guard decoded.isConsistent else { throw E2EEV2ConversationStateStore.Failure.invalidRecord }
+        return decoded
+    }
+
     func purge(ownerScopeId: String) throws {
         Self.lock.lock()
         defer { Self.lock.unlock() }

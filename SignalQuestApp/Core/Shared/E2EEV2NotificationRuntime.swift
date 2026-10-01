@@ -49,21 +49,30 @@ enum E2EEV2NotificationPresentationPolicy {
     }
 
     /// Message v2 ouvert par l'extension (§2.6) : le texte seulement en mode
-    /// complet, jamais le contenu d'une édition ou d'une suppression.
+    /// complet, jamais celui d'un message éphémère (la notification lui
+    /// survivrait), d'une édition ou d'une suppression.
     static func present(
         _ payload: E2EEV2ContentPayloadV2,
+        ephemeral: Bool,
         privacy: E2EEV2NotificationPrivacy,
         senderName: String? = nil
     ) -> E2EEV2NotificationPresentation {
         let fullText: String
         switch payload.body {
+        case .text where ephemeral:
+            fullText = String(localized: "Message éphémère chiffré")
         case .text(let text):
             let normalized = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
             fullText = normalized.isEmpty ? String(localized: "Nouveau message chiffré") : String(normalized.prefix(240))
         case .edit: fullText = String(localized: "Message chiffré modifié")
-        case .delete: fullText = String(localized: "Nouveau message chiffré")
+        case .delete: fullText = String(localized: "Message chiffré supprimé")
         }
         return presentation(fullText: fullText, privacy: privacy, senderName: senderName)
+    }
+
+    /// Expéditeur authentifié, contenu jamais lu (mode « expéditeur seulement »).
+    static func presentSender(privacy: E2EEV2NotificationPrivacy, senderName: String?) -> E2EEV2NotificationPresentation {
+        presentation(fullText: String(localized: "Nouveau message chiffré"), privacy: privacy, senderName: senderName)
     }
 
     private static func presentation(

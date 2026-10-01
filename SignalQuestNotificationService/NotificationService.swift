@@ -101,6 +101,7 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
                     loadContext: { try contextStore.load() },
                     isCurrent: { try contextStore.isCurrent($0) },
                     loadConversation: { try contextStore.conversation($0) },
+                    claimShown: { try contextStore.claimShown(conversationId: $0, deviceId: $1, counter: $2, floor: $3) },
                     fetch: { try await E2EEV2NotificationNetwork.fetch($0) }
                 )
             )

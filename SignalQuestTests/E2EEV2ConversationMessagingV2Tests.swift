@@ -133,15 +133,79 @@ final class E2EEV2ConversationMessagingV2Tests: XCTestCase {
         XCTAssertFalse(current.memberIds.contains(bruno), "Bruno ne reçoit plus rien de neuf")
     }
 
+    func testTheNotificationMirrorFollowsOnlyWhatSucceeded() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let carla = E2EEV2TestRemote(user: "user_carla_01J7ABCD23456789", device: "device_carla_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device, carla.device])
+        let seeded = try fixture.seedGroup(with: [bruno, carla.device.userId], devices: devices)
+        let server = try FakeV2Server(fixture, seeded: seeded, pageSize: 100)
+        for counter in 1...2 { server.add(try item(from: phone, seeded: seeded, counter: counter, text: "Message \(counter)")) }
+        MockURLProtocol.requestHandler = server.handle
+        let contextStore = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
+        try contextStore.saveContractPreview(E2EEV2NotificationContext(
+            version: E2EEV2NotificationContext.currentVersion, revisionId: UUID().uuidString.lowercased(),
+            ownerScopeId: PushOwnerScope.id(for: fixture.user), sessionId: fixture.session.sessionId,
+            authToken: "fixture.jwt.signature", expiresAtMs: Int64(Date().addingTimeInterval(3_600).timeIntervalSince1970 * 1_000),
+            deviceId: fixture.descriptor.deviceId, privacy: .full, senderNames: [:]
+        ), now: Date())
+        let messaging = try makeMessaging(fixture, notifications: contextStore)
+        let refresh = {
+            await messaging.refresh(
+                conversationId: seeded.conversationId, isGroup: true, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+            )
+        }
+
+        guard case .refreshed = await refresh() else { return XCTFail("Relève") }
+        let entry = try XCTUnwrap(try contextStore.conversation(seeded.conversationId))
+        XCTAssertEqual(entry.counters[phone.device.deviceId], 2, "Rien de ce que l'app a reçu ne s'affichera")
+        XCTAssertEqual(Set(entry.latestMemberIds), [fixture.user, bruno, carla.device.userId])
+        XCTAssertEqual(entry.epochs.map(\.epochNumber), [1])
+
+        server.failsList = true
+        guard case .failure = await refresh() else { return XCTFail("Relève interrompue") }
+        XCTAssertNil(try contextStore.conversation(seeded.conversationId), "Une relève interrompue ne laisse aucune entrée")
+        server.failsList = false
+        guard case .refreshed = await refresh() else { return XCTFail("Relève reprise") }
+        XCTAssertNotNil(try contextStore.conversation(seeded.conversationId))
+
+        server.failsSend = true
+        let failed = await messaging.send(
+            .init(body: .text("Ne partira pas"), replyToRef: nil, mentions: [], ttlSeconds: 0),
+            clientRequestId: "message_01J7ABCD00000009", conversationId: seeded.conversationId, isGroup: true,
+            devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .failure = failed else { return XCTFail("Envoi refusé : \(failed)") }
+        XCTAssertNil(try contextStore.conversation(seeded.conversationId), "Un envoi échoué ne réécrit pas l'entrée")
+        server.failsSend = false
+        guard case .refreshed = await refresh() else { return XCTFail("Relève après l'échec") }
+
+        let left = await messaging.change(
+            .leave, conversationId: seeded.conversationId, isGroup: true, devices: devices,
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .applied = left else { return XCTFail("Départ : \(left)") }
+        XCTAssertNil(try contextStore.conversation(seeded.conversationId), "Conversation quittée : plus d'entrée")
+    }
+
     // MARK: Aides
 
-    private func makeMessaging(_ fixture: E2EEV2AccountFixture) throws -> E2EEV2ConversationMessagingV2 {
+    private func makeMessaging(
+        _ fixture: E2EEV2AccountFixture,
+        notifications: E2EEV2NotificationContextStore? = nil
+    ) throws -> E2EEV2ConversationMessagingV2 {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("messaging-" + UUID().uuidString, isDirectory: true)
         directories.append(directory)
+        let ledger = try E2EEV2MessageLedgerStore(baseDirectory: directory.appendingPathComponent("ledger"))
         return E2EEV2ConversationMessagingV2(
             api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
-            ledgerStore: try E2EEV2MessageLedgerStore(baseDirectory: directory.appendingPathComponent("ledger")),
+            ledgerStore: ledger,
             messageStore: E2EEV2MessageStoreV2(rootURL: directory.appendingPathComponent("messages"), keyStore: InMemoryTokenStore()),
+            notificationMirror: notifications.map {
+                E2EEV2NotificationMirrorWriter(
+                    keyStore: fixture.keys, stateStore: fixture.states, ledgerStore: ledger, contextStore: $0, contractPreview: true
+                )
+            },
             expectedSession: fixture.session
         )
     }
@@ -190,6 +254,8 @@ private final class FakeV2Server: @unchecked Sendable {
     private var afters: [String] = []
     private var epochs = 0
     private var envelopes: [E2EEV2SignedMessageEnvelopeV2] = []
+    private var listFails = false
+    private var sendFails = false
 
     init(_ fixture: E2EEV2AccountFixture, seeded: E2EEV2SeededConversation, pageSize: Int) throws {
         conversationId = seeded.conversationId
@@ -203,6 +269,16 @@ private final class FakeV2Server: @unchecked Sendable {
     var listAfters: [String] { lock.withLock { afters } }
     var epochPosts: Int { lock.withLock { epochs } }
     var sentEnvelopes: [E2EEV2SignedMessageEnvelopeV2] { lock.withLock { envelopes } }
+    /// La liste répond 503 tant que c'est vrai.
+    var failsList: Bool {
+        get { lock.withLock { listFails } }
+        set { lock.withLock { listFails = newValue } }
+    }
+    /// L'envoi répond 503 tant que c'est vrai.
+    var failsSend: Bool {
+        get { lock.withLock { sendFails } }
+        set { lock.withLock { sendFails = newValue } }
+    }
 
     func add(_ item: Item) { lock.withLock { items.append(item) } }
     func appendChange(_ change: E2EEV2SignedString) { lock.withLock { chain.append(change) } }
@@ -243,6 +319,7 @@ private final class FakeV2Server: @unchecked Sendable {
             return respond(request, .object(["epoch": epoch, "recipientCount": .string(String(envelopes.count))]))
         }
         if path.hasSuffix("/messages"), !post {
+            if listFails { return E2EEV2AccountFixture.response(request, Data("{}".utf8), status: 503) }
             let after = query.first { $0.name == "after" }?.value ?? "0"
             afters.append(after)
             let start = Int(after) ?? 0
@@ -258,6 +335,7 @@ private final class FakeV2Server: @unchecked Sendable {
             return respond(request, .object(["messages": .array(messages), "hasMore": .bool(start + slice.count < items.count)]))
         }
         if path.hasSuffix("/messages"), post {
+            if sendFails { return E2EEV2AccountFixture.response(request, Data("{}".utf8), status: 503) }
             let signed = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(E2EEV2AccountFixture.rawBody(request)))
             envelopes.append(signed)
             items.append(Item(senderUserId: ownUserId, senderDeviceId: ownDeviceId, signed: signed))

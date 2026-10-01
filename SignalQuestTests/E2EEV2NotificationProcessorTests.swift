@@ -43,7 +43,12 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         let reads = Counter()
         var failRemoval = false
         var failWrite = false
-        func string(for key: String) throws -> String? { reads.increment(); return try memory.string(for: key) }
+        var failReadPrefix: String?
+        func string(for key: String) throws -> String? {
+            reads.increment()
+            if let failReadPrefix, key.hasPrefix(failReadPrefix) { throw StorageFailure.unavailable }
+            return try memory.string(for: key)
+        }
         func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws {
             if failWrite { throw StorageFailure.unavailable }
             try memory.set(value, for: key, accessibility: accessibility)
@@ -53,7 +58,10 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
             try memory.remove(key)
         }
         func keys(withPrefix prefix: String) throws -> [String] { try memory.keys(withPrefix: prefix) }
-        func removeAll() throws { try memory.removeAll() }
+        func removeAll() throws {
+            if failRemoval { throw StorageFailure.unavailable }
+            try memory.removeAll()
+        }
     }
 
     private final class FailingActivationStore: E2EEV2NotificationActivationStoring, @unchecked Sendable {
@@ -67,6 +75,23 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         }
     }
 
+    /// Appelle `beforeEntryWrite` une fois, juste avant d'écrire une entrée.
+    private final class InterceptingTokenStore: TokenStore, @unchecked Sendable {
+        private let memory = InMemoryTokenStore()
+        var beforeEntryWrite: (() -> Void)?
+        func string(for key: String) throws -> String? { try memory.string(for: key) }
+        func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws {
+            if key.hasPrefix("notification-conversation-v1:"), let hook = beforeEntryWrite {
+                beforeEntryWrite = nil
+                hook()
+            }
+            try memory.set(value, for: key, accessibility: accessibility)
+        }
+        func remove(_ key: String) throws { try memory.remove(key) }
+        func keys(withPrefix prefix: String) throws -> [String] { try memory.keys(withPrefix: prefix) }
+        func removeAll() throws { try memory.removeAll() }
+    }
+
     func testRuntimeGatePrecedesContextKeysAndNetwork() async throws {
         let calls = Counter()
         let request = try XCTUnwrap(E2EEV2OpaqueNotificationRequest(envelopeId: envelopeId, recipientOwnerScope: owner))
@@ -77,6 +102,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
                 loadContext: { calls.increment(); return nil },
                 isCurrent: { _ in calls.increment(); return false },
                 loadConversation: { _ in calls.increment(); return nil },
+                claimShown: { _, _, _, _ in calls.increment(); return false },
                 fetch: { _ in calls.increment(); return Data() }
             )
         )
@@ -127,8 +153,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         let stranger = try self.fixture()
         let strangerStore = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
         try strangerStore.saveContractPreview(stranger.context, now: now)
-        try strangerStore.saveConversationContractPreview(E2EEV2NotificationConversation(
-            version: 1, conversationId: conversationId, epochs: stranger.conversation.epochs,
+        try strangerStore.saveConversationContractPreview(entry(stranger.conversation,
             signingKeys: [E2EEV2NotificationConversation.signingKeyName(userId: senderId, deviceId: senderDeviceId):
                 P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()]
         ), now: now)
@@ -138,10 +163,8 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         let outsider = try self.fixture()
         let outsiderStore = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
         try outsiderStore.saveContractPreview(outsider.context, now: now)
-        try outsiderStore.saveConversationContractPreview(E2EEV2NotificationConversation(
-            version: 1, conversationId: conversationId,
-            epochs: outsider.conversation.epochs.map { .init(epochNumber: $0.epochNumber, keyB64: $0.keyB64, memberIds: [recipientId], replacedAtMs: $0.replacedAtMs) },
-            signingKeys: outsider.conversation.signingKeys
+        try outsiderStore.saveConversationContractPreview(entry(outsider.conversation,
+            epochs: outsider.conversation.epochs.map { .init(epochNumber: $0.epochNumber, keyB64: $0.keyB64, memberIds: [recipientId], replacedAtMs: $0.replacedAtMs) }
         ), now: now)
         let notMember = await process(outsider, store: outsiderStore) { _ in outsider.data }
         XCTAssertEqual(notMember, .generic(.invalidDelivery), "L'émetteur n'est pas membre de l'époque")
@@ -177,6 +200,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
                 loadContext: { try store.load(now: fixture.now) },
                 isCurrent: { try store.isCurrent($0, now: fixture.now) },
                 loadConversation: { try store.conversation($0, now: fixture.now) },
+                claimShown: { try store.claimShown(conversationId: $0, deviceId: $1, counter: $2, floor: $3, now: fixture.now) },
                 fetch: { _ in calls.increment(); return fixture.data },
                 now: { fixture.now }
             )
@@ -204,7 +228,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
     }
 
     func testExpiredMessageStaysGeneric() async throws {
-        let fixture = try fixture(createdAt: now.addingTimeInterval(-120)), store = try store(fixture)
+        let fixture = try fixture(createdAt: now.addingTimeInterval(-120), ttlSeconds: 60), store = try store(fixture)
         let result = await process(fixture, store: store) { _ in fixture.data }
         XCTAssertEqual(result, .generic(.expired))
     }
@@ -228,6 +252,246 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
             Data(repeating: 32, count: E2EEV2WireLimits.maxJSONResponseBytes + 1)
         }
         XCTAssertEqual(result, .generic(.invalidDelivery))
+    }
+
+    // MARK: Jamais deux fois, jamais trop vieux, jamais pour un autre (§2.6, §3.4, §4.2)
+
+    func testTheSameSignedMessageIsShownOnlyOnce() async throws {
+        let fixture = try fixture(), store = try store(fixture)
+        let first = await process(fixture, store: store) { _ in fixture.data }
+        guard case .preview = first else { return XCTFail("Premier affichage : \(first)") }
+        // Le serveur le remet sous un autre identifiant, qui n'est pas signé.
+        let otherId = "envelope_notification_fixture_02"
+        let replayed = Data(String(decoding: fixture.data, as: UTF8.self).replacingOccurrences(of: envelopeId, with: otherId).utf8)
+        let second = await process(fixture, store: store, envelopeId: otherId) { _ in replayed }
+        XCTAssertEqual(second, .generic(.replayed))
+    }
+
+    func testWhatTheExtensionShowedSurvivesTheAppsRewrite() async throws {
+        let fixture = try fixture(), store = try store(fixture)
+        guard case .preview = await process(fixture, store: store, fetch: { _ in fixture.data }) else {
+            return XCTFail("Premier affichage")
+        }
+        // L'app retire puis réécrit l'entrée sans avoir reçu ce message.
+        try store.removeConversation(conversationId)
+        try store.saveConversationContractPreview(fixture.conversation, now: now)
+        let otherId = "envelope_notification_fixture_03"
+        let replayed = Data(String(decoding: fixture.data, as: UTF8.self).replacingOccurrences(of: envelopeId, with: otherId).utf8)
+        let again = await process(fixture, store: store, envelopeId: otherId) { _ in replayed }
+        XCTAssertEqual(again, .generic(.replayed))
+    }
+
+    func testTwoSimultaneousDeliveriesShowOnce() async throws {
+        let fixture = try fixture(), store = try store(fixture)
+        let owner = self.owner, otherId = "envelope_notification_fixture_04"
+        let copy = Data(String(decoding: fixture.data, as: UTF8.self).replacingOccurrences(of: envelopeId, with: otherId).utf8)
+        let deliveries = [(envelopeId, fixture.data), (otherId, copy)]
+        let results = await withTaskGroup(of: E2EEV2NotificationProcessingResult.self) { group in
+            for (id, data) in deliveries {
+                group.addTask {
+                    await E2EEV2NotificationProcessor.processContractPreview(
+                        request: E2EEV2OpaqueNotificationRequest(envelopeId: id, recipientOwnerScope: owner)!,
+                        apiBaseURL: URL(string: "https://api.example.test")!,
+                        dependencies: .init(
+                            loadContext: { try store.load(now: fixture.now) },
+                            isCurrent: { try store.isCurrent($0, now: fixture.now) },
+                            loadConversation: { try store.conversation($0, now: fixture.now) },
+                            claimShown: {
+                                try store.claimShown(conversationId: $0, deviceId: $1, counter: $2, floor: $3, now: fixture.now)
+                            },
+                            fetch: { _ in
+                                try await Task.sleep(nanoseconds: 20_000_000)
+                                return data
+                            },
+                            now: { fixture.now }
+                        )
+                    )
+                }
+            }
+            var all: [E2EEV2NotificationProcessingResult] = []
+            for await result in group { all.append(result) }
+            return all
+        }
+        XCTAssertEqual(results.filter { if case .preview = $0 { return true } else { return false } }.count, 1)
+        XCTAssertTrue(results.contains(.generic(.replayed)))
+    }
+
+    func testAnUnreadableShownRecordKeepsTheNotificationGeneric() async throws {
+        let fixture = try fixture(), tokens = FailingTokenStore()
+        let store = E2EEV2NotificationContextStore(tokenStore: tokens)
+        try store.saveContractPreview(fixture.context, now: now)
+        try store.saveConversationContractPreview(fixture.conversation, now: now)
+        tokens.failReadPrefix = "notification-shown-v1:"
+        let result = await process(fixture, store: store) { _ in fixture.data }
+        guard case .generic = result else { return XCTFail("Lecture en échec : rien de montré, \(result)") }
+    }
+
+    func testAMessageTheAppAlreadyReceivedIsNeverShown() async throws {
+        let base = try fixture()
+        let store = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
+        try store.saveContractPreview(base.context, now: now)
+        try store.saveConversationContractPreview(entry(base.conversation, counters: [senderDeviceId: 1]), now: now)
+        let result = await process(base, store: store) { _ in base.data }
+        XCTAssertEqual(result, .generic(.replayed), "Compteur déjà reçu par l'app")
+    }
+
+    func testTheAnnouncedConversationMustBeTheSignedOne() async throws {
+        let fixture = try fixture(conversation: "conversation_notification_other"), store = try store(fixture)
+        let result = await process(fixture, store: store) { _ in fixture.data }
+        XCTAssertEqual(result, .generic(.invalidDelivery), "Signé pour une autre conversation que celle annoncée")
+    }
+
+    func testADepartedMemberIsShownForTwentyFourHoursOnly() async throws {
+        let base = try fixture()
+        let cases: [(TimeInterval?, Bool)] = [(nil, false), (3_600, true), (25 * 3_600, false)]
+        for (departedAgo, shown) in cases {
+            let store = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
+            try store.saveContractPreview(base.context, now: now)
+            try store.saveConversationContractPreview(entry(
+                base.conversation, latestMemberIds: [recipientId],
+                departures: departedAgo.map { [senderId: ms(now.addingTimeInterval(-$0))] } ?? [:]
+            ), now: now)
+            let result = await process(base, store: store) { _ in base.data }
+            if shown {
+                guard case .preview = result else { return XCTFail("Parti depuis une heure : \(result)") }
+            } else {
+                XCTAssertEqual(result, .generic(.invalidDelivery), "Départ : \(String(describing: departedAgo))")
+            }
+        }
+    }
+
+    func testAMessageSignedTooLongAgoOrInTheFutureStaysGeneric() async throws {
+        for created in [now.addingTimeInterval(-49 * 3_600), now.addingTimeInterval(20 * 60)] {
+            let fixture = try fixture(createdAt: created), store = try store(fixture)
+            let result = await process(fixture, store: store) { _ in fixture.data }
+            XCTAssertEqual(result, .generic(.outdated), "Signé le \(created)")
+        }
+    }
+
+    func testEphemeralEditAndDeletePreviewsNeverShowTheirText() async throws {
+        let target = E2EEV2MessageRef.make(
+            conversationId: conversationId, senderDeviceId: senderDeviceId, clientRequestId: "request_notification_target"
+        )
+        let cases: [(Int, E2EEV2ContentPayloadV2.Body, String)] = [
+            (60, .text("Contenu privé de test"), String(localized: "Message éphémère chiffré")),
+            (0, .edit(targetRef: target, text: "Texte privé modifié"), String(localized: "Message chiffré modifié")),
+            (0, .delete(targetRef: target), String(localized: "Message chiffré supprimé")),
+        ]
+        for (ttl, body, expected) in cases {
+            let fixture = try fixture(ttlSeconds: ttl, body: body), store = try store(fixture)
+            let result = await process(fixture, store: store) { _ in fixture.data }
+            guard case .preview(let preview) = result else { return XCTFail("Aperçu : \(result)") }
+            XCTAssertEqual(preview.presentation.body, expected)
+            XCTAssertFalse(preview.presentation.body.contains("privé"))
+        }
+    }
+
+    func testSenderOnlyMirrorsNoEpochKey() throws {
+        let keyed = try fixture(), senderOnly = try fixture(privacy: .senderOnly)
+        XCTAssertTrue(senderOnly.conversation.epochs.allSatisfy { $0.keyB64 == nil })
+        let store = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
+        try store.saveContractPreview(senderOnly.context, now: now)
+        XCTAssertThrowsError(try store.saveConversationContractPreview(keyed.conversation, now: now),
+                             "Aucune clé d'époque sans l'aperçu complet")
+        try store.saveConversationContractPreview(senderOnly.conversation, now: now)
+        let full = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
+        try full.saveContractPreview(keyed.context, now: now)
+        XCTAssertThrowsError(try full.saveConversationContractPreview(senderOnly.conversation, now: now),
+                             "Aperçu complet : toutes les clés")
+    }
+
+    func testAnOldEntryIsNotUsedAndLeaves() async throws {
+        let base = try fixture(), memory = InMemoryTokenStore()
+        let store = E2EEV2NotificationContextStore(tokenStore: memory)
+        try store.saveContractPreview(base.context, now: now)
+        try store.saveConversationContractPreview(entry(base.conversation, writtenAtMs: ms(now.addingTimeInterval(-25 * 3_600))), now: now)
+        let result = await process(base, store: store) { _ in base.data }
+        XCTAssertEqual(result, .generic(.contextUnavailable), "Écrite il y a plus de 24 heures")
+        XCTAssertTrue(try memory.keys(withPrefix: "notification-conversation-v1:").isEmpty, "Croisée trop vieille, elle part")
+    }
+
+    func testTheCurrentEpochMustBeTheMostRecent() throws {
+        let fixture = try fixture()
+        XCTAssertTrue(fixture.conversation.isStructurallyValid)
+        let older = entry(fixture.conversation, epochs: fixture.conversation.epochs.map {
+            .init(epochNumber: $0.replacedAtMs == nil ? 6 : $0.epochNumber, keyB64: $0.keyB64,
+                  memberIds: $0.memberIds, replacedAtMs: $0.replacedAtMs)
+        })
+        XCTAssertFalse(older.isStructurallyValid)
+    }
+
+    func testAnEntryOfAnotherSessionIsUnreadable() throws {
+        let fixture = try fixture(), memory = InMemoryTokenStore()
+        let store = E2EEV2NotificationContextStore(tokenStore: memory)
+        try store.saveContractPreview(fixture.context, now: now)
+        let foreign = entry(fixture.conversation, sessionId: "00000000-0000-4000-8000-0000000000ff")
+        XCTAssertThrowsError(try store.saveConversationContractPreview(foreign, now: now))
+        let key = "notification-conversation-v1:" + SHA256.hash(data: Data(conversationId.utf8)).map { String(format: "%02x", $0) }.joined()
+        try memory.set(String(decoding: try JSONEncoder().encode(foreign), as: UTF8.self), for: key, accessibility: .afterFirstUnlock)
+        XCTAssertNil(try store.conversation(conversationId, now: now))
+    }
+
+    func testEntriesLeftByAPreviousSessionNeverComeBack() throws {
+        let fixture = try fixture(), tokens = FailingTokenStore()
+        let store = E2EEV2NotificationContextStore(tokenStore: tokens)
+        try store.saveContractPreview(fixture.context, now: now)
+        try store.saveConversationContractPreview(fixture.conversation, now: now)
+        // Déconnexion : le marqueur est révoqué, mais rien ne s'efface du trousseau.
+        tokens.failRemoval = true
+        try store.revoke()
+        XCTAssertFalse(try tokens.keys(withPrefix: "notification-conversation-v1:").isEmpty, "L'entrée est restée")
+        let next = E2EEV2NotificationContext(
+            version: E2EEV2NotificationContext.currentVersion, revisionId: "00000000-0000-4000-8000-000000000003",
+            ownerScopeId: "user:" + String(repeating: "b", count: 64), sessionId: "00000000-0000-4000-8000-000000000004",
+            authToken: "other.jwt.signature", expiresAtMs: fixture.context.expiresAtMs,
+            deviceId: "device_other_notification_fixture", privacy: .full, senderNames: [:]
+        )
+        // Un autre compte active ses aperçus : rien ne s'active tant qu'elle reste,
+        XCTAssertThrowsError(try store.saveContractPreview(next, now: now))
+        XCTAssertNil(try store.load(now: now))
+        // puis elle part avant l'activation.
+        tokens.failRemoval = false
+        try store.saveContractPreview(next, now: now)
+        XCTAssertTrue(try tokens.keys(withPrefix: "notification-conversation-v1:").isEmpty)
+        XCTAssertNil(try store.conversation(conversationId, now: now))
+    }
+
+    func testARevocationDuringTheWriteTakesTheEntryAway() throws {
+        let fixture = try fixture(), tokens = InterceptingTokenStore()
+        let store = E2EEV2NotificationContextStore(tokenStore: tokens)
+        try store.saveContractPreview(fixture.context, now: now)
+        tokens.beforeEntryWrite = { try? store.revoke() }
+        XCTAssertThrowsError(try store.saveConversationContractPreview(fixture.conversation, now: now))
+        XCTAssertTrue(try tokens.keys(withPrefix: "notification-conversation-v1:").isEmpty,
+                      "Écrite après la révocation, l'entrée repart aussitôt")
+    }
+
+    func testExtensionNotificationsAreClearedWithTheAppOnes() {
+        XCTAssertTrue(E2EEV2NotificationScope.isEncryptedNotification(identifier: "e2ee-v2:owner:session:envelope", userInfo: [:]))
+        XCTAssertTrue(E2EEV2NotificationScope.isEncryptedNotification(
+            identifier: "6F2A1C3E-APNS", userInfo: ["type": "e2ee_v2_envelope", "envelopeId": envelopeId]
+        ), "Posée par l'extension sous l'identifiant APNs")
+        XCTAssertFalse(E2EEV2NotificationScope.isEncryptedNotification(identifier: "6F2A1C3E-APNS", userInfo: ["type": "message_new"]))
+    }
+
+    func testTheNetworkReadAcceptsOnlyABoundedAnswerAtTheExactAddress() async throws {
+        let url = try XCTUnwrap(URL(string: "https://api.example.test/api/e2ee/v2/envelopes/\(envelopeId)/fetch"))
+        let request = URLRequest(url: url)
+        defer { MockURLProtocol.requestHandler = nil }
+        func answer(status: Int = 200, at address: URL? = nil, body: Data = Data("{}".utf8)) async -> Data? {
+            MockURLProtocol.requestHandler = { _ in
+                (HTTPURLResponse(url: address ?? url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!, body)
+            }
+            return try? await E2EEV2NotificationNetwork.fetch(request, protocolClasses: [MockURLProtocol.self])
+        }
+        let ok = await answer()
+        XCTAssertEqual(ok, Data("{}".utf8))
+        let refused = await answer(status: 503)
+        XCTAssertNil(refused, "Seul un 200")
+        let elsewhere = await answer(at: URL(string: "https://api.example.test/api/e2ee/v2/envelopes/other/fetch"))
+        XCTAssertNil(elsewhere, "Seulement à l'adresse demandée")
+        let oversized = await answer(body: Data(repeating: 32, count: E2EEV2WireLimits.maxJSONResponseBytes + 1))
+        XCTAssertNil(oversized, "Jamais plus de 512 Kio")
     }
 
     func testNotificationMirrorIsDormantAndRevocable() throws {
@@ -527,19 +791,45 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
     private func process(
         _ fixture: Fixture,
         store: E2EEV2NotificationContextStore,
+        envelopeId requested: String? = nil,
         fetch: @escaping @Sendable (URLRequest) async throws -> Data
     ) async -> E2EEV2NotificationProcessingResult {
         await E2EEV2NotificationProcessor.processContractPreview(
-            request: E2EEV2OpaqueNotificationRequest(envelopeId: envelopeId, recipientOwnerScope: owner)!,
+            request: E2EEV2OpaqueNotificationRequest(envelopeId: requested ?? envelopeId, recipientOwnerScope: owner)!,
             apiBaseURL: URL(string: "https://api.example.test")!,
             dependencies: .init(
                 loadContext: { try store.load(now: fixture.now) },
                 isCurrent: { try store.isCurrent($0, now: fixture.now) },
                 loadConversation: { try store.conversation($0, now: fixture.now) },
+                claimShown: { try store.claimShown(conversationId: $0, deviceId: $1, counter: $2, floor: $3, now: fixture.now) },
                 fetch: fetch, now: { fixture.now }
             )
         )
     }
+
+    /// La même entrée, quelques champs changés.
+    private func entry(
+        _ base: E2EEV2NotificationConversation,
+        conversationId: String? = nil,
+        ownerScopeId: String? = nil,
+        sessionId: String? = nil,
+        writtenAtMs: Int64? = nil,
+        epochs: [E2EEV2NotificationConversation.Epoch]? = nil,
+        latestMemberIds: [String]? = nil,
+        departures: [String: Int64]? = nil,
+        counters: [String: Int]? = nil,
+        signingKeys: [String: String]? = nil
+    ) -> E2EEV2NotificationConversation {
+        .init(
+            version: base.version, conversationId: conversationId ?? base.conversationId,
+            ownerScopeId: ownerScopeId ?? base.ownerScopeId, sessionId: sessionId ?? base.sessionId,
+            writtenAtMs: writtenAtMs ?? base.writtenAtMs, epochs: epochs ?? base.epochs,
+            latestMemberIds: latestMemberIds ?? base.latestMemberIds, departures: departures ?? base.departures,
+            counters: counters ?? base.counters, signingKeys: signingKeys ?? base.signingKeys
+        )
+    }
+
+    private func ms(_ date: Date) -> Int64 { Int64(date.timeIntervalSince1970 * 1_000) }
 
     private func store(_ fixture: Fixture) throws -> E2EEV2NotificationContextStore {
         let store = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
@@ -551,7 +841,10 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
     private func fixture(
         privacy: E2EEV2NotificationPrivacy = .full,
         createdAt: Date? = nil,
-        replacedAt: Date? = nil
+        replacedAt: Date? = nil,
+        ttlSeconds: Int = 0,
+        body: E2EEV2ContentPayloadV2.Body = .text("Contenu privé de test"),
+        conversation announced: String? = nil
     ) throws -> Fixture {
         let recipientIdentity = try P256.KeyAgreement.PrivateKey(rawRepresentation: Data(repeating: 1, count: 32))
         let recipientSigning = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 2, count: 32))
@@ -560,10 +853,10 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         let created = createdAt ?? now
         let payload = try E2EEV2ContentPayloadV2(
             sentAtMs: Int64(created.timeIntervalSince1970 * 1_000), counter: 1, replyToRef: nil, mentions: [],
-            body: .text("Contenu privé de test")
+            body: body
         ).encoded()
         let signed = try E2EEV2MessageComposerV2.compose(
-            payload: payload, conversationId: conversationId, clientRequestId: "request_notification_fixture", ttlSeconds: 60,
+            payload: payload, conversationId: conversationId, clientRequestId: "request_notification_fixture", ttlSeconds: ttlSeconds,
             epoch: E2EEV2StoredEpochKey(
                 conversationId: conversationId, epochId: "epoch_notification_fixture_01", epochNumber: 7,
                 keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(epochKey), epochKey: epochKey
@@ -597,19 +890,24 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
             expiresAtMs: Int64(now.addingTimeInterval(3_600).timeIntervalSince1970 * 1_000),
             deviceId: recipientDeviceId, privacy: privacy, senderNames: [senderId: "Test Sender"]
         )
+        // Clés d'époque seulement avec l'aperçu complet.
+        let keyed = privacy == .full
         let conversation = E2EEV2NotificationConversation(
-            version: E2EEV2NotificationConversation.currentVersion, conversationId: conversationId,
+            version: E2EEV2NotificationConversation.currentVersion, conversationId: announced ?? conversationId,
+            ownerScopeId: owner, sessionId: context.sessionId, writtenAtMs: Int64(now.timeIntervalSince1970 * 1_000),
             epochs: [
-                .init(epochNumber: 8, keyB64: Data(repeating: 6, count: 32).base64EncodedString(), memberIds: [senderId, recipientId], replacedAtMs: nil),
-                .init(epochNumber: 7, keyB64: epochKey.base64EncodedString(), memberIds: [senderId, recipientId],
+                .init(epochNumber: 8, keyB64: keyed ? Data(repeating: 6, count: 32).base64EncodedString() : nil,
+                      memberIds: [senderId, recipientId], replacedAtMs: nil),
+                .init(epochNumber: 7, keyB64: keyed ? epochKey.base64EncodedString() : nil, memberIds: [senderId, recipientId],
                       replacedAtMs: Int64((replacedAt ?? now.addingTimeInterval(-60)).timeIntervalSince1970 * 1_000)),
             ],
+            latestMemberIds: [senderId, recipientId], departures: [:], counters: [:],
             signingKeys: [
                 E2EEV2NotificationConversation.signingKeyName(userId: senderId, deviceId: senderDeviceId):
                     senderSigning.publicKey.x963Representation.base64EncodedString(),
             ]
         )
-        let data = E2EEV2CanonicalJSON.encode(.object(["conversationId": .string(conversationId), "message": message]))
+        let data = E2EEV2CanonicalJSON.encode(.object(["conversationId": .string(announced ?? conversationId), "message": message]))
         return Fixture(context: context, conversation: conversation, descriptor: descriptor, data: data, now: now)
     }
 }
