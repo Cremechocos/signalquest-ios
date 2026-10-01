@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.11**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.12**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -189,6 +189,12 @@
 >   `E2EE_REPORT_QUOTA`, rapport trop grand en 400 `E2EE_REPORT_TOO_LARGE`
 >   (§11, §16, D.8, E.0, E.3), après accord du serveur. Aucun vecteur ne
 >   change.
+> - v0.4.12 (01/10/2026) : vecteur `capability-intersection-v1`, produit par
+>   iOS (§12, §15) : appareils pris en compte, versions, `kind` et fonctions
+>   communs, ou capacité indisponible ; dix cas, dont l'exclusion des
+>   navigateurs, la mise à l'écart, un membre sans appareil certifié et un
+>   membre refusé. Précision : un document de 90 jours pile ne compte plus
+>   (« moins de 90 jours »). Aucun autre vecteur ne change.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -1204,6 +1210,12 @@ conversation, et sans permettre un faux signalement ni un message insignalable.
     des membres actuels. Un navigateur compte seulement s'il est approuvé et
     si `excludesWeb` n'est pas actif. Un membre sans appareil certifié ne
     compte pas (§10.0).
+  - L'âge d'un document se compte depuis son `issuedAtMs` : à 90 jours pile,
+    il ne compte plus.
+  - Un membre dont le paquet de confiance est refusé (§2.4) rend la capacité
+    indisponible : ses appareils sont inconnus. Sans aucun appareil pris en
+    compte, elle est indisponible aussi.
+  - Vecteur : `capability-intersection-v1`.
 - Un appareil sans document récent est **mis à l'écart** : il sort de
   l'intersection et des nouvelles époques (§3.3), jusqu'à ce qu'il publie un
   document à jour. Cette mise à l'écart, décidée par les clients, remplace
