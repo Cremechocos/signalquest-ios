@@ -19,12 +19,12 @@
   "membershipDigest": "rjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds",
   "createdAtMs": "1790000000003",
   "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n3\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000003",
-  "signatureDerB64": "MEQCIDUmhA9zi6Kjxc4Xhxgs6QDtWJXL0q8aHPjdUQ5BOmwVAiAA5Od6iMXQ/08+NhBb1aoPFHSyhRLlBVzzZkcYinyqOg==",
+  "signatureDerB64": "MEUCIQCSlG9baL4EcY8dArM3E3t5BZjCaRedhtNkpY/WjUfFvgIgUfBWA5Zg/AzYN1TFGRNu/MxHxBw1fFyAMUNFT5DbtWo=",
   "negative": [
     {
       "case": "excludesWebWithWebRecipient",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n1\n3\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000003",
-      "signatureDerB64": "MEUCIQC1/EmbVKkEKmIfTNk695i+QJb7QRVL4Ch6QMhf7e5M2QIgN4wdIe/3zCjidY0pPfWIZRVyiHpRZDu3h9/TE2/IeJI="
+      "signatureDerB64": "MEUCIQDUht1ZU21FQJ+wjSjJGWODzgZdlh5GZNiifq4Ez5oBwgIgVQsZc0Y6YblSyWTvwK5aRh/Ire9YlthLbfRxSJyY9oI="
     },
     {
       "case": "recipientsMismatch",
@@ -35,22 +35,22 @@
     },
     {
       "case": "highS",
-      "signatureDerB64": "MEUCIDUmhA9zi6Kjxc4Xhxgs6QDtWJXL0q8aHPjdUQ5BOmwVAiEA/xsYhHc6LwGwwcnvpCpV8KhySCiUMpkoAFODqnHmexc="
+      "signatureDerB64": "MEYCIQCSlG9baL4EcY8dArM3E3t5BZjCaRedhtNkpY/WjUfFvgIhAK4PqftpnwP0J8irOubskQLwnzaRcZtCBMJ2hXNrh2/n"
     },
     {
       "case": "formatVersion1",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n1\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n1790000000003",
-      "signatureDerB64": "MEQCIG7KIK9L7rnxidiVPLNK+VmRQsPHRe3Zlsjdv83YRSJYAiAXFUqDcgk+yl/z2GfVTtXk0qjb+rYSJ9Yxw136vV18Ww=="
+      "signatureDerB64": "MEQCICm5K8U5xJlzoN4Dw+yqMNJP47YXzqMOBApZew/ZK63/AiAjnpfr4Pk8opURCGhNuQ6VMxdfFdm88/8ujSDLR3gdtQ=="
     },
     {
       "case": "membershipZero",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n0\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000003",
-      "signatureDerB64": "MEUCIQCHAg/0joOp5AS9VJcI7O++y+qw6P4ZrqtcLAZf/teteAIgUSjYRCTeJH9kvKke8t2eDqesyyS78dRzKeLEd0MFXBc="
+      "signatureDerB64": "MEUCIQDV8sGOoe4HMIT8cZarBMKf7xscAw2pbg1/UscD9BDtyQIgSsAz9zPK7Lv49dAPCntBlo+qufl92ZjOug/5WKz/+Do="
     },
     {
       "case": "duplicateDevice",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n2\n-ERajBlUOGxwdUGeT5A3jqvYI5oehgVIegB57HG0bvY\n0\n3\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000003",
-      "signatureDerB64": "MEQCIBq2VfudwVaU/z7yztfbPBBYQJqGLzb2MCOyIaaG20f1AiB/N8NvuoNXLkBzsKJ8TDDLFdzCWogUKj9iPrsRdHzYzg==",
+      "signatureDerB64": "MEQCICvfO6DcIzbRv8tfdobcPwz78mz+ZZEMzmcdMLwLPhEtAiB8QRZbN+/7a2h0O98mLWw/LzewMpKCIeQwadP/cKxD7A==",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nLRp6exRyrhvgi7tPCJA7xPbch0g3eJUD4MPi4QQH-zg"
@@ -59,11 +59,19 @@
     {
       "case": "unknownPlatform",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n2\ncHbG0IdZ1FrjMl52FplAKb-cH9yb72xA1rBueTNQQcE\n0\n3\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000003",
-      "signatureDerB64": "MEQCIDAZke7dzy0zhovUYhq6LWTCu28HsJMvLnkiZLoX7XeSAiA6w6OIsHm70oOzsrmwqWVjY0VGtJB4lyR2R1rt9D8Gmw==",
+      "signatureDerB64": "MEUCIQCqOdvB+av8Qe5H7Zg302kpSt/JVgVKhFdCOwjnf77SDgIgVMLnl5YEXQeGCbJH+GkDLECw8Jihf3tDschq1Sgv4As=",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\nmacos\nH8BO1Tk_VkVyOTbAeCDArOYIU_axncpIVahy57w_CHI"
       ]
+    },
+    {
+      "case": "nonCanonicalDer",
+      "signatureDerB64": "MEYCIgAAkpRvW2i+BHGPHQKzNxN7eQWYwmkXnYbTZKWP1o1Hxb4CIFHwVgOWYPwM2DdUxRkTbvzMR8QcNXxcgDFDRU+Q27Vq"
+    },
+    {
+      "case": "trailingDerBytes",
+      "signatureDerB64": "MEUCIQCSlG9baL4EcY8dArM3E3t5BZjCaRedhtNkpY/WjUfFvgIgUfBWA5Zg/AzYN1TFGRNu/MxHxBw1fFyAMUNFT5DbtWoA"
     }
   ]
 }

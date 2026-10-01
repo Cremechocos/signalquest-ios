@@ -18,26 +18,26 @@
   "chain": [
     {
       "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n1\nADD\nuser_alice_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\n-\n1790000000000",
-      "signatureDerB64": "MEUCIQCcdccuSz3hS45FKNmagpCYRUOO34Z8l8t1pyc444qdeAIgKGgOIP1BSTodb8IIA/nbPHARy6O0Qv3oqI4kDTUZVYA="
+      "signatureDerB64": "MEUCIQD+HWSn++HgDbR5EY/9xTzAJDR4wV2IA9d9c+MfRiVo6wIgYjDhOuQLVnp9dXh3C4wB6rPVww5Avv7j5hY6hPbjj3E="
     },
     {
       "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n2\nADD\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nYXH94i-HMDrM2iuoaPiuHgF1xXyAbpUZFyVjzOhGTqk\n1790000000001",
-      "signatureDerB64": "MEUCIQCgBPlYvlDidEeFLnst2rA4S7Ui5wmll/h9bq+tG6LxlgIgOMFz/oQXsnNv3luTQy6Y1jz4fMSwwJQ6ASiB2EUFk2s="
+      "signatureDerB64": "MEUCIQDqI6EEbb51x/HDDVbZHEU5wnuJwKU5XzrrWbVDUG+45AIgL2XkqaR4Yrc6F4Qaw+F42Ib80CmjCamK6c5/DkIt5iY="
     },
     {
       "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n3\nROLE_ADMIN\nuser_alice_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nkLxl5DZU1eOdiYsh5kwQucXiZmE9Fkj2bnpw6vBARV8\n1790000000002",
-      "signatureDerB64": "MEQCIH9vpwUZqnMDIAYRvu9Edke9qNSHAwVNmqUNmMbNBUKUAiAFSWawmnLZXVDBhx/Lu69TNzzKLjUZhbPicnp6AjD5cQ=="
+      "signatureDerB64": "MEUCIQCDnh1au6eN7lAyyZOPWRIfq+dSU5YPsSDxeFu9jnVypwIgMb47W80hIc9fzzNr2O9wyBuyyv8SSctnzSZdFCVgmdE="
     },
     {
       "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n4\nEXCLUDE_WEB_ON\n-\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000003",
-      "signatureDerB64": "MEUCIQDWqNXzMm9sHMMLWqkItE74zYsPsY2sPpK2frlWc7fajQIgBUANRffP/Q0Ytmij3ns5lqbdr91tjqzA9YrrJAEj6wA="
+      "signatureDerB64": "MEUCIQD4OyMoRLQlYUkx0EiPlvx/JsYDqAEdoHxenlQMxMSuOwIgVQvg/50vBGZwcS3xuEJkoBT7BZl17T//8aepRG6KT34="
     }
   ],
   "cases": [
     {
       "case": "genesis",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n3\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000011",
-      "signatureDerB64": "MEUCIQCHc7PDq+meenTjdGN1B0QBo8US7gERM1WS/rWq2ZziXgIgaJQPVWXOavFgqQVMYwOkxmsKzjaBmZH3HD2AtNmSNx4=",
+      "signatureDerB64": "MEUCIQCpoGGnKXDSsdqFsTW9YNxiCIdsQGX2ZgGr8Ykl02Ke2QIgaHSS3VxBSQlgZyulInVaG7bk+m4UhafYU7IlNpWM1fY=",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
@@ -48,7 +48,7 @@
     {
       "case": "secondEpoch",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n2\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n2\n4oWN9Qf9wwQwF4k91Zk2E8O5hiomb7l8c3VeV4Fci3Y\n1\n4\n-So2vji8Xx-pgL7UxRq6gWtFmG9MJmFuGr6vKo0_k7E\n1790000000012",
-      "signatureDerB64": "MEUCIQDavQZ0TFcoAZFr/t4CoPbKh2eYRrDvUCzmwJiTT6H9VwIgGeEQROIdNX5D35krjcPQOEqqywEC8S0uYGlzXSVl7Jk=",
+      "signatureDerB64": "MEQCIFU1f9xGifvVytimOrGwIYmcjc4WlnkWhSaxdtVGJv79AiBBF2hT92EUFGS9/kb955XHlOVx+pv2nVpGD6J02tVHww==",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\nandroid\nH8BO1Tk_VkVyOTbAeCDArOYIU_axncpIVahy57w_CHI"
@@ -59,7 +59,7 @@
     {
       "case": "sameMembershipAsPrevious",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n3\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n2\n4oWN9Qf9wwQwF4k91Zk2E8O5hiomb7l8c3VeV4Fci3Y\n1\n4\n-So2vji8Xx-pgL7UxRq6gWtFmG9MJmFuGr6vKo0_k7E\n1790000000013",
-      "signatureDerB64": "MEUCIQCzrXxTNlrF2JyHWpP8Y0wXx1Svz3useIw9nIIvOyKcSwIgZPILiJocf4KfNMd7LbRM8ElP3umhbxO67cdPBDcG5F8=",
+      "signatureDerB64": "MEUCIQCCPILVrRYZ0oLkAIPRR5uzgJAg8YNDY9lp03fbE/XwnAIgMYDFEegeRQ56M+MilcRiF+c0N2jmAqlzDfwRRkAMkRg=",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\nandroid\nH8BO1Tk_VkVyOTbAeCDArOYIU_axncpIVahy57w_CHI"
@@ -70,7 +70,7 @@
     {
       "case": "wrongDigest",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n3\nkLxl5DZU1eOdiYsh5kwQucXiZmE9Fkj2bnpw6vBARV8\n1790000000011",
-      "signatureDerB64": "MEUCIQDEk6RB4a65G1HapzglsTTELYaSXkK1z7My8awa1NdYdgIgBOe+hnhYYwFpvCv05ZpBo2yUXPynog5gKcQWX2ZLLbE=",
+      "signatureDerB64": "MEQCIBHuMxHJ3P1aBGZHpCBtrTX83TkLxkbh8upexZK9/0KkAiAWWZocx+FEQoiuEfBtSxtoPC5wCacWff3oRkXQZq1BAw==",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
@@ -81,7 +81,7 @@
     {
       "case": "recipientNotMember",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n4\n1ifGsVcLJKe_qJ6S7ym5DQ3HBZkp1TlPz2dIxxAjWu4\n0\n3\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000011",
-      "signatureDerB64": "MEQCICiSiEBkXSY2Ht2cs1gvaBQRZu4jpyZwZ5UW7mkdPdViAiAqAWhkxL0sOqyowRzAQWkCraSTHauiDMRZFMQGNY98SQ==",
+      "signatureDerB64": "MEQCIEq/VGda4IDk9OpDlcnArmVMVMcFPdYXOUa92KS+KEsjAiBIbukjBm0YCrHiukwDJrWXOAhgRZjmnkJl+pGhPL5fFg==",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
@@ -93,7 +93,7 @@
     {
       "case": "excludesWebMismatch",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n2\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n2\n4oWN9Qf9wwQwF4k91Zk2E8O5hiomb7l8c3VeV4Fci3Y\n0\n4\n-So2vji8Xx-pgL7UxRq6gWtFmG9MJmFuGr6vKo0_k7E\n1790000000012",
-      "signatureDerB64": "MEUCIQCL4oOX5odI809hVikB3SjzdocgLd3ZfqccRU8FQYddSAIgf2Jf/INxw7nIwPsoxSeOdMKXa/hP/g5luJcIDC9AcZ8=",
+      "signatureDerB64": "MEQCIB5V8vT9xglRicdQq3DgiP5tP9Gx5/CJz12nk5ww9D+zAiAAxDabnR2Nrla52yptiyrzrZhPniGr9TJw6O3OObXqMA==",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\nandroid\nH8BO1Tk_VkVyOTbAeCDArOYIU_axncpIVahy57w_CHI"
@@ -104,7 +104,7 @@
     {
       "case": "membershipRegressed",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n2\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n3\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000012",
-      "signatureDerB64": "MEUCIQDuYqdQFlcBvJEJL4qv4OKpTXeqzHV0tod9xZKCqbtfLAIgHzMIXeARGU4BOFnSWbmRtrgELqVWFaGqVQuivVttI0Y=",
+      "signatureDerB64": "MEUCIQCnpAd/IRFy0BkSC7H8BHq/27zh2tEfGybv9ERBREU8CgIgbYrUfCyJejwMXZ7N1GsyvIbXAA8N+r6GBCcpVMNBj8s=",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
@@ -116,7 +116,7 @@
     {
       "case": "genesisMismatch",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n3\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000011",
-      "signatureDerB64": "MEQCIDAgUcs1adPUH2QOV0fNAL1Cu9M5KcduWbZ/lVPp1VHUAiBh+y6thGvXm4AtvRXsrHp7eJBeNk7eeEmkq6HbaZviMA==",
+      "signatureDerB64": "MEQCIFAu37SKHpGvR04CUNdLL4tp7+W0gjBYri68hoR5gjwJAiBnBHEdhsR+bZTbYc9WYtGngTZz7ZtgUtFdYfpBBIUM6w==",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
@@ -127,7 +127,7 @@
     {
       "case": "genesisByTwoDevices",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n3\nVcXSL8cOTGs-paUBDIiC6c3eCQtVQyVnSiERzvx_H-o\n1790000000011",
-      "signatureDerB64": "MEQCIAOXYZyLlW8PS0aQ5p+Tkh6s3ckoOCbCekLkna1OgBDpAiBnShtmKWaMd9uvQbHiaRUWVeVcXGtZrBeEltvYJmlv9Q==",
+      "signatureDerB64": "MEQCIEL8cJ6qhSB/yAsBdodY2qeSyN+cWxq8+rgnPJYfTHxNAiAmU07VOI9IAbhbdM7Hnjbci0TpaKaTMlJHi0UhmvfX6A==",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
@@ -136,15 +136,15 @@
       "chain": [
         {
           "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n1\nADD\nuser_alice_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\n-\n1790000000000",
-          "signatureDerB64": "MEUCIQCYIH/GjbNhdKoEHJOPgOBLU9hUhSPsPxmtIb5bodjpdAIgALGRNKro4Z+oKfk9m0VtojaqIekLwq36tnC2u+Gd/No="
+          "signatureDerB64": "MEUCIQC4VmdWxxkSX7HVPLyBuPdt0qwc5WJWBuLVAt4v6bnUHwIgN2IzXNJ5FFNw9eMn9fZHbym8SUbwFfDy5SdJ3GhcICU="
         },
         {
           "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n2\nADD\nuser_bruno_01J7ABCD23456789\nuser_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\nYXH94i-HMDrM2iuoaPiuHgF1xXyAbpUZFyVjzOhGTqk\n1790000000001",
-          "signatureDerB64": "MEUCIQD2xihYrQLkeVZtYbY2+PnwkTfOha7yZNqo44QbLb0x8AIgekzlGwVVxc33glJixJXNsnpPijlDnYb6sFtYTBxPGp4="
+          "signatureDerB64": "MEUCIQCaBlYdNJJjHy+tBPkEQjZlwqJgVnYVB0kOH/YHobgmVQIgDLmYrHb5QF1/3NnDh9p636wgOikCDuMkGxRliQhfaOw="
         },
         {
           "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n3\nROLE_ADMIN\nuser_alice_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nb41nSvto2famcBgKCe4LfqaXC_piQMmjChlrRoEfWWs\n1790000000002",
-          "signatureDerB64": "MEUCIQCaoEoWpv4U+MPhSNR2IVQJF12fRKMzBYcKznn/21fObwIgYzAMlnqUssq1/jQz/kVWLoFSCpuCIa3O9GiE0A5wtp4="
+          "signatureDerB64": "MEQCIAc5qnJI2ImdIGMnJ+O1uPp6GvIalpDTOEc0PXpLZ5O5AiAC0nKq+Ok4Qxi5YCGe/Z+IBtWdELP3XcH1jcJocVeLtA=="
         }
       ],
       "expected": "invalidChain"
@@ -152,7 +152,7 @@
     {
       "case": "unsortedGenesis",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n3\npA7u4IysibwJlDKMIxJ-alJ9h1bjXOdBDVrOKPkb6Y8\n1790000000011",
-      "signatureDerB64": "MEQCIAbWs/+czoLgMb9BtAJV43Ael2J9E1c5JbmO7664SE2zAiB16Yxnhv5sbXt3vlM8VAKvE/x+tY/7RKBCqgb7p9g2dQ==",
+      "signatureDerB64": "MEQCICCGZFC5mdVN9lm04SOHtCD/b1mnTpHU3YqJ64Ld0JWAAiBMzX9CuCSMYEcETlE+0X1vsiLE69+Gw2R5aSn1AYmBDg==",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
@@ -161,15 +161,15 @@
       "chain": [
         {
           "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n1\nADD\nuser_bruno_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\n-\n1790000000000",
-          "signatureDerB64": "MEQCIDhl9x67LSANSRwbCp+HECIkflAVfnXGpIvm3Khj+uumAiAWI9+frSKOck/wdAqIN+UZCQaB4BCWg4qYNFbg/6+xgA=="
+          "signatureDerB64": "MEQCIGJegQu+qpvDQRLcqIr+EvCvGUVDrL2bb+FJ4N9VhE/zAiAHt88WSDODPLBGyQZry+CzRbTO8dvjFck8UBX3FPGCWQ=="
         },
         {
           "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n2\nADD\nuser_alice_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ngtdHyCNPHwLy6zcrsshi1RsQ7npTaLSclIzXoe31n-U\n1790000000001",
-          "signatureDerB64": "MEUCIQDmZmN+rInWzVQbFwt3oe82DGG//s5m/RPPmtTW9EyU9gIgAfT3S6g4R8mA8i9Fteb0pzazJ3PDW61H5/BE89K1cPw="
+          "signatureDerB64": "MEUCIQCqrnAEyOTpqzpyLzaE2RuvbH0xNCmir4UPji4nKO1EHwIgDZPQEAI4PqXUq1iv2drDVxEoBOJi7eGB9ex6kOiSNw8="
         },
         {
           "changeUtf8": "SQ-E2EE-V2-MEMBERSHIP\n1\nconversation_01J7ABCD23456789\n3\nROLE_ADMIN\nuser_alice_01J7ABCD23456789\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\n32_pPH7bIMzsmtMS95Z4dlX7sBhyqWQ-PZT1Fb8aEKg\n1790000000002",
-          "signatureDerB64": "MEUCIQD0hNcmgF526yK8AN7DUcgWzL4/nrqU3P7kqVkttGSnjQIgaKKryeQNzR2qBF1ld0QLGrHsdN0ojiPAAS9/ptIZzF8="
+          "signatureDerB64": "MEQCIBZaVp5Kn/4X2BcemDcXISjbZ0dsu/IFHq6W85I08eJfAiADPbAqAEPlRSMmvCvkNrv5zLqtGq8UQrJHGuYQz1mN7w=="
         }
       ],
       "expected": "invalidChain"
@@ -177,7 +177,7 @@
     {
       "case": "roleAdminInDirect",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n3\nYE31kQ6eBhoyTVcCheawIVvC-wPgP9tdTD4XrP_6CB4\n0\n3\nrjnaI7yCv27utRHrR7N-ao6febu4a2Pm2HbypNBG9Ds\n1790000000011",
-      "signatureDerB64": "MEUCIQCZ7kgUc9EBvR3UOS1PHwEYM5njmOcLgNwxTW2jhwIwEwIgfWeLkP2WhMtu2qxgjV2gYPEw6YYhrVJkwIZ8WbwclBI=",
+      "signatureDerB64": "MEUCIQDpqBpck1qG6ge9705D+mgI0RLvg/OA1QO081qMC/pg1wIgaMIplxV749RtUyiOduDD+v/y6zBshp/fImJHysuNRFA=",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y",
@@ -189,7 +189,7 @@
     {
       "case": "membershipBeyondChain",
       "manifestUtf8": "SQ-E2EE-V2-EPOCH-MANIFEST\n2\nconversation_01J7ABCD23456789\n1\nuser_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\ndVsYjzDZuI1mBim6dDCADUYQaLRBZiXB8sYSCQDlEc0=\n2\n4oWN9Qf9wwQwF4k91Zk2E8O5hiomb7l8c3VeV4Fci3Y\n1\n5\n-So2vji8Xx-pgL7UxRq6gWtFmG9MJmFuGr6vKo0_k7E\n1790000000011",
-      "signatureDerB64": "MEQCICbItheTLAJ4fAfyJk//s2VjoV6i/5O1wF5UYG9i1HIoAiAdFeYndhQdJoFPOdi4A9carN/5rZDsUtm144ZuBxOmyg==",
+      "signatureDerB64": "MEQCIGRTf0VShpdgchDQ7r7dLUockkcGo49JW4V+mHQpaBTXAiBH4sn9WZag94vImycHTkw9E6M0qnMyvMc01TkkcjYlPg==",
       "recipients": [
         "user_alice_01J7ABCD23456789\ndevice_alice_ios_01J7ABCD2345\nios\nIQXCg9mwVMg4-dqrhdccirB4reCd1IY9ykrgn-E0D6I",
         "user_bruno_01J7ABCD23456789\ndevice_bruno_android_01J7ABCD\nandroid\nH8BO1Tk_VkVyOTbAeCDArOYIU_axncpIVahy57w_CHI"

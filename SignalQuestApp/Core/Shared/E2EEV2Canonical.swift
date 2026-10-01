@@ -308,9 +308,13 @@ enum E2EEV2LowS {
         try normalize(der: try key.signature(for: message).derRepresentation)
     }
 
+    /// DER canonique exigé : la signature doit se réencoder à l'identique,
+    /// sans zéro de tête superflu ni octet en trop, faute de quoi deux
+    /// encodages d'une même signature passeraient.
     static func verify(derSignature: Data, message: Data, publicKey: P256.Signing.PublicKey) -> Bool {
         guard isLowS(der: derSignature),
-              let signature = try? P256.Signing.ECDSASignature(derRepresentation: derSignature) else {
+              let signature = try? P256.Signing.ECDSASignature(derRepresentation: derSignature),
+              signature.derRepresentation == derSignature else {
             return false
         }
         return publicKey.isValidSignature(signature, for: message)

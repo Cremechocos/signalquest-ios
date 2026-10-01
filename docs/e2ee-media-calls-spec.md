@@ -479,8 +479,11 @@ conversation est v2 (§12).
   `membershipChangeNumber` qui n'est pas le dernier changement accepté :
   `409 E2EE_MEMBERSHIP_STALE`, avec l'état courant. Sinon, un membre tout
   juste retiré recevrait encore la clé.
-- Vecteurs : `epoch-manifest-v2` (format) et `epoch-binding-v1` (liaison à
-  la chaîne, cas négatifs compris).
+- Alphabets : `keyCommitmentB64` en base64 standard avec remplissage,
+  `recipientsDigest` et `membershipDigest` en base64url sans remplissage
+  (D.0).
+- Vecteurs : `epoch-manifest-v2` (format, DER non canonique compris) et
+  `epoch-binding-v1` (liaison à la chaîne, cas négatifs compris).
 
 ---
 
@@ -1586,8 +1589,8 @@ serveur porte aussi le web.
 
 **Web**
 
-- **WEB-A1** Pile v2 en WebCrypto : P-256, conversion DER ↔ `r‖s`, low-S,
-  vecteurs (§15).
+- **WEB-A1** Pile v2 en WebCrypto : P-256, conversion DER ↔ `r‖s` stricte
+  (DER canonique), refus explicite du high-S (`s ≤ n/2`), vecteurs (§15).
 - **WEB-A2** Navigateur sur demande : enrôlement par QR approuvé depuis un
   téléphone. Ni approbation ni récupération depuis le web (§2.7).
 - **WEB-A3** Messages texte v2, franking, signalement (§4, §11).
@@ -1629,7 +1632,15 @@ implémentation seule.
 - **Empreinte d'appareil** : `b64url(SHA-256(identityKey ‖ signingKey))`, sur
   les deux clés X9.63 brutes.
 - **Signature** : ECDSA P-256 avec SHA-256, sur les octets UTF-8 de la chaîne
-  canonique, en DER, forme low-S, en b64 standard.
+  canonique, en DER canonique, forme low-S, en b64 standard.
+  - DER canonique : entiers minimaux, sans zéro de tête superflu, sans octet
+    après la séquence. Le vérificateur refuse tout autre encodage : la
+    signature doit se réencoder à l'identique (v0.4.7).
+  - Le refus du high-S (`s > n/2`) et d'un DER non canonique est un contrôle
+    explicite : WebCrypto (`crypto.subtle.verify`) accepte le high-S.
+- **Alphabets** : clés, signatures, nonces et `keyCommitmentB64` en base64
+  standard avec remplissage ; empreintes d'appareil et condensats (`…Digest`)
+  en base64url sans remplissage. Une même chaîne signée peut mêler les deux.
 - **Une chaîne signée voyage telle quelle**, dans un champ JSON texte, avec sa
   signature. Le destinataire la découpe strictement, avec un nombre de champs
   exact et chaque champ validé. Il ne la reconstruit jamais à partir de champs

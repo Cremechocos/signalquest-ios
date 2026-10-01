@@ -839,6 +839,8 @@ private extension E2EEV2JalonAVectorTests {
                 try negative("membershipZero", manifest(false, recipients, membership: 0)),
                 try negative("duplicateDevice", manifest(false, duplicate), recipients: duplicate),
                 try negative("unknownPlatform", manifest(false, unknownPlatform), recipients: unknownPlatform),
+                .o([("case", .s("nonCanonicalDer")), ("signatureDerB64", .s(try nonCanonicalDer(signed.signatureB64)))]),
+                .o([("case", .s("trailingDerBytes")), ("signatureDerB64", .s(try trailingDerBytes(signed.signatureB64)))]),
             ])),
         ])
     }
@@ -1475,6 +1477,22 @@ private extension E2EEV2JalonAVectorTests {
             identityKeyX963: try agreementKey(identitySeed).publicKey.x963Representation,
             signingKeyX963: try signingKey(signingSeed).publicKey.x963Representation
         )
+    }
+
+    /// Même signature, avec un zéro de tête superflu devant `r` (D.0).
+    func nonCanonicalDer(_ signatureB64: String) throws -> String {
+        var der = [UInt8](try XCTUnwrap(Data(base64Encoded: signatureB64)))
+        XCTAssertEqual(der[0], 0x30)
+        XCTAssertEqual(der[2], 0x02)
+        der.insert(0x00, at: 4)
+        der[3] += 1
+        der[1] += 1
+        return Data(der).base64EncodedString()
+    }
+
+    /// Même signature, suivie d'un octet en trop (D.0).
+    func trailingDerBytes(_ signatureB64: String) throws -> String {
+        (try XCTUnwrap(Data(base64Encoded: signatureB64)) + Data([0x00])).base64EncodedString()
     }
 
     func highS(_ signatureB64: String) throws -> String {
