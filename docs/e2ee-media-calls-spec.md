@@ -2041,12 +2041,20 @@ version publiée qui ouvre les verrous.
   - `manifest`, au format 2 (§3.5) ;
   - `envelopes`.
 
+  Reçu proposé par iOS : `{epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
   En cas de conflit : 409 `E2EE_EPOCH_STALE`, avec
-  `details.currentEpoch` au format de `epochs/current`. Si le manifeste
-  repose sur un état d'appartenance qui n'est plus le dernier : 409
-  `E2EE_MEMBERSHIP_STALE`, avec l'état courant.
-- **`GET /api/e2ee/v2/conversations/{id}/epochs/current`**, étendu. La
-  réponse ajoute le manifeste signé, avec sa liste de destinataires.
+  `details.currentEpoch` au format de `epochs/current`. Le client peut aussi
+  relire `epochs/current`, puisqu'un manifeste de 500 lignes dépasse la
+  taille d'un corps d'erreur ; il vérifie l'époque acceptée comme un
+  destinataire avant de l'adopter. Si le manifeste repose sur un état
+  d'appartenance qui n'est plus le dernier : 409 `E2EE_MEMBERSHIP_STALE`,
+  avec l'état courant.
+- **`GET /api/e2ee/v2/conversations/{id}/epochs/current`**, étendu.
+  Réponse proposée par iOS :
+  `{conversationId, epoch: {id, epochNumber, status, createdAt}, manifest: {manifest, signatureB64, recipients}, envelope}`,
+  où `envelope` est celle de l'appareil qui lit (A.3). La clé du créateur se
+  lit dans l'annuaire des appareils certifiés (§2.2), jamais dans la
+  réponse.
 - **`POST /api/e2ee/v2/conversations/{id}/epochs/{epochNumber}/ack`**, accusé
   de réception. Le serveur passe l'enveloppe de l'appareil en ligne témoin
   (§2.6).
