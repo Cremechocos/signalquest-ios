@@ -651,23 +651,76 @@ enum E2EEV2ApprovalV2 {
         }
     }
 
-    /// Code de comparaison à 6 chiffres, calculé des deux côtés. Il couvre la
-    /// plateforme du nouvel appareil (v0.4.5).
+    /// SAS v3 (v0.4.6), première étape : l'appareil en attente met son aléa
+    /// en gage avant de connaître celui de l'approbateur.
+    static func sasCommitment(
+        userId: String,
+        approvalId: String,
+        pendingDeviceId: String,
+        platform: String,
+        fingerprint: String,
+        pendingNonceB64Url: String
+    ) -> String {
+        E2EEV2Canonical.sha256B64URL(E2EEV2Canonical.line([
+            "SQ-E2EE-V2-SAS-COMMIT", "1", userId, approvalId, pendingDeviceId, platform, fingerprint,
+            pendingNonceB64Url,
+        ]))
+    }
+
+    /// Code de comparaison à 6 chiffres, calculé des deux côtés une fois les
+    /// deux aléas connus et la mise en gage vérifiée. Il couvre la plateforme.
     static func sas(
         userId: String,
         pendingDeviceId: String,
         platform: String,
         fingerprint: String,
         approvalId: String,
-        challengeB64Url: String
+        pendingNonceB64Url: String,
+        approverNonceB64Url: String
     ) -> String {
         let hash = Data(SHA256.hash(data: E2EEV2Canonical.line([
-            "SQ-E2EE-V2-APPROVAL-SAS", "2", userId, pendingDeviceId, platform, fingerprint, approvalId,
-            challengeB64Url,
+            "SQ-E2EE-V2-APPROVAL-SAS", "3", userId, pendingDeviceId, platform, fingerprint, approvalId,
+            pendingNonceB64Url, approverNonceB64Url,
         ])))
         let value = hash.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) } % 1_000_000
         let text = String(value)
         return String(repeating: "0", count: 6 - text.count) + text
+    }
+
+    /// Code de proximité v2 (v0.4.6) : 80 bits liés à l'empreinte et à la
+    /// plateforme, en 16 caractères base32 Crockford.
+    static func proximityCode(
+        userId: String,
+        approvalId: String,
+        pendingDeviceId: String,
+        platform: String,
+        fingerprint: String,
+        challengeB64Url: String
+    ) -> String {
+        let hash = Data(SHA256.hash(data: E2EEV2Canonical.line([
+            "SQ-E2EE-V2-PROXIMITY", "1", userId, approvalId, pendingDeviceId, platform, fingerprint,
+            challengeB64Url,
+        ])))
+        let alphabet = Array("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
+        var bits = hash.prefix(10).reduce(into: [UInt8]()) { result, byte in
+            for shift in stride(from: 7, through: 0, by: -1) { result.append((byte >> UInt8(shift)) & 1) }
+        }
+        var code = ""
+        while !bits.isEmpty {
+            let chunk = bits.prefix(5).reduce(0) { ($0 << 1) | Int($1) }
+            code.append(alphabet[chunk])
+            bits.removeFirst(5)
+        }
+        return code
+    }
+
+    /// Comparaison d'une saisie au code attendu : majuscules, sans espaces ni
+    /// tirets, en temps constant.
+    static func proximityMatches(_ input: String, expected: String) -> Bool {
+        let typed = Array(input.uppercased().filter { !$0.isWhitespace && $0 != "-" }.utf8)
+        let reference = Array(expected.utf8)
+        guard typed.count == reference.count else { return false }
+        return zip(typed, reference).reduce(UInt8(0)) { $0 | ($1.0 ^ $1.1) } == 0
     }
 
     /// 32 octets en base64url canonique, sans bourrage.

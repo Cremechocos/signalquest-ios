@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.5**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.6**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -90,6 +90,13 @@
 >   l'utilisateur compare à l'approbation (QR v3, code SAS), ensemble fermé des
 >   plateformes, refus par l'approbateur et par le serveur (§2.3, D.2, D.13,
 >   E.0). Accord des sessions serveur, Android et web.
+> - v0.4.6 (01/10/2026) : après une relecture de sécurité indépendante du code
+>   iOS de la chaîne de confiance. Les navigateurs ne détiennent jamais l'UIK
+>   (§2.7, D.1). Code SAS en mise en gage puis révélation (D.13). Code de
+>   proximité dérivé de l'empreinte. Chaîne des listes servie depuis la
+>   version épinglée (D.3, E.1). Vérification de l'UIK de son propre compte
+>   sur un nouvel appareil (§2.3). Bundle de récupération signé par l'UIK
+>   (§2.8). Lecture stricte des lignes de liste et du base64 des clés.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -215,7 +222,15 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
   compare (QR et code SAS, D.13). L'approbateur signe le certificat avec la
   plateforme que l'utilisateur a vue, jamais avec celle que déclare le serveur.
 - L'approbation **par notification** exige un code de comparaison (SAS) de six
-  chiffres, affiché sur les deux écrans et confirmé par l'utilisateur.
+  chiffres, affiché sur les deux écrans et confirmé par l'utilisateur. Le
+  nouvel appareil met d'abord son aléa en gage, l'approbateur répond par le
+  sien, puis le premier révèle le sien (D.13) : le serveur ne peut plus
+  chercher un code qui coïncide. Une seule tentative par code.
+- Le nouvel appareil reçoit l'UIK du compte sans pouvoir la comparer seul. Il
+  la marque « clé du compte non vérifiée » jusqu'à ce que l'utilisateur
+  compare les 30 chiffres du compte (D.12) avec un autre de ses appareils. Un
+  QR montré par l'approbateur et scanné par le nouvel appareil PEUT remplacer
+  cette comparaison.
 - Tout ajout d'appareil est annoncé aux contacts dans les conversations
   (message système vérifié) ; le numéro de sécurité ne change pas (§2.4).
 
@@ -290,6 +305,19 @@ conversations chiffrées **sur demande seulement**.
   prend effet à l'époque suivante et figure dans son manifeste (§3.5).
 - Depuis le web, il est impossible d'approuver un appareil ou d'utiliser la
   récupération.
+- Un navigateur ne détient **jamais** l'UIK : aucun `uikWrap` pour
+  `platform = web` (D.1). Avec l'UIK, un JavaScript malveillant pourrait
+  certifier un faux téléphone et annuler l'exclusion des navigateurs. En
+  conséquence :
+  - le navigateur crée ses deux clés d'appareil, montre le QR v3 et attend
+    qu'un téléphone signe son certificat ;
+  - sa page « Appareils » est en lecture seule et renvoie vers le téléphone
+    pour révoquer ;
+  - après une rotation de l'UIK, un téléphone re-signe son certificat, et le
+    web demande « réapprouvez ce navigateur depuis votre téléphone » ;
+  - un compte sans téléphone ne peut pas activer la v2 sur le web, puisque le
+    premier appareil doit porter l'UIK ;
+  - le web ne crée aucun bundle de récupération.
 - Le client web DEVRAIT être servi depuis une origine statique distincte, avec
   une CSP stricte, l'intégrité des sous-ressources (SRI) et des bundles
   reproductibles publiés. C'est un chantier d'infrastructure à part.
@@ -304,6 +332,12 @@ conversations chiffrées **sur demande seulement**.
 - **Règle normative** : un appareil N'ENVELOPPE une clé d'époque que vers la
   clé de récupération de **son propre compte**. Il n'utilise jamais une clé de
   récupération d'un autre membre fournie par le serveur.
+- Le serveur ne choisit pas non plus la clé de son propre compte : le bundle
+  porte une signature de l'UIK sur
+  `SQ-E2EE-V2-RECOVERY-BUNDLE\n1\n<userId>\n<bundleHash>\n<recoveryPublicIdentityKeyB64>`.
+  Un appareil qui n'a pas créé le bundle vérifie cette signature avant
+  d'envelopper. En attendant ce format, seul l'appareil qui a créé le bundle
+  sauvegarde l'historique.
 - La clé de récupération ouvre tout l'historique **et** permet d'approuver un
   appareil. Son usage déclenche la même alerte qu'un nouvel appareil, puis une
   nouvelle clé de récupération est proposée.
@@ -1524,6 +1558,8 @@ implémentation seule.
 ### D.1 Transport de l'UIK à l'approbation (`uik-wrap-v1`)
 
 L'appareil approbateur envoie l'UIK au nouvel appareil, pour sa clé d'accord.
+Jamais à un navigateur : pour `platform = web`, l'approbation porte le
+certificat et la liste, sans `uikWrap` (§2.7).
 
 - Clé éphémère P-256 `e` ; secret = ECDH(`e`, clé d'accord du nouvel appareil).
 - Sel : `SHA-256("SQ-E2EE-V2-UIK-WRAP-SALT\n1\n<userId>\n<approverDeviceId>\n<newDeviceId>")`.
@@ -1546,12 +1582,21 @@ L'appareil approbateur envoie l'UIK au nouvel appareil, pour sa clé d'accord.
 - `platform` appartient à un ensemble fermé, en ASCII minuscule : `ios`,
   `android` ou `web`. Aucune normalisation (casse, espaces) : toute autre
   valeur est refusée, au bootstrap comme à la lecture.
+- Les clés publiques sont en base64 **canonique** (ré-encoder les octets
+  redonne la chaîne). Une variante aux bits de bourrage non nuls est refusée :
+  comparée comme chaîne, elle passerait pour une autre clé.
 - Signée par l'UIK.
 - JSON : `{"certificate": "<chaîne>", "signatureB64": "…"}`.
 
 ### D.3 Liste d'appareils (`device-list-v1`)
 
 - Ligne d'appareil : `<deviceId>\n<keyVersion>\n<platform>\n<empreinte>`.
+  Les lignes contiennent des retours à la ligne : chaque ligne est donc lue
+  strictement (exactement 4 champs, `deviceId` opaque, `keyVersion` décimal
+  de 1 à 2³¹−2, `platform` de D.2, empreinte de 43 caractères en base64url
+  canonique), et un même `deviceId` n'apparaît qu'une fois. Sans ce contrôle,
+  deux découpages différents donneraient le même condensat.
+- `version` est un décimal de 1 à 2³¹−2 ; les comparaisons ne débordent pas.
 - `devicesDigest` : condensat de liste d'étiquette
   `SQ-E2EE-V2-DEVICE-LIST-ENTRIES`.
 - Chaîne signée par l'UIK :
@@ -1562,6 +1607,13 @@ L'appareil approbateur envoie l'UIK au nouvel appareil, pour sa clé d'accord.
 - Un appareil révoqué est absent de la liste suivante.
 - Le serveur accepte une liste si `version` vaut la courante + 1 et si
   `previousListDigest` est le condensat de la courante.
+- Un client ne saute jamais un maillon : depuis sa version épinglée N, il lit
+  les listes N+1 à M (E.1) et vérifie chaque signature et chaque condensat
+  précédent. Il refuse à la moindre lacune.
+- Un `deviceId` certifié par deux comptes n'est cru pour aucun des deux.
+- Limite : un appareil révoqué garde l'UIK et pourrait re-signer une liste
+  qui le remet. Révoquer un appareil pour la raison `COMPROMISED` propose donc
+  une réinitialisation d'identité (D.14).
 
 ### D.4 Changement de membre (`membership-change-v1`)
 
@@ -1709,13 +1761,29 @@ Format au §11. Le vecteur `franking-v1` donne `fk`, la charge, `frankTag`,
   - `<platform>` suit D.2. Elle ne peut contenir ni `|` ni retour à la ligne.
   - L'approbateur compare `<empreinte>` à celle du descripteur en attente, et
     `<platform>` à la plateforme qu'il déclare.
-- **Code SAS** (approbation par notification) : on prend
-  `SHA-256("SQ-E2EE-V2-APPROVAL-SAS\n2\n<userId>\n<pendingDeviceId>\n<platform>\n<empreinte>\n<approvalId>\n<challengeB64Url>")`.
-  Ses 4 premiers octets, en entier big-endian modulo 1 000 000, donnent un
-  code de 6 chiffres.
-- **Code de proximité** : celui de `device-approval-v1`, auquel on joint
-  l'empreinte complète. L'approbateur affiche la plateforme déclarée, et
-  l'utilisateur la confirme avant d'approuver.
+- **Code SAS v3** (approbation par notification), en mise en gage puis
+  révélation, pour que le serveur ne puisse pas chercher un code qui coïncide :
+  1. l'appareil en attente tire `nP` (32 octets aléatoires) et publie, avec sa
+     demande, `commitB64Url = b64url(SHA-256("SQ-E2EE-V2-SAS-COMMIT\n1\n<userId>\n<approvalId>\n<pendingDeviceId>\n<platform>\n<empreinte>\n<nPB64Url>"))` ;
+  2. l'approbateur lit la demande et sa mise en gage, puis tire et envoie `nA`
+     (32 octets aléatoires) ;
+  3. l'appareil en attente révèle `nP`. L'approbateur recalcule la mise en
+     gage et abandonne si elle diffère.
+
+  Le code : les 4 premiers octets, en entier big-endian modulo 1 000 000, de
+  `SHA-256("SQ-E2EE-V2-APPROVAL-SAS\n3\n<userId>\n<pendingDeviceId>\n<platform>\n<empreinte>\n<approvalId>\n<nPB64Url>\n<nAB64Url>")`.
+  Les champs sont séparés par `\n` comme dans toute l'annexe D : leurs formats
+  (identifiants opaques, base64url, plateforme) excluent ce caractère, ce qui
+  vaut un encodage par longueur. Une seule tentative : écart, révélation
+  absente ou demande expirée ⇒ abandon, puis nouvelle demande. L'approbateur
+  n'affiche le code qu'après avoir vérifié la mise en gage.
+- **Code de proximité v2** : 16 caractères en base32 Crockford (80 bits), tirés
+  des 10 premiers octets de
+  `SHA-256("SQ-E2EE-V2-PROXIMITY\n1\n<userId>\n<approvalId>\n<pendingDeviceId>\n<platform>\n<empreinte>\n<challengeB64Url>")`.
+  L'appareil en attente l'affiche ; l'approbateur le recalcule depuis la demande
+  que sert le serveur et le compare à la saisie, normalisée (majuscules,
+  espaces et tirets retirés), à temps constant. Substituer d'autres clés
+  demanderait une collision sur 80 bits.
 - **Plateforme affichée** : un libellé traduit de la plateforme lue dans le
   QR ou couverte par le SAS, jamais de celle du serveur. La comparaison porte
   sur la valeur canonique. Pour un navigateur, l'avertissement sur les
@@ -1796,10 +1864,14 @@ version publiée qui ouvre les verrous.
 
 ### E.1 Identité et appareils
 
-- **`GET /api/e2ee/v2/users/{userId}/identity`**, le paquet de confiance d'un
-  compte. Réponse :
+- **`GET /api/e2ee/v2/users/{userId}/identity?sinceVersion=<N>`**, le paquet de
+  confiance d'un compte. `sinceVersion` est la version épinglée du client
+  (absente au premier contact). Réponse :
   - `accountIdentityKeyB64` ;
   - `deviceList` : `{list, signatureB64, devices}` ;
+  - `deviceListChain` : les listes N+1 à M−1, en `{list, signatureB64}` et dans
+    l'ordre, M étant la courante ; pages plafonnées à 50, avec
+    `nextSinceVersion` quand il en reste. Le client vérifie chaque maillon ;
   - `certificates` : liste de `{certificate, signatureB64}`, les appareils de
     la liste courante ;
   - `capabilities` : liste de `{document, signatureB64}`, le dernier document

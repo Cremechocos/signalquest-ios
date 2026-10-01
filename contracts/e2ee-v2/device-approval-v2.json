@@ -1,5 +1,5 @@
 {
-  "fixtureVersion": "2",
+  "fixtureVersion": "3",
   "userId": "user_alice_01J7ABCD23456789",
   "approvalId": "approval_0000000000000002",
   "pendingDeviceId": "device_alice_web_01J7ABCD2345",
@@ -8,8 +8,15 @@
   "challengeB64Url": "AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0",
   "expiresAtMs": "1790000300000",
   "qrPayload": "SQE2EE2|3|approval_0000000000000002|device_alice_web_01J7ABCD2345|web|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000",
-  "sasCanonicalUtf8": "SQ-E2EE-V2-APPROVAL-SAS\n2\nuser_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y\napproval_0000000000000002\nAAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0",
-  "sas": "841428",
+  "pendingNonceB64Url": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+  "approverNonceB64Url": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+  "sasCommitCanonicalUtf8": "SQ-E2EE-V2-SAS-COMMIT\n1\nuser_alice_01J7ABCD23456789\napproval_0000000000000002\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y\nQEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+  "sasCommitB64Url": "On2gKbsmhRAMRvQoqHUZzEZlxF0HhIoPy18fF5rPg-E",
+  "sasCanonicalUtf8": "SQ-E2EE-V2-APPROVAL-SAS\n3\nuser_alice_01J7ABCD23456789\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y\napproval_0000000000000002\nQEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8\nYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8",
+  "sas": "861729",
+  "proximityCanonicalUtf8": "SQ-E2EE-V2-PROXIMITY\n1\nuser_alice_01J7ABCD23456789\napproval_0000000000000002\ndevice_alice_web_01J7ABCD2345\nweb\nBIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y\nAAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0",
+  "proximityCode": "ACYC65WHV5F25DY0",
+  "proximityTyped": "acyc-65WH V5F25DY0",
   "negative": [
     {
       "case": "sevenFields",
@@ -34,6 +41,18 @@
     {
       "case": "extraField",
       "qrPayload": "SQE2EE2|3|approval_0000000000000002|device_alice_web_01J7ABCD2345|web|BIvEzRnDtjcgd71KmhCGSRY-SEZyGtNShnAtobvQJ9Y|AAMGCQwPEhUYGx4hJCcqLTAzNjk8P0JFSEtOUVRXWl0|1790000300000|x"
+    },
+    {
+      "case": "revealedNonceDiffers",
+      "pendingNonceB64Url": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2A"
+    },
+    {
+      "case": "proximityForOtherKeys",
+      "proximityTyped": "Y6ZPE27W6XKG6D7C"
+    },
+    {
+      "case": "proximityForOtherPlatform",
+      "proximityTyped": "QDDS0NNXCYVDJYT6"
     }
   ]
 }

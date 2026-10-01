@@ -451,12 +451,36 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
         )
         XCTAssertEqual(qr.payload, try str(v, "qrPayload"))
         XCTAssertEqual(E2EEV2ApprovalV2.QR.parse(try str(v, "qrPayload")), qr)
+        // SAS v3 : mise en gage, puis code sur les deux aléas.
+        let commit = E2EEV2ApprovalV2.sasCommitment(
+            userId: try str(v, "userId"), approvalId: try str(v, "approvalId"),
+            pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"),
+            fingerprint: try str(v, "fingerprint"), pendingNonceB64Url: try str(v, "pendingNonceB64Url")
+        )
+        XCTAssertEqual(commit, try str(v, "sasCommitB64Url"))
         XCTAssertEqual(
-            E2EEV2ApprovalV2.sas(userId: try str(v, "userId"), pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"), fingerprint: try str(v, "fingerprint"), approvalId: try str(v, "approvalId"), challengeB64Url: try str(v, "challengeB64Url")),
+            E2EEV2ApprovalV2.sas(userId: try str(v, "userId"), pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"), fingerprint: try str(v, "fingerprint"), approvalId: try str(v, "approvalId"), pendingNonceB64Url: try str(v, "pendingNonceB64Url"), approverNonceB64Url: try str(v, "approverNonceB64Url")),
             try str(v, "sas")
         )
+        let proximity = E2EEV2ApprovalV2.proximityCode(
+            userId: try str(v, "userId"), approvalId: try str(v, "approvalId"),
+            pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"),
+            fingerprint: try str(v, "fingerprint"), challengeB64Url: try str(v, "challengeB64Url")
+        )
+        XCTAssertEqual(proximity, try str(v, "proximityCode"))
+        XCTAssertTrue(E2EEV2ApprovalV2.proximityMatches(try str(v, "proximityTyped"), expected: proximity))
         try forEachNegative(v) { neg in
-            XCTAssertNil(E2EEV2ApprovalV2.QR.parse(try str(neg, "qrPayload")), caseName(neg))
+            if let payload = neg["qrPayload"] as? String {
+                XCTAssertNil(E2EEV2ApprovalV2.QR.parse(payload), caseName(neg))
+            } else if let nonce = neg["pendingNonceB64Url"] as? String {
+                XCTAssertNotEqual(E2EEV2ApprovalV2.sasCommitment(
+                    userId: try str(v, "userId"), approvalId: try str(v, "approvalId"),
+                    pendingDeviceId: try str(v, "pendingDeviceId"), platform: try str(v, "platform"),
+                    fingerprint: try str(v, "fingerprint"), pendingNonceB64Url: nonce
+                ), commit, caseName(neg))
+            } else {
+                XCTAssertFalse(E2EEV2ApprovalV2.proximityMatches(try str(neg, "proximityTyped"), expected: proximity), caseName(neg))
+            }
         }
     }
 
@@ -994,13 +1018,37 @@ private extension E2EEV2JalonAVectorTests {
         )
         func payload(_ fields: [String]) -> VJ { .s(fields.joined(separator: "|")) }
         let fields = qr.payload.components(separatedBy: "|")
+        let pendingNonce = Data((0..<32).map { UInt8(0x40 + $0) }).base64URLEncodedNoPadding()
+        let approverNonce = Data((0..<32).map { UInt8(0x60 + $0) }).base64URLEncodedNoPadding()
+        let otherNonce = Data((0..<32).map { UInt8(0x41 + $0) }).base64URLEncodedNoPadding()
+        let proximity = E2EEV2ApprovalV2.proximityCode(
+            userId: userA, approvalId: approvalId, pendingDeviceId: deviceA2, platform: "web",
+            fingerprint: fingerprint, challengeB64Url: challenge
+        )
+        let otherFingerprint = try deviceFingerprint(identitySeed: 0x23, signingSeed: 0x33)
+        let otherProximity = E2EEV2ApprovalV2.proximityCode(
+            userId: userA, approvalId: approvalId, pendingDeviceId: deviceA2, platform: "web",
+            fingerprint: otherFingerprint, challengeB64Url: challenge
+        )
+        let iosProximity = E2EEV2ApprovalV2.proximityCode(
+            userId: userA, approvalId: approvalId, pendingDeviceId: deviceA2, platform: "ios",
+            fingerprint: fingerprint, challengeB64Url: challenge
+        )
+        let typed = String(proximity.prefix(4)).lowercased() + "-" + String(proximity.dropFirst(4).prefix(4))
+            + " " + String(proximity.dropFirst(8))
         return .o([
-            ("fixtureVersion", .s("2")), ("userId", .s(userA)), ("approvalId", .s(approvalId)),
+            ("fixtureVersion", .s("3")), ("userId", .s(userA)), ("approvalId", .s(approvalId)),
             ("pendingDeviceId", .s(deviceA2)), ("platform", .s("web")), ("fingerprint", .s(fingerprint)),
             ("challengeB64Url", .s(challenge)), ("expiresAtMs", .s(String(expires))),
             ("qrPayload", .s(qr.payload)),
-            ("sasCanonicalUtf8", .s(["SQ-E2EE-V2-APPROVAL-SAS", "2", userA, deviceA2, "web", fingerprint, approvalId, challenge].joined(separator: "\n"))),
-            ("sas", .s(E2EEV2ApprovalV2.sas(userId: userA, pendingDeviceId: deviceA2, platform: "web", fingerprint: fingerprint, approvalId: approvalId, challengeB64Url: challenge))),
+            ("pendingNonceB64Url", .s(pendingNonce)), ("approverNonceB64Url", .s(approverNonce)),
+            ("sasCommitCanonicalUtf8", .s(["SQ-E2EE-V2-SAS-COMMIT", "1", userA, approvalId, deviceA2, "web", fingerprint, pendingNonce].joined(separator: "\n"))),
+            ("sasCommitB64Url", .s(E2EEV2ApprovalV2.sasCommitment(userId: userA, approvalId: approvalId, pendingDeviceId: deviceA2, platform: "web", fingerprint: fingerprint, pendingNonceB64Url: pendingNonce))),
+            ("sasCanonicalUtf8", .s(["SQ-E2EE-V2-APPROVAL-SAS", "3", userA, deviceA2, "web", fingerprint, approvalId, pendingNonce, approverNonce].joined(separator: "\n"))),
+            ("sas", .s(E2EEV2ApprovalV2.sas(userId: userA, pendingDeviceId: deviceA2, platform: "web", fingerprint: fingerprint, approvalId: approvalId, pendingNonceB64Url: pendingNonce, approverNonceB64Url: approverNonce))),
+            ("proximityCanonicalUtf8", .s(["SQ-E2EE-V2-PROXIMITY", "1", userA, approvalId, deviceA2, "web", fingerprint, challenge].joined(separator: "\n"))),
+            ("proximityCode", .s(proximity)),
+            ("proximityTyped", .s(typed)),
             ("negative", .a([
                 .o([("case", .s("sevenFields")), ("qrPayload", payload(fields.enumerated().filter { $0.offset != 4 }.map(\.element)))]),
                 .o([("case", .s("version2")), ("qrPayload", payload(["SQE2EE2", "2"] + fields.dropFirst(2)))]),
@@ -1008,6 +1056,9 @@ private extension E2EEV2JalonAVectorTests {
                 .o([("case", .s("emptyPlatform")), ("qrPayload", payload(fields.enumerated().map { $0.offset == 4 ? "" : $0.element }))]),
                 .o([("case", .s("unknownPlatform")), ("qrPayload", payload(fields.enumerated().map { $0.offset == 4 ? "desktop" : $0.element }))]),
                 .o([("case", .s("extraField")), ("qrPayload", payload(fields + ["x"]))]),
+                .o([("case", .s("revealedNonceDiffers")), ("pendingNonceB64Url", .s(otherNonce))]),
+                .o([("case", .s("proximityForOtherKeys")), ("proximityTyped", .s(otherProximity))]),
+                .o([("case", .s("proximityForOtherPlatform")), ("proximityTyped", .s(iosProximity))]),
             ])),
         ])
     }
