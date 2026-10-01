@@ -28,6 +28,8 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     @Published var approvalErrorMessage: String?
     @Published var generatedApproval: E2EEV2Approval?
     @Published var approvalDetail: E2EEV2ApprovalDetail?
+    /// QR v3 lu pour `approvalDetail` : l'approbation signe ce que l'utilisateur a scanné.
+    private var approvalQR: E2EEV2QRApprovalPayload?
     @Published var bootstrapChallenge: E2EEV2BootstrapEmailChallenge?
 
     private let identityStore: E2EEV2DeviceIdentityStore
@@ -126,6 +128,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         approvalErrorMessage = nil
         generatedApproval = nil
         approvalDetail = nil
+        approvalQR = nil
         bootstrapChallenge = nil
     }
 
@@ -170,6 +173,9 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
             resetApproval()
             confirmationMessage = "Premier appareil approuvé."
             await load()
+        case .failed(let failure) where failure.code == "E2EE_IDENTITY_ALREADY_ESTABLISHED":
+            approvalErrorMessage = String(localized: "Un autre appareil a déjà établi le chiffrement de ce compte. Fais approuver celui-ci en scannant son QR.")
+            await load()
         case .failed:
             approvalErrorMessage = "Le code est invalide, expiré ou ne correspond plus à cet appareil."
         }
@@ -181,17 +187,19 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         isActing = true
         approvalErrorMessage = nil
         defer { isActing = false }
-        let result: E2EEV2DeviceLifecycleResult<E2EEV2ApprovalDetail>
-        if input.hasPrefix("SQE2EE2|") {
-            result = await lifecycle.loadQRApproval(input)
-        } else {
-            result = await lifecycle.resolveProximityCode(input)
+        // Lot A1 : l'approbation passe seulement par le QR, qui porte l'empreinte comparée.
+        guard input.hasPrefix("SQE2EE2|"), let qr = E2EEV2DeviceApprovalContract.parseQRPayload(input) else {
+            approvalDetail = nil
+            approvalErrorMessage = String(localized: "Scanne le QR affiché sur l’appareil à approuver.")
+            return
         }
-        switch result {
+        switch await lifecycle.loadQRApproval(input) {
         case .success(let detail):
             approvalDetail = detail
+            approvalQR = qr
         case .failed(let failure):
             approvalDetail = nil
+            approvalQR = nil
             switch failure.message {
             case "e2ee-qr-platform-mismatch":
                 approvalErrorMessage = String(localized: "Plateforme différente de celle affichée, approbation refusée.")
@@ -208,28 +216,67 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         isActing = true
         approvalErrorMessage = nil
         defer { isActing = false }
-        switch await lifecycle.loadApproval(approvalId) {
-        case .success(let detail)
-            where detail.approval.method == .push && detail.approval.status == .pending:
-            approvalDetail = detail
-        case .success, .failed:
-            approvalDetail = nil
-            approvalErrorMessage = "Cette demande par notification est invalide ou a expiré."
-        }
+        // Lot A1 : une demande par notification ne s'approuve plus ; son QR, oui.
+        _ = approvalId
+        approvalDetail = nil
+        approvalErrorMessage = String(localized: "Pour approuver cet appareil, scanne le QR qu’il affiche.")
     }
 
     func approveResolvedDevice() async {
-        guard !isActing, currentDeviceCanRevoke, let detail = approvalDetail else { return }
+        guard !isActing, currentDeviceCanRevoke, let detail = approvalDetail, let qr = approvalQR else { return }
         isActing = true
         approvalErrorMessage = nil
         defer { isActing = false }
-        switch await lifecycle.approve(detail) {
+        switch await lifecycle.approve(detail, comparedQR: qr) {
         case .success:
             resetApproval()
             confirmationMessage = "Appareil approuvé. La rotation de clés requise a été enregistrée."
             await load()
-        case .failed:
-            approvalErrorMessage = "Impossible d’approuver cet appareil. Actualisez puis réessayez."
+        case .failed(let failure):
+            approvalErrorMessage = Self.approvalFailureMessage(failure)
+        }
+    }
+
+    /// Lot A1 : les refus propres à la chaîne de confiance, sinon le message générique.
+    private static func approvalFailureMessage(_ failure: E2EEV2TransportFailure) -> String {
+        switch failure.code ?? failure.message {
+        case "e2ee-account-key-unavailable":
+            return String(localized: "Cet appareil n’a pas la clé du compte : il ne peut pas en approuver un autre.")
+        case "e2ee-account-trust-refused", "e2ee-account-identity-unavailable", "E2EE_DEVICE_LIST_INVALID", "e2ee-device-list-stale":
+            return String(localized: "La liste des appareils du compte n’a pas pu être vérifiée. Approbation refusée.")
+        case "E2EE_IDENTITY_STATE_REPAIR_REQUIRED":
+            return String(localized: "Le chiffrement de ce compte doit être réinitialisé avant d’approuver un appareil.")
+        default:
+            return String(localized: "Impossible d’approuver cet appareil. Actualisez puis réessayez.")
+        }
+    }
+
+    /// Appareil en attente, QR affiché : attend l'approbation, puis installe
+    /// la clé du compte déposée pour lui (lot A1).
+    func waitForApproval() async {
+        guard let approvalId = generatedApproval?.id else { return }
+        while !Task.isCancelled, generatedApproval?.id == approvalId {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled, generatedApproval?.id == approvalId else { return }
+            switch await lifecycle.receiveApprovedTrust(approvalId: approvalId) {
+            case .success(.pending):
+                continue
+            case .success(.approved):
+                resetApproval()
+                confirmationMessage = String(localized: "Appareil approuvé. La clé du compte est installée sur cet appareil.")
+                await load()
+                return
+            case .success:
+                generatedApproval = nil
+                approvalErrorMessage = String(localized: "La demande a expiré ou a été refusée. Affiche un nouveau QR.")
+                return
+            case .failed(let failure) where failure.kind == .retryable:
+                continue
+            case .failed:
+                generatedApproval = nil
+                approvalErrorMessage = String(localized: "La clé du compte n’a pas pu être reçue. Affiche un nouveau QR et fais-le scanner de nouveau.")
+                return
+            }
         }
     }
 
@@ -346,7 +393,7 @@ struct E2EEV2TrustedDevicesView: View {
                currentDevice.status == .pending,
                model.identityEstablished {
                 Section {
-                    Text("Choisis une preuve temporaire à transmettre à un appareil déjà approuvé.")
+                    Text("Affiche un QR temporaire et scanne-le depuis un appareil déjà approuvé.")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
                     if let approval = model.generatedApproval {
@@ -357,21 +404,9 @@ struct E2EEV2TrustedDevicesView: View {
                         .frame(minHeight: 48)
                     } else {
                         Button {
-                            Task { await model.requestApproval(.push) }
-                        } label: {
-                            Label("Envoyer une notification", systemImage: "bell.badge.fill")
-                                .frame(minHeight: 48)
-                        }
-                        Button {
                             Task { await model.requestApproval(.qr) }
                         } label: {
                             Label("Afficher un QR temporaire", systemImage: "qrcode")
-                                .frame(minHeight: 48)
-                        }
-                        Button {
-                            Task { await model.requestApproval(.proximityCode) }
-                        } label: {
-                            Label("Afficher un code de proximité", systemImage: "number.square.fill")
                                 .frame(minHeight: 48)
                         }
                     }
@@ -383,7 +418,7 @@ struct E2EEV2TrustedDevicesView: View {
 
             if model.currentDeviceCanRevoke {
                 Section {
-                    Text("Scanne le code affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous.")
+                    Text("Scanne le QR affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous.")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
                     if let detail = model.approvalDetail {
@@ -409,7 +444,7 @@ struct E2EEV2TrustedDevicesView: View {
                         }
                         .disabled(model.isActing)
                         .accessibilityIdentifier("devices.scanApproval")
-                        TextField("QR SignalQuest ou code de proximité", text: $approvalInput, axis: .vertical)
+                        TextField("Contenu du QR SignalQuest", text: $approvalInput, axis: .vertical)
                             .lineLimit(2...4)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -488,6 +523,9 @@ struct E2EEV2TrustedDevicesView: View {
                 approvalInput = code
                 Task { await model.resolveApproval(code) }
             }
+        }
+        .task(id: model.generatedApproval?.id) {
+            await model.waitForApproval()
         }
         .task {
             await model.load()

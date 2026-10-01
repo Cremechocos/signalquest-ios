@@ -206,6 +206,27 @@ actor E2EEV2TrustDirectory {
         return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals)
     }
 
+    /// Son propre compte, vérifié : la liste courante sur laquelle signer la
+    /// suivante (approbation, révocation), et ses appareils certifiés. Avec
+    /// l'UIK détenue ici, le serveur ne peut pas en servir une autre ; sans
+    /// elle (appareil qui vient d'être approuvé), c'est un premier contact.
+    struct AccountTrust: Equatable, Sendable {
+        let outcome: E2EEV2IdentityVerification.Outcome
+        let deviceList: E2EEV2SignedString
+        let deviceEntries: [String]
+    }
+
+    func ownAccountTrust() async throws -> AccountTrust {
+        guard let ownUserId else { throw Failure.malformedResponse(userId: "") }
+        let read = try await read(userId: ownUserId, expectedUIK: ownAccountKey())
+        switch read.result {
+        case .success(let outcome):
+            return AccountTrust(outcome: outcome, deviceList: read.bundle.deviceList, deviceEntries: read.bundle.deviceEntries)
+        case .failure(let failure):
+            throw failure
+        }
+    }
+
     private struct Read {
         /// Le pin courant à la fin de la lecture : celui qu'elle a écrit si le
         /// paquet a été accepté.

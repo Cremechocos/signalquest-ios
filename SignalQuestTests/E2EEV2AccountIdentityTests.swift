@@ -172,7 +172,7 @@ final class E2EEV2AccountIdentityTests: XCTestCase {
         XCTAssertEqual(Set(outcome.devices.map(\.deviceId)), [first.device.deviceId, second.deviceId])
 
         let uik = try E2EEV2DeviceApprovalTrust.accept(
-            approval.uikWrap, account: outcome, userId: userId, device: second
+            XCTUnwrap(approval.uikWrap), account: outcome, userId: userId, device: second
         ) { wrap, approverKey, expected in
             try newStore.unwrapAccountIdentityKey(
                 wrap, approverSigningKey: approverKey, expectedUIKB64: expected, ownerNamespace: "ns-new"
@@ -213,7 +213,7 @@ final class E2EEV2AccountIdentityTests: XCTestCase {
 
         // Paquet encore à la v1 : le compte ne certifie pas (encore) ce nouvel appareil.
         let v1 = try E2EEV2IdentityVerification.verify(first.bundle(), pinned: nil).get()
-        XCTAssertThrowsError(try E2EEV2DeviceApprovalTrust.accept(approval.uikWrap, account: v1, userId: userId, device: second, unwrap: unwrap)) {
+        XCTAssertThrowsError(try E2EEV2DeviceApprovalTrust.accept(XCTUnwrap(approval.uikWrap), account: v1, userId: userId, device: second, unwrap: unwrap)) {
             XCTAssertEqual($0 as? E2EEV2DeviceApprovalTrust.Failure, .notCertified)
         }
 

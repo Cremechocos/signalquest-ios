@@ -2639,8 +2639,11 @@ final class E2EETests: XCTestCase {
         XCTAssertTrue(source.contains("bootstrapInitialDevice"))
         XCTAssertTrue(source.contains("requestApproval(method)"))
         XCTAssertTrue(source.contains("loadQRApproval(input)"))
-        XCTAssertTrue(source.contains("resolveProximityCode(input)"))
-        XCTAssertTrue(source.contains("lifecycle.approve(detail)"))
+        // Lot A1 : approbation par QR v3 seulement, l'appareil en attente reçoit l'UIK.
+        XCTAssertFalse(source.contains("resolveProximityCode(input)"))
+        XCTAssertFalse(source.contains("requestApproval(.push)"))
+        XCTAssertTrue(source.contains("lifecycle.approve(detail, comparedQR: qr)"))
+        XCTAssertTrue(source.contains("receiveApprovedTrust(approvalId: approvalId)"))
         XCTAssertTrue(source.contains("encodeQRPayload(approval, device: device)"))
         XCTAssertTrue(source.contains("E2EEV2RecoveryCoordinatorV2"))
         XCTAssertTrue(source.contains("E2EEV2RecoveryEpochCoordinator"))
@@ -5039,8 +5042,12 @@ extension E2EETests {
             events.value.append((session, ids, notify))
         }
         let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: fixture.api, identityStore: fixture.identity,
-            epochKeyStore: fixture.keys, mediaOutboxStore: fixture.outbox, rotationCommitted: onCommitted)
+            epochKeyStore: fixture.keys, mediaOutboxStore: fixture.outbox,
+            accountIdentityStore: E2EEV2AccountIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true }),
+            trustPins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()), rotationCommitted: onCommitted)
         let recovery = E2EEV2RecoveryCoordinatorV2(api: fixture.api, identityStore: fixture.identity, rotationCommitted: onCommitted)
+        // Lot A1 : le compte tel que le bootstrap l'a déposé, servi à `…/identity`.
+        let account = LockedBox<[String: Any]>([:])
         var material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: fixture.context.ownerScopeId)
         defer { material.zeroize() }
         let bundle = material.bundle
@@ -5055,7 +5062,13 @@ extension E2EETests {
             // Independent valid server receipts exercise each real client success branch.
             let path = request.url!.path
             var value: [String: Any]
-            if path.hasSuffix("/bootstrap") {
+            if path.hasSuffix("/identity") {
+                let deposited = account.value
+                value = ["accountIdentityKeyB64": deposited["accountIdentityKeyB64"] ?? "", "deviceList": deposited["deviceList"] ?? [:],
+                    "deviceListChain": [], "certificates": [deposited["certificate"] ?? [:]], "capabilities": [],
+                    "pendingIdentityReset": NSNull()]
+            } else if path.hasSuffix("/bootstrap") {
+                account.value = try E2EEV2AccountFixture.body(request)
                 value = ["device": ["deviceId": fixture.descriptor.deviceId, "status": "approved", "approvedByDeviceId": NSNull()],
                     "identity": ["generation": 1, "establishmentMethod": "account_reauth", "establishedAt": date],
                     "alreadyBootstrapped": false, "epochRotationRequired": false]
@@ -5088,14 +5101,20 @@ extension E2EETests {
         let bootstrap = await lifecycle.bootstrapInitialDevice(.password("synthetic"))
         guard case .success = bootstrap else { return XCTFail("Bootstrap receipt was lost") }
         let detail = E2EEV2ApprovalDetail(
-            approval: .init(id: "approval_rotation_00001", pendingDeviceId: target, method: .push,
+            approval: .init(id: "approval_rotation_00001", pendingDeviceId: target, method: .qr,
                 challengeB64URL: String(repeating: "A", count: 43), proximityCode: nil, status: .pending, expiresAt: expiry, createdAt: date),
             pendingDevice: .init(descriptor: .init(deviceId: target, platform: "ios", label: "Target", publicIdentityKeyB64: fixture.descriptor.publicIdentityKeyB64,
                 publicSigningKeyB64: fixture.descriptor.publicSigningKeyB64, identityKeyAlgorithm: E2EEV2DeviceIdentityStore.identityKeyAlgorithm,
                 signingKeyAlgorithm: E2EEV2DeviceIdentityStore.signingKeyAlgorithm, keyVersion: 1),
                 status: .pending, approvedAt: nil, revokedAt: nil, lastSeenAt: nil, createdAt: date)
         )
-        guard case .success = await lifecycle.approve(detail) else { return XCTFail("Approval receipt was lost") }
+        let qr = E2EEV2QRApprovalPayload(
+            approvalId: detail.approval.id, pendingDeviceId: target, platform: "ios",
+            fingerprint: try XCTUnwrap(E2EEV2DeviceApprovalContract.fingerprint(of: detail.pendingDevice.descriptor)),
+            challengeB64URL: String(repeating: "A", count: 43),
+            expiresAtMs: Int64((try XCTUnwrap(ISO8601DateFormatter().date(from: expiry)).timeIntervalSince1970 * 1_000).rounded())
+        )
+        guard case .success = await lifecycle.approve(detail, comparedQR: qr) else { return XCTFail("Approval receipt was lost") }
         guard case .success = await lifecycle.revoke(deviceId: target, reason: "USER_REQUEST") else { return XCTFail("Revocation receipt was lost") }
         guard case .success = await recovery.recover(recoveryKey: material.recoveryKey) else { return XCTFail("Recovery receipt was lost") }
         switch await recovery.createAndUploadBundle() {
@@ -5451,7 +5470,11 @@ extension E2EETests {
             case .failed(let failure): throw localQAOperation("load-approval", failure)
             case .success(let value): detail = value
             }
-            switch await lifecycle.approve(detail) {
+            // Lot A1 : seule l'approbation par QR v3 reste possible.
+            guard config.phase == .approveQR, let qr = E2EEV2DeviceApprovalContract.parseQRPayload(input) else {
+                throw localQAOperation("approve", .init(kind: .localState, message: "e2ee-approval-method-unsupported"))
+            }
+            switch await lifecycle.approve(detail, comparedQR: qr) {
             case .failed(let failure): throw localQAOperation("approve", failure)
             case .success(let value):
                 payload = ["deviceId": value.deviceId,

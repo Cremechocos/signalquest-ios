@@ -17,6 +17,8 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
     static func key(ownerNamespace: String) -> String { "uik-v1:\(ownerNamespace)" }
     /// §2.3 : la clé du compte a été vérifiée sur cet appareil.
     static func verifiedKey(ownerNamespace: String) -> String { "uik-verified-v1:\(ownerNamespace)" }
+    /// Bootstrap en cours : l'heure des textes signés, tant que le serveur n'a pas répondu.
+    static func pendingBootstrapKey(ownerNamespace: String) -> String { "uik-bootstrap-v1:\(ownerNamespace)" }
 
     private let tokenStore: TokenStore
     private let allowsOwner: @Sendable (String) -> Bool
@@ -45,6 +47,36 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
         try install(key, ownerNamespace: ownerNamespace)
         try tokenStore.set("1", for: Self.verifiedKey(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
         return key
+    }
+
+    /// Premier appareil (E.1) : l'UIK et l'heure de son certificat et de sa
+    /// liste v1, gardées jusqu'à la réponse du serveur. Une reprise renvoie
+    /// ainsi les mêmes textes, ce que le serveur accepte comme un rejeu.
+    func pendingBootstrap(ownerNamespace: String, nowMs: Int64) throws -> (uik: P256.Signing.PrivateKey, issuedAtMs: Int64) {
+        if let key = try load(ownerNamespace: ownerNamespace) {
+            guard let raw = try tokenStore.string(for: Self.pendingBootstrapKey(ownerNamespace: ownerNamespace)),
+                  let issuedAtMs = Int64(raw), issuedAtMs > 0 else { return (key, nowMs) }
+            return (key, issuedAtMs)
+        }
+        try tokenStore.set(String(nowMs), for: Self.pendingBootstrapKey(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
+        return (try create(ownerNamespace: ownerNamespace), nowMs)
+    }
+
+    /// Le serveur a enregistré l'identité : l'UIK est celle du compte.
+    func confirmBootstrap(ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        try tokenStore.remove(Self.pendingBootstrapKey(ownerNamespace: ownerNamespace))
+    }
+
+    /// Un autre appareil a établi l'identité du compte : l'UIK créée pour un
+    /// bootstrap jamais confirmé est retirée, celle du compte arrivera à
+    /// l'approbation. Une UIK confirmée ou reçue n'est jamais touchée.
+    func discardPendingBootstrap(ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        guard try tokenStore.string(for: Self.pendingBootstrapKey(ownerNamespace: ownerNamespace)) != nil else { return }
+        try tokenStore.remove(Self.key(ownerNamespace: ownerNamespace))
+        try tokenStore.remove(Self.verifiedKey(ownerNamespace: ownerNamespace))
+        try tokenStore.remove(Self.pendingBootstrapKey(ownerNamespace: ownerNamespace))
     }
 
     /// §2.3 : un appareil approuvé reçoit l'UIK sans pouvoir la comparer seul. Elle
@@ -115,17 +147,20 @@ enum E2EEV2InitialTrust {
         features: [String],
         nowMs: Int64
     ) throws -> Artifacts {
-        guard let identityKey = Data(base64Encoded: device.publicIdentityKeyB64),
+        // §2.7 : un navigateur ne porte jamais l'UIK, il n'est jamais le premier appareil.
+        guard device.platform != "web",
+              let identityKey = Data(base64Encoded: device.publicIdentityKeyB64),
               let signingKey = Data(base64Encoded: device.publicSigningKeyB64) else {
             throw E2EEV2TrustFormatError.invalidKey
         }
+        // La plateforme enregistrée, sinon le serveur refuse (E2EE_CERT_PLATFORM_MISMATCH).
         let certificate = E2EEV2DeviceCertificate(
             userId: userId,
             deviceId: device.deviceId,
             keyVersion: device.keyVersion,
             identityKeyB64: device.publicIdentityKeyB64,
             signingKeyB64: device.publicSigningKeyB64,
-            platform: "ios",
+            platform: device.platform,
             createdAtMs: nowMs
         )
         // Relu avant d'être signé : jamais un certificat que les autres refuseraient.
@@ -135,7 +170,7 @@ enum E2EEV2InitialTrust {
         let entry = E2EEV2DeviceList.entry(
             deviceId: device.deviceId,
             keyVersion: device.keyVersion,
-            platform: "ios",
+            platform: device.platform,
             fingerprint: E2EEV2Canonical.deviceFingerprint(identityKeyX963: identityKey, signingKeyX963: signingKey)
         )
         let list = E2EEV2DeviceList.make(
@@ -201,26 +236,29 @@ enum E2EEV2DeviceApprovalTrust {
         let certificate: E2EEV2SignedString
         let deviceList: E2EEV2SignedString
         let deviceEntries: [String]
-        let uikWrap: E2EEV2UIKWrap
+        /// Jamais pour un navigateur (§2.7) : la clé est alors absente du corps.
+        let uikWrap: E2EEV2UIKWrap?
 
-        /// E.1 : les trois clés ajoutées au corps de
+        /// E.1 : les clés ajoutées au corps de
         /// `POST /api/e2ee/v2/device-approvals/{id}/approve`.
         var approveFields: [String: Any] {
-            [
+            var fields: [String: Any] = [
                 "certificate": ["certificate": certificate.canonical, "signatureB64": certificate.signatureB64],
                 "deviceList": ["list": deviceList.canonical, "signatureB64": deviceList.signatureB64, "devices": deviceEntries],
-                "uikWrap": [
-                    "userId": uikWrap.userId,
-                    "approverDeviceId": uikWrap.approverDeviceId,
-                    "newDeviceId": uikWrap.newDeviceId,
-                    "uikPublicKeyB64": uikWrap.uikPublicKeyB64,
-                    "ephemeralPublicKeyB64": uikWrap.ephemeralPublicKeyB64,
-                    "nonceB64": uikWrap.nonceB64,
-                    "aadB64": uikWrap.aadB64,
-                    "wrappedUikB64": uikWrap.wrappedUikB64,
-                    "signatureB64": uikWrap.signatureB64,
-                ],
             ]
+            guard let uikWrap else { return fields }
+            fields["uikWrap"] = [
+                "userId": uikWrap.userId,
+                "approverDeviceId": uikWrap.approverDeviceId,
+                "newDeviceId": uikWrap.newDeviceId,
+                "uikPublicKeyB64": uikWrap.uikPublicKeyB64,
+                "ephemeralPublicKeyB64": uikWrap.ephemeralPublicKeyB64,
+                "nonceB64": uikWrap.nonceB64,
+                "aadB64": uikWrap.aadB64,
+                "wrappedUikB64": uikWrap.wrappedUikB64,
+                "signatureB64": uikWrap.signatureB64,
+            ]
+            return fields
         }
     }
 
@@ -280,7 +318,7 @@ enum E2EEV2DeviceApprovalTrust {
             certificate: try E2EEV2SignedString.sign(certificate.canonical, with: uik),
             deviceList: try E2EEV2SignedString.sign(next.canonical, with: uik),
             deviceEntries: entries,
-            uikWrap: try E2EEV2UIKWrapCrypto.wrap(
+            uikWrap: newDevice.platform == "web" ? nil : try E2EEV2UIKWrapCrypto.wrap(
                 uik: uik, userId: userId, approverDeviceId: approverDeviceId, newDeviceId: newDevice.deviceId,
                 newDeviceAgreementKey: agreementKey, signWithApprover: signWithApprover, nonce: nonce
             )

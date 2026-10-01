@@ -449,6 +449,38 @@
         }
       }
     },
+    "Appareil approuvé. La clé du compte est installée sur cet appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device approved. The account key is now on this device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil approuvé. La clé du compte est installée sur cet appareil."
+          }
+        }
+      }
+    },
+    "Affiche un QR temporaire et scanne-le depuis un appareil déjà approuvé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show a temporary QR code and scan it from a device that is already approved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche un QR temporaire et scanne-le depuis un appareil déjà approuvé."
+          }
+        }
+      }
+    },
     "Appel chiffré" : {
       "localizations" : {
         "en" : {
@@ -641,6 +673,22 @@
         }
       }
     },
+    "Cet appareil n’a pas la clé du compte : il ne peut pas en approuver un autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device does not have the account key, so it cannot approve another device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’a pas la clé du compte : il ne peut pas en approuver un autre."
+          }
+        }
+      }
+    },
     "Cette conversation n’accepte que des appels chiffrés de bout en bout, et ils ne sont pas encore prêts sur cet appareil. Réessaie plus tard." : {
       "localizations" : {
         "en" : {
@@ -785,6 +833,22 @@
         }
       }
     },
+    "Contenu du QR SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest QR code contents"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenu du QR SignalQuest"
+          }
+        }
+      }
+    },
     "Conversation chiffrée : le message signalé, tel que tu le vois, et ses versions précédentes dans la limite de taille d’un signalement sont envoyés à l’équipe de modération, déchiffrés sur ton appareil et chiffrés pour elle seule. Elle pourra les lire. Ni le reste de la conversation ni sa clé ne sont transmis." : {
       "localizations" : {
         "en" : {
@@ -913,6 +977,22 @@
         }
       }
     },
+    "Impossible d’approuver cet appareil. Actualisez puis réessayez." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t approve this device. Refresh and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’approuver cet appareil. Actualisez puis réessayez."
+          }
+        }
+      }
+    },
     "Impossible d’enregistrer ce réglage. Vérifie ta connexion et réessaie." : {
       "localizations" : {
         "en" : {
@@ -1009,6 +1089,22 @@
         }
       }
     },
+    "La clé du compte n’a pas pu être reçue. Affiche un nouveau QR et fais-le scanner de nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The account key could not be received. Show a new QR code and have it scanned again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La clé du compte n’a pas pu être reçue. Affiche un nouveau QR et fais-le scanner de nouveau."
+          }
+        }
+      }
+    },
     "La conversation vient de changer. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -1021,6 +1117,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La conversation vient de changer. Réessaie."
+          }
+        }
+      }
+    },
+    "La demande a expiré ou a été refusée. Affiche un nouveau QR." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The request expired or was declined. Show a new QR code."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La demande a expiré ou a été refusée. Affiche un nouveau QR."
+          }
+        }
+      }
+    },
+    "La liste des appareils du compte n’a pas pu être vérifiée. Approbation refusée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The account’s device list could not be verified. Approval declined."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La liste des appareils du compte n’a pas pu être vérifiée. Approbation refusée."
           }
         }
       }
@@ -1053,6 +1181,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le chiffrement avec un membre n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard."
+          }
+        }
+      }
+    },
+    "Le chiffrement de ce compte doit être réinitialisé avant d’approuver un appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encryption for this account must be reset before a device can be approved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement de ce compte doit être réinitialisé avant d’approuver un appareil."
           }
         }
       }
@@ -1281,6 +1425,22 @@
         }
       }
     },
+    "Pour approuver cet appareil, scanne le QR qu’il affiche." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To approve this device, scan the QR code it shows."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour approuver cet appareil, scanne le QR qu’il affiche."
+          }
+        }
+      }
+    },
     "Rattrapage en cours côté serveur : ces chiffres peuvent encore bouger." : {
       "localizations" : {
         "en" : {
@@ -1345,18 +1505,34 @@
         }
       }
     },
-    "Scanne le code affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous." : {
+    "Scanne le QR affiché sur l’appareil à approuver." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scan the code shown on the device to approve, browsers included. Without a camera, paste its content below."
+            "value" : "Scan the QR code shown on the device to approve."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scanne le code affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous."
+            "value" : "Scanne le QR affiché sur l’appareil à approuver."
+          }
+        }
+      }
+    },
+    "Scanne le QR affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan the QR code shown on the device to approve, browsers included. Without a camera, paste its contents below."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanne le QR affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous."
           }
         }
       }
@@ -1789,6 +1965,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Accepter sans vérifier"
+          }
+        }
+      }
+    },
+    "Un autre appareil a déjà établi le chiffrement de ce compte. Fais approuver celui-ci en scannant son QR." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another device has already set up encryption for this account. Get this one approved by scanning its QR code."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un autre appareil a déjà établi le chiffrement de ce compte. Fais approuver celui-ci en scannant son QR."
           }
         }
       }
@@ -7276,22 +7468,6 @@
         }
       }
     },
-    "Afficher un code de proximité" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show a proximity code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher un code de proximité"
-          }
-        }
-      }
-    },
     "Agrandir" : {
       "localizations" : {
         "en" : {
@@ -12428,22 +12604,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet appareil ne correspond pas au code affiché, approbation refusée."
-          }
-        }
-      }
-    },
-    "Choisis une preuve temporaire à transmettre à un appareil déjà approuvé." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose a temporary proof to send to an already approved device."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choisis une preuve temporaire à transmettre à un appareil déjà approuvé."
           }
         }
       }
@@ -22178,22 +22338,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Envoyer une demande à %@"
-          }
-        }
-      }
-    },
-    "Envoyer une notification" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send a notification"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Envoyer une notification"
           }
         }
       }
@@ -39230,22 +39374,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Période du classement"
-          }
-        }
-      }
-    },
-    "QR SignalQuest ou code de proximité" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SignalQuest QR or proximity code"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "QR SignalQuest ou code de proximité"
           }
         }
       }

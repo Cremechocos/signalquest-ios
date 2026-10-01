@@ -2527,7 +2527,7 @@ enum E2EEV2DeviceApprovalContract {
         guard detail.approval.status == .pending else { throw E2EEV2DeviceIdentityError.invalidRecord }
         var object: [String: Any] = ["pendingDeviceId": detail.approval.pendingDeviceId]
         if let trust {
-            guard trust.uikWrap.newDeviceId == detail.approval.pendingDeviceId else {
+            guard trust.uikWrap.map({ $0.newDeviceId == detail.approval.pendingDeviceId }) ?? (detail.pendingDevice.descriptor.platform == "web") else {
                 throw E2EEV2DeviceIdentityError.invalidRecord
             }
             object.merge(trust.approveFields) { current, _ in current }
@@ -3173,6 +3173,9 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
     private let epochKeyStore: E2EEV2EpochKeyStore
     private let conversationStateStore: E2EEV2ConversationStateStore
     private let mediaOutboxStore: E2EEV2MediaOutboxStore?
+    private let accountIdentityStore: E2EEV2AccountIdentityStore
+    private let trustPins: E2EEV2TrustPinStore
+    private let nowMs: @Sendable () -> Int64
     private let rotationCommitted: @Sendable (LocalAccountSession, [String], Bool) -> Void
 
     init(
@@ -3181,6 +3184,9 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         epochKeyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
         conversationStateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
         mediaOutboxStore: E2EEV2MediaOutboxStore? = nil,
+        accountIdentityStore: E2EEV2AccountIdentityStore = E2EEV2AccountIdentityStore(),
+        trustPins: E2EEV2TrustPinStore = E2EEV2TrustPinStore(),
+        nowMs: @escaping @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) },
         rotationCommitted: @escaping @Sendable (LocalAccountSession, [String], Bool) -> Void = {
             E2EEV2RotationEvents.recordCommitted(session: $0, conversations: $1, notify: $2)
         }
@@ -3190,6 +3196,9 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         self.epochKeyStore = epochKeyStore
         self.conversationStateStore = conversationStateStore
         self.mediaOutboxStore = mediaOutboxStore ?? (try? E2EEV2MediaOutboxStore())
+        self.accountIdentityStore = accountIdentityStore
+        self.trustPins = trustPins
+        self.nowMs = nowMs
         self.rotationCommitted = rotationCommitted
     }
 
@@ -3400,12 +3409,29 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         let transport = self.transport.bound(to: session)
         do {
             let namespace = LocalAccountScope.storageNamespace(for: owner)
-            guard let descriptor = try identityStore.load(ownerNamespace: namespace) else {
+            guard let descriptor = try identityStore.load(ownerNamespace: namespace),
+                  let userId = Self.userId(owner) else {
                 return localFailure("e2ee-device-identity-unavailable")
             }
+            // Lot A1 (E.1) : le premier appareil apporte l'UIK du compte, son
+            // certificat et la liste v1. Le document de capacités, signé avec,
+            // part plus tard par sa propre route.
+            let pending = try accountIdentityStore.pendingBootstrap(ownerNamespace: namespace, nowMs: nowMs())
+            let trust = try E2EEV2InitialTrust.make(
+                userId: userId,
+                device: descriptor,
+                uik: pending.uik,
+                signWithDevice: { [identityStore] in
+                    try identityStore.signWithDeviceId(canonicalRequest: $0, ownerNamespace: namespace).signature
+                },
+                kinds: ["TEXT"],
+                features: [],
+                nowMs: pending.issuedAtMs
+            )
             let body = try E2EEV2DeviceApprovalContract.initialBootstrapData(
                 deviceId: descriptor.deviceId,
-                reauthentication: reauthentication
+                reauthentication: reauthentication,
+                trust: trust
             )
             let result = map(
                 await transport.postJSON(
@@ -3422,7 +3448,16 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                 },
                 invalidMessage: "invalid-e2ee-bootstrap-response"
             )
-            if case .success = result { rotationCommitted(session, [], true) }
+            switch result {
+            case .success:
+                try? accountIdentityStore.confirmBootstrap(ownerNamespace: namespace)
+                rotationCommitted(session, [], true)
+            case .failed(let failure) where failure.code == "E2EE_IDENTITY_ALREADY_ESTABLISHED":
+                // Un autre appareil a établi le compte : son UIK arrivera à l'approbation.
+                try? accountIdentityStore.discardPendingBootstrap(ownerNamespace: namespace)
+            case .failed:
+                break
+            }
             return result
         } catch {
             return localFailure("invalid-e2ee-bootstrap-proof")
@@ -3481,27 +3516,122 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         }
     }
 
-    func approve(_ detail: E2EEV2ApprovalDetail) async -> E2EEV2DeviceLifecycleResult<E2EEV2ApprovalCompletion> {
-        guard let owner = ownerScope(), let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == owner else {
+    /// Lot A1 : seulement par QR v3 (décision du 1er octobre). Le certificat,
+    /// la liste suivante et l'UIK chiffrée sont signés contre l'empreinte et la
+    /// plateforme lues dans le QR, jamais contre ce que déclare le serveur. Une
+    /// liste périmée (`E2EE_DEVICE_LIST_STALE`) est relue une fois.
+    func approve(
+        _ detail: E2EEV2ApprovalDetail,
+        comparedQR qr: E2EEV2QRApprovalPayload
+    ) async -> E2EEV2DeviceLifecycleResult<E2EEV2ApprovalCompletion> {
+        guard let owner = ownerScope(), let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == owner,
+              let userId = Self.userId(owner) else {
             return localFailure("authenticated-account-required")
         }
+        guard detail.approval.method == .qr, E2EEV2DeviceApprovalContract.compareQR(qr, detail) == .match else {
+            return localFailure("e2ee-approval-method-unsupported")
+        }
         let transport = self.transport.bound(to: session)
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
         do {
-            let body = try E2EEV2DeviceApprovalContract.approvalCompletionData(detail)
-            let result = map(
-                await transport.postJSON(
+            guard let uik = try accountIdentityStore.load(ownerNamespace: namespace) else {
+                return localFailure("e2ee-account-key-unavailable")
+            }
+            guard let approver = try identityStore.load(ownerNamespace: namespace) else {
+                return localFailure("e2ee-device-identity-unavailable")
+            }
+            for attempt in 0..<2 {
+                let account = try await accountTrust(owner: owner, transport: transport, uik: uik)
+                let trust = try E2EEV2DeviceApprovalTrust.make(
+                    userId: userId,
+                    currentList: account.deviceList,
+                    currentEntries: account.deviceEntries,
+                    newDevice: detail.pendingDevice.descriptor,
+                    expectedFingerprint: qr.fingerprint,
+                    comparedPlatform: qr.platform,
+                    uik: uik,
+                    approverDeviceId: approver.deviceId,
+                    signWithApprover: { [identityStore] in
+                        try identityStore.signWithDeviceId(canonicalRequest: $0, ownerNamespace: namespace).signature
+                    },
+                    nonce: Data(AES.GCM.Nonce()),
+                    nowMs: nowMs()
+                )
+                let body = try E2EEV2DeviceApprovalContract.approvalCompletionData(detail, trust: trust)
+                let response = await transport.postJSON(
                     path: "/api/e2ee/v2/device-approvals/\(detail.approval.id)/approve",
                     body: body,
                     expectedOwnerScopeId: owner,
                     capabilitySet: .deviceLifecycle
-                ),
-                parser: E2EEV2DeviceApprovalContract.parseCompletion,
-                invalidMessage: "invalid-e2ee-approval-completion"
-            )
-            if case .success(let value) = result { rotationCommitted(session, value.affectedConversationIds, true) }
-            return result
+                )
+                if case .failure(let failure) = response, failure.code == "E2EE_DEVICE_LIST_STALE", attempt == 0 { continue }
+                let result = map(
+                    response,
+                    parser: E2EEV2DeviceApprovalContract.parseCompletion,
+                    invalidMessage: "invalid-e2ee-approval-completion"
+                )
+                if case .success(let value) = result { rotationCommitted(session, value.affectedConversationIds, true) }
+                return result
+            }
+            return localFailure("e2ee-device-list-stale")
         } catch {
-            return localFailure("invalid-e2ee-approval-proof")
+            return trustFailure(error, fallback: "invalid-e2ee-approval-proof")
+        }
+    }
+
+    /// Lot A1 : l'appareil en attente, une fois approuvé, lit le dépôt de
+    /// confiance (E.1) et installe l'UIK du compte. L'UIK n'est acceptée que
+    /// d'un approbateur certifié par le compte, pour cet appareil tel que le
+    /// compte le certifie. Rend l'état de la demande.
+    func receiveApprovedTrust(approvalId: String) async -> E2EEV2DeviceLifecycleResult<E2EEV2ApprovalStatus> {
+        guard let owner = ownerScope(), let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == owner,
+              let userId = Self.userId(owner) else {
+            return localFailure("authenticated-account-required")
+        }
+        guard E2EEV2DeviceApprovalContract.validOpaqueId(approvalId) else { return localFailure("invalid-e2ee-approval-id") }
+        let transport = self.transport.bound(to: session)
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        do {
+            guard let descriptor = try identityStore.load(ownerNamespace: namespace) else {
+                return localFailure("e2ee-device-identity-unavailable")
+            }
+            let detail: E2EEV2ApprovalDetail
+            switch map(
+                await transport.getJSON(
+                    path: "/api/e2ee/v2/device-approvals/\(approvalId)",
+                    expectedOwnerScopeId: owner,
+                    capabilitySet: .deviceLifecycle
+                ),
+                parser: E2EEV2DeviceApprovalContract.parseApprovalDetail,
+                invalidMessage: "invalid-e2ee-approval-detail"
+            ) {
+            case .failed(let failure): return .failed(failure)
+            case .success(let value): detail = value
+            }
+            guard detail.pendingDevice.descriptor.deviceId == descriptor.deviceId else {
+                return localFailure("e2ee-approval-other-device")
+            }
+            guard detail.approval.status == .approved else { return .success(detail.approval.status) }
+            guard let wrap = detail.trust?.uikWrap else {
+                // Dépôt déjà consommé : l'UIK est ici, ou ne peut plus arriver.
+                return try accountIdentityStore.load(ownerNamespace: namespace) != nil
+                    ? .success(.approved)
+                    : localFailure("e2ee-account-key-not-delivered")
+            }
+            let account = try await accountTrust(owner: owner, transport: transport, uik: nil)
+            let uik = try E2EEV2DeviceApprovalTrust.accept(
+                wrap, account: account.outcome, userId: userId, device: descriptor
+            ) { [identityStore] wrap, approverKey, expectedUIK in
+                try identityStore.unwrapAccountIdentityKey(
+                    wrap, approverSigningKey: approverKey, expectedUIKB64: expectedUIK, ownerNamespace: namespace
+                )
+            }
+            guard session.isCurrent else { return localFailure("e2ee-session-changed") }
+            try accountIdentityStore.discardPendingBootstrap(ownerNamespace: namespace)
+            try accountIdentityStore.install(uik, ownerNamespace: namespace)
+            return .success(.approved)
+        } catch {
+            return trustFailure(error, fallback: "e2ee-account-key-not-delivered")
         }
     }
 
@@ -3516,27 +3646,81 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         guard E2EEV2DeviceApprovalContract.validOpaqueId(deviceId) else {
             return localFailure("invalid-e2ee-device-id")
         }
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
         do {
-            let body = try E2EEV2DeviceApprovalContract.revocationData(reason: reason)
-            let result = map(
-                await transport.postJSON(
+            // Lot A1 : la liste suivante, sans l'appareil, seulement s'il est
+            // dans la liste courante (un appareil en attente n'y est pas).
+            let uik = try accountIdentityStore.load(ownerNamespace: namespace)
+            for attempt in 0..<2 {
+                var trust: E2EEV2DeviceRevocationTrust.Artifacts?
+                if let uik, let userId = Self.userId(owner) {
+                    let account = try await accountTrust(owner: owner, transport: transport, uik: uik)
+                    if account.deviceEntries.contains(where: { $0.components(separatedBy: "\n").first == deviceId }) {
+                        trust = try E2EEV2DeviceRevocationTrust.make(
+                            userId: userId, revokedDeviceId: deviceId, currentList: account.deviceList,
+                            currentEntries: account.deviceEntries, uik: uik, nowMs: nowMs()
+                        )
+                    }
+                }
+                let body = try E2EEV2DeviceApprovalContract.revocationData(reason: reason, trust: trust)
+                let response = await transport.postJSON(
                     path: "/api/e2ee/v2/devices/\(deviceId)/revoke",
                     body: body,
                     expectedOwnerScopeId: owner,
                     capabilitySet: .deviceLifecycle
-                ),
-                parser: E2EEV2DeviceApprovalContract.parseRevocation,
-                invalidMessage: "invalid-e2ee-revocation-response"
-            )
-            if case .success(let value) = result { rotationCommitted(session, value.affectedConversationIds, true) }
-            return result
+                )
+                if case .failure(let failure) = response, failure.code == "E2EE_DEVICE_LIST_STALE", attempt == 0 { continue }
+                let result = map(
+                    response,
+                    parser: E2EEV2DeviceApprovalContract.parseRevocation,
+                    invalidMessage: "invalid-e2ee-revocation-response"
+                )
+                if case .success(let value) = result { rotationCommitted(session, value.affectedConversationIds, true) }
+                return result
+            }
+            return localFailure("e2ee-device-list-stale")
         } catch {
-            return localFailure("invalid-e2ee-revocation-reason")
+            return trustFailure(error, fallback: "invalid-e2ee-revocation-reason")
         }
     }
 
     private func ownerScope() -> String? {
         LocalAccountScope.currentUserId == nil ? nil : LocalAccountScope.currentOwnerScopeId
+    }
+
+    private static func userId(_ ownerScopeId: String) -> String? {
+        guard ownerScopeId.hasPrefix("user:") else { return nil }
+        let userId = String(ownerScopeId.dropFirst(5))
+        return E2EEV2Canonical.isOpaque(userId) ? userId : nil
+    }
+
+    /// Son propre compte relu par l'annuaire de confiance (E.1), vérifié contre
+    /// l'UIK détenue ici quand il y en a une.
+    private func accountTrust(
+        owner: String,
+        transport: E2EEV2APITransport,
+        uik: P256.Signing.PrivateKey?
+    ) async throws -> E2EEV2TrustDirectory.AccountTrust {
+        let publicKey = uik?.publicKey
+        return try await E2EEV2TrustDirectory(
+            ownerNamespace: LocalAccountScope.storageNamespace(for: owner),
+            pins: trustPins,
+            ownUserId: Self.userId(owner),
+            ownAccountKey: { publicKey },
+            fetch: E2EEV2TrustDirectory.identityFetch(transport: transport, ownerScopeId: owner)
+        ).ownAccountTrust()
+    }
+
+    /// Une erreur réseau garde sa forme serveur ; un compte refusé ou illisible
+    /// devient un état local.
+    private func trustFailure<Value: Sendable>(_ error: Error, fallback: String) -> E2EEV2DeviceLifecycleResult<Value> {
+        switch error {
+        case let failure as E2EEV2TransportFailure: return .failed(failure)
+        case is E2EEV2TrustDirectory.IdentityNotFound: return localFailure("e2ee-account-identity-unavailable")
+        case is E2EEV2IdentityVerification.Failure, is E2EEV2DeviceApprovalTrust.Failure:
+            return localFailure("e2ee-account-trust-refused")
+        default: return localFailure(fallback)
+        }
     }
 
     private func map<Value: Sendable>(
