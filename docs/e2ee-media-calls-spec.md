@@ -744,9 +744,11 @@ version qui expose `discardFrameWhenCryptorNotReady` et
     conversation de l'appel.
   - L'appel peut être relancé sous la nouvelle époque.
   - `ratchetKey` est interdit.
-- **SIF** : un SDK peut appliquer d'office celui du serveur (c'est le cas
-  en Swift). Il est neutralisé, par une valeur vide posée après la jonction
-  ou par un correctif du SDK, et le test négatif de COM-1 le prouve.
+- **SIF** : les trois SDK appliquent d'office celui du serveur, à chaque
+  réponse de jonction. Il est neutralisé par **32 octets aléatoires**, inconnus
+  du serveur, posés après chaque jonction, ou par un correctif du SDK ; jamais
+  par une valeur vide, que les SDK JS (livekit-client 2.18) et Android (2.27)
+  ignorent en gardant l'ancien marqueur. Le test négatif de COM-1 le prouve.
   - Le SDK Swift le repose à chaque réponse de jonction, donc à chaque
     **reconnexion complète**, qui réintègre aussi les participants sans
     événement. Un appel chiffré prend donc fin dès le début d'une reconnexion
