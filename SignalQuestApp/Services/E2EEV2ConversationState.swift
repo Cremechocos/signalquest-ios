@@ -35,6 +35,12 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         /// Heure locale de l'acceptation : l'âge d'une époque s'y mesure, pas à
         /// la date que son créateur a signée.
         let acceptedAtMs: Int64
+        /// Identité et engagement de la clé de cette époque, épinglés ici,
+        /// lisibles après le premier déverrouillage : une clé lue verrouillé dans
+        /// le miroir des aperçus, que l'extension peut écrire, ne sert que si elle
+        /// tient cet engagement (§2.6, v0.4.13). Absents des époques gardées avant.
+        var epochId: String? = nil
+        var keyCommitmentB64: String? = nil
     }
 
     /// Époque acceptée, gardée après son remplacement : membres de l'époque
@@ -495,6 +501,44 @@ enum E2EEV2VerifiedEpochKeys {
                   current.epochNumber == epochNumber else { return nil }
         }
         return try keyStore.loadEpoch(conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace)
+    }
+
+    /// La même époque, appareil verrouillé (spec §2.6, v0.4.13). La clé vient
+    /// du miroir des aperçus, que l'extension de notification peut écrire : elle
+    /// ne sert que si elle tient l'engagement épinglé dans l'état de l'app, pour
+    /// l'époque courante vérifiée, avec l'aperçu complet choisi sur l'appareil
+    /// et un miroir de ce compte et de cette session. Sinon nil : l'appel attend
+    /// le déverrouillage.
+    static func exactWhileLocked(
+        conversationId: String,
+        epochNumber: Int,
+        session: LocalAccountSession,
+        stateStore: E2EEV2ConversationStateStore,
+        contextStore: E2EEV2NotificationContextStore?,
+        privacy: (String) -> E2EEV2NotificationPrivacy = { E2EEV2NotificationPrivacyStore.get(ownerScopeId: $0) },
+        now: Date = Date()
+    ) -> E2EEV2StoredEpochKey? {
+        let ownerNamespace = session.ownerNamespace
+        guard let contextStore, session.ownerScopeId.hasPrefix("user:") else { return nil }
+        let pushOwnerScopeId = PushOwnerScope.id(for: String(session.ownerScopeId.dropFirst("user:".count)))
+        guard privacy(pushOwnerScopeId) == .full,
+              (try? stateStore.isV2(conversationId: conversationId, ownerNamespace: ownerNamespace)) == true,
+              let current = try? stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace),
+              current.epochNumber == epochNumber,
+              let epochId = current.epochId, let commitment = current.keyCommitmentB64,
+              let context = try? contextStore.load(now: now), context.privacy == .full,
+              context.ownerScopeId == pushOwnerScopeId, context.sessionId == session.sessionId,
+              let entry = try? contextStore.conversation(conversationId, now: now),
+              let epoch = entry.epochs.first(where: { $0.replacedAtMs == nil }), epoch.epochNumber == epochNumber,
+              let keyB64 = epoch.keyB64, var key = Data(base64Encoded: keyB64) else { return nil }
+        guard (try? E2EEV2EpochCrypto.keyCommitment(key)) == commitment else {
+            key.resetBytes(in: 0..<key.count)
+            return nil
+        }
+        return .init(
+            conversationId: conversationId, epochId: epochId, epochNumber: epochNumber,
+            keyCommitmentB64: commitment, epochKey: key
+        )
     }
 
     /// Les anciens chemins pilotés par le serveur ne touchent jamais une

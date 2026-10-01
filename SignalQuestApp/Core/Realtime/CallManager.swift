@@ -314,6 +314,9 @@ final class CallManager: NSObject, ObservableObject {
     enum CallError: LocalizedError {
         case missingCredentials
         case e2eeUnavailable
+        /// Spec §2.6 (v0.4.13) : une clé de l'appel (époque sans aperçu complet,
+        /// ou signature sans copie lisible) n'est lisible qu'après le déverrouillage.
+        case deviceLocked
         case untrustedE2EESession
         case connectionFailed(String)
         case connectionEnded
@@ -321,6 +324,7 @@ final class CallManager: NSObject, ObservableObject {
             switch self {
             case .missingCredentials: return "Identifiants d'appel manquants."
             case .e2eeUnavailable: return "L’appel chiffré de bout en bout n’est pas disponible sur cet appareil."
+            case .deviceLocked: return String(localized: "Déverrouille ton appareil pour rejoindre l’appel chiffré.")
             case .untrustedE2EESession: return "La vérification du chiffrement de l’appel a échoué."
             case .connectionFailed(let m): return String(localized: "Connexion à l'appel impossible : \(m)")
             case .connectionEnded: return String(localized: "L'appel s'est terminé pendant la connexion.")
@@ -516,6 +520,8 @@ final class CallManager: NSObject, ObservableObject {
             switch callError {
             case .e2eeUnavailable, .untrustedE2EESession:
                 return String(localized: "La vérification du chiffrement de l’appel a échoué. Aucun appel n’a été passé.")
+            case .deviceLocked:
+                return String(localized: "Appel chiffré manqué : ton appareil est resté verrouillé.")
             case .connectionEnded:
                 return String(localized: "L’appel s’est terminé pendant la connexion.")
             case .missingCredentials, .connectionFailed:
@@ -538,7 +544,8 @@ final class CallManager: NSObject, ObservableObject {
             handle: call.handle,
             conversationId: call.conversationId,
             hasVideo: call.hasVideo,
-            requiresE2EE: call.isOutgoing && call.requiresE2EE == true
+            // Reçu ou passé : « Rappeler » ne retire jamais le chiffrement.
+            requiresE2EE: call.requiresE2EE == true
         )
     }
 
@@ -831,6 +838,8 @@ final class CallManager: NSObject, ObservableObject {
                 e2eeSession = try material.consume { epochKey, context in
                     try E2EEV2LiveKitSession.make(epochKey: epochKey, context: context)
                 }
+            case .blocked(.deviceLocked):
+                throw CallError.deviceLocked
             case .blocked:
                 throw CallError.untrustedE2EESession
             }
@@ -861,6 +870,7 @@ final class CallManager: NSObject, ObservableObject {
         switch E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversationId) {
         case .prepared(let context): return context
         case .runtimeClosed, .localEpochUnavailable: throw CallError.e2eeUnavailable
+        case .deviceLocked: throw CallError.deviceLocked
         }
     }
 
@@ -868,10 +878,14 @@ final class CallManager: NSObject, ObservableObject {
         guard let callId = call.callId else { throw CallError.missingCredentials }
         let serverCall = try await callsService.pending().first(where: { $0.id == callId })
         guard let serverCall else { throw CallError.connectionEnded }
-        var reconciled = call
+        // Relu après la réponse du serveur : un appel terminé entre-temps n'est
+        // jamais ressuscité, et une fin en cours n'est jamais effacée.
+        guard var reconciled = activeCall, reconciled.callId == callId, !reconciled.isEnding else {
+            throw CallError.connectionEnded
+        }
         reconciled.serverStatus = serverCall.status?.lowercased()
         reconciled.requiresE2EE = IncomingCallE2EEExpectation.merged(
-            known: call.requiresE2EE, server: serverCall.e2eeRequired
+            known: reconciled.requiresE2EE, server: serverCall.e2eeRequired
         )
         reconciled.e2eeDescriptor = serverCall.e2ee
         activeCall = reconciled
@@ -895,7 +909,48 @@ final class CallManager: NSObject, ObservableObject {
         ) {
         case .prepared(let context): return context
         case .runtimeClosed, .localEpochUnavailable: throw CallError.e2eeUnavailable
+        case .deviceLocked: throw CallError.deviceLocked
         }
+    }
+
+    private func answerOnce(_ call: ActiveCall, callId: String) async throws -> CallSession {
+        let context = try answerE2EEContext(for: call)
+        return try await callsService.answer(callId: callId, e2ee: context)
+    }
+
+    /// Verrouillé : la clé de l'époque (aperçu qui n'est pas complet) ou la clé
+    /// de signature (pas encore de copie lisible) attend le déverrouillage.
+    nonisolated static func waitsForUnlock(_ error: Error) -> Bool {
+        if case CallError.deviceLocked = error { return true }
+        if case CallsServiceError.e2eeUnavailable(let reason) = error { return reason == "e2ee-device-locked" }
+        return false
+    }
+
+    private func isStillAnswering(_ callId: String?) -> Bool {
+        callId != nil && activeCall?.callId == callId && activeCall?.isEnding == false
+    }
+
+    /// On attend le déverrouillage tant que cet appel sonne encore ; l'écran de
+    /// CallKit, seul visible téléphone verrouillé, et une notification le disent.
+    private func waitForUnlockToAnswer(_ call: ActiveCall) async throws {
+        let identifier = "e2ee-call-unlock-\(call.id.uuidString)"
+        showUnlockHint(for: call, waiting: true)
+        CallUnlockPrompt.show(identifier: identifier)
+        defer {
+            CallUnlockPrompt.dismiss(identifier: identifier)
+            showUnlockHint(for: call, waiting: false)
+        }
+        let unlocked = await CallUnlockPrompt.waitForUnlock(stillWanted: { self.isStillAnswering(call.callId) })
+        guard unlocked, isStillAnswering(call.callId) else { throw CallError.deviceLocked }
+    }
+
+    private func showUnlockHint(for call: ActiveCall, waiting: Bool) {
+        guard activeCall?.id == call.id else { return }
+        let update = CXCallUpdate()
+        update.localizedCallerName = waiting
+            ? String(localized: "\(call.handle) · Déverrouille pour rejoindre")
+            : call.handle
+        provider.reportCall(with: call.id, updated: update)
     }
 
     private func tearDown(notice: EndNotice? = nil) async {
@@ -1094,6 +1149,7 @@ final class CallManager: NSObject, ObservableObject {
                   call.callId == callId,
                   !call.isAnswered,
                   !call.isEnding else { return }
+            self.activeCall?.isEnding = true
             self.reportCallEnded(call.id, reason: .unanswered)
             await self.notifyBackendCallTerminated(call)
             await self.tearDown()
@@ -1251,18 +1307,45 @@ extension CallManager: CXProviderDelegate {
         Task { @MainActor in
             let action = box.value
             guard let call = self.activeCall, let callId = call.callId else { action.fail(); return }
+            var fulfilled = false
             do {
-                let reconciled = try await self.reconcileE2EEForAnswer(call)
-                let context = try self.answerE2EEContext(for: reconciled)
-                let session = try await self.callsService.answer(callId: callId, e2ee: context)
+                var reconciled = try await self.reconcileE2EEForAnswer(call)
+                let session: CallSession
+                do {
+                    session = try await self.answerOnce(reconciled, callId: callId)
+                } catch where Self.waitsForUnlock(error) {
+                    // Décroché : CallKit le montre, et l'appel attend le
+                    // déverrouillage plutôt que d'échouer (§2.6, v0.4.13).
+                    self.liveKit.prepareCallKitAudioSession()
+                    action.fulfill()
+                    fulfilled = true
+                    try await self.waitForUnlockToAnswer(reconciled)
+                    // Relu après l'attente : un appel terminé ou décroché ailleurs
+                    // entre-temps n'est jamais rejoint.
+                    reconciled = try await self.reconcileE2EEForAnswer(reconciled)
+                    session = try await self.answerOnce(reconciled, callId: callId)
+                }
+                guard self.isStillAnswering(callId) else {
+                    // Raccroché pendant la réponse : le serveur l'a peut-être déjà
+                    // rejoint, on le quitte (sans effet s'il ne l'est pas).
+                    await self.notifyBackendCallTerminated(callId: callId, action: .leave)
+                    if !fulfilled { action.fail() }
+                    return
+                }
                 // L'autorisation serveur a déjà fait passer le participant à
                 // `joined`; tout échec média ultérieur doit donc utiliser leave/end,
                 // jamais reject (qui n'accepte que RINGING).
                 self.activeCall?.isAnswered = true
                 try await self.connectLiveKit(for: session, video: call.hasVideo)
                 self.showCallScreen = true
-                action.fulfill()
+                if !fulfilled { action.fulfill() }
             } catch {
+                // Raccroché ou terminé ailleurs pendant la réponse : la fin s'en
+                // occupe, sans écran d'échec.
+                guard self.isStillAnswering(callId) else {
+                    if !fulfilled { action.fail() }
+                    return
+                }
                 self.logger.error("answer failed: \(error.localizedDescription, privacy: .public)")
                 // CALL-RTC-02 : l'appel a déjà été rapporté à CallKit (entrant) ;
                 // action.fail() ne le retire pas → on le clôt explicitement pour ne
@@ -1270,7 +1353,7 @@ extension CallManager: CXProviderDelegate {
                 if let id = self.activeCall?.id { self.reportCallEnded(id, reason: .failed) }
                 let notice = self.failureNotice(for: error)
                 if let call = self.activeCall { await self.notifyBackendCallTerminated(call) }
-                action.fail()
+                if !fulfilled { action.fail() }
                 await self.tearDown(notice: notice)
             }
         }
@@ -1280,6 +1363,8 @@ extension CallManager: CXProviderDelegate {
         let box = UnsafeMainActorBox(value: action)
         Task { @MainActor in
             let action = box.value
+            // Avant toute attente : une réponse en cours ne reprend plus cet appel.
+            self.activeCall?.isEnding = true
             let call = self.activeCall
             await self.liveKit.disconnect()
             // CALL-BUG-02 / CALL-RTC-06 : reject (entrant jamais décroché) vs end

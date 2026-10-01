@@ -142,7 +142,11 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
 
         let stored = try XCTUnwrap(try fixture.keys.load(conversationId: seeded.conversationId, ownerNamespace: fixture.session.ownerNamespace))
         XCTAssertEqual(stored.epochNumber, 2)
-        XCTAssertEqual(try fixture.states.currentEpoch(conversationId: seeded.conversationId, ownerNamespace: fixture.session.ownerNamespace)?.epochNumber, 2)
+        let current = try XCTUnwrap(try fixture.states.currentEpoch(conversationId: seeded.conversationId, ownerNamespace: fixture.session.ownerNamespace))
+        XCTAssertEqual(current.epochNumber, 2)
+        // Épinglés avec l'époque gardée, pour vérifier une clé lue verrouillé (§2.6).
+        XCTAssertEqual(current.epochId, stored.epochId)
+        XCTAssertEqual(current.keyCommitmentB64, try E2EEV2EpochCrypto.keyCommitment(stored.epochKey))
     }
 
     /// Conflit : l'époque acceptée entre-temps est relue, vérifiée et adoptée.

@@ -17,6 +17,22 @@
         }
       }
     },
+    "%@ · Déverrouille pour rejoindre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Unlock to join"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Déverrouille pour rejoindre"
+          }
+        }
+      }
+    },
     "%@ a activé le chiffrement de bout en bout de cette conversation." : {
       "localizations" : {
         "en" : {
@@ -285,6 +301,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ t’a retiré le rôle d’admin."
+          }
+        }
+      }
+    },
+    "Appel chiffré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted call"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel chiffré"
+          }
+        }
+      }
+    },
+    "Appel chiffré manqué : ton appareil est resté verrouillé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missed encrypted call: your device stayed locked."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel chiffré manqué : ton appareil est resté verrouillé."
           }
         }
       }

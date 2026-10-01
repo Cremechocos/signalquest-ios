@@ -245,7 +245,8 @@ enum E2EEV2EpochVerifierV2 {
                     conversationId: conversationId, epochNumber: accepted.epochNumber,
                     membershipChangeNumber: membership.changeNumber, memberIds: membership.members.sorted(),
                     recipientsDigest: E2EEV2Canonical.listDigest(tag: E2EEV2EpochManifest.recipientsTag, lines: recipients),
-                    excludesWeb: membership.excludesWeb, createdAtMs: createdAtMs, acceptedAtMs: acceptedAtMs
+                    excludesWeb: membership.excludesWeb, createdAtMs: createdAtMs, acceptedAtMs: acceptedAtMs,
+                    epochId: accepted.epochId, keyCommitmentB64: commitment
                 ),
                 ownerNamespace: session.ownerNamespace
             ) {

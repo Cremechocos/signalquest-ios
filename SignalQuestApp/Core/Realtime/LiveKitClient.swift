@@ -202,6 +202,18 @@ final class LiveKitClient: ObservableObject {
         mediaErrorMessage = nil
     }
 
+    /// Décroché avant la connexion (appel chiffré qui attend le déverrouillage) :
+    /// CallKit active la session audio dès l'action accomplie. Elle doit déjà
+    /// porter la catégorie et le mode d'un appel, comme le pose `connect`.
+    func prepareCallKitAudioSession() {
+        guard !allowsLocalQADataBootstrap, state != .connecting, state != .connected else { return }
+        managesAudioSession = false
+        try? session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP])
+        #if canImport(LiveKit)
+        AudioManager.shared.audioSession.isAutomaticConfigurationEnabled = false
+        #endif
+    }
+
     func connect(
         url: URL,
         token: String,

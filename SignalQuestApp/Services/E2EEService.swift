@@ -6501,12 +6501,16 @@ enum E2EEV2CallRequestPreparation: Equatable, Sendable {
     case prepared(E2EEV2CallEpochContext)
     case runtimeClosed
     case localEpochUnavailable
+    /// La clé existe mais l'appareil est verrouillé, sans copie lisible dans
+    /// le miroir des aperçus : l'appel attend le déverrouillage (§2.6, v0.4.13).
+    case deviceLocked
 }
 
 enum E2EEV2CallSessionFailure: Equatable, Sendable {
     case runtimeClosed
     case localEpochUnavailable
     case descriptorMismatch
+    case deviceLocked
 }
 
 enum E2EEV2CallSessionResolution: Sendable {
@@ -6600,21 +6604,40 @@ enum E2EEV2CallBridge {
         conversationId: String,
         descriptor: E2EEV2CallSessionDescriptor,
         keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
-        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
+        contextStore: E2EEV2NotificationContextStore? = .configured()
     ) -> E2EEV2CallRequestPreparation {
         guard E2EEV2CallRuntimeGate.allowsControlPlane() else { return .runtimeClosed }
         guard LocalAccountScope.currentUserId != nil else { return .localEpochUnavailable }
         let owner = LocalAccountScope.currentOwnerScopeId
-        let namespace = LocalAccountScope.storageNamespace(for: owner)
-        return prepareAnswerContractPreview(
+        return prepareAnswer(
+            conversationId: conversationId, descriptor: descriptor,
+            ownerNamespace: LocalAccountScope.storageNamespace(for: owner),
+            keyStore: keyStore, stateStore: stateStore, contextStore: contextStore
+        )
+    }
+
+    /// Après le verrou d'exécution : la clé du coffre, ou du miroir des aperçus
+    /// appareil verrouillé (§2.6, v0.4.13).
+    static func prepareAnswer(
+        conversationId: String,
+        descriptor: E2EEV2CallSessionDescriptor,
+        ownerNamespace: String,
+        keyStore: E2EEV2EpochKeyStore,
+        stateStore: E2EEV2ConversationStateStore,
+        contextStore: E2EEV2NotificationContextStore?
+    ) -> E2EEV2CallRequestPreparation {
+        var locked = false
+        let prepared = prepareAnswerContractPreview(
             conversationId: conversationId,
             descriptor: descriptor
         ) {
-            try? E2EEV2VerifiedEpochKeys.exact(
-                conversationId: conversationId, epochNumber: descriptor.epochNumber, ownerNamespace: namespace,
-                keyStore: keyStore, stateStore: stateStore
+            callEpoch(
+                conversationId: conversationId, epochNumber: descriptor.epochNumber, ownerNamespace: ownerNamespace,
+                keyStore: keyStore, stateStore: stateStore, contextStore: contextStore, locked: &locked
             )
         }
+        return prepared == .localEpochUnavailable && locked ? .deviceLocked : prepared
     }
 
     static func prepareAnswerContractPreview(
@@ -6652,23 +6675,75 @@ enum E2EEV2CallBridge {
         liveKitURL: URL,
         descriptor: E2EEV2CallSessionDescriptor,
         keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
-        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
+        contextStore: E2EEV2NotificationContextStore? = .configured()
     ) -> E2EEV2CallSessionResolution {
         guard E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: liveKitURL) else {
             return .blocked(.runtimeClosed)
         }
         guard LocalAccountScope.currentUserId != nil else { return .blocked(.localEpochUnavailable) }
         let owner = LocalAccountScope.currentOwnerScopeId
-        let namespace = LocalAccountScope.storageNamespace(for: owner)
-        return resolveContractPreview(
+        return resolveSession(
+            conversationId: conversationId, callId: callId, descriptor: descriptor,
+            ownerNamespace: LocalAccountScope.storageNamespace(for: owner),
+            keyStore: keyStore, stateStore: stateStore, contextStore: contextStore
+        )
+    }
+
+    /// Après le verrou d'exécution, comme `prepareAnswer`.
+    static func resolveSession(
+        conversationId: String,
+        callId: String,
+        descriptor: E2EEV2CallSessionDescriptor,
+        ownerNamespace: String,
+        keyStore: E2EEV2EpochKeyStore,
+        stateStore: E2EEV2ConversationStateStore,
+        contextStore: E2EEV2NotificationContextStore?
+    ) -> E2EEV2CallSessionResolution {
+        var locked = false
+        let resolution = resolveContractPreview(
             conversationId: conversationId,
             callId: callId,
             descriptor: descriptor
         ) {
-            try? E2EEV2VerifiedEpochKeys.exact(
-                conversationId: conversationId, epochNumber: descriptor.epochNumber, ownerNamespace: namespace,
+            callEpoch(
+                conversationId: conversationId, epochNumber: descriptor.epochNumber, ownerNamespace: ownerNamespace,
+                keyStore: keyStore, stateStore: stateStore, contextStore: contextStore, locked: &locked
+            )
+        }
+        if case .blocked(.localEpochUnavailable) = resolution, locked { return .blocked(.deviceLocked) }
+        return resolution
+    }
+
+    /// Clé de l'époque d'un appel : celle du coffre de l'app ; s'il est fermé
+    /// parce que l'appareil est verrouillé, celle du miroir des aperçus (§2.6,
+    /// v0.4.13). `locked` : ni l'un ni l'autre ne l'a donnée, verrouillé.
+    private static func callEpoch(
+        conversationId: String,
+        epochNumber: Int,
+        ownerNamespace: String,
+        keyStore: E2EEV2EpochKeyStore,
+        stateStore: E2EEV2ConversationStateStore,
+        contextStore: E2EEV2NotificationContextStore?,
+        locked: inout Bool
+    ) -> E2EEV2StoredEpochKey? {
+        do {
+            return try E2EEV2VerifiedEpochKeys.exact(
+                conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace,
                 keyStore: keyStore, stateStore: stateStore
             )
+        } catch where E2EEV2DeviceIdentityStore.isLocked(error) {
+            if let session = LocalAccountScope.sessionSnapshot(), session.ownerNamespace == ownerNamespace,
+               let mirrored = E2EEV2VerifiedEpochKeys.exactWhileLocked(
+                   conversationId: conversationId, epochNumber: epochNumber, session: session,
+                   stateStore: stateStore, contextStore: contextStore
+               ) {
+                return mirrored
+            }
+            locked = true
+            return nil
+        } catch {
+            return nil
         }
     }
 

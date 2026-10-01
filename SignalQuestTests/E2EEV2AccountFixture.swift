@@ -246,7 +246,8 @@ extension E2EEV2AccountFixture {
             conversationId: creation.conversationId, epochNumber: 1, membershipChangeNumber: creation.genesis.changeNumber,
             memberIds: creation.genesis.members.sorted(),
             recipientsDigest: E2EEV2Canonical.listDigest(tag: E2EEV2EpochManifest.recipientsTag, lines: creation.epoch.recipients),
-            excludesWeb: false, createdAtMs: creation.epoch.createdAtMs, acceptedAtMs: creation.epoch.createdAtMs
+            excludesWeb: false, createdAtMs: creation.epoch.createdAtMs, acceptedAtMs: creation.epoch.createdAtMs,
+            epochId: "epoch_seeded_000000000001", keyCommitmentB64: creation.epoch.keyCommitmentB64
         )
         try states.appendMembership(creation.membership, conversationId: creation.conversationId, ownerNamespace: namespace)
         try states.record(
@@ -296,7 +297,8 @@ extension E2EEV2AccountFixture {
                 conversationId: current.conversationId, epochNumber: epochNumber,
                 membershipChangeNumber: current.membershipChangeNumber, memberIds: current.memberIds,
                 recipientsDigest: current.recipientsDigest, excludesWeb: current.excludesWeb,
-                createdAtMs: current.createdAtMs + 1_000, acceptedAtMs: current.acceptedAtMs + 1_000
+                createdAtMs: current.createdAtMs + 1_000, acceptedAtMs: current.acceptedAtMs + 1_000,
+                epochId: "epoch_seeded_00000000000\(epochNumber)", keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(epochKey)
             ),
             ownerNamespace: namespace
         )

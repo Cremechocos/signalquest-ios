@@ -28,6 +28,15 @@ final class CallFailureMessageTests: XCTestCase {
         )
     }
 
+    /// Spec §2.6 (v0.4.13) : resté verrouillé jusqu'à la fin de l'attente,
+    /// l'appel est manqué, et l'écran de fin dit pourquoi.
+    func testALockedDeviceExplainsTheMissedCall() {
+        XCTAssertEqual(
+            CallManager.failureMessage(for: CallManager.CallError.deviceLocked),
+            String(localized: "Appel chiffré manqué : ton appareil est resté verrouillé.")
+        )
+    }
+
     func testCancellationStaysSilent() {
         XCTAssertNil(CallManager.failureMessage(for: CancellationError()))
     }
