@@ -4841,6 +4841,22 @@ extension E2EETests {
         )?.epochKey, epochKey)
     }
 
+    func testV2RecoveryBackfillWrapsOnlyForTheOwnAccountRecoveryKey() {
+        let own = E2EEV2RecoveryEpochRecipient(
+            recipientUserId: "user_alice_01J7ABCD2345", recoveryBundleHash: "hash-alice",
+            recoveryPublicIdentityKeyB64: "cle-alice"
+        )
+        let other = E2EEV2RecoveryEpochRecipient(
+            recipientUserId: "user_bruno_01J7ABCD2345", recoveryBundleHash: "hash-bruno",
+            recoveryPublicIdentityKeyB64: "cle-bruno"
+        )
+        XCTAssertEqual(
+            E2EEV2RecoveryEpochContract.ownRecipients([other, own], userId: "user_alice_01J7ABCD2345"), [own],
+            "La clé de récupération d'un autre membre, fournie par le serveur, n'est jamais utilisée"
+        )
+        XCTAssertEqual(E2EEV2RecoveryEpochContract.ownRecipients([other], userId: "user_alice_01J7ABCD2345"), [])
+    }
+
     func testV2RecoveryEpochBackfillPaginatesWithARealQuery() async throws {
         let fixture = try RotationFixture(); defer { fixture.close() }
         let firstPage = try JSONSerialization.data(withJSONObject: [

@@ -5112,6 +5112,16 @@ enum E2EEV2RecoveryEpochContract {
         return .init(items: items, nextCursor: nextCursor)
     }
 
+    /// §2.8 : un appareil n'enveloppe une clé d'époque que vers la clé de
+    /// récupération de son propre compte, jamais vers celle d'un autre membre,
+    /// même fournie par le serveur.
+    static func ownRecipients(
+        _ recipients: [E2EEV2RecoveryEpochRecipient],
+        userId: String
+    ) -> [E2EEV2RecoveryEpochRecipient] {
+        recipients.filter { $0.recipientUserId == userId }
+    }
+
     static func uploadData(_ envelopes: [E2EEV2RecoveryEpochEnvelope]) throws -> Data {
         guard (1...maxRecipients).contains(envelopes.count),
               Set(envelopes.map(\.recipientUserId)).count == envelopes.count,
@@ -5414,7 +5424,12 @@ final class E2EEV2RecoveryEpochCoordinator: @unchecked Sendable {
                             ownerNamespace: account.ownerNamespace
                           ) else { return localFailure("e2ee-backfill-epoch-storage-failed") }
 
-                    let envelopes = try item.recoveryRecipients.map { recipient in
+                    // §2.8 : seulement vers la clé de récupération de son propre compte.
+                    let recipients = E2EEV2RecoveryEpochContract.ownRecipients(
+                        item.recoveryRecipients, userId: account.userId
+                    )
+                    guard !recipients.isEmpty else { continue }
+                    let envelopes = try recipients.map { recipient in
                         try identityStore.createSignedRecoveryEpochEnvelope(
                             context: .init(
                                 conversationId: item.deviceDelivery.conversationId,
