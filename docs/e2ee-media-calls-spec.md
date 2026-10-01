@@ -2139,7 +2139,10 @@ version publiée qui ouvre les verrous.
   - `deviceList` : `{list, signatureB64, devices}` ;
   - `deviceListChain` : les listes N+1 à M−1, en `{list, signatureB64}` et dans
     l'ordre, M étant la courante ; pages plafonnées à 50, avec
-    `nextSinceVersion` quand il en reste. Le client vérifie chaque maillon ;
+    `nextSinceVersion` (chaîne décimale, toujours plus grande que la version
+    demandée) quand il en reste. Le client redemande à partir de là, vérifie
+    chaque maillon (signature de l'UIK, numéro suivant, condensat du
+    précédent) et refuse le paquet à la moindre lacune ;
   - `certificates` : liste de `{certificate, signatureB64}`, les appareils de
     la liste courante ;
   - `capabilities` : liste de `{document, signatureB64}`, le dernier document
