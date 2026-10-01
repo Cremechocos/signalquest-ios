@@ -515,8 +515,15 @@ private extension E2EEV2JalonAVectorTests {
         func variant(_ canonical: String) throws -> String { try E2EEV2SignedString.sign(canonical, with: uik).signatureB64 }
         let keyVersionZero = certificate.canonical.replacingOccurrences(of: "\n\(deviceA1)\n1\n", with: "\n\(deviceA1)\n0\n")
         let watch = certificate.canonical.replacingOccurrences(of: "\nios\n", with: "\nwatch\n")
+        // Même clé, base64 non canonique (bits de bourrage non nuls).
+        let b64 = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+        var identityB64 = Array(identity.publicKey.x963Representation.base64EncodedString())
+        identityB64[identityB64.count - 2] = b64[(b64.firstIndex(of: identityB64[identityB64.count - 2]) ?? 0) ^ 1]
+        let looseKey = certificate.canonical.replacingOccurrences(
+            of: identity.publicKey.x963Representation.base64EncodedString(), with: String(identityB64)
+        )
         return .o([
-            ("fixtureVersion", .s("1")), ("userId", .s(userA)), ("deviceId", .s(deviceA1)), ("keyVersion", .s("1")),
+            ("fixtureVersion", .s("2")), ("userId", .s(userA)), ("deviceId", .s(deviceA1)), ("keyVersion", .s("1")),
             ("platform", .s("ios")), ("createdAtMs", .s(String(createdAtMs))),
             ("uikPrivateRawB64", .s(uik.rawRepresentation.base64EncodedString())),
             ("uikPublicX963B64", .s(uik.publicKey.x963Representation.base64EncodedString())),
@@ -532,6 +539,7 @@ private extension E2EEV2JalonAVectorTests {
                 .o([("case", .s("keyVersionZero")), ("certificateUtf8", .s(keyVersionZero)), ("signatureDerB64", .s(try variant(keyVersionZero)))]),
                 .o([("case", .s("unknownPlatform")), ("certificateUtf8", .s(watch)), ("signatureDerB64", .s(try variant(watch)))]),
                 .o([("case", .s("extraField")), ("certificateUtf8", .s(certificate.canonical + "\nextra")), ("signatureDerB64", .s(try variant(certificate.canonical + "\nextra")))]),
+                .o([("case", .s("nonCanonicalKey")), ("certificateUtf8", .s(looseKey)), ("signatureDerB64", .s(try variant(looseKey)))]),
                 .o([("case", .s("wrongUik")), ("uikPublicX963B64", .s(other.publicKey.x963Representation.base64EncodedString()))]),
             ])),
         ])
@@ -553,6 +561,18 @@ private extension E2EEV2JalonAVectorTests {
             deviceCount: 1, devicesDigest: list2.devicesDigest, issuedAtMs: list2.issuedAtMs
         )
         let versionOneWithPrevious = E2EEV2DeviceList.make(userId: userA, version: 1, previousCanonical: list1.canonical, entries: [entryA1], issuedAtMs: createdAtMs)
+        // Les lignes contiennent des « \n » : autre découpage des huit lignes, même condensat possible.
+        let lines = (entryA1 + "\n" + entryA2).components(separatedBy: "\n")
+        let grouped = [lines[0..<3].joined(separator: "\n"), lines[3...].joined(separator: "\n")]
+        let groupedList = E2EEV2DeviceList.make(userId: userA, version: 1, previousCanonical: nil, entries: grouped, issuedAtMs: createdAtMs)
+        let outOfRange = E2EEV2DeviceList.make(userId: userA, version: Int(Int32.max), previousCanonical: list1.canonical, entries: [entryA1], issuedAtMs: createdAtMs)
+        let b64url = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+        var loose = Array(fingerprintA1)
+        loose[loose.count - 1] = b64url[(b64url.firstIndex(of: loose[loose.count - 1]) ?? 0) ^ 1]
+        let looseEntry = E2EEV2DeviceList.entry(deviceId: deviceA1, keyVersion: 1, platform: "ios", fingerprint: String(loose))
+        let looseList = E2EEV2DeviceList.make(userId: userA, version: 1, previousCanonical: nil, entries: [looseEntry], issuedAtMs: createdAtMs)
+        let twinEntry = E2EEV2DeviceList.entry(deviceId: deviceA1, keyVersion: 2, platform: "ios", fingerprint: fingerprintA2)
+        let twinList = E2EEV2DeviceList.make(userId: userA, version: 1, previousCanonical: nil, entries: [entryA1, twinEntry], issuedAtMs: createdAtMs)
         func neg(_ name: String, _ list: String, _ entries: [String], _ previous: String?) throws -> VJ {
             var fields: [(String, VJ)] = [
                 ("case", .s(name)), ("listUtf8", .s(list)),
@@ -563,7 +583,7 @@ private extension E2EEV2JalonAVectorTests {
             return .o(fields)
         }
         return .o([
-            ("fixtureVersion", .s("1")), ("userId", .s(userA)),
+            ("fixtureVersion", .s("2")), ("userId", .s(userA)),
             ("uikPrivateRawB64", .s(uik.rawRepresentation.base64EncodedString())),
             ("uikPublicX963B64", .s(uik.publicKey.x963Representation.base64EncodedString())),
             ("entriesV1", .a([.s(entryA1), .s(entryA2)])),
@@ -577,6 +597,10 @@ private extension E2EEV2JalonAVectorTests {
                 try neg("brokenChain", brokenChain.canonical, [entryA1], list1.canonical),
                 try neg("versionOneWithPrevious", versionOneWithPrevious.canonical, [entryA1], nil),
                 try neg("missingPrevious", list2.canonical, [entryA1], nil),
+                try neg("groupedEntries", groupedList.canonical, grouped, nil),
+                try neg("versionOutOfRange", outOfRange.canonical, [entryA1], list1.canonical),
+                try neg("nonCanonicalFingerprint", looseList.canonical, [looseEntry], nil),
+                try neg("duplicateDeviceId", twinList.canonical, [entryA1, twinEntry], nil),
                 .o([("case", .s("highS")), ("listUtf8", .s(list1.canonical)), ("signatureDerB64", .s(try highS(signed1.signatureB64))), ("entries", .a([.s(entryA1), .s(entryA2)])), ("previousUtf8", .null)]),
             ])),
         ])
