@@ -1,6 +1,26 @@
 import Foundation
 import CoreFoundation
 
+extension E2EEV2NotificationContext {
+    /// Contexte d'un compte qui a accepté l'avis, aperçus permis (§2.6) : aucune
+    /// clé d'appareil, seulement son identifiant.
+    static func make(
+        account: E2EEV2NotificationAccountSnapshot,
+        deviceId: String,
+        senderNames: [String: String],
+        revisionId: String = UUID().uuidString.lowercased()
+    ) throws -> E2EEV2NotificationContext {
+        guard account.noticeAcknowledged, account.privacy != .hidden else {
+            throw E2EEV2NotificationContextStoreError.invalidContext
+        }
+        return .init(
+            version: currentVersion, revisionId: revisionId, ownerScopeId: account.ownerScopeId,
+            sessionId: account.sessionId, authToken: account.authToken, expiresAtMs: account.expiresAtMs,
+            deviceId: deviceId, privacy: account.privacy, senderNames: senderNames
+        )
+    }
+}
+
 enum E2EEV2NotificationContextRefreshReason: String, Sendable {
     case foreground
     case credentials
@@ -84,18 +104,12 @@ actor E2EEV2NotificationContextCoordinator {
             return .unavailable
         }
         do {
-            // A token refresh may happen while the original whenUnlocked keys are
-            // unavailable. Reuse only a mirror from this exact local session.
-            // Every envelope fetch still revalidates approval on the server.
+            // A token refresh reuses only a mirror from this exact local session.
+            // Every envelope fetch still revalidates the session on the server.
             if reason == .credentials, let existing = try d.loadExisting(),
                existing.ownerScopeId == account.ownerScopeId, existing.sessionId == account.sessionId {
-                let renewed = E2EEV2NotificationContext(
-                    version: 1, revisionId: UUID().uuidString.lowercased(),
-                    ownerScopeId: account.ownerScopeId, sessionId: account.sessionId,
-                    authToken: account.authToken, expiresAtMs: account.expiresAtMs,
-                    descriptor: existing.descriptor, identityPrivateRawB64: existing.identityPrivateRawB64,
-                    signingPrivateRawB64: existing.signingPrivateRawB64, privacy: account.privacy,
-                    senderNames: existing.senderNames
+                let renewed = try E2EEV2NotificationContext.make(
+                    account: account, deviceId: existing.deviceId, senderNames: existing.senderNames
                 )
                 return try persistIfCurrent(renewed, account: account, generation: requestedGeneration, dependencies: d)
             }
@@ -179,8 +193,16 @@ final class E2EEV2NotificationContextBridge: @unchecked Sendable {
             snapshot: { [self] in snapshot() },
             approval: { [self] in await approvedDevice(for: $0) },
             senderNames: { [self] in await senderNames(for: $0) },
-            prepare: { [self] account, descriptor, names in
-                try identityStore.makeNotificationContextRuntime(account: account, approvedDevice: descriptor, senderNames: names)
+            prepare: { account, descriptor, names in
+                guard E2EEV2RuntimeReadGate.enabled,
+                      PushOwnerScope.current == account.ownerScopeId,
+                      LocalAccountScope.currentOwnerScopeId == account.localOwnerScopeId,
+                      LocalAccountScope.storageNamespace == account.ownerNamespace,
+                      LocalAccountScope.currentSessionId == account.sessionId else {
+                    throw E2EEV2DeviceIdentityError.unauthenticated
+                }
+                // Aucune clé d'appareil ne quitte son coffre (§2.6).
+                return try E2EEV2NotificationContext.make(account: account, deviceId: descriptor.deviceId, senderNames: names)
             },
             loadExisting: { try store.loadForCredentialRefresh() },
             persist: { try store.saveRuntime($0) },

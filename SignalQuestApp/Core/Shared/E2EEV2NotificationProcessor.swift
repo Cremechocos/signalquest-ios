@@ -16,18 +16,23 @@ struct E2EEV2OpaqueNotificationRequest: Equatable, Sendable {
     }
 }
 
-/// Optional, revocable notification-only mirror. It never contains epoch/history keys.
-/// Persist only in the dedicated shared Keychain group, never in UserDefaults or a file.
+/// Miroir réservé aux notifications, facultatif et révocable (§2.6) : la
+/// session, l'identifiant de l'appareil et les noms des expéditeurs. Aucune clé
+/// privée d'appareil : l'extension lit l'enveloppe avec le seul cookie de
+/// session, et les clés d'époque vérifiées vivent dans des entrées par
+/// conversation (`E2EEV2NotificationConversation`). Rien du tout en mode
+/// « aucun aperçu ». Persisté seulement dans le groupe de trousseau dédié,
+/// jamais dans UserDefaults ni dans un fichier.
 struct E2EEV2NotificationContext: Codable, Equatable, Sendable {
+    static let currentVersion = 2
+
     let version: Int
     let revisionId: String
     let ownerScopeId: String
     let sessionId: String
     let authToken: String
     let expiresAtMs: Int64
-    let descriptor: E2EEV2DeviceDescriptor
-    let identityPrivateRawB64: String
-    let signingPrivateRawB64: String
+    let deviceId: String
     let privacy: E2EEV2NotificationPrivacy
     let senderNames: [String: String]
 
@@ -36,37 +41,71 @@ struct E2EEV2NotificationContext: Codable, Equatable, Sendable {
     }
 
     var isStructurallyValid: Bool {
-        guard version == 1,
-              UUID(uuidString: revisionId) != nil,
-              UUID(uuidString: sessionId) != nil,
-              ownerScopeId.range(of: #"^user:[a-f0-9]{64}\z"#, options: .regularExpression) != nil,
-              !authToken.isEmpty, authToken.utf8.count <= 16_384,
-              authToken.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
-              !authToken.contains(";"), !authToken.contains("\u{0}"),
-              expiresAtMs > 0,
-              E2EEV2PortableInventoryContract.validOpaqueId(descriptor.deviceId),
-              descriptor.platform == "ios", descriptor.keyVersion == 1,
-              descriptor.identityKeyAlgorithm == E2EEV2DeviceAlgorithms.identityKeyAlgorithm,
-              descriptor.signingKeyAlgorithm == E2EEV2DeviceAlgorithms.signingKeyAlgorithm,
-              privacy != .hidden,
-              senderNames.count <= 500,
-              senderNames.allSatisfy({
-                  E2EEV2PortableInventoryContract.validOpaqueId($0.key) &&
-                      !$0.value.isEmpty && $0.value.count <= 120
-              }),
-              let identityRaw = Data(base64Encoded: identityPrivateRawB64), identityRaw.count == 32,
-              let signingRaw = Data(base64Encoded: signingPrivateRawB64), signingRaw.count == 32,
-              let identity = try? P256.KeyAgreement.PrivateKey(rawRepresentation: identityRaw),
-              let signing = try? P256.Signing.PrivateKey(rawRepresentation: signingRaw) else { return false }
-        return identity.publicKey.x963Representation.base64EncodedString() == descriptor.publicIdentityKeyB64 &&
-            signing.publicKey.x963Representation.base64EncodedString() == descriptor.publicSigningKeyB64
+        version == Self.currentVersion &&
+            UUID(uuidString: revisionId) != nil &&
+            UUID(uuidString: sessionId) != nil &&
+            ownerScopeId.range(of: #"^user:[a-f0-9]{64}\z"#, options: .regularExpression) != nil &&
+            !authToken.isEmpty && authToken.utf8.count <= 16_384 &&
+            authToken.rangeOfCharacter(from: .whitespacesAndNewlines) == nil &&
+            !authToken.contains(";") && !authToken.contains("\u{0}") &&
+            expiresAtMs > 0 &&
+            E2EEV2PortableInventoryContract.validOpaqueId(deviceId) &&
+            privacy != .hidden &&
+            senderNames.count <= 500 &&
+            senderNames.allSatisfy {
+                E2EEV2PortableInventoryContract.validOpaqueId($0.key) && !$0.value.isEmpty && $0.value.count <= 120
+            }
     }
 
     func hasSameContent(as other: Self) -> Bool {
         version == other.version && ownerScopeId == other.ownerScopeId && sessionId == other.sessionId &&
-            authToken == other.authToken && expiresAtMs == other.expiresAtMs && descriptor == other.descriptor &&
-            identityPrivateRawB64 == other.identityPrivateRawB64 && signingPrivateRawB64 == other.signingPrivateRawB64 &&
+            authToken == other.authToken && expiresAtMs == other.expiresAtMs && deviceId == other.deviceId &&
             privacy == other.privacy && senderNames == other.senderNames
+    }
+}
+
+/// Ce que l'extension peut lire d'une conversation v2, écran verrouillé (§2.6) :
+/// les clés d'époque vérifiées (la courante, et celles remplacées depuis moins
+/// de 24 heures), leurs membres, et les clés publiques certifiées des appareils
+/// de ces membres. Écrite par l'app, jamais par le serveur.
+struct E2EEV2NotificationConversation: Codable, Equatable, Sendable {
+    static let currentVersion = 1
+    static let maxEpochs = 16
+    static let maxSigningKeys = 512
+
+    struct Epoch: Codable, Equatable, Sendable {
+        let epochNumber: Int
+        let keyB64: String
+        let memberIds: [String]
+        /// Heure locale de son remplacement ; nil pour l'époque courante.
+        let replacedAtMs: Int64?
+    }
+
+    let version: Int
+    let conversationId: String
+    let epochs: [Epoch]
+    /// « userId deviceId » → clé publique de signature certifiée (X9.63, b64).
+    let signingKeys: [String: String]
+
+    static func signingKeyName(userId: String, deviceId: String) -> String { "\(userId) \(deviceId)" }
+
+    var isStructurallyValid: Bool {
+        version == Self.currentVersion &&
+            E2EEV2Canonical.isOpaque(conversationId) &&
+            (1...Self.maxEpochs).contains(epochs.count) &&
+            Set(epochs.map(\.epochNumber)).count == epochs.count &&
+            epochs.filter({ $0.replacedAtMs == nil }).count == 1 &&
+            epochs.allSatisfy { epoch in
+                (1...E2EEV2Canonical.maxSequenceNumber).contains(epoch.epochNumber) &&
+                    Data(base64Encoded: epoch.keyB64)?.count == 32 &&
+                    !epoch.memberIds.isEmpty && epoch.memberIds.allSatisfy(E2EEV2Canonical.isOpaque)
+            } &&
+            signingKeys.count <= Self.maxSigningKeys &&
+            signingKeys.allSatisfy { name, key in
+                let parts = name.split(separator: " ", omittingEmptySubsequences: false)
+                return parts.count == 2 && parts.allSatisfy { E2EEV2Canonical.isOpaque(String($0)) }
+                    && E2EEV2Canonical.isX963PublicKey(key)
+            }
     }
 }
 
@@ -98,11 +137,15 @@ enum E2EEV2NotificationProcessingResult: Equatable, Sendable {
 struct E2EEV2NotificationProcessorDependencies: Sendable {
     let loadContext: @Sendable () throws -> E2EEV2NotificationContext?
     let isCurrent: @Sendable (E2EEV2NotificationContext) throws -> Bool
+    let loadConversation: @Sendable (String) throws -> E2EEV2NotificationConversation?
     let fetch: @Sendable (URLRequest) async throws -> Data
     var now: @Sendable () -> Date = { Date() }
 }
 
 enum E2EEV2NotificationProcessor {
+    /// Fenêtre d'une époque remplacée, comme dans l'app (§3.4).
+    static let replacedEpochWindowMs: Int64 = 24 * 60 * 60 * 1_000
+
     static func processRuntime(
         request: E2EEV2OpaqueNotificationRequest,
         apiBaseURL: URL,
@@ -119,6 +162,9 @@ enum E2EEV2NotificationProcessor {
         )
     }
 
+    /// Lecture de l'enveloppe avec le seul cookie de session (E.0, E.3), puis,
+    /// comme l'app : appareil certifié, membre de l'époque, signature avant
+    /// tout déchiffrement, franking et charge. Aucune clé privée d'appareil.
     /// Contract tests use this entry point; production enters only through processRuntime.
     static func processContractPreview(
         request: E2EEV2OpaqueNotificationRequest,
@@ -133,70 +179,50 @@ enum E2EEV2NotificationProcessor {
             }
             guard context.ownerScopeId == request.recipientOwnerScope else { return .generic(.wrongAccount) }
             guard try dependencies.isCurrent(context) else { return .generic(.staleContext) }
-            let networkRequest = try signedRequest(
-                request: request,
-                context: context,
-                apiBaseURL: apiBaseURL,
-                allowLocalHTTP: allowLocalHTTP,
-                now: dependencies.now()
-            )
-            let data = try await dependencies.fetch(networkRequest)
+            let data = try await dependencies.fetch(fetchRequest(
+                request: request, context: context, apiBaseURL: apiBaseURL, allowLocalHTTP: allowLocalHTTP
+            ))
             try Task.checkCancellation()
             guard try dependencies.isCurrent(context), context.isValid(now: dependencies.now()) else {
                 return .generic(.staleContext)
             }
-            guard data.count <= E2EEV2WireLimits.maxJSONResponseBytes,
-                  let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-                  let envelope = root["envelope"] as? [String: Any],
-                  let conversationId = envelope["conversationId"] as? String,
-                  let delivery = E2EEV2MessageDeliveryContract.parseAndVerify(
-                    data,
-                    ownerScopeId: context.ownerScopeId,
-                    expectedEnvelopeId: request.envelopeId,
-                    expectedConversationId: conversationId,
-                    expectedRecipientDeviceId: context.descriptor.deviceId
-                  ), delivery.epochDelivery.status != "compromised" else {
+            guard let fetched = E2EEV2DeliveredMessageV2.parseFetch(data, envelopeId: request.envelopeId) else {
                 return .generic(.invalidDelivery)
             }
-            if let expiresAt = delivery.expiresAt,
-               let expiry = E2EEV2PortableInventoryContract.parseInstant(expiresAt),
-               expiry <= dependencies.now() {
-                return .generic(.expired)
-            }
-            guard let privateData = Data(base64Encoded: context.identityPrivateRawB64) else {
+            let (conversationId, message) = fetched
+            guard let conversation = try dependencies.loadConversation(conversationId),
+                  conversation.conversationId == conversationId, conversation.isStructurallyValid else {
                 return .generic(.contextUnavailable)
             }
-            var identityRaw = privateData
-            var epochKey = Data()
-            defer {
-                identityRaw.resetBytes(in: 0..<identityRaw.count)
-                epochKey.resetBytes(in: 0..<epochKey.count)
+            let envelope = message.signed.envelope
+            let nowMs = Int64(dependencies.now().timeIntervalSince1970 * 1_000)
+            guard let keyB64 = conversation.signingKeys[E2EEV2NotificationConversation.signingKeyName(
+                      userId: message.senderUserId, deviceId: message.senderDeviceId
+                  )],
+                  let keyData = Data(base64Encoded: keyB64),
+                  let senderKey = try? P256.Signing.PublicKey(x963Representation: keyData),
+                  let epoch = conversation.epochs.first(where: { $0.epochNumber == envelope.epochNumber }),
+                  epoch.replacedAtMs.map({ nowMs - $0 <= replacedEpochWindowMs }) ?? true,
+                  epoch.memberIds.contains(message.senderUserId) else {
+                return .generic(.invalidDelivery)
             }
-            let identity = try P256.KeyAgreement.PrivateKey(rawRepresentation: identityRaw)
-            epochKey = try E2EEV2EpochCrypto.unwrap(
-                envelope: delivery.epochDelivery.envelope.cryptoEnvelope,
-                keyCommitmentB64: delivery.epochDelivery.keyCommitmentB64,
-                recipientPrivateKey: identity,
-                context: delivery.epochDelivery.epochContext
+            let messageContext = message.signed.context(conversationId: conversationId, senderDeviceId: message.senderDeviceId)
+            try E2EEV2MessageCryptoV2.verifySignature(
+                context: messageContext, envelope: envelope, signatureDerB64: message.signed.senderSignatureB64,
+                senderSigningKey: senderKey
             )
-            let message = try E2EEV2MessageReceiver.decryptContractPreview(
-                input: delivery.incoming,
-                epoch: .init(
-                    conversationId: conversationId,
-                    epochId: delivery.epochDelivery.epochId,
-                    epochNumber: delivery.epochDelivery.epochNumber,
-                    keyCommitmentB64: delivery.epochDelivery.keyCommitmentB64,
-                    epochKey: epochKey
-                )
-            )
+            guard var epochKey = Data(base64Encoded: epoch.keyB64) else { return .generic(.contextUnavailable) }
+            defer { epochKey.resetBytes(in: 0..<epochKey.count) }
+            let opened = try E2EEV2MessageCryptoV2.decrypt(envelope: envelope, epochKey: epochKey, context: messageContext)
+            if envelope.ttlSeconds > 0, opened.payload.sentAtMs + Int64(envelope.ttlSeconds) * 1_000 <= nowMs {
+                return .generic(.expired)
+            }
             guard try dependencies.isCurrent(context), !Task.isCancelled else {
                 return .generic(.staleContext)
             }
             return .preview(.init(
                 presentation: E2EEV2NotificationPresentationPolicy.present(
-                    message,
-                    privacy: context.privacy,
-                    senderName: context.senderNames[delivery.senderId]
+                    opened.payload, privacy: context.privacy, senderName: context.senderNames[message.senderUserId]
                 ),
                 envelopeId: request.envelopeId,
                 conversationId: conversationId,
@@ -206,21 +232,22 @@ enum E2EEV2NotificationProcessor {
             ))
         } catch is CancellationError {
             return .generic(.cancelled)
-        } catch is E2EEV2MessageCryptoError {
+        } catch is E2EEV2MessageV2Error {
             return .generic(.invalidDelivery)
-        } catch is E2EEV2EpochCryptoError {
+        } catch is E2EEV2MessageCryptoError {
             return .generic(.invalidDelivery)
         } catch {
             return .generic(.transport)
         }
     }
 
-    private static func signedRequest(
+    /// `GET`, cookie de session seulement : les lectures ne portent pas de
+    /// signature d'appareil (E.0), et l'extension n'a aucune clé privée.
+    private static func fetchRequest(
         request: E2EEV2OpaqueNotificationRequest,
         context: E2EEV2NotificationContext,
         apiBaseURL: URL,
-        allowLocalHTTP: Bool,
-        now: Date
+        allowLocalHTTP: Bool
     ) throws -> URLRequest {
         guard let components = URLComponents(url: apiBaseURL, resolvingAgainstBaseURL: false),
               components.user == nil, components.password == nil,
@@ -228,39 +255,20 @@ enum E2EEV2NotificationProcessor {
               components.path.isEmpty || components.path == "/",
               let host = components.host, !host.isEmpty,
               components.scheme == "https" || (allowLocalHTTP && components.scheme == "http" &&
-                ["localhost", "127.0.0.1", "::1"].contains(host)),
-              let raw = Data(base64Encoded: context.signingPrivateRawB64) else {
+                ["localhost", "127.0.0.1", "::1"].contains(host)) else {
             throw E2EEV2MessageCryptoError.invalidContext
         }
         let path = "/api/e2ee/v2/envelopes/\(request.envelopeId)/fetch"
-        let body = Data("{}".utf8)
-        let timestamp = Int64(now.timeIntervalSince1970 * 1_000)
-        let nonce = try E2EEV2SignedRequest.newNonce()
-        let canonical = try E2EEV2SignedRequest.canonicalRequest(
-            method: "POST", path: path, timestampMs: timestamp, nonce: nonce, body: body
-        )
-        var privateRaw = raw
-        defer { privateRaw.resetBytes(in: 0..<privateRaw.count) }
-        let signing = try P256.Signing.PrivateKey(rawRepresentation: privateRaw)
-        let proof = E2EEV2SignedHeaders(
-            deviceId: context.descriptor.deviceId,
-            timestampMs: timestamp,
-            nonce: nonce,
-            signatureB64: try E2EEV2LowS.sign(canonical, with: signing).base64EncodedString()
-        )
         var result = URLRequest(url: apiBaseURL.appendingPathComponent(String(path.dropFirst())))
-        result.httpMethod = "POST"
-        result.httpBody = body
+        result.httpMethod = "GET"
         result.timeoutInterval = 12
         result.cachePolicy = .reloadIgnoringLocalCacheData
-        result.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         result.setValue("application/json", forHTTPHeaderField: "Accept")
         result.setValue("auth_token=\(context.authToken)", forHTTPHeaderField: "Cookie")
         result.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
         result.setValue(String(E2EEV2ProtocolWire.version), forHTTPHeaderField: E2EEV2ProtocolWire.protocolVersionHeader)
         result.setValue(E2EEV2ProtocolWire.messageCapabilities.sorted().joined(separator: ","),
                         forHTTPHeaderField: E2EEV2ProtocolWire.capabilitiesHeader)
-        for (key, value) in proof.values { result.setValue(value, forHTTPHeaderField: key) }
         return result
     }
 }

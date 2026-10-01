@@ -576,13 +576,17 @@ struct E2EEV2DeliveredMessageV2: Equatable, Sendable {
         return (messages, hasMore)
     }
 
-    /// `GET /api/e2ee/v2/envelopes/{id}/fetch` d'un message v2 : `{"message": …}`.
-    static func parseFetch(_ data: Data, envelopeId: String) -> E2EEV2DeliveredMessageV2? {
+    /// `GET /api/e2ee/v2/envelopes/{id}/fetch` d'un message v2 :
+    /// `{"conversationId": …, "message": …}`. La conversation annoncée n'est
+    /// qu'un aiguillage : l'AAD et la signature la lient, et rien ne s'ouvre
+    /// sous une autre.
+    static func parseFetch(_ data: Data, envelopeId: String) -> (conversationId: String, message: E2EEV2DeliveredMessageV2)? {
         guard data.count <= E2EEV2WireLimits.maxJSONResponseBytes,
               let root = (try? E2EEV2CanonicalJSON.parseStrict(data))?.objectValue,
-              Set(root.keys) == ["message"], let message = root["message"].flatMap(parse),
-              message.envelopeId == envelopeId else { return nil }
-        return message
+              Set(root.keys) == ["conversationId", "message"],
+              let conversationId = root["conversationId"]?.stringValue, E2EEV2Canonical.isOpaque(conversationId),
+              let message = root["message"].flatMap(parse), message.envelopeId == envelopeId else { return nil }
+        return (conversationId, message)
     }
 }
 

@@ -184,6 +184,9 @@ targets:
       - path: SignalQuestApp/Core/Shared/E2EEV2Canonical.swift
       - path: SignalQuestApp/Core/Shared/E2EEV2NotificationRuntime.swift
       - path: SignalQuestApp/Core/Shared/E2EEV2NotificationProcessor.swift
+      # Messages v2 lus par l'extension avec les seules clés d'époque vérifiées (§2.6).
+      - path: SignalQuestApp/Core/Shared/E2EEV2MessageFormats.swift
+      - path: SignalQuestApp/Core/Shared/E2EEV2HPKE.swift
       - path: SignalQuestApp/Core/Shared/E2EEV2NotificationContextStore.swift
       - path: SignalQuestApp/Core/Security/KeychainStore.swift
       - path: SignalQuestApp/Core/Shared/OutageNotificationReceiptContract.swift

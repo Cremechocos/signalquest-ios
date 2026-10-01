@@ -10,11 +10,14 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
     private let senderId = "sender_notification_fixture_01"
     private let senderDeviceId = "device_sender_notification_fixture"
     private let recipientDeviceId = "device_recipient_notification_fixture"
+    private let recipientId = "recipient_notification_fixture_01"
     private let owner = "user:" + String(repeating: "a", count: 64)
     private let now = Date(timeIntervalSince1970: 1_787_832_000)
 
     private struct Fixture: Sendable {
         let context: E2EEV2NotificationContext
+        let conversation: E2EEV2NotificationConversation
+        let descriptor: E2EEV2DeviceDescriptor
         let data: Data
         let now: Date
     }
@@ -73,6 +76,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
             dependencies: .init(
                 loadContext: { calls.increment(); return nil },
                 isCurrent: { _ in calls.increment(); return false },
+                loadConversation: { _ in calls.increment(); return nil },
                 fetch: { _ in calls.increment(); return Data() }
             )
         )
@@ -80,32 +84,86 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         XCTAssertEqual(calls.count, 0)
     }
 
-    func testSignedFetchAndBothEncryptedEnvelopesProduceLocalPreview() async throws {
+    func testUnsignedFetchAndVerifiedMessageProduceLocalPreview() async throws {
         let fixture = try fixture()
         let store = try store(fixture)
         let result = await process(fixture, store: store) { request in
             XCTAssertEqual(request.url?.absoluteString, "https://api.example.test/api/e2ee/v2/envelopes/envelope_notification_fixture_01/fetch")
-            XCTAssertEqual(request.httpMethod, "POST")
-            XCTAssertEqual(request.httpBody, Data("{}".utf8))
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertNil(request.httpBody)
             XCTAssertEqual(request.value(forHTTPHeaderField: E2EEV2ProtocolWire.protocolVersionHeader), "2")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "auth_token=fixture.jwt.signature")
-            let timestamp = try XCTUnwrap(Int64(try XCTUnwrap(request.value(forHTTPHeaderField: E2EEV2SignedRequest.headerTimestampMs))))
-            let nonce = try XCTUnwrap(request.value(forHTTPHeaderField: E2EEV2SignedRequest.headerNonce))
-            let signature = try P256.Signing.ECDSASignature(derRepresentation: XCTUnwrap(Data(base64Encoded:
-                XCTUnwrap(request.value(forHTTPHeaderField: E2EEV2SignedRequest.headerSignature)))))
-            let publicKey = try P256.Signing.PublicKey(x963Representation: XCTUnwrap(Data(base64Encoded:
-                fixture.context.descriptor.publicSigningKeyB64)))
-            let canonical = try E2EEV2SignedRequest.canonicalRequest(
-                method: "POST", path: request.url!.path, timestampMs: timestamp, nonce: nonce, body: request.httpBody!
-            )
-            XCTAssertTrue(publicKey.isValidSignature(signature, for: canonical))
+            XCTAssertNil(request.value(forHTTPHeaderField: E2EEV2SignedRequest.headerSignature), "Aucune clé d'appareil pour signer (§2.6)")
             return fixture.data
         }
-        guard case .preview(let preview) = result else { return XCTFail("Expected verified local preview") }
+        guard case .preview(let preview) = result else { return XCTFail("Expected verified local preview: \(result)") }
         XCTAssertEqual(preview.presentation.title, "Test Sender")
         XCTAssertEqual(preview.presentation.body, "Contenu privé de test")
         XCTAssertEqual(preview.conversationId, conversationId)
         XCTAssertEqual(preview.contextRevisionId, fixture.context.revisionId)
+    }
+
+    func testMirrorHoldsNoDevicePrivateKey() throws {
+        let fixture = try fixture()
+        let context = String(decoding: try JSONEncoder().encode(fixture.context), as: UTF8.self)
+        let entry = String(decoding: try JSONEncoder().encode(fixture.conversation), as: UTF8.self)
+        for text in [context, entry] {
+            XCTAssertFalse(text.lowercased().contains("private"), text)
+        }
+        let recipientIdentity = try P256.KeyAgreement.PrivateKey(rawRepresentation: Data(repeating: 1, count: 32))
+        let recipientSigning = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 2, count: 32))
+        for secret in [recipientIdentity.rawRepresentation, recipientSigning.rawRepresentation] {
+            XCTAssertFalse(context.contains(secret.base64EncodedString()) || entry.contains(secret.base64EncodedString()))
+        }
+    }
+
+    func testUnknownConversationUncertifiedSenderOrOldEpochStaysGeneric() async throws {
+        let base = try self.fixture()
+        let empty = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
+        try empty.saveContractPreview(base.context, now: now)
+        let unknown = await process(base, store: empty) { _ in base.data }
+        XCTAssertEqual(unknown, .generic(.contextUnavailable), "Conversation sans entrée : rien à déchiffrer")
+
+        let stranger = try self.fixture()
+        let strangerStore = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
+        try strangerStore.saveContractPreview(stranger.context, now: now)
+        try strangerStore.saveConversationContractPreview(E2EEV2NotificationConversation(
+            version: 1, conversationId: conversationId, epochs: stranger.conversation.epochs,
+            signingKeys: [E2EEV2NotificationConversation.signingKeyName(userId: senderId, deviceId: senderDeviceId):
+                P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()]
+        ), now: now)
+        let forged = await process(stranger, store: strangerStore) { _ in stranger.data }
+        XCTAssertEqual(forged, .generic(.invalidDelivery), "Signature d'une autre clé que la certifiée")
+
+        let outsider = try self.fixture()
+        let outsiderStore = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
+        try outsiderStore.saveContractPreview(outsider.context, now: now)
+        try outsiderStore.saveConversationContractPreview(E2EEV2NotificationConversation(
+            version: 1, conversationId: conversationId,
+            epochs: outsider.conversation.epochs.map { .init(epochNumber: $0.epochNumber, keyB64: $0.keyB64, memberIds: [recipientId], replacedAtMs: $0.replacedAtMs) },
+            signingKeys: outsider.conversation.signingKeys
+        ), now: now)
+        let notMember = await process(outsider, store: outsiderStore) { _ in outsider.data }
+        XCTAssertEqual(notMember, .generic(.invalidDelivery), "L'émetteur n'est pas membre de l'époque")
+
+        let old = try self.fixture(replacedAt: now.addingTimeInterval(-25 * 3_600))
+        let oldStore = try store(old)
+        let late = await process(old, store: oldStore) { _ in old.data }
+        XCTAssertEqual(late, .generic(.invalidDelivery), "Époque remplacée depuis plus de 24 heures")
+    }
+
+    func testConversationEntriesNeedAnActiveContextAndDieWithRevocation() throws {
+        let fixture = try fixture(), memory = InMemoryTokenStore()
+        let store = E2EEV2NotificationContextStore(tokenStore: memory)
+        XCTAssertThrowsError(try store.saveConversationContractPreview(fixture.conversation, now: now), "Pas de contexte, pas d'entrée")
+        XCTAssertFalse(try store.saveConversationRuntime(fixture.conversation, now: now), "Verrou fermé : rien n'est écrit")
+        try store.saveContractPreview(fixture.context, now: now)
+        try store.saveConversationContractPreview(fixture.conversation, now: now)
+        XCTAssertEqual(try store.conversation(conversationId, now: now), fixture.conversation)
+        try memory.set("{}", for: "active-notification-context-v1", accessibility: .afterFirstUnlock)
+        try store.revoke()
+        XCTAssertNil(try store.conversation(conversationId, now: now))
+        XCTAssertTrue(try memory.keys(withPrefix: "").isEmpty, "Contexte, entrées et ancien contexte v1 effacés")
     }
 
     func testWrongAccountNeverFetches() async throws {
@@ -118,6 +176,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
             dependencies: .init(
                 loadContext: { try store.load(now: fixture.now) },
                 isCurrent: { try store.isCurrent($0, now: fixture.now) },
+                loadConversation: { try store.conversation($0, now: fixture.now) },
                 fetch: { _ in calls.increment(); return fixture.data },
                 now: { fixture.now }
             )
@@ -152,11 +211,13 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
 
     func testTamperedCiphertextIsNeverDisplayed() async throws {
         let fixture = try fixture(), store = try store(fixture)
-        var root = try XCTUnwrap(JSONSerialization.jsonObject(with: fixture.data) as? [String: Any])
-        var value = try XCTUnwrap(root["envelope"] as? [String: Any])
-        value["ciphertextB64"] = Data(repeating: 7, count: 80).base64EncodedString()
-        root["envelope"] = value
-        let tampered = try JSONSerialization.data(withJSONObject: root)
+        let text = String(decoding: fixture.data, as: UTF8.self)
+        let marker = #""ciphertextB64":""#
+        let start = try XCTUnwrap(text.range(of: marker)).upperBound
+        let end = try XCTUnwrap(text[start...].firstIndex(of: "\""))
+        var ciphertext = try XCTUnwrap(Data(base64Encoded: String(text[start..<end])))
+        ciphertext[0] ^= 0x01
+        let tampered = Data(text.replacingCharacters(in: start..<end, with: ciphertext.base64EncodedString()).utf8)
         let result = await process(fixture, store: store) { _ in tampered }
         XCTAssertEqual(result, .generic(.invalidDelivery))
     }
@@ -173,6 +234,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         let fixture = try fixture(), memory = InMemoryTokenStore()
         let store = E2EEV2NotificationContextStore(tokenStore: memory)
         XCTAssertFalse(try store.saveRuntime(fixture.context, now: now))
+        XCTAssertFalse(try store.saveConversationRuntime(fixture.conversation, now: now))
         XCTAssertTrue(try memory.keys(withPrefix: "").isEmpty)
         try store.saveContractPreview(fixture.context, now: now)
         XCTAssertEqual(try store.load(now: now), fixture.context)
@@ -228,36 +290,13 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         XCTAssertEqual(calls.count, 0)
     }
 
-    func testRuntimeIdentityMirrorGateDoesNotReadPrivateRecord() throws {
-        let fixture = try fixture(), tokens = FailingTokenStore()
-        let identity = E2EEV2DeviceIdentityStore(tokenStore: tokens, allowsOwner: { _ in true })
-        XCTAssertThrowsError(try identity.makeNotificationContextRuntime(
-            account: account(fixture), approvedDevice: fixture.context.descriptor, senderNames: [:]
-        ))
-        XCTAssertEqual(tokens.reads.count, 0)
-    }
-
-    func testIdentityMirrorUsesApprovedKeysWithoutChangingOriginalRecord() throws {
-        let fixture = try fixture(), tokens = InMemoryTokenStore(), account = account(fixture)
-        let identity = E2EEV2DeviceIdentityStore(tokenStore: tokens, allowsOwner: { _ in true })
-        let descriptor = try identity.loadOrCreate(ownerNamespace: account.ownerNamespace)
-        let before = try tokens.string(for: identity.storageKey(ownerNamespace: account.ownerNamespace))
-        let context = try identity.makeNotificationContextContractPreview(account: account,
-            approvedDevice: descriptor, senderNames: [:])
-        XCTAssertTrue(context.isValid(now: now))
-        XCTAssertEqual(context.descriptor, descriptor)
-        XCTAssertEqual(try tokens.string(for: identity.storageKey(ownerNamespace: account.ownerNamespace)), before)
-        XCTAssertThrowsError(try identity.makeNotificationContextContractPreview(account: account,
-            approvedDevice: fixture.context.descriptor, senderNames: [:]))
-    }
-
-    func testNoticeRequiredBeforeInitialKeyExport() async throws {
+    func testNoticeRequiredBeforeTheMirrorIsWritten() async throws {
         let fixture = try fixture(), store = try store(fixture), calls = Counter()
         let state = AccountBox(account(fixture, notice: false))
         let result = await E2EEV2NotificationContextCoordinator().refreshContractPreview(
             reason: .foreground,
             dependencies: bridgeDependencies(fixture, state: state, store: store, approval: { _ in
-                calls.increment(); return .approved(fixture.context.descriptor)
+                calls.increment(); return .approved(fixture.descriptor)
             })
         )
         XCTAssertEqual(result, .awaitingNotice)
@@ -284,7 +323,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         let result = await E2EEV2NotificationContextCoordinator().refreshContractPreview(reason: .foreground,
             dependencies: bridgeDependencies(fixture, state: state, store: store, approval: { _ in
                 state.set(nil)
-                return .approved(fixture.context.descriptor)
+                return .approved(fixture.descriptor)
             }))
         XCTAssertEqual(result, .stale)
         XCTAssertNil(try store.load(now: now))
@@ -294,7 +333,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         let fixture = try fixture(), calls = Counter()
         let oldAccount = account(fixture, expiry: Int64(now.timeIntervalSince1970 * 1_000) - 1_000)
         let oldContext = Self.context(fixture.context, account: oldAccount,
-            descriptor: fixture.context.descriptor, names: fixture.context.senderNames)
+            descriptor: fixture.descriptor, names: fixture.context.senderNames)
         let store = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
         try store.saveContractPreview(oldContext, now: now.addingTimeInterval(-7_200))
         XCTAssertNil(try store.load(now: now))
@@ -308,7 +347,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         XCTAssertEqual(calls.count, 0)
         let renewed = try XCTUnwrap(store.load(now: now))
         XCTAssertEqual(renewed.authToken, newAccount.authToken)
-        XCTAssertEqual(renewed.identityPrivateRawB64, oldContext.identityPrivateRawB64)
+        XCTAssertEqual(renewed.deviceId, oldContext.deviceId)
     }
 
     func testNewLocalSessionCannotReusePreviousMirror() async throws {
@@ -343,7 +382,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         let older = bridgeDependencies(fixture, state: state, store: store, approval: { _ in
             let result = await coordinator.refreshContractPreview(reason: .foreground, dependencies: latest)
             XCTAssertEqual(result, .ready)
-            return .approved(fixture.context.descriptor)
+            return .approved(fixture.descriptor)
         })
         let result = await coordinator.refreshContractPreview(reason: .foreground, dependencies: older)
         XCTAssertEqual(result, .stale)
@@ -468,17 +507,16 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
 
     private static func context(_ base: E2EEV2NotificationContext, account: E2EEV2NotificationAccountSnapshot,
                                 descriptor: E2EEV2DeviceDescriptor, names: [String: String]) -> E2EEV2NotificationContext {
-        .init(version: 1, revisionId: UUID().uuidString.lowercased(), ownerScopeId: account.ownerScopeId,
-            sessionId: account.sessionId, authToken: account.authToken, expiresAtMs: account.expiresAtMs,
-            descriptor: descriptor, identityPrivateRawB64: base.identityPrivateRawB64,
-            signingPrivateRawB64: base.signingPrivateRawB64, privacy: account.privacy, senderNames: names)
+        .init(version: E2EEV2NotificationContext.currentVersion, revisionId: UUID().uuidString.lowercased(),
+            ownerScopeId: account.ownerScopeId, sessionId: account.sessionId, authToken: account.authToken,
+            expiresAtMs: account.expiresAtMs, deviceId: descriptor.deviceId, privacy: account.privacy, senderNames: names)
     }
 
     private func bridgeDependencies(_ fixture: Fixture, state: AccountBox, store: E2EEV2NotificationContextStore,
         approval: (@Sendable (E2EEV2NotificationAccountSnapshot) async -> E2EEV2NotificationDeviceApproval)? = nil,
         names: (@Sendable (E2EEV2NotificationAccountSnapshot) async -> [String: String])? = nil
     ) -> E2EEV2NotificationContextBridgeDependencies {
-        .init(snapshot: { state.get() }, approval: approval ?? { _ in .approved(fixture.context.descriptor) },
+        .init(snapshot: { state.get() }, approval: approval ?? { _ in .approved(fixture.descriptor) },
             senderNames: names ?? { _ in fixture.context.senderNames },
             prepare: { account, descriptor, names in Self.context(fixture.context, account: account, descriptor: descriptor, names: names) },
             loadExisting: { try store.loadForCredentialRefresh() },
@@ -497,6 +535,7 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
             dependencies: .init(
                 loadContext: { try store.load(now: fixture.now) },
                 isCurrent: { try store.isCurrent($0, now: fixture.now) },
+                loadConversation: { try store.conversation($0, now: fixture.now) },
                 fetch: fetch, now: { fixture.now }
             )
         )
@@ -505,73 +544,72 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
     private func store(_ fixture: Fixture) throws -> E2EEV2NotificationContextStore {
         let store = E2EEV2NotificationContextStore(tokenStore: InMemoryTokenStore())
         try store.saveContractPreview(fixture.context, now: now)
+        try store.saveConversationContractPreview(fixture.conversation, now: now)
         return store
     }
 
     private func fixture(
         privacy: E2EEV2NotificationPrivacy = .full,
-        createdAt: Date? = nil
+        createdAt: Date? = nil,
+        replacedAt: Date? = nil
     ) throws -> Fixture {
         let recipientIdentity = try P256.KeyAgreement.PrivateKey(rawRepresentation: Data(repeating: 1, count: 32))
         let recipientSigning = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 2, count: 32))
         let senderSigning = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 3, count: 32))
         let epochKey = Data(repeating: 4, count: 32)
-        let commitment = try E2EEV2EpochCrypto.keyCommitment(epochKey)
-        let epochContext = E2EEV2EpochContext(conversationId: conversationId, epochNumber: 7,
-            senderDeviceId: senderDeviceId, recipientDeviceId: recipientDeviceId)
-        let wrapped = try E2EEV2EpochCrypto.wrap(
-            epochKey: epochKey, recipientPublicKey: recipientIdentity.publicKey,
-            ephemeralPrivateKey: P256.KeyAgreement.PrivateKey(rawRepresentation: Data(repeating: 5, count: 32)),
-            nonce: Data(repeating: 6, count: 12), context: epochContext
-        )
-        // Forme low-S, comme en production (spec §15) : le récepteur refuse le high-S.
-        let epochSignature = try E2EEV2LowS.sign(E2EEV2EpochCrypto.signatureCanonical(
-            context: epochContext, keyCommitmentB64: commitment, envelope: wrapped
-        ), with: senderSigning).base64EncodedString()
-        let content = try E2EEV2ContentContract.encode([
-            "schema": E2EEV2ContentContract.schema, "version": 1, "kind": "TEXT",
-            "replyToId": NSNull(), "mentions": [], "body": ["text": "Contenu privé de test"],
-        ])
-        let messageContext = E2EEV2MessageContext(conversationId: conversationId, epochNumber: 7,
-            senderDeviceId: senderDeviceId, clientRequestId: "request_notification_fixture", ttlSeconds: 60, encryptedBlobIds: [])
-        let encrypted = try E2EEV2MessageCrypto.encrypt(cleartext: content, epochKey: epochKey,
-            nonce: Data(repeating: 8, count: 12), context: messageContext)
-        let signature = try E2EEV2LowS.sign(E2EEV2MessageCrypto.signatureCanonical(
-            context: messageContext, envelope: encrypted
-        ), with: senderSigning).base64EncodedString()
         let created = createdAt ?? now
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let value: [String: Any] = [
-            "id": envelopeId, "conversationId": conversationId, "senderId": senderId,
-            "senderDevice": ["deviceId": senderDeviceId, "publicSigningKeyB64": senderSigning.publicKey.x963Representation.base64EncodedString(),
-                "signingKeyAlgorithm": E2EEV2DeviceAlgorithms.signingKeyAlgorithm, "keyVersion": 1],
-            "epoch": ["id": "epoch_notification_fixture_01", "epochNumber": 7,
-                "algorithm": E2EEV2MessageCrypto.algorithm, "keyCommitmentB64": commitment,
-                "reason": "INITIAL", "status": "active", "createdAt": formatter.string(from: created.addingTimeInterval(-1)),
-                "recipientEnvelope": ["recipientDeviceId": recipientDeviceId, "senderDeviceId": senderDeviceId,
-                    "wrapAlgorithm": wrapped.wrapAlgorithm, "ephemeralPublicKeyB64": wrapped.ephemeralPublicKeyB64,
-                    "wrappedEpochKeyB64": wrapped.wrappedEpochKeyB64, "nonceB64": wrapped.nonceB64,
-                    "aadB64": wrapped.aadB64, "signatureB64": epochSignature,
-                    "senderPublicSigningKeyB64": senderSigning.publicKey.x963Representation.base64EncodedString(),
-                    "senderSigningKeyAlgorithm": E2EEV2DeviceAlgorithms.signingKeyAlgorithm, "senderKeyVersion": 1]],
-            "envelopeVersion": encrypted.envelopeVersion, "clientRequestId": encrypted.clientRequestId,
-            "algorithm": encrypted.algorithm, "contentType": encrypted.contentType, "ttlSeconds": 60,
-            "encryptedBlobIds": [], "nonceB64": encrypted.nonceB64, "aadB64": encrypted.aadB64,
-            "ciphertextB64": encrypted.ciphertextB64, "senderSignatureB64": signature, "encryptedBlobs": [],
-            "createdAt": formatter.string(from: created), "expiresAt": formatter.string(from: created.addingTimeInterval(60)),
-        ]
-        let context = E2EEV2NotificationContext(version: 1, revisionId: "00000000-0000-4000-8000-000000000001",
+        let payload = try E2EEV2ContentPayloadV2(
+            sentAtMs: Int64(created.timeIntervalSince1970 * 1_000), counter: 1, replyToRef: nil, mentions: [],
+            body: .text("Contenu privé de test")
+        ).encoded()
+        let signed = try E2EEV2MessageComposerV2.compose(
+            payload: payload, conversationId: conversationId, clientRequestId: "request_notification_fixture", ttlSeconds: 60,
+            epoch: E2EEV2StoredEpochKey(
+                conversationId: conversationId, epochId: "epoch_notification_fixture_01", epochNumber: 7,
+                keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(epochKey), epochKey: epochKey
+            ),
+            device: .init(
+                deviceId: senderDeviceId, platform: "android", label: nil,
+                publicIdentityKeyB64: recipientIdentity.publicKey.x963Representation.base64EncodedString(),
+                publicSigningKeyB64: senderSigning.publicKey.x963Representation.base64EncodedString(),
+                identityKeyAlgorithm: E2EEV2DeviceAlgorithms.identityKeyAlgorithm,
+                signingKeyAlgorithm: E2EEV2DeviceAlgorithms.signingKeyAlgorithm, keyVersion: 1
+            ),
+            fk: Data(repeating: 5, count: 32), nonce: Data(repeating: 8, count: 12),
+            sign: { try E2EEV2LowS.sign($0, with: senderSigning) }
+        )
+        let message: E2EEV2JSON = .object([
+            "envelopeId": .string(envelopeId), "sequence": .string("1"),
+            "senderUserId": .string(senderId), "senderDeviceId": .string(senderDeviceId), "envelope": signed.json,
+            "serverTagB64": .string(Data(repeating: 9, count: 32).base64EncodedString()),
+            "serverTimeMs": .string(String(Int64(created.timeIntervalSince1970 * 1_000))), "keyId": .string("server_tag_key_01J7ABCD"),
+        ])
+        let descriptor = E2EEV2DeviceDescriptor(
+            deviceId: recipientDeviceId, platform: "ios", label: nil,
+            publicIdentityKeyB64: recipientIdentity.publicKey.x963Representation.base64EncodedString(),
+            publicSigningKeyB64: recipientSigning.publicKey.x963Representation.base64EncodedString(),
+            identityKeyAlgorithm: E2EEV2DeviceAlgorithms.identityKeyAlgorithm,
+            signingKeyAlgorithm: E2EEV2DeviceAlgorithms.signingKeyAlgorithm, keyVersion: 1
+        )
+        let context = E2EEV2NotificationContext(
+            version: E2EEV2NotificationContext.currentVersion, revisionId: "00000000-0000-4000-8000-000000000001",
             ownerScopeId: owner, sessionId: "00000000-0000-4000-8000-000000000002", authToken: "fixture.jwt.signature",
             expiresAtMs: Int64(now.addingTimeInterval(3_600).timeIntervalSince1970 * 1_000),
-            descriptor: .init(deviceId: recipientDeviceId, platform: "ios", label: nil,
-                publicIdentityKeyB64: recipientIdentity.publicKey.x963Representation.base64EncodedString(),
-                publicSigningKeyB64: recipientSigning.publicKey.x963Representation.base64EncodedString(),
-                identityKeyAlgorithm: E2EEV2DeviceAlgorithms.identityKeyAlgorithm,
-                signingKeyAlgorithm: E2EEV2DeviceAlgorithms.signingKeyAlgorithm, keyVersion: 1),
-            identityPrivateRawB64: recipientIdentity.rawRepresentation.base64EncodedString(),
-            signingPrivateRawB64: recipientSigning.rawRepresentation.base64EncodedString(), privacy: privacy,
-            senderNames: [senderId: "Test Sender"])
-        return Fixture(context: context, data: try JSONSerialization.data(withJSONObject: ["envelope": value]), now: now)
+            deviceId: recipientDeviceId, privacy: privacy, senderNames: [senderId: "Test Sender"]
+        )
+        let conversation = E2EEV2NotificationConversation(
+            version: E2EEV2NotificationConversation.currentVersion, conversationId: conversationId,
+            epochs: [
+                .init(epochNumber: 8, keyB64: Data(repeating: 6, count: 32).base64EncodedString(), memberIds: [senderId, recipientId], replacedAtMs: nil),
+                .init(epochNumber: 7, keyB64: epochKey.base64EncodedString(), memberIds: [senderId, recipientId],
+                      replacedAtMs: Int64((replacedAt ?? now.addingTimeInterval(-60)).timeIntervalSince1970 * 1_000)),
+            ],
+            signingKeys: [
+                E2EEV2NotificationConversation.signingKeyName(userId: senderId, deviceId: senderDeviceId):
+                    senderSigning.publicKey.x963Representation.base64EncodedString(),
+            ]
+        )
+        let data = E2EEV2CanonicalJSON.encode(.object(["conversationId": .string(conversationId), "message": message]))
+        return Fixture(context: context, conversation: conversation, descriptor: descriptor, data: data, now: now)
     }
 }

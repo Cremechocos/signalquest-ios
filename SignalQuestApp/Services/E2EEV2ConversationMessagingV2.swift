@@ -40,6 +40,9 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
     private let sender: E2EEV2MessageSenderV2
     private let receiver: E2EEV2MessageReceiverV2
     private let writer: E2EEV2MembershipWriterV2
+    /// Entrées du miroir de notification (§2.6), mises à jour après chaque
+    /// relève, envoi ou changement.
+    private let notificationMirror: E2EEV2NotificationMirrorWriter?
     private let expectedSession: LocalAccountSession?
     private let now: @Sendable () -> Date
 
@@ -50,9 +53,11 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
         ledgerStore: E2EEV2MessageLedgerStore,
         messageStore: E2EEV2MessageStoreV2,
+        notificationMirror: E2EEV2NotificationMirrorWriter? = nil,
         expectedSession: LocalAccountSession? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
+        self.notificationMirror = notificationMirror
         self.stateStore = stateStore
         self.ledgerStore = ledgerStore
         self.messageStore = messageStore
@@ -190,6 +195,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
                     })
                 }
             }
+            notificationMirror?.update(conversationId: conversationId, devices: devices, ownerNamespace: session.ownerNamespace)
             return .refreshed(E2EEV2MessagesV2(
                 snapshot: snapshot, unsupported: unsupported, missingByDevice: missing,
                 waitingForEpoch: synced == .waitingForEpoch
@@ -240,6 +246,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
                     conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
                 ) { return .failure(error) }
             default:
+                updateMirror(conversationId: conversationId, devices: devices)
                 return last
             }
         }
@@ -278,6 +285,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         case .add, .leave, .promote, .demote:
             break
         }
+        updateMirror(conversationId: conversationId, devices: devices)
         return result
     }
 
@@ -316,6 +324,11 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
             },
             messageCount: count
         )
+    }
+
+    private func updateMirror(conversationId: String, devices: E2EEV2CertifiedDeviceSet) {
+        guard let notificationMirror, let session = expectedSession ?? LocalAccountScope.sessionSnapshot() else { return }
+        notificationMirror.update(conversationId: conversationId, devices: devices, ownerNamespace: session.ownerNamespace)
     }
 
     private func ownUserId(_ ownerScopeId: String) -> String {

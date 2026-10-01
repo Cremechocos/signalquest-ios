@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 enum E2EEV2NotificationContextStoreError: Error, Equatable {
@@ -60,7 +61,11 @@ final class E2EEV2NotificationFileActivationStore: E2EEV2NotificationActivationS
 /// Separate service AND access group: the notification extension cannot query
 /// the app's private E2EE history, recovery keys or unrelated account storage.
 final class E2EEV2NotificationContextStore: @unchecked Sendable {
-    private static let storageKey = "active-notification-context-v1"
+    private static let storageKey = "active-notification-context-v2"
+    /// Contexte v1, qui portait les clés privées de l'appareil : effacé à
+    /// chaque révocation, jamais relu.
+    private static let legacyStorageKey = "active-notification-context-v1"
+    private static let conversationPrefix = "notification-conversation-v1:"
     private let tokenStore: TokenStore
     private let activationStore: E2EEV2NotificationActivationStoring
 
@@ -142,10 +147,57 @@ final class E2EEV2NotificationContextStore: @unchecked Sendable {
         guard try load(now: now) == context else { throw E2EEV2NotificationContextStoreError.invalidRecord }
     }
 
+    /// Entrée d'une conversation (§2.6), écrite par l'app seulement tant qu'un
+    /// contexte est actif : jamais en mode « aucun aperçu ».
+    @discardableResult
+    func saveConversationRuntime(_ entry: E2EEV2NotificationConversation, now: Date = Date()) throws -> Bool {
+        guard E2EEV2RuntimeReadGate.enabled else { return false }
+        try saveConversationContractPreview(entry, now: now)
+        return true
+    }
+
+    /// Used by deterministic tests. Runtime callers must use saveConversationRuntime.
+    func saveConversationContractPreview(_ entry: E2EEV2NotificationConversation, now: Date = Date()) throws {
+        guard entry.isStructurallyValid, try load(now: now) != nil else {
+            throw E2EEV2NotificationContextStoreError.invalidContext
+        }
+        let data = try JSONEncoder().encode(entry)
+        guard data.count <= 256 * 1_024, let raw = String(data: data, encoding: .utf8) else {
+            throw E2EEV2NotificationContextStoreError.invalidContext
+        }
+        try tokenStore.set(raw, for: Self.conversationKey(entry.conversationId), accessibility: .afterFirstUnlock)
+    }
+
+    /// Rien n'est lisible sans contexte actif : un marqueur révoqué suffit à
+    /// rendre muettes les entrées qu'une suppression aurait manquées.
+    func conversation(_ conversationId: String, now: Date = Date()) throws -> E2EEV2NotificationConversation? {
+        guard try load(now: now) != nil,
+              let raw = try tokenStore.string(for: Self.conversationKey(conversationId)) else { return nil }
+        guard raw.utf8.count <= 256 * 1_024, let data = raw.data(using: .utf8),
+              let entry = try? JSONDecoder().decode(E2EEV2NotificationConversation.self, from: data),
+              entry.conversationId == conversationId, entry.isStructurallyValid else {
+            throw E2EEV2NotificationContextStoreError.invalidRecord
+        }
+        return entry
+    }
+
+    func removeConversation(_ conversationId: String) throws {
+        try tokenStore.remove(Self.conversationKey(conversationId))
+    }
+
     func revoke() throws {
         var markerRevoked = false
         do { try activationStore.revoke(); markerRevoked = true } catch { /* Keychain deletion remains an alternative. */ }
-        do { try tokenStore.remove(Self.storageKey) }
-        catch { if !markerRevoked { throw error } }
+        do {
+            try tokenStore.remove(Self.storageKey)
+            try tokenStore.remove(Self.legacyStorageKey)
+            for key in try tokenStore.keys(withPrefix: Self.conversationPrefix) { try tokenStore.remove(key) }
+        } catch {
+            if !markerRevoked { throw error }
+        }
+    }
+
+    private static func conversationKey(_ conversationId: String) -> String {
+        conversationPrefix + SHA256.hash(data: Data(conversationId.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -437,9 +437,13 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         XCTAssertNil(E2EEV2DeliveredMessageV2.parsePage(page([try item(4, counter: 1)], hasMore: false), after: 4), "Au plus le curseur")
         XCTAssertNil(E2EEV2DeliveredMessageV2.parsePage(page([try item(5, counter: 1), try item(4, counter: 2)], hasMore: false), after: 0), "Ordre croissant")
         XCTAssertNil(E2EEV2DeliveredMessageV2.parsePage(page([], hasMore: true), after: 0), "Page vide qui en annonce d'autres")
-        let fetched = E2EEV2CanonicalJSON.encode(.object(["message": try item(4, counter: 1)]))
-        XCTAssertNotNil(E2EEV2DeliveredMessageV2.parseFetch(fetched, envelopeId: "envelope_01J7ABCD00000004"))
+        let fetched = E2EEV2CanonicalJSON.encode(.object([
+            "conversationId": .string(epoch.conversationId), "message": try item(4, counter: 1),
+        ]))
+        XCTAssertEqual(E2EEV2DeliveredMessageV2.parseFetch(fetched, envelopeId: "envelope_01J7ABCD00000004")?.conversationId, epoch.conversationId)
         XCTAssertNil(E2EEV2DeliveredMessageV2.parseFetch(fetched, envelopeId: "envelope_01J7ABCD00000005"), "Autre enveloppe")
+        XCTAssertNil(E2EEV2DeliveredMessageV2.parseFetch(E2EEV2CanonicalJSON.encode(.object(["message": try item(4, counter: 1)])),
+                                                         envelopeId: "envelope_01J7ABCD00000004"), "Sans sa conversation")
     }
 
     // MARK: Aides

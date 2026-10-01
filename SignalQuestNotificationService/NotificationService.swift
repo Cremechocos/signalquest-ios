@@ -100,6 +100,7 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
                 dependencies: .init(
                     loadContext: { try contextStore.load() },
                     isCurrent: { try contextStore.isCurrent($0) },
+                    loadConversation: { try contextStore.conversation($0) },
                     fetch: { try await E2EEV2NotificationNetwork.fetch($0) }
                 )
             )

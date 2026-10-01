@@ -981,51 +981,6 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         return try E2EEV2LowS.sign(canonicalRequest, with: privateKey)
     }
 
-    /// Explicit preview mirror only: original keys retain whenUnlocked protection.
-    /// The caller must also have verified the remote device and the local notice choice.
-    func makeNotificationContextRuntime(
-        account: E2EEV2NotificationAccountSnapshot,
-        approvedDevice: E2EEV2DeviceDescriptor,
-        senderNames: [String: String]
-    ) throws -> E2EEV2NotificationContext {
-        guard E2EEV2RuntimeReadGate.enabled,
-              PushOwnerScope.current == account.ownerScopeId,
-              LocalAccountScope.currentOwnerScopeId == account.localOwnerScopeId,
-              LocalAccountScope.storageNamespace == account.ownerNamespace,
-              LocalAccountScope.currentSessionId == account.sessionId else {
-            throw E2EEV2DeviceIdentityError.unauthenticated
-        }
-        return try makeNotificationContextContractPreview(account: account, approvedDevice: approvedDevice, senderNames: senderNames)
-    }
-
-    /// Deterministic tests only; runtime must enter through the gated wrapper above.
-    func makeNotificationContextContractPreview(
-        account: E2EEV2NotificationAccountSnapshot,
-        approvedDevice: E2EEV2DeviceDescriptor,
-        senderNames: [String: String]
-    ) throws -> E2EEV2NotificationContext {
-        guard account.noticeAcknowledged, account.privacy != .hidden else {
-            throw E2EEV2DeviceIdentityError.unauthenticated
-        }
-        let record = try requiredRecord(ownerNamespace: account.ownerNamespace)
-        guard record.descriptor.deviceId == approvedDevice.deviceId,
-              record.descriptor.publicIdentityKeyB64 == approvedDevice.publicIdentityKeyB64,
-              record.descriptor.publicSigningKeyB64 == approvedDevice.publicSigningKeyB64,
-              record.descriptor.identityKeyAlgorithm == approvedDevice.identityKeyAlgorithm,
-              record.descriptor.signingKeyAlgorithm == approvedDevice.signingKeyAlgorithm,
-              record.descriptor.keyVersion == approvedDevice.keyVersion else {
-            throw E2EEV2DeviceIdentityError.invalidRecord
-        }
-        return E2EEV2NotificationContext(
-            version: 1, revisionId: UUID().uuidString.lowercased(),
-            ownerScopeId: account.ownerScopeId, sessionId: account.sessionId,
-            authToken: account.authToken, expiresAtMs: account.expiresAtMs, descriptor: approvedDevice,
-            identityPrivateRawB64: record.identityPrivateRawB64,
-            signingPrivateRawB64: record.signingPrivateRawB64,
-            privacy: account.privacy, senderNames: senderNames
-        )
-    }
-
     /// Unwraps an already authenticated epoch delivery without exporting the
     /// private ECDH key outside this Keychain-backed store.
     func unwrapEpochKey(

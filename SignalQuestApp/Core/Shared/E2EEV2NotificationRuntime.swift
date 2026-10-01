@@ -45,6 +45,32 @@ enum E2EEV2NotificationPresentationPolicy {
         case "EDIT": fullText = String(localized: "Message chiffré modifié")
         default: fullText = String(localized: "Nouveau message chiffré")
         }
+        return presentation(fullText: fullText, privacy: privacy, senderName: senderName)
+    }
+
+    /// Message v2 ouvert par l'extension (§2.6) : le texte seulement en mode
+    /// complet, jamais le contenu d'une édition ou d'une suppression.
+    static func present(
+        _ payload: E2EEV2ContentPayloadV2,
+        privacy: E2EEV2NotificationPrivacy,
+        senderName: String? = nil
+    ) -> E2EEV2NotificationPresentation {
+        let fullText: String
+        switch payload.body {
+        case .text(let text):
+            let normalized = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            fullText = normalized.isEmpty ? String(localized: "Nouveau message chiffré") : String(normalized.prefix(240))
+        case .edit: fullText = String(localized: "Message chiffré modifié")
+        case .delete: fullText = String(localized: "Nouveau message chiffré")
+        }
+        return presentation(fullText: fullText, privacy: privacy, senderName: senderName)
+    }
+
+    private static func presentation(
+        fullText: String,
+        privacy: E2EEV2NotificationPrivacy,
+        senderName: String?
+    ) -> E2EEV2NotificationPresentation {
         let normalizedSender = senderName?.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         let senderTitle = normalizedSender.flatMap { $0.isEmpty ? nil : String($0.prefix(120)) }
         switch privacy {
