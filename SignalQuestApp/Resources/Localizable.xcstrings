@@ -1,6 +1,91 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Un message est arrivé en deux versions différentes : aucune n’est affichée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A message arrived in two different versions: neither is shown."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un message est arrivé en deux versions différentes : aucune n’est affichée."
+          }
+        }
+      }
+    },
+    "Des messages de %@ n’ont pas été reçus." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some messages from %@ were not received."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des messages de %@ n’ont pas été reçus."
+          }
+        }
+      }
+    },
+    "Des messages n’ont pas été reçus." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some messages were not received."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des messages n’ont pas été reçus."
+          }
+        }
+      }
+    },
+    "Un message demande une version plus récente de SignalQuest." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A message needs a newer version of SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un message demande une version plus récente de SignalQuest."
+          }
+        }
+      }
+    },
+    "En attente de la clé de cette conversation chiffrée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for the key of this encrypted conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de la clé de cette conversation chiffrée."
+          }
+        }
+      }
+    },
     "Flux simultanés" : {
       "extractionState" : "manual",
       "localizations" : {
