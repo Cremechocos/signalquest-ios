@@ -86,6 +86,25 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         XCTAssertEqual(result, .upToDate)
     }
 
+    func testAMemberWhoseIdentityIsNotTrustedIsNeverDroppedSilently() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let seeded = try seed(fixture, devices: fixture.deviceSet(adding: [phone.device]))
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("Aucune époque sans Bruno")
+            throw URLError(.badURL)
+        }
+        // Le numéro de Bruno a changé : ses appareils ne sont plus crus.
+        let refused = E2EEV2CertifiedDeviceSet(
+            devicesByUser: fixture.deviceSet(adding: []).devicesByUser, refusals: [bruno: .uikChanged]
+        )
+        let result = await rotator(fixture).rotateIfNeeded(
+            conversationId: seeded.conversationId, membership: seeded.genesis, membershipAt: { _ in seeded.genesis },
+            devices: refused, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(result, .membersNotTrusted([bruno]))
+    }
+
     func testAnAddedDeviceRotatesWithTheNextNumberAndKeepsTheKeyOnceAccepted() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")

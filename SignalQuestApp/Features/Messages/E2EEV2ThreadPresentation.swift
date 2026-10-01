@@ -20,7 +20,7 @@ struct E2EEV2ThreadPresentation: Equatable {
             case .equivocation:
                 return String(localized: "Un message est arrivé en deux versions différentes : aucune n’est affichée.")
             case .missing(let name?, _):
-                return String(localized: "Des messages de \(name) n’ont pas été reçus.")
+                return String(localized: "Des messages envoyés par \(name) n’ont pas été reçus.")
             case .missing(nil, _):
                 return String(localized: "Des messages n’ont pas été reçus.")
             case .unsupported:

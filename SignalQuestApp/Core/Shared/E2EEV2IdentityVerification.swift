@@ -127,6 +127,13 @@ struct E2EEV2TrustPin: Codable, Equatable, Sendable {
     /// Numéro de sécurité comparé explicitement (§2.1) ; sinon, confiance à la
     /// première utilisation.
     let verified: Bool
+
+    func with(verified: Bool) -> E2EEV2TrustPin {
+        E2EEV2TrustPin(
+            uikX963B64: uikX963B64, listVersion: listVersion, listCanonical: listCanonical,
+            capabilitySequences: capabilitySequences, verified: verified
+        )
+    }
 }
 
 enum E2EEV2IdentityVerification {

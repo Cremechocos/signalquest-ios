@@ -90,6 +90,26 @@ final class E2EEV2ConversationMessagingV2Tests: XCTestCase {
         XCTAssertEqual(sent.envelope.epochNumber, 2, "Chiffré sous l'époque qui inclut la tablette")
     }
 
+    func testNothingIsSentWhileAMembersIdentityIsNotTrusted() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let seeded = try fixture.seedConversation(with: bruno, devices: fixture.deviceSet(adding: [phone.device]))
+        let server = try FakeV2Server(fixture, seeded: seeded, pageSize: 100)
+        MockURLProtocol.requestHandler = server.handle
+        let messaging = try makeMessaging(fixture)
+        let refused = E2EEV2CertifiedDeviceSet(
+            devicesByUser: fixture.deviceSet(adding: []).devicesByUser, refusals: [bruno: .uikChanged]
+        )
+        let result = await messaging.send(
+            .init(body: .text("Bruno ne doit rien perdre"), replyToRef: nil, mentions: [], ttlSeconds: 0),
+            clientRequestId: "message_01J7ABCD00000009", conversationId: seeded.conversationId, isGroup: false,
+            devices: refused, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(result, .membersNotTrusted([bruno]))
+        XCTAssertEqual(server.epochPosts, 0, "Aucune époque qui l'exclurait en silence")
+        XCTAssertTrue(server.sentEnvelopes.isEmpty, "Rien d'envoyé tant que son numéro n'est pas accepté")
+    }
+
     func testExcludingBrowsersRotatesAtOnce() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")

@@ -219,6 +219,12 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         devices: E2EEV2CertifiedDeviceSet,
         expectedOwnerScopeId: String
     ) async -> E2EEV2MessageSendResultV2 {
+        // Avant tout, pour ne rien retirer du miroir : un membre dont l'identité
+        // n'est pas crue suspend l'envoi, il n'est jamais exclu en silence (§2.4).
+        if let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) {
+            let untrusted = devices.untrustedMembers(context.head.members)
+            guard untrusted.isEmpty else { return .membersNotTrusted(untrusted) }
+        }
         let mirrorGeneration = notificationMirror?.invalidate(conversationId)
         var last = E2EEV2MessageSendResultV2.needsEpoch
         for _ in 0..<Self.maxSendRounds {
@@ -236,6 +242,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
                     devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
                 ) {
                 case .failure(let error): return .failure(error)
+                case .membersNotTrusted(let untrusted): return .membersNotTrusted(untrusted)
                 case .needsMembershipSync:
                     if case .failure(let error) = await syncer.sync(
                         conversationId: conversationId, isGroup: isGroup, devices: devices,

@@ -115,6 +115,9 @@ struct E2EEV2ConversationCreation: Sendable {
         case invalidMembers
         /// Cet appareil n'est pas certifié, ou pas tel que l'annuaire le connaît.
         case deviceNotCertified
+        /// Des membres dont l'identité n'est pas crue : la conversation attend
+        /// que l'utilisateur ait accepté leur nouveau numéro (§2.4).
+        case membersNotTrusted([String])
     }
 
     let conversationId: String
@@ -173,6 +176,8 @@ struct E2EEV2ConversationCreation: Sendable {
         guard members.count == participantIds.count + 1, isGroup || members.count == 2 else {
             throw Failure.invalidMembers
         }
+        let untrusted = devices.untrustedMembers(members)
+        guard untrusted.isEmpty else { throw Failure.membersNotTrusted(untrusted) }
         let actor = E2EEV2MembershipChain.Actor(userId: ownUserId, deviceId: device.deviceId)
         guard let ownCertified = devices.device(userId: ownUserId, deviceId: device.deviceId),
               ownCertified.identityKeyB64 == device.publicIdentityKeyB64,

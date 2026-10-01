@@ -113,6 +113,11 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertThrowsError(try fixture.make(participants: [fixture.user, bruno], isGroup: true, title: nil, excludesWeb: false, devices: devices, epochKey: Data(count: 32))) {
             XCTAssertEqual($0 as? E2EEV2ConversationCreation.Failure, .invalidMembers, "L'auteur n'est pas un participant invité")
         }
+        let refused = E2EEV2CertifiedDeviceSet(devicesByUser: fixture.deviceSet(adding: []).devicesByUser, refusals: [bruno: .uikChanged])
+        XCTAssertThrowsError(try fixture.make(participants: [bruno], isGroup: false, title: nil, excludesWeb: false, devices: refused, epochKey: Data(count: 32))) {
+            XCTAssertEqual($0 as? E2EEV2ConversationCreation.Failure, .membersNotTrusted([bruno]),
+                           "Pas de conversation qui l'exclurait en silence")
+        }
     }
 
     /// §3.1 : une époque ne sert qu'acceptée. La clé et l'état « v2 » ne sont

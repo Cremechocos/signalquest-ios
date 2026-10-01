@@ -272,6 +272,9 @@ enum E2EEV2EpochRotationV2Result: Sendable, Equatable {
     case adopted(epochNumber: Int)
     /// La chaîne d'appartenance locale est en retard : la synchroniser d'abord.
     case needsMembershipSync
+    /// Des membres dont l'identité n'est pas crue (numéro changé, paquet
+    /// refusé) : aucune époque ne les exclut en silence (§2.4).
+    case membersNotTrusted([String])
     case failure(E2EEV2TransportFailure)
 }
 
@@ -317,6 +320,8 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
               session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:") else {
             return .failure(localError("invalid-e2ee-rotation-scope"))
         }
+        let untrusted = devices.untrustedMembers(membership.members)
+        guard untrusted.isEmpty else { return .membersNotTrusted(untrusted) }
         let ownerNamespace = session.ownerNamespace
         let ownUserId = String(expectedOwnerScopeId.dropFirst("user:".count))
         guard let device = try? identityStore.load(ownerNamespace: ownerNamespace),

@@ -155,6 +155,14 @@ enum AppEnvironment {
         false
         #endif
     }
+    static var showsSafetyNumberQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-safety-number") || hasArgument("--qa-safety-number-changed")
+            || hasArgument("--qa-safety-number-changed-verified")
+        #else
+        false
+        #endif
+    }
     static var showsCommentsQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-comments") || hasArgument("--qa-comments-replies")

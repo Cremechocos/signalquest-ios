@@ -57,6 +57,9 @@ enum E2EEV2MessageSendResultV2: Sendable, Equatable {
     case needsEpoch
     /// L'époque courante doit tourner avant tout envoi (§3.3).
     case needsRotation
+    /// Des membres dont l'identité n'est pas crue : rien n'est envoyé tant que
+    /// l'utilisateur n'a pas accepté leur nouveau numéro (§2.4).
+    case membersNotTrusted([String])
     case failure(E2EEV2TransportFailure)
 }
 

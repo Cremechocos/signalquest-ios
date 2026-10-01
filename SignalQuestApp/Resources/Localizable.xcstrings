@@ -1,6 +1,390 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "%@ a un nouveau numéro de sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ has a new safety number"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a un nouveau numéro de sécurité"
+          }
+        }
+      }
+    },
+    "Ce numéro n’est pas encore disponible : cet appareil n’a pas la clé de ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This number isn’t available yet: this device doesn’t have your account key."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce numéro n’est pas encore disponible : cet appareil n’a pas la clé de ton compte."
+          }
+        }
+      }
+    },
+    "Ce numéro se compare avec un contact, pas avec ton propre compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This number is compared with a contact, not with your own account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce numéro se compare avec un contact, pas avec ton propre compte."
+          }
+        }
+      }
+    },
+    "Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare these digits with the ones %@ sees, in person or on a call. If they match, no one is standing between you. If they differ, don’t mark this number as verified: someone could be reading your conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges."
+          }
+        }
+      }
+    },
+    "Des messages envoyés par %@ n’ont pas été reçus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some messages sent by %@ were not received."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des messages envoyés par %@ n’ont pas été reçus."
+          }
+        }
+      }
+    },
+    "Impossible de charger le numéro de sécurité. Vérifie ta connexion et réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t load the safety number. Check your connection and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger le numéro de sécurité. Vérifie ta connexion et réessaie."
+          }
+        }
+      }
+    },
+    "Le chiffrement avec %@ n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encryption with %@ couldn’t be verified: nothing is sent to them for now. Try again later."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement avec %@ n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard."
+          }
+        }
+      }
+    },
+    "Le numéro vient de changer. Compare le nouveau numéro avant de continuer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The number just changed. Compare the new number before continuing."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le numéro vient de changer. Compare le nouveau numéro avant de continuer."
+          }
+        }
+      }
+    },
+    "Impossible d’enregistrer ce choix. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t save this choice. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer ce choix. Réessaie."
+          }
+        }
+      }
+    },
+    "Chargement du numéro de sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading the safety number"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement du numéro de sécurité"
+          }
+        }
+      }
+    },
+    "Nouveau numéro accepté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New number accepted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau numéro accepté"
+          }
+        }
+      }
+    },
+    "Numéro de sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Safety number"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numéro de sécurité"
+          }
+        }
+      }
+    },
+    "Ce numéro ne change pas quand l’un de vous ajoute un appareil. Il change seulement si l’un de vous réinitialise son chiffrement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This number doesn’t change when one of you adds a device. It only changes if one of you resets their encryption."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce numéro ne change pas quand l’un de vous ajoute un appareil. Il change seulement si l’un de vous réinitialise son chiffrement."
+          }
+        }
+      }
+    },
+    "Cela arrive quand %@ réinitialise son chiffrement, par exemple après avoir perdu tous ses appareils. Cela peut aussi signaler une tentative d’interception : compare le nouveau numéro avec %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This happens when %1$@ resets their encryption, for example after losing all their devices. It can also signal an interception attempt: compare the new number with %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cela arrive quand %@ réinitialise son chiffrement, par exemple après avoir perdu tous ses appareils. Cela peut aussi signaler une tentative d’interception : compare le nouveau numéro avec %@."
+          }
+        }
+      }
+    },
+    "Tu avais vérifié l’ancien numéro : compare le nouveau avant de l’accepter." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You had verified the previous number: compare the new one before accepting it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu avais vérifié l’ancien numéro : compare le nouveau avant de l’accepter."
+          }
+        }
+      }
+    },
+    "Numéro marqué comme vérifié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number marked as verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numéro marqué comme vérifié"
+          }
+        }
+      }
+    },
+    "Tu avais vérifié l’ancien numéro : rien n’est envoyé à %@ tant que tu n’as pas vérifié le nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You had verified the previous number: nothing is sent to %@ until you verify the new one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu avais vérifié l’ancien numéro : rien n’est envoyé à %@ tant que tu n’as pas vérifié le nouveau."
+          }
+        }
+      }
+    },
+    "Rien n’est envoyé à %@ tant que tu n’as pas accepté ce nouveau numéro." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing is sent to %@ until you accept this new number."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n’est envoyé à %@ tant que tu n’as pas accepté ce nouveau numéro."
+          }
+        }
+      }
+    },
+    "Code QR du numéro de sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Safety number QR code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code QR du numéro de sécurité"
+          }
+        }
+      }
+    },
+    "Non vérifié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non vérifié"
+          }
+        }
+      }
+    },
+    "Marquer comme vérifié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mark as verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marquer comme vérifié"
+          }
+        }
+      }
+    },
+    "Retirer la vérification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove verification"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer la vérification"
+          }
+        }
+      }
+    },
+    "J’ai comparé : marquer comme vérifié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I compared: mark as verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J’ai comparé : marquer comme vérifié"
+          }
+        }
+      }
+    },
+    "Accepter sans vérifier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accept without verifying"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepter sans vérifier"
+          }
+        }
+      }
+    },
     "Un message est arrivé en deux versions différentes : aucune n’est affichée." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14,23 +398,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un message est arrivé en deux versions différentes : aucune n’est affichée."
-          }
-        }
-      }
-    },
-    "Des messages de %@ n’ont pas été reçus." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Some messages from %@ were not received."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Des messages de %@ n’ont pas été reçus."
           }
         }
       }
@@ -49954,6 +50321,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utiliser une autre adresse"
+          }
+        }
+      }
+    },
+    "Vérification retirée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verification removed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification retirée"
           }
         }
       }
