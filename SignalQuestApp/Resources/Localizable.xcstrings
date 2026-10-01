@@ -337,6 +337,22 @@
         }
       }
     },
+    "Ce réglage ne peut plus être changé depuis ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This setting can no longer be changed from your account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce réglage ne peut plus être changé depuis ton compte."
+          }
+        }
+      }
+    },
     "Ce signalement est trop volumineux : choisis moins de messages." : {
       "localizations" : {
         "en" : {
@@ -417,6 +433,38 @@
         }
       }
     },
+    "Impossible d’enregistrer ce réglage. Vérifie ta connexion et réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t save this setting. Check your connection and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer ce réglage. Vérifie ta connexion et réessaie."
+          }
+        }
+      }
+    },
+    "Exclure les navigateurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exclude web browsers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exclure les navigateurs"
+          }
+        }
+      }
+    },
     "Impossible d’envoyer le signalement. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -445,6 +493,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de charger le numéro de sécurité. Vérifie ta connexion et réessaie."
+          }
+        }
+      }
+    },
+    "La conversation vient de changer. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversation just changed. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation vient de changer. Réessaie."
           }
         }
       }
@@ -545,6 +609,54 @@
         }
       }
     },
+    "Navigateurs exclus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web browsers excluded"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navigateurs exclus"
+          }
+        }
+      }
+    },
+    "Navigateurs de nouveau autorisés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web browsers allowed again"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navigateurs de nouveau autorisés"
+          }
+        }
+      }
+    },
+    "Les navigateurs web ne pourront plus lire les nouveaux messages de cette conversation ni rejoindre ses appels. Ce qu’ils ont déjà reçu y reste lisible. Tous les membres sont prévenus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web browsers will no longer be able to read new messages in this conversation or join its calls. What they already received stays readable there. All members are notified."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les navigateurs web ne pourront plus lire les nouveaux messages de cette conversation ni rejoindre ses appels. Ce qu’ils ont déjà reçu y reste lisible. Tous les membres sont prévenus."
+          }
+        }
+      }
+    },
     "Nouveau numéro accepté" : {
       "localizations" : {
         "en" : {
@@ -637,6 +749,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas de mesure"
+          }
+        }
+      }
+    },
+    "Seul un admin du groupe peut changer ce réglage." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only a group admin can change this setting."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seul un admin du groupe peut changer ce réglage."
           }
         }
       }

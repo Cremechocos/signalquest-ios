@@ -402,6 +402,8 @@ struct RootView: View {
                 E2EEV2SafetyNumberQAScreen()
             } else if AppEnvironment.showsE2EEReportQA {
                 E2EEV2MessageReportQAScreen()
+            } else if AppEnvironment.showsBrowserExclusionQA {
+                E2EEV2BrowserExclusionQAScreen()
             } else if case .updateRequired(let message, let storeURL) = versionPolicy.state {
                 // Un ancien build ne construit rien d'autre : le dock restait
                 // atteignable sous un simple overlay de mise à jour forcée.

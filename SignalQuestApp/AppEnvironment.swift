@@ -163,6 +163,14 @@ enum AppEnvironment {
         false
         #endif
     }
+    static var showsBrowserExclusionQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-e2ee-browsers") || hasArgument("--qa-e2ee-browsers-member")
+            || hasArgument("--qa-e2ee-browsers-refused")
+        #else
+        false
+        #endif
+    }
     static var showsSafetyNumberQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-safety-number") || hasArgument("--qa-safety-number-changed")
