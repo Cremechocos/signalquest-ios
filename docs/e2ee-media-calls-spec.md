@@ -101,9 +101,11 @@
 >   appel terminé jamais rejoint, fin d'un appel chiffré à une reconnexion
 >   complète, chiffrement que le serveur ne peut pas retirer, média coupé avant
 >   tout aller-retour réseau, pistes publiées muettes jusqu'au chiffreur prêt,
->   pistes distantes reçues seulement d'un participant prouvé, marqueur SIF
->   remplacé par 32 octets aléatoires après chaque jonction (§10.1, §10.3,
->   §10.4). Accord des sessions Android et web ; avis du serveur attendu.
+>   pistes distantes reçues seulement d'un participant prouvé, nom affiché
+>   d'après l'utilisateur prouvé, marqueur SIF remplacé par 32 octets
+>   aléatoires après chaque jonction, états des chiffreurs gardés à une
+>   reconnexion rapide (§10.1, §10.3, §10.4). Accord des sessions Android et
+>   web ; avis du serveur attendu.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -755,6 +757,10 @@ version qui expose `discardFrameWhenCryptorNotReady` et
     **reconnexion complète**, qui réintègre aussi les participants sans
     événement. Un appel chiffré prend donc fin dès le début d'une reconnexion
     complète ; une reconnexion rapide le laisse continuer.
+  - Une reconnexion rapide garde les chiffreurs. Ceux-ci ne réannoncent
+    « OK » qu'après une erreur (constaté avec Swift 2.17.0) : leurs états
+    restent valables et ne sont jamais remis à zéro, sans quoi l'appel ne
+    redeviendrait jamais vérifié.
 - **Canal de données chiffré** sur les trois SDK. Un paquet non chiffré est
   refusé. La preuve de jonction y passe.
 - Un SDK qui ne permet pas ces réglages n'offre pas d'appel chiffré : il est
@@ -847,6 +853,9 @@ version qui expose `discardFrameWhenCryptorNotReady` et
     à l'appel, avec « Appel chiffré impossible ».
   - Tant qu'un participant n'a pas prouvé son appareil, rien de lui n'est
     rendu ni remis à l'app, et le cadenas reste absent.
+  - Le nom affiché d'un participant est celui de l'utilisateur prouvé, lu
+    sur l'appareil parmi les membres de la conversation, jamais le nom du
+    jeton LiveKit, que choisit le serveur. À défaut : « Participant ».
   - Vecteur : `call-join-proof-v1`.
 - Les états d'erreur (clé manquante, échec de chiffrement ou de
   déchiffrement, erreur interne) retirent le cadenas et l'annoncent.
