@@ -138,7 +138,16 @@
 >   vérifiée avant toute question d'époque, taille du signalement (§3.3, §3.4,
 >   D.7, D.8, D.10, E.2, E.3). Puis : miroir de l'extension de notification
 >   sans clé privée d'appareil, lecture d'une enveloppe au cookie seul, avec sa
->   conversation (§2.6, E.3).
+>   conversation (§2.6, E.3). Puis, après deux relectures indépendantes :
+>   entrée du miroir liée au compte et à la session, retirée avant tout
+>   changement d'état et réécrite après succès dans l'ordre des opérations,
+>   inutilisable après 24 heures ; départs vérifiés par l'extension ; un
+>   message montré une fois au plus, retenu d'un seul geste, et, avec
+>   l'aperçu complet, jamais signé il y a plus de 48 heures ; aucun texte
+>   d'éphémère, d'édition ou de suppression ; aucune clé d'époque en mode
+>   « expéditeur seulement », dont les limites sont écrites ; lecture
+>   d'enveloppe réservée aux membres, sans effet de bord, jamais mise en
+>   cache (§2.6, E.3).
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -327,12 +336,44 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
     `WhenUnlocked` ; Android : `setUnlockedDeviceRequired`) ;
   - sur iOS, le miroir de l'extension ne contient que la session,
     l'identifiant de l'appareil, les noms des expéditeurs et, par
-    conversation, les clés d'époque vérifiées (la courante et celles
-    remplacées depuis moins de 24 heures), leurs membres et les clés
-    publiques certifiées de leurs appareils. Jamais de clé privée
-    d'appareil, et rien du tout avec « aucun aperçu ». L'extension vérifie
-    comme l'app : appareil certifié, membre de l'époque, signature avant tout
-    déchiffrement.
+    conversation :
+    - une entrée écrite par l'app pour ce compte et cette session : les
+      époques vérifiées dont l'appareil détient la clé (la courante et
+      celles remplacées depuis moins de 24 heures) et leurs membres, les
+      clés publiques certifiées de leurs appareils, les membres actuels, les
+      départs appris depuis moins de 24 heures et, par appareil émetteur, le
+      plus haut compteur reçu par l'app. Les clés d'époque n'y figurent
+      qu'avec l'aperçu complet ;
+    - ce que l'extension a déjà montré : le plus haut compteur par appareil
+      émetteur, lié lui aussi au compte et à la session, sans aucune clé.
+
+    Jamais de clé privée d'appareil, et rien du tout avec « aucun aperçu » ;
+  - la messagerie v2 de l'app retire l'entrée avant toute relève, tout envoi
+    et tout changement d'appartenance, et ne la réécrit qu'après leur
+    succès, jamais par-dessus une opération commencée plus tard. Un échec
+    d'écriture, ou un registre de l'app illisible, la retire ; si elle ne
+    part pas, tout le miroir est révoqué. Une conversation quittée perd son
+    entrée et ce que l'extension en a montré. Une révocation efface tout le
+    miroir ; une activation pour un autre compte, une autre session ou un
+    autre mode d'aperçu efface d'abord tout, sinon rien ne s'active. Une
+    entrée écrite il y a plus de 24 heures ne sert plus et part dès qu'on la
+    croise ;
+  - l'extension applique les règles de l'app à cet état figé : une
+    révocation ou un retrait postérieurs à la dernière écriture ne valent
+    qu'à la suivante, donc au plus 24 heures après. Elle vérifie : appareil
+    certifié, signature avant tout, époque connue, membre de l'époque,
+    membre parti accepté 24 heures (§3.4), aucun blob. Sans le registre de
+    l'app (§4.2), elle ne montre un message que si son compteur dépasse à
+    la fois celui reçu par l'app et le plus haut qu'elle a déjà montré pour
+    cet appareil, ce qu'elle retient d'un seul geste : un message arrivé
+    après un plus récent du même appareil reste donc générique. Avec
+    l'aperçu complet, elle déchiffre et refuse aussi un message signé il y a
+    plus de 48 heures (10 minutes d'avance tolérées). En mode « expéditeur
+    seulement », elle ne déchiffre rien : elle n'authentifie que l'appareil
+    signataire et son appartenance, ni l'âge ni le contenu du message. Le
+    nom affiché vient du serveur, comme dans l'app. Sinon, comme pour tout
+    échec, la notification reste générique. Un message éphémère, une
+    édition ou une suppression ne montrent jamais leur texte.
 - Après une restauration d'appareil, les clés locales ont disparu. Le client le
   détecte au démarrage et demande un nouvel enrôlement, plutôt que de laisser un
   appareil fantôme.
@@ -2329,8 +2370,10 @@ version publiée qui ouvre les verrous.
   liste. Lecture authentifiée par le seul cookie de session, sans signature
   d'appareil (E.0) : l'extension de notification n'a aucune clé privée
   (§2.6). La conversation annoncée n'est qu'un aiguillage, que l'AAD et la
-  signature lient. La réponse pour un message v1 ne change pas (règle de
-  compatibilité, §16).
+  signature lient. Le serveur ne la sert qu'à la session d'un membre de la
+  conversation ; elle n'a aucun effet de bord (ni accusé de réception, ni
+  remise) et sa réponse porte `Cache-Control: no-store, private`. La
+  réponse pour un message v1 ne change pas (règle de compatibilité, §16).
 - **`POST /api/e2ee/v2/reports`**. Corps :
   `{clear, encB64, sealedB64, moderationKeyId}` (D.10).
   - Le serveur vérifie les `serverTag` et l'appartenance du signaleur, puis
