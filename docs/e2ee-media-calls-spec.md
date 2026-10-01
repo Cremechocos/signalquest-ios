@@ -119,7 +119,12 @@
 >   compté depuis son acceptation locale, liaison à la longueur de la genèse,
 >   genèse revérifiée à chaque relecture, clé vérifiée pour l'envoi et les
 >   appels, migration idempotente, réponses en JSON strict, limite du premier
->   contact écrite (§3.1, §3.3, §3.5, §12, §14, E.2).
+>   contact écrite (§3.1, §3.3, §3.5, §12, §14, E.2). Puis, pour le texte v2 :
+>   enveloppe transportée à clés exactes et entiers en chaînes, chiffré sur un
+>   palier de bourrage, charge bornée pour que l'enveloppe tienne en 512 Kio,
+>   accusé d'envoi, liste et lecture des messages, renvoi à l'identique et
+>   rechiffrement sur refus d'époque (D.7, E.0, E.3). Vecteur
+>   `message-envelope-v2` complété par l'enveloppe transportée.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -1811,7 +1816,9 @@ Mêmes routes et même type de contenu que la v1 (A.4), avec
 `envelopeVersion` = 2.
 
 - **Clair** : `fk (32 octets) ‖ charge ‖ 0x80 ‖ 0x00…`. La charge est le JSON
-  canonique de D.8, de 256 Kio au plus.
+  canonique de D.8, de 262 111 octets au plus (256 Kio − 33) : le clair
+  bourré tient en 256 Kio, et l'enveloppe transportée sous 512 Kio, limite
+  d'un corps JSON.
 - **Bourrage** : soit `L = 32 + longueur(charge) + 1`. Si `L` ≤ 4 096, la
   longueur bourrée est le multiple de 256 supérieur ou égal à `L`. Sinon,
   c'est la puissance de deux supérieure ou égale à `L`.
@@ -1822,8 +1829,33 @@ Mêmes routes et même type de contenu que la v1 (A.4), avec
 - **AAD** : `SQ-E2EE-V2-MESSAGE-ENVELOPE\n2\n<conv>\n<epochNumber>\n<senderDeviceId>\n<clientRequestId>\n<counter>\nAES_256_GCM_HKDF_SHA256\napplication/vnd.signalquest.e2ee-envelope+json\n<engagementB64>\n<ttlSeconds>\n<condensatBlobs>\n<frankTagB64>`.
 - **Signature de l'appareil** sur :
   `SQ-E2EE-V2-MESSAGE-SIGNATURE\n2\n<conv>\n<epochNumber>\n<senderDeviceId>\n<clientRequestId>\n<counter>\nAES_256_GCM_HKDF_SHA256\napplication/vnd.signalquest.e2ee-envelope+json\n<engagementB64>\n<ttlSeconds>\n<condensatBlobs>\n<frankTagB64>\n<nonceB64>\n<aadB64>\n<ciphertextB64>`.
-- **Champs transportés** en plus de ceux de la v1 : `counter` (décimal) et
-  `frankTagB64`.
+- **Enveloppe transportée** (corps de l'envoi, `envelope` des lectures) :
+  objet JSON à clés exactes, lu par un analyseur strict (D.0). Mêmes noms de
+  champs que la v1, plus `counter` et `frankTagB64`. Les entiers voyagent en
+  chaînes décimales canoniques, à la différence de la v1 : une enveloppe v2
+  se reconnaît à `envelopeVersion` = `"2"`, une chaîne.
+
+  | Champ | Encodage |
+  |---|---|
+  | `envelopeVersion` | `"2"` |
+  | `epochNumber` | décimal, de 1 à 2³¹ − 2 |
+  | `clientRequestId` | A.1 |
+  | `counter` | décimal, de 1 à 2³¹ − 2 ; égal à celui de la charge |
+  | `algorithm`, `contentType` | ceux de l'AAD |
+  | `keyCommitmentB64` | b64 de 32 octets |
+  | `ttlSeconds` | décimal, de 0 à 2 592 000 |
+  | `encryptedBlobIds` | identifiants opaques, 20 au plus, sans doublon ; vide au jalon A |
+  | `frankTagB64` | b64 de 32 octets |
+  | `nonceB64` | b64 de 12 octets |
+  | `aadB64` | b64 de l'AAD ci-dessus |
+  | `ciphertextB64` | b64 ; sa longueur moins 16 est un palier de bourrage |
+  | `senderSignatureB64` | b64 de la signature, DER canonique et low-S (D.0) |
+
+  - Tout b64 y est canonique : remplissage présent, aucun autre alphabet.
+  - L'appareil émetteur n'est jamais lu dans l'enveloppe. À l'envoi, il vient
+    de la requête signée ; à la lecture, du message remis (E.3).
+  - Le compteur est tenu par appareil et par conversation (§4.3). Une
+    nouvelle identité d'appareil repart de 1.
 - **Réception**, dans cet ordre :
   1. certificat et signature ;
   2. déchiffrement ;
@@ -1961,7 +1993,8 @@ Format au §11. Le vecteur `franking-v1` donne `fk`, la charge, `frankTag`,
 Chaque vecteur donne ses entrées, avec les clés et les aléas fixés pour être
 reproductible, ses valeurs intermédiaires et ses sorties. Il comporte aussi
 une section `negative` : au moins un cas par règle de rejet, avec le motif
-attendu.
+attendu. `message-envelope-v2` donne en plus l'enveloppe transportée
+(`wireJsonUtf8`) et ce qu'un analyseur strict refuse (`wireNegative`).
 
 Le générateur de référence est côté iOS (COM-0) ; chaque plateforme rejoue les
 vecteurs dans les deux sens. L'ECDSA étant aléatoire, une signature produite
@@ -2004,6 +2037,8 @@ version publiée qui ouvre les verrous.
   - `CONVERSATION_ID_TAKEN` et `CALL_ID_TAKEN` (409) : identifiant choisi par
     le client déjà utilisé ;
   - `CALL_NONCE_TAKEN` (409) : `callNonce` déjà enregistré (§10.1) ;
+  - `E2EE_MESSAGE_CONFLICT` (409) : une autre enveloppe a déjà été acceptée
+    pour la même identité de message (§4.2) ;
   - `E2EE_UPDATE_REQUIRED` (409) : écriture d'une app sans v2 dans ce qui
     exige la v2 (§14). `error` porte le texte à afficher, que les apps
     publiées montrent tel quel.
@@ -2130,14 +2165,32 @@ version publiée qui ouvre les verrous.
 
 - **`POST /api/e2ee/v2/conversations/{id}/messages`**, étendu à
   l'enveloppe v2 :
-  - corps : l'enveloppe de D.7, avec `envelopeVersion: 2`, `counter`,
-    `frankTagB64` et `signatureB64` ;
-  - réponse : `envelopeId`, `serverTagB64`, `serverTimeMs` et `keyId` (§11).
-- **`GET /api/e2ee/v2/envelopes/{id}/fetch`**, étendu : ajoute
-  `serverTagB64`, `serverTimeMs` et `keyId`.
-- **`GET /api/e2ee/v2/conversations/{id}/messages?after=<curseur>&limit=`**,
-  la liste des messages v2 : enveloppes opaques, `serverTagB64`,
-  `serverTimeMs` et séquence serveur, dans l'ordre de la séquence.
+  - corps : l'enveloppe transportée de D.7 ;
+  - le serveur vérifie la requête signée, l'appartenance de l'appareil, la
+    forme stricte et la signature de l'enveloppe. L'époque doit être la
+    courante, sinon `409 E2EE_EPOCH_STALE`, avec l'époque courante ;
+  - identité `(conversationId, appareil, clientRequestId)` : la même
+    enveloppe, à l'octet, rend le même accusé ; une autre enveloppe pour une
+    identité déjà acceptée est refusée (`409 E2EE_MESSAGE_CONFLICT`). Une
+    enveloppe refusée ne compte pas ;
+  - réponse : `{envelopeId, clientRequestId, serverTagB64, serverTimeMs, keyId}`,
+    entiers en chaînes (§11) ;
+  - **côté client** : l'enveloppe préparée est gardée avant le premier envoi
+    et renvoyée telle quelle à chaque essai, car son accusé a pu se perdre.
+    Elle n'est rechiffrée que sur `409 E2EE_EPOCH_STALE`, sous l'époque
+    courante vérifiée, avec la même identité, le même compteur et la même
+    charge.
+- **`GET /api/e2ee/v2/conversations/{id}/messages?after=<séquence>&limit=<1 à 100>`**,
+  la liste des messages v2 : `{messages, hasMore}`.
+  - Chaque message :
+    `{envelopeId, sequence, senderUserId, senderDeviceId, envelope, serverTagB64, serverTimeMs, keyId}`,
+    entiers en chaînes, `envelope` étant l'enveloppe transportée.
+  - Séquences du serveur croissantes, toutes après `after`.
+  - Une page tient en 512 Kio : le serveur s'arrête avant, avec `hasMore` à
+    vrai. Une page vide n'annonce jamais de suite.
+- **`GET /api/e2ee/v2/envelopes/{id}/fetch`** d'un message v2 :
+  `{"message": …}`, le même objet. La réponse pour un message v1 ne change
+  pas (règle de compatibilité, §16).
 - **`POST /api/e2ee/v2/reports`**. Corps :
   `{clear, encB64, sealedB64, moderationKeyId}` (D.10).
   - Le serveur vérifie les `serverTag` et l'appartenance du signaleur, puis
