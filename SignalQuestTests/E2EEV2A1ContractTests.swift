@@ -1,0 +1,157 @@
+import Security
+import XCTest
+@testable import SignalQuest
+
+/// Lot A1 « confiance » du serveur (PR #259, formes figées le 02/10) : détails
+/// d'erreur, versions de clé, dépôt de confiance d'une approbation, cible signée.
+final class E2EEV2A1ContractTests: XCTestCase {
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        super.tearDown()
+    }
+
+    private func device(_ descriptor: E2EEV2DeviceDescriptor, keyVersion: Any = 1, platform: String? = nil) -> [String: Any] {
+        [
+            "deviceId": descriptor.deviceId, "platform": platform ?? descriptor.platform, "label": NSNull(),
+            "publicIdentityKeyB64": descriptor.publicIdentityKeyB64, "publicSigningKeyB64": descriptor.publicSigningKeyB64,
+            "identityKeyAlgorithm": descriptor.identityKeyAlgorithm, "signingKeyAlgorithm": descriptor.signingKeyAlgorithm,
+            "keyVersion": keyVersion, "status": "pending", "approvedAt": NSNull(), "revokedAt": NSNull(),
+            "lastSeenAt": NSNull(), "createdAt": "2026-10-02T00:00:00.000Z",
+        ]
+    }
+
+    private func descriptor() throws -> E2EEV2DeviceDescriptor {
+        try E2EEV2DeviceIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
+            .loadOrCreate(ownerNamespace: "account-a1")
+    }
+
+    func testARecertifiedDeviceIsReadWithItsKeyVersion() throws {
+        let pending = try descriptor()
+        let two = try JSONSerialization.data(withJSONObject: ["devices": [device(pending, keyVersion: 2)]])
+        XCTAssertEqual(E2EEV2DeviceApprovalContract.parseDevices(two)?.first?.descriptor.keyVersion, 2)
+        for invalid: Any in [0, true, 1.5, "2"] {
+            let data = try JSONSerialization.data(withJSONObject: ["devices": [device(pending, keyVersion: invalid)]])
+            XCTAssertNil(E2EEV2DeviceApprovalContract.parseDevices(data), "keyVersion \(invalid)")
+        }
+    }
+
+    private func approval(_ pending: E2EEV2DeviceDescriptor, status: String, challenge: Any) -> [String: Any] {
+        [
+            "id": "approval_0000000000000001", "pendingDeviceId": pending.deviceId, "method": "QR",
+            "challengeB64Url": challenge, "proximityCode": NSNull(), "status": status,
+            "expiresAt": "2026-10-02T00:10:00.000Z", "createdAt": "2026-10-02T00:00:00.000Z",
+        ]
+    }
+
+    private let wrap: [String: Any] = [
+        "userId": "user_a1", "approverDeviceId": "ios_approver_000000000001", "newDeviceId": "",
+        "uikPublicKeyB64": "BAAA", "ephemeralPublicKeyB64": "BBBB", "nonceB64": "CCCC", "aadB64": "DDDD",
+        "wrappedUikB64": "EEEE", "signatureB64": "FFFF",
+    ]
+
+    func testTheApprovalTrustDepositFollowsTheServerStates() throws {
+        let pending = try descriptor()
+        let challenge = String(repeating: "A", count: 43)
+        func parse(_ root: [String: Any]) throws -> E2EEV2ApprovalDetail? {
+            E2EEV2DeviceApprovalContract.parseApprovalDetail(try JSONSerialization.data(withJSONObject: root))
+        }
+        var uikWrap = wrap
+        uikWrap["newDeviceId"] = pending.deviceId
+        let certificate: [String: Any] = ["certificate": "SQ-E2EE-V2-DEVICE-CERT\n1", "signatureB64": "MEUC"]
+        let list: [String: Any] = ["list": "SQ-E2EE-V2-DEVICE-LIST\n1", "signatureB64": "MEUC", "devices": ["entry"]]
+
+        // En attente : le dépôt est nul.
+        let waiting = try XCTUnwrap(parse([
+            "approval": approval(pending, status: "pending", challenge: challenge), "pendingDevice": device(pending),
+            "certificate": NSNull(), "deviceList": NSNull(), "uikWrap": NSNull(),
+        ]))
+        XCTAssertNil(waiting.trust)
+        // Approuvée : le défi est effacé, le dépôt rempli.
+        let approved = try XCTUnwrap(parse([
+            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
+            "certificate": certificate, "deviceList": list, "uikWrap": uikWrap,
+        ]))
+        XCTAssertEqual(approved.trust?.uikWrap?.newDeviceId, pending.deviceId)
+        XCTAssertEqual(approved.trust?.deviceEntries, ["entry"])
+        // Navigateur : jamais d'UIK.
+        let browser = try XCTUnwrap(parse([
+            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending, platform: "web"),
+            "certificate": certificate, "deviceList": list, "uikWrap": NSNull(),
+        ]))
+        XCTAssertNotNil(browser.trust)
+        XCTAssertNil(browser.trust?.uikWrap)
+        XCTAssertNil(try parse([
+            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending, platform: "web"),
+            "certificate": certificate, "deviceList": list, "uikWrap": uikWrap,
+        ]), "Une UIK pour un navigateur est refusée")
+        XCTAssertNil(try parse([
+            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
+            "certificate": certificate, "deviceList": list, "uikWrap": wrap.merging(["newDeviceId": "ios_other_000000000001"]) { $1 },
+        ]), "Une UIK destinée à un autre appareil est refusée")
+        // Dépôt consommé ou expiré : de nouveau nul, l'approbation reste lisible.
+        XCTAssertNil(try XCTUnwrap(parse([
+            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
+            "certificate": NSNull(), "deviceList": NSNull(), "uikWrap": NSNull(),
+        ])).trust)
+        // Un dépôt partiel, une clé de trop ou une UIK à dix clés : refusés.
+        XCTAssertNil(try parse([
+            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
+            "certificate": certificate, "deviceList": NSNull(), "uikWrap": uikWrap,
+        ]))
+        var tooMany = uikWrap
+        tooMany["extra"] = "x"
+        XCTAssertNil(try parse([
+            "approval": approval(pending, status: "approved", challenge: NSNull()), "pendingDevice": device(pending),
+            "certificate": certificate, "deviceList": list, "uikWrap": tooMany,
+        ]))
+        XCTAssertNil(try parse([
+            "approval": approval(pending, status: "pending", challenge: NSNull()), "pendingDevice": device(pending),
+            "certificate": NSNull(), "deviceList": NSNull(), "uikWrap": NSNull(),
+        ]), "En attente, le défi reste obligatoire")
+    }
+
+    func testTheSignedTargetEncodesEverythingButUnreservedCharacters() {
+        XCTAssertEqual(
+            E2EEV2SignedTarget.encodedQuery([URLQueryItem(name: "q", value: "a+b c@d'é"), URLQueryItem(name: "sinceVersion", value: "3")]),
+            "q=a%2Bb%20c%40d%27%C3%A9&sinceVersion=3"
+        )
+        XCTAssertNil(E2EEV2SignedTarget.encodedQuery([]))
+        XCTAssertTrue(E2EEV2SignedTarget.isEncodedPath("/api/e2ee/v2/users/user_0123456789abcdef/identity"))
+        XCTAssertFalse(E2EEV2SignedTarget.isEncodedPath("/api/e2ee/v2/users/a b/identity"))
+        XCTAssertFalse(E2EEV2SignedTarget.isEncodedPath("/api//identity"))
+    }
+
+    /// La requête part telle qu'elle est signée, et `E2EE_DEVICE_LIST_STALE`
+    /// garde les membres dont relire l'identité.
+    func testTheWireTargetMatchesTheSignatureAndStaleDetailsSurvive() async throws {
+        let previousUserId = LocalAccountScope.currentUserId
+        LocalAccountScope.activate(userId: "a1-target")
+        defer { if let previousUserId { LocalAccountScope.activate(userId: previousUserId) } else { LocalAccountScope.deactivate() } }
+        let session = try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        let store = E2EEV2DeviceIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
+        _ = try store.loadOrCreate(ownerNamespace: session.ownerNamespace)
+        let seen = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            seen.append(request, body: [:])
+            let body = try JSONSerialization.data(withJSONObject: [
+                "error": "stale", "code": "E2EE_DEVICE_LIST_STALE", "requestId": "r",
+                "details": ["userId": "user_member_00000000001", "userIds": ["user_member_00000000001", "user_member_00000000002"]],
+            ])
+            return (HTTPURLResponse(url: request.url!, statusCode: 409, httpVersion: nil, headerFields: nil)!, body)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("a1-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let result = await E2EEV2APITransport(api: api, identityStore: store).getJSON(
+            path: "/api/e2ee/v2/devices", query: [URLQueryItem(name: "q", value: "a+b c")],
+            expectedOwnerScopeId: session.ownerScopeId, capabilitySet: .deviceLifecycle
+        )
+        let request = try XCTUnwrap(seen.first?.0)
+        XCTAssertEqual(request.url?.query, "q=a%2Bb%20c")
+        guard case .failure(let failure) = result else { return XCTFail("409 attendu") }
+        XCTAssertEqual(failure.code, "E2EE_DEVICE_LIST_STALE")
+        XCTAssertEqual(failure.staleUserIds, ["user_member_00000000001", "user_member_00000000002"])
+    }
+}

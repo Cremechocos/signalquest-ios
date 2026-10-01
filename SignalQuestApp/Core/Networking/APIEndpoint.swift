@@ -29,6 +29,9 @@ struct APIEndpoint: Sendable {
     var validateBeforeSend: (@Sendable () async throws -> Void)?
     /// Overall deadline for one response, distinct from the inactivity timeout.
     var responseDeadline: Duration?
+    /// Requête déjà encodée, envoyée telle quelle (requêtes signées E2EE, A.2) ;
+    /// prime sur `query`.
+    var percentEncodedQuery: String?
 
     init(
         path: String,

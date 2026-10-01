@@ -427,7 +427,9 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         ) else {
             throw APIError.invalidURL(endpoint.path)
         }
-        if !endpoint.query.isEmpty {
+        if let encoded = endpoint.percentEncodedQuery {
+            components.percentEncodedQuery = encoded
+        } else if !endpoint.query.isEmpty {
             components.queryItems = endpoint.query
         }
         guard let url = components.url else { throw APIError.invalidURL(endpoint.path) }

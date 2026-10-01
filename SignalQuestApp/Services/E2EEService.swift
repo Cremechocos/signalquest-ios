@@ -1553,6 +1553,42 @@ extension E2EEV2SignedRequest {
 
 // MARK: - E2EE v2 signed transport (preview, fail-closed)
 
+/// Cible d'une requête signée (A.2, v0.4.15) : tout ce qui n'est pas « non
+/// réservé » (RFC 3986) est encodé en pourcentage, en majuscules, avant de
+/// signer, et part tel quel sur le fil ; le serveur la lit sans la décoder.
+enum E2EEV2SignedTarget {
+    private static let unreserved = CharacterSet(
+        charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+    )
+
+    static func encode(_ component: String) -> String {
+        component.addingPercentEncoding(withAllowedCharacters: unreserved) ?? ""
+    }
+
+    static func encodedQuery(_ items: [URLQueryItem]) -> String? {
+        guard !items.isEmpty else { return nil }
+        return items.map { encode($0.name) + "=" + encode($0.value ?? "") }.joined(separator: "&")
+    }
+
+    /// Chemin déjà fait de segments non réservés (identifiants opaques).
+    static func isEncodedPath(_ path: String) -> Bool {
+        path.split(separator: "/", omittingEmptySubsequences: false).dropFirst().allSatisfy { segment in
+            !segment.isEmpty && segment.unicodeScalars.allSatisfy { unreserved.contains($0) }
+        }
+    }
+}
+
+/// Version de clé d'un appareil : 1 au départ, +1 à chaque recertification
+/// (`PUT …/certificate`, lot A1). Un nombre JSON entier et positif, jamais un booléen.
+enum E2EEV2DeviceKeyVersion {
+    static func parse(_ value: Any?) -> Int? {
+        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+              let version = value as? Int, Double(version) == number.doubleValue,
+              (1...1_000_000).contains(version) else { return nil }
+        return version
+    }
+}
+
 enum E2EEV2TransportFailureKind: Equatable, Sendable {
     case authentication
     case retryable
@@ -1566,17 +1602,36 @@ struct E2EEV2TransportFailure: Error, Equatable, Sendable {
     let statusCode: Int?
     let code: String?
     let message: String
+    /// `details` de l'erreur (E.0), aujourd'hui seulement pour
+    /// `E2EE_DEVICE_LIST_STALE` : les membres dont relire l'identité.
+    let details: [String: JSONValue]?
 
     init(
         kind: E2EEV2TransportFailureKind,
         statusCode: Int? = nil,
         code: String? = nil,
-        message: String
+        message: String,
+        details: [String: JSONValue]? = nil
     ) {
         self.kind = kind
         self.statusCode = statusCode
         self.code = code
         self.message = message
+        self.details = details
+    }
+
+    /// `E2EE_DEVICE_LIST_STALE` : `details.userIds`, à défaut `details.userId`.
+    var staleUserIds: [String] {
+        guard code == "E2EE_DEVICE_LIST_STALE", let details else { return [] }
+        if case .array(let values)? = details["userIds"] {
+            let ids = values.compactMap { value -> String? in
+                if case .string(let id) = value, E2EEV2Canonical.isOpaque(id) { return id }
+                return nil
+            }
+            if !ids.isEmpty { return ids }
+        }
+        if case .string(let id)? = details["userId"], E2EEV2Canonical.isOpaque(id) { return [id] }
+        return []
     }
 }
 
@@ -1903,14 +1958,12 @@ final class E2EEV2APITransport: @unchecked Sendable {
         capabilitySet: E2EEV2RequestCapabilitySet,
         useResetCandidate: Bool = false
     ) async -> E2EEV2TransportResult<Data> {
-        var signedComponents = URLComponents()
-        signedComponents.path = path
-        signedComponents.queryItems = query.isEmpty ? nil : query
-        guard validPath(path), validOwner(expectedOwnerScopeId),
-              signedComponents.percentEncodedPath == path else {
+        guard validPath(path), validOwner(expectedOwnerScopeId), E2EEV2SignedTarget.isEncodedPath(path) else {
             return localFailure("invalid-e2ee-request-scope")
         }
-        let signedPath = path + (signedComponents.percentEncodedQuery.map { "?\($0)" } ?? "")
+        // A.2 (v0.4.15) : la requête part telle qu'elle est signée.
+        let encodedQuery = E2EEV2SignedTarget.encodedQuery(query)
+        let signedPath = path + (encodedQuery.map { "?\($0)" } ?? "")
         guard currentOwnerIs(expectedOwnerScopeId) else {
             return authenticationFailure("account-scope-changed")
         }
@@ -1938,10 +1991,9 @@ final class E2EEV2APITransport: @unchecked Sendable {
             guard currentOwnerIs(expectedOwnerScopeId) else {
                 return authenticationFailure("account-scope-changed")
             }
-            let endpoint = APIEndpoint(
+            var endpoint = APIEndpoint(
                 path: path,
                 method: method,
-                query: query,
                 headers: requestHeaders(
                     contentType: contentType,
                     capabilitySet: capabilitySet,
@@ -1951,6 +2003,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
                 authenticated: true,
                 skipsAutoRefresh: true
             )
+            endpoint.percentEncodedQuery = encodedQuery
             let token = expectedSession == nil ? nil : api.credentials.accessToken()
             guard expectedSession == nil || token != nil else { return authenticationFailure("e2ee-authentication-required") }
             if let expectedSession, let token, !expectedSession.matchesAuthToken(token) {
@@ -2004,7 +2057,8 @@ final class E2EEV2APITransport: @unchecked Sendable {
                 code: decoded?.code,
                 message: decoded?.error?.isEmpty == false
                     ? decoded?.error ?? "e2ee-http-\(response.statusCode)"
-                    : "e2ee-http-\(response.statusCode)"
+                    : "e2ee-http-\(response.statusCode)",
+                details: decoded?.details
             )
         )
     }
@@ -2031,6 +2085,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
     }
 
     private func validPath(_ path: String) -> Bool {
+        // Cible signée bornée (A.2) ; la requête est encodée à part.
         !path.isEmpty && path.utf8.count <= 512 && path.hasPrefix("/")
             && !path.contains("?") && !path.contains("#")
             && !path.contains("\n") && !path.contains("\r")
@@ -2315,6 +2370,18 @@ struct E2EEV2Approval: Equatable, Sendable {
 struct E2EEV2ApprovalDetail: Equatable, Sendable {
     let approval: E2EEV2Approval
     let pendingDevice: E2EEV2RemoteDevice
+    /// Dépôt de confiance (lot A1), lu par l'appareil en attente une fois
+    /// approuvé ; nil avant, après consommation ou expiration, et pour un autre lecteur.
+    var trust: E2EEV2ApprovalTrustDeposit? = nil
+}
+
+/// Ce que l'approbateur a déposé pour le nouvel appareil (E.1) : son
+/// certificat et la liste qui le porte, et l'UIK enveloppée (jamais pour un navigateur).
+struct E2EEV2ApprovalTrustDeposit: Equatable, Sendable {
+    let certificate: E2EEV2SignedString
+    let deviceList: E2EEV2SignedString
+    let deviceEntries: [String]
+    let uikWrap: E2EEV2UIKWrap?
 }
 
 /// QR v3 (D.13) lu par l'approbateur : la plateforme et l'empreinte de
@@ -2654,7 +2721,59 @@ enum E2EEV2DeviceApprovalContract {
               let approval = parseApproval(approvalObject),
               let device = parseDevice(deviceObject),
               approval.pendingDeviceId == device.descriptor.deviceId else { return nil }
-        return .init(approval: approval, pendingDevice: device)
+        // Lot A1 : les trois clés du dépôt sont toujours présentes, nulles ou
+        // remplies ensemble ; l'UIK seule reste nulle pour un navigateur.
+        let trustKeys = ["certificate", "deviceList", "uikWrap"]
+        guard Set(root.keys) == Set(["approval", "pendingDevice"]) || Set(root.keys) == Set(["approval", "pendingDevice"] + trustKeys)
+        else { return nil }
+        guard Set(root.keys).isSuperset(of: trustKeys) else { return .init(approval: approval, pendingDevice: device) }
+        let certificate = root["certificate"], list = root["deviceList"], wrap = root["uikWrap"]
+        if certificate is NSNull, list is NSNull, wrap is NSNull {
+            return .init(approval: approval, pendingDevice: device)
+        }
+        guard approval.status == .approved,
+              let certificateObject = certificate as? [String: Any],
+              Set(certificateObject.keys) == ["certificate", "signatureB64"],
+              let certificateCanonical = certificateObject["certificate"] as? String,
+              let certificateSignature = certificateObject["signatureB64"] as? String,
+              let listObject = list as? [String: Any],
+              Set(listObject.keys) == ["list", "signatureB64", "devices"],
+              let listCanonical = listObject["list"] as? String,
+              let listSignature = listObject["signatureB64"] as? String,
+              let entries = listObject["devices"] as? [String], !entries.isEmpty, entries.count <= 500 else { return nil }
+        let uikWrap: E2EEV2UIKWrap?
+        if wrap is NSNull {
+            guard device.descriptor.platform == "web" else { return nil }
+            uikWrap = nil
+        } else {
+            guard device.descriptor.platform != "web", let wrapObject = wrap as? [String: Any],
+                  let parsed = parseUIKWrap(wrapObject),
+                  parsed.newDeviceId == device.descriptor.deviceId else { return nil }
+            uikWrap = parsed
+        }
+        return .init(
+            approval: approval, pendingDevice: device,
+            trust: .init(
+                certificate: .init(canonical: certificateCanonical, signatureB64: certificateSignature),
+                deviceList: .init(canonical: listCanonical, signatureB64: listSignature),
+                deviceEntries: entries, uikWrap: uikWrap
+            )
+        )
+    }
+
+    /// Exactement les neuf clés de D.5.
+    static func parseUIKWrap(_ value: [String: Any]) -> E2EEV2UIKWrap? {
+        let keys = ["userId", "approverDeviceId", "newDeviceId", "uikPublicKeyB64", "ephemeralPublicKeyB64",
+                    "nonceB64", "aadB64", "wrappedUikB64", "signatureB64"]
+        guard Set(value.keys) == Set(keys) else { return nil }
+        let strings = keys.compactMap { value[$0] as? String }
+        guard strings.count == keys.count, strings.allSatisfy({ !$0.isEmpty }),
+              validOpaqueId(strings[1]), validOpaqueId(strings[2]) else { return nil }
+        return .init(
+            userId: strings[0], approverDeviceId: strings[1], newDeviceId: strings[2], uikPublicKeyB64: strings[3],
+            ephemeralPublicKeyB64: strings[4], nonceB64: strings[5], aadB64: strings[6], wrappedUikB64: strings[7],
+            signatureB64: strings[8]
+        )
     }
 
     static func parseDevices(_ data: Data) -> [E2EEV2RemoteDevice]? {
@@ -2930,7 +3049,9 @@ enum E2EEV2DeviceApprovalContract {
         case .proximityCode:
             guard proximity != nil, challenge == nil else { return nil }
         case .push, .qr:
-            guard challenge.map(validChallenge) == true, proximity == nil else { return nil }
+            // Une fois approuvée, le serveur efface le défi (lot A1).
+            let challengeValid = challenge.map(validChallenge) ?? (status != .pending)
+            guard challengeValid, proximity == nil else { return nil }
         }
         return .init(
             id: id,
@@ -2955,7 +3076,7 @@ enum E2EEV2DeviceApprovalContract {
               validP256(publicSigning),
               value["identityKeyAlgorithm"] as? String == E2EEV2DeviceIdentityStore.identityKeyAlgorithm,
               value["signingKeyAlgorithm"] as? String == E2EEV2DeviceIdentityStore.signingKeyAlgorithm,
-              value["keyVersion"] as? Int == 1,
+              let keyVersion = E2EEV2DeviceKeyVersion.parse(value["keyVersion"]),
               let statusRaw = (value["status"] as? String)?.lowercased(),
               let status = E2EEV2RemoteDeviceStatus(rawValue: statusRaw),
               let createdAt = value["createdAt"] as? String,
@@ -2972,7 +3093,7 @@ enum E2EEV2DeviceApprovalContract {
                 publicSigningKeyB64: publicSigning,
                 identityKeyAlgorithm: E2EEV2DeviceIdentityStore.identityKeyAlgorithm,
                 signingKeyAlgorithm: E2EEV2DeviceIdentityStore.signingKeyAlgorithm,
-                keyVersion: 1
+                keyVersion: keyVersion
             ),
             status: status,
             approvedAt: nullableString(value["approvedAt"]),
@@ -6193,7 +6314,7 @@ enum E2EEV2EpochRotationContract {
                 Data(base64Encoded: publicSigning)?.count == 65,
                 device["identityKeyAlgorithm"] as? String == E2EEV2DeviceIdentityStore.identityKeyAlgorithm,
                 device["signingKeyAlgorithm"] as? String == E2EEV2DeviceIdentityStore.signingKeyAlgorithm,
-                device["keyVersion"] as? Int == 1 else { return nil }
+                E2EEV2DeviceKeyVersion.parse(device["keyVersion"]) != nil else { return nil }
                 let approvedAt = nullableString(device["approvedAt"])
                 guard approvedAt.valid, approvedAt.value.map(validISO8601) ?? true else { return nil }
                 devices.append(.init(
