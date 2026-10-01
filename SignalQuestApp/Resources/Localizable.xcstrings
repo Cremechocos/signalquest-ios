@@ -17,6 +17,22 @@
         }
       }
     },
+    "%@ a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ has a new safety number. Nothing is sent to them until you’ve seen it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu."
+          }
+        }
+      }
+    },
     "Ce message ne peut pas être signalé : il n’est plus gardé sur cet appareil." : {
       "localizations" : {
         "en" : {
@@ -173,6 +189,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le chiffrement avec %@ n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard."
+          }
+        }
+      }
+    },
+    "Le chiffrement avec un membre n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encryption with a member couldn’t be verified: nothing is sent to them for now. Try again later."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement avec un membre n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard."
           }
         }
       }
@@ -477,6 +509,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Accepter sans vérifier"
+          }
+        }
+      }
+    },
+    "Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member has a new safety number. Nothing is sent to them until you’ve seen it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu."
           }
         }
       }

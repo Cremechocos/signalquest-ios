@@ -6,6 +6,12 @@ import Foundation
 /// vérification sont faites avant, par la messagerie v2.
 struct E2EEV2ThreadPresentation: Equatable {
     enum Notice: Equatable {
+        /// Un membre a un nouveau numéro de sécurité : rien ne lui est envoyé
+        /// tant que l'utilisateur ne l'a pas vu (§2.4). L'avis mène à son numéro.
+        case identityChanged(userId: String, name: String?)
+        /// Le paquet de confiance d'un membre est refusé (liste en recul,
+        /// lacune, signature invalide) : rien ne lui est envoyé non plus.
+        case identityUnverified(userId: String, name: String?)
         /// Deux versions d'un même message : aucune n'est affichée (§4.2).
         case equivocation(count: Int)
         /// Des messages d'un membre n'ont pas été reçus (§4.3).
@@ -17,6 +23,14 @@ struct E2EEV2ThreadPresentation: Equatable {
 
         var text: String {
             switch self {
+            case .identityChanged(_, let name?):
+                return String(localized: "\(name) a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu.")
+            case .identityChanged(_, nil):
+                return String(localized: "Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu.")
+            case .identityUnverified(_, let name?):
+                return String(localized: "Le chiffrement avec \(name) n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard.")
+            case .identityUnverified(_, nil):
+                return String(localized: "Le chiffrement avec un membre n’a pas pu être vérifié : rien ne lui est envoyé pour l’instant. Réessaie plus tard.")
             case .equivocation:
                 return String(localized: "Un message est arrivé en deux versions différentes : aucune n’est affichée.")
             case .missing(let name?, _):
@@ -37,12 +51,15 @@ struct E2EEV2ThreadPresentation: Equatable {
 
 enum E2EEV2ThreadPresenter {
     /// `members` : nom et avatar par utilisateur ; `deviceOwners` : l'utilisateur
-    /// de chaque appareil certifié, pour nommer qui a des messages manquants.
+    /// de chaque appareil certifié, pour nommer qui a des messages manquants ;
+    /// `refusals` : les membres dont l'annuaire n'a pas cru l'identité, en tête
+    /// des avis puisque l'envoi les attend.
     static func present(
         _ result: E2EEV2MessagesV2,
         conversationId: String,
         members: [String: MessageUser],
-        deviceOwners: [String: String]
+        deviceOwners: [String: String],
+        refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
     ) -> E2EEV2ThreadPresentation {
         let messages = result.snapshot.messages.map { stored in
             MessageItem(
@@ -69,7 +86,12 @@ enum E2EEV2ThreadPresenter {
                 reactions: []
             )
         }
-        var notices: [E2EEV2ThreadPresentation.Notice] = []
+        var notices: [E2EEV2ThreadPresentation.Notice] = refusals.keys.sorted().map { userId in
+            let name = members[userId]?.displayName
+            return refusals[userId] == .uikChanged
+                ? .identityChanged(userId: userId, name: name)
+                : .identityUnverified(userId: userId, name: name)
+        }
         if result.waitingForEpoch { notices.append(.waitingForEpoch) }
         if !result.snapshot.equivocalRefs.isEmpty {
             notices.append(.equivocation(count: result.snapshot.equivocalRefs.count))

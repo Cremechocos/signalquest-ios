@@ -70,4 +70,20 @@ final class E2EEV2ThreadPresentationTests: XCTestCase {
         ])
         XCTAssertTrue(thread.notices[3].text.contains("Bruno"))
     }
+
+    func testAMemberWhoseIdentityIsNotTrustedComesFirst() {
+        let result = E2EEV2MessagesV2(
+            snapshot: .init(cursor: 1, messages: [], equivocalRefs: []), unsupported: [], missingByDevice: [:], waitingForEpoch: true
+        )
+        let thread = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [bruno.id: bruno], deviceOwners: [:],
+            refusals: [carla.id: .deviceListRollback, bruno.id: .uikChanged]
+        )
+        XCTAssertEqual(thread.notices, [
+            .identityChanged(userId: bruno.id, name: "Bruno"),
+            .identityUnverified(userId: carla.id, name: nil),
+            .waitingForEpoch,
+        ], "L'envoi les attend : ils passent en tête")
+        XCTAssertTrue(thread.notices[0].text.contains("Bruno"))
+    }
 }
