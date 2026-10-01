@@ -706,6 +706,7 @@
 		E30D9C990D91BDD01802BDD8 /* CarPlayVoiceGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1FBD30EB70D45AE7E0747EE /* CarPlayVoiceGuide.swift */; };
 		E324B778DDBD2190BB193839 /* ObservedCellSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49585CCEE5ACBC0C1E3F60E /* ObservedCellSheet.swift */; };
 		E334F060DA22618A06883CC7 /* VoiceNoteRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97E995D86EB1D6FE8BFA16CA /* VoiceNoteRecorder.swift */; };
+		E386A7909B112F0B5FF32787 /* E2EEV2DeviceLockedSigningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28DC9230E443BCF2CA73F788 /* E2EEV2DeviceLockedSigningTests.swift */; };
 		E43A40D999EFDF7895848F3D /* E2EEV2EpochRotationV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A567F31189154F64431EE0F /* E2EEV2EpochRotationV2Tests.swift */; };
 		E4D3352BEA88542E42F96E7B /* ValidationsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8738D9A09B93678F37E5A510 /* ValidationsSheet.swift */; };
 		E52009FC4C73188A934B5054 /* E2EEV2MessageReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C26B4339ED01B0D802A1A65 /* E2EEV2MessageReportTests.swift */; };
@@ -955,6 +956,7 @@
 		287E5D3DE8022D0293D4CFB3 /* ConversationPinUnreadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationPinUnreadTests.swift; sourceTree = "<group>"; };
 		2889EBCE5E9340D9FFD22A58 /* MobileChallengeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileChallengeTests.swift; sourceTree = "<group>"; };
 		28B47498218EE99E0870A720 /* FavoriteAntennasTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteAntennasTests.swift; sourceTree = "<group>"; };
+		28DC9230E443BCF2CA73F788 /* E2EEV2DeviceLockedSigningTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2DeviceLockedSigningTests.swift; sourceTree = "<group>"; };
 		29545835569FD2D703C23E6A /* TerritoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerritoriesView.swift; sourceTree = "<group>"; };
 		29DFF718DF6D58771CA26060 /* LivePresenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePresenceService.swift; sourceTree = "<group>"; };
 		2A5251F96893CB76BAAC1239 /* SignalQuestWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SignalQuestWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2692,6 +2694,7 @@
 				C15B5E5210CC19ED923782CA /* E2EEV2ConversationMessagingV2Tests.swift */,
 				FF15169FFA7B3EAE60467F71 /* E2EEV2ConversationStateTests.swift */,
 				45DB63F96676D57869124FC9 /* E2EEV2ConversationSyncV2Tests.swift */,
+				28DC9230E443BCF2CA73F788 /* E2EEV2DeviceLockedSigningTests.swift */,
 				2A567F31189154F64431EE0F /* E2EEV2EpochRotationV2Tests.swift */,
 				7C129F6AA51DA75F6A60A791 /* E2EEV2IdentityVerificationTests.swift */,
 				AE462EB9FB52BB5A8D4AB872 /* E2EEV2JalonAVectorTests.swift */,
@@ -3900,6 +3903,7 @@
 				D86A7ED4DB41D234F89833B7 /* E2EEV2ConversationMessagingV2Tests.swift in Sources */,
 				0C5C061E773EAA66585D6C63 /* E2EEV2ConversationStateTests.swift in Sources */,
 				1E97EC5725E0B9B4C65382AB /* E2EEV2ConversationSyncV2Tests.swift in Sources */,
+				E386A7909B112F0B5FF32787 /* E2EEV2DeviceLockedSigningTests.swift in Sources */,
 				E43A40D999EFDF7895848F3D /* E2EEV2EpochRotationV2Tests.swift in Sources */,
 				2249B0FFD84B669F701D887D /* E2EEV2IdentityVerificationTests.swift in Sources */,
 				01CA0252CB25A0F8AFCDB2E6 /* E2EEV2JalonAVectorTests.swift in Sources */,

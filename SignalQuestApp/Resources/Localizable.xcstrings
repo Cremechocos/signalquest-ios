@@ -609,6 +609,22 @@
         }
       }
     },
+    "Déverrouille ton appareil pour rejoindre l’appel chiffré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock your device to join the encrypted call."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouille ton appareil pour rejoindre l’appel chiffré."
+          }
+        }
+      }
+    },
     "Impossible d’enregistrer ce réglage. Vérifie ta connexion et réessaie." : {
       "localizations" : {
         "en" : {

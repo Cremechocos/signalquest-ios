@@ -290,6 +290,13 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
                 UserDefaults.standard.set(true, forKey: Self.legacyLockedKey)
                 privacyLock()
                 stateLock.withLock { unlockedPrivateJwk = nil; conversationKeyCache.removeAll() }
+                // Après l'invalidation de la session : plus aucune signature ne la recopie.
+                if let expectedSession {
+                    try? E2EEV2DeviceIdentityStore.removeLockedSigning(
+                        store: tokenStore,
+                        ownerNamespace: LocalAccountScope.storageNamespace(for: expectedSession.ownerScopeId)
+                    )
+                }
             }
         } catch { return }
         // Ces clés historiques n'ont pas de propriétaire fiable. Les préfixes v2 restent intacts.
@@ -762,6 +769,9 @@ enum E2EEV2DeviceIdentityError: Error, Equatable {
     case unauthenticated
     case invalidRecord
     case randomGenerationFailed
+    /// Clé illisible parce que l'appareil est verrouillé : on réessaie au
+    /// déverrouillage, jamais de nouvel enrôlement (spec §2.6, v0.4.13).
+    case locked
 }
 
 enum E2EEV2VaultBoundary {
@@ -773,23 +783,40 @@ enum E2EEV2VaultBoundary {
     static func purge(store: TokenStore, ownerScopeId: String) throws {
         guard ownerScopeId.hasPrefix("user:"), ownerScopeId.count > 5 else { return }
         let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
-        for key in ["device-v2:\(namespace)", "device-v2-reset-candidate:\(namespace)",
-                    "epoch-v2-owner-index:\(namespace)", "rotation-work-v1:\(namespace)",
+        // Chaque effacement est tenté ; la première erreur est rendue à la fin.
+        var firstError: Error?
+        func attempt(_ erase: () throws -> Void) {
+            do { try erase() } catch { if firstError == nil { firstError = error } }
+        }
+        // La copie lisible verrouillé d'abord, sous son verrou : une signature
+        // en cours ne la réécrit pas après l'effacement.
+        E2EEV2DeviceIdentityStore.signingCopyLock.withLock {
+            for key in [E2EEV2DeviceIdentityStore.lockedSigningStorageKey(ownerNamespace: namespace),
+                        "device-v2:\(namespace)", "device-v2-reset-candidate:\(namespace)"] {
+                attempt { try store.remove(key) }
+            }
+        }
+        for key in ["epoch-v2-owner-index:\(namespace)", "rotation-work-v1:\(namespace)",
                     E2EEV2AccountIdentityStore.key(ownerNamespace: namespace),
                     E2EEV2AccountIdentityStore.verifiedKey(ownerNamespace: namespace)] {
-            try store.remove(key)
+            attempt { try store.remove(key) }
         }
         for prefix in ["epoch-v2:\(namespace):", "epoch-v2-history:\(namespace):", "epoch-v2-index:\(namespace):",
                        E2EEV2TrustPinStore.prefix(ownerNamespace: namespace),
                        E2EEV2ConversationStateStore.prefix(ownerNamespace: namespace)] {
-            for key in try store.keys(withPrefix: prefix) { try store.remove(key) }
+            attempt { for key in try store.keys(withPrefix: prefix) { attempt { try store.remove(key) } } }
         }
-        for key in try store.keys(withPrefix: "e2ee_v2_live_share_") {
-            guard let raw = try store.string(for: key), let data = raw.data(using: .utf8),
-                  let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-                  json["ownerScopeId"] as? String == ownerScopeId else { continue }
-            try store.remove(key)
+        attempt {
+            for key in try store.keys(withPrefix: "e2ee_v2_live_share_") {
+                attempt {
+                    guard let raw = try store.string(for: key), let data = raw.data(using: .utf8),
+                          let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                          json["ownerScopeId"] as? String == ownerScopeId else { return }
+                    try store.remove(key)
+                }
+            }
         }
+        if let firstError { throw firstError }
     }
 }
 
@@ -840,11 +867,7 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         guard LocalAccountScope.currentUserId != nil else {
             throw E2EEV2DeviceIdentityError.unauthenticated
         }
-        let record = try requiredRecord(ownerNamespace: LocalAccountScope.storageNamespace)
-        let privateData = try decoded(record.signingPrivateRawB64)
-        let privateKey = try P256.Signing.PrivateKey(rawRepresentation: privateData)
-        // Forme low-S obligatoire (spec §4.1 et §15) : CryptoKit peut produire du high-S.
-        return try E2EEV2LowS.sign(canonicalRequest, with: privateKey)
+        return try sign(canonicalRequest: canonicalRequest, ownerNamespace: LocalAccountScope.storageNamespace)
     }
 
     func reset() throws {
@@ -852,30 +875,40 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
             throw E2EEV2DeviceIdentityError.unauthenticated
         }
         let ownerNamespace = LocalAccountScope.storageNamespace
-        try tokenStore.remove(storageKey(ownerNamespace: ownerNamespace))
-        try tokenStore.remove(resetCandidateStorageKey(ownerNamespace: ownerNamespace))
+        try Self.signingCopyLock.withLock {
+            try tokenStore.remove(Self.lockedSigningStorageKey(ownerNamespace: ownerNamespace))
+            try tokenStore.remove(storageKey(ownerNamespace: ownerNamespace))
+            try tokenStore.remove(resetCandidateStorageKey(ownerNamespace: ownerNamespace))
+        }
     }
 
     @discardableResult
     func loadOrCreate(ownerNamespace: String, label: String? = nil) throws -> E2EEV2DeviceDescriptor {
-        guard allowsOwner(ownerNamespace) else { throw E2EEV2DeviceIdentityError.unauthenticated }
-        if let existing = try tokenStore.string(for: storageKey(ownerNamespace: ownerNamespace)) {
-            guard let data = existing.data(using: .utf8),
-                  let record = try? JSONDecoder().decode(Record.self, from: data) else {
-                throw E2EEV2DeviceIdentityError.invalidRecord
-            }
-            try validate(record)
-            return record.descriptor
+        try loadOrCreateRecord(ownerNamespace: ownerNamespace, label: label).descriptor
+    }
+
+    private func loadOrCreateRecord(ownerNamespace: String, label: String? = nil) throws -> Record {
+        if let record = try loadRecord(ownerNamespace: ownerNamespace) {
+            // Identités créées avant la copie lisible verrouillé : elle s'écrit ici.
+            try? syncLockedSigning(ownerNamespace: ownerNamespace)
+            return record
         }
 
         let (_, value) = try makeRecord(label: label)
-        try tokenStore.set(
-            value,
-            for: storageKey(ownerNamespace: ownerNamespace),
-            accessibility: .whenUnlocked
-        )
-        identityChanged(ownerNamespace)
-        return try requiredRecord(ownerNamespace: ownerNamespace).descriptor
+        let created = try Self.signingCopyLock.withLock { () throws -> (record: Record, isNew: Bool) in
+            // Deux premières requêtes simultanées : une seule identité.
+            if let existing = try loadRecord(ownerNamespace: ownerNamespace) { return (existing, false) }
+            try tokenStore.set(
+                value,
+                for: storageKey(ownerNamespace: ownerNamespace),
+                accessibility: .whenUnlocked
+            )
+            let record = try requiredRecord(ownerNamespace: ownerNamespace)
+            try? writeLockedSigning(record, ownerNamespace: ownerNamespace)
+            return (record, true)
+        }
+        if created.isNew { identityChanged(ownerNamespace) }
+        return created.record
     }
 
     /// Prepares a replacement identity without touching the active identity.
@@ -954,13 +987,22 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
             guard try tokenStore.string(for: candidateKey) == candidateRaw else {
                 throw E2EEV2DeviceIdentityError.invalidRecord
             }
-            if try tokenStore.string(for: activeKey) != candidateRaw {
-                try tokenStore.set(candidateRaw, for: activeKey, accessibility: .whenUnlocked)
-                guard try tokenStore.string(for: activeKey) == candidateRaw else {
-                    throw E2EEV2DeviceIdentityError.invalidRecord
+            // Jamais l'ancienne clé de signature dans la copie lisible verrouillé :
+            // la copie part avant que la nouvelle identité ne s'écrive, et rien ne
+            // s'écrit si elle ne part pas.
+            let changed = try Self.signingCopyLock.withLock { () throws -> Bool in
+                let changed = try tokenStore.string(for: activeKey) != candidateRaw
+                if changed {
+                    try tokenStore.remove(Self.lockedSigningStorageKey(ownerNamespace: ownerNamespace))
+                    try tokenStore.set(candidateRaw, for: activeKey, accessibility: .whenUnlocked)
+                    guard try tokenStore.string(for: activeKey) == candidateRaw else {
+                        throw E2EEV2DeviceIdentityError.invalidRecord
+                    }
                 }
-                identityChanged(ownerNamespace)
+                try? writeLockedSigning(candidate, ownerNamespace: ownerNamespace)
+                return changed
             }
+            if changed { identityChanged(ownerNamespace) }
             try tokenStore.remove(candidateKey)
             return LocalAccountScope.sessionSnapshot()
         }
@@ -974,12 +1016,104 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
     }
 
     func sign(canonicalRequest: Data, ownerNamespace: String) throws -> Data {
-        let record = try requiredRecord(ownerNamespace: ownerNamespace)
-        let privateKey = try P256.Signing.PrivateKey(
-            rawRepresentation: decoded(record.signingPrivateRawB64)
-        )
+        let signer = try signingKey(ownerNamespace: ownerNamespace, createsIdentity: false)
         // Forme low-S obligatoire (spec §4.1 et §15) : CryptoKit peut produire du high-S.
-        return try E2EEV2LowS.sign(canonicalRequest, with: privateKey)
+        return try E2EEV2LowS.sign(canonicalRequest, with: signer.key)
+    }
+
+    /// Requête signée, appareil verrouillé compris (spec §2.6, v0.4.13) :
+    /// l'identifiant et la signature viennent de la même clé, lue une fois.
+    func signWithDeviceId(canonicalRequest: Data, ownerNamespace: String) throws -> (deviceId: String, signature: Data) {
+        let signer = try signingKey(ownerNamespace: ownerNamespace, createsIdentity: true)
+        return (signer.deviceId, try E2EEV2LowS.sign(canonicalRequest, with: signer.key))
+    }
+
+    private func signingKey(
+        ownerNamespace: String,
+        createsIdentity: Bool
+    ) throws -> (deviceId: String, key: P256.Signing.PrivateKey) {
+        do {
+            let record = createsIdentity
+                ? try loadOrCreateRecord(ownerNamespace: ownerNamespace)
+                : try requiredRecord(ownerNamespace: ownerNamespace)
+            let key = try P256.Signing.PrivateKey(rawRepresentation: decoded(record.signingPrivateRawB64))
+            if !createsIdentity { try? syncLockedSigning(ownerNamespace: ownerNamespace) }
+            return (record.descriptor.deviceId, key)
+        } catch where Self.isLocked(error) {
+            return try lockedSigning(ownerNamespace: ownerNamespace)
+        }
+    }
+
+    // MARK: Signature écran verrouillé (spec §2.6, v0.4.13)
+
+    /// Copie de la seule clé de signature, lisible dès le premier déverrouillage
+    /// après le démarrage, pour décrocher un appel chiffré écran verrouillé. La
+    /// clé d'accord et l'UIK restent derrière le déverrouillage.
+    /// L'enregistrement principal reste la référence : la copie est tenue à jour
+    /// à chaque lecture réussie, et ne sert que si le trousseau le refuse parce
+    /// que l'appareil est verrouillé.
+    private struct LockedSigningRecord: Codable {
+        let version: Int
+        let deviceId: String
+        let signingPrivateRawB64: String
+    }
+
+    static func lockedSigningStorageKey(ownerNamespace: String) -> String {
+        "device-v2-signing-afu:\(ownerNamespace)"
+    }
+
+    /// Partagé par toutes les instances, qui lisent le même trousseau : toute
+    /// écriture de l'enregistrement principal ou de la copie se fait sous ce verrou.
+    static let signingCopyLock = NSLock()
+
+    /// « Verrouillé » n'est jamais « perdu » : le trousseau refuse l'accès, la clé existe.
+    static func isLocked(_ error: Error) -> Bool {
+        (error as? KeychainError) == .unexpectedStatus(errSecInteractionNotAllowed)
+            || (error as? E2EEV2DeviceIdentityError) == .locked
+    }
+
+    /// Déconnexion : la clé de signature ne reste pas lisible verrouillé ; la
+    /// prochaine lecture déverrouillée d'une session ouverte la recopie.
+    static func removeLockedSigning(store: TokenStore, ownerNamespace: String) throws {
+        try signingCopyLock.withLock { try store.remove(lockedSigningStorageKey(ownerNamespace: ownerNamespace)) }
+    }
+
+    /// Recopie l'enregistrement principal relu sous le verrou : une signature qui
+    /// a lu l'ancienne clé juste avant un remplacement ne la recopie jamais, et un
+    /// propriétaire qui n'a plus de session ne recopie rien.
+    private func syncLockedSigning(ownerNamespace: String) throws {
+        try Self.signingCopyLock.withLock {
+            try writeLockedSigning(try requiredRecord(ownerNamespace: ownerNamespace), ownerNamespace: ownerNamespace)
+        }
+    }
+
+    /// Sous `signingCopyLock`.
+    private func writeLockedSigning(_ record: Record, ownerNamespace: String) throws {
+        let key = Self.lockedSigningStorageKey(ownerNamespace: ownerNamespace)
+        if let raw = try tokenStore.string(for: key), let data = raw.data(using: .utf8),
+           let current = try? JSONDecoder().decode(LockedSigningRecord.self, from: data),
+           current.version == 1, current.deviceId == record.descriptor.deviceId,
+           current.signingPrivateRawB64 == record.signingPrivateRawB64 {
+            return
+        }
+        let copy = LockedSigningRecord(
+            version: 1, deviceId: record.descriptor.deviceId, signingPrivateRawB64: record.signingPrivateRawB64
+        )
+        try tokenStore.set(String(decoding: try JSONEncoder().encode(copy), as: UTF8.self), for: key, accessibility: .afterFirstUnlock)
+    }
+
+    private func lockedSigning(ownerNamespace: String) throws -> (deviceId: String, key: P256.Signing.PrivateKey) {
+        guard allowsOwner(ownerNamespace) else { throw E2EEV2DeviceIdentityError.unauthenticated }
+        guard let raw = try tokenStore.string(for: Self.lockedSigningStorageKey(ownerNamespace: ownerNamespace)) else {
+            // Pas encore de copie : seul le déverrouillage permet de signer.
+            throw E2EEV2DeviceIdentityError.locked
+        }
+        guard let data = raw.data(using: .utf8),
+              let copy = try? JSONDecoder().decode(LockedSigningRecord.self, from: data),
+              copy.version == 1, E2EEV2Canonical.isOpaque(copy.deviceId) else {
+            throw E2EEV2DeviceIdentityError.invalidRecord
+        }
+        return (copy.deviceId, try P256.Signing.PrivateKey(rawRepresentation: decoded(copy.signingPrivateRawB64)))
     }
 
     /// Unwraps an already authenticated epoch delivery without exporting the
@@ -1275,19 +1409,15 @@ extension E2EEV2SignedRequest {
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore()
     ) throws -> E2EEV2SignedHeaders {
         let resolvedNonce = try nonce ?? newNonce()
-        let descriptor = try identityStore.loadOrCreate()
-        let canonical = try canonicalRequest(
+        guard LocalAccountScope.currentUserId != nil else { throw E2EEV2DeviceIdentityError.unauthenticated }
+        return try signBodyHash(
             method: method,
             path: path,
+            bodySHA256Base64URL: bodySHA256Base64URL,
+            ownerNamespace: LocalAccountScope.storageNamespace,
             timestampMs: timestampMs,
             nonce: resolvedNonce,
-            bodySHA256Base64URL: bodySHA256Base64URL
-        )
-        return E2EEV2SignedHeaders(
-            deviceId: descriptor.deviceId,
-            timestampMs: timestampMs,
-            nonce: resolvedNonce,
-            signatureB64: try identityStore.sign(canonicalRequest: canonical).base64EncodedString()
+            identityStore: identityStore
         )
     }
 
@@ -1301,7 +1431,6 @@ extension E2EEV2SignedRequest {
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore()
     ) throws -> E2EEV2SignedHeaders {
         let resolvedNonce = try nonce ?? newNonce()
-        let descriptor = try identityStore.loadOrCreate(ownerNamespace: ownerNamespace)
         let canonical = try canonicalRequest(
             method: method,
             path: path,
@@ -1309,14 +1438,12 @@ extension E2EEV2SignedRequest {
             nonce: resolvedNonce,
             bodySHA256Base64URL: bodySHA256Base64URL
         )
+        let signed = try identityStore.signWithDeviceId(canonicalRequest: canonical, ownerNamespace: ownerNamespace)
         return E2EEV2SignedHeaders(
-            deviceId: descriptor.deviceId,
+            deviceId: signed.deviceId,
             timestampMs: timestampMs,
             nonce: resolvedNonce,
-            signatureB64: try identityStore.sign(
-                canonicalRequest: canonical,
-                ownerNamespace: ownerNamespace
-            ).base64EncodedString()
+            signatureB64: signed.signature.base64EncodedString()
         )
     }
 
@@ -1825,6 +1952,10 @@ final class E2EEV2APITransport: @unchecked Sendable {
         }
         if error is URLError || error is CancellationError {
             return .failure(.init(kind: .retryable, message: "e2ee-transport-unavailable"))
+        }
+        // Verrouillé n'est pas un état local invalide : on réessaie au déverrouillage.
+        if E2EEV2DeviceIdentityStore.isLocked(error) {
+            return .failure(.init(kind: .retryable, message: "e2ee-device-locked"))
         }
         return localFailure("invalid-e2ee-local-state")
     }

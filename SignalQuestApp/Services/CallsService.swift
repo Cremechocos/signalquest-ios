@@ -184,6 +184,9 @@ enum CallsServiceError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
+        case .e2eeUnavailable(let reason) where reason == "e2ee-device-locked":
+            // Spec §2.6 (v0.4.13) : verrouillé, la clé existe ; seul le déverrouillage manque.
+            return String(localized: "Déverrouille ton appareil pour rejoindre l’appel chiffré.")
         case .e2eeUnavailable:
             return String(localized: "L’appel chiffré de bout en bout n’est pas disponible sur cet appareil.")
         case .invalidE2EEResponse:
