@@ -22,6 +22,10 @@ struct E2EEV2IdentityBundle: Equatable, Sendable {
     let certificates: [E2EEV2SignedString]
     let capabilities: [E2EEV2SignedCapabilities]
     let hasPendingIdentityReset: Bool
+    /// Listes N+1 à M−1 depuis la version épinglée N (E.1), dans l'ordre.
+    var deviceListChain: [E2EEV2SignedString] = []
+    /// Page suivante de la chaîne, quand il en reste.
+    var nextSinceVersion: Int?
 
     /// Lecture stricte des objets signés ; une clé de premier niveau inconnue
     /// est ignorée (ajout compatible), une clé attendue absente refuse tout.
@@ -52,6 +56,23 @@ struct E2EEV2IdentityBundle: Equatable, Sendable {
         }
         let reset = object["pendingIdentityReset"]
         guard reset is NSNull || reset is [String: Any] else { return nil }
+        // Chaîne des listes (E.1) : absente, elle est vide ; la vérification
+        // refuse alors tout saut de version.
+        var chain: [E2EEV2SignedString] = []
+        if let links = object["deviceListChain"] {
+            guard let items = links as? [[String: Any]], items.count <= 50 else { return nil }
+            for item in items {
+                guard Set(item.keys) == ["list", "signatureB64"],
+                      let list = item["list"] as? String,
+                      let signature = item["signatureB64"] as? String else { return nil }
+                chain.append(E2EEV2SignedString(canonical: list, signatureB64: signature))
+            }
+        }
+        var next: Int?
+        if let value = object["nextSinceVersion"], !(value is NSNull) {
+            guard let text = value as? String, let number = E2EEV2Canonical.sequenceNumber(text) else { return nil }
+            next = number
+        }
         return E2EEV2IdentityBundle(
             userId: userId,
             uikX963B64: uik,
@@ -59,7 +80,9 @@ struct E2EEV2IdentityBundle: Equatable, Sendable {
             deviceEntries: entries,
             certificates: signedCertificates,
             capabilities: signedCapabilities,
-            hasPendingIdentityReset: reset is [String: Any]
+            hasPendingIdentityReset: reset is [String: Any],
+            deviceListChain: chain,
+            nextSinceVersion: next
         )
     }
 }
@@ -118,6 +141,8 @@ enum E2EEV2IdentityVerification {
         /// Liste plus ancienne que la dernière vue, ou une autre liste à la
         /// même version.
         case deviceListRollback
+        /// Un maillon manque entre la version épinglée et la courante (D.3).
+        case deviceListGap
     }
 
     struct Outcome: Equatable, Sendable {
@@ -153,9 +178,24 @@ enum E2EEV2IdentityVerification {
             if list.version == pinned.listVersion, bundle.deviceList.canonical != pinned.listCanonical {
                 return .failure(.deviceListRollback)
             }
-            if list.version - 1 == pinned.listVersion,
-               list.previousListDigest != E2EEV2DeviceList.digest(of: pinned.listCanonical) {
-                return .failure(.invalidDeviceList)
+            if list.version > pinned.listVersion {
+                // Chaque maillon de N+1 à M (D.3) : signé par l'UIK, numéro
+                // suivant, condensat du précédent. Jamais de saut.
+                guard bundle.deviceListChain.count == list.version - pinned.listVersion - 1 else {
+                    return .failure(.deviceListGap)
+                }
+                var previous = pinned.listCanonical
+                for (offset, link) in bundle.deviceListChain.enumerated() {
+                    guard let verified = try? E2EEV2DeviceList.verifyLink(link, uik: uik, previousCanonical: previous),
+                          verified.userId == bundle.userId,
+                          verified.version == pinned.listVersion + offset + 1 else {
+                        return .failure(.invalidDeviceList)
+                    }
+                    previous = link.canonical
+                }
+                guard list.previousListDigest == E2EEV2DeviceList.digest(of: previous) else {
+                    return .failure(.invalidDeviceList)
+                }
             }
         }
         var entries: [String: (keyVersion: Int, platform: String, fingerprint: String)] = [:]

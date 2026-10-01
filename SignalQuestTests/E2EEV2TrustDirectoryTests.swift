@@ -19,6 +19,18 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         }
     }
 
+    /// Réponses selon `sinceVersion` (E.1).
+    private final class SincePages: @unchecked Sendable {
+        private let lock = NSLock()
+        private var responses: [String: Data] = [:]
+        func serve(_ data: Data, since: Int?) { lock.lock(); responses[since.map(String.init) ?? "-"] = data; lock.unlock() }
+        func response(since: Int?) throws -> Data {
+            lock.lock(); defer { lock.unlock() }
+            guard let data = responses[since.map(String.init) ?? "-"] else { throw URLError(.fileDoesNotExist) }
+            return data
+        }
+    }
+
     private struct Account {
         let userId: String
         let uik = P256.Signing.PrivateKey()
@@ -43,7 +55,7 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         server.serve(try bundle(bruno, version: 1, features: ["calls"]), for: bruno.userId)
         server.serve(try bundle(carla, version: 1, features: ["calls"]), for: carla.userId)
         let pins = E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
-        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: pins) { try server.response(for: $0) }
+        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: pins) { userId, _ in try server.response(for: userId) }
 
         let set = try await directory.certifiedDevices(for: [carla.userId, bruno.userId, bruno.userId])
         XCTAssertEqual(set.refusals, [:])
@@ -70,7 +82,7 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         server.serve(try bundle(bruno, version: 1, features: ["calls"]), for: bruno.userId)
         let directory = E2EEV2TrustDirectory(
             ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
-        ) { try server.response(for: $0) }
+        ) { userId, _ in try server.response(for: userId) }
         _ = try await directory.certifiedDevices(for: [bruno.userId])
 
         server.serve(try bundle(impostor, version: 1, features: ["calls"]), for: bruno.userId)
@@ -88,7 +100,7 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         server.serve(try bundle(carla, version: 1, features: ["calls"]), for: carla.userId)
         let directory = E2EEV2TrustDirectory(
             ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
-        ) { try server.response(for: $0) }
+        ) { userId, _ in try server.response(for: userId) }
         let set = try await directory.certifiedDevices(for: [bruno.userId, carla.userId])
         XCTAssertNil(set.device(deviceId: bruno.deviceId), "Identifiant ambigu : aucun des deux n'est cru")
         XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now))
@@ -102,9 +114,40 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         let directory = E2EEV2TrustDirectory(
             ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()),
             ownUserId: alice.userId, ownAccountKey: { held }
-        ) { try server.response(for: $0) }
+        ) { userId, _ in try server.response(for: userId) }
         let set = try await directory.certifiedDevices(for: [alice.userId])
         XCTAssertEqual(set.refusals, [alice.userId: .uikChanged])
+    }
+
+    func testTheDeviceListChainIsReadLinkByLinkFromThePin() async throws {
+        let bruno = Account("bruno")
+        let pins = E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
+        let pages = SincePages()
+        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: pins) { _, since in try pages.response(since: since) }
+        pages.serve(try bundle(bruno, version: 1, features: ["calls"]), since: nil)
+        _ = try await directory.certifiedDevices(for: [bruno.userId])
+
+        // De la version 1 épinglée à la 4 : maillons 2 et 3 relus.
+        pages.serve(try bundle(bruno, version: 4, features: ["calls"], chainFrom: 1), since: 1)
+        let caughtUp = try await directory.certifiedDevices(for: [bruno.userId])
+        XCTAssertEqual(caughtUp.refusals, [:])
+        XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.listVersion, 4)
+
+        // Un saut sans ses maillons, ou un maillon signé par une autre clé : refusés.
+        pages.serve(try bundle(bruno, version: 6, features: ["calls"]), since: 4)
+        let gap = try await directory.certifiedDevices(for: [bruno.userId])
+        XCTAssertEqual(gap.refusals, [bruno.userId: .deviceListGap])
+        pages.serve(try bundle(bruno, version: 6, features: ["calls"], chainFrom: 4, linkSigner: P256.Signing.PrivateKey()), since: 4)
+        let forged = try await directory.certifiedDevices(for: [bruno.userId])
+        XCTAssertEqual(forged.refusals, [bruno.userId: .invalidDeviceList])
+        XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.listVersion, 4, "Rien n'est épinglé d'un paquet refusé")
+
+        // De la 4 à la 7, en deux pages : le maillon 5, puis le 6.
+        pages.serve(try bundle(bruno, version: 7, features: ["calls"], chainFrom: 4, chainUpTo: 5, next: 5), since: 4)
+        pages.serve(try bundle(bruno, version: 7, features: ["calls"], chainFrom: 5), since: 5)
+        let paged = try await directory.certifiedDevices(for: [bruno.userId])
+        XCTAssertEqual(paged.refusals, [:])
+        XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.listVersion, 7)
     }
 
     func testARefusedMemberMakesVerifiedCallsUnavailable() {
@@ -145,20 +188,39 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
 
     // MARK: - Outils
 
-    /// Réponse E.1 d'un compte à un seul appareil.
-    private func bundle(_ account: Account, version: Int, features: [String]) throws -> Data {
+    /// Réponse E.1 d'un compte à un seul appareil. `chainFrom` : les maillons
+    /// servis après cette version, jusqu'à `chainUpTo` (par défaut la liste
+    /// précédant la courante) ; `next` : la page suivante annoncée.
+    private func bundle(
+        _ account: Account,
+        version: Int,
+        features: [String],
+        chainFrom: Int? = nil,
+        chainUpTo: Int? = nil,
+        linkSigner: P256.Signing.PrivateKey? = nil,
+        next: Int? = nil
+    ) throws -> Data {
         let fingerprint = E2EEV2Canonical.deviceFingerprint(
             identityKeyX963: account.identity.publicKey.x963Representation,
             signingKeyX963: account.signing.publicKey.x963Representation
         )
         let entry = E2EEV2DeviceList.entry(deviceId: account.deviceId, keyVersion: 1, platform: "ios", fingerprint: fingerprint)
-        // Chaîne de listes jusqu'à `version` : seule la dernière est servie.
+        // Chaîne de listes jusqu'à `version` : la dernière est la courante.
         var previous: String?
         var list = E2EEV2DeviceList.make(userId: account.userId, version: 1, previousCanonical: nil, entries: [entry], issuedAtMs: now)
+        var canonicals = [list.canonical]
         if version > 1 {
             for v in 2...version {
                 previous = list.canonical
                 list = E2EEV2DeviceList.make(userId: account.userId, version: v, previousCanonical: previous, entries: [entry], issuedAtMs: now + Int64(v))
+                canonicals.append(list.canonical)
+            }
+        }
+        var links: [[String: String]] = []
+        if let chainFrom, chainFrom + 1 <= min(chainUpTo ?? version - 1, version - 1) {
+            for v in (chainFrom + 1)...min(chainUpTo ?? version - 1, version - 1) {
+                let link = try E2EEV2SignedString.sign(canonicals[v - 1], with: linkSigner ?? account.uik)
+                links.append(["list": link.canonical, "signatureB64": link.signatureB64])
             }
         }
         let signedList = try E2EEV2SignedString.sign(list.canonical, with: account.uik)
@@ -176,12 +238,15 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         let signedDocument = try E2EEV2SignedString.sign(
             E2EEV2CapabilitiesDocument.signatureCanonical(document: document), with: account.signing
         )
-        return try JSONSerialization.data(withJSONObject: [
+        var object: [String: Any] = [
             "accountIdentityKeyB64": account.uik.publicKey.x963Representation.base64EncodedString(),
             "deviceList": ["list": signedList.canonical, "signatureB64": signedList.signatureB64, "devices": [entry]],
             "certificates": [["certificate": signedCertificate.canonical, "signatureB64": signedCertificate.signatureB64]],
             "capabilities": [["document": document, "signatureB64": signedDocument.signatureB64]],
             "pendingIdentityReset": NSNull(),
-        ] as [String: Any])
+        ]
+        if chainFrom != nil { object["deviceListChain"] = links }
+        if let next { object["nextSinceVersion"] = String(next) }
+        return try JSONSerialization.data(withJSONObject: object)
     }
 }

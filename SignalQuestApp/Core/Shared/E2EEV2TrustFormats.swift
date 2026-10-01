@@ -310,15 +310,39 @@ struct E2EEV2DeviceList: Equatable, Sendable {
         try verify(signed, entries: entries, uik: uik, expectedPrevious: previousCanonical.map(digest(of:)) ?? "-")
     }
 
-    /// Même contrôle quand la liste précédente n'est pas connue ici (versions
-    /// manquées) : le chaînage ne peut pas être vérifié ; la signature de
-    /// l'UIK et la version croissante, contrôlée par l'appelant, suffisent.
+    /// Même contrôle sans le chaînage, que l'appelant vérifie à part : maillon
+    /// par maillon depuis sa version épinglée (D.3, `verifyLink`), ou rien au
+    /// premier contact.
     static func verifyWithoutChain(
         _ signed: E2EEV2SignedString,
         entries: [String],
         uik: P256.Signing.PublicKey
     ) throws -> E2EEV2DeviceList {
         try verify(signed, entries: entries, uik: uik, expectedPrevious: nil)
+    }
+
+    /// Maillon intermédiaire de la chaîne (D.3, E.1) : servi sans ses lignes,
+    /// il ne prouve que sa signature, son numéro et son chaînage. Seule la
+    /// liste courante, avec ses lignes, fait croire des appareils.
+    static func verifyLink(
+        _ signed: E2EEV2SignedString,
+        uik: P256.Signing.PublicKey,
+        previousCanonical: String
+    ) throws -> E2EEV2DeviceList {
+        guard signed.verify(with: uik) else { throw E2EEV2TrustFormatError.invalidSignature }
+        guard let f = E2EEV2Canonical.split(signed.canonical, tag: tag, version: "1", fieldCount: 8),
+              E2EEV2Canonical.isOpaque(f[2]),
+              E2EEV2Canonical.isDecimal(f[3]), let version = Int(f[3]), (2..<Int(Int32.max)).contains(version),
+              E2EEV2Canonical.isDecimal(f[5]), let count = Int(f[5]),
+              E2EEV2ApprovalV2.isDigest(f[6]),
+              E2EEV2Canonical.isDecimal(f[7]), let issuedAt = Int64(f[7]) else {
+            throw E2EEV2TrustFormatError.invalidField
+        }
+        guard f[4] == digest(of: previousCanonical) else { throw E2EEV2TrustFormatError.digestMismatch }
+        return E2EEV2DeviceList(
+            userId: f[2], version: version, previousListDigest: f[4], deviceCount: count,
+            devicesDigest: f[6], issuedAtMs: issuedAt
+        )
     }
 
     private static func verify(

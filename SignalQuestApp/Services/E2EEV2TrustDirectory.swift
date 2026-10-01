@@ -80,7 +80,10 @@ actor E2EEV2TrustDirectory {
     private let pins: E2EEV2TrustPinStore
     private let ownUserId: String?
     private let ownAccountKey: @Sendable () -> P256.Signing.PublicKey?
-    private let fetch: @Sendable (_ userId: String) async throws -> Data
+    /// `sinceVersion` : la version épinglée, ou la page suivante de la chaîne (E.1).
+    private let fetch: @Sendable (_ userId: String, _ sinceVersion: Int?) async throws -> Data
+    /// 50 maillons par page : au-delà, la chaîne est trop longue pour être relue.
+    static let maxChainPages = 20
 
     /// `ownAccountKey` : la clé de compte détenue ici. Son propre paquet doit la
     /// porter, sinon le serveur pourrait y glisser une autre clé au premier
@@ -90,7 +93,7 @@ actor E2EEV2TrustDirectory {
         pins: E2EEV2TrustPinStore = E2EEV2TrustPinStore(),
         ownUserId: String? = nil,
         ownAccountKey: @escaping @Sendable () -> P256.Signing.PublicKey? = { nil },
-        fetch: @escaping @Sendable (_ userId: String) async throws -> Data
+        fetch: @escaping @Sendable (_ userId: String, _ sinceVersion: Int?) async throws -> Data
     ) {
         self.ownerNamespace = ownerNamespace
         self.pins = pins
@@ -103,12 +106,8 @@ actor E2EEV2TrustDirectory {
         var devices: [String: [E2EEV2CertifiedDevice]] = [:]
         var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
         for userId in Set(userIds).sorted() {
-            let data = try await fetch(userId)
-            guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let bundle = E2EEV2IdentityBundle.parse(object, userId: userId) else {
-                throw Failure.malformedResponse(userId: userId)
-            }
             let pinned = try pins.pin(userId: userId, ownerNamespace: ownerNamespace)
+            let bundle = try await bundle(userId: userId, sinceVersion: pinned?.listVersion)
             let expected = userId == ownUserId ? ownAccountKey() : nil
             switch E2EEV2IdentityVerification.verify(bundle, pinned: pinned, expectedUIK: expected) {
             case .success(let outcome):
@@ -126,5 +125,28 @@ actor E2EEV2TrustDirectory {
             devices = devices.mapValues { $0.filter { !ambiguous.contains($0.deviceId) } }
         }
         return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals)
+    }
+
+    /// Le paquet de confiance et toute la chaîne depuis la version épinglée,
+    /// page après page (E.1).
+    private func bundle(userId: String, sinceVersion pinned: Int?) async throws -> E2EEV2IdentityBundle {
+        var chain: [E2EEV2SignedString] = []
+        var since = pinned
+        for _ in 0..<Self.maxChainPages {
+            let data = try await fetch(userId, since)
+            guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  var page = E2EEV2IdentityBundle.parse(object, userId: userId) else {
+                throw Failure.malformedResponse(userId: userId)
+            }
+            chain += page.deviceListChain
+            guard let next = page.nextSinceVersion else {
+                page.deviceListChain = chain
+                return page
+            }
+            // Une page suivante doit avancer, sinon la lecture boucle.
+            guard next > (since ?? 0) else { throw Failure.malformedResponse(userId: userId) }
+            since = next
+        }
+        throw Failure.malformedResponse(userId: userId)
     }
 }
