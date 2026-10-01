@@ -160,6 +160,32 @@ final class LiveKitJoinProofLoopbackTests: XCTestCase {
         XCTAssertFalse(aliceClient.isE2EEVerified)
     }
 
+    /// Seul un participant prouvé est reçu : ses pistes chiffrées sont abonnées
+    /// après sa preuve ; celles d'un participant sans preuve ne le sont jamais.
+    @MainActor
+    func testOnlyProvenParticipantsAreReceived() async throws {
+        let url = try loopbackURL()
+        let call = try makeCall()
+        let alice = device("alice"), bruno = device("bruno")
+        let directory = [alice, bruno]
+        let (aliceClient, aliceLog) = try await join(url, call, as: alice, trusting: directory)
+        let (brunoClient, _) = try await join(url, call, as: bruno, trusting: directory)
+        try await waitUntil("preuves échangées") { aliceClient.isE2EEVerified && brunoClient.isE2EEVerified }
+        try await brunoClient.debugPublishSyntheticVideo(frame: try pixelBuffer())
+        try await waitUntil("vidéo du participant prouvé reçue", timeout: 15) {
+            aliceClient.debugRemoteSubscriptions()[bruno.identity] == true
+        }
+
+        // Même clé de trame, mais aucune preuve : sa vidéo n'est jamais abonnée.
+        let (silent, _) = try await join(url, call, as: nil, identity: "lk_silent_video", trusting: [])
+        try await silent.debugPublishSyntheticVideo(frame: try pixelBuffer())
+        try await waitUntil("publication du participant sans preuve vue", timeout: 8) {
+            aliceClient.debugRemotePublishers().contains("lk_silent_video")
+        }
+        XCTAssertNotEqual(aliceClient.debugRemoteSubscriptions()["lk_silent_video"], true, "Jamais abonnée sans preuve")
+        try await waitUntil("appel coupé faute de preuve", timeout: 12) { aliceLog.losses == [.joinProof] }
+    }
+
     /// Une reconnexion complète réarme le marqueur SIF dans le SDK : un appel
     /// chiffré prend fin. Une reconnexion rapide le laisse continuer.
     @MainActor

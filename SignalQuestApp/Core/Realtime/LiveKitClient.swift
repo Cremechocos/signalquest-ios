@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import AVFAudio
 import Combine
@@ -175,6 +176,9 @@ final class LiveKitClient: ObservableObject {
 #endif
 #if canImport(LiveKit)
     private var room: Room?
+    #if DEBUG && canImport(LiveKit)
+    private var debugFeeders: [Task<Void, Never>] = []
+    #endif
     private var localMedia: LocalMedia?
     private var roomObserver: RoomConnectionObserver?
     private var activeE2eeSession: E2EEV2LiveKitSession?
@@ -312,6 +316,18 @@ final class LiveKitClient: ObservableObject {
                     e2eeSession?.verification.failGlobally()
                     Task { @MainActor in self?.handleE2EETrustLoss(.reconnected) }
                 },
+                onRemoteTrackPublished: { [weak self] _, encryptionType in
+                    // Une piste annoncée en clair met fin à un appel chiffré dès sa
+                    // publication : elle n'est jamais abonnée.
+                    guard E2EEV2CallMediaPolicy.accepts(
+                        requiresE2EE: e2eeSession != nil, encryptionType: encryptionType
+                    ) else {
+                        e2eeSession?.verification.failGlobally()
+                        Task { @MainActor in self?.handleE2EETrustLoss() }
+                        return
+                    }
+                    Task { @MainActor in await self?.enforceRemoteTracks() }
+                },
                 onMediaChanged: { [weak self] in
                     Task { @MainActor in self?.refreshRemoteMedia() }
                 },
@@ -411,6 +427,7 @@ final class LiveKitClient: ObservableObject {
                             Task { @MainActor in
                                 self?.isE2EEVerified = verified
                                 self?.refreshRemoteMedia()
+                                await self?.enforceRemoteTracks()
                                 // Réponse à sa première preuve : notre preuve lui
                                 // parvient même s'il n'était pas prêt à son arrivée.
                                 if outcome == .proven { await self?.sendJoinProof(to: senderIdentity) }
@@ -437,8 +454,14 @@ final class LiveKitClient: ObservableObject {
                     encryptionOptions: e2eeSession?.encryptionOptions
                 )
             )
-            try await liveRoom.connect(url: url.absoluteString, token: token)
+            // Appel prouvé : pas d'abonnement automatique, rien d'un participant
+            // non prouvé n'est reçu (voir `enforceRemoteTracks`).
+            try await liveRoom.connect(
+                url: url.absoluteString, token: token,
+                connectOptions: ConnectOptions(autoSubscribe: e2eeSession?.joinVerifier == nil)
+            )
             e2eeSession?.neutralizeServerInjectedFrames()
+            await enforceRemoteTracks(in: liveRoom)
             if didE2EEFailDuringConnect {
                 await liveRoom.disconnect()
                 state = .failed("La vérification du chiffrement média a échoué.")
@@ -567,6 +590,10 @@ final class LiveKitClient: ObservableObject {
         isTearingDown = true
         emptyRoomTask?.cancel()
         emptyRoomTask = nil
+        #if DEBUG && canImport(LiveKit)
+        debugFeeders.forEach { $0.cancel() }
+        debugFeeders.removeAll()
+        #endif
         mediaCancellables.removeAll()
         stopObservingInterruptions()
 #if os(iOS) && canImport(LiveKit)
@@ -637,10 +664,75 @@ final class LiveKitClient: ObservableObject {
         }
     }
 
+    #if canImport(LiveKit)
+    /// Appel chiffré (§10.4) : une piste distante annoncée en clair met fin à
+    /// l'appel, même déjà présente à la jonction. Appel prouvé : on ne s'abonne
+    /// aux pistes d'un participant qu'une fois sa preuve de jonction vérifiée ;
+    /// sans abonnement, WebRTC ne joue rien d'un participant non prouvé.
+    private func enforceRemoteTracks(in room: Room) async {
+        guard let session = activeE2eeSession else { return }
+        let publications = room.remoteParticipants.values.flatMap { participant in
+            participant.trackPublications.values.compactMap { $0 as? RemoteTrackPublication }.map { (participant, $0) }
+        }
+        guard publications.allSatisfy({ $0.1.encryptionType == .gcm }) else {
+            session.verification.failGlobally()
+            handleE2EETrustLoss()
+            return
+        }
+        guard let joinVerifier = session.joinVerifier else { return }
+        for (participant, remote) in publications where !remote.isSubscribed {
+            guard let identity = participant.identity?.stringValue, joinVerifier.isProven(identity) else { continue }
+            try? await remote.set(subscribed: true)
+        }
+    }
+
+    private func enforceRemoteTracks() async {
+        guard let room else { return }
+        await enforceRemoteTracks(in: room)
+    }
+    #endif
+
     #if DEBUG && canImport(LiveKit)
     /// Banc local : provoque une reconnexion que le SDK sait simuler.
     func debugSimulate(_ scenario: SimulateScenario) async throws {
         try await room?.debug_simulate(scenario: scenario)
+    }
+
+    /// Banc local : publie une piste vidéo d'images synthétiques, alimentée
+    /// tant que l'appel dure (le SDK attend une première image pour publier).
+    func debugPublishSyntheticVideo(frame: CVPixelBuffer) async throws {
+        guard let room else { throw LiveKitError(.invalidState, message: "room absente") }
+        let track = await LocalVideoTrack.createBufferTrack(name: "sq-test-video", source: .camera)
+        guard let capturer = track.capturer as? BufferCapturer else {
+            throw LiveKitError(.invalidState, message: "capteur absent")
+        }
+        let feeder = Task { [weak room] in
+            while !Task.isCancelled, room?.connectionState != .disconnected {
+                capturer.capture(frame)
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+        }
+        debugFeeders.append(feeder)
+        _ = try await room.localParticipant.publish(videoTrack: track)
+    }
+
+    /// Banc local : pour chaque participant distant, s'il a une piste abonnée.
+    func debugRemoteSubscriptions() -> [String: Bool] {
+        guard let room else { return [:] }
+        var result: [String: Bool] = [:]
+        for participant in room.remoteParticipants.values {
+            guard let identity = participant.identity?.stringValue else { continue }
+            result[identity] = participant.trackPublications.values.contains { $0.isSubscribed }
+        }
+        return result
+    }
+
+    /// Banc local : participants distants ayant publié au moins une piste.
+    func debugRemotePublishers() -> Set<String> {
+        guard let room else { return [] }
+        return Set(room.remoteParticipants.values.compactMap { participant in
+            participant.trackPublications.isEmpty ? nil : participant.identity?.stringValue
+        })
     }
     #endif
 
@@ -1086,6 +1178,7 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
     private let onDisconnect: @Sendable () -> Void
     private let onReconnectingChanged: @Sendable (Bool) -> Void
     private let onFullReconnectStarted: @Sendable () -> Void
+    private let onRemoteTrackPublished: @Sendable (String?, EncryptionType) -> Void
     private let onMediaChanged: @Sendable () -> Void
     private let onParticipantExpected: @Sendable (String) -> Void
     private let onParticipantRemoved: @Sendable (String) -> Void
@@ -1100,6 +1193,7 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
         onDisconnect: @escaping @Sendable () -> Void,
         onReconnectingChanged: @escaping @Sendable (Bool) -> Void,
         onFullReconnectStarted: @escaping @Sendable () -> Void,
+        onRemoteTrackPublished: @escaping @Sendable (String?, EncryptionType) -> Void,
         onMediaChanged: @escaping @Sendable () -> Void,
         onParticipantExpected: @escaping @Sendable (String) -> Void,
         onParticipantRemoved: @escaping @Sendable (String) -> Void,
@@ -1113,6 +1207,7 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
         self.onDisconnect = onDisconnect
         self.onReconnectingChanged = onReconnectingChanged
         self.onFullReconnectStarted = onFullReconnectStarted
+        self.onRemoteTrackPublished = onRemoteTrackPublished
         self.onMediaChanged = onMediaChanged
         self.onParticipantExpected = onParticipantExpected
         self.onParticipantRemoved = onParticipantRemoved
@@ -1176,6 +1271,10 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
             return
         }
         onCryptorRemoved(identity, publication.sid.stringValue)
+        onMediaChanged()
+    }
+    func room(_ room: Room, participant: RemoteParticipant, didPublishTrack publication: RemoteTrackPublication) {
+        onRemoteTrackPublished(participant.identity?.stringValue, publication.encryptionType)
         onMediaChanged()
     }
     func room(_ room: Room, participant: LocalParticipant, didPublishTrack publication: LocalTrackPublication) {
@@ -1508,9 +1607,11 @@ struct E2EEV2LiveKitSession {
     }
 
     /// Le SDK pose le marqueur SIF envoyé par le serveur à la jonction : une
-    /// trame qui le porte passerait sans déchiffrement. Il est vidé aussitôt.
+    /// trame qui le porte passerait sans déchiffrement. Il est remplacé aussitôt
+    /// par 32 octets aléatoires, inconnus du serveur : un marqueur vide n'est pas
+    /// pris en compte par tous les SDK (le SDK JS l'ignore).
     func neutralizeServerInjectedFrames() {
-        keyProvider.setSifTrailer(trailer: Data())
+        keyProvider.setSifTrailer(trailer: SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) })
     }
 }
 #endif
