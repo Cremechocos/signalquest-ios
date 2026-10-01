@@ -367,6 +367,7 @@
 		7931B6341BA331E1468FBC56 /* ExploreGlobalSearchQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3D99AB068ED83725E470A8 /* ExploreGlobalSearchQATests.swift */; };
 		793681D2CF8D8A53E6621EE2 /* ZoneAlertSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2239B52410782180E4CB864A /* ZoneAlertSettingsView.swift */; };
 		7ADCFD42E2206C871B47EEED /* MessagesPinUnreadQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0E9C39D40A2311FB9BBC641 /* MessagesPinUnreadQATests.swift */; };
+		7AE18B8A170E86218DBB690F /* E2EEV2ConversationCreationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B9C641548A12B48DDDF8ABB /* E2EEV2ConversationCreationTests.swift */; };
 		7B2E163A3536AB5845B515FC /* IPerfCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89BA5EE9C0B99DE64018088D /* IPerfCatalogService.swift */; };
 		7B6075C24CC5984782DA63A0 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C94F0842C3E314471448652B /* CarPlaySceneDelegate.swift */; };
 		7BF24559F13FF22175E0AAC0 /* TwoFactorEnrollmentServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F641F437482259809F38B8F9 /* TwoFactorEnrollmentServiceTests.swift */; };
@@ -729,6 +730,7 @@
 		F94F714BF73E1CD5DA89E712 /* MapPartialTilesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFFDE5301B27871440AFD669 /* MapPartialTilesTests.swift */; };
 		F960185E81A4E8A5E850DB27 /* LocationManagerDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40E6A2E443D65305A9D17B36 /* LocationManagerDriver.swift */; };
 		F988AD7664A31CFCFD9E94CA /* AntennaSectorGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3023383A4E568490429AE96 /* AntennaSectorGridView.swift */; };
+		F99EE69800479C9567228302 /* E2EEV2ConversationCreation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E033DEB487CB440000810F0 /* E2EEV2ConversationCreation.swift */; };
 		FA1FA3B1FB3F9621CC897800 /* ReportsRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED23939334EC481F2A096590 /* ReportsRoutingTests.swift */; };
 		FA8A1167522105F2D6EBEFB7 /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9594367DF3047FDF3B240AB /* MockURLProtocol.swift */; };
 		FB57CD4C24B26102CCD880A0 /* SpeedtestBurstSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E8ED2F3CAFB9F5358E68F4 /* SpeedtestBurstSummary.swift */; };
@@ -1191,6 +1193,7 @@
 		8A4F1A6B2D39931723BEF026 /* NetworkWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkWidget.swift; sourceTree = "<group>"; };
 		8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEService.swift; sourceTree = "<group>"; };
 		8B6CF56AACB58DF8C8A52D98 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		8B9C641548A12B48DDDF8ABB /* E2EEV2ConversationCreationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2ConversationCreationTests.swift; sourceTree = "<group>"; };
 		8BCDF535985DE44CBDD88A60 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		8C0D9C041D8E61783255A67B /* AntennaCoverageFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AntennaCoverageFocus.swift; sourceTree = "<group>"; };
 		8C1FE525B9AFAD0D19CB5A8F /* NearestAntennaTemplateBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearestAntennaTemplateBuilder.swift; sourceTree = "<group>"; };
@@ -1238,6 +1241,7 @@
 		9CAC30E3E67432914FD008BA /* AndroidDataPresenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AndroidDataPresenceTests.swift; sourceTree = "<group>"; };
 		9D5360BD0D52EF7D1245729B /* TwoFactorErrorQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFactorErrorQATests.swift; sourceTree = "<group>"; };
 		9D849C59293B6E1D70C5F88A /* MessagingE2EEQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingE2EEQATests.swift; sourceTree = "<group>"; };
+		9E033DEB487CB440000810F0 /* E2EEV2ConversationCreation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2ConversationCreation.swift; sourceTree = "<group>"; };
 		9E10ADAF4CC70C622AF6B67A /* CallJoinProofTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallJoinProofTests.swift; sourceTree = "<group>"; };
 		9E51CEABE03315848B6AED88 /* MapHTTPRuntimeQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapHTTPRuntimeQATests.swift; sourceTree = "<group>"; };
 		9E54BD3EC5237CAE037E9ABB /* SignalQuestWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalQuestWidgetBundle.swift; sourceTree = "<group>"; };
@@ -2436,6 +2440,7 @@
 				74C44E54A806F05156B150F1 /* CustomSitesService.swift */,
 				8A9F2E2D4B9B169A32FD7AB4 /* E2EEService.swift */,
 				56D690C4D6BDE693AEB92D28 /* E2EEV2AccountIdentity.swift */,
+				9E033DEB487CB440000810F0 /* E2EEV2ConversationCreation.swift */,
 				C9A637C729D615B4C54DC245 /* E2EEV2ConversationState.swift */,
 				5D404DFE27EC08D9B2F3B585 /* E2EEV2TrustDirectory.swift */,
 				510C718208A0F0CD33A6405E /* EntitlementsService.swift */,
@@ -2554,6 +2559,7 @@
 				BE1882206E87BDC3D7752ECD /* DriveTestSessionRecapTests.swift */,
 				1483D87FE8E1D946F88F7C05 /* E2EETests.swift */,
 				935937F42798C1626D6792E3 /* E2EEV2AccountIdentityTests.swift */,
+				8B9C641548A12B48DDDF8ABB /* E2EEV2ConversationCreationTests.swift */,
 				FF15169FFA7B3EAE60467F71 /* E2EEV2ConversationStateTests.swift */,
 				7C129F6AA51DA75F6A60A791 /* E2EEV2IdentityVerificationTests.swift */,
 				AE462EB9FB52BB5A8D4AB872 /* E2EEV2JalonAVectorTests.swift */,
@@ -3261,6 +3267,7 @@
 				29CED9BFB56E57B89BA55FBF /* E2EEV2CallFormats.swift in Sources */,
 				EF26E3AE408F4AF530EB09EA /* E2EEV2CallJoinVerifier.swift in Sources */,
 				EEE8A3E6276DB8B7B111C9E8 /* E2EEV2Canonical.swift in Sources */,
+				F99EE69800479C9567228302 /* E2EEV2ConversationCreation.swift in Sources */,
 				99848B2C0661DB267C8E2424 /* E2EEV2ConversationState.swift in Sources */,
 				5D61E375526CADBF2DDB5CC6 /* E2EEV2HPKE.swift in Sources */,
 				7FB7A5B2F83C4E56A19F4906 /* E2EEV2IdentityVerification.swift in Sources */,
@@ -3710,6 +3717,7 @@
 				FCDA55A3E109754904290CDF /* DriveTestSessionRecapTests.swift in Sources */,
 				A9AA093F88B7A4E23A7EE3A7 /* E2EETests.swift in Sources */,
 				40CACEB59DAE52804D4CEA31 /* E2EEV2AccountIdentityTests.swift in Sources */,
+				7AE18B8A170E86218DBB690F /* E2EEV2ConversationCreationTests.swift in Sources */,
 				0C5C061E773EAA66585D6C63 /* E2EEV2ConversationStateTests.swift in Sources */,
 				2249B0FFD84B669F701D887D /* E2EEV2IdentityVerificationTests.swift in Sources */,
 				01CA0252CB25A0F8AFCDB2E6 /* E2EEV2JalonAVectorTests.swift in Sources */,
