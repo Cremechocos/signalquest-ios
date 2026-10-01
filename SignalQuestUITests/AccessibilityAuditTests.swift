@@ -182,7 +182,12 @@ final class AccessibilityAuditTests: XCTestCase {
                 // passés de `labelSecondary` à `label`, qui échouait au rendu sous
                 // 13 pt) ; chiffre brique en 22 pt gras, grand texte
                 // (`testBrandTokensMeetGraphicThreshold`).
-                "feed.post.text", "map.antenna.legend.label", "profile.stat.", "profile.progression."
+                "feed.post.text", "map.antenna.legend.label", "profile.stat.", "profile.progression.",
+                // Statistiques ANFR par bande (plan 3, lot 10) : pastilles d'opérateur
+                // (`label` sur `surface`, `onAccent` sur brique), titres de carte et
+                // légendes du détail (`label`/`labelSecondary` sur `surface`).
+                // Mesuré sur les pixels de l'audit le 01/10 : 5,12 à 13,48:1.
+                "anfr.bands."
             ]
             if issue.auditType == .contrast,
                provenContrastIdentifiers.contains(where: name.hasPrefix) {
@@ -199,10 +204,17 @@ final class AccessibilityAuditTests: XCTestCase {
             // couple de jetons prouvé. Intermittent selon la hauteur du défilement.
             // Lot 7 (30/09) : même nœud intermittent, selon la hauteur de défilement,
             // sur la liste de la messagerie et le Drive Test en très grand texte.
+            // Statistiques ANFR par bande (lot 10, sonde du 01/10 par bissection) :
+            // 5 nœuds dans les rangées de génération (boutons au contenu combiné),
+            // 8 dans le détail (rangées de bande et graphique aux enfants masqués).
+            // Leurs textes sont à l'encre ou au gris secondaire, couples verrouillés
+            // par DesignTokenContrastTests ; traits de bande par
+            // `testANFRBandColorsMeetGraphicThreshold`.
             if element == nil, name == "sans nom", issue.auditType == .contrast,
                screen.hasPrefix("Communauté") || screen.hasPrefix("Profil") || screen.hasPrefix("Accueil")
                 || screen == "Réglages" || screen == "Notifications"
-                || screen.hasPrefix("Messagerie") || screen.hasPrefix("Drive Test") {
+                || screen.hasPrefix("Messagerie") || screen.hasPrefix("Drive Test")
+                || screen.hasPrefix("ANFR — générations et bandes") {
                 return exclude("fond décoratif sans élément ni action ; texte testé séparément", name, issue.auditType)
             }
             // Champ du composeur : la capsule de 176×51 pt est touchable partout,
@@ -421,6 +433,35 @@ final class AccessibilityAuditTests: XCTestCase {
 
     /// Fin d'appel expliquée (SOC-13) : le simulateur n'aboutit à aucun vrai
     /// appel, l'écran est donc ouvert par son point d'entrée QA.
+    /// Statistiques ANFR par génération et par bande (plan 3, lot 10).
+    func testAuditANFRBands() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch(["--mock-auth", "--reset-map", "--qa-anfr-stats"])
+        openANFRBands(in: app)
+        audit(app, screen: "ANFR — générations et bandes", blocking: true)
+    }
+
+    func testAuditANFRBandsAtAccessibilityTextSize() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
+        let app = launch([
+            "--mock-auth", "--reset-map", "--qa-anfr-stats",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXL"
+        ])
+        openANFRBands(in: app)
+        audit(app, screen: "ANFR — générations et bandes — texte accessibilité", blocking: true,
+              types: Self.renderedLargeTextTypes)
+    }
+
+    private func openANFRBands(in app: XCUIApplication) {
+        let entry = app.buttons["anfr.stats.bands"].firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 45), "Entrée « Générations et bandes » absente")
+        _ = SignalQuestUITestSupport.scrollToHittable(entry, in: app)
+        entry.tap()
+        XCTAssertTrue(app.buttons["anfr.bands.generation.5g"].waitForExistence(timeout: 20), "Générations absentes")
+        // L'écran précédent part à la fin de la transition : l'audit mesure l'écran seul.
+        XCTAssertTrue(entry.waitForNonExistence(timeout: 10), "Transition vers les bandes inachevée")
+    }
+
     func testAuditCallEnd() throws {
         guard #available(iOS 17.0, *) else { throw XCTSkip("Auditeur Apple indisponible avant iOS 17") }
         let app = launch(["--mock-auth", "--qa-call-ended"])

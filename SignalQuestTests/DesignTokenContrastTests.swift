@@ -118,6 +118,20 @@ final class DesignTokenContrastTests: XCTestCase {
         assertMinimum(UIColor(SQColor.danger), named: "danger", atLeast: 3.0)
     }
 
+    /// Bandes ANFR et traits de génération (table provisoire de la v1.1 du
+    /// contrat de couleurs) : objets graphiques posés sur la carte et la tuile.
+    func testANFRBandColorsMeetGraphicThreshold() {
+        let bands = ["2g900", "2g1800", "3g900", "3g2100", "4g700", "4g800", "4g900", "4g1800", "4g2100", "4g2600",
+                     "n28", "n1", "n78"]
+        for band in bands {
+            let generation = band.hasPrefix("n") ? "5G" : band.prefix(2).uppercased()
+            assertMinimum(UIColor(SQNetworkColors.bandColor(band, generation: generation)), named: band, atLeast: 3.0)
+        }
+        for generation in ["2G", "3G", "4G", "5G"] {
+            assertMinimum(UIColor(SQNetworkColors.generationChartColor(generation)), named: "trait \(generation)", atLeast: 3.0)
+        }
+    }
+
     // MARK: - Texte posé sur sa propre pastille teintée
 
     /// Composite une teinte translucide sur un fond, comme le fait le rendu.

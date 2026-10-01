@@ -212,5 +212,87 @@ enum ANFRDemoData {
             ])
         ]
     }()
+
+    // MARK: Générations et bandes (`view=bands`)
+
+    /// (clé, génération, MHz, bande NR, libellé FR, libellé EN, court, dernier
+    /// relevé, écart sur 52 semaines, pic, date du pic), d'après les ordres de
+    /// grandeur publiés par l'ANFR au 01/10/2026, tous opérateurs.
+    private static let bandRows: [(String, String, Int?, String?, String, String, String, Int, Int, Int, String)] = [
+        ("2g", "2G", nil, nil, "2G (tous supports)", "2G (all sites)", "2G", 34446, -3640, 39736, "2024-01-04"),
+        ("2g900", "2G", 900, nil, "2G 900 MHz", "2G 900 MHz", "900", 34322, -3586, 39419, "2024-01-04"),
+        ("2g1800", "2G", 1800, nil, "2G 1800 MHz", "2G 1800 MHz", "1800", 358, -371, 4522, "2021-12-29"),
+        ("3g", "3G", nil, nil, "3G (tous supports)", "3G (all sites)", "3G", 51334, -9829, 61290, "2025-10-30"),
+        ("3g900", "3G", 900, nil, "3G 900 MHz", "3G 900 MHz", "900", 50806, -9757, 60709, "2025-10-30"),
+        ("3g2100", "3G", 2100, nil, "3G 2100 MHz", "3G 2100 MHz", "2100", 4881, -1473, 36974, "2021-12-29"),
+        ("4g", "4G", nil, nil, "4G (tous supports)", "4G (all sites)", "4G", 65384, 2375, 65384, "2026-10-01"),
+        ("4g700", "4G", 700, nil, "4G 700 MHz", "4G 700 MHz", "700", 53917, 2595, 53917, "2026-10-01"),
+        ("4g800", "4G", 800, nil, "4G 800 MHz", "4G 800 MHz", "800", 54267, 2063, 54267, "2026-10-01"),
+        ("4g900", "4G", 900, nil, "4G 900 MHz", "4G 900 MHz", "900", 24746, 16878, 24746, "2026-10-01"),
+        ("4g1800", "4G", 1800, nil, "4G 1800 MHz", "4G 1800 MHz", "1800", 57045, 2471, 57045, "2026-10-01"),
+        ("4g2100", "4G", 2100, nil, "4G 2100 MHz", "4G 2100 MHz", "2100", 49405, 1669, 49779, "2026-09-03"),
+        ("4g2600", "4G", 2600, nil, "4G 2600 MHz", "4G 2600 MHz", "2600", 45087, 2173, 45087, "2026-10-01"),
+        ("5g", "5G", nil, nil, "5G (tous supports)", "5G (all sites)", "5G", 49367, 5066, 49367, "2026-10-01"),
+        ("n28", "5G", 700, "n28", "5G n28 700 MHz", "5G n28 700 MHz", "n28", 32086, 2693, 32086, "2026-10-01"),
+        ("n1", "5G", 2100, "n1", "5G n1 2100 MHz", "5G n1 2100 MHz", "n1", 24030, 4536, 24030, "2026-10-01"),
+        ("n78", "5G", 3500, "n78", "5G n78 3,5 GHz", "5G n78 3.5 GHz", "n78", 33066, 3424, 33066, "2026-10-01"),
+    ]
+
+    /// Réponse de démonstration au format du contrat, filtrée comme le serveur :
+    /// séries hebdomadaires linéaires sur la fenêtre, résumé sur tout l'historique.
+    static func bandStats(generation: String?, operatorKey: String?, weeks: Int?) -> ANFRBandStats {
+        let operatorKey = operatorKey ?? "all"
+        let scales: [String: Double] = ["all": 1, "orange": 0.46, "sfr": 0.41, "bytel": 0.39, "free": 0.43]
+        let scale = scales[operatorKey] ?? 1
+        let rows = bandRows.filter { generation == nil || $0.1.lowercased() == generation?.lowercased() }
+        let weekCount = max(1, min(weeks ?? 53, 520))
+        let latest = DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(identifier: "UTC"),
+                                    year: 2026, month: 10, day: 1).date ?? Date()
+        func day(_ weeksBack: Int) -> String {
+            let date = latest.addingTimeInterval(-Double(weeksBack) * 7 * 86_400)
+            return date.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+        }
+        var bands: [[String: Any]] = []
+        var series: [[String: Any]] = []
+        var summary: [[String: Any]] = []
+        for row in rows {
+            let value = { (count: Int) in Int((Double(count) * scale).rounded()) }
+            let now = value(row.7), delta52 = value(row.8)
+            var band: [String: Any] = [
+                "key": row.0, "generation": row.1, "kind": row.2 == nil ? "generation" : "band",
+                "label": ["fr": row.4, "en": row.5, "short": row.6], "firstDate": "2021-12-29",
+            ]
+            band["mhz"] = row.2.map { $0 as Any } ?? NSNull()
+            band["nrBand"] = row.3.map { $0 as Any } ?? NSNull()
+            bands.append(band)
+            for weeksBack in stride(from: weekCount - 1, through: 0, by: -1) {
+                let operational = now - delta52 * weeksBack / 52
+                series.append([
+                    "date": day(weeksBack), "operator": operatorKey, "band": row.0,
+                    "operational": operational, "projected": operational / 12, "total": operational + operational / 12,
+                ])
+            }
+            let peak = max(value(row.9), now)
+            func change(_ weeksBack: Int) -> [String: Any] {
+                ["referenceDate": day(weeksBack), "operational": delta52 * weeksBack / 52]
+            }
+            var item: [String: Any] = ["operator": operatorKey, "band": row.0]
+            item["latest"] = ["date": day(0), "operational": now, "projected": now / 12] as [String: Any]
+            item["delta1w"] = change(1)
+            item["delta4w"] = change(4)
+            item["delta52w"] = change(52)
+            item["peak"] = ["date": row.10, "operational": peak] as [String: Any]
+            let share: Any = peak > 0 ? Int((1_000 * Double(now) / Double(peak)).rounded()) : NSNull()
+            item["shareOfPeakPermille"] = share
+            summary.append(item)
+        }
+        let json: [String: Any] = [
+            "meta": ["firstDate": day(weekCount - 1), "latestDate": day(0), "partial": false],
+            "bands": bands, "series": series, "summary": summary,
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: json)) ?? Data()
+        // Construite ici, au format du contrat : un échec serait un défaut de ce fichier.
+        return try! JSONDecoder.signalQuest.decode(ANFRBandStats.self, from: data)
+    }
 }
 #endif

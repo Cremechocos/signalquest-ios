@@ -17,6 +17,54 @@
         }
       }
     },
+    "« Tous » compte chaque support une fois, même partagé entre opérateurs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“All” counts each site once, even when operators share it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« Tous » compte chaque support une fois, même partagé entre opérateurs."
+          }
+        }
+      }
+    },
+    "%@ : aucune donnée sur la période." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: no data for the period."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ : aucune donnée sur la période."
+          }
+        }
+      }
+    },
+    "%@ : de %@ à %@ sites en service sur la période." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: from %2$@ to %3$@ sites in service over the period."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ : de %@ à %@ sites en service sur la période."
+          }
+        }
+      }
+    },
     "%@ · Déverrouille pour rejoindre" : {
       "localizations" : {
         "en" : {
@@ -225,6 +273,102 @@
         }
       }
     },
+    "%@ en projet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ planned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en projet"
+          }
+        }
+      }
+    },
+    "%@ sites en service" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sites in service"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sites en service"
+          }
+        }
+      }
+    },
+    "%@ par bande" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ by band"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ par bande"
+          }
+        }
+      }
+    },
+    "%@ en un an" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ in a year"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en un an"
+          }
+        }
+      }
+    },
+    "%@ de son pic (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ of its peak (%2$@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ de son pic (%@)"
+          }
+        }
+      }
+    },
+    "2G et 3G en extinction, 4G et 5G par fréquence" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2G and 3G switching off, 4G and 5G by frequency"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2G et 3G en extinction, 4G et 5G par fréquence"
+          }
+        }
+      }
+    },
     "Admins : %@." : {
       "localizations" : {
         "en" : {
@@ -349,6 +493,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Approuver un appareil"
+          }
+        }
+      }
+    },
+    "au plus haut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "at its peak"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "au plus haut"
           }
         }
       }
@@ -493,6 +653,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette conversation n’accepte que des appels chiffrés de bout en bout, et ils ne sont pas encore prêts sur cet appareil. Réessaie plus tard."
+          }
+        }
+      }
+    },
+    "Chargement des générations et des bandes…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading generations and bands…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement des générations et des bandes…"
           }
         }
       }
@@ -669,6 +845,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déverrouille ton appareil pour rejoindre l’appel chiffré."
+          }
+        }
+      }
+    },
+    "Générations et bandes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generations and bands"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Générations et bandes"
+          }
+        }
+      }
+    },
+    "en une semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in a week"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en une semaine"
+          }
+        }
+      }
+    },
+    "en 4 semaines" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in 4 weeks"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en 4 semaines"
+          }
+        }
+      }
+    },
+    "en un an" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in a year"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en un an"
           }
         }
       }
@@ -1025,6 +1265,38 @@
         }
       }
     },
+    "Par génération" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By generation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par génération"
+          }
+        }
+      }
+    },
+    "Rattrapage en cours côté serveur : ces chiffres peuvent encore bouger." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Server catch-up in progress: these figures may still change."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rattrapage en cours côté serveur : ces chiffres peuvent encore bouger."
+          }
+        }
+      }
+    },
     "S’ils diffèrent, ne marque rien : retire cet appareil depuis ton autre appareil, puis fais-le approuver de nouveau." : {
       "localizations" : {
         "en" : {
@@ -1133,6 +1405,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "SignalQuest n’a pas accès à la caméra. Autorise-la dans les Réglages d’iOS, ou colle le contenu du code sur l’écran des appareils."
+          }
+        }
+      }
+    },
+    "Supports en service relevés chaque semaine par l’ANFR : la 2G et la 3G s’éteignent, la 4G et la 5G progressent bande par bande." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites in service, surveyed weekly by ANFR: 2G and 3G are switching off, 4G and 5G grow band by band."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports en service relevés chaque semaine par l’ANFR : la 2G et la 3G s’éteignent, la 4G et la 5G progressent bande par bande."
+          }
+        }
+      }
+    },
+    "sites en service" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sites in service"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sites en service"
+          }
+        }
+      }
+    },
+    "Source : observatoire de l’ANFR, relevé du %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: ANFR observatory, survey of %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source : observatoire de l’ANFR, relevé du %@."
           }
         }
       }

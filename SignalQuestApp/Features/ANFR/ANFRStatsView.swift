@@ -187,8 +187,10 @@ struct ANFRStatsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Pilote l'animation des barres/donuts : passe à 1 après apparition.
     @State private var appeared = false
+    private let service: ANFRServicing
 
     init(service: ANFRServicing) {
+        self.service = service
         _model = StateObject(wrappedValue: ANFRStatsViewModel(service: service))
     }
 
@@ -205,6 +207,8 @@ struct ANFRStatsView: View {
                     }
                     .sqFadeUp()
                     heroCard
+                        .sqFadeUp()
+                    bandsLink
                         .sqFadeUp()
                     operatorSection
                         .sqFadeUp()
@@ -351,6 +355,42 @@ struct ANFRStatsView: View {
                 .padding(SQSpace.lg)
                 .accessibilityHidden(true)
         }
+    }
+
+    // MARK: Générations et bandes
+
+    private var bandsLink: some View {
+        NavigationLink {
+            ANFRBandsView(service: service)
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(SQColor.brandRed)
+                    .frame(width: 40, height: 40)
+                    .background(SQColor.accentSoft, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Générations et bandes")
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                    Text("2G et 3G en extinction, 4G et 5G par fréquence")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(SQSpace.lg)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .sqCardBackground()
+        }
+        .buttonStyle(SQPressButtonStyle(scale: 0.98))
+        .accessibilityIdentifier("anfr.stats.bands")
     }
 
     @ViewBuilder
