@@ -163,6 +163,14 @@ enum AppEnvironment {
         false
         #endif
     }
+    static var showsAccountKeyQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-account-key") || hasArgument("--qa-account-key-verified")
+            || hasArgument("--qa-account-key-missing")
+        #else
+        false
+        #endif
+    }
     static var showsBrowserExclusionQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-e2ee-browsers") || hasArgument("--qa-e2ee-browsers-member")

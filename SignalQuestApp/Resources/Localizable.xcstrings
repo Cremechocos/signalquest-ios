@@ -369,6 +369,102 @@
         }
       }
     },
+    "Clé de ton compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account key"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé de ton compte"
+          }
+        }
+      }
+    },
+    "Chargement de la clé de ton compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading your account key"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement de la clé de ton compte"
+          }
+        }
+      }
+    },
+    "Cet appareil n’a pas encore la clé de ton compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device doesn’t have your account key yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’a pas encore la clé de ton compte."
+          }
+        }
+      }
+    },
+    "Clé du compte vérifiée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account key verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé du compte vérifiée"
+          }
+        }
+      }
+    },
+    "Ces 30 chiffres identifient la clé de ton compte : ils sont les mêmes sur tous tes appareils. Compare-les quand tu en ajoutes un." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These 30 digits identify your account key: they’re the same on all your devices. Compare them when you add one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces 30 chiffres identifient la clé de ton compte : ils sont les mêmes sur tous tes appareils. Compare-les quand tu en ajoutes un."
+          }
+        }
+      }
+    },
+    "Cet appareil a reçu la clé de ton compte à son approbation, sans pouvoir la vérifier seul. Compare ces 30 chiffres avec ceux de la même page sur un autre de tes appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device received your account key when it was approved, without being able to check it on its own. Compare these 30 digits with the same page on another of your devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a reçu la clé de ton compte à son approbation, sans pouvoir la vérifier seul. Compare ces 30 chiffres avec ceux de la même page sur un autre de tes appareils."
+          }
+        }
+      }
+    },
     "Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges." : {
       "localizations" : {
         "en" : {
@@ -497,6 +593,38 @@
         }
       }
     },
+    "Impossible de lire la clé de ton compte sur cet appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t read your account key on this device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de lire la clé de ton compte sur cet appareil."
+          }
+        }
+      }
+    },
+    "La clé de ton compte a changé sur cet appareil. Compare les nouveaux chiffres." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account key changed on this device. Compare the new digits."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La clé de ton compte a changé sur cet appareil. Compare les nouveaux chiffres."
+          }
+        }
+      }
+    },
     "La conversation vient de changer. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -609,6 +737,22 @@
         }
       }
     },
+    "Les chiffres sont identiques : marquer comme vérifiée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The digits match: mark as verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les chiffres sont identiques : marquer comme vérifiée"
+          }
+        }
+      }
+    },
     "Navigateurs exclus" : {
       "localizations" : {
         "en" : {
@@ -653,6 +797,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les navigateurs web ne pourront plus lire les nouveaux messages de cette conversation ni rejoindre ses appels. Ce qu’ils ont déjà reçu y reste lisible. Tous les membres sont prévenus."
+          }
+        }
+      }
+    },
+    "Non vérifiée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non vérifiée"
           }
         }
       }
@@ -717,6 +877,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cela arrive quand %@ réinitialise son chiffrement, par exemple après avoir perdu tous ses appareils. Cela peut aussi signaler une tentative d’interception : compare le nouveau numéro avec %@."
+          }
+        }
+      }
+    },
+    "S’ils diffèrent, ne marque rien : retire cet appareil depuis ton autre appareil, puis fais-le approuver de nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If they differ, don’t mark anything: remove this device from your other device, then have it approved again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "S’ils diffèrent, ne marque rien : retire cet appareil depuis ton autre appareil, puis fais-le approuver de nouveau."
           }
         }
       }
@@ -51105,6 +51281,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vérification retirée"
+          }
+        }
+      }
+    },
+    "Vérifiée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifiée"
           }
         }
       }
