@@ -352,8 +352,9 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
   - la messagerie v2 de l'app retire l'entrée avant toute relève, tout envoi
     et tout changement d'appartenance, et ne la réécrit qu'après leur
     succès, jamais par-dessus une opération commencée plus tard. Un échec
-    d'écriture, ou un registre de l'app illisible, la retire ; si elle ne
-    part pas, tout le miroir est révoqué. Une conversation quittée perd son
+    d'écriture, ou un registre de l'app illisible ou repris de zéro depuis
+    moins de 48 heures, la retire ; si elle ne part pas, tout le miroir est
+    révoqué. Une conversation quittée perd son
     entrée et ce que l'extension en a montré. Une révocation efface tout le
     miroir, ce que l'extension a montré compris : après une réactivation,
     seul le compteur reçu par l'app écarte un message déjà vu. Une

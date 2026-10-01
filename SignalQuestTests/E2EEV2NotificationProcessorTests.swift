@@ -75,13 +75,14 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         }
     }
 
-    /// Appelle `beforeEntryWrite` une fois, juste avant d'écrire une entrée.
+    /// Appelle `beforeEntryWrite` une fois, juste avant d'écrire sous `interceptPrefix`.
     private final class InterceptingTokenStore: TokenStore, @unchecked Sendable {
         private let memory = InMemoryTokenStore()
+        var interceptPrefix = "notification-conversation-v1:"
         var beforeEntryWrite: (() -> Void)?
         func string(for key: String) throws -> String? { try memory.string(for: key) }
         func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws {
-            if key.hasPrefix("notification-conversation-v1:"), let hook = beforeEntryWrite {
+            if key.hasPrefix(interceptPrefix), let hook = beforeEntryWrite {
                 beforeEntryWrite = nil
                 hook()
             }
@@ -464,6 +465,18 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         XCTAssertThrowsError(try store.saveConversationContractPreview(fixture.conversation, now: now))
         XCTAssertTrue(try tokens.keys(withPrefix: "notification-conversation-v1:").isEmpty,
                       "Écrite après la révocation, l'entrée repart aussitôt")
+    }
+
+    func testARevocationDuringTheClaimLeavesNothingAndShowsNothing() throws {
+        let fixture = try fixture(), tokens = InterceptingTokenStore()
+        let store = E2EEV2NotificationContextStore(tokenStore: tokens)
+        try store.saveContractPreview(fixture.context, now: now)
+        tokens.interceptPrefix = "notification-shown-v1:"
+        tokens.beforeEntryWrite = { try? store.revoke() }
+        XCTAssertFalse(try store.claimShown(
+            conversationId: conversationId, deviceId: senderDeviceId, counter: 1, floor: 0, now: now
+        ))
+        XCTAssertTrue(try tokens.keys(withPrefix: "notification-shown-v1:").isEmpty, "Rien du tout après une révocation")
     }
 
     func testExtensionNotificationsAreClearedWithTheAppOnes() {

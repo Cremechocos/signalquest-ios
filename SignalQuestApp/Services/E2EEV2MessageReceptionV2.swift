@@ -42,6 +42,13 @@ struct E2EEV2MessageLedgerV2: Codable, Equatable, Sendable {
     /// `messageRef`. Au-delà des identités récentes, une identité déjà vue n'est
     /// plus jamais affichée de nouveau.
     private(set) var seenRefs: Set<String> = []
+    /// Heure locale où un registre illisible a été repris de zéro : ses
+    /// compteurs ne disent plus tout ce qui a été reçu (miroir de notification).
+    private(set) var resetAtMs: Int64?
+
+    mutating func markReset(atMs: Int64) {
+        resetAtMs = atMs
+    }
 
     static func refPrefix(_ messageRef: String) -> String { String(messageRef.prefix(16)) }
 
@@ -154,14 +161,20 @@ final class E2EEV2MessageLedgerStore: @unchecked Sendable {
         let directory = baseDirectory.appendingPathComponent(Self.digest(ownerScopeId), isDirectory: true)
         let file = directory.appendingPathComponent(Self.digest(conversationId) + ".json")
         var ledger = E2EEV2MessageLedgerV2()
+        var unreadable = false
         // Illisible ou incohérent : repart de zéro plutôt que de bloquer la
-        // conversation. Le magasin des messages garde les siens et ses équivoques.
-        if fileManager.fileExists(atPath: file.path),
-           let decoded = try? JSONDecoder().decode(E2EEV2MessageLedgerV2.self, from: Data(contentsOf: file)),
-           decoded.isConsistent {
-            ledger = decoded
+        // conversation, en le notant. Le magasin des messages garde les siens
+        // et ses équivoques.
+        if fileManager.fileExists(atPath: file.path) {
+            if let decoded = try? JSONDecoder().decode(E2EEV2MessageLedgerV2.self, from: Data(contentsOf: file)),
+               decoded.isConsistent {
+                ledger = decoded
+            } else {
+                unreadable = true
+            }
         }
         let before = ledger
+        if unreadable { ledger.markReset(atMs: Int64(Date().timeIntervalSince1970 * 1_000)) }
         let result = try body(&ledger)
         guard ledger != before else { return result }
         if !fileManager.fileExists(atPath: directory.path) {

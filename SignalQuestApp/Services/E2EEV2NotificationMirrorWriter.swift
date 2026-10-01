@@ -90,8 +90,12 @@ struct E2EEV2NotificationMirrorWriter: Sendable {
             }
         }
         // Le registre de l'app, pour les seuls appareils dont un message peut
-        // s'afficher ; illisible, pas d'entrée.
+        // s'afficher ; illisible, ou repris de zéro depuis moins de 48 heures
+        // (ses compteurs ne disent plus tout ce qui a été reçu), pas d'entrée.
         let ledger = try ledgerStore.read(conversationId: conversationId, ownerScopeId: session.ownerScopeId)
+        if let resetAtMs = ledger.resetAtMs, nowMs - resetAtMs < E2EEV2NotificationProcessor.maxMessageAgeMs {
+            return nil
+        }
         let counters = certifiedDeviceIds.reduce(into: [String: Int]()) { result, deviceId in
             if let highest = ledger.highestCounter(deviceId: deviceId) { result[deviceId] = highest }
         }

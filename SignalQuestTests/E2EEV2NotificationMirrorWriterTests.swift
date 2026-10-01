@@ -173,17 +173,45 @@ final class E2EEV2NotificationMirrorWriterTests: XCTestCase {
             session: fixture.session, generation: writer.invalidate(seeded.conversationId)
         ), "Registre illisible : pas de plancher, pas d'entrée")
         XCTAssertNil(try contextStore.conversation(seeded.conversationId))
+
+        // La relève le reprend de zéro en le notant : ses compteurs ne disent
+        // plus tout ce qui a été reçu, pas d'entrée pendant 48 heures.
+        let ledger = try E2EEV2MessageLedgerStore(baseDirectory: directory)
+        try ledger.update(conversationId: seeded.conversationId, ownerScopeId: fixture.session.ownerScopeId) { ledger in
+            _ = ledger.record(
+                messageRef: E2EEV2MessageRef.make(
+                    conversationId: seeded.conversationId, senderDeviceId: phone.device.deviceId, clientRequestId: "message_mirror_000009"
+                ),
+                deviceId: phone.device.deviceId, counter: 9, frankTagB64: Data(repeating: 1, count: 32).base64EncodedString(),
+                epochNumber: 1
+            )
+        }
+        XCTAssertNotNil(try ledger.read(conversationId: seeded.conversationId, ownerScopeId: fixture.session.ownerScopeId).resetAtMs)
+        XCTAssertFalse(writer.update(
+            conversationId: seeded.conversationId, devices: devices, latestMemberIds: [fixture.user, bruno],
+            session: fixture.session, generation: writer.invalidate(seeded.conversationId)
+        ), "Repris de zéro il y a moins de 48 heures")
+        let later = E2EEV2NotificationMirrorWriter(
+            keyStore: fixture.keys, stateStore: fixture.states, ledgerStore: ledger, contextStore: contextStore,
+            now: { Date().addingTimeInterval(49 * 3_600) }, contractPreview: true
+        )
+        try contextStore.saveContractPreview(notificationContext(fixture, expiresIn: 72 * 3_600), now: Date())
+        XCTAssertTrue(later.update(
+            conversationId: seeded.conversationId, devices: devices, latestMemberIds: [fixture.user, bruno],
+            session: fixture.session, generation: later.invalidate(seeded.conversationId)
+        ), "Passé 48 heures, l'entrée revient")
     }
 
     private func notificationContext(
         _ fixture: E2EEV2AccountFixture,
         privacy: E2EEV2NotificationPrivacy = .full,
-        sessionId: String? = nil
+        sessionId: String? = nil,
+        expiresIn: TimeInterval = 3_600
     ) -> E2EEV2NotificationContext {
         .init(
             version: E2EEV2NotificationContext.currentVersion, revisionId: UUID().uuidString.lowercased(),
             ownerScopeId: PushOwnerScope.id(for: fixture.user), sessionId: sessionId ?? fixture.session.sessionId,
-            authToken: "fixture.jwt.signature", expiresAtMs: Int64(Date().addingTimeInterval(3_600).timeIntervalSince1970 * 1_000),
+            authToken: "fixture.jwt.signature", expiresAtMs: Int64(Date().addingTimeInterval(expiresIn).timeIntervalSince1970 * 1_000),
             deviceId: fixture.descriptor.deviceId, privacy: privacy, senderNames: [:]
         )
     }

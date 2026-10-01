@@ -252,6 +252,11 @@ final class E2EEV2NotificationContextStore: @unchecked Sendable {
                 throw E2EEV2NotificationContextStoreError.invalidRecord
             }
             try tokenStore.set(raw, for: Self.shownKey(conversationId), accessibility: .afterFirstUnlock)
+            // Une révocation pendant l'écriture : rien ne reste, rien n'est montré.
+            guard (try? load(now: now))?.revisionId == context.revisionId else {
+                try? tokenStore.remove(Self.shownKey(conversationId))
+                return false
+            }
             return true
         }
     }
