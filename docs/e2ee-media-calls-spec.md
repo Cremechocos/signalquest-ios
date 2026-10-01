@@ -1,10 +1,11 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.13**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.14**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
-> iOS, Android et le web, est la condition de la prochaine bêta TestFlight
-> iOS (décision produit du 30/09, §16).
+> iOS, Android et le web, est la condition de la bêta TestFlight iOS des
+> appels chiffrés (décision produit du 30/09, §16) ; une bêta intermédiaire,
+> le nouveau chiffrement fermé, la précède (décision du 01/10).
 >
 > - v0.1 (30/09/2026) : première rédaction (plan 2, Lot 6).
 > - v0.2 (30/09/2026) : révisée après une relecture de sécurité indépendante.
@@ -201,6 +202,12 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.14 (02/10/2026), proposition : sur iOS, la clé de signature de
+>   l'appareil vit dans la Secure Enclave, non extractable comme sur Android
+>   et le web (décision produit du 01/10) ; le compromis du §2.6 se réduit à
+>   l'usage de la clé par qui tient l'appareil. Précision : la clé d'époque
+>   n'est lisible écran verrouillé qu'avec l'aperçu complet. Format des
+>   signatures inchangé (DER canonique, low-S, D.0). Aucun vecteur ne change.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -422,16 +429,20 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
     sans `setUnlockedDeviceRequired`), pour la preuve de jonction (§10.4) et
     les requêtes signées (A.2). La **clé d'accord** de l'appareil et l'**UIK**
     restent soumises au déverrouillage. La clé de l'époque courante suit la
-    règle des aperçus : avec eux, l'appel se rejoint verrouillé ; avec
-    « aucun aperçu », elle exige le déverrouillage. Quand rejoindre demande
-    le déverrouillage (« aucun aperçu », ou époque que l'appareil n'a pas
-    encore ouverte), l'écran d'appel le dit et la jonction reprend au
+    règle des aperçus : avec l'aperçu complet, l'appel se rejoint
+    verrouillé ; sinon (« expéditeur seulement » ou « aucun aperçu »), elle
+    exige le déverrouillage. Quand rejoindre demande le déverrouillage
+    (aperçu qui n'est pas complet, ou époque que l'appareil n'a pas encore
+    ouverte), l'écran d'appel le dit et la jonction reprend au
     déverrouillage. Une clé illisible parce que l'appareil est verrouillé
     n'est jamais prise pour une clé perdue : on réessaie après le
-    déverrouillage, sans nouvel enrôlement. Compromis assumé : un appareil
-    saisi après un premier déverrouillage depuis son démarrage permet
-    d'utiliser sa clé de signature, et de l'extraire là où elle est
-    logicielle (iOS), jusqu'à sa révocation ;
+    déverrouillage, sans nouvel enrôlement. La clé de signature n'est
+    jamais extractable : Secure Enclave sur iOS (v0.4.14), Keystore sur
+    Android, clé WebCrypto non exportable sur le web ; ses signatures
+    suivent D.0 (DER canonique, low-S, normalisées avant envoi). Compromis
+    assumé : un appareil saisi après un premier déverrouillage depuis son
+    démarrage permet d'utiliser sa clé de signature tant qu'on le détient,
+    jusqu'à sa révocation ;
   - avec « aucun aperçu », ces clés exigent le déverrouillage (iOS : classe
     `WhenUnlocked` ; Android : `setUnlockedDeviceRequired`) ;
   - sur iOS, le miroir de l'extension ne contient que la session,
