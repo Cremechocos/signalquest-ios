@@ -82,7 +82,7 @@ struct FriendLiveSheet: View {
                 ForEach(tiles, id: \.label) { tile in
                     VStack(alignment: .leading, spacing: SQSpace.xxs) {
                         Text(LocalizedStringKey(tile.label))
-                            .font(SQFont.archivo(11, .semibold))
+                            .font(SQFont.archivo(12, .semibold))
                             .foregroundStyle(SQColor.labelSecondary)
                         Text(tile.value)
                             .font(SQFont.display(17, .bold))

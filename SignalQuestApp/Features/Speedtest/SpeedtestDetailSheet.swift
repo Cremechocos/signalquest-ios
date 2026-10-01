@@ -241,8 +241,7 @@ struct SpeedtestDetailContent: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.lg, elevation: .rest)
     }
 
     @ViewBuilder
@@ -366,8 +365,7 @@ struct SpeedtestDetailContent: View {
                 metaRow("Latence", String(localized: "mesurée en \(proto)"), icon: "timer")
             }
         }
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.lg, elevation: .rest)
     }
 
     static func resultByteSource(_ phase: SpeedtestPhaseTrace?, fallback: String?) -> String? {

@@ -346,7 +346,7 @@ struct RadioLogsView: View {
                     Text("Identifier \(min(candidates.count, 50)) sites à la suite")
                         .font(SQFont.body(13, .bold))
                     Text("un site après l'autre, sortie à tout moment")
-                        .font(SQFont.body(11.5))
+                        .font(SQFont.body(12))
                         // Pas d'opacité sous 13 pt sur aplat brique : l'anti-crénelage
                         // mange déjà ~23 % du contraste (DesignTokenContrastTests).
                         .foregroundStyle(P.onAccent)

@@ -137,13 +137,17 @@ struct SQEditorialTag: View {
     }
 }
 
-/// A simple "label / value" tile reused by every specialised card. Style
-/// « Crème » : tuile `SurfaceMuted` rayon 14 sans bordure, label Figtree 11
-/// secondaire en casse normale, valeur Bricolage Bold 15 (accent si highlight).
+/// Tuile « libellé / valeur » des cartes du fil et des fiches, aux jetons de
+/// la tuile partagée (`SQMetricTile`, TRX-11) : fond `surfaceMuted` rayon 14,
+/// libellé Figtree 12,5 à l'encre, valeur Figtree Bold 17, en brique
+/// (`accentInk`) si `highlight`. Libellé et valeur passent à la ligne plutôt
+/// que de se tronquer à Dynamic Type élevé.
 struct CardMetricTile: View {
     let label: String
     let value: String
     var highlight: Bool = false
+    /// Ignoré : une couleur de qualité ne tient pas 4,5:1 sur la tuile ; le
+    /// surlignage passe par `accentInk`, comme dans `SQMetricTile`.
     var accent: Color = SQColor.brandRed
     /// Une valeur COMPOSÉE peut demander deux lignes — « Internet, Voix · 4G, 5G » sur la carte de
     /// panne. Défaut à 1 : une mesure (« 240 Mbps ») tient sur une ligne, et l'autoriser à passer
@@ -153,14 +157,14 @@ struct CardMetricTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(LocalizedStringKey(label))
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.primary)
+                .font(SQFont.body(12.5, .medium, relativeTo: .footnote))
+                .foregroundStyle(SQColor.label)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("feed.metric.label")
             Text(value)
-                .font(.headline.weight(.bold))
-                .foregroundStyle(Color.primary)
+                .font(SQFont.archivo(17, .bold, relativeTo: .headline))
+                .foregroundStyle(highlight ? SQColor.accentInk : SQColor.label)
                 .lineLimit(max(2, valueLineLimit))
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("feed.metric.value")
@@ -413,16 +417,15 @@ struct CardActionsBar: View {
 // MARK: - Editorial card surface
 
 extension View {
-    /// Surface de carte douce (DA « Crème & Terre cuite ») : fond
-    /// `SurfaceElevated`, rayon 22 continu, ombre carte chaude. Zéro bordure
-    /// (règle No-Border). Passe `clip = true` pour rogner un média plein cadre
-    /// (PhotoCard).
+    /// Surface de carte douce (DA « Crème & Terre cuite ») : la carte partagée
+    /// (`sqCardBackground`, TRX-11), rayon 22, ombre carte chaude, et le
+    /// liseré qui la détache du fond en noir intense (OLED). Passe
+    /// `clip = true` pour rogner un média plein cadre (PhotoCard).
     func sqSoftCard(clip: Bool = false) -> some View {
         let shape = RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
         return self
-            .background(SQColor.surface, in: shape)
             .modifier(ConditionalClip(shape: shape, clip: clip))
-            .sqShadowCard()
+            .sqCardBackground(cornerRadius: SQRadius.xl)
     }
 
     /// Alias historique : les ~15 appels existants passent sur la carte douce.

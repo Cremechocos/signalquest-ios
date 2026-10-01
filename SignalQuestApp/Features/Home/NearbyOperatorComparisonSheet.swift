@@ -110,7 +110,7 @@ struct NearbyOperatorComparisonSheet: View {
                         .font(SQFont.display(20, .bold))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
-                    Text(metric.unit).font(SQFont.body(11)).foregroundStyle(SQColor.labelSecondary)
+                    Text(metric.unit).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
                 }
             }
             GeometryReader { geo in
@@ -122,7 +122,7 @@ struct NearbyOperatorComparisonSheet: View {
             }
             .frame(height: 8)
             Text(detailText(stat))
-                .font(SQFont.body(11.5))
+                .font(SQFont.body(12))
                 .foregroundStyle(SQColor.labelSecondary)
         }
         .padding(SQSpace.md)

@@ -377,8 +377,7 @@ struct GamificationView: View {
                 }
                 .padding(SQSpace.md - 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .sqShadowSoft()
+                .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
                 .opacity(0.75)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Succès : \(badge.title ?? "Badge")")
@@ -410,8 +409,7 @@ struct GamificationView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(SQSpace.md - 2)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
     }
 
     private var eventsList: some View {
@@ -445,8 +443,7 @@ struct GamificationView: View {
                     }
                 }
                 .padding(SQSpace.md - 2)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .sqShadowSoft()
+                .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
                 .accessibilityElement(children: .combine)
             }
         }

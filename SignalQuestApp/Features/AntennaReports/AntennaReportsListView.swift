@@ -103,7 +103,7 @@ struct AntennaReportsListView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                     if let date = report.createdAt {
                         Text(date, format: .relative(presentation: .named))
-                            .font(SQFont.body(11.5, relativeTo: .caption2))
+                            .font(SQFont.body(12, relativeTo: .caption2))
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
@@ -136,8 +136,7 @@ struct AntennaReportsListView: View {
         }
         .padding(SQSpace.md + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .contentShape(Rectangle())
     }
 }

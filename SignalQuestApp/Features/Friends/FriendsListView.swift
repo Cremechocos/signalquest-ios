@@ -327,8 +327,7 @@ struct FriendsListView: View {
             .padding(.horizontal, SQSpace.md + 2)
             .padding(.vertical, SQSpace.sm + 2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .sqShadowSoft()
+            .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
     }
 
     /// Rangée-carte douce : surface, rayon 14, ombre repos.
@@ -392,7 +391,7 @@ struct FriendsListView: View {
                     Text(custom).font(.caption).foregroundStyle(SQColor.labelSecondary)
                 } else if let last = friend.presence?.lastSeenAt, friend.presence?.isOnline != true {
                     Text(last, format: .relative(presentation: .named))
-                        .font(.caption2)
+                        .font(SQFont.body(12, relativeTo: .caption2))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             }

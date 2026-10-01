@@ -958,7 +958,7 @@ struct PhotoDetailView: View {
                     Spacer()
                     if let date = comment.createdAt {
                         Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                            .font(.caption2)
+                            .font(SQFont.body(12, relativeTo: .caption2))
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
@@ -968,8 +968,7 @@ struct PhotoDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(SQSpace.md)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .sqShadowSoft()
+            .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         }
     }
 

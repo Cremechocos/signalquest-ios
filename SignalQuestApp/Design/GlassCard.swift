@@ -1,15 +1,46 @@
 import SwiftUI
 
+/// Fond « verre » des contrôles posés sur une carte (Carte, Drive Test) :
+/// verre dépoli teinté, le seul verre de la DA.
+func sqMapGlassBackground<S: InsettableShape>(_ shape: S) -> some View {
+    shape
+        .fill(SQColor.surfaceGlass)
+        .background(.ultraThinMaterial, in: shape)
+}
+
+/// Élévation d'une carte : `card` pour les cartes de contenu, `rest` (ombre
+/// repos) pour les rangées et les petites tuiles.
+enum SQCardElevation {
+    case card
+    case rest
+}
+
 extension View {
     /// Fond de carte : surface, rayon continu, ombre carte. En « Noir intense »,
     /// carte et fond sont tous deux noirs et l'ombre s'efface : le liseré prend le
     /// relais, sans quoi les cartes se fondaient dans le fond (TRX-09, SOC-26).
     /// Hors OLED il est transparent : jamais ombre et bordure à la fois.
-    func sqCardBackground(_ fill: Color = SQColor.surface, cornerRadius: CGFloat = SQRadius.xl) -> some View {
+    func sqCardBackground(
+        _ fill: Color = SQColor.surface,
+        cornerRadius: CGFloat = SQRadius.xl,
+        elevation: SQCardElevation = .card
+    ) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return background(fill, in: shape)
             .overlay { shape.strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-            .sqShadowCard()
+            .modifier(SQCardShadow(elevation: elevation))
+    }
+}
+
+private struct SQCardShadow: ViewModifier {
+    let elevation: SQCardElevation
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        switch elevation {
+        case .card: content.sqShadowCard()
+        case .rest: content.sqShadowSoft()
+        }
     }
 }
 

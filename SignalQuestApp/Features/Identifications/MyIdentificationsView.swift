@@ -552,8 +552,7 @@ private struct IdentificationDetailSheet: View {
             }
             .padding(SQSpace.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .sqShadowSoft()
+            .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         }
         .buttonStyle(SQPressButtonStyle())
     }

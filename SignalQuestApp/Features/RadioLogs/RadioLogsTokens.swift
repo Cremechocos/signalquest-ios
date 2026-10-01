@@ -14,6 +14,10 @@ import SwiftUI
 /// CONVERSION : la maquette est cadrée sur un téléphone de 412 px. 1 px de
 /// maquette = 1 pt, 1 px de police = 1 pt de police.
 ///
+/// TEXTE : jamais sous 12 pt (TRX-12). Les tailles de la maquette en dessous
+/// (10 à 11,5) sont relevées à 12 : à 10 pt, les pastilles et méta-données
+/// devenaient pénibles à lire.
+///
 /// COULEURS : elles ne viennent PAS de la maquette. `SQColor` porte déjà la DA,
 /// le mode sombre et le noir intense (OLED) ; les hex de la maquette n'en sont
 /// qu'une approximation figée, qui ignorerait ces trois choses. Seules les
@@ -34,7 +38,7 @@ enum RadioLogsMetrics {
     // .site-id / .tech
     static let siteIdSize: CGFloat = 15.5
     static let siteIdTracking: CGFloat = 0.155   // .01em × 15.5
-    static let techSize: CGFloat = 10
+    static let techSize: CGFloat = 12
     static let techTracking: CGFloat = 0.8       // .08em × 10
     static let techPaddingH: CGFloat = 7
     static let techPaddingV: CGFloat = 2
@@ -44,12 +48,12 @@ enum RadioLogsMetrics {
     static let siteNameTop: CGFloat = 4
     static let siteNameSize: CGFloat = 13
     static let siteMetaTop: CGFloat = 3
-    static let siteMetaSize: CGFloat = 11.5
+    static let siteMetaSize: CGFloat = 12
 
     // .pills / .pill
     static let pillsTop: CGFloat = 8
     static let pillsGap: CGFloat = 5
-    static let pillSize: CGFloat = 10.5
+    static let pillSize: CGFloat = 12
     static let pillPaddingH: CGFloat = 8
     static let pillPaddingV: CGFloat = 3
     static let pillRadius: CGFloat = 7
@@ -72,17 +76,17 @@ enum RadioLogsMetrics {
 
     // .cells — le panneau déplié
     static let cellsTop: CGFloat = 11
-    static let cellsHeaderSize: CGFloat = 10
+    static let cellsHeaderSize: CGFloat = 12
     static let cellsHeaderBottom: CGFloat = 8
     static let cellRowGap: CGFloat = 9
     static let cellRowPaddingV: CGFloat = 6
-    static let cellPciSize: CGFloat = 11
+    static let cellPciSize: CGFloat = 12
     static let cellPciPaddingH: CGFloat = 7
     static let cellPciPaddingV: CGFloat = 3
     static let cellPciRadius: CGFloat = 6
     static let cellPciMinWidth: CGFloat = 58
     static let cellIdSize: CGFloat = 12
-    static let cellBandSize: CGFloat = 10.5
+    static let cellBandSize: CGFloat = 12
 
     // .scan — le bandeau de balayage
     static let scanRadius: CGFloat = 18
@@ -99,7 +103,7 @@ enum RadioLogsMetrics {
     static let scanActionRadius: CGFloat = 9
     static let barHeight: CGFloat = 6
     static let scanSubTop: CGFloat = 8
-    static let scanSubSize: CGFloat = 11.5
+    static let scanSubSize: CGFloat = 12
 
     // .tally — le dénombrement
     static let tallyGap: CGFloat = 12
@@ -120,10 +124,10 @@ enum RadioLogsMetrics {
     static let doneGap: CGFloat = 9
     static let doneBottom: CGFloat = 12
     static let doneBarHeight: CGFloat = 5
-    static let doneTextSize: CGFloat = 11.5
+    static let doneTextSize: CGFloat = 12
 
     // .oph — l'intertitre opérateur
-    static let operatorHeaderSize: CGFloat = 11
+    static let operatorHeaderSize: CGFloat = 12
     static let operatorHeaderStrongSize: CGFloat = 12
     static let operatorHeaderTop: CGFloat = 12
     static let operatorHeaderBottom: CGFloat = 8
@@ -136,18 +140,18 @@ enum RadioLogsMetrics {
     static let sheetSubtitleSize: CGFloat = 12
     static let sheetSubtitleBottom: CGFloat = 16
     static let groupBottom: CGFloat = 16
-    static let groupHeaderSize: CGFloat = 10.5
+    static let groupHeaderSize: CGFloat = 12
     static let groupHeaderBottom: CGFloat = 8
     static let optionGap: CGFloat = 7
     static let optionSize: CGFloat = 12.5
     static let optionPaddingH: CGFloat = 13
     static let optionPaddingV: CGFloat = 9
     static let optionRadius: CGFloat = 11
-    static let optionHintSize: CGFloat = 10.5
+    static let optionHintSize: CGFloat = 12
     static let toggleRowPaddingV: CGFloat = 11
     static let toggleRowGap: CGFloat = 12
     static let toggleLabelSize: CGFloat = 13
-    static let toggleHintSize: CGFloat = 11.5
+    static let toggleHintSize: CGFloat = 12
 
     // Identification en chaîne
     static let chainCountSize: CGFloat = 12

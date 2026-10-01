@@ -231,7 +231,7 @@ struct SessionDetailView: View {
                 .frame(width: 24)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(LocalizedStringKey(label)).font(SQFont.body(11, relativeTo: .caption2)).foregroundStyle(SQColor.labelSecondary)
+                Text(LocalizedStringKey(label)).font(SQFont.body(12, relativeTo: .caption2)).foregroundStyle(SQColor.labelSecondary)
                 Text(value)
                     .font(SQFont.display(15, .bold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
@@ -259,7 +259,7 @@ struct SessionDetailView: View {
                         Text(op.label).font(SQFont.body(13, .semibold, relativeTo: .caption))
                         if let count = op.count {
                             Text("\(count)")
-                                .font(SQFont.body(11.5, relativeTo: .caption2))
+                                .font(SQFont.body(12, relativeTo: .caption2))
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
@@ -318,7 +318,7 @@ struct SessionDetailView: View {
             legendDot(SessionRSRPColor.ui(-105), "Faible")
             legendDot(SessionRSRPColor.ui(-115), "Mauvais")
         }
-        .font(SQFont.body(11, .medium, relativeTo: .caption2))
+        .font(SQFont.body(12, .medium, relativeTo: .caption2))
         .foregroundStyle(SQColor.labelSecondary)
         .frame(maxWidth: .infinity)
     }
@@ -334,7 +334,7 @@ struct SessionDetailView: View {
             legendDot(SessionGenerationColor.ui("Inconnu"), "Inconnu")
             legendDot(SessionGenerationColor.ui(nil), "Aucun")
         }
-        .font(SQFont.body(11, .medium, relativeTo: .caption2))
+        .font(SQFont.body(12, .medium, relativeTo: .caption2))
         .foregroundStyle(SQColor.labelSecondary)
         .frame(maxWidth: .infinity)
     }
@@ -379,7 +379,7 @@ struct SessionDetailView: View {
                             .foregroundStyle(SQColor.label)
                         Spacer()
                         Text("\(s.count) pts")
-                            .font(SQFont.body(11.5, relativeTo: .caption2))
+                            .font(SQFont.body(12, relativeTo: .caption2))
                             .foregroundStyle(SQColor.labelSecondary)
                         Text("\(Int(s.pct.rounded()))%")
                             .font(SQFont.display(15, .bold, relativeTo: .subheadline))
@@ -441,7 +441,7 @@ struct SessionDetailView: View {
     private func speedStat(_ label: String, _ value: Double?, _ unit: String, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(LocalizedStringKey(label))
-                .font(SQFont.body(10.5, relativeTo: .caption2))
+                .font(SQFont.body(12, relativeTo: .caption2))
                 .foregroundStyle(SQColor.labelSecondary)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value.map { "\(Int($0.rounded()))" } ?? "—")
@@ -449,7 +449,7 @@ struct SessionDetailView: View {
                     .foregroundStyle(color)
                     .lineLimit(1).minimumScaleFactor(0.7)
                 Text(unit)
-                    .font(SQFont.body(10, relativeTo: .caption2))
+                    .font(SQFont.body(12, relativeTo: .caption2))
                     .foregroundStyle(SQColor.labelSecondary)
             }
         }
@@ -473,13 +473,13 @@ struct SessionDetailView: View {
                     if let mvno = st.mvnoName, !mvno.isEmpty,
                        mvno.caseInsensitiveCompare(st.operatorKey ?? "") != .orderedSame {
                         Text("SIM \(mvno)")
-                            .font(SQFont.body(10.5, .semibold, relativeTo: .caption2))
+                            .font(SQFont.body(12, .semibold, relativeTo: .caption2))
                             .foregroundStyle(SQColor.labelSecondary)
                             .lineLimit(1)
                     }
                     if let net = st.networkType, !net.isEmpty {
                         Text(net)
-                            .font(SQFont.body(10.5, .semibold, relativeTo: .caption2))
+                            .font(SQFont.body(12, .semibold, relativeTo: .caption2))
                             .foregroundStyle(Color(uiColor: SessionGenerationColor.ui(net)))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Color(uiColor: SessionGenerationColor.ui(net)).opacity(0.16), in: Capsule(style: .continuous))
@@ -487,7 +487,7 @@ struct SessionDetailView: View {
                 }
                 if let t = st.timestamp {
                     Text(t.formatted(.dateTime.hour().minute()))
-                        .font(SQFont.body(11.5, relativeTo: .caption2))
+                        .font(SQFont.body(12, relativeTo: .caption2))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             }
@@ -502,7 +502,7 @@ struct SessionDetailView: View {
                     Text("\(st.pingMs.map { "\(Int($0.rounded()))" } ?? "—") ms")
                         .foregroundStyle(SQColor.labelSecondary)
                 }
-                .font(SQFont.body(11.5, relativeTo: .caption2))
+                .font(SQFont.body(12, relativeTo: .caption2))
             }
         }
         .padding(.vertical, SQSpace.xs)
@@ -535,19 +535,19 @@ struct SessionDetailView: View {
         HStack(spacing: SQSpace.sm) {
             Circle().fill(Self.statusColor(antenna.status)).frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
-                Text(antenna.operatorDisplayName ?? antenna.displayName ?? "Antenne")
+                Text(antenna.operatorDisplayName ?? antenna.displayName ?? String(localized: "Antenne"))
                     .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                 Text(Self.statusLabel(antenna))
-                    .font(SQFont.body(11.5, relativeTo: .caption2))
+                    .font(SQFont.body(12, relativeTo: .caption2))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 if let commune = antenna.commune, !commune.isEmpty {
                     Text(commune)
-                        .font(SQFont.body(11.5, relativeTo: .caption2))
+                        .font(SQFont.body(12, relativeTo: .caption2))
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
             }
             Spacer()
@@ -601,8 +601,7 @@ struct SessionDetailView: View {
             .foregroundStyle(SQColor.labelSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SQSpace.md)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .sqShadowSoft()
+            .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
     }
 
     // MARK: Helpers

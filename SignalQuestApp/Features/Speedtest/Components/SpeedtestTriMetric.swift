@@ -141,7 +141,7 @@ struct SpeedtestTriMetric: View {
                     .contentTransition(.numericText())
                     .accessibilityIdentifier("speedtest.metric.\(id).value")
                 Text(unit)
-                    .font(SQFont.body(10.5, .semibold, relativeTo: .caption))
+                    .font(SQFont.body(12, .semibold, relativeTo: .caption))
                     .foregroundStyle(SQColor.labelSecondary)
                     .accessibilityIdentifier("speedtest.metric.\(id).unit")
             }
@@ -154,8 +154,7 @@ struct SpeedtestTriMetric: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, SQSpace.md + 2)
         .padding(.horizontal, SQSpace.sm)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .sqAnimation(.snappy(duration: 0.25), value: state)
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier("speedtest.metric.\(id)")

@@ -224,7 +224,7 @@ struct SentinelleDetectedAddress: View {
                         .fixedSize(horizontal: false, vertical: true)
                     if let prefix = suggestion.prefix {
                         Text("Préfixe \(prefix.label)\nProposé \(suggestion.suggested)")
-                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                            .font(.system(.caption, design: .monospaced, weight: .medium))
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                 }

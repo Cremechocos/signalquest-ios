@@ -262,8 +262,7 @@ private struct LocalCoverageArchiveRow: View {
                 .accessibilityHidden(true)
         }
         .padding(SQSpace.md + 2)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .contentShape(Rectangle())
         .accessibilityIdentifier("sessions.localArchive.row")
     }
@@ -305,8 +304,7 @@ private struct LocalCoverageArchiveDetailView: View {
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
                 .padding(SQSpace.lg)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                .sqShadowSoft()
+                .sqCardBackground(cornerRadius: SQRadius.lg, elevation: .rest)
             }
             .padding(SQSpace.lg)
             .sqReadableWidth()
@@ -348,14 +346,14 @@ private struct SessionRow: View {
                         Text(date, format: .dateTime.day().month().year())
                     }
                 }
-                .font(SQFont.body(11.5, .medium, relativeTo: .caption2))
+                .font(SQFont.body(12, .medium, relativeTo: .caption2))
                 .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(1)
                 if !session.operators.isEmpty {
                     HStack(spacing: 5) {
                         ForEach(session.operators.prefix(4)) { op in
                             Text(op.label)
-                                .font(SQFont.body(11, .semibold, relativeTo: .caption2))
+                                .font(SQFont.body(12, .semibold, relativeTo: .caption2))
                                 .padding(.horizontal, 7).padding(.vertical, 2)
                                 .background(SessionDetailView.operatorColor(op.colorHex).opacity(0.14), in: Capsule(style: .continuous))
                                 .foregroundStyle(SessionDetailView.operatorColor(op.colorHex))
@@ -370,8 +368,7 @@ private struct SessionRow: View {
                 .accessibilityHidden(true)
         }
         .padding(SQSpace.md + 2)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .contentShape(Rectangle())
     }
 }

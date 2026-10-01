@@ -135,11 +135,11 @@ struct NearbyNetworkQualityDetailSheet: View {
                 }
                 if band == .unknown {
                     Text("Pas assez de mesures")
-                        .font(SQFont.body(11.5, .semibold))
+                        .font(SQFont.body(12, .semibold))
                         .foregroundStyle(SQColor.labelSecondary)
                 } else {
                     Text(band.title)
-                        .font(SQFont.body(11.5, .bold))
+                        .font(SQFont.body(12, .bold))
                         .foregroundStyle(band.swiftUIColor)
                         .padding(.horizontal, 8).padding(.vertical, 2)
                         .background(band.swiftUIColor.opacity(0.14), in: Capsule(style: .continuous))

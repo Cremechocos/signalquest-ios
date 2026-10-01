@@ -926,7 +926,7 @@ struct AntennaDetailSheet: View {
                     )
                     let distance = originLocation.distance(from: siteLocation)
                     Text(SQUnits.distance(meters: distance))
-                        .font(SQFont.archivo(11, .bold))
+                        .font(SQFont.archivo(12, .bold))
                         .foregroundStyle(SQColor.label)
                         .padding(.horizontal, SQSpace.sm)
                         .padding(.vertical, SQSpace.xs)

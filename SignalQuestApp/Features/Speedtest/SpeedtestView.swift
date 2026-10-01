@@ -913,8 +913,7 @@ struct SpeedtestView: View {
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("speedtest.mapPublicationNotice")
     }

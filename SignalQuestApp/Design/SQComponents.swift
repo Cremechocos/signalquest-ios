@@ -49,7 +49,7 @@ struct MetricPill: View {
                 .foregroundStyle(SQColor.brandRed)
             VStack(alignment: .leading, spacing: 1) {
                 Text(LocalizedStringKey(title))
-                    .font(SQFont.body(11))
+                    .font(SQFont.body(12))
                     .foregroundStyle(SQColor.labelSecondary)
                 Text(value)
                     .font(SQFont.display(15, .bold))
@@ -275,8 +275,8 @@ struct MapItemSheet: View {
             detailRows([
                 ("Opérateur", detail?.mobileOperator ?? local?.operatorName),
                 ("Réseau", network),
-                ("Serveur", detail?.downloadServerName ?? detail?.server),
-                ("Streams", detail?.streams.map(String.init)),
+                ("Serveur de mesure", detail?.downloadServerName ?? detail?.server),
+                ("Flux simultanés", detail?.streams.map(String.init)),
                 ("Durée", SignalFormatters.duration(detail?.testDuration)),
                 ("Appareil", [detail?.deviceType, detail?.deviceModel].compactMap { $0 }.joined(separator: " ")),
                 ("Date", formatDate(detail?.timestamp ?? local?.timestamp)),
@@ -312,7 +312,7 @@ struct MapItemSheet: View {
                     }
                 }
                 Spacer()
-                TechBadge(text: item.kind.rawValue, color: SQColor.brandGreen)
+                TechBadge(text: kindLabel, color: SQColor.brandGreen)
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                 CardMetricTile(label: "RSRP", value: SignalFormatters.dbm(rsrp), highlight: true, accent: coverageColor(rsrp))
@@ -325,10 +325,10 @@ struct MapItemSheet: View {
             detailRows([
                 ("Opérateur", details?.operatorName),
                 ("Groupe", details?.groupId),
-                ("Primaire", details?.isPrimary.map { $0 ? "Oui" : "Non" }),
+                ("Primaire", details?.isPrimary.map { $0 ? String(localized: "Oui") : String(localized: "Non") }),
                 ("Date", formatDate(details?.timestamp)),
                 ("Position", coordinatesText(lat: item.coordinate.latitude, lon: item.coordinate.longitude)),
-                ("Source", details?.note ?? "Backend SignalQuest")
+                ("Source", details?.note ?? "SignalQuest")
             ])
         }
     }
@@ -344,7 +344,7 @@ struct MapItemSheet: View {
                         .foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer()
-                TechBadge(text: item.kind.rawValue, color: SQColor.brandGreen)
+                TechBadge(text: kindLabel, color: SQColor.brandGreen)
             }
             if let metric = item.metric {
                 MetricPill(title: "Donnée", value: metric, systemImage: "waveform.path.ecg")
@@ -358,7 +358,25 @@ struct MapItemSheet: View {
             speedtestDetail = try await services.speedtest.details(id: id)
             detailError = nil
         } catch {
-            detailError = "Détail API indisponible: \(error.userFacingMessage)"
+            detailError = String(localized: "Le détail de cette mesure n’a pas pu être chargé. \(error.userFacingMessage)")
+        }
+    }
+
+    /// Nom du genre d'élément, jamais sa valeur technique (TRX-26).
+    private var kindLabel: String {
+        switch item.kind {
+        case .friend: String(localized: "Ami")
+        case .photo: String(localized: "Photo")
+        case .validation: String(localized: "Validation")
+        case .session: String(localized: "Session de couverture")
+        case .coverage: String(localized: "Couverture")
+        case .speedtest: String(localized: "Speedtest")
+        case .outage: String(localized: "Panne")
+        case .communityOutage: String(localized: "Panne signalée")
+        case .planned: String(localized: "Site prévu")
+        case .antenna: String(localized: "Antenne")
+        case .communitySite: String(localized: "Site communautaire")
+        case .customSite: String(localized: "Site ajouté par un membre")
         }
     }
 
@@ -370,7 +388,9 @@ struct MapItemSheet: View {
         return VStack(spacing: SQSpace.sm) {
             ForEach(Array(visibleRows.enumerated()), id: \.offset) { _, row in
                 HStack(alignment: .firstTextBaseline) {
-                    Text(row.0)
+                    // Clé du catalogue : un libellé passé en `String` restait
+                    // en français dans l'app anglaise.
+                    Text(LocalizedStringKey(row.0))
                         .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
                         .foregroundStyle(SQColor.labelSecondary)
                     Spacer(minLength: 12)

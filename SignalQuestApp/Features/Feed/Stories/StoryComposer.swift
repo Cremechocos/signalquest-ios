@@ -387,8 +387,7 @@ struct StoryComposer: View {
                     .accessibilityHidden(true)
             }
             .padding(SQSpace.sm + 2)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .sqShadowSoft()
+            .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         }
         .buttonStyle(SQPressButtonStyle())
     }

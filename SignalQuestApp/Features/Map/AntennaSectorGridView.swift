@@ -301,7 +301,7 @@ struct AntennaSectorGridView: View {
                     ForEach(fhBeams.prefix(8)) { beam in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text("\(Int(beam.azimuth.rounded()))°")
-                                .font(SQFont.archivo(11.5, .bold))
+                                .font(SQFont.archivo(12, .bold))
                                 .foregroundStyle(tint)
                                 .frame(width: 34, alignment: .leading)
                             Text(describe(beam))

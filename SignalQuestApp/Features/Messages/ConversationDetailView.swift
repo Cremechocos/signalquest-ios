@@ -1136,7 +1136,7 @@ struct ConversationDetailView: View {
                                 .font(.system(size: 13))
                             if reaction.count > 1 {
                                 Text("\(reaction.count)")
-                                    .font(SQFont.body(11, .semibold))
+                                    .font(SQFont.body(12, .semibold))
                                     .foregroundStyle(reaction.mine ? SQColor.brandRed : SQColor.labelSecondary)
                             }
                         }

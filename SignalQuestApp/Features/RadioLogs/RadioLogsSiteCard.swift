@@ -311,6 +311,21 @@ struct RadioLogSiteCard: View {
     /// `.cells` — la composition du site. DESCRIPTIVE : aucune pastille de statut,
     /// aucun bouton. On ne calcule plus d'identification par cellule, donc il n'y
     /// a plus rien à y valider.
+    private func cellIdentity(_ cell: RadioLogCell) -> some View {
+        Text(cell.identityLabel ?? "—")
+            .font(.sqTechnical(M.cellIdSize))
+            .foregroundStyle(P.ink)
+            .lineLimit(1)
+    }
+
+    private func cellBand(_ label: String) -> some View {
+        Text(label)
+            .font(SQFont.body(M.cellBandSize))
+            .monospacedDigit()
+            .foregroundStyle(P.muted)
+            .lineLimit(1)
+    }
+
     private var cellsPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             RadioLogDashedSeparator()
@@ -322,19 +337,22 @@ struct RadioLogSiteCard: View {
                 .padding(.bottom, M.cellsHeaderBottom)
 
             ForEach(Array(site.cells.enumerated()), id: \.element.id) { index, cell in
-                HStack(spacing: M.cellRowGap) {
-                    RadioLogCellPciTag(label: cell.pciLabel)
-                    Text(cell.identityLabel ?? "—")
-                        .font(.sqTechnical(M.cellIdSize))
-                        .foregroundStyle(P.ink)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if let bandLabel = cell.bandLabel {
-                        Text(bandLabel)
-                            .font(SQFont.body(M.cellBandSize))
-                            .monospacedDigit()
-                            .foregroundStyle(P.muted)
-                            .lineLimit(1)
+                // Une ligne tant qu'elle tient ; texte agrandi, la bande passe
+                // dessous plutôt que de tronquer l'identité de la cellule.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: M.cellRowGap) {
+                        RadioLogCellPciTag(label: cell.pciLabel)
+                        cellIdentity(cell)
+                            .fixedSize()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let bandLabel = cell.bandLabel { cellBand(bandLabel).fixedSize() }
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: M.cellRowGap) {
+                            RadioLogCellPciTag(label: cell.pciLabel)
+                            cellIdentity(cell).lineLimit(2)
+                        }
+                        if let bandLabel = cell.bandLabel { cellBand(bandLabel) }
                     }
                 }
                 .padding(.vertical, M.cellRowPaddingV)

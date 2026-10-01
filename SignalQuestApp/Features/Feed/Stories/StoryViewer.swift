@@ -260,7 +260,7 @@ struct StoryViewer: View {
                                 .foregroundStyle(.white)
                             if let date = story.createdAt {
                                 Text(date, format: .relative(presentation: .named))
-                                    .font(.caption2)
+                                    .font(SQFont.body(12, relativeTo: .caption2))
                                     .foregroundStyle(.white.opacity(0.78))
                             }
                         }

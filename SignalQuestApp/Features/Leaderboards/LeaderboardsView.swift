@@ -1249,8 +1249,7 @@ private struct LeaderboardSkeleton: View {
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.vertical, SQSpace.md + 1)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.xl, elevation: .rest)
     }
 }
 

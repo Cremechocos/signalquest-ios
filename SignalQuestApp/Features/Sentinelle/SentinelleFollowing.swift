@@ -113,7 +113,7 @@ struct SentinelleFollowedCard: View {
                     }
 
                     Text("Ni adresse ni chemin réseau : c’est ce qui distingue une connexion suivie d’une box à soi.")
-                        .font(SQFont.body(11))
+                        .font(SQFont.body(12))
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -149,7 +149,7 @@ struct SentinelleFollowedCard: View {
     private func detailStat(_ label: String, _ value: String?) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .font(.caption2.weight(.semibold))
+                .font(SQFont.body(12, .semibold, relativeTo: .caption2))
                 .textCase(.uppercase)
                 .foregroundStyle(SQColor.labelSecondary)
             Text(value ?? "—")

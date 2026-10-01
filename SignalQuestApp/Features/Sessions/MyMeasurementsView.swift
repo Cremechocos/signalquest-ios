@@ -211,8 +211,7 @@ struct MyMeasurementsView: View {
             legendRow(Color(uiColor: SessionGenerationColor.ui(nil)), "Aucun")
         }
         .padding(SQSpace.sm + 2)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowSoft()
+        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .padding(SQSpace.md)
         .accessibilityHidden(true)
     }
@@ -221,7 +220,7 @@ struct MyMeasurementsView: View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 10, height: 10)
             Text(LocalizedStringKey(label))
-                .font(SQFont.body(11.5, relativeTo: .caption2))
+                .font(SQFont.body(12, relativeTo: .caption2))
                 .foregroundStyle(SQColor.label)
         }
     }

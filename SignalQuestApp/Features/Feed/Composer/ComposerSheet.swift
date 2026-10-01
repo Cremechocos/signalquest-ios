@@ -753,7 +753,7 @@ struct ComposerSheet: View {
             if charCount > 0 {
                 if isClose {
                     Text("\(limit - charCount)")
-                        .font(SQFont.body(11, .semibold))
+                        .font(SQFont.body(12, .semibold))
                         .foregroundStyle(isOver ? SQColor.danger : SQColor.warning)
                         .contentTransition(.numericText())
                 }

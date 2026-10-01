@@ -382,7 +382,7 @@ struct SentinelleAddressView: View {
         VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 Text(hop.collapsed > 1 ? "·" : "\(hop.idx)")
-                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
+                    .font(.system(.caption, design: .monospaced, weight: .semibold))
                     .foregroundStyle(SQColor.labelTertiary)
                     .frame(width: 16, alignment: .trailing)
                 Text(hop.label)

@@ -522,7 +522,7 @@ struct E2EEV2TrustedDevicesView: View {
                         .font(SQType.heading)
                     if isCurrent {
                         Text("Cet appareil")
-                            .font(.caption2.bold())
+                            .font(SQFont.body(12, .bold, relativeTo: .caption2))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(SQColor.accentSoft, in: Capsule())
@@ -535,7 +535,7 @@ struct E2EEV2TrustedDevicesView: View {
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                 Text("Clé de signature · \(device.signingKeyFingerprint)")
-                    .font(.caption2.monospaced())
+                    .font(.caption.monospaced())
                     .foregroundStyle(SQColor.labelSecondary)
                     .textSelection(.enabled)
             }

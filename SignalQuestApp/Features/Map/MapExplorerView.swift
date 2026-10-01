@@ -2202,14 +2202,14 @@ struct MapExplorerView: View {
                let error = model.friendsConnectionError,
                !error.isEmpty {
                 Text(error)
-                    .font(SQFont.archivo(10.5, .regular))
+                    .font(SQFont.archivo(12, .regular))
                     .foregroundStyle(SQColor.danger)
                     .lineLimit(2)
             }
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
-        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)) }
+        .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)) }
         .sqShadowSoft()
         .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: effectiveFriendsConnectionState)
     }
@@ -2317,7 +2317,7 @@ struct MapExplorerView: View {
                 }
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.vertical, SQSpace.sm + 2)
-                .background { mapGlassBackground(Capsule(style: .continuous)) }
+                .background { sqMapGlassBackground(Capsule(style: .continuous)) }
                 .sqShadowCard()
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -2412,7 +2412,7 @@ struct MapExplorerView: View {
         .padding(.horizontal, SQSpace.md + 2)
         .frame(minHeight: 44)
         .frame(maxWidth: .infinity)
-        .background { mapGlassBackground(Capsule(style: .continuous)) }
+        .background { sqMapGlassBackground(Capsule(style: .continuous)) }
         .overlay {
             Capsule(style: .continuous)
                 .strokeBorder(searchFieldFocused ? SQColor.brandRed : .clear, lineWidth: 2)
@@ -2431,7 +2431,7 @@ struct MapExplorerView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 44, height: 44)
-                    .background { mapGlassBackground(Circle()) }
+                    .background { sqMapGlassBackground(Circle()) }
                 if activeFilterCount > 0 && !dynamicTypeSize.isAccessibilitySize {
                     Text("\(activeFilterCount)")
                         .font(SQFont.body(10, .bold))
@@ -2512,7 +2512,7 @@ struct MapExplorerView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .frame(width: 46, height: 46)
                 .foregroundStyle(tint)
-                .background { mapGlassBackground(Circle()) }
+                .background { sqMapGlassBackground(Circle()) }
                 .sqShadowCard()
         }
         .buttonStyle(SQPressButtonStyle())
@@ -2523,12 +2523,6 @@ struct MapExplorerView: View {
 
     /// Fond commun des contrôles posés sur la carte : `surfaceGlass` (crème 92 %)
     /// sur blur système — la profondeur vient des ombres, jamais d'une bordure.
-    private func mapGlassBackground<S: InsettableShape>(_ shape: S) -> some View {
-        shape
-            .fill(SQColor.surfaceGlass)
-            .background(.ultraThinMaterial, in: shape)
-    }
-
     /// Bandeau « couverture isolée » : sans lui, une carte presque vide passerait
     /// pour un bug alors que c'est un filtre volontaire — et rien ne dirait
     /// comment en sortir.
@@ -2738,7 +2732,7 @@ struct MapExplorerView: View {
                 }
                 .padding(.leading, SQSpace.md + 2)
                 .padding(.trailing, SQSpace.sm)
-                .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+                .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
                 .sqShadowSoft()
                 ForEach(recentSearchResults) { result in
                     Button { openRecent(result) } label: {
@@ -2791,7 +2785,7 @@ struct MapExplorerView: View {
             .padding(.horizontal, SQSpace.md + 2)
             .padding(.vertical, SQSpace.sm + 2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+            .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
             .sqShadowSoft()
         }
     }
@@ -2828,7 +2822,7 @@ struct MapExplorerView: View {
         .padding(.horizontal, SQSpace.md + 2)
         .padding(.vertical, SQSpace.sm + 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+        .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
         .sqShadowSoft()
     }
 

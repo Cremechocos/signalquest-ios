@@ -59,7 +59,7 @@ struct OutageDetailSheet: View {
                             .foregroundStyle(SQColor.label)
                         Spacer(minLength: 0)
                         Text(serviceStatusLabel(service.status))
-                            .font(SQFont.body(11, .bold, relativeTo: .caption2))
+                            .font(SQFont.body(12, .bold, relativeTo: .caption2))
                             .foregroundStyle(serviceColor(service.status))
                     }
                     .padding(.horizontal, SQSpace.sm + 2)

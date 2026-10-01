@@ -1326,12 +1326,6 @@ struct DriveTestView: View {
 
     /// Fond des contrôles posés sur la carte : verre crème (`surfaceGlass` sur blur
     /// système) — la profondeur vient des ombres, jamais d'une bordure.
-    private func mapGlassBackground<S: InsettableShape>(_ shape: S) -> some View {
-        shape
-            .fill(SQColor.surfaceGlass)
-            .background(.ultraThinMaterial, in: shape)
-    }
-
     /// Bouton de légende (masquée par défaut) + légende compacte génération/débit.
     private var mapLegendControl: some View {
         VStack(alignment: .trailing, spacing: SQSpace.xs) {
@@ -1342,7 +1336,7 @@ struct DriveTestView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 40, height: 40)
-                    .background { mapGlassBackground(Circle()) }
+                    .background { sqMapGlassBackground(Circle()) }
                     .sqShadowSoft()
                     .padding(2)
                     .contentShape(Rectangle())
@@ -1358,7 +1352,7 @@ struct DriveTestView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(SQColor.accentInk)
                         .frame(width: 40, height: 40)
-                        .background { mapGlassBackground(Circle()) }
+                        .background { sqMapGlassBackground(Circle()) }
                         .sqShadowSoft()
                         .padding(2)
                         .contentShape(Rectangle())
@@ -1393,7 +1387,7 @@ struct DriveTestView: View {
             )
         }
         .padding(SQSpace.sm + 2)
-        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+        .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
         .sqShadowCard()
         // Largeur PLAFONNÉE et non figée : à 146 pt fixes, la légende débordait dès
         // les grandes tailles de texte.
@@ -1471,7 +1465,7 @@ struct DriveTestView: View {
             ScrollView { panelContent }
         }
         .padding(SQSpace.lg)
-        .background { mapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)) }
+        .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)) }
         .sqShadowDock()
     }
 
