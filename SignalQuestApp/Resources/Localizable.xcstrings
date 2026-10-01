@@ -3264,6 +3264,38 @@
         }
       }
     },
+    "5G 3,5 GHz" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G 3.5 GHz"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G 3,5 GHz"
+          }
+        }
+      }
+    },
+    "5G 2,1 GHz" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G 2.1 GHz"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G 2,1 GHz"
+          }
+        }
+      }
+    },
     "10 antennes validées" : {
       "extractionState" : "stale",
       "localizations" : {

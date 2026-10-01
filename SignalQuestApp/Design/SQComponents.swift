@@ -793,7 +793,7 @@ struct SQChip: View {
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SQPressButtonStyle(scale: 0.97))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

@@ -193,24 +193,7 @@ struct MyMeasurementsView: View {
     }
 
     private func coloringChip(_ label: String, value: SessionPointColoring) -> some View {
-        let isSelected = coloring == value
-        return Button {
-            Haptics.selection()
-            coloring = value
-        } label: {
-            Text(LocalizedStringKey(label))
-                .font(SQFont.body(13, .semibold))
-                .padding(.horizontal, SQSpace.lg - 2)
-                .padding(.vertical, SQSpace.sm)
-                .frame(minHeight: 34)
-                .background(isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
-                .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
-                .sqShadowSoft()
-                .padding(.vertical, 5)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        SQChip(label: label, isSelected: coloring == value) { coloring = value }
     }
 
     /// Légende de la carte de couverture GÉNÉRATION — couleurs dérivées de

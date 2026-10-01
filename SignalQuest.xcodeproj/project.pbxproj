@@ -57,6 +57,7 @@
 		0ECBE473F9CE2213A93E7583 /* SQUserBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC5255F7439DB3A81B3C67F6 /* SQUserBadge.swift */; };
 		0EEF1C07C36C03F62FB62C7C /* CommunityOutageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBF10C60A108A1CB37B923B /* CommunityOutageService.swift */; };
 		0F303A7E35909C0794F276C8 /* CommentsPaginationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FD3E622986BF2B624EAAA44 /* CommentsPaginationTests.swift */; };
+		0F45DA9182F7FE0F51DCD54D /* FilterChipsQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF852357E76EA3FBE622AF9 /* FilterChipsQATests.swift */; };
 		0F93CA162732A4E9F82EC1AF /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD246E248AC961551013A82C /* Haptics.swift */; };
 		0FC1E05534800C8F2C87ABD4 /* SQFriendMarkerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E75516A87ED197A5BB4AB1 /* SQFriendMarkerView.swift */; };
 		101EE7790A3B45CF264F25A4 /* MobileChallenge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F63BABF362FE8E93BB147A /* MobileChallenge.swift */; };
@@ -1521,6 +1522,7 @@
 		FFB64D26D0A20143A4BE4181 /* SignalDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalDetailSheet.swift; sourceTree = "<group>"; };
 		FFC069610DDF030B6E30662A /* E2EEV2NotificationContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2NotificationContracts.swift; sourceTree = "<group>"; };
 		FFEDF50792978A1127B6CE18 /* RecentlyViewedStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentlyViewedStoreTests.swift; sourceTree = "<group>"; };
+		FFF852357E76EA3FBE622AF9 /* FilterChipsQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChipsQATests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2114,6 +2116,7 @@
 				778C35EAFC6F349073E319F2 /* EmailVerificationHTTPQATests.swift */,
 				1A3D99AB068ED83725E470A8 /* ExploreGlobalSearchQATests.swift */,
 				A8C2E559B11AB5C6C4A0CC44 /* FeedHTTPQATests.swift */,
+				FFF852357E76EA3FBE622AF9 /* FilterChipsQATests.swift */,
 				CFDF16B243853AE40E37D07C /* FluidityQATests.swift */,
 				102DC9580336DD3FD9659049 /* ForcedUpdateQATests.swift */,
 				AEF301566BC00073B5C158FA /* Info.plist */,
@@ -3594,6 +3597,7 @@
 				705787474C4AA97E1CE08765 /* EmailVerificationHTTPQATests.swift in Sources */,
 				7931B6341BA331E1468FBC56 /* ExploreGlobalSearchQATests.swift in Sources */,
 				ADDFB57BB4F15CED64D1B4F3 /* FeedHTTPQATests.swift in Sources */,
+				0F45DA9182F7FE0F51DCD54D /* FilterChipsQATests.swift in Sources */,
 				3D1F0588D592CF8DED9BD1EB /* FluidityQATests.swift in Sources */,
 				9BBEA8BCA31C96AB96163886 /* ForcedUpdateQATests.swift in Sources */,
 				14F9B1F1C6BFB7DFD7619108 /* KeyboardShortcutsQATests.swift in Sources */,

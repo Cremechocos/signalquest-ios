@@ -303,25 +303,11 @@ struct ANFRStatsView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
                 ForEach(ANFRFilterType.allCases) { type in
-                    let selected = model.selectedFilter == type
-                    Button {
-                        Haptics.selection()
+                    SQChip(label: type.label, isSelected: model.selectedFilter == type) {
                         withAnimation(reduceMotion ? nil : SQMotion.standard) {
                             model.selectedFilter = type
                         }
-                    } label: {
-                        Text(type.label)
-                            .font(SQFont.body(13, .semibold))
-                            .padding(.horizontal, SQSpace.md)
-                            .frame(height: 36)
-                            .background(selected ? SQColor.brandRed : SQColor.surface, in: Capsule(style: .continuous))
-                            .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
-                            .sqShadowSoft()
-                            .padding(.vertical, 4)
-                            .contentShape(Rectangle())
                     }
-                    .buttonStyle(SQPressButtonStyle())
-                    .sqAnimation(SQMotion.fast, value: selected)
                 }
             }
             .padding(.horizontal, 2)

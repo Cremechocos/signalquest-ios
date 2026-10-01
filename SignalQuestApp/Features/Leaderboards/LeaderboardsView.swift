@@ -312,7 +312,7 @@ struct LeaderboardsView: View {
             Spacer(minLength: 0)
 
             // Portée Amis : toggle icône compact.
-            LeaderboardFilterChip(label: "Amis", icon: "person.2.fill", isOn: model.scope == "friends") {
+            SQChip(label: "Amis", systemImage: "person.2.fill", isSelected: model.scope == "friends") {
                 model.toggleScope()
             }
         }
@@ -792,45 +792,6 @@ private struct LeaderboardMenuPill<Items: View>: View {
             .contentShape(Capsule(style: .continuous))
         }
         .accessibilityLabel("\(accessibility) : \(label)")
-    }
-}
-
-// MARK: - Chip de filtre
-
-// Capsule de segment/filtre « Crème » : Figtree SemiBold 13 en casse normale ;
-// actif = fond brique + texte crème, inactif = surface + ombre douce (sans bordure).
-private struct LeaderboardFilterChip: View {
-    let label: String
-    var icon: String? = nil
-    let isOn: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            Haptics.selection()
-            action()
-        } label: {
-            HStack(spacing: 5) {
-                if let icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 11, weight: .semibold))
-                }
-                Text(LocalizedStringKey(label))
-                    .font(SQFont.body(13, .semibold))
-            }
-                .padding(.horizontal, SQSpace.md + 2)
-                .padding(.vertical, SQSpace.sm)
-                .background(
-                    isOn ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                    in: Capsule(style: .continuous)
-                )
-                .foregroundStyle(isOn ? SQColor.onAccent : SQColor.label)
-                .sqShadowSoft()
-                .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(LocalizedStringKey(label))
-        .accessibilityAddTraits(isOn ? [.isSelected] : [])
     }
 }
 
