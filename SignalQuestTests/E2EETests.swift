@@ -670,11 +670,12 @@ final class E2EETests: XCTestCase {
         XCTAssertNil(E2EEV2DeviceEnrollmentContract.parseRegistration(mismatched, expected: descriptor))
     }
 
-    func testV2DeviceApprovalQRMatchesSharedFixtureAndRejectsTamperingOrExpiry() throws {
+    func testV2DeviceApprovalQRCarriesPlatformAndFingerprintAndRefusesTheOldVersion() throws {
         let fixture = try deviceApprovalFixture()
         let expiresAt = ISO8601DateFormatter().string(
             from: Date(timeIntervalSince1970: TimeInterval(fixture.expiresAtMs) / 1_000)
         )
+        let device = approvalDescriptor(deviceId: fixture.pendingDeviceId)
         let approval = E2EEV2Approval(
             id: fixture.approvalId,
             pendingDeviceId: fixture.pendingDeviceId,
@@ -686,20 +687,24 @@ final class E2EETests: XCTestCase {
             createdAt: expiresAt
         )
 
-        XCTAssertEqual(try E2EEV2DeviceApprovalContract.encodeQRPayload(approval), fixture.qr.payload)
-        let parsed = E2EEV2DeviceApprovalContract.parseQRPayload(
+        let payload = try E2EEV2DeviceApprovalContract.encodeQRPayload(approval, device: device)
+        XCTAssertTrue(payload.hasPrefix("SQE2EE2|3|"), "QR v3 (spec v0.4.5)")
+        let parsed = try XCTUnwrap(E2EEV2DeviceApprovalContract.parseQRPayload(
+            payload,
+            nowMs: fixture.expiresAtMs - 60_000
+        ))
+        XCTAssertEqual(parsed.approvalId, fixture.approvalId)
+        XCTAssertEqual(parsed.platform, "ios")
+        XCTAssertEqual(parsed.fingerprint, E2EEV2DeviceApprovalContract.fingerprint(of: device))
+        XCTAssertNil(E2EEV2DeviceApprovalContract.parseQRPayload(
             try XCTUnwrap(fixture.qr.payload),
             nowMs: fixture.expiresAtMs - 60_000
-        )
-        XCTAssertEqual(parsed?.approvalId, fixture.approvalId)
-        XCTAssertNil(E2EEV2DeviceApprovalContract.parseQRPayload(
-            try XCTUnwrap(fixture.qr.payload) + "|extra",
-            nowMs: 0
-        ))
-        XCTAssertNil(E2EEV2DeviceApprovalContract.parseQRPayload(
-            try XCTUnwrap(fixture.qr.payload),
-            nowMs: fixture.expiresAtMs
-        ))
+        ), "L'ancien QR, sans empreinte ni plateforme, est refusé")
+        XCTAssertNil(E2EEV2DeviceApprovalContract.parseQRPayload(payload + "|extra", nowMs: 0))
+        XCTAssertNil(E2EEV2DeviceApprovalContract.parseQRPayload(payload, nowMs: fixture.expiresAtMs))
+        XCTAssertThrowsError(try E2EEV2DeviceApprovalContract.encodeQRPayload(
+            approval, device: approvalDescriptor(deviceId: "device_other_ios_01J7ABCD")
+        ), "Un QR ne montre que l'appareil de sa demande")
     }
 
     func testV2DeviceApprovalProximityCodeRejectsAmbiguousCharacters() throws {
@@ -738,50 +743,76 @@ final class E2EETests: XCTestCase {
         let expiresAt = ISO8601DateFormatter().string(
             from: Date(timeIntervalSince1970: TimeInterval(fixture.expiresAtMs) / 1_000)
         )
-        let descriptor = E2EEV2DeviceDescriptor(
-            deviceId: fixture.pendingDeviceId,
+        let descriptor = approvalDescriptor(deviceId: fixture.pendingDeviceId)
+        let approval = E2EEV2Approval(
+            id: fixture.approvalId,
+            pendingDeviceId: fixture.pendingDeviceId,
+            method: .qr,
+            challengeB64URL: fixture.qr.challengeB64Url,
+            proximityCode: nil,
+            status: .pending,
+            expiresAt: expiresAt,
+            createdAt: expiresAt
+        )
+        func detail(_ pending: E2EEV2DeviceDescriptor, challenge: String? = nil) -> E2EEV2ApprovalDetail {
+            E2EEV2ApprovalDetail(
+                approval: .init(
+                    id: fixture.approvalId,
+                    pendingDeviceId: fixture.pendingDeviceId,
+                    method: .qr,
+                    challengeB64URL: challenge ?? fixture.qr.challengeB64Url,
+                    proximityCode: nil,
+                    status: .pending,
+                    expiresAt: expiresAt,
+                    createdAt: expiresAt
+                ),
+                pendingDevice: .init(
+                    descriptor: pending,
+                    status: .pending,
+                    approvedAt: nil,
+                    revokedAt: nil,
+                    lastSeenAt: nil,
+                    createdAt: expiresAt
+                )
+            )
+        }
+        let qr = try XCTUnwrap(E2EEV2DeviceApprovalContract.parseQRPayload(
+            try E2EEV2DeviceApprovalContract.encodeQRPayload(approval, device: descriptor),
+            nowMs: fixture.expiresAtMs - 1
+        ))
+        XCTAssertEqual(E2EEV2DeviceApprovalContract.compareQR(qr, detail(descriptor)), .match)
+        XCTAssertTrue(E2EEV2DeviceApprovalContract.qrMatchesDetail(qr, detail(descriptor)))
+        XCTAssertEqual(
+            E2EEV2DeviceApprovalContract.compareQR(qr, detail(descriptor, challenge: fixture.push.challengeB64Url)),
+            .approvalMismatch
+        )
+        XCTAssertEqual(
+            E2EEV2DeviceApprovalContract.compareQR(qr, detail(approvalDescriptor(deviceId: fixture.pendingDeviceId))),
+            .deviceMismatch, "Le serveur annonce d'autres clés que celles du QR"
+        )
+        let relabelled = E2EEV2DeviceDescriptor(
+            deviceId: descriptor.deviceId, platform: "web", label: descriptor.label,
+            publicIdentityKeyB64: descriptor.publicIdentityKeyB64, publicSigningKeyB64: descriptor.publicSigningKeyB64,
+            identityKeyAlgorithm: descriptor.identityKeyAlgorithm, signingKeyAlgorithm: descriptor.signingKeyAlgorithm,
+            keyVersion: descriptor.keyVersion
+        )
+        XCTAssertEqual(
+            E2EEV2DeviceApprovalContract.compareQR(qr, detail(relabelled)), .platformMismatch,
+            "Le serveur présente l'appareil avec une autre plateforme que celle du QR"
+        )
+    }
+
+    private func approvalDescriptor(deviceId: String) -> E2EEV2DeviceDescriptor {
+        E2EEV2DeviceDescriptor(
+            deviceId: deviceId,
             platform: "ios",
             label: "iPhone",
-            publicIdentityKeyB64: "unused",
-            publicSigningKeyB64: "unused",
+            publicIdentityKeyB64: P256.KeyAgreement.PrivateKey().publicKey.x963Representation.base64EncodedString(),
+            publicSigningKeyB64: P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString(),
             identityKeyAlgorithm: E2EEV2DeviceIdentityStore.identityKeyAlgorithm,
             signingKeyAlgorithm: E2EEV2DeviceIdentityStore.signingKeyAlgorithm,
             keyVersion: 1
         )
-        let detail = E2EEV2ApprovalDetail(
-            approval: .init(
-                id: fixture.approvalId,
-                pendingDeviceId: fixture.pendingDeviceId,
-                method: .qr,
-                challengeB64URL: fixture.qr.challengeB64Url,
-                proximityCode: nil,
-                status: .pending,
-                expiresAt: expiresAt,
-                createdAt: expiresAt
-            ),
-            pendingDevice: .init(
-                descriptor: descriptor,
-                status: .pending,
-                approvedAt: nil,
-                revokedAt: nil,
-                lastSeenAt: nil,
-                createdAt: expiresAt
-            )
-        )
-        let qr = try XCTUnwrap(E2EEV2DeviceApprovalContract.parseQRPayload(
-            try XCTUnwrap(fixture.qr.payload),
-            nowMs: fixture.expiresAtMs - 1
-        ))
-        XCTAssertTrue(E2EEV2DeviceApprovalContract.qrMatchesDetail(qr, detail))
-        XCTAssertFalse(E2EEV2DeviceApprovalContract.qrMatchesDetail(
-            .init(
-                approvalId: qr.approvalId,
-                pendingDeviceId: qr.pendingDeviceId,
-                challengeB64URL: fixture.push.challengeB64Url,
-                expiresAtMs: qr.expiresAtMs
-            ),
-            detail
-        ))
     }
 
     func testV2InitialBootstrapMatchesSharedFixtureAndBindsOneProofAndDevice() throws {
@@ -2616,7 +2647,7 @@ final class E2EETests: XCTestCase {
         XCTAssertTrue(source.contains("loadQRApproval(input)"))
         XCTAssertTrue(source.contains("resolveProximityCode(input)"))
         XCTAssertTrue(source.contains("lifecycle.approve(detail)"))
-        XCTAssertTrue(source.contains("encodeQRPayload(approval)"))
+        XCTAssertTrue(source.contains("encodeQRPayload(approval, device: device)"))
         XCTAssertTrue(source.contains("E2EEV2RecoveryCoordinatorV2"))
         XCTAssertTrue(source.contains("E2EEV2RecoveryEpochCoordinator"))
         XCTAssertTrue(source.contains("loadActiveBundle()"))
@@ -5396,7 +5427,9 @@ extension E2EETests {
                     "method": approval.method.rawValue,
                     "expiresAt": approval.expiresAt,
                 ]
-                if method == .qr { value["qrPayload"] = try E2EEV2DeviceApprovalContract.encodeQRPayload(approval) }
+                if method == .qr, let device = try identity.load() {
+                    value["qrPayload"] = try E2EEV2DeviceApprovalContract.encodeQRPayload(approval, device: device)
+                }
                 if let code = approval.proximityCode { value["proximityCode"] = code }
                 payload = value
             }

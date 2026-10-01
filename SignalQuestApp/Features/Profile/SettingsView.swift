@@ -17,6 +17,8 @@ struct ExportedDataFile: Identifiable {
 final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     @Published private(set) var devices: [E2EEV2RemoteDevice] = []
     @Published private(set) var currentDeviceId: String?
+    /// Descripteur local : le QR d'approbation en montre la plateforme et l'empreinte.
+    @Published private(set) var localDescriptor: E2EEV2DeviceDescriptor?
     @Published private(set) var activationEnabled = false
     @Published private(set) var identityGeneration: Int?
     @Published private(set) var isLoading = false
@@ -59,8 +61,10 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            currentDeviceId = try identityStore.load()?.deviceId
+            localDescriptor = try identityStore.load()
+            currentDeviceId = localDescriptor?.deviceId
         } catch {
+            localDescriptor = nil
             currentDeviceId = nil
             devices = []
             errorMessage = String(localized: "L’identité locale E2EE v2 est illisible. Elle n’a pas été remplacée automatiquement.")
@@ -186,9 +190,16 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         switch result {
         case .success(let detail):
             approvalDetail = detail
-        case .failed:
+        case .failed(let failure):
             approvalDetail = nil
-            approvalErrorMessage = "Demande invalide, expirée ou incohérente avec le serveur."
+            switch failure.message {
+            case "e2ee-qr-platform-mismatch":
+                approvalErrorMessage = String(localized: "Plateforme différente de celle affichée, approbation refusée.")
+            case "e2ee-qr-device-mismatch":
+                approvalErrorMessage = String(localized: "Cet appareil ne correspond pas au code affiché, approbation refusée.")
+            default:
+                approvalErrorMessage = "Demande invalide, expirée ou incohérente avec le serveur."
+            }
         }
     }
 
@@ -575,7 +586,8 @@ struct E2EEV2TrustedDevicesView: View {
                         .foregroundStyle(SQColor.danger)
                 }
             case .qr:
-                if let payload = try? E2EEV2DeviceApprovalContract.encodeQRPayload(approval),
+                if let device = model.localDescriptor,
+                   let payload = try? E2EEV2DeviceApprovalContract.encodeQRPayload(approval, device: device),
                    let image = qrCode(for: payload) {
                     Image(uiImage: image)
                         .interpolation(.none)

@@ -10391,6 +10391,22 @@
         }
       }
     },
+    "Cet appareil ne correspond pas au code affiché, approbation refusée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device doesn't match the code displayed. Approval refused."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil ne correspond pas au code affiché, approbation refusée."
+          }
+        }
+      }
+    },
     "Choisis une preuve temporaire à transmettre à un appareil déjà approuvé." : {
       "localizations" : {
         "en" : {
@@ -33161,6 +33177,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photos en cours de vérification : %lld"
+          }
+        }
+      }
+    },
+    "Plateforme différente de celle affichée, approbation refusée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The platform differs from the one displayed. Approval refused."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plateforme différente de celle affichée, approbation refusée."
           }
         }
       }

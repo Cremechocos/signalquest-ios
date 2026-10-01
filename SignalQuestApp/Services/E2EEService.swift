@@ -2151,11 +2151,26 @@ struct E2EEV2ApprovalDetail: Equatable, Sendable {
     let pendingDevice: E2EEV2RemoteDevice
 }
 
+/// QR v3 (D.13) lu par l'approbateur : la plateforme et l'empreinte de
+/// l'appareil en attente font partie de ce que l'utilisateur compare.
 struct E2EEV2QRApprovalPayload: Equatable, Sendable {
     let approvalId: String
     let pendingDeviceId: String
+    let platform: String
+    let fingerprint: String
     let challengeB64URL: String
     let expiresAtMs: Int64
+}
+
+/// Ce que le QR scanné dit du serveur (D.13).
+enum E2EEV2QRComparison: Equatable, Sendable {
+    case match
+    /// Une autre demande que celle du QR.
+    case approvalMismatch
+    /// Les clés annoncées par le serveur ne sont pas celles du QR.
+    case deviceMismatch
+    /// « Plateforme différente de celle affichée, approbation refusée. »
+    case platformMismatch
 }
 
 struct E2EEV2ApprovalCompletion: Equatable, Sendable {
@@ -2410,49 +2425,55 @@ enum E2EEV2DeviceApprovalContract {
         return matches(normalized, proximityPattern) ? normalized : nil
     }
 
-    static func encodeQRPayload(_ approval: E2EEV2Approval) throws -> String {
+    /// QR v3 affiché par l'appareil en attente, avec sa plateforme et
+    /// l'empreinte de ses deux clés (D.13).
+    static func encodeQRPayload(_ approval: E2EEV2Approval, device: E2EEV2DeviceDescriptor) throws -> String {
         guard approval.method == .qr,
               approval.status == .pending,
               validOpaqueId(approval.id),
               validOpaqueId(approval.pendingDeviceId),
+              approval.pendingDeviceId == device.deviceId,
               let challenge = approval.challengeB64URL,
               validChallenge(challenge),
-              let expiresAt = parseISO8601(approval.expiresAt) else {
+              let expiresAt = parseISO8601(approval.expiresAt),
+              let fingerprint = fingerprint(of: device) else {
             throw E2EEV2DeviceIdentityError.invalidRecord
         }
-        let expiresAtMs = Int64((expiresAt.timeIntervalSince1970 * 1_000).rounded())
-        return [
-            "SQE2EE2",
-            "1",
-            approval.id,
-            approval.pendingDeviceId,
-            challenge,
-            String(expiresAtMs),
-        ].joined(separator: "|")
+        let qr = E2EEV2ApprovalV2.QR(
+            approvalId: approval.id,
+            pendingDeviceId: approval.pendingDeviceId,
+            platform: device.platform,
+            fingerprint: fingerprint,
+            challengeB64Url: challenge,
+            expiresAtMs: Int64((expiresAt.timeIntervalSince1970 * 1_000).rounded())
+        )
+        guard E2EEV2ApprovalV2.QR.parse(qr.payload) == qr else { throw E2EEV2DeviceIdentityError.invalidRecord }
+        return qr.payload
     }
 
+    /// Lecture stricte du QR v3 ; une autre version est refusée, jamais devinée.
     static func parseQRPayload(
         _ raw: String,
         nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)
     ) -> E2EEV2QRApprovalPayload? {
-        let parts = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(separator: "|", omittingEmptySubsequences: false)
-            .map(String.init)
-        guard parts.count == 6,
-              parts[0] == "SQE2EE2",
-              parts[1] == "1",
-              validOpaqueId(parts[2]),
-              validOpaqueId(parts[3]),
-              validChallenge(parts[4]),
-              let expiresAtMs = Int64(parts[5]),
-              expiresAtMs > nowMs,
-              expiresAtMs - nowMs <= challengeTTL else { return nil }
+        guard let qr = E2EEV2ApprovalV2.QR.parse(raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              validChallenge(qr.challengeB64Url),
+              qr.expiresAtMs > nowMs,
+              qr.expiresAtMs - nowMs <= challengeTTL else { return nil }
         return .init(
-            approvalId: parts[2],
-            pendingDeviceId: parts[3],
-            challengeB64URL: parts[4],
-            expiresAtMs: expiresAtMs
+            approvalId: qr.approvalId,
+            pendingDeviceId: qr.pendingDeviceId,
+            platform: qr.platform,
+            fingerprint: qr.fingerprint,
+            challengeB64URL: qr.challengeB64Url,
+            expiresAtMs: qr.expiresAtMs
         )
+    }
+
+    static func fingerprint(of device: E2EEV2DeviceDescriptor) -> String? {
+        guard let identity = Data(base64Encoded: device.publicIdentityKeyB64),
+              let signing = Data(base64Encoded: device.publicSigningKeyB64) else { return nil }
+        return E2EEV2Canonical.deviceFingerprint(identityKeyX963: identity, signingKeyX963: signing)
     }
 
     static func parseApprovalCreation(_ data: Data) -> E2EEV2Approval? {
@@ -2701,13 +2722,26 @@ enum E2EEV2DeviceApprovalContract {
     }
 
     static func qrMatchesDetail(_ qr: E2EEV2QRApprovalPayload, _ detail: E2EEV2ApprovalDetail) -> Bool {
-        guard let expiry = parseISO8601(detail.approval.expiresAt) else { return false }
-        return detail.approval.method == .qr
-            && detail.approval.status == .pending
-            && detail.approval.id == qr.approvalId
-            && detail.approval.pendingDeviceId == qr.pendingDeviceId
-            && detail.approval.challengeB64URL == qr.challengeB64URL
-            && Int64((expiry.timeIntervalSince1970 * 1_000).rounded()) == qr.expiresAtMs
+        compareQR(qr, detail) == .match
+    }
+
+    static func compareQR(_ qr: E2EEV2QRApprovalPayload, _ detail: E2EEV2ApprovalDetail) -> E2EEV2QRComparison {
+        guard let expiry = parseISO8601(detail.approval.expiresAt),
+              detail.approval.method == .qr,
+              detail.approval.status == .pending,
+              detail.approval.id == qr.approvalId,
+              detail.approval.pendingDeviceId == qr.pendingDeviceId,
+              detail.approval.challengeB64URL == qr.challengeB64URL,
+              Int64((expiry.timeIntervalSince1970 * 1_000).rounded()) == qr.expiresAtMs else {
+            return .approvalMismatch
+        }
+        let pending = detail.pendingDevice.descriptor
+        guard pending.deviceId == qr.pendingDeviceId, fingerprint(of: pending) == qr.fingerprint else {
+            return .deviceMismatch
+        }
+        // Comparaison octet à octet, sans normalisation (D.2).
+        guard pending.platform == qr.platform else { return .platformMismatch }
+        return .match
     }
 
     static func validOpaqueId(_ value: String) -> Bool { matches(value, opaquePattern) }
@@ -3102,9 +3136,12 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         case .failed(let failure):
             return .failed(failure)
         case .success(let detail):
-            return E2EEV2DeviceApprovalContract.qrMatchesDetail(qr, detail)
-                ? .success(detail)
-                : localFailure("e2ee-qr-server-mismatch")
+            switch E2EEV2DeviceApprovalContract.compareQR(qr, detail) {
+            case .match: return .success(detail)
+            case .approvalMismatch: return localFailure("e2ee-qr-server-mismatch")
+            case .deviceMismatch: return localFailure("e2ee-qr-device-mismatch")
+            case .platformMismatch: return localFailure("e2ee-qr-platform-mismatch")
+            }
         }
     }
 
