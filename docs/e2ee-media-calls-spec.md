@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.8**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.9**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la prochaine bêta TestFlight
@@ -156,6 +156,16 @@
 >   changement d'appartenance sérialisés, genèse idempotente à l'octet,
 >   portée du compteur et séquences de la liste (§2.7, §2.8, D.13, E.0 à
 >   E.3). Aucun vecteur ne change.
+> - v0.4.9 (01/10/2026) : changement de numéro de sécurité vu par un contact.
+>   Le nouveau numéro est montré sans que la nouvelle UIK soit crue. Tant que
+>   l'utilisateur ne l'a pas acceptée, rien n'est envoyé à ce compte et il
+>   n'est jamais exclu en silence d'une nouvelle époque ; il en va de même
+>   pour tout membre dont le paquet est refusé. Elle n'est épinglée qu'à la
+>   demande de l'utilisateur, si c'est encore celle dont le numéro a été
+>   montré, après une relecture du paquet sans `sinceVersion`. Force du numéro
+>   précisée : environ 100 bits par personne. Le serveur ignore un
+>   `sinceVersion` qui dépasse la version courante de la liste (§2.4, E.1).
+>   Aucun vecteur ne change.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -295,15 +305,34 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
 
 ### 2.4 Numéro de sécurité
 
-- **Par utilisateur**, calculé sur la clé publique de l'UIK : au moins 128 bits,
-  affichés en 60 chiffres par groupes de cinq et en QR, avec une dérivation
-  itérée (5 200 itérations de SHA-512, comme Signal).
+- **Par utilisateur**, calculé sur la clé publique de l'UIK : 30 chiffres, soit
+  environ 100 bits par personne, comme Signal (v0.4.9). Le numéro d'une paire,
+  60 chiffres, s'affiche par groupes de cinq et en QR. La dérivation itérée
+  (5 200 itérations de SHA-512) renchérit chaque essai d'une clé qui donnerait
+  les mêmes chiffres.
 - Il ne change pas à l'ajout d'un appareil certifié. Il change seulement à la
   réinitialisation de l'identité.
 - **Réinitialisation d'identité** : les appareils existants du compte en sont
   notifiés et peuvent s'y opposer pendant 72 heures. Les contacts voient
-  « Le numéro de sécurité de X a changé ». Si l'UIK était vérifiée, l'envoi est
-  bloqué jusqu'à nouvelle vérification.
+  « X a un nouveau numéro de sécurité ». L'envoi vers X attend que
+  l'utilisateur accepte ce nouveau numéro et, si l'ancien était vérifié, qu'il
+  le vérifie (ci-dessous).
+- **Changement vu par un contact** (v0.4.9) :
+  - le client montre le nouveau numéro, calculé sur l'UIK servie, sans la
+    croire : aucun appareil de ce compte n'est certifié tant qu'elle n'est pas
+    épinglée ;
+  - d'ici là, le client NE DOIT rien envoyer à ce compte, ni l'exclure en
+    silence d'une nouvelle époque. Dans les conversations dont il est membre,
+    l'envoi, la rotation et la création attendent, et un avis y donne accès à
+    son numéro. Il en va de même pour tout membre dont le paquet est refusé
+    (liste en recul, lacune, signature invalide) ;
+  - le client n'épingle la nouvelle UIK qu'à la demande de l'utilisateur,
+    « vérifiée » s'il vient de comparer, et seulement si l'UIK servie est
+    encore celle dont le numéro a été montré. Il relit alors le paquet **sans**
+    `sinceVersion`, puisque la liste de la nouvelle identité repart de 1
+    (D.14), et le vérifie comme au premier contact ;
+  - une UIK vérifiée ne se remplace qu'avec une nouvelle vérification ; une
+    UIK non vérifiée s'accepte d'un geste.
 
 ### 2.5 Membres des groupes
 
@@ -2217,6 +2246,11 @@ version publiée qui ouvre les verrous.
   - `capabilities` : liste de `{document, signatureB64}`, le dernier document
     de chaque appareil ;
   - `pendingIdentityReset` : `{reset, signatureB64}` ou `null`.
+
+  Un `sinceVersion` plus grand que la version courante de la liste (identité
+  réinitialisée depuis, v0.4.9) est ignoré : la réponse porte l'UIK et la
+  liste courantes, sans chaîne ni erreur. Le client compare l'UIK avant de
+  vérifier la chaîne.
 - **`POST /api/e2ee/v2/bootstrap`**, étendu pour le premier appareil. Corps
   existant, plus :
   - `accountIdentityKeyB64` ;
