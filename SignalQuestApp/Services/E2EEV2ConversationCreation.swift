@@ -136,6 +136,14 @@ struct E2EEV2ConversationCreation: Sendable {
         ]))
     }
 
+    /// Migration d'une conversation v1 (§14.2) : la conversation existe déjà.
+    var migrationBody: Data {
+        E2EEV2CanonicalJSON.encode(.object([
+            "membership": .array(membership.map(E2EEV2MembershipChange.json)),
+            "epoch": epoch.json,
+        ]))
+    }
+
     /// Identifiant choisi par l'appareil : 128 bits aléatoires au format opaque.
     static func newConversationId() throws -> String {
         var bytes = Data(count: 16)
@@ -152,6 +160,7 @@ struct E2EEV2ConversationCreation: Sendable {
         isGroup: Bool,
         title: String?,
         excludesWeb: Bool,
+        adminIds: [String]? = nil,
         devices: E2EEV2CertifiedDeviceSet,
         epochKey: Data,
         nowMs: Int64,
@@ -169,8 +178,11 @@ struct E2EEV2ConversationCreation: Sendable {
               let signingKey = ownCertified.signingKey else {
             throw Failure.deviceNotCertified
         }
+        // Création : le créateur administre son groupe. Migration : les
+        // administrateurs v1, que seul le serveur peut vérifier (§14.2).
         let changes = try E2EEV2MembershipChain.genesis(
-            conversationId: conversationId, memberIds: Array(members), adminIds: isGroup ? [ownUserId] : [],
+            conversationId: conversationId, memberIds: Array(members),
+            adminIds: adminIds ?? (isGroup ? [ownUserId] : []),
             isGroup: isGroup, excludesWeb: excludesWeb, actor: actor, createdAtMs: nowMs
         )
         let signedChanges = try changes.map {
@@ -199,6 +211,61 @@ struct E2EEV2ConversationCreation: Sendable {
             participantIds: participantIds.sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) },
             membership: signedChanges, genesis: genesis, epoch: epoch,
             pendingUserIds: genesis.members.subtracting(served).sorted()
+        )
+    }
+}
+
+/// Migration d'une conversation chiffrée v1 à son ouverture (§14.2) : le
+/// premier appareil v2 qui l'ouvre signe sa genèse (membres actuels, puis
+/// propriétaire et administrateurs v1) et son époque 1. Elle est alors v2 pour
+/// toujours. La genèse hérite de la confiance v1 : seul le serveur peut
+/// vérifier les administrateurs v1.
+enum E2EEV2ConversationMigration {
+    enum Decision: Equatable, Sendable {
+        case migrate
+        case alreadyV2
+        case notEncrypted
+        /// Membres sans appareil certifié à jour : la migration attend.
+        case membersWaiting([String])
+    }
+
+    static func decide(
+        _ conversation: MessageConversation,
+        isV2: Bool,
+        devices: E2EEV2CertifiedDeviceSet,
+        nowMs: Int64
+    ) -> Decision {
+        guard !isV2 else { return .alreadyV2 }
+        guard conversation.e2eeEnabled == true else { return .notEncrypted }
+        let waiting = conversation.participants.map(\.userId).filter { user in
+            !(devices.devicesByUser[user] ?? []).contains { !$0.isSidelined(nowMs: nowMs) }
+        }
+        return waiting.isEmpty ? .migrate : .membersWaiting(waiting.sorted())
+    }
+
+    /// Administrateurs v1 : propriétaire et administrateurs d'un groupe.
+    static func adminIds(_ conversation: MessageConversation) -> [String] {
+        guard conversation.isGroup else { return [] }
+        return conversation.participants.filter { $0.role == "owner" || $0.role == "admin" }.map(\.userId)
+    }
+
+    static func make(
+        _ conversation: MessageConversation,
+        ownUserId: String,
+        device: E2EEV2DeviceDescriptor,
+        devices: E2EEV2CertifiedDeviceSet,
+        epochKey: Data,
+        nowMs: Int64,
+        sign: (Data) throws -> Data,
+        wrap: (_ context: E2EEV2EpochContext, _ recipientIdentityKeyB64: String) throws -> E2EEV2SignedEpochEnvelope
+    ) throws -> E2EEV2ConversationCreation {
+        let members = conversation.participants.map(\.userId)
+        guard members.contains(ownUserId) else { throw E2EEV2ConversationCreation.Failure.invalidMembers }
+        return try E2EEV2ConversationCreation.make(
+            conversationId: conversation.id, ownUserId: ownUserId, device: device,
+            participantIds: members.filter { $0 != ownUserId }, isGroup: conversation.isGroup,
+            title: conversation.title, excludesWeb: false, adminIds: adminIds(conversation),
+            devices: devices, epochKey: epochKey, nowMs: nowMs, sign: sign, wrap: wrap
         )
     }
 }
@@ -267,6 +334,47 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         devices: E2EEV2CertifiedDeviceSet,
         expectedOwnerScopeId: String
     ) async -> E2EEV2ConversationCreationResult {
+        await submit(expectedOwnerScopeId: expectedOwnerScopeId, path: { _ in "/api/e2ee/v2/conversations" }, body: \.body) {
+            try E2EEV2ConversationCreation.make(
+                conversationId: try E2EEV2ConversationCreation.newConversationId(), ownUserId: $0, device: $1,
+                participantIds: participantIds, isGroup: isGroup, title: title, excludesWeb: excludesWeb,
+                devices: devices, epochKey: $2, nowMs: $3, sign: $4, wrap: $5
+            )
+        }
+    }
+
+    /// Migration d'une conversation chiffrée v1 (§14.2), sous son identifiant.
+    func migrate(
+        _ conversation: MessageConversation,
+        devices: E2EEV2CertifiedDeviceSet,
+        expectedOwnerScopeId: String
+    ) async -> E2EEV2ConversationCreationResult {
+        await submit(
+            expectedOwnerScopeId: expectedOwnerScopeId,
+            path: { "/api/e2ee/v2/conversations/\($0.conversationId)/genesis" },
+            body: \.migrationBody
+        ) {
+            try E2EEV2ConversationMigration.make(
+                conversation, ownUserId: $0, device: $1, devices: devices, epochKey: $2, nowMs: $3, sign: $4, wrap: $5
+            )
+        }
+    }
+
+    private typealias Builder = (
+        _ ownUserId: String,
+        _ device: E2EEV2DeviceDescriptor,
+        _ epochKey: Data,
+        _ nowMs: Int64,
+        _ sign: (Data) throws -> Data,
+        _ wrap: (E2EEV2EpochContext, String) throws -> E2EEV2SignedEpochEnvelope
+    ) throws -> E2EEV2ConversationCreation
+
+    private func submit(
+        expectedOwnerScopeId: String,
+        path: (E2EEV2ConversationCreation) -> String,
+        body: (E2EEV2ConversationCreation) -> Data,
+        build: Builder
+    ) async -> E2EEV2ConversationCreationResult {
         guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
               session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:") else {
             return .failure(localError("invalid-e2ee-creation-scope"))
@@ -283,13 +391,10 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
 
         let creation: E2EEV2ConversationCreation
         do {
-            let nowMs = Int64(now().timeIntervalSince1970 * 1_000)
-            creation = try E2EEV2ConversationCreation.make(
-                conversationId: try E2EEV2ConversationCreation.newConversationId(),
-                ownUserId: ownUserId, device: device, participantIds: participantIds, isGroup: isGroup,
-                title: title, excludesWeb: excludesWeb, devices: devices, epochKey: epochKey, nowMs: nowMs,
-                sign: { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: ownerNamespace) },
-                wrap: { [identityStore] context, recipientKey in
+            creation = try build(
+                ownUserId, device, epochKey, Int64(now().timeIntervalSince1970 * 1_000),
+                { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: ownerNamespace) },
+                { [identityStore] context, recipientKey in
                     try identityStore.createSignedEpochEnvelope(
                         context: context, epochKey: epochKey, recipientPublicIdentityKeyB64: recipientKey,
                         ownerNamespace: ownerNamespace
@@ -302,8 +407,8 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
 
         let response: Data
         switch await transport.bound(to: session).postJSON(
-            path: "/api/e2ee/v2/conversations",
-            body: creation.body,
+            path: path(creation),
+            body: body(creation),
             expectedOwnerScopeId: expectedOwnerScopeId,
             capabilitySet: .message
         ) {

@@ -172,7 +172,84 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertTrue(try fixture.states.isV2(conversationId: conversationId, ownerNamespace: fixture.session.ownerNamespace))
     }
 
+    // MARK: Migration (§14.2)
+
+    func testAnEncryptedV1ConversationMigratesOnceEveryMemberHasACertifiedDevice() throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
+        let brunoPhone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let carlaPhone = remote(user: carla, device: "device_carla_ios_01J7ABCD2345", platform: "ios")
+        let group = v1Conversation(group: true, participants: [(fixture.user, "member"), (bruno, "owner"), (carla, "admin")])
+        let partial = fixture.deviceSet(adding: [brunoPhone.device])
+        let all = fixture.deviceSet(adding: [brunoPhone.device, carlaPhone.device])
+
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: false, devices: partial, nowMs: nowMs), .membersWaiting([carla]))
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: false, devices: all, nowMs: nowMs), .migrate)
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: true, devices: all, nowMs: nowMs), .alreadyV2)
+        let plain = v1Conversation(group: false, participants: [(fixture.user, "member"), (bruno, "member")], encrypted: false)
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(plain, isV2: false, devices: all, nowMs: nowMs), .notEncrypted)
+
+        let epochKey = Data(repeating: 3, count: 32)
+        let migration = try E2EEV2ConversationMigration.make(
+            group, ownUserId: fixture.user, device: fixture.descriptor, devices: all, epochKey: epochKey, nowMs: nowMs,
+            sign: fixture.signer(), wrap: fixture.wrapper(epochKey: epochKey)
+        )
+        XCTAssertEqual(migration.conversationId, group.id, "La conversation garde son identifiant")
+        XCTAssertEqual(migration.genesis.members, [fixture.user, bruno, carla])
+        XCTAssertEqual(migration.genesis.admins, [bruno, carla], "Propriétaire et administrateurs v1, l'auteur reste membre")
+        XCTAssertEqual(migration.genesis.genesisActor?.userId, fixture.user)
+        let body = try XCTUnwrap(try E2EEV2CanonicalJSON.parseCanonical(String(decoding: migration.migrationBody, as: UTF8.self)).objectValue)
+        XCTAssertEqual(Set(body.keys), ["membership", "epoch"])
+
+        let stranger = v1Conversation(group: true, participants: [(bruno, "owner"), (carla, "member")])
+        XCTAssertThrowsError(try E2EEV2ConversationMigration.make(
+            stranger, ownUserId: fixture.user, device: fixture.descriptor, devices: all, epochKey: epochKey, nowMs: nowMs,
+            sign: fixture.signer(), wrap: fixture.wrapper(epochKey: epochKey)
+        ), "Seul un membre migre une conversation")
+    }
+
+    func testMigrationIsPostedOnTheGenesisRouteAndKeptOnlyOnceAccepted() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let brunoPhone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let devices = fixture.deviceSet(adding: [brunoPhone.device])
+        let direct = v1Conversation(group: false, participants: [(fixture.user, "member"), (bruno, "member")])
+        let creator = E2EEV2ConversationCreator(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let captured = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            let body = try E2EEV2AccountFixture.body(request)
+            captured.append(request, body: body)
+            let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []
+            return E2EEV2AccountFixture.response(request, try E2EEV2AccountFixture.receipt(conversationId: direct.id, recipientCount: envelopes.count))
+        }
+        guard case .created(let conversationId, _) = await creator.migrate(
+            direct, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        ) else { return XCTFail("Migration refusée") }
+        XCTAssertEqual(conversationId, direct.id)
+        let (request, body) = try XCTUnwrap(captured.first)
+        XCTAssertEqual(request.url?.path, "/api/e2ee/v2/conversations/\(direct.id)/genesis")
+        XCTAssertEqual(Set(body.keys), ["membership", "epoch"])
+        XCTAssertTrue(try fixture.states.isV2(conversationId: direct.id, ownerNamespace: fixture.session.ownerNamespace))
+        XCTAssertEqual(try fixture.states.currentEpoch(conversationId: direct.id, ownerNamespace: fixture.session.ownerNamespace)?.epochNumber, 1)
+    }
+
     // MARK: Outils
+
+    private func v1Conversation(group: Bool, participants: [(String, String)], encrypted: Bool = true) -> MessageConversation {
+        MessageConversation(
+            id: "conversation_v1_0123456789AB", title: group ? "Équipe terrain" : nil, isGroup: group, e2eeEnabled: encrypted,
+            groupPhotoUrl: nil, createdAt: nil, updatedAt: nil, lastMessageAt: nil, lastReadAt: nil, pinnedAt: nil,
+            participants: participants.map {
+                ConversationParticipant(
+                    userId: $0.0, role: $0.1, joinedAt: nil, lastReadAt: nil,
+                    user: MessageUser(id: $0.0, name: nil, email: "", avatarUrl: nil), presence: nil
+                )
+            },
+            lastMessage: nil
+        )
+    }
 
     private func remote(user: String, device: String, platform: String, capabilities: Bool = true) -> Remote {
         let agreement = P256.KeyAgreement.PrivateKey()

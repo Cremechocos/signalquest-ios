@@ -153,12 +153,30 @@ final class E2EEV2AccountFixture: @unchecked Sendable {
 
     /// Reçu de création proposé par iOS (E.2).
     static func receipt(for body: [String: Any], recipientCount: Int) throws -> Data {
-        let conversationId = try XCTUnwrap(body["conversationId"] as? String)
-        return try JSONSerialization.data(withJSONObject: [
-            "conversation": ["id": conversationId, "e2eeProtocolVersion": 2, "isGroup": body["isGroup"] ?? false],
+        try receipt(conversationId: try XCTUnwrap(body["conversationId"] as? String), recipientCount: recipientCount)
+    }
+
+    static func receipt(conversationId: String, recipientCount: Int) throws -> Data {
+        try JSONSerialization.data(withJSONObject: [
+            "conversation": ["id": conversationId, "e2eeProtocolVersion": 2],
             "epoch": ["id": "epoch_" + conversationId, "epochNumber": 1, "status": "active", "createdAt": "2026-10-01T05:40:00.000Z"],
             "recipientCount": recipientCount,
         ])
+    }
+
+    /// Signature et enveloppes par le coffre de l'appareil local.
+    func signer() -> (Data) throws -> Data {
+        let namespace = session.ownerNamespace
+        return { [identity] in try identity.sign(canonicalRequest: $0, ownerNamespace: namespace) }
+    }
+
+    func wrapper(epochKey: Data) -> (E2EEV2EpochContext, String) throws -> E2EEV2SignedEpochEnvelope {
+        let namespace = session.ownerNamespace
+        return { [identity] context, key in
+            try identity.createSignedEpochEnvelope(
+                context: context, epochKey: epochKey, recipientPublicIdentityKeyB64: key, ownerNamespace: namespace
+            )
+        }
     }
 
     static func response(_ request: URLRequest, _ data: Data, status: Int = 200) -> (HTTPURLResponse, Data) {
