@@ -136,7 +136,9 @@
 >   membres partis acceptés seulement en vol, rotation dès un retrait ou un
 >   départ connu, identités gardées à vie, époques sautées relues, signature
 >   vérifiée avant toute question d'époque, taille du signalement (§3.3, §3.4,
->   D.7, D.8, D.10, E.2, E.3).
+>   D.7, D.8, D.10, E.2, E.3). Puis : miroir de l'extension de notification
+>   sans clé privée d'appareil, lecture d'une enveloppe au cookie seul, avec sa
+>   conversation (§2.6, E.3).
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -322,7 +324,15 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
     messagerie (Android) peut utiliser les clés d'époque courantes écran
     verrouillé, jamais les clés d'identité ;
   - avec « aucun aperçu », ces clés exigent le déverrouillage (iOS : classe
-    `WhenUnlocked` ; Android : `setUnlockedDeviceRequired`).
+    `WhenUnlocked` ; Android : `setUnlockedDeviceRequired`) ;
+  - sur iOS, le miroir de l'extension ne contient que la session,
+    l'identifiant de l'appareil, les noms des expéditeurs et, par
+    conversation, les clés d'époque vérifiées (la courante et celles
+    remplacées depuis moins de 24 heures), leurs membres et les clés
+    publiques certifiées de leurs appareils. Jamais de clé privée
+    d'appareil, et rien du tout avec « aucun aperçu ». L'extension vérifie
+    comme l'app : appareil certifié, membre de l'époque, signature avant tout
+    déchiffrement.
 - Après une restauration d'appareil, les clés locales ont disparu. Le client le
   détecte au démarrage et demande un nouvel enrôlement, plutôt que de laisser un
   appareil fantôme.
@@ -2312,8 +2322,12 @@ version publiée qui ouvre les verrous.
       verrouillé, stockage) ne fait pas avancer le curseur : le message se
       relira.
 - **`GET /api/e2ee/v2/envelopes/{id}/fetch`** d'un message v2 :
-  `{"message": …}`, le même objet. La réponse pour un message v1 ne change
-  pas (règle de compatibilité, §16).
+  `{"conversationId", "message"}`, `message` étant le même objet que dans la
+  liste. Lecture authentifiée par le seul cookie de session, sans signature
+  d'appareil (E.0) : l'extension de notification n'a aucune clé privée
+  (§2.6). La conversation annoncée n'est qu'un aiguillage, que l'AAD et la
+  signature lient. La réponse pour un message v1 ne change pas (règle de
+  compatibilité, §16).
 - **`POST /api/e2ee/v2/reports`**. Corps :
   `{clear, encB64, sealedB64, moderationKeyId}` (D.10).
   - Le serveur vérifie les `serverTag` et l'appartenance du signaleur, puis
