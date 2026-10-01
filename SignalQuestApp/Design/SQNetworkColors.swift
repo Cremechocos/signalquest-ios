@@ -52,36 +52,20 @@ enum SQNetworkColors {
         SQQualityScale.Generation(technology: tech).hex
     }
 
-    // MARK: Bandes ANFR → couleur (provisoire)
+    // MARK: Bandes ANFR → couleur (contrat v1.1)
 
-    /// Table provisoire proposée au web le 01/10 comme base de la v1.1 du
-    /// contrat de couleurs, à remplacer à l'octet dès son gel. Chaque bande
-    /// reste dans la famille de sa génération ; la plus basse est la plus
-    /// contrastée ; au moins 3:1 sur la carte, le fond et la tuile, en clair
-    /// (premier) comme en sombre (second).
-    private static let bandHexes: [String: (light: UInt32, dark: UInt32)] = [
-        "2g900": (0x485363, 0xC6D2E3), "2g1800": (0x717D8F, 0x727D8C),
-        "3g900": (0x03483F, 0x81CFC0), "3g2100": (0x228A87, 0x338886),
-        "4g700": (0x013761, 0x88C3FE), "4g800": (0x014282, 0x76B4FF), "4g900": (0x024AAD, 0x6AA3FE),
-        "4g1800": (0x2452CF, 0x6191FF), "4g2100": (0x455FE2, 0x617FF6), "4g2600": (0x616CF3, 0x626FE7),
-        "n28": (0x3F0091, 0xBCB2FE), "n1": (0x761FC6, 0xB480FE), "n78": (0xB14AE5, 0xAB53DA),
-    ]
+    /// Trait d'une bande ANFR, clair et sombre (`SQQualityScale.Band`). Une clé
+    /// sans génération reconnaissable prend le trait de la génération donnée.
+    static func bandColor(_ band: String, generation: String) -> Color {
+        guard let stroke = SQQualityScale.Band.stroke(band) else { return generationChartColor(generation) }
+        return dynamic(light: stroke.light, dark: stroke.dark)
+    }
 
     /// Trait « tous supports » d'une génération dans un graphique : la teinte
     /// du contrat en clair ; en sombre, la même, éclaircie pour garder 3:1.
-    private static let generationChartDarkHexes: [String: UInt32] = [
-        "2G": 0x6F8097, "3G": 0x308C83, "4G": 0x3877FF, "5G": 0x9160FF,
-    ]
-
-    /// Une bande inconnue prend la teinte de sa génération.
-    static func bandColor(_ band: String, generation: String) -> Color {
-        guard let hexes = bandHexes[band.lowercased()] else { return generationChartColor(generation) }
-        return dynamic(light: hexes.light, dark: hexes.dark)
-    }
-
     static func generationChartColor(_ generation: String) -> Color {
-        let light = generationHex(generation)
-        return dynamic(light: light, dark: generationChartDarkHexes[generation.uppercased()] ?? light)
+        let scale = SQQualityScale.Generation(technology: generation)
+        return dynamic(light: scale.hex, dark: scale.chartDarkHex)
     }
 
     private static func dynamic(light: UInt32, dark: UInt32) -> Color {

@@ -6,8 +6,10 @@ import Foundation
 /// messagerie, widget — et la même que sur le web et Android (« Meaning Rule »
 /// de DESIGN.md). Seuils, teintes et ordre d'évaluation suivent le contrat
 /// commun `contracts/quality-scale-v1.json` (figé le 01/10/2026 avec Alexandre),
-/// vérifié par `QualityScaleContractTests` : toute nouvelle version passe par
-/// un changement visible de cette copie.
+/// vérifié par `QualityScaleContractTests` ; les bandes ANFR et les traits de
+/// génération en sombre, sa v1.1 (`contracts/quality-scale-v1.1.json`, même
+/// jour), vérifiée par `QualityScaleContractV11Tests`. Toute nouvelle version
+/// passe par un changement visible de ces copies.
 ///
 /// Partagé avec la cible widget : Foundation seulement, couleurs en hexadécimal.
 /// Les glyphes donnent une lecture qui ne dépend pas des couleurs (WCAG 1.4.1) et
@@ -255,6 +257,19 @@ enum SQQualityScale {
             }
         }
 
+        /// Trait « tous supports » d'un graphique en sombre (contrat v1.1,
+        /// `bands.generationStroke`) : éclairci pour garder 3:1 sur les fonds
+        /// sombres. En clair, et sur la carte, le trait reste `hex`.
+        var chartDarkHex: UInt32 {
+            switch self {
+            case .fiveG: return 0x9160FF
+            case .fourG: return 0x3877FF
+            case .threeG: return 0x308C83
+            case .twoG: return 0x6F8097
+            case .none: return SQQualityScale.unknownHex
+            }
+        }
+
         /// Priorité pour élire la génération dominante d'un lieu (5G NSA : ancre
         /// 4G et cellule 5G co-localisées).
         var rank: Int {
@@ -265,6 +280,51 @@ enum SQQualityScale {
             case .twoG: return 2
             case .none: return 0
             }
+        }
+    }
+
+    // MARK: Bandes ANFR (contrat v1.1)
+
+    /// Trait d'une bande ANFR (courbe, barre, pastille de légende ; jamais le
+    /// remplissage d'un point de carte) : contrat v1.1, `bands`. Chaque bande
+    /// reste dans la famille de sa génération, la plus basse fréquence la plus
+    /// contrastée ; au moins 3:1 sur la carte, le fond et la tuile.
+    struct Band: Equatable, Sendable {
+        let light: UInt32
+        let dark: UInt32
+
+        /// Clés de `GET /api/anfr/stats?view=bands`, comparées en minuscules.
+        static let levels: [String: Band] = [
+            "2g900": Band(light: 0x485363, dark: 0xC6D2E3), "2g1800": Band(light: 0x717D8F, dark: 0x727D8C),
+            "3g900": Band(light: 0x03483F, dark: 0x81CFC0), "3g2100": Band(light: 0x228A87, dark: 0x338886),
+            "4g700": Band(light: 0x013761, dark: 0x88C3FE), "4g800": Band(light: 0x014282, dark: 0x76B4FF),
+            "4g900": Band(light: 0x024AAD, dark: 0x6AA3FE), "4g1800": Band(light: 0x2452CF, dark: 0x6191FF),
+            "4g2100": Band(light: 0x455FE2, dark: 0x617FF6), "4g2600": Band(light: 0x616CF3, dark: 0x626FE7),
+            "n28": Band(light: 0x3F0091, dark: 0xBCB2FE), "n1": Band(light: 0x761FC6, dark: 0xB480FE),
+            "n78": Band(light: 0xB14AE5, dark: 0xAB53DA),
+        ]
+
+        /// Teinte d'une clé : celle de la table ; sinon le trait de sa
+        /// génération (clés de génération, bandes inconnues) ; sans génération
+        /// reconnaissable, aucune.
+        static func stroke(_ key: String) -> Band? {
+            let key = key.trimmingCharacters(in: .whitespaces).lowercased()
+            if let band = levels[key] { return band }
+            guard let generation = generation(ofKey: key) else { return nil }
+            return Band(light: generation.hex, dark: generation.chartDarkHex)
+        }
+
+        /// Génération lue sur le préfixe : « 2g » à « 5g », ou « n » suivi de
+        /// chiffres pour la 5G NR.
+        static func generation(ofKey key: String) -> Generation? {
+            if key.hasPrefix("2g") { return .twoG }
+            if key.hasPrefix("3g") { return .threeG }
+            if key.hasPrefix("4g") { return .fourG }
+            if key.hasPrefix("5g") { return .fiveG }
+            if key.hasPrefix("n"), key.count > 1, key.dropFirst().allSatisfy({ ("0"..."9").contains($0) }) {
+                return .fiveG
+            }
+            return nil
         }
     }
 }

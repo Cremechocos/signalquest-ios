@@ -118,8 +118,8 @@ final class DesignTokenContrastTests: XCTestCase {
         assertMinimum(UIColor(SQColor.danger), named: "danger", atLeast: 3.0)
     }
 
-    /// Bandes ANFR et traits de génération (table provisoire de la v1.1 du
-    /// contrat de couleurs) : objets graphiques posés sur la carte et la tuile.
+    /// Bandes ANFR et traits de génération (contrat de couleurs v1.1) : objets
+    /// graphiques posés sur la carte et la tuile.
     func testANFRBandColorsMeetGraphicThreshold() {
         let bands = ["2g900", "2g1800", "3g900", "3g2100", "4g700", "4g800", "4g900", "4g1800", "4g2100", "4g2600",
                      "n28", "n1", "n78"]
