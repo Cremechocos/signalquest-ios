@@ -60,6 +60,7 @@ struct ReportSheet: View {
                     Section("Précisions (optionnel)") {
                         TextField("Décris ce qui te pose problème", text: $note, axis: .vertical)
                             .lineLimit(3...6)
+                            .accessibilityIdentifier("report.comment")
                     }
                 }
                 if let error {

@@ -158,6 +158,7 @@ enum AppEnvironment {
     static var showsE2EEReportQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-e2ee-report") || hasArgument("--qa-e2ee-report-unavailable")
+            || hasArgument("--qa-e2ee-report-comment")
         #else
         false
         #endif

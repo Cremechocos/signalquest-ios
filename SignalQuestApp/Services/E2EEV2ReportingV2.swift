@@ -18,6 +18,9 @@ enum E2EEV2ReportResultV2: Equatable, Sendable {
     case sent(reportId: String)
     /// Aucune clé de modération épinglée dans cette version de l'app.
     case unavailable
+    /// Le corps dépasserait 512 Kio (D.10) : rien n'est parti, il faut moins
+    /// de messages.
+    case tooLarge
     case failure(E2EEV2TransportFailure)
 }
 
@@ -92,9 +95,7 @@ final class E2EEV2ReportSenderV2: @unchecked Sendable {
             return .failure(localError("e2ee-report-preparation-failed"))
         }
         // Le corps tient en 512 Kio (D.10) : sinon, moins de messages.
-        guard body.count <= E2EEV2WireLimits.maxJSONResponseBytes else {
-            return .failure(localError("e2ee-report-too-large"))
-        }
+        guard body.count <= E2EEV2WireLimits.maxJSONResponseBytes else { return .tooLarge }
         switch await transport.bound(to: session).postJSON(
             path: "/api/e2ee/v2/reports", body: body, expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
         ) {

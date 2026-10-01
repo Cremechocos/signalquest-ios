@@ -65,6 +65,22 @@
         }
       }
     },
+    "Ce signalement est trop volumineux : choisis moins de messages." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This report is too large: choose fewer messages."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce signalement est trop volumineux : choisis moins de messages."
+          }
+        }
+      }
+    },
     "Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges." : {
       "localizations" : {
         "en" : {
@@ -81,18 +97,18 @@
         }
       }
     },
-    "Conversation chiffrée : le message signalé, déchiffré sur ton appareil, est envoyé à l’équipe de modération, chiffré pour elle seule. Elle pourra le lire et vérifier qu’il vient bien de son auteur. Ni le reste de la conversation ni sa clé ne sont transmis." : {
+    "Conversation chiffrée : le message signalé, tel que tu le vois, et ses versions précédentes dans la limite de taille d’un signalement sont envoyés à l’équipe de modération, déchiffrés sur ton appareil et chiffrés pour elle seule. Elle pourra les lire. Ni le reste de la conversation ni sa clé ne sont transmis." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encrypted conversation: the reported message, decrypted on your device, is sent to the moderation team, encrypted for them only. They will be able to read it and check that it really comes from its author. Neither the rest of the conversation nor its key is shared."
+            "value" : "Encrypted conversation: the reported message, as you see it, and its previous versions within the size limit of a report are sent to the moderation team, decrypted on your device and encrypted for them only. They will be able to read them. Neither the rest of the conversation nor its key is shared."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conversation chiffrée : le message signalé, déchiffré sur ton appareil, est envoyé à l’équipe de modération, chiffré pour elle seule. Elle pourra le lire et vérifier qu’il vient bien de son auteur. Ni le reste de la conversation ni sa clé ne sont transmis."
+            "value" : "Conversation chiffrée : le message signalé, tel que tu le vois, et ses versions précédentes dans la limite de taille d’un signalement sont envoyés à l’équipe de modération, déchiffrés sur ton appareil et chiffrés pour elle seule. Elle pourra les lire. Ni le reste de la conversation ni sa clé ne sont transmis."
           }
         }
       }
@@ -285,6 +301,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cela arrive quand %@ réinitialise son chiffrement, par exemple après avoir perdu tous ses appareils. Cela peut aussi signaler une tentative d’interception : compare le nouveau numéro avec %@."
+          }
+        }
+      }
+    },
+    "Tu as atteint la limite de signalements pour aujourd’hui. Réessaie demain." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’ve reached today’s report limit. Try again tomorrow."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as atteint la limite de signalements pour aujourd’hui. Réessaie demain."
           }
         }
       }

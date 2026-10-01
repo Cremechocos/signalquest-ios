@@ -17,13 +17,29 @@ final class E2EEReportQATests: XCTestCase {
         if !notice.waitForExistence(timeout: 10) { app.buttons["report.qa.open"].tap() }
         XCTAssertTrue(notice.waitForExistence(timeout: 10))
         XCTAssertTrue(notice.label.contains("équipe de modération"), notice.label)
-        XCTAssertFalse(app.textFields["Décris ce qui te pose problème"].exists, "Aucun champ libre pour un message chiffré")
-        XCTAssertFalse(app.textViews["Décris ce qui te pose problème"].exists)
-
+        XCTAssertTrue(notice.label.contains("versions précédentes"), "Les versions précédentes partent avec le message")
+        XCTAssertFalse(app.descendants(matching: .any)["report.comment"].exists, "Aucun champ libre pour un message chiffré")
         let send = app.buttons["report.send"]
+        XCTAssertTrue(send.waitForExistence(timeout: 5))
+        XCTAssertLessThan(notice.frame.minY, send.frame.minY, "L'avertissement vient avant l'envoi")
+
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(send, in: app))
         send.tap()
-        XCTAssertTrue(app.staticTexts["report.qa.sent"].waitForExistence(timeout: 5), "Feuille fermée, envoi confirmé")
+        let sent = app.staticTexts["report.qa.sent"]
+        XCTAssertTrue(sent.waitForExistence(timeout: 5), "Feuille fermée, envoi confirmé")
+        XCTAssertEqual(sent.label, "SPAM · -", "Motif transmis, aucun commentaire")
+        XCTAssertTrue(send.waitForNonExistence(timeout: 5), "La feuille s'est fermée")
+    }
+
+    /// Témoin : la même recherche trouve le champ libre quand il existe.
+    func testTheCommentFieldIsFoundWhenTheSheetHasOne() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--qa-e2ee-report-comment"], locale: "fr")
+        defer { app.terminate() }
+        let send = app.buttons["report.send"]
+        if !send.waitForExistence(timeout: 10) { app.buttons["report.qa.open"].tap() }
+        XCTAssertTrue(send.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["report.comment"].exists)
     }
 
     func testWithoutAModerationKeyTheSheetSaysSoInEnglish() {

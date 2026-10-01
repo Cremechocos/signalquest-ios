@@ -108,6 +108,11 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         defer { Self.lock.unlock() }
         var file = try read(conversationId: conversationId, ownerScopeId: ownerScopeId)
         var touched: Set<String> = []
+        // Une édition qui devient équivoque ne compte plus : sa cible se rejoue.
+        for ref in Set(equivocal).subtracting(file.equivocal) {
+            if let target = file.messages[ref]?.targetRef { touched.insert(target) }
+        }
+        file.equivocal.formUnion(equivocal)
         for message in received where file.messages[message.messageRef] == nil {
             let target: String?, text: String?
             switch message.payload.body {
@@ -127,10 +132,19 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
             )
             touched.insert(target ?? message.messageRef)
         }
-        for ref in touched { Self.settle(ref, in: &file.messages) }
-        file.equivocal.formUnion(equivocal)
-        // Un message éphémère expiré quitte aussi l'appareil (§13).
-        file.messages = file.messages.filter { $0.value.expiresAtMs.map { $0 > nowMs } ?? true }
+        for ref in touched { Self.settle(ref, in: &file.messages, equivocal: file.equivocal) }
+        // Un message éphémère expiré quitte l'appareil avec ses éditions ; une
+        // édition expirée ne compte plus, et sa cible se rejoue (§13, D.8).
+        let expired = file.messages.values.filter { $0.expiresAtMs.map { $0 <= nowMs } ?? false }
+        if !expired.isEmpty {
+            let expiredRefs = Set(expired.map(\.messageRef))
+            let expiredTexts = Set(expired.filter { $0.kind == "TEXT" }.map(\.messageRef))
+            let replayed = Set(expired.compactMap(\.targetRef)).subtracting(expiredTexts)
+            file.messages = file.messages.filter {
+                !expiredRefs.contains($0.key) && !($0.value.targetRef.map(expiredTexts.contains) ?? false)
+            }
+            for ref in replayed { Self.settle(ref, in: &file.messages, equivocal: file.equivocal) }
+        }
         file.cursor = max(file.cursor, cursor)
         if file.messages.count > Self.maxMessages {
             let kept = file.messages.values.sorted { $0.sequence > $1.sequence }.prefix(Self.maxMessages)
@@ -140,18 +154,30 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     }
 
     /// Rejoue sur un message ses éditions et sa suppression autorisées, dans
-    /// l'ordre de leur envoi. Une suppression efface texte et charge.
-    private static func settle(_ ref: String, in messages: inout [String: Stored]) {
-        guard var target = messages[ref], target.kind == "TEXT", !target.deleted else { return }
-        let actions = messages.values
-            .filter { $0.targetRef == ref && $0.senderUserId == target.senderUserId }
+    /// l'ordre de leur envoi, en repartant de son texte d'origine : une édition
+    /// expirée ou équivoque cesse de compter. Une suppression efface texte et
+    /// charge, ceux du message comme ceux de ses éditions, même arrivées après
+    /// elle. Une action d'un autre membre est ignorée et gardée sans contenu (§5.3).
+    private static func settle(_ ref: String, in messages: inout [String: Stored], equivocal: Set<String>) {
+        guard var target = messages[ref], target.kind == "TEXT" else { return }
+        let related = messages.values.filter { $0.targetRef == ref }
+        erase(related.filter { $0.senderUserId != target.senderUserId }, in: &messages)
+        let actions = related
+            .filter { $0.senderUserId == target.senderUserId && !equivocal.contains($0.messageRef) }
             .sorted { ($0.sentAtMs, $0.sequence) < ($1.sentAtMs, $1.sequence) }
+        guard !target.deleted else {
+            erase(actions.filter { $0.kind == "EDIT" }, in: &messages)
+            return
+        }
+        target.text = originalText(of: target)
+        target.editedAtMs = nil
         for action in actions {
             if action.kind == "DELETE" {
                 target.text = nil
                 target.payloadB64 = nil
                 target.fkB64 = nil
                 target.deleted = true
+                erase(actions.filter { $0.kind == "EDIT" }, in: &messages)
                 break
             }
             if action.kind == "EDIT" {
@@ -160,6 +186,23 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
             }
         }
         messages[ref] = target
+    }
+
+    private static func originalText(of stored: Stored) -> String? {
+        guard let data = stored.payloadB64.flatMap({ Data(base64Encoded: $0) }),
+              let payload = try? E2EEV2ContentPayloadV2.parse(data),
+              case .text(let value) = payload.body else { return stored.text }
+        return value
+    }
+
+    private static func erase(_ edits: [Stored], in messages: inout [String: Stored]) {
+        for edit in edits {
+            var erased = edit
+            erased.text = nil
+            erased.payloadB64 = nil
+            erased.fkB64 = nil
+            messages[edit.messageRef] = erased
+        }
     }
 
     /// Avance le curseur de la liste (E.3), jamais en arrière. Séparé de
@@ -187,14 +230,27 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         return count
     }
 
-    /// Messages gardés, pour un signalement (§11) : seulement ceux reçus par
-    /// cet appareil, dont la charge exacte et `fk` sont encore là.
-    func reportable(_ refs: [String], conversationId: String, ownerScopeId: String) throws -> [E2EEV2ReceivedMessageV2] {
+    /// Ce qu'un signalement peut porter d'un message (§11, v0.4.11).
+    struct ReportGroup: Equatable, Sendable {
+        /// La version affichée : sa dernière édition retenue, ou le message
+        /// lui-même s'il n'a pas été modifié. Elle part toujours.
+        let displayed: E2EEV2ReceivedMessageV2
+        /// Le reste de son histoire, le plus utile d'abord : l'original, puis
+        /// les éditions intermédiaires de la plus récente à la plus ancienne.
+        let history: [E2EEV2ReceivedMessageV2]
+    }
+
+    /// Les messages choisis, gardés avec leur charge exacte et `fk`. Rien pour
+    /// un message supprimé, expiré, en équivoque, dont une charge manque, ou
+    /// dont le texte affiché ne correspond plus à une version gardée.
+    func reportGroups(
+        _ refs: [String], conversationId: String, ownerScopeId: String, nowMs: Int64
+    ) throws -> [String: ReportGroup] {
         Self.lock.lock()
         defer { Self.lock.unlock() }
         let file = try read(conversationId: conversationId, ownerScopeId: ownerScopeId)
-        return refs.compactMap { ref -> E2EEV2ReceivedMessageV2? in
-            guard let stored = file.messages[ref], !file.equivocal.contains(ref),
+        func kept(_ stored: Stored) -> E2EEV2ReceivedMessageV2? {
+            guard !file.equivocal.contains(stored.messageRef), stored.expiresAtMs.map({ $0 > nowMs }) ?? true,
                   let payloadBytes = stored.payloadB64.flatMap({ Data(base64Encoded: $0) }),
                   let fk = stored.fkB64.flatMap({ Data(base64Encoded: $0) }),
                   let payload = try? E2EEV2ContentPayloadV2.parse(payloadBytes) else { return nil }
@@ -206,6 +262,36 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
                 keyId: stored.keyId, payload: payload, payloadBytes: payloadBytes, fk: fk, expiresAtMs: stored.expiresAtMs
             )
         }
+        var groups: [String: ReportGroup] = [:]
+        for ref in refs {
+            guard let stored = file.messages[ref], stored.kind == "TEXT", !stored.deleted,
+                  let original = kept(stored) else { continue }
+            let edits = file.messages.values
+                .filter { $0.kind == "EDIT" && $0.targetRef == ref && $0.senderUserId == stored.senderUserId }
+                .sorted { ($0.sentAtMs, $0.sequence) < ($1.sentAtMs, $1.sequence) }
+                .compactMap(kept)
+            let displayed = edits.last ?? original
+            // Ce que l'utilisateur voit doit être la version qui part.
+            guard Self.text(of: displayed) == stored.text else { continue }
+            groups[ref] = ReportGroup(
+                displayed: displayed, history: edits.isEmpty ? [] : [original] + edits.dropLast().reversed()
+            )
+        }
+        return groups
+    }
+
+    private static func text(of message: E2EEV2ReceivedMessageV2) -> String? {
+        switch message.payload.body {
+        case .text(let value), .edit(_, let value): return value
+        case .delete: return nil
+        }
+    }
+
+    /// Un message gardé tel quel, édition ou suppression comprises (tests).
+    func stored(_ ref: String, conversationId: String, ownerScopeId: String) throws -> Stored? {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        return try read(conversationId: conversationId, ownerScopeId: ownerScopeId).messages[ref]
     }
 
     func purge(ownerScopeId: String) throws {
