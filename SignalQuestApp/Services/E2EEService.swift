@@ -831,8 +831,53 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         let version: Int
         let descriptor: E2EEV2DeviceDescriptor
         let identityPrivateRawB64: String
+        /// Clé brute, ou blob de la Secure Enclave selon `signingStorage`.
         let signingPrivateRawB64: String
         let createdAtMs: Int64
+        /// Absent : clé logicielle (identités d'avant la v0.4.14, appareil sans Secure Enclave).
+        var signingStorage: SigningStorage? = nil
+    }
+
+    /// Où vit la clé de signature (spec §2.6, v0.4.14).
+    enum SigningStorage: String, Codable, Sendable {
+        /// Secure Enclave : seul son blob, inutilisable hors de cet appareil, est gardé.
+        case secureEnclave
+    }
+
+    /// Clé de signature de l'appareil, jamais extractable dans la Secure Enclave.
+    /// Toute signature passe par la forme DER canonique et low-S (D.0) : la
+    /// Secure Enclave, comme CryptoKit, produit environ une fois sur deux un s haut.
+    private enum Signer {
+        case software(P256.Signing.PrivateKey)
+        case secureEnclave(SecureEnclave.P256.Signing.PrivateKey)
+
+        init(material: Data, storage: SigningStorage?) throws {
+            switch storage {
+            case nil: self = .software(try P256.Signing.PrivateKey(rawRepresentation: material))
+            case .secureEnclave: self = .secureEnclave(try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: material))
+            }
+        }
+
+        var publicKey: P256.Signing.PublicKey {
+            switch self {
+            case .software(let key): return key.publicKey
+            case .secureEnclave(let key): return key.publicKey
+            }
+        }
+
+        func sign(_ message: Data) throws -> Data {
+            switch self {
+            case .software(let key): return try E2EEV2LowS.sign(message, with: key)
+            case .secureEnclave(let key): return try E2EEV2LowS.normalize(der: key.signature(for: message).derRepresentation)
+            }
+        }
+    }
+
+    /// Dès qu'il y en a une (le simulateur d'un Mac Apple silicon en fournit une).
+    static var createsSecureEnclaveKeys: Bool { SecureEnclave.isAvailable }
+
+    private func signer(_ record: Record) throws -> Signer {
+        try Signer(material: decoded(record.signingPrivateRawB64), storage: record.signingStorage)
     }
 
     private let tokenStore: TokenStore
@@ -954,11 +999,8 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         ownerNamespace: String
     ) throws -> Data {
         let record = try requiredResetCandidateRecord(ownerNamespace: ownerNamespace)
-        let privateKey = try P256.Signing.PrivateKey(
-            rawRepresentation: decoded(record.signingPrivateRawB64)
-        )
         // Forme low-S obligatoire (spec §4.1 et §15) : CryptoKit peut produire du high-S.
-        return try E2EEV2LowS.sign(canonicalRequest, with: privateKey)
+        return try signer(record).sign(canonicalRequest)
     }
 
     /// Restart-safe local commit after a strictly validated server response.
@@ -1016,27 +1058,27 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
     }
 
     func sign(canonicalRequest: Data, ownerNamespace: String) throws -> Data {
-        let signer = try signingKey(ownerNamespace: ownerNamespace, createsIdentity: false)
+        let signing = try signingKey(ownerNamespace: ownerNamespace, createsIdentity: false)
         // Forme low-S obligatoire (spec §4.1 et §15) : CryptoKit peut produire du high-S.
-        return try E2EEV2LowS.sign(canonicalRequest, with: signer.key)
+        return try signing.key.sign(canonicalRequest)
     }
 
     /// Requête signée, appareil verrouillé compris (spec §2.6, v0.4.13) :
     /// l'identifiant et la signature viennent de la même clé, lue une fois.
     func signWithDeviceId(canonicalRequest: Data, ownerNamespace: String) throws -> (deviceId: String, signature: Data) {
-        let signer = try signingKey(ownerNamespace: ownerNamespace, createsIdentity: true)
-        return (signer.deviceId, try E2EEV2LowS.sign(canonicalRequest, with: signer.key))
+        let signing = try signingKey(ownerNamespace: ownerNamespace, createsIdentity: true)
+        return (signing.deviceId, try signing.key.sign(canonicalRequest))
     }
 
     private func signingKey(
         ownerNamespace: String,
         createsIdentity: Bool
-    ) throws -> (deviceId: String, key: P256.Signing.PrivateKey) {
+    ) throws -> (deviceId: String, key: Signer) {
         do {
             let record = createsIdentity
                 ? try loadOrCreateRecord(ownerNamespace: ownerNamespace)
                 : try requiredRecord(ownerNamespace: ownerNamespace)
-            let key = try P256.Signing.PrivateKey(rawRepresentation: decoded(record.signingPrivateRawB64))
+            let key = try signer(record)
             if !createsIdentity { try? syncLockedSigning(ownerNamespace: ownerNamespace) }
             return (record.descriptor.deviceId, key)
         } catch where Self.isLocked(error) {
@@ -1056,6 +1098,7 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         let version: Int
         let deviceId: String
         let signingPrivateRawB64: String
+        var signingStorage: SigningStorage? = nil
     }
 
     static func lockedSigningStorageKey(ownerNamespace: String) -> String {
@@ -1093,16 +1136,17 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         if let raw = try tokenStore.string(for: key), let data = raw.data(using: .utf8),
            let current = try? JSONDecoder().decode(LockedSigningRecord.self, from: data),
            current.version == 1, current.deviceId == record.descriptor.deviceId,
-           current.signingPrivateRawB64 == record.signingPrivateRawB64 {
+           current.signingPrivateRawB64 == record.signingPrivateRawB64, current.signingStorage == record.signingStorage {
             return
         }
         let copy = LockedSigningRecord(
-            version: 1, deviceId: record.descriptor.deviceId, signingPrivateRawB64: record.signingPrivateRawB64
+            version: 1, deviceId: record.descriptor.deviceId, signingPrivateRawB64: record.signingPrivateRawB64,
+            signingStorage: record.signingStorage
         )
         try tokenStore.set(String(decoding: try JSONEncoder().encode(copy), as: UTF8.self), for: key, accessibility: .afterFirstUnlock)
     }
 
-    private func lockedSigning(ownerNamespace: String) throws -> (deviceId: String, key: P256.Signing.PrivateKey) {
+    private func lockedSigning(ownerNamespace: String) throws -> (deviceId: String, key: Signer) {
         guard allowsOwner(ownerNamespace) else { throw E2EEV2DeviceIdentityError.unauthenticated }
         guard let raw = try tokenStore.string(for: Self.lockedSigningStorageKey(ownerNamespace: ownerNamespace)) else {
             // Pas encore de copie : seul le déverrouillage permet de signer.
@@ -1113,7 +1157,7 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
               copy.version == 1, E2EEV2Canonical.isOpaque(copy.deviceId) else {
             throw E2EEV2DeviceIdentityError.invalidRecord
         }
-        return (copy.deviceId, try P256.Signing.PrivateKey(rawRepresentation: decoded(copy.signingPrivateRawB64)))
+        return (copy.deviceId, try Signer(material: decoded(copy.signingPrivateRawB64), storage: copy.signingStorage))
     }
 
     /// Unwraps an already authenticated epoch delivery without exporting the
@@ -1180,16 +1224,12 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
             nonce: try nonce ?? randomBytes(count: 12),
             context: context
         )
-        let signingPrivate = try P256.Signing.PrivateKey(
-            rawRepresentation: decoded(record.signingPrivateRawB64)
-        )
-        let signature = try E2EEV2LowS.sign(
+        let signature = try signer(record).sign(
             E2EEV2EpochCrypto.signatureCanonical(
                 context: context,
                 keyCommitmentB64: E2EEV2EpochCrypto.keyCommitment(epochKey),
                 envelope: envelope
-            ),
-            with: signingPrivate
+            )
         )
         return E2EEV2SignedEpochEnvelope(
             recipientDeviceId: envelope.recipientDeviceId,
@@ -1229,16 +1269,12 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
             nonce: try nonce ?? randomBytes(count: 12),
             context: context
         )
-        let signingPrivate = try P256.Signing.PrivateKey(
-            rawRepresentation: decoded(record.signingPrivateRawB64)
-        )
-        let signature = try E2EEV2LowS.sign(
+        let signature = try signer(record).sign(
             E2EEV2RecoveryEpochCrypto.signatureCanonical(
                 context: context,
                 keyCommitmentB64: keyCommitmentB64,
                 envelope: unsigned
-            ),
-            with: signingPrivate
+            )
         )
         return E2EEV2RecoveryEpochEnvelope(
             recipientUserId: unsigned.recipientUserId,
@@ -1302,13 +1338,13 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
 
     private func makeRecord(label: String?) throws -> (Record, String) {
         let identityPrivate = P256.KeyAgreement.PrivateKey()
-        let signingPrivate = P256.Signing.PrivateKey()
+        let signing = try Self.newSigningKey()
         let descriptor = E2EEV2DeviceDescriptor(
             deviceId: "ios_\(try randomBytes(count: 24).base64URLEncodedNoPadding())",
             platform: "ios",
             label: label?.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120).nonEmptyString,
             publicIdentityKeyB64: identityPrivate.publicKey.x963Representation.base64EncodedString(),
-            publicSigningKeyB64: signingPrivate.publicKey.x963Representation.base64EncodedString(),
+            publicSigningKeyB64: signing.publicKey.x963Representation.base64EncodedString(),
             identityKeyAlgorithm: Self.identityKeyAlgorithm,
             signingKeyAlgorithm: Self.signingKeyAlgorithm,
             keyVersion: 1
@@ -1317,8 +1353,9 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
             version: 1,
             descriptor: descriptor,
             identityPrivateRawB64: identityPrivate.rawRepresentation.base64EncodedString(),
-            signingPrivateRawB64: signingPrivate.rawRepresentation.base64EncodedString(),
-            createdAtMs: Int64(Date().timeIntervalSince1970 * 1_000)
+            signingPrivateRawB64: signing.material.base64EncodedString(),
+            createdAtMs: Int64(Date().timeIntervalSince1970 * 1_000),
+            signingStorage: signing.storage
         )
         let encoded = try JSONEncoder().encode(record)
         guard let value = String(data: encoded, encoding: .utf8) else {
@@ -1344,15 +1381,13 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
             let identityPrivate = try P256.KeyAgreement.PrivateKey(
                 rawRepresentation: decoded(record.identityPrivateRawB64)
             )
-            let signingPrivate = try P256.Signing.PrivateKey(
-                rawRepresentation: decoded(record.signingPrivateRawB64)
-            )
+            let signingPublic = try signer(record).publicKey
             guard identityPrivate.publicKey.x963Representation.base64EncodedString()
                     == record.descriptor.publicIdentityKeyB64,
-                  signingPrivate.publicKey.x963Representation.base64EncodedString()
+                  signingPublic.x963Representation.base64EncodedString()
                     == record.descriptor.publicSigningKeyB64,
                   identityPrivate.publicKey.x963Representation.count == 65,
-                  signingPrivate.publicKey.x963Representation.count == 65 else {
+                  signingPublic.x963Representation.count == 65 else {
                 throw E2EEV2DeviceIdentityError.invalidRecord
             }
         } catch let error as E2EEV2DeviceIdentityError {
@@ -1360,6 +1395,25 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         } catch {
             throw E2EEV2DeviceIdentityError.invalidRecord
         }
+    }
+
+    /// Clé de signature d'une nouvelle identité : dans la Secure Enclave quand
+    /// l'appareil en a une, utilisable dès le premier déverrouillage après le
+    /// démarrage pour rejoindre un appel chiffré verrouillé (§2.6), jamais
+    /// extractable ; sinon logicielle.
+    private static func newSigningKey() throws -> (publicKey: P256.Signing.PublicKey, material: Data, storage: SigningStorage?) {
+        guard createsSecureEnclaveKeys else {
+            let key = P256.Signing.PrivateKey()
+            return (key.publicKey, key.rawRepresentation, nil)
+        }
+        var error: Unmanaged<CFError>?
+        guard let access = SecAccessControlCreateWithFlags(
+            kCFAllocatorDefault, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly, .privateKeyUsage, &error
+        ) else {
+            throw E2EEV2DeviceIdentityError.randomGenerationFailed
+        }
+        let key = try SecureEnclave.P256.Signing.PrivateKey(accessControl: access)
+        return (key.publicKey, key.dataRepresentation, .secureEnclave)
     }
 
     private func decoded(_ value: String) throws -> Data {

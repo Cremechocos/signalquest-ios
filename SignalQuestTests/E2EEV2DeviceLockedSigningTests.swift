@@ -265,4 +265,34 @@ final class E2EEV2DeviceLockedSigningTests: XCTestCase {
             "L'appel dit de déverrouiller"
         )
     }
+    /// D.0 : DER canonique, forme low-S, quelle que soit la clé (v0.4.14).
+    func testEverySignatureIsLowSAndVerifies() throws {
+        let tokens = LockableTokenStore()
+        let store = makeStore(tokens)
+        let descriptor = try store.loadOrCreate(ownerNamespace: namespace)
+        let publicKey = try P256.Signing.PublicKey(x963Representation: XCTUnwrap(Data(base64Encoded: descriptor.publicSigningKeyB64)))
+        for index in 0..<64 {
+            let message = Data("SQ-E2EE-V2-SIGNED-REQUEST\n1\nPOST\n/api/\(index)".utf8)
+            let signature = try store.sign(canonicalRequest: message, ownerNamespace: namespace)
+            XCTAssertTrue(E2EEV2LowS.isLowS(der: signature), "Signature \(index) en forme high-S")
+            XCTAssertTrue(E2EEV2LowS.verify(derSignature: signature, message: message, publicKey: publicKey))
+        }
+    }
+
+    /// La clé naît dans la Secure Enclave (appareil, ou simulateur d'un Mac Apple
+    /// silicon), seul son blob est gardé, et ses signatures suivent le même chemin low-S.
+    func testTheSigningKeyLivesInTheSecureEnclave() throws {
+        try XCTSkipUnless(E2EEV2DeviceIdentityStore.createsSecureEnclaveKeys, "Pas de Secure Enclave sur cette machine")
+        let tokens = LockableTokenStore()
+        let store = makeStore(tokens)
+        let descriptor = try store.loadOrCreate(ownerNamespace: namespace)
+        let raw = try XCTUnwrap(tokens.string(for: store.storageKey(ownerNamespace: namespace)))
+        XCTAssertTrue(raw.contains("\"signingStorage\":\"secureEnclave\""))
+        let publicKey = try P256.Signing.PublicKey(x963Representation: XCTUnwrap(Data(base64Encoded: descriptor.publicSigningKeyB64)))
+        for index in 0..<64 {
+            let message = Data("enclave-\(index)".utf8)
+            let signature = try store.sign(canonicalRequest: message, ownerNamespace: namespace)
+            XCTAssertTrue(E2EEV2LowS.verify(derSignature: signature, message: message, publicKey: publicKey))
+        }
+    }
 }
