@@ -15,6 +15,8 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
     }
 
     static func key(ownerNamespace: String) -> String { "uik-v1:\(ownerNamespace)" }
+    /// §2.3 : la clé du compte a été vérifiée sur cet appareil.
+    static func verifiedKey(ownerNamespace: String) -> String { "uik-verified-v1:\(ownerNamespace)" }
 
     private let tokenStore: TokenStore
     private let allowsOwner: @Sendable (String) -> Bool
@@ -36,11 +38,26 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
     }
 
     /// Premier appareil du compte : une nouvelle UIK, jamais par-dessus une autre.
+    /// Il l'a créée lui-même : elle est vérifiée d'office.
     func create(ownerNamespace: String) throws -> P256.Signing.PrivateKey {
         guard try load(ownerNamespace: ownerNamespace) == nil else { throw Failure.alreadyExists }
         let key = P256.Signing.PrivateKey()
         try install(key, ownerNamespace: ownerNamespace)
+        try tokenStore.set("1", for: Self.verifiedKey(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
         return key
+    }
+
+    /// §2.3 : un appareil approuvé reçoit l'UIK sans pouvoir la comparer seul. Elle
+    /// reste « clé du compte non vérifiée » jusqu'à ce que l'utilisateur compare les
+    /// 30 chiffres du compte (D.12) avec un autre de ses appareils.
+    func isVerified(ownerNamespace: String) throws -> Bool {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        return try tokenStore.string(for: Self.verifiedKey(ownerNamespace: ownerNamespace)) == "1"
+    }
+
+    func markVerified(ownerNamespace: String) throws {
+        guard try load(ownerNamespace: ownerNamespace) != nil else { throw Failure.invalidRecord }
+        try tokenStore.set("1", for: Self.verifiedKey(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
     }
 
     /// Appareil approuvé : l'UIK reçue chiffrée à l'approbation (D.1). Jamais
@@ -51,6 +68,9 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
             guard existing.rawRepresentation == key.rawRepresentation else { throw Failure.alreadyExists }
             return
         }
+        // Une clé reçue n'est jamais vérifiée d'avance, même si un drapeau a
+        // survécu à une purge interrompue.
+        try tokenStore.remove(Self.verifiedKey(ownerNamespace: ownerNamespace))
         try tokenStore.set(
             key.rawRepresentation.base64EncodedString(),
             for: Self.key(ownerNamespace: ownerNamespace),

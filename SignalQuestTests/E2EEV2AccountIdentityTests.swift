@@ -47,6 +47,34 @@ final class E2EEV2AccountIdentityTests: XCTestCase {
         XCTAssertNotNil(try store.load(ownerNamespace: "ns-other"), "Les autres comptes gardent leur clé")
     }
 
+    /// §2.3 : le premier appareil a créé la clé du compte ; un appareil approuvé
+    /// la reçoit « non vérifiée » jusqu'à la comparaison des 30 chiffres du compte.
+    func testAnApprovedDeviceHoldsAnUnverifiedAccountKeyUntilCompared() throws {
+        let tokens = InMemoryTokenStore()
+        let store = E2EEV2AccountIdentityStore(tokenStore: tokens) { _ in true }
+        let created = try store.create(ownerNamespace: namespace)
+        XCTAssertTrue(try store.isVerified(ownerNamespace: namespace), "Créée ici : rien à comparer")
+
+        try store.install(created, ownerNamespace: "ns-approved")
+        XCTAssertFalse(try store.isVerified(ownerNamespace: "ns-approved"), "Reçue à l'approbation : non vérifiée")
+        try store.install(created, ownerNamespace: "ns-approved")
+        XCTAssertFalse(try store.isVerified(ownerNamespace: "ns-approved"), "Réinstaller ne la vérifie pas")
+        try store.markVerified(ownerNamespace: "ns-approved")
+        XCTAssertTrue(try store.isVerified(ownerNamespace: "ns-approved"))
+        XCTAssertThrowsError(try store.markVerified(ownerNamespace: "ns-empty"), "Pas de clé, rien à vérifier")
+
+        try tokens.set("1", for: E2EEV2AccountIdentityStore.verifiedKey(ownerNamespace: "ns-stale"), accessibility: .whenUnlocked)
+        try store.install(created, ownerNamespace: "ns-stale")
+        XCTAssertFalse(try store.isVerified(ownerNamespace: "ns-stale"), "Un drapeau orphelin ne vérifie pas une clé reçue")
+
+        let ownerScopeId = "user:\(userId)"
+        let ownNamespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
+        _ = try store.create(ownerNamespace: ownNamespace)
+        try E2EEV2VaultBoundary.purge(store: tokens, ownerScopeId: ownerScopeId)
+        XCTAssertFalse(try store.isVerified(ownerNamespace: ownNamespace), "Effacée avec le compte")
+        XCTAssertTrue(try store.isVerified(ownerNamespace: "ns-approved"), "Les autres comptes gardent la leur")
+    }
+
     /// Ce que publie le premier appareil se vérifie comme le paquet de
     /// n'importe quel contact, jusqu'à l'UIK.
     func testTheFirstDeviceTrustVerifiesLikeAnyContactBundle() throws {

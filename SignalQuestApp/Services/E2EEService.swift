@@ -775,7 +775,8 @@ enum E2EEV2VaultBoundary {
         let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
         for key in ["device-v2:\(namespace)", "device-v2-reset-candidate:\(namespace)",
                     "epoch-v2-owner-index:\(namespace)", "rotation-work-v1:\(namespace)",
-                    E2EEV2AccountIdentityStore.key(ownerNamespace: namespace)] {
+                    E2EEV2AccountIdentityStore.key(ownerNamespace: namespace),
+                    E2EEV2AccountIdentityStore.verifiedKey(ownerNamespace: namespace)] {
             try store.remove(key)
         }
         for prefix in ["epoch-v2:\(namespace):", "epoch-v2-history:\(namespace):", "epoch-v2-index:\(namespace):",
