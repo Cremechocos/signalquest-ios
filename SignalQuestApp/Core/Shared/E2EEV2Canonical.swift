@@ -28,6 +28,11 @@ indirect enum E2EEV2JSON: Equatable, Sendable {
         if case .object(let value) = self { return value }
         return nil
     }
+
+    var boolValue: Bool? {
+        if case .bool(let value) = self { return value }
+        return nil
+    }
 }
 
 enum E2EEV2CanonicalJSONError: Error, Equatable {
@@ -67,6 +72,13 @@ enum E2EEV2CanonicalJSON {
 
     static func parseCanonical(_ text: String) throws -> E2EEV2JSON {
         try parseCanonical(Data(text.utf8))
+    }
+
+    /// Analyse stricte d'une réponse du serveur : clés dupliquées, nombres et
+    /// substituts isolés refusés, sans exiger l'ordre canonique des clés.
+    static func parseStrict(_ data: Data) throws -> E2EEV2JSON {
+        var parser = Parser(bytes: Array(data))
+        return try parser.parseDocument()
     }
 
     private static func write(_ value: E2EEV2JSON, into out: inout Data) {
@@ -408,6 +420,16 @@ enum E2EEV2Canonical {
 
     static func isDecimal(_ value: String) -> Bool {
         value.range(of: decimalPattern, options: .regularExpression) != nil
+    }
+
+    /// Plus grand numéro d'époque ou de changement accepté (2³¹ − 2), comme pour
+    /// les versions de liste (D.3) : `n + 1` ne déborde jamais.
+    static let maxSequenceNumber = 2_147_483_646
+
+    /// Numéro décimal canonique de 1 à `maxSequenceNumber`.
+    static func sequenceNumber(_ value: String) -> Int? {
+        guard isDecimal(value), let number = Int(value), (1...maxSequenceNumber).contains(number) else { return nil }
+        return number
     }
 
     static func base64URL(_ data: Data) -> String {

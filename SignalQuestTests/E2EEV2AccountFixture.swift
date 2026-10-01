@@ -156,11 +156,12 @@ final class E2EEV2AccountFixture: @unchecked Sendable {
         try receipt(conversationId: try XCTUnwrap(body["conversationId"] as? String), recipientCount: recipientCount)
     }
 
+    /// Entiers en chaînes (D.0).
     static func receipt(conversationId: String, recipientCount: Int) throws -> Data {
         try JSONSerialization.data(withJSONObject: [
-            "conversation": ["id": conversationId, "e2eeProtocolVersion": 2],
-            "epoch": ["id": "epoch_" + conversationId, "epochNumber": 1, "status": "active", "createdAt": "2026-10-01T05:40:00.000Z"],
-            "recipientCount": recipientCount,
+            "conversationId": conversationId,
+            "epoch": ["id": "epoch_" + conversationId, "epochNumber": "1", "status": "active", "createdAt": "2026-10-01T05:40:00.000Z"],
+            "recipientCount": String(recipientCount),
         ])
     }
 

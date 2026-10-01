@@ -6,25 +6,22 @@ enum E2EEV2MembershipContractV2 {
 
     /// `{changes: [{change, signatureB64}], hasMore}`.
     static func parsePage(_ data: Data) -> (changes: [E2EEV2SignedString], hasMore: Bool)? {
-        guard data.count <= E2EEV2WireLimits.maxJSONResponseBytes,
-              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              Set(root.keys) == ["changes", "hasMore"],
-              let items = root["changes"] as? [Any], items.count <= pageLimit,
-              let hasMore = root["hasMore"] as? Bool else { return nil }
-        let changes = items.compactMap { E2EEV2MembershipChange.signed(from: E2EEV2EpochContractV2.json($0)) }
+        guard let root = E2EEV2EpochContractV2.object(data), Set(root.keys) == ["changes", "hasMore"],
+              let items = root["changes"]?.arrayValue, items.count <= pageLimit,
+              let hasMore = root["hasMore"]?.boolValue else { return nil }
+        let changes = items.compactMap(E2EEV2MembershipChange.signed(from:))
         // Une page vide qui en annonce d'autres bouclerait.
         guard changes.count == items.count, !(hasMore && changes.isEmpty) else { return nil }
         return (changes, hasMore)
     }
 
-    /// `{epochNumber, manifest: {manifest, signatureB64, recipients}}`.
+    /// `{epochNumber, manifest: {manifest, signatureB64, recipients}}`, entiers en chaînes.
     static func parseManifest(_ data: Data, epochNumber: Int) -> (manifest: E2EEV2SignedString, recipients: [String])? {
-        guard data.count <= E2EEV2WireLimits.maxJSONResponseBytes,
-              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              Set(root.keys) == ["epochNumber", "manifest"], root["epochNumber"] as? Int == epochNumber else {
+        guard let root = E2EEV2EpochContractV2.object(data), Set(root.keys) == ["epochNumber", "manifest"],
+              root["epochNumber"]?.stringValue == String(epochNumber) else {
             return nil
         }
-        return E2EEV2EpochManifest.signed(from: E2EEV2EpochContractV2.json(root["manifest"]))
+        return root["manifest"].flatMap(E2EEV2EpochManifest.signed(from:))
     }
 }
 
@@ -108,11 +105,15 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
         }
         let all = known + fresh
 
-        // 2. La genèse, vérifiée une fois sur le manifeste de l'époque 1.
-        let genesisLength: Int
+        // 2. La genèse : vérifiée une fois sur le manifeste de l'époque 1, puis
+        //    revérifiée à chaque passage (longueur, condensat, auteur). Rien
+        //    n'est écrit avant que toute la chaîne soit relue.
+        let genesis: E2EEV2ConversationStateStore.Genesis
+        let isNewGenesis: Bool
         do {
-            if let genesis = try stateStore.genesis(conversationId: conversationId, ownerNamespace: ownerNamespace) {
-                genesisLength = genesis.membershipChangeNumber
+            if let recorded = try stateStore.genesis(conversationId: conversationId, ownerNamespace: ownerNamespace) {
+                genesis = recorded
+                isNewGenesis = false
             } else {
                 let data: Data
                 switch await bound.getJSON(
@@ -131,30 +132,39 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
                 let manifest = try E2EEV2EpochManifest.verify(
                     served.manifest, recipients: served.recipients, creatorSigningKey: creatorKey
                 )
-                guard manifest.conversationId == conversationId, all.count >= manifest.membershipChangeNumber else {
+                guard manifest.conversationId == conversationId, manifest.epochNumber == 1,
+                      all.count >= manifest.membershipChangeNumber else {
                     return .failure(localError("invalid-e2ee-genesis-manifest"))
                 }
                 _ = try E2EEV2EpochBinding.verifyGenesis(
                     manifest, recipients: served.recipients, chain: Array(all.prefix(manifest.membershipChangeNumber)),
                     isGroup: isGroup, signingKey: signingKey
                 )
-                try stateStore.record(
-                    .init(
-                        conversationId: conversationId, creatorUserId: manifest.creatorUserId,
-                        creatorDeviceId: manifest.creatorDeviceId,
-                        manifestDigest: E2EEV2Canonical.sha256B64URL(Data(served.manifest.canonical.utf8)),
-                        membershipChangeNumber: manifest.membershipChangeNumber,
-                        recordedAtMs: Int64(now().timeIntervalSince1970 * 1_000)
-                    ),
-                    ownerNamespace: ownerNamespace
+                genesis = .init(
+                    conversationId: conversationId, creatorUserId: manifest.creatorUserId,
+                    creatorDeviceId: manifest.creatorDeviceId,
+                    manifestDigest: E2EEV2Canonical.sha256B64URL(Data(served.manifest.canonical.utf8)),
+                    membershipChangeNumber: manifest.membershipChangeNumber,
+                    membershipDigest: manifest.membershipDigest,
+                    recordedAtMs: Int64(now().timeIntervalSince1970 * 1_000)
                 )
-                genesisLength = manifest.membershipChangeNumber
+                isNewGenesis = true
             }
-            // Toute la chaîne est relue, la suite comprise, avant d'être gardée.
-            _ = try E2EEV2MembershipChain.apply(
-                all, conversationId: conversationId, isGroup: isGroup, genesisLength: genesisLength, signingKey: signingKey
+            guard all.count >= genesis.membershipChangeNumber,
+                  E2EEV2MembershipChange.digest(of: all[genesis.membershipChangeNumber - 1].canonical) == genesis.membershipDigest
+            else { return .failure(localError("invalid-e2ee-membership")) }
+            // Toute la chaîne est relue, la suite comprise ; la partie déjà
+            // gardée l'a été vérifiée, sans dépendre de l'annuaire du jour.
+            let head = try E2EEV2MembershipChain.apply(
+                all, conversationId: conversationId, isGroup: isGroup, genesisLength: genesis.membershipChangeNumber,
+                verifiedCount: known.count, signingKey: signingKey
             )
+            guard head.genesisActor == E2EEV2MembershipChain.Actor(userId: genesis.creatorUserId, deviceId: genesis.creatorDeviceId)
+            else { return .failure(localError("invalid-e2ee-membership")) }
+            // Chaîne d'abord, genèse ensuite : une genèse n'est jamais gardée
+            // sans la chaîne qui la porte.
             try stateStore.appendMembership(fresh, conversationId: conversationId, ownerNamespace: ownerNamespace)
+            if isNewGenesis { try stateStore.record(genesis, ownerNamespace: ownerNamespace) }
         } catch {
             return .failure(localError("invalid-e2ee-membership"))
         }
@@ -183,14 +193,15 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
             return .upToDate(epochNumber: current.epochNumber)
         }
         let membershipAt = { (number: Int) -> E2EEV2MembershipState? in
-            guard number >= genesisLength, number <= all.count else { return nil }
+            guard number >= genesis.membershipChangeNumber, number <= all.count else { return nil }
             return try? E2EEV2MembershipChain.apply(
                 Array(all.prefix(number)), conversationId: conversationId, isGroup: isGroup,
-                genesisLength: genesisLength, signingKey: signingKey
+                genesisLength: genesis.membershipChangeNumber, verifiedCount: all.count, signingKey: signingKey
             )
         }
         switch E2EEV2EpochVerifierV2.open(
-            served, conversationId: conversationId, ownDeviceId: device.deviceId,
+            served, conversationId: conversationId, ownUserId: String(expectedOwnerScopeId.dropFirst("user:".count)),
+            ownDeviceId: device.deviceId, genesis: genesis,
             previousMembershipChangeNumber: current?.membershipChangeNumber, devices: devices,
             membershipAt: membershipAt,
             unwrap: { [identityStore] in try identityStore.unwrapEpochKey(delivery: $0, ownerNamespace: ownerNamespace) }
@@ -206,7 +217,8 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
             return E2EEV2EpochVerifierV2.keep(
                 epochKey: epochKey, accepted: served.accepted, conversationId: conversationId,
                 commitment: manifest.keyCommitmentB64, membership: state, recipients: served.recipients,
-                createdAtMs: manifest.createdAtMs, session: session, keyStore: keyStore, stateStore: stateStore
+                createdAtMs: manifest.createdAtMs, acceptedAtMs: Int64(now().timeIntervalSince1970 * 1_000),
+                session: session, keyStore: keyStore, stateStore: stateStore
             ) ? .received(epochNumber: manifest.epochNumber) : .failure(localError("e2ee-received-epoch-storage-failed"))
         }
     }

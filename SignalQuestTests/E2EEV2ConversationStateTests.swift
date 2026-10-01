@@ -102,6 +102,60 @@ final class E2EEV2ConversationStateTests: XCTestCase {
                              "On n'ajoute personne à un tête-à-tête")
     }
 
+    /// Relecture indépendante du lot 4 : l'époque 1 repose sur toute la
+    /// genèse, et aucune époque sur une genèse partielle (ici, avant son
+    /// EXCLUDE_WEB_ON final, quand un navigateur était encore permis).
+    func testAnEpochCannotRestOnAPartialGenesis() throws {
+        let changes = try E2EEV2MembershipChain.genesis(
+            conversationId: conversationId, memberIds: [alice, bruno], adminIds: [alice], isGroup: true, excludesWeb: true,
+            actor: .init(userId: alice, deviceId: aliceDevice), createdAtMs: createdAtMs
+        ).map { try E2EEV2SignedString.sign($0.canonical, with: XCTUnwrap(keys[aliceDevice])) }
+        XCTAssertEqual(changes.count, 4)
+        let partial = try apply(Array(changes.prefix(3)), group: true, genesisLength: 4)
+        let web = E2EEV2EpochManifest.recipient(
+            userId: bruno, deviceId: "device_bruno_web_01J7ABCD2345", platform: "web",
+            fingerprint: E2EEV2Canonical.sha256B64URL(Data("navigateur".utf8))
+        )
+        func manifest(epoch: Int, on state: E2EEV2MembershipState) throws -> E2EEV2EpochManifest {
+            E2EEV2EpochManifest.make(
+                conversationId: conversationId, epochNumber: epoch, creatorUserId: alice, creatorDeviceId: aliceDevice,
+                keyCommitmentB64: Data(repeating: 1, count: 32).base64EncodedString(), recipients: [web],
+                excludesWeb: false, membershipChangeNumber: state.changeNumber,
+                membershipDigest: E2EEV2MembershipChange.digest(of: try XCTUnwrap(state.lastCanonical)), createdAtMs: createdAtMs
+            )
+        }
+        for epoch in [1, 2] {
+            XCTAssertThrowsError(try E2EEV2EpochBinding.check(
+                try manifest(epoch: epoch, on: partial), recipients: [web], state: partial, genesisLength: 4,
+                previousMembershipChangeNumber: nil
+            )) { XCTAssertEqual($0 as? E2EEV2EpochBinding.Failure, .membershipMismatch, "Époque \(epoch) sur une genèse partielle") }
+        }
+    }
+
+    func testSequenceNumbersAndEncodingsAreBounded() throws {
+        XCTAssertEqual(E2EEV2Canonical.sequenceNumber("2147483646"), 2_147_483_646)
+        XCTAssertNil(E2EEV2Canonical.sequenceNumber("2147483647"), "n + 1 ne doit jamais déborder")
+        XCTAssertNil(E2EEV2Canonical.sequenceNumber("0"))
+        XCTAssertNil(E2EEV2Canonical.sequenceNumber("01"))
+        let huge = [E2EEV2MembershipChange.tag, "1", conversationId, "2147483647", "ADD", bruno, alice, aliceDevice, "x", String(createdAtMs)]
+            .joined(separator: "\n")
+        XCTAssertThrowsError(try E2EEV2MembershipChange.parse(huge, previousCanonical: "précédent"))
+
+        // Une même signature en base64 non canonique (bits de bourrage) est refusée.
+        let signed = try E2EEV2SignedString.sign("SQ-TEST\n1", with: XCTUnwrap(keys[aliceDevice]))
+        let key = try XCTUnwrap(keys[aliceDevice]).publicKey
+        XCTAssertTrue(signed.verify(with: key))
+        if signed.signatureB64.hasSuffix("=") {
+            var characters = Array(signed.signatureB64)
+            let index = characters.lastIndex { $0 != "=" }!
+            let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+            characters[index] = alphabet[alphabet.firstIndex(of: characters[index])! ^ 1]
+            let variant = E2EEV2SignedString(canonical: signed.canonical, signatureB64: String(characters))
+            XCTAssertEqual(Data(base64Encoded: variant.signatureB64), Data(base64Encoded: signed.signatureB64))
+            XCTAssertFalse(variant.verify(with: key), "Base64 non canonique")
+        }
+    }
+
     // MARK: État collant
 
     func testStickyStateNeverRegressesAndRefusesASecondGenesis() throws {
@@ -113,7 +167,8 @@ final class E2EEV2ConversationStateTests: XCTestCase {
         let genesis = E2EEV2ConversationStateStore.Genesis(
             conversationId: conversationId, creatorUserId: alice, creatorDeviceId: aliceDevice,
             manifestDigest: E2EEV2Canonical.sha256B64URL(Data("manifeste 1".utf8)),
-            membershipChangeNumber: 3, recordedAtMs: createdAtMs
+            membershipChangeNumber: 3, membershipDigest: E2EEV2Canonical.sha256B64URL(Data("changement 3".utf8)),
+            recordedAtMs: createdAtMs
         )
         try store.record(genesis, ownerNamespace: namespace)
         XCTAssertTrue(try store.isV2(conversationId: conversationId, ownerNamespace: namespace))
@@ -122,7 +177,8 @@ final class E2EEV2ConversationStateTests: XCTestCase {
         let other = E2EEV2ConversationStateStore.Genesis(
             conversationId: conversationId, creatorUserId: bruno, creatorDeviceId: brunoDevice,
             manifestDigest: E2EEV2Canonical.sha256B64URL(Data("manifeste 2".utf8)),
-            membershipChangeNumber: 4, recordedAtMs: createdAtMs + 1
+            membershipChangeNumber: 4, membershipDigest: E2EEV2Canonical.sha256B64URL(Data("changement 4".utf8)),
+            recordedAtMs: createdAtMs + 1
         )
         XCTAssertThrowsError(try store.record(other, ownerNamespace: namespace)) {
             XCTAssertEqual($0 as? E2EEV2ConversationStateStore.Failure, .genesisConflict)
@@ -138,6 +194,101 @@ final class E2EEV2ConversationStateTests: XCTestCase {
 
         try E2EEV2VaultBoundary.purge(store: tokens, ownerScopeId: "user:\(alice)")
         XCTAssertFalse(try store.isV2(conversationId: conversationId, ownerNamespace: namespace), "Effacé avec le compte")
+    }
+
+    /// Réinitialisation d'identité : sans ses clés, une époque courante n'est
+    /// plus à jour ; la genèse, elle, reste.
+    func testIdentityResetDropsCurrentEpochsButKeepsTheGenesis() throws {
+        let tokens = InMemoryTokenStore()
+        let namespace = LocalAccountScope.storageNamespace(for: "user:\(alice)")
+        let store = E2EEV2ConversationStateStore(tokenStore: tokens, allowsOwner: { $0 == namespace })
+        try store.record(
+            .init(
+                conversationId: conversationId, creatorUserId: alice, creatorDeviceId: aliceDevice,
+                manifestDigest: E2EEV2Canonical.sha256B64URL(Data("m".utf8)), membershipChangeNumber: 2,
+                membershipDigest: E2EEV2Canonical.sha256B64URL(Data("c".utf8)), recordedAtMs: createdAtMs
+            ),
+            ownerNamespace: namespace
+        )
+        try store.recordCurrentEpoch(
+            .init(
+                conversationId: conversationId, epochNumber: 3, membershipChangeNumber: 2, memberIds: [alice, bruno],
+                recipientsDigest: "d", excludesWeb: false, createdAtMs: createdAtMs, acceptedAtMs: createdAtMs
+            ),
+            ownerNamespace: namespace
+        )
+        try store.removeCurrentEpochs(ownerNamespace: namespace)
+        XCTAssertNil(try store.currentEpoch(conversationId: conversationId, ownerNamespace: namespace))
+        XCTAssertTrue(try store.isV2(conversationId: conversationId, ownerNamespace: namespace))
+    }
+
+    /// Relecture indépendante du lot 4 (constat critique) : pour une
+    /// conversation v2, l'envoi et les appels prennent l'époque vérifiée, lue
+    /// par son numéro, même si un ancien chemin a déplacé le pointeur du coffre.
+    func testAV2ConversationAlwaysUsesItsVerifiedEpoch() throws {
+        let tokens = InMemoryTokenStore()
+        let owner = "user:\(alice)"
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        let states = E2EEV2ConversationStateStore(tokenStore: tokens, allowsOwner: { $0 == namespace })
+        let keys = E2EEV2EpochKeyStore(tokenStore: tokens, allowsOwner: { $0 == namespace })
+        func put(_ number: Int, _ byte: UInt8, conversation: String) throws {
+            let key = Data(repeating: byte, count: 32)
+            XCTAssertTrue(try keys.put(
+                recordInput: .init(
+                    conversationId: conversation, epochId: "epoch_review_\(number)_0123456789",
+                    epochNumber: number, keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(key)
+                ),
+                epochKey: key, ownerNamespace: namespace
+            ))
+        }
+        try put(1, 0x11, conversation: conversationId)
+        try states.record(
+            .init(
+                conversationId: conversationId, creatorUserId: alice, creatorDeviceId: aliceDevice,
+                manifestDigest: E2EEV2Canonical.sha256B64URL(Data("m".utf8)), membershipChangeNumber: 2,
+                membershipDigest: E2EEV2Canonical.sha256B64URL(Data("c".utf8)), recordedAtMs: createdAtMs
+            ),
+            ownerNamespace: namespace
+        )
+        try states.recordCurrentEpoch(
+            .init(
+                conversationId: conversationId, epochNumber: 1, membershipChangeNumber: 2, memberIds: [alice, bruno],
+                recipientsDigest: "d", excludesWeb: false, createdAtMs: createdAtMs, acceptedAtMs: createdAtMs
+            ),
+            ownerNamespace: namespace
+        )
+        // Un ancien chemin piloté par le serveur avance le pointeur à l'époque 5.
+        try put(5, 0x55, conversation: conversationId)
+        XCTAssertEqual(try keys.load(conversationId: conversationId, ownerNamespace: namespace)?.epochNumber, 5)
+
+        let used = try XCTUnwrap(try E2EEV2VerifiedEpochKeys.current(
+            conversationId: conversationId, ownerNamespace: namespace, keyStore: keys, stateStore: states
+        ))
+        XCTAssertEqual(used.epochNumber, 1)
+        XCTAssertEqual(used.epochKey, Data(repeating: 0x11, count: 32))
+        XCTAssertNil(try E2EEV2VerifiedEpochKeys.exact(
+            conversationId: conversationId, epochNumber: 5, ownerNamespace: namespace, keyStore: keys, stateStore: states
+        ), "Aucun appel sur une époque non vérifiée")
+        XCTAssertFalse(E2EEV2VerifiedEpochKeys.allowsLegacyEpochPath(
+            conversationId: conversationId, ownerNamespace: namespace, stateStore: states
+        ))
+
+        // Une conversation non v2 garde le comportement d'avant.
+        let legacy = "conversation_legacy_0123456789"
+        try put(2, 0x22, conversation: legacy)
+        XCTAssertEqual(try E2EEV2VerifiedEpochKeys.current(
+            conversationId: legacy, ownerNamespace: namespace, keyStore: keys, stateStore: states
+        )?.epochNumber, 2)
+        XCTAssertTrue(E2EEV2VerifiedEpochKeys.allowsLegacyEpochPath(conversationId: legacy, ownerNamespace: namespace, stateStore: states))
+
+        // État illisible : aucune clé, aucun ancien chemin.
+        let unreadable = E2EEV2ConversationStateStore(tokenStore: ThrowingTokenStore(), allowsOwner: { _ in true })
+        XCTAssertThrowsError(try E2EEV2VerifiedEpochKeys.current(
+            conversationId: conversationId, ownerNamespace: namespace, keyStore: keys, stateStore: unreadable
+        ))
+        XCTAssertFalse(E2EEV2VerifiedEpochKeys.allowsLegacyEpochPath(
+            conversationId: conversationId, ownerNamespace: namespace, stateStore: unreadable
+        ))
     }
 
     // MARK: Outils
@@ -181,4 +332,14 @@ final class E2EEV2ConversationStateTests: XCTestCase {
             .deletingLastPathComponent()
             .appendingPathComponent("contracts/e2ee-v2/\(name).json")
     }
+}
+
+/// Coffre dont toute lecture échoue (trousseau verrouillé, enregistrement abîmé).
+private final class ThrowingTokenStore: TokenStore, @unchecked Sendable {
+    struct Locked: Error {}
+    func string(for key: String) throws -> String? { throw Locked() }
+    func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws { throw Locked() }
+    func remove(_ key: String) throws { throw Locked() }
+    func keys(withPrefix prefix: String) throws -> [String] { throw Locked() }
+    func removeAll() throws { throw Locked() }
 }

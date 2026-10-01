@@ -16,6 +16,9 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         let manifestDigest: String
         /// Fin de la genèse dans la chaîne d'appartenance.
         let membershipChangeNumber: Int
+        /// Condensat du dernier changement de la genèse : à chaque relecture, la
+        /// chaîne doit reproduire exactement cette genèse.
+        let membershipDigest: String
         let recordedAtMs: Int64
     }
 
@@ -29,6 +32,9 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         let recipientsDigest: String
         let excludesWeb: Bool
         let createdAtMs: Int64
+        /// Heure locale de l'acceptation : l'âge d'une époque s'y mesure, pas à
+        /// la date que son créateur a signée.
+        let acceptedAtMs: Int64
     }
 
     enum Failure: Error, Equatable {
@@ -102,6 +108,17 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
 
     /// N'avance que : numéro d'époque plus grand, état d'appartenance égal ou plus récent.
     func recordCurrentEpoch(_ epoch: CurrentEpoch, ownerNamespace: String) throws {
+        try advanceCurrentEpoch(epoch, ownerNamespace: ownerNamespace) {}
+    }
+
+    /// Avance l'époque courante sous verrou : la règle « jamais en arrière » est
+    /// vérifiée sur une lecture fraîche AVANT `beforeRecord` (la clé gardée),
+    /// qui ne s'exécute donc jamais pour une époque qui recule.
+    func advanceCurrentEpoch(
+        _ epoch: CurrentEpoch,
+        ownerNamespace: String,
+        beforeRecord: () throws -> Void
+    ) throws {
         guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
         Self.lock.lock()
         defer { Self.lock.unlock() }
@@ -111,12 +128,42 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
                 throw Failure.regressed
             }
         }
+        try beforeRecord()
         let data = try JSONEncoder().encode(epoch)
         guard let value = String(data: data, encoding: .utf8) else { throw Failure.invalidRecord }
         try tokenStore.set(
             value, for: currentKey(conversationId: epoch.conversationId, ownerNamespace: ownerNamespace),
             accessibility: .afterFirstUnlock
         )
+    }
+
+    /// Réinitialisation d'identité : les clés d'époque partent avec l'ancienne
+    /// identité, les époques courantes aussi ; genèses et chaînes restent.
+    func removeCurrentEpochs(ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        for key in try tokenStore.keys(withPrefix: Self.prefix(ownerNamespace: ownerNamespace)) where key.hasSuffix(":current") {
+            try tokenStore.remove(key)
+        }
+    }
+
+    /// Migration en cours (§14.2) : le corps signé une fois est renvoyé tel quel,
+    /// jamais une seconde genèse pour la même conversation.
+    func pendingGenesis(conversationId: String, ownerNamespace: String) throws -> String? {
+        try tokenStore.string(for: pendingKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
+    }
+
+    func savePendingGenesis(_ body: String, conversationId: String, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        try tokenStore.set(
+            body, for: pendingKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
+    }
+
+    func clearPendingGenesis(conversationId: String, ownerNamespace: String) throws {
+        try tokenStore.remove(pendingKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
     }
 
     /// Chaîne d'appartenance signée, telle que relue : rejouée pour vérifier une
@@ -161,6 +208,10 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":chain"
     }
 
+    private func pendingKey(conversationId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":pending"
+    }
+
     private func key(conversationId: String, ownerNamespace: String) -> String {
         Self.prefix(ownerNamespace: ownerNamespace)
             + SHA256.hash(data: Data(conversationId.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -169,5 +220,54 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
     /// Même préfixe que la genèse : effacé avec le compte.
     private func currentKey(conversationId: String, ownerNamespace: String) -> String {
         key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":current"
+    }
+}
+
+/// Clé d'époque telle que l'envoi et les appels doivent la prendre (§3.5, §12).
+/// Pour une conversation v2 : celle de l'époque courante vérifiée, lue par son
+/// numéro, jamais le pointeur courant du coffre, que d'anciens chemins
+/// (livraison, rotation pilotée par le serveur, récupération) peuvent déplacer.
+/// Un état illisible lève une erreur : aucune clé.
+enum E2EEV2VerifiedEpochKeys {
+    static func current(
+        conversationId: String,
+        ownerNamespace: String,
+        keyStore: E2EEV2EpochKeyStore,
+        stateStore: E2EEV2ConversationStateStore
+    ) throws -> E2EEV2StoredEpochKey? {
+        if try stateStore.isV2(conversationId: conversationId, ownerNamespace: ownerNamespace) {
+            guard let current = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            else { return nil }
+            return try keyStore.loadEpoch(
+                conversationId: conversationId, epochNumber: current.epochNumber, ownerNamespace: ownerNamespace
+            )
+        }
+        return try keyStore.load(conversationId: conversationId, ownerNamespace: ownerNamespace)
+    }
+
+    /// Une époque désignée (réponse à un appel) : pour une conversation v2,
+    /// seulement l'époque courante vérifiée.
+    static func exact(
+        conversationId: String,
+        epochNumber: Int,
+        ownerNamespace: String,
+        keyStore: E2EEV2EpochKeyStore,
+        stateStore: E2EEV2ConversationStateStore
+    ) throws -> E2EEV2StoredEpochKey? {
+        if try stateStore.isV2(conversationId: conversationId, ownerNamespace: ownerNamespace) {
+            guard let current = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace),
+                  current.epochNumber == epochNumber else { return nil }
+        }
+        return try keyStore.loadEpoch(conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace)
+    }
+
+    /// Les anciens chemins pilotés par le serveur ne touchent jamais une
+    /// conversation v2 ; un état illisible vaut v2.
+    static func allowsLegacyEpochPath(
+        conversationId: String,
+        ownerNamespace: String,
+        stateStore: E2EEV2ConversationStateStore
+    ) -> Bool {
+        (try? stateStore.isV2(conversationId: conversationId, ownerNamespace: ownerNamespace)) == false
     }
 }

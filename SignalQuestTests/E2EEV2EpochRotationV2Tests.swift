@@ -45,7 +45,8 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         var shrunk = seeded.genesis
         shrunk.members.remove(bruno)
         XCTAssertEqual(reasons([phone.device], membership: shrunk), [.members, .devices], "Membre retiré")
-        XCTAssertEqual(reasons([phone.device], at: seeded.current.createdAtMs + E2EEV2RotationPolicy.maxEpochAgeMs), [.age], "30 jours")
+        XCTAssertEqual(reasons([phone.device], at: seeded.current.acceptedAtMs + E2EEV2RotationPolicy.maxEpochAgeMs), [.age],
+                       "30 jours depuis l'acceptation locale")
     }
 
     func testCurrentEpochOnlyMovesForward() throws {
@@ -59,7 +60,8 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         }
         let olderMembership = E2EEV2ConversationStateStore.CurrentEpoch(
             conversationId: same.conversationId, epochNumber: 2, membershipChangeNumber: same.membershipChangeNumber - 1,
-            memberIds: same.memberIds, recipientsDigest: same.recipientsDigest, excludesWeb: false, createdAtMs: same.createdAtMs
+            memberIds: same.memberIds, recipientsDigest: same.recipientsDigest, excludesWeb: false,
+            createdAtMs: same.createdAtMs, acceptedAtMs: same.acceptedAtMs
         )
         XCTAssertThrowsError(try fixture.states.recordCurrentEpoch(olderMembership, ownerNamespace: namespace))
         try E2EEV2VaultBoundary.purge(store: fixture.vault, ownerScopeId: fixture.session.ownerScopeId)
@@ -96,8 +98,8 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
             captured.append(request, body: body)
             let envelopes = body["envelopes"] as? [[String: Any]] ?? []
             return E2EEV2AccountFixture.response(request, try JSONSerialization.data(withJSONObject: [
-                "epoch": ["id": "epoch_rotation_000000000002", "epochNumber": 2, "status": "active", "createdAt": "2026-10-01T06:00:00.000Z"],
-                "recipientCount": envelopes.count,
+                "epoch": ["id": "epoch_rotation_000000000002", "epochNumber": "2", "status": "active", "createdAt": "2026-10-01T06:00:00.000Z"],
+                "recipientCount": String(envelopes.count),
             ]))
         }
         let result = await rotator(fixture).rotateIfNeeded(
@@ -183,6 +185,58 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         XCTAssertEqual(try fixture.keys.load(conversationId: seeded.conversationId, ownerNamespace: namespace)?.epochNumber, 1)
     }
 
+    /// Relecture indépendante du lot 4 : une époque qui recule (numéro ou état
+    /// d'appartenance) ne déplace jamais le pointeur de clé, même vérifiée sur
+    /// un état devenu ancien.
+    func testKeepNeverMovesTheKeyForAnEpochThatGoesBack() throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let seeded = try seed(fixture, devices: fixture.deviceSet(adding: [phone.device]))
+        let namespace = fixture.session.ownerNamespace
+        func keep(_ number: Int, _ byte: UInt8, membership: E2EEV2MembershipState) throws -> Bool {
+            let key = Data(repeating: byte, count: 32)
+            return E2EEV2EpochVerifierV2.keep(
+                epochKey: key,
+                accepted: .init(epochId: "epoch_keep_\(number)_0123456789", epochNumber: number, createdAt: "2026-10-01T07:00:00.000Z"),
+                conversationId: seeded.conversationId, commitment: try E2EEV2EpochCrypto.keyCommitment(key),
+                membership: membership, recipients: ["ligne"], createdAtMs: 0, acceptedAtMs: 0,
+                session: fixture.session, keyStore: fixture.keys, stateStore: fixture.states
+            )
+        }
+        XCTAssertTrue(try keep(3, 0x33, membership: seeded.genesis))
+        XCTAssertFalse(try keep(2, 0x22, membership: seeded.genesis), "Numéro qui recule")
+        var older = seeded.genesis
+        older.changeNumber -= 1
+        XCTAssertFalse(try keep(4, 0x44, membership: older), "État d'appartenance qui recule")
+        let stored = try XCTUnwrap(try fixture.keys.load(conversationId: seeded.conversationId, ownerNamespace: namespace))
+        XCTAssertEqual(stored.epochNumber, 3)
+        XCTAssertEqual(stored.epochKey, Data(repeating: 0x33, count: 32))
+    }
+
+    func testTheLastEpochNumberNeverOverflows() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let seeded = try seed(fixture, devices: fixture.deviceSet(adding: [phone.device]))
+        let last = seeded.current
+        try fixture.states.recordCurrentEpoch(
+            .init(
+                conversationId: last.conversationId, epochNumber: E2EEV2Canonical.maxSequenceNumber,
+                membershipChangeNumber: last.membershipChangeNumber, memberIds: last.memberIds,
+                recipientsDigest: last.recipientsDigest, excludesWeb: false, createdAtMs: 0, acceptedAtMs: 0
+            ),
+            ownerNamespace: fixture.session.ownerNamespace
+        )
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("Aucune proposition au-delà du dernier numéro")
+            throw URLError(.badURL)
+        }
+        let tablet = remote(user: bruno, device: "device_bruno_tablet_01J7ABCD", platform: "android")
+        guard case .failure = await rotator(fixture).rotateIfNeeded(
+            conversationId: seeded.conversationId, membership: seeded.genesis, membershipAt: { _ in seeded.genesis },
+            devices: fixture.deviceSet(adding: [phone.device, tablet.device]), expectedOwnerScopeId: fixture.session.ownerScopeId
+        ) else { return XCTFail("Rotation au-delà du dernier numéro") }
+    }
+
     // MARK: Outils
 
     private func rotator(_ fixture: E2EEV2AccountFixture) -> E2EEV2EpochRotatorV2 {
@@ -205,7 +259,18 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
             conversationId: creation.conversationId, epochNumber: 1, membershipChangeNumber: creation.genesis.changeNumber,
             memberIds: creation.genesis.members.sorted(),
             recipientsDigest: E2EEV2Canonical.listDigest(tag: E2EEV2EpochManifest.recipientsTag, lines: creation.epoch.recipients),
-            excludesWeb: false, createdAtMs: creation.epoch.createdAtMs
+            excludesWeb: false, createdAtMs: creation.epoch.createdAtMs, acceptedAtMs: creation.epoch.createdAtMs
+        )
+        try fixture.states.appendMembership(creation.membership, conversationId: creation.conversationId, ownerNamespace: namespace)
+        try fixture.states.record(
+            .init(
+                conversationId: creation.conversationId, creatorUserId: fixture.user, creatorDeviceId: fixture.descriptor.deviceId,
+                manifestDigest: E2EEV2Canonical.sha256B64URL(Data(creation.epoch.manifest.canonical.utf8)),
+                membershipChangeNumber: creation.genesis.changeNumber,
+                membershipDigest: E2EEV2MembershipChange.digest(of: try XCTUnwrap(creation.membership.last?.canonical)),
+                recordedAtMs: creation.epoch.createdAtMs
+            ),
+            ownerNamespace: namespace
         )
         try fixture.states.recordCurrentEpoch(current, ownerNamespace: namespace)
         return Seeded(conversationId: creation.conversationId, genesis: creation.genesis, current: current)
@@ -248,7 +313,7 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         )
         return try JSONSerialization.data(withJSONObject: [
             "conversationId": seeded.conversationId,
-            "epoch": ["id": "epoch_rotation_000000000002", "epochNumber": 2, "status": "active", "createdAt": "2026-10-01T06:00:00.000Z"],
+            "epoch": ["id": "epoch_rotation_000000000002", "epochNumber": "2", "status": "active", "createdAt": "2026-10-01T06:00:00.000Z"],
             "manifest": ["manifest": signed.canonical, "signatureB64": signed.signatureB64, "recipients": lines],
             "envelope": [
                 "recipientDeviceId": envelope.recipientDeviceId, "wrapAlgorithm": envelope.wrapAlgorithm,

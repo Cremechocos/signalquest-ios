@@ -63,6 +63,7 @@ enum E2EEV2EpochProposals {
         creatorSigningKey: P256.Signing.PublicKey,
         recipients: [E2EEV2CertifiedDevice],
         membership: E2EEV2MembershipState,
+        genesisLength: Int,
         previousMembershipChangeNumber: Int?,
         epochKey: Data,
         nowMs: Int64,
@@ -88,7 +89,8 @@ enum E2EEV2EpochProposals {
         )
         let verified = try E2EEV2EpochManifest.verify(signed, recipients: lines, creatorSigningKey: creatorSigningKey)
         try E2EEV2EpochBinding.check(
-            verified, recipients: lines, state: membership, previousMembershipChangeNumber: previousMembershipChangeNumber
+            verified, recipients: lines, state: membership, genesisLength: genesisLength,
+            previousMembershipChangeNumber: previousMembershipChangeNumber
         )
         let envelopes = try recipients.map { device in
             try wrap(
@@ -202,7 +204,8 @@ struct E2EEV2ConversationCreation: Sendable {
         }
         let epoch = try E2EEV2EpochProposals.make(
             conversationId: conversationId, epochNumber: 1, creator: actor, creatorSigningKey: signingKey,
-            recipients: recipients, membership: genesis, previousMembershipChangeNumber: nil,
+            recipients: recipients, membership: genesis, genesisLength: signedChanges.count,
+            previousMembershipChangeNumber: nil,
             epochKey: epochKey, nowMs: nowMs, sign: sign, wrap: wrap
         )
         let served = Set(recipients.map(\.userId))
@@ -229,13 +232,15 @@ enum E2EEV2ConversationMigration {
         case membersWaiting([String])
     }
 
+    /// `isV2` nil : état « v2 » illisible. On ne migre jamais sur un doute, une
+    /// seconde genèse serait possible.
     static func decide(
         _ conversation: MessageConversation,
-        isV2: Bool,
+        isV2: Bool?,
         devices: E2EEV2CertifiedDeviceSet,
         nowMs: Int64
     ) -> Decision {
-        guard !isV2 else { return .alreadyV2 }
+        guard isV2 == false else { return .alreadyV2 }
         guard conversation.e2eeEnabled == true else { return .notEncrypted }
         let waiting = conversation.participants.map(\.userId).filter { user in
             !(devices.devicesByUser[user] ?? []).contains { !$0.isSidelined(nowMs: nowMs) }
@@ -270,28 +275,17 @@ enum E2EEV2ConversationMigration {
     }
 }
 
-/// Reçu de création (proposition iOS, E.2) : la conversation v2 et son époque 1
-/// acceptée, sous la forme du reçu de rotation.
+/// Reçu de création (proposition iOS, E.2) : la conversation v2 et son époque
+/// 1 acceptée. JSON strict, entiers en chaînes (D.0).
 enum E2EEV2ConversationCreationReceipt {
-    struct Accepted: Equatable, Sendable {
-        let epochId: String
-        let createdAt: String
-    }
-
-    static func parse(_ data: Data, conversationId: String, recipientCount: Int) -> Accepted? {
-        guard data.count <= E2EEV2WireLimits.maxJSONResponseBytes,
-              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-              Set(root.keys) == ["conversation", "epoch", "recipientCount"],
-              let conversation = root["conversation"] as? [String: Any],
-              conversation["id"] as? String == conversationId,
-              conversation["e2eeProtocolVersion"] as? Int == 2,
-              let epoch = root["epoch"] as? [String: Any],
-              Set(epoch.keys) == ["id", "epochNumber", "status", "createdAt"],
-              let epochId = epoch["id"] as? String, E2EEV2Canonical.isOpaque(epochId),
-              epoch["epochNumber"] as? Int == 1, epoch["status"] as? String == "active",
-              let createdAt = epoch["createdAt"] as? String, !createdAt.isEmpty, createdAt.count <= 64,
-              root["recipientCount"] as? Int == recipientCount else { return nil }
-        return Accepted(epochId: epochId, createdAt: createdAt)
+    /// `{conversationId, epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
+    static func parse(_ data: Data, conversationId: String, recipientCount: Int) -> E2EEV2EpochContractV2.Accepted? {
+        guard let root = E2EEV2EpochContractV2.object(data),
+              Set(root.keys) == ["conversationId", "epoch", "recipientCount"],
+              root["conversationId"]?.stringValue == conversationId,
+              let accepted = E2EEV2EpochContractV2.epoch(root["epoch"]), accepted.epochNumber == 1,
+              root["recipientCount"]?.stringValue == String(recipientCount) else { return nil }
+        return accepted
     }
 }
 
@@ -300,9 +294,55 @@ enum E2EEV2ConversationCreationResult: Sendable {
     case failure(E2EEV2TransportFailure)
 }
 
-/// Crée la conversation, puis, seulement une fois l'époque 1 acceptée, garde sa
-/// clé et l'état « v2 » collant (§3.1, §12).
+/// Crée ou migre une conversation, puis, seulement une fois l'époque 1
+/// acceptée, garde sa chaîne, sa genèse, sa clé et son époque courante (§3.1,
+/// §12), dans cet ordre.
 final class E2EEV2ConversationCreator: @unchecked Sendable {
+    /// Ce qui part au serveur et ce qu'il faut garder après son reçu.
+    private struct Prepared {
+        let conversationId: String
+        let isGroup: Bool
+        let membership: [E2EEV2SignedString]
+        let manifest: E2EEV2SignedString
+        let recipients: [String]
+        let envelopes: [E2EEV2SignedEpochEnvelope]
+        let pendingUserIds: [String]
+        let body: Data
+
+        init(_ creation: E2EEV2ConversationCreation, body: Data) {
+            conversationId = creation.conversationId
+            isGroup = creation.isGroup
+            membership = creation.membership
+            manifest = creation.epoch.manifest
+            recipients = creation.epoch.recipients
+            envelopes = creation.epoch.envelopes
+            pendingUserIds = creation.pendingUserIds
+            self.body = body
+        }
+
+        /// Corps de migration gardé, relu strictement.
+        init?(migrationBody: String, conversationId: String, isGroup: Bool) {
+            guard let root = try? E2EEV2CanonicalJSON.parseCanonical(migrationBody).objectValue,
+                  Set(root.keys) == ["membership", "epoch"],
+                  let items = root["membership"]?.arrayValue,
+                  let epoch = root["epoch"]?.objectValue,
+                  Set(epoch.keys) == ["epochNumber", "previousEpochNumber", "manifest", "envelopes"],
+                  let wire = epoch["manifest"].flatMap(E2EEV2EpochManifest.signed(from:)),
+                  let envelopeItems = epoch["envelopes"]?.arrayValue else { return nil }
+            let changes = items.compactMap(E2EEV2MembershipChange.signed(from:))
+            let envelopes = envelopeItems.compactMap(E2EEV2EpochContractV2.envelope)
+            guard changes.count == items.count, envelopes.count == envelopeItems.count else { return nil }
+            self.conversationId = conversationId
+            self.isGroup = isGroup
+            membership = changes
+            manifest = wire.manifest
+            recipients = wire.recipients
+            self.envelopes = envelopes
+            pendingUserIds = []
+            body = Data(migrationBody.utf8)
+        }
+    }
+
     private let transport: E2EEV2APITransport
     private let identityStore: E2EEV2DeviceIdentityStore
     private let keyStore: E2EEV2EpochKeyStore
@@ -334,127 +374,193 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         devices: E2EEV2CertifiedDeviceSet,
         expectedOwnerScopeId: String
     ) async -> E2EEV2ConversationCreationResult {
-        await submit(expectedOwnerScopeId: expectedOwnerScopeId, path: { _ in "/api/e2ee/v2/conversations" }, body: \.body) {
-            try E2EEV2ConversationCreation.make(
-                conversationId: try E2EEV2ConversationCreation.newConversationId(), ownUserId: $0, device: $1,
-                participantIds: participantIds, isGroup: isGroup, title: title, excludesWeb: excludesWeb,
-                devices: devices, epochKey: $2, nowMs: $3, sign: $4, wrap: $5
-            )
+        guard let context = context(expectedOwnerScopeId) else {
+            return .failure(localError("invalid-e2ee-creation-scope"))
         }
+        let prepared: Prepared
+        do {
+            let creation = try build(context) {
+                try E2EEV2ConversationCreation.make(
+                    conversationId: try E2EEV2ConversationCreation.newConversationId(), ownUserId: context.ownUserId,
+                    device: context.device, participantIds: participantIds, isGroup: isGroup, title: title,
+                    excludesWeb: excludesWeb, devices: devices, epochKey: $0, nowMs: $1, sign: $2, wrap: $3
+                )
+            }
+            prepared = Prepared(creation, body: creation.body)
+        } catch {
+            return .failure(localError("e2ee-conversation-creation-invalid"))
+        }
+        return await submit(prepared, path: "/api/e2ee/v2/conversations", context: context, devices: devices)
     }
 
     /// Migration d'une conversation chiffrée v1 (§14.2), sous son identifiant.
+    /// Une seule genèse est jamais signée : un nouvel essai renvoie le même corps.
     func migrate(
         _ conversation: MessageConversation,
         devices: E2EEV2CertifiedDeviceSet,
         expectedOwnerScopeId: String
     ) async -> E2EEV2ConversationCreationResult {
-        await submit(
-            expectedOwnerScopeId: expectedOwnerScopeId,
-            path: { "/api/e2ee/v2/conversations/\($0.conversationId)/genesis" },
-            body: \.migrationBody
-        ) {
-            try E2EEV2ConversationMigration.make(
-                conversation, ownUserId: $0, device: $1, devices: devices, epochKey: $2, nowMs: $3, sign: $4, wrap: $5
-            )
-        }
-    }
-
-    private typealias Builder = (
-        _ ownUserId: String,
-        _ device: E2EEV2DeviceDescriptor,
-        _ epochKey: Data,
-        _ nowMs: Int64,
-        _ sign: (Data) throws -> Data,
-        _ wrap: (E2EEV2EpochContext, String) throws -> E2EEV2SignedEpochEnvelope
-    ) throws -> E2EEV2ConversationCreation
-
-    private func submit(
-        expectedOwnerScopeId: String,
-        path: (E2EEV2ConversationCreation) -> String,
-        body: (E2EEV2ConversationCreation) -> Data,
-        build: Builder
-    ) async -> E2EEV2ConversationCreationResult {
-        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
-              session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:") else {
+        guard let context = context(expectedOwnerScopeId) else {
             return .failure(localError("invalid-e2ee-creation-scope"))
         }
-        let ownerNamespace = session.ownerNamespace
-        let ownUserId = String(expectedOwnerScopeId.dropFirst("user:".count))
-        guard let device = try? identityStore.load(ownerNamespace: ownerNamespace) else {
-            return .failure(localError("e2ee-device-identity-unavailable"))
-        }
-        var epochKey = Data(count: 32)
-        let status = epochKey.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
-        defer { epochKey.resetBytes(in: 0..<epochKey.count) }
-        guard status == errSecSuccess else { return .failure(localError("e2ee-epoch-random-generation-failed")) }
-
-        let creation: E2EEV2ConversationCreation
+        let prepared: Prepared
         do {
-            creation = try build(
-                ownUserId, device, epochKey, Int64(now().timeIntervalSince1970 * 1_000),
-                { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: ownerNamespace) },
-                { [identityStore] context, recipientKey in
-                    try identityStore.createSignedEpochEnvelope(
-                        context: context, epochKey: epochKey, recipientPublicIdentityKeyB64: recipientKey,
-                        ownerNamespace: ownerNamespace
+            if let pending = try stateStore.pendingGenesis(conversationId: conversation.id, ownerNamespace: context.ownerNamespace) {
+                guard let restored = Prepared(migrationBody: pending, conversationId: conversation.id, isGroup: conversation.isGroup)
+                else { return .failure(localError("e2ee-pending-genesis-invalid")) }
+                prepared = restored
+            } else {
+                let migration = try build(context) {
+                    try E2EEV2ConversationMigration.make(
+                        conversation, ownUserId: context.ownUserId, device: context.device, devices: devices,
+                        epochKey: $0, nowMs: $1, sign: $2, wrap: $3
                     )
                 }
-            )
+                // Gardé avant tout envoi : un échec ne fait jamais signer une seconde genèse.
+                try stateStore.savePendingGenesis(
+                    String(decoding: migration.migrationBody, as: UTF8.self),
+                    conversationId: conversation.id, ownerNamespace: context.ownerNamespace
+                )
+                prepared = Prepared(migration, body: migration.migrationBody)
+            }
         } catch {
             return .failure(localError("e2ee-conversation-creation-invalid"))
         }
+        let result = await submit(
+            prepared, path: "/api/e2ee/v2/conversations/\(conversation.id)/genesis", context: context, devices: devices
+        )
+        if case .created = result {
+            try? stateStore.clearPendingGenesis(conversationId: conversation.id, ownerNamespace: context.ownerNamespace)
+        }
+        return result
+    }
 
+    private struct Context {
+        let session: LocalAccountSession
+        let ownerNamespace: String
+        let ownUserId: String
+        let device: E2EEV2DeviceDescriptor
+        let expectedOwnerScopeId: String
+    }
+
+    private func context(_ expectedOwnerScopeId: String) -> Context? {
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:"),
+              let device = try? identityStore.load(ownerNamespace: session.ownerNamespace) else { return nil }
+        return Context(
+            session: session, ownerNamespace: session.ownerNamespace,
+            ownUserId: String(expectedOwnerScopeId.dropFirst("user:".count)), device: device,
+            expectedOwnerScopeId: expectedOwnerScopeId
+        )
+    }
+
+    /// Clé tirée ici, signatures et enveloppes par le coffre de l'appareil.
+    /// La clé n'est pas gardée : après le reçu, elle se relit dans l'enveloppe
+    /// que l'appareil s'est adressée.
+    private func build<T>(
+        _ context: Context,
+        _ make: (Data, Int64, (Data) throws -> Data, (E2EEV2EpochContext, String) throws -> E2EEV2SignedEpochEnvelope) throws -> T
+    ) throws -> T {
+        var epochKey = Data(count: 32)
+        let status = epochKey.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
+        defer { epochKey.resetBytes(in: 0..<epochKey.count) }
+        guard status == errSecSuccess else { throw E2EEV2DeviceIdentityError.randomGenerationFailed }
+        let ownerNamespace = context.ownerNamespace
+        return try make(
+            epochKey, Int64(now().timeIntervalSince1970 * 1_000),
+            { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: ownerNamespace) },
+            { [identityStore] epochContext, recipientKey in
+                try identityStore.createSignedEpochEnvelope(
+                    context: epochContext, epochKey: epochKey, recipientPublicIdentityKeyB64: recipientKey,
+                    ownerNamespace: ownerNamespace
+                )
+            }
+        )
+    }
+
+    private func submit(
+        _ prepared: Prepared,
+        path: String,
+        context: Context,
+        devices: E2EEV2CertifiedDeviceSet
+    ) async -> E2EEV2ConversationCreationResult {
         let response: Data
-        switch await transport.bound(to: session).postJSON(
-            path: path(creation),
-            body: body(creation),
-            expectedOwnerScopeId: expectedOwnerScopeId,
-            capabilitySet: .message
+        switch await transport.bound(to: context.session).postJSON(
+            path: path, body: prepared.body, expectedOwnerScopeId: context.expectedOwnerScopeId, capabilitySet: .message
         ) {
         case .failure(let error): return .failure(error)
         case .success(let data, _, _): response = data
         }
-        guard session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
+        guard context.session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
         guard let accepted = E2EEV2ConversationCreationReceipt.parse(
-            response, conversationId: creation.conversationId, recipientCount: creation.epoch.envelopes.count
+            response, conversationId: prepared.conversationId, recipientCount: prepared.envelopes.count
         ) else {
             return .failure(localError("invalid-e2ee-conversation-creation-response"))
         }
         do {
-            guard try keyStore.put(
-                recordInput: .init(
-                    conversationId: creation.conversationId, epochId: accepted.epochId, epochNumber: 1,
-                    keyCommitmentB64: creation.epoch.keyCommitmentB64
-                ),
-                epochKey: epochKey, ownerNamespace: ownerNamespace, expectedSession: session
-            ) else { return .failure(localError("e2ee-created-epoch-storage-failed")) }
-            try stateStore.record(
-                .init(
-                    conversationId: creation.conversationId, creatorUserId: ownUserId, creatorDeviceId: device.deviceId,
-                    manifestDigest: E2EEV2Canonical.sha256B64URL(Data(creation.epoch.manifest.canonical.utf8)),
-                    membershipChangeNumber: creation.genesis.changeNumber,
-                    recordedAtMs: Int64(now().timeIntervalSince1970 * 1_000)
-                ),
-                ownerNamespace: ownerNamespace
-            )
-            try stateStore.appendMembership(creation.membership, conversationId: creation.conversationId, ownerNamespace: ownerNamespace)
-            try stateStore.recordCurrentEpoch(
-                .init(
-                    conversationId: creation.conversationId, epochNumber: 1,
-                    membershipChangeNumber: creation.genesis.changeNumber,
-                    memberIds: creation.genesis.members.sorted(),
-                    recipientsDigest: E2EEV2Canonical.listDigest(
-                        tag: E2EEV2EpochManifest.recipientsTag, lines: creation.epoch.recipients
-                    ),
-                    excludesWeb: creation.genesis.excludesWeb, createdAtMs: creation.epoch.createdAtMs
-                ),
-                ownerNamespace: ownerNamespace
-            )
+            try finish(prepared, accepted: accepted, context: context, devices: devices)
         } catch {
             return .failure(localError("e2ee-created-epoch-storage-failed"))
         }
-        return .created(conversationId: creation.conversationId, pendingUserIds: creation.pendingUserIds)
+        return .created(conversationId: prepared.conversationId, pendingUserIds: prepared.pendingUserIds)
+    }
+
+    /// Relit ce que l'appareil a lui-même signé, puis garde : la chaîne, la
+    /// genèse (avec le condensat de son dernier changement), et sous verrou la
+    /// clé et l'époque courante.
+    private func finish(
+        _ prepared: Prepared,
+        accepted: E2EEV2EpochContractV2.Accepted,
+        context: Context,
+        devices: E2EEV2CertifiedDeviceSet
+    ) throws {
+        guard let own = devices.device(userId: context.ownUserId, deviceId: context.device.deviceId),
+              own.signingKeyB64 == context.device.publicSigningKeyB64, let signingKey = own.signingKey,
+              let last = prepared.membership.last?.canonical,
+              let ownEnvelope = prepared.envelopes.first(where: { $0.recipientDeviceId == context.device.deviceId }) else {
+            throw E2EEV2ConversationCreation.Failure.deviceNotCertified
+        }
+        let genesis = try E2EEV2MembershipChain.apply(
+            prepared.membership, conversationId: prepared.conversationId, isGroup: prepared.isGroup,
+            genesisLength: prepared.membership.count
+        ) { userId, deviceId in
+            userId == context.ownUserId && deviceId == context.device.deviceId ? signingKey : nil
+        }
+        let manifest = try E2EEV2EpochManifest.verify(prepared.manifest, recipients: prepared.recipients, creatorSigningKey: signingKey)
+        try E2EEV2EpochBinding.check(
+            manifest, recipients: prepared.recipients, state: genesis, genesisLength: prepared.membership.count,
+            previousMembershipChangeNumber: nil
+        )
+        var epochKey = try identityStore.unwrapEpochKey(
+            delivery: E2EEV2EpochDelivery(
+                conversationId: prepared.conversationId, epochId: accepted.epochId, epochNumber: 1,
+                keyCommitmentB64: manifest.keyCommitmentB64, reason: "INITIAL", status: "active",
+                createdAt: accepted.createdAt, senderDeviceId: context.device.deviceId,
+                senderPublicSigningKeyB64: context.device.publicSigningKeyB64, envelope: ownEnvelope
+            ),
+            ownerNamespace: context.ownerNamespace
+        )
+        defer { epochKey.resetBytes(in: 0..<epochKey.count) }
+        if try stateStore.membershipChain(conversationId: prepared.conversationId, ownerNamespace: context.ownerNamespace).isEmpty {
+            try stateStore.appendMembership(prepared.membership, conversationId: prepared.conversationId, ownerNamespace: context.ownerNamespace)
+        }
+        try stateStore.record(
+            .init(
+                conversationId: prepared.conversationId, creatorUserId: context.ownUserId,
+                creatorDeviceId: context.device.deviceId,
+                manifestDigest: E2EEV2Canonical.sha256B64URL(Data(prepared.manifest.canonical.utf8)),
+                membershipChangeNumber: prepared.membership.count,
+                membershipDigest: E2EEV2MembershipChange.digest(of: last),
+                recordedAtMs: Int64(now().timeIntervalSince1970 * 1_000)
+            ),
+            ownerNamespace: context.ownerNamespace
+        )
+        guard E2EEV2EpochVerifierV2.keep(
+            epochKey: epochKey, accepted: accepted, conversationId: prepared.conversationId,
+            commitment: manifest.keyCommitmentB64, membership: genesis, recipients: prepared.recipients,
+            createdAtMs: manifest.createdAtMs, acceptedAtMs: Int64(now().timeIntervalSince1970 * 1_000),
+            session: context.session, keyStore: keyStore, stateStore: stateStore
+        ) else { throw E2EEV2ConversationStateStore.Failure.invalidRecord }
     }
 
     private func localError(_ message: String) -> E2EEV2TransportFailure {

@@ -24,7 +24,8 @@ struct E2EEV2SignedString: Equatable, Sendable {
     }
 
     func verify(with publicKey: P256.Signing.PublicKey) -> Bool {
-        guard let der = Data(base64Encoded: signatureB64) else { return false }
+        // Base64 canonique : `Data(base64Encoded:)` accepte des variantes.
+        guard let der = Data(base64Encoded: signatureB64), der.base64EncodedString() == signatureB64 else { return false }
         return E2EEV2LowS.verify(derSignature: der, message: Data(canonical.utf8), publicKey: publicKey)
     }
 }
@@ -385,7 +386,7 @@ struct E2EEV2MembershipChange: Equatable, Sendable {
     static func parse(_ canonical: String, previousCanonical: String?) throws -> E2EEV2MembershipChange {
         guard let f = E2EEV2Canonical.split(canonical, tag: tag, version: "1", fieldCount: 10),
               E2EEV2Canonical.isOpaque(f[2]),
-              E2EEV2Canonical.isDecimal(f[3]), let number = Int(f[3]), number >= 1,
+              let number = E2EEV2Canonical.sequenceNumber(f[3]),
               actions.contains(f[4]),
               E2EEV2Canonical.isOpaque(f[6]), E2EEV2Canonical.isOpaque(f[7]),
               E2EEV2Canonical.isDecimal(f[9]), let createdAt = Int64(f[9]) else {
@@ -475,13 +476,16 @@ enum E2EEV2MembershipChain {
     /// Applique des changements signés, dans l'ordre, à l'état connu. La
     /// genèse (changements 1 à `genesisLength`, que fixe l'époque 1) vient d'un
     /// seul appareil et précède tout administrateur ; la suite respecte les
-    /// autorisations de D.4.
+    /// autorisations de D.4. Les `verifiedCount` premiers changements, déjà
+    /// vérifiés quand l'appareil les a gardés, ne sont pas revérifiés contre
+    /// l'annuaire du jour : un auteur révoqué depuis ne casse pas la relecture.
     static func apply(
         _ signed: [E2EEV2SignedString],
         to state: E2EEV2MembershipState = E2EEV2MembershipState(),
         conversationId: String,
         isGroup: Bool,
         genesisLength: Int,
+        verifiedCount: Int = 0,
         signingKey: (_ userId: String, _ deviceId: String) -> P256.Signing.PublicKey?
     ) throws -> E2EEV2MembershipState {
         guard genesisLength >= 1 else { throw E2EEV2TrustFormatError.invalidField }
@@ -491,8 +495,10 @@ enum E2EEV2MembershipChain {
             guard change.conversationId == conversationId, change.changeNumber == state.changeNumber + 1 else {
                 throw E2EEV2TrustFormatError.invalidField
             }
-            guard let key = signingKey(change.actorUserId, change.actorDeviceId), item.verify(with: key) else {
-                throw E2EEV2TrustFormatError.invalidSignature
+            if change.changeNumber > verifiedCount {
+                guard let key = signingKey(change.actorUserId, change.actorDeviceId), item.verify(with: key) else {
+                    throw E2EEV2TrustFormatError.invalidSignature
+                }
             }
             if change.changeNumber <= genesisLength {
                 try applyGenesis(change, to: &state, isGroup: isGroup)
@@ -742,12 +748,13 @@ struct E2EEV2EpochManifest: Equatable, Sendable {
         guard signed.verify(with: creatorSigningKey) else { throw E2EEV2TrustFormatError.invalidSignature }
         guard let f = E2EEV2Canonical.split(signed.canonical, tag: tag, version: version, fieldCount: 13),
               E2EEV2Canonical.isOpaque(f[2]),
-              E2EEV2Canonical.isDecimal(f[3]), let epochNumber = Int(f[3]), epochNumber >= 1,
+              let epochNumber = E2EEV2Canonical.sequenceNumber(f[3]),
               E2EEV2Canonical.isOpaque(f[4]), E2EEV2Canonical.isOpaque(f[5]),
-              Data(base64Encoded: f[6])?.count == 32,
+              let commitment = Data(base64Encoded: f[6]), commitment.count == 32,
+              commitment.base64EncodedString() == f[6],
               E2EEV2Canonical.isDecimal(f[7]), let count = Int(f[7]), (1...maxRecipients).contains(count),
               f[9] == "0" || f[9] == "1",
-              E2EEV2Canonical.isDecimal(f[10]), let membershipNumber = Int(f[10]), membershipNumber >= 1,
+              let membershipNumber = E2EEV2Canonical.sequenceNumber(f[10]),
               E2EEV2ApprovalV2.isDigest(f[11]),
               E2EEV2Canonical.isDecimal(f[12]), let createdAt = Int64(f[12]) else {
             throw E2EEV2TrustFormatError.invalidField
@@ -812,10 +819,18 @@ enum E2EEV2EpochBinding {
         _ manifest: E2EEV2EpochManifest,
         recipients: [String],
         state: E2EEV2MembershipState,
+        genesisLength: Int,
         previousMembershipChangeNumber: Int?
     ) throws {
         guard state.changeNumber == manifest.membershipChangeNumber, let last = state.lastCanonical,
               E2EEV2MembershipChange.digest(of: last) == manifest.membershipDigest else {
+            throw Failure.membershipMismatch
+        }
+        // L'époque 1 repose sur toute la genèse, et rien ne repose sur une
+        // genèse partielle (par exemple avant son EXCLUDE_WEB_ON final).
+        guard manifest.epochNumber == 1
+            ? manifest.membershipChangeNumber == genesisLength
+            : manifest.membershipChangeNumber >= genesisLength else {
             throw Failure.membershipMismatch
         }
         if let previous = previousMembershipChangeNumber, manifest.membershipChangeNumber < previous {
@@ -848,7 +863,10 @@ enum E2EEV2EpochBinding {
             chain, conversationId: manifest.conversationId, isGroup: isGroup,
             genesisLength: manifest.membershipChangeNumber, signingKey: signingKey
         )
-        try check(manifest, recipients: recipients, state: state, previousMembershipChangeNumber: nil)
+        try check(
+            manifest, recipients: recipients, state: state, genesisLength: manifest.membershipChangeNumber,
+            previousMembershipChangeNumber: nil
+        )
         return state
     }
 }

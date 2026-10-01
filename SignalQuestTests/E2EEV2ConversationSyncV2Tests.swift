@@ -92,6 +92,87 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
                       "La genèse vérifiée rend la conversation v2, avant même la clé")
     }
 
+    /// Relecture indépendante du lot 4 : une genèse n'est jamais gardée sans la
+    /// chaîne qui la porte, ni avant que toute la chaîne soit relue.
+    func testNothingIsKeptWhenTheChainFailsAfterAValidGenesis() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
+        let devices = fixture.deviceSet(adding: [creator.device])
+        var served = try serve(fixture, creator: creator, devices: devices)
+        let added = E2EEV2MembershipChange(
+            conversationId: conversationId, changeNumber: 3, action: "ADD", targetUserId: carla,
+            actorUserId: alice, actorDeviceId: creator.device.deviceId,
+            previousChangeDigest: E2EEV2MembershipChange.digest(of: served.chain[1].canonical), createdAtMs: 1_790_000_000_100
+        )
+        served.chain.append(try E2EEV2SignedString.sign(added.canonical, with: creator.signing))
+        MockURLProtocol.requestHandler = Self.server(served)
+
+        guard case .failure = await sync(fixture, devices: devices) else { return XCTFail("Chaîne invalide acceptée") }
+        let namespace = fixture.session.ownerNamespace
+        XCTAssertFalse(try fixture.states.isV2(conversationId: conversationId, ownerNamespace: namespace), "Genèse non gardée")
+        XCTAssertEqual(try fixture.states.membershipChain(conversationId: conversationId, ownerNamespace: namespace), [])
+    }
+
+    /// La genèse gardée est revérifiée à chaque passage : une chaîne gardée qui
+    /// ne la reproduit plus (condensat, auteur) est refusée.
+    func testAStoredChainThatNoLongerMatchesTheGenesisIsRefused() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
+        let devices = fixture.deviceSet(adding: [creator.device])
+        MockURLProtocol.requestHandler = Self.server(try serve(fixture, creator: creator, devices: devices))
+        let first = await sync(fixture, devices: devices)
+        XCTAssertEqual(first, .received(epochNumber: 1))
+
+        // Une autre genèse, cohérente en elle-même, remplace la chaîne gardée.
+        let other = try E2EEV2MembershipChain.genesis(
+            conversationId: conversationId, memberIds: [alice, fixture.user], adminIds: [], isGroup: false,
+            actor: .init(userId: alice, deviceId: creator.device.deviceId), createdAtMs: 1_790_000_009_000
+        ).map { try E2EEV2SignedString.sign($0.canonical, with: creator.signing) }
+        let namespace = fixture.session.ownerNamespace
+        let chainKey = E2EEV2ConversationStateStore.prefix(ownerNamespace: namespace)
+            + SHA256.hash(data: Data(conversationId.utf8)).map { String(format: "%02x", $0) }.joined() + ":chain"
+        try fixture.vault.set(
+            E2EEV2CanonicalJSON.encodeString(.array(other.map(E2EEV2MembershipChange.json))), for: chainKey,
+            accessibility: .afterFirstUnlock
+        )
+        guard case .failure = await sync(fixture, devices: devices) else { return XCTFail("Genèse remplacée acceptée") }
+    }
+
+    /// Un auteur de la chaîne révoqué depuis ne casse pas la relecture : la
+    /// partie gardée a été vérifiée quand elle l'a été.
+    func testARevokedAuthorDoesNotBreakTheStoredChain() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
+        let devices = fixture.deviceSet(adding: [creator.device])
+        MockURLProtocol.requestHandler = Self.server(try serve(fixture, creator: creator, devices: devices))
+        let first = await sync(fixture, devices: devices)
+        XCTAssertEqual(first, .received(epochNumber: 1))
+
+        let withoutCreator = fixture.deviceSet(adding: [])
+        let again = await sync(fixture, devices: withoutCreator)
+        XCTAssertEqual(again, .upToDate(epochNumber: 1))
+    }
+
+    /// La ligne de cet appareil doit être exactement son appareil certifié.
+    func testAnEpochWithAWrongLineForThisDeviceIsRefused() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
+        let devices = fixture.deviceSet(adding: [creator.device])
+        let own = try XCTUnwrap(devices.device(userId: fixture.user, deviceId: fixture.descriptor.deviceId))
+        let altered = E2EEV2CertifiedDevice(
+            userId: own.userId, deviceId: own.deviceId, keyVersion: own.keyVersion, platform: own.platform,
+            identityKeyB64: own.identityKeyB64, signingKeyB64: own.signingKeyB64,
+            fingerprint: E2EEV2Canonical.sha256B64URL(Data("autre appareil".utf8)), capabilities: own.capabilities
+        )
+        let skewed = E2EEV2CertifiedDeviceSet(devicesByUser: [fixture.user: [altered], alice: [creator.device]], refusals: [:])
+        MockURLProtocol.requestHandler = Self.server(try serve(fixture, creator: creator, devices: skewed))
+
+        guard case .failure = await sync(fixture, devices: devices) else { return XCTFail("Ligne fausse acceptée") }
+        let namespace = fixture.session.ownerNamespace
+        XCTAssertTrue(try fixture.states.isV2(conversationId: conversationId, ownerNamespace: namespace), "La genèse, elle, est valide")
+        XCTAssertNil(try fixture.keys.load(conversationId: conversationId, ownerNamespace: namespace))
+    }
+
     // MARK: Outils
 
     private func sync(_ fixture: E2EEV2AccountFixture, devices: E2EEV2CertifiedDeviceSet) async -> E2EEV2ConversationSyncResult {
@@ -136,10 +217,10 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
         )
         return Served(
             chain: chain,
-            manifest: try JSONSerialization.data(withJSONObject: ["epochNumber": 1, "manifest": manifestObject]),
+            manifest: try JSONSerialization.data(withJSONObject: ["epochNumber": "1", "manifest": manifestObject]),
             current: try JSONSerialization.data(withJSONObject: [
                 "conversationId": conversationId,
-                "epoch": ["id": "epoch_sync_00000000000001", "epochNumber": 1, "status": "active", "createdAt": "2026-10-01T06:10:00.000Z"],
+                "epoch": ["id": "epoch_sync_00000000000001", "epochNumber": "1", "status": "active", "createdAt": "2026-10-01T06:10:00.000Z"],
                 "manifest": manifestObject,
                 "envelope": [
                     "recipientDeviceId": envelope.recipientDeviceId, "wrapAlgorithm": envelope.wrapAlgorithm,

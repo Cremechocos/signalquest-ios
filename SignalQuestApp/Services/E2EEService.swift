@@ -2861,6 +2861,7 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
     private let transport: E2EEV2APITransport
     private let identityStore: E2EEV2DeviceIdentityStore
     private let epochKeyStore: E2EEV2EpochKeyStore
+    private let conversationStateStore: E2EEV2ConversationStateStore
     private let mediaOutboxStore: E2EEV2MediaOutboxStore?
     private let rotationCommitted: @Sendable (LocalAccountSession, [String], Bool) -> Void
 
@@ -2868,6 +2869,7 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         api: APIClient,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
         epochKeyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
+        conversationStateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
         mediaOutboxStore: E2EEV2MediaOutboxStore? = nil,
         rotationCommitted: @escaping @Sendable (LocalAccountSession, [String], Bool) -> Void = {
             E2EEV2RotationEvents.recordCommitted(session: $0, conversations: $1, notify: $2)
@@ -2876,6 +2878,7 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         transport = E2EEV2APITransport(api: api, identityStore: identityStore)
         self.identityStore = identityStore
         self.epochKeyStore = epochKeyStore
+        self.conversationStateStore = conversationStateStore
         self.mediaOutboxStore = mediaOutboxStore ?? (try? E2EEV2MediaOutboxStore())
         self.rotationCommitted = rotationCommitted
     }
@@ -3007,6 +3010,9 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                 }
                 try mediaOutboxStore.purge(ownerScopeId: owner, expectedSession: session)
                 try epochKeyStore.removeAll(ownerNamespace: namespace, expectedSession: session)
+                // Sans ses clés, une époque courante n'est plus « à jour » : la
+                // prochaine époque, créée pour la nouvelle identité, sera reçue.
+                try conversationStateStore.removeCurrentEpochs(ownerNamespace: namespace)
                 let renewed = try identityStore.activateResetCandidate(
                     ownerNamespace: namespace,
                     expectedDeviceId: parsed.replacementDeviceId,
@@ -4756,16 +4762,19 @@ final class E2EEV2EpochDeliveryClient: @unchecked Sendable {
     private let transport: E2EEV2APITransport
     private let identityStore: E2EEV2DeviceIdentityStore
     private let keyStore: E2EEV2EpochKeyStore
+    private let stateStore: E2EEV2ConversationStateStore
     private let expectedSession: LocalAccountSession?
 
     init(
         api: APIClient,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
         keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
         expectedSession: LocalAccountSession? = nil
     ) {
         self.identityStore = identityStore
         self.keyStore = keyStore
+        self.stateStore = stateStore
         self.expectedSession = expectedSession
         transport = E2EEV2APITransport(api: api, identityStore: identityStore, expectedSession: expectedSession)
     }
@@ -4787,6 +4796,11 @@ final class E2EEV2EpochDeliveryClient: @unchecked Sendable {
             return localFailure("invalid-e2ee-epoch-fetch-scope")
         }
         let ownerNamespace = LocalAccountScope.storageNamespace(for: expectedOwnerScopeId)
+        // Une conversation v2 ne reçoit ses époques que vérifiées (lot 4) :
+        // jamais par cette livraison, dont la clé de l'émetteur vient du serveur.
+        guard E2EEV2VerifiedEpochKeys.allowsLegacyEpochPath(
+            conversationId: conversationId, ownerNamespace: ownerNamespace, stateStore: stateStore
+        ) else { return localFailure("e2ee-v2-conversation-uses-verified-epochs") }
         let device: E2EEV2DeviceDescriptor
         do {
             guard let loaded = try identityStore.load(ownerNamespace: ownerNamespace) else {
@@ -6144,17 +6158,20 @@ final class E2EEV2EpochRotationCoordinator: @unchecked Sendable {
     private let transport: E2EEV2APITransport
     private let identityStore: E2EEV2DeviceIdentityStore
     private let keyStore: E2EEV2EpochKeyStore
+    private let stateStore: E2EEV2ConversationStateStore
 
     init(
         api: APIClient,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
         keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
         expectedSession: LocalAccountSession? = nil
     ) {
         self.api = api
         self.expectedSession = expectedSession
         self.identityStore = identityStore
         self.keyStore = keyStore
+        self.stateStore = stateStore
         transport = E2EEV2APITransport(api: api, identityStore: identityStore)
     }
 
@@ -6184,6 +6201,11 @@ final class E2EEV2EpochRotationCoordinator: @unchecked Sendable {
             return .failure(localError("invalid-e2ee-rotation-scope"))
         }
         let ownerNamespace = LocalAccountScope.storageNamespace(for: expectedOwnerScopeId)
+        // Une conversation v2 décide elle-même de ses rotations, vers des
+        // appareils certifiés (lot 4) : jamais vers la liste du serveur.
+        guard E2EEV2VerifiedEpochKeys.allowsLegacyEpochPath(
+            conversationId: conversationId, ownerNamespace: ownerNamespace, stateStore: stateStore
+        ) else { return .failure(localError("e2ee-v2-conversation-uses-verified-epochs")) }
         let sender: E2EEV2DeviceDescriptor
         do {
             guard let loaded = try identityStore.load(ownerNamespace: ownerNamespace) else {
@@ -6220,7 +6242,7 @@ final class E2EEV2EpochRotationCoordinator: @unchecked Sendable {
             epochNumber: directory.currentEpochNumber, ownerNamespace: ownerNamespace)
         if local == nil && (directory.currentEpochStatus == "active" || !directory.rotationRequired) {
             let delivery = E2EEV2EpochDeliveryClient(api: api, identityStore: identityStore,
-                keyStore: keyStore, expectedSession: session)
+                keyStore: keyStore, stateStore: stateStore, expectedSession: session)
             switch await delivery.fetchCurrent(conversationId: conversationId, expectedOwnerScopeId: expectedOwnerScopeId) {
             case .success(let stored):
                 var key = stored.epochKey; key.resetBytes(in: 0..<key.count)
@@ -6442,14 +6464,17 @@ enum E2EEV2CallBridge {
 
     static func prepareRuntimeRequest(
         conversationId: String,
-        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore()
+        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
     ) -> E2EEV2CallRequestPreparation {
         guard E2EEV2CallRuntimeGate.allowsControlPlane() else { return .runtimeClosed }
         guard LocalAccountScope.currentUserId != nil else { return .localEpochUnavailable }
         let owner = LocalAccountScope.currentOwnerScopeId
         let namespace = LocalAccountScope.storageNamespace(for: owner)
         return prepareContractPreview(conversationId: conversationId) {
-            try? keyStore.load(conversationId: conversationId, ownerNamespace: namespace)
+            try? E2EEV2VerifiedEpochKeys.current(
+                conversationId: conversationId, ownerNamespace: namespace, keyStore: keyStore, stateStore: stateStore
+            )
         }
     }
 
@@ -6479,7 +6504,8 @@ enum E2EEV2CallBridge {
     static func prepareRuntimeAnswerRequest(
         conversationId: String,
         descriptor: E2EEV2CallSessionDescriptor,
-        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore()
+        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
     ) -> E2EEV2CallRequestPreparation {
         guard E2EEV2CallRuntimeGate.allowsControlPlane() else { return .runtimeClosed }
         guard LocalAccountScope.currentUserId != nil else { return .localEpochUnavailable }
@@ -6489,10 +6515,9 @@ enum E2EEV2CallBridge {
             conversationId: conversationId,
             descriptor: descriptor
         ) {
-            try? keyStore.loadEpoch(
-                conversationId: conversationId,
-                epochNumber: descriptor.epochNumber,
-                ownerNamespace: namespace
+            try? E2EEV2VerifiedEpochKeys.exact(
+                conversationId: conversationId, epochNumber: descriptor.epochNumber, ownerNamespace: namespace,
+                keyStore: keyStore, stateStore: stateStore
             )
         }
     }
@@ -6531,7 +6556,8 @@ enum E2EEV2CallBridge {
         callId: String,
         liveKitURL: URL,
         descriptor: E2EEV2CallSessionDescriptor,
-        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore()
+        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
     ) -> E2EEV2CallSessionResolution {
         guard E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: liveKitURL) else {
             return .blocked(.runtimeClosed)
@@ -6544,10 +6570,9 @@ enum E2EEV2CallBridge {
             callId: callId,
             descriptor: descriptor
         ) {
-            try? keyStore.loadEpoch(
-                conversationId: conversationId,
-                epochNumber: descriptor.epochNumber,
-                ownerNamespace: namespace
+            try? E2EEV2VerifiedEpochKeys.exact(
+                conversationId: conversationId, epochNumber: descriptor.epochNumber, ownerNamespace: namespace,
+                keyStore: keyStore, stateStore: stateStore
             )
         }
     }
@@ -7554,15 +7579,16 @@ enum E2EEV2MessageComposer {
     static func prepareRuntime(
         input: E2EEV2MessagePreparationInput,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
-        epochStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore()
+        epochStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
     ) -> E2EEV2MessagePreparationResult {
         prepareRuntimeWithStateLoader(input: input, nonceProvider: randomNonce) {
             guard LocalAccountScope.currentUserId != nil else { return nil }
             let ownerNamespace = LocalAccountScope.storageNamespace
             guard let device = try identityStore.load(ownerNamespace: ownerNamespace),
-                  let epoch = try epochStore.load(
-                      conversationId: input.conversationId,
-                      ownerNamespace: ownerNamespace
+                  let epoch = try E2EEV2VerifiedEpochKeys.current(
+                      conversationId: input.conversationId, ownerNamespace: ownerNamespace,
+                      keyStore: epochStore, stateStore: stateStore
                   ) else { return nil }
             return E2EEV2MessageLocalState(
                 device: device,

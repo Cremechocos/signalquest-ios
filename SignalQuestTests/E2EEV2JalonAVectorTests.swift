@@ -324,7 +324,10 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
                         conversationId: try str(v, "conversationId"), isGroup: isGroup,
                         genesisLength: genesisLength, signingKey: { keys["\($0)/\($1)"] }
                     )
-                    try E2EEV2EpochBinding.check(manifest, recipients: recipients, state: state, previousMembershipChangeNumber: previous)
+                    try E2EEV2EpochBinding.check(
+                        manifest, recipients: recipients, state: state, genesisLength: genesisLength,
+                        previousMembershipChangeNumber: previous
+                    )
                     outcome = "ok"
                 } catch let failure as E2EEV2EpochBinding.Failure {
                     outcome = "\(failure)"

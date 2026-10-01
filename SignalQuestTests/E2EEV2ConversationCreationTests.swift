@@ -235,6 +235,48 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertEqual(try fixture.states.currentEpoch(conversationId: direct.id, ownerNamespace: fixture.session.ownerNamespace)?.epochNumber, 1)
     }
 
+    /// Relecture indépendante du lot 4 : une migration ne signe qu'une genèse.
+    /// Après un échec, le nouvel essai renvoie le même corps, octet pour octet.
+    func testAFailedMigrationIsRetriedWithTheSameSignedBody() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let brunoPhone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let devices = fixture.deviceSet(adding: [brunoPhone.device])
+        let direct = v1Conversation(group: false, participants: [(fixture.user, "member"), (bruno, "member")])
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(direct, isV2: nil, devices: devices, nowMs: 0), .alreadyV2,
+                       "État « v2 » illisible : jamais de migration")
+        let creator = E2EEV2ConversationCreator(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let bodies = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            bodies.append(request, body: try E2EEV2AccountFixture.body(request))
+            return E2EEV2AccountFixture.response(request, Data(#"{"error":"Indisponible.","code":"UNAVAILABLE"}"#.utf8), status: 503)
+        }
+        guard case .failure = await creator.migrate(direct, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId)
+        else { return XCTFail("Un 503 n'est pas une migration") }
+        let namespace = fixture.session.ownerNamespace
+        XCTAssertNotNil(try fixture.states.pendingGenesis(conversationId: direct.id, ownerNamespace: namespace))
+
+        MockURLProtocol.requestHandler = { request in
+            let body = try E2EEV2AccountFixture.body(request)
+            bodies.append(request, body: body)
+            let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []
+            return E2EEV2AccountFixture.response(request, try E2EEV2AccountFixture.receipt(conversationId: direct.id, recipientCount: envelopes.count))
+        }
+        guard case .created = await creator.migrate(direct, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId)
+        else { return XCTFail("Nouvel essai refusé") }
+        let sent = bodies.all
+        XCTAssertEqual(sent.count, 2)
+        XCTAssertEqual(
+            try JSONSerialization.data(withJSONObject: sent[0].1, options: [.sortedKeys]),
+            try JSONSerialization.data(withJSONObject: sent[1].1, options: [.sortedKeys]),
+            "Même genèse, même époque 1, mêmes signatures"
+        )
+        XCTAssertNil(try fixture.states.pendingGenesis(conversationId: direct.id, ownerNamespace: namespace), "Effacé une fois acceptée")
+        XCTAssertTrue(try fixture.states.isV2(conversationId: direct.id, ownerNamespace: namespace))
+    }
+
     // MARK: Outils
 
     private func v1Conversation(group: Bool, participants: [(String, String)], encrypted: Bool = true) -> MessageConversation {
