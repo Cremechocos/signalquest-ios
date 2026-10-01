@@ -30,10 +30,10 @@ final class DriveTestSessionLifecycleQATests: XCTestCase {
         print("SQ_DIAG \(moment) boutons=\(labels)")
     }
 
-    /// Ouvre le Drive Test depuis l'onglet Tester et démarre une session en mode
-    /// « Couverture » — le seul mode qui ne lance aucun test de débit, donc le seul
-    /// utilisable dans une suite automatisée.
-    private func startCoverageSession(in app: XCUIApplication) throws {
+    /// Ouvre le Drive Test depuis l'onglet Tester et démarre un trajet. Au
+    /// simulateur, la connexion est vue en Wi-Fi ou filaire : le trajet démarre
+    /// en pause et aucun test de débit ne part, la suite reste hors réseau.
+    private func startSession(in app: XCUIApplication) throws {
         let speedTab = SignalQuestUITestSupport.tab(named: "Tester", in: app)
         XCTAssertTrue(speedTab.waitForExistence(timeout: 20), "Onglet Tester introuvable")
         speedTab.tap()
@@ -53,30 +53,47 @@ final class DriveTestSessionLifecycleQATests: XCTestCase {
         }
         diagnose(app, "01-drivetest-ouvert")
 
-        // Mode « Couverture » : enregistre la génération sans enchaîner de speedtests.
-        let coverageMode = app.buttons["Couverture"].firstMatch
-        if coverageMode.waitForExistence(timeout: 6) { coverageMode.tap() }
-
-        let start = app.buttons["Démarrer l'enregistrement couverture"].firstMatch
-        guard start.waitForExistence(timeout: 8) else {
-            diagnose(app, "02-demarrage-introuvable")
-            throw XCTSkip("Bouton de démarrage absent — mode Couverture non sélectionnable")
-        }
+        let start = app.buttons["drivetest.start"].firstMatch
+        XCTAssertTrue(start.waitForExistence(timeout: 10), "Bouton de démarrage introuvable")
         start.tap()
-        _ = app.staticTexts.firstMatch.waitForExistence(timeout: 4)
-        diagnose(app, "03-apres-demarrage")
+
+        // Localisation pas encore accordée : la vérification avant départ bloque
+        // et propose « Autoriser », puis iOS pose sa question.
+        let authorize = app.buttons["Autoriser"].firstMatch
+        if authorize.waitForExistence(timeout: 4) {
+            authorize.tap()
+            allowLocation()
+            XCTAssertTrue(start.waitForExistence(timeout: 8), "Retour au bouton de démarrage après l'autorisation")
+            start.tap()
+        }
+        // Wi-Fi et position encore absente : des avertissements, pas un blocage.
+        let anyway = app.buttons["Démarrer quand même"].firstMatch
+        if anyway.waitForExistence(timeout: 5) { anyway.tap() }
+        diagnose(app, "02-apres-demarrage")
 
         XCTAssertTrue(
             app.buttons[stopLabel].waitForExistence(timeout: 10),
-            "La session n'a pas démarré : le bouton d'arrêt n'apparaît pas"
+            "Le trajet n'a pas démarré : le bouton d'arrêt n'apparaît pas"
         )
+    }
+
+    /// Accepte la question de localisation d'iOS, en français comme en anglais.
+    private func allowLocation() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let alert = springboard.alerts.firstMatch
+        guard alert.waitForExistence(timeout: 6) else { return }
+        let allow = alert.buttons.matching(NSPredicate(
+            format: "label CONTAINS[c] 'active' OR label CONTAINS[c] 'While Using' OR label CONTAINS[c] 'une fois' OR label CONTAINS[c] 'Once'"
+        )).firstMatch
+        if allow.exists { allow.tap() } else { alert.buttons.element(boundBy: 1).tap() }
+        _ = alert.waitForNonExistence(timeout: 5)
     }
 
     /// Le scénario réel : je roule, je vais voir la carte, je reviens.
     func testSessionSurvivesTabSwitch() throws {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
-        try startCoverageSession(in: app)
+        try startSession(in: app)
 
         // Aller sur la carte, puis revenir à l'onglet Tester.
         let mapTab = SignalQuestUITestSupport.tab(named: "Carte", in: app)
@@ -133,7 +150,7 @@ final class DriveTestSessionLifecycleQATests: XCTestCase {
     func testExplicitStopEndsSession() throws {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
-        try startCoverageSession(in: app)
+        try startSession(in: app)
 
         app.buttons[stopLabel].firstMatch.tap()
         XCTAssertTrue(
