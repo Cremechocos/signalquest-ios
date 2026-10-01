@@ -161,40 +161,128 @@ struct SQInfoButton: View {
     }
 }
 
-/// Tuile de mesure : libellé, valeur et ⓘ du terme affiché. Généralise la
-/// tuile des fiches antenne à tout l'app ; VoiceOver lit « libellé : valeur »
-/// d'un bloc et propose l'action « Expliquer ».
+/// Tuile de mesure partagée (TRX-11) : libellé, valeur, unité, et au besoin
+/// une icône, une précision et le ⓘ du terme affiché. VoiceOver lit « libellé :
+/// valeur unité » d'un bloc et propose l'action « Expliquer ».
+///
+/// La valeur reste à l'encre, en brique (`accentInk`) si `highlight` : une
+/// couleur de débit ou de qualité ne tient pas 4,5:1 sur la tuile. La couleur
+/// qui porte le sens (réception, envoi, latence) va à l'icône.
 struct SQMetricTile: View {
+    enum Size {
+        /// Figtree Bold 17 : grilles de stats.
+        case regular
+        /// Bricolage Bold 22, chiffres alignés : résultats d'une mesure.
+        case large
+    }
+
     let label: String
     let value: String
+    var unit: String? = nil
     var term: SQTerm? = nil
     var highlight = false
+    var icon: String? = nil
+    var iconTint: Color = SQColor.labelSecondary
+    var detail: String? = nil
+    var size: Size = .regular
+    /// Prend la hauteur que lui donne sa rangée (`HStack` en `fixedSize`) :
+    /// des tuiles voisines de même hauteur, même si un libellé passe à la ligne.
+    var fillsHeight = false
+
+    var body: some View {
+        SQMetricTileContent(
+            label: label, value: value, unit: unit, highlight: highlight, icon: icon, iconTint: iconTint,
+            detail: detail, size: size, fillsHeight: fillsHeight
+        ) {
+            if let term {
+                SQInfoButton(term: term)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(LocalizedStringKey(label)) + Text(verbatim: " : ") + Text(verbatim: spokenValue))
+        .modifier(SQOptionalExplains(term: term))
+    }
+
+    private var spokenValue: String {
+        [[value, unit].compactMap { $0 }.joined(separator: " "), detail]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+    }
+}
+
+/// Le dessin de la tuile, sans ses règles d'accessibilité : partagé avec les
+/// tuiles qui ouvrent autre chose (fiche antenne).
+struct SQMetricTileContent<Trailing: View>: View {
+    let label: String
+    let value: String
+    var unit: String? = nil
+    var highlight = false
+    var icon: String? = nil
+    var iconTint: Color = SQColor.labelSecondary
+    var detail: String? = nil
+    var size: SQMetricTile.Size = .regular
+    var fillsHeight = false
+    @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 4) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(iconTint)
+                }
                 Text(LocalizedStringKey(label))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
-                if let term {
-                    SQInfoButton(term: term)
-                        .accessibilityHidden(true)
+                trailing()
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value)
+                    .font(valueFont)
+                    .foregroundStyle(highlight ? SQColor.accentInk : SQColor.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if let unit {
+                    Text(unit)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
             }
-            Text(value)
-                .font(SQFont.archivo(17, .bold))
-                .foregroundStyle(highlight ? SQColor.accentInk : SQColor.label)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            if let detail {
+                Text(detail)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: fillsHeight ? .infinity : nil, alignment: .topLeading)
         .padding(SQSpace.md)
         .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(LocalizedStringKey(label)) + Text(verbatim: " : ") + Text(verbatim: value))
-        .modifier(SQOptionalExplains(term: term))
+    }
+
+    private var valueFont: Font {
+        switch size {
+        case .regular: return SQFont.archivo(17, .bold)
+        case .large: return SQFont.display(22, .bold).monospacedDigit()
+        }
+    }
+}
+
+extension SQMetricTileContent where Trailing == EmptyView {
+    init(
+        label: String, value: String, unit: String? = nil, highlight: Bool = false, icon: String? = nil,
+        iconTint: Color = SQColor.labelSecondary, detail: String? = nil, size: SQMetricTile.Size = .regular,
+        fillsHeight: Bool = false
+    ) {
+        self.init(
+            label: label, value: value, unit: unit, highlight: highlight, icon: icon, iconTint: iconTint,
+            detail: detail, size: size, fillsHeight: fillsHeight, trailing: { EmptyView() }
+        )
     }
 }
 

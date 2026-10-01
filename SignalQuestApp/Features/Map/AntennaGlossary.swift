@@ -184,27 +184,12 @@ struct AntennaMetricTile: View {
             Haptics.light()
             selection = entry
         } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 4) {
-                    Text(LocalizedStringKey(label))
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                    Spacer(minLength: 0)
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(SQColor.labelTertiary)
-                }
-                Text(value)
-                    .font(SQFont.archivo(17, .bold))
-                    .foregroundStyle(highlight ? SQColor.brandRed : SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+            // Dessin de la tuile partagée (TRX-11) ; son tap explique la mesure.
+            SQMetricTileContent(label: label, value: value, highlight: highlight) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(SQSpace.md)
-            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())

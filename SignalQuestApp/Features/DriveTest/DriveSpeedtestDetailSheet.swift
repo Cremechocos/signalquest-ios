@@ -110,22 +110,7 @@ struct DriveSpeedtestDetailSheet: View {
     }
 
     private func metricTile(_ title: String, value: String, unit: String, detail: String, color: Color, icon: String, term: SQTerm? = nil) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs) {
-            HStack(spacing: 6) {
-                Image(systemName: icon).font(.caption.weight(.semibold)).foregroundStyle(color)
-                Text(LocalizedStringKey(title)).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
-                Spacer(minLength: 0)
-                if let term { SQInfoButton(term: term) }
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value).font(SQFont.display(24, .bold)).monospacedDigit().foregroundStyle(SQColor.label)
-                Text(unit).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
-            }
-            Text(detail).font(SQType.micro).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(SQSpace.md)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        SQMetricTile(label: title, value: value, unit: unit, term: term, icon: icon, iconTint: color, detail: detail, size: .large)
     }
 
     // MARK: Sparkline du download

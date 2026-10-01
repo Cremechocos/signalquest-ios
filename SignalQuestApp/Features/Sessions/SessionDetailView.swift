@@ -133,6 +133,7 @@ struct SessionDetailView: View {
     @StateObject private var model: SessionDetailViewModel
     @State private var validationTarget: ValidationTarget?
     @State private var pendingIdentify: ServingAntenna?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     struct ValidationTarget: Identifiable {
         let id = UUID()
@@ -211,7 +212,10 @@ struct SessionDetailView: View {
         // génération. Repli sur la liste tant que le détail n'est pas chargé.
         let s = model.detail?.session ?? model.session
         return GlassCard {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 2), spacing: SQSpace.sm) {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
+                spacing: SQSpace.sm
+            ) {
                 statTile("Points", s.totalPoints.map { "\($0)" } ?? "—", "mappin.and.ellipse")
                 statTile("Distance", s.distanceKm.map(Self.formatKm) ?? "—", "ruler")
                 statTile("RSRP moyen", s.avgRsrpLabel ?? "—", "antenna.radiowaves.left.and.right")
@@ -224,28 +228,7 @@ struct SessionDetailView: View {
     }
 
     private func statTile(_ label: String, _ value: String, _ icon: String) -> some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 24)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(LocalizedStringKey(label)).font(SQFont.body(12, relativeTo: .caption2)).foregroundStyle(SQColor.labelSecondary)
-                Text(value)
-                    .font(SQFont.display(15, .bold, relativeTo: .subheadline))
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(SQSpace.sm + 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(LocalizedStringKey(label))
-        .accessibilityValue(value)
+        SQMetricTile(label: label, value: value, icon: icon, iconTint: SQColor.brandRed)
     }
 
     // MARK: Operators + technologies chips
@@ -414,11 +397,24 @@ struct SessionDetailView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                 }
                 if let sum = model.speedtestSummary {
-                    HStack(spacing: SQSpace.sm) {
-                        // Lexique : Réception / Envoi / Latence, unité selon la langue (valeurs en Mbit/s).
-                        speedStat("Réception moy.", sum.avgDown, String(localized: "Mbit/s"), SQColor.info)
-                        speedStat("Envoi moy.", sum.avgUp, String(localized: "Mbit/s"), SQColor.brandGreen)
-                        speedStat("Latence moy.", sum.avgPing, "ms", SQColor.label)
+                    // Lexique : Réception / Envoi / Latence, unité selon la langue (valeurs en Mbit/s).
+                    // Couleurs de la fiche d'une mesure (TRX-11), portées par l'icône.
+                    let stats = Group {
+                        speedStat("Réception moy.", sum.avgDown, String(localized: "Mbit/s"), "arrow.down",
+                                  Color(uiColor: SessionSpeedColor.ui(sum.avgDown)))
+                        speedStat("Envoi moy.", sum.avgUp, String(localized: "Mbit/s"), "arrow.up", SQColor.success)
+                        speedStat("Latence moy.", sum.avgPing, "ms", "bolt.horizontal", SQColor.warning)
+                    }
+                    Group {
+                        // Trois tuiles étroites coupaient « Réception » au milieu du mot
+                        // dès le texte agrandi : une seule colonne à partir de .xxLarge.
+                        if dynamicTypeSize >= .xxLarge {
+                            VStack(spacing: SQSpace.sm) { stats }
+                        } else {
+                            // Même hauteur pour les trois, quel que soit le libellé le plus long.
+                            HStack(alignment: .top, spacing: SQSpace.sm) { stats }
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     .padding(.bottom, SQSpace.xs)
                 }
@@ -438,24 +434,12 @@ struct SessionDetailView: View {
         }
     }
 
-    private func speedStat(_ label: String, _ value: Double?, _ unit: String, _ color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(LocalizedStringKey(label))
-                .font(SQFont.body(12, relativeTo: .caption2))
-                .foregroundStyle(SQColor.labelSecondary)
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value.map { "\(Int($0.rounded()))" } ?? "—")
-                    .font(SQFont.display(18, .bold, relativeTo: .title3))
-                    .foregroundStyle(color)
-                    .lineLimit(1).minimumScaleFactor(0.7)
-                Text(unit)
-                    .font(SQFont.body(12, relativeTo: .caption2))
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(SQSpace.sm)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    /// Valeur à l'encre : la couleur du débit ne tenait pas 4,5:1 sur la tuile.
+    private func speedStat(_ label: String, _ value: Double?, _ unit: String, _ icon: String, _ color: Color) -> some View {
+        SQMetricTile(
+            label: label, value: value.map { "\(Int($0.rounded()))" } ?? "—", unit: unit, icon: icon, iconTint: color,
+            fillsHeight: true
+        )
     }
 
     private func speedtestRow(_ st: SessionSpeedtest) -> some View {

@@ -671,6 +671,7 @@
 		DBD0D12749E80A111EB9DEB5 /* MapLoadConsistencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB83B28A83979ABC55BD6DF /* MapLoadConsistencyTests.swift */; };
 		DBD653BB59B8D01C74592509 /* MessagingE2EEQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D849C59293B6E1D70C5F88A /* MessagingE2EEQATests.swift */; };
 		DCC5F897D3A9BEC62D7DB7F6 /* MessageSchedulingSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA8ECC4FB30FDE6210DF221A /* MessageSchedulingSheets.swift */; };
+		DD9E60C9CA808CF562269C4C /* SQMetricTileRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 882BB762FD7952DF5B6E0D46 /* SQMetricTileRenderingTests.swift */; };
 		DDD16DE9E37F2D956E9137ED /* FavoriteAntennasService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB34EF09E14C9657FBA0268A /* FavoriteAntennasService.swift */; };
 		DDEF72B8D9CD5FA74A298A1E /* SignalQuestHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E5F08C223344D06C67E166E /* SignalQuestHomeView.swift */; };
 		DE04D7D25EBEBC995ACB8720 /* SQKeyboardActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16FB03432A8CF4D394EF41F9 /* SQKeyboardActionTests.swift */; };
@@ -1239,6 +1240,7 @@
 		8738D9A09B93678F37E5A510 /* ValidationsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationsSheet.swift; sourceTree = "<group>"; };
 		87728CF52BF5ECDADDD60D2F /* SQShadow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQShadow.swift; sourceTree = "<group>"; };
 		87AE9139473E16EE1FB4FFE7 /* DriveTestDataBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveTestDataBudgetTests.swift; sourceTree = "<group>"; };
+		882BB762FD7952DF5B6E0D46 /* SQMetricTileRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQMetricTileRenderingTests.swift; sourceTree = "<group>"; };
 		885DAE78D34639CBB592A710 /* ValidationsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValidationsService.swift; sourceTree = "<group>"; };
 		887BA35C4B8B1BD36ECD57D2 /* FollowedAntennaIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowedAntennaIntents.swift; sourceTree = "<group>"; };
 		896071B7533980CBAF23DA8A /* ICMPPingerLiveCallbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICMPPingerLiveCallbackTests.swift; sourceTree = "<group>"; };
@@ -2774,6 +2776,7 @@
 				D176E1FFD2421988F0706243 /* SpeedtestVisibilityServiceTests.swift */,
 				7DAB8EA7B350B181429EE0A5 /* SpeedtestVisibilityViewModelTests.swift */,
 				16FB03432A8CF4D394EF41F9 /* SQKeyboardActionTests.swift */,
+				882BB762FD7952DF5B6E0D46 /* SQMetricTileRenderingTests.swift */,
 				B239A401D9E724CC411016D4 /* SQObservedDefaultsKeysTests.swift */,
 				F2BDADB697C23558E9CC6B44 /* SQQuickActionsTests.swift */,
 				F39F4F70B46A0A5DEC1FD984 /* SQShareCardBuilderTests.swift */,
@@ -3945,6 +3948,7 @@
 				DFBBB03368E73DD9FE23DBCC /* RecipeBackendPersistenceTests.swift in Sources */,
 				FA1FA3B1FB3F9621CC897800 /* ReportsRoutingTests.swift in Sources */,
 				DE04D7D25EBEBC995ACB8720 /* SQKeyboardActionTests.swift in Sources */,
+				DD9E60C9CA808CF562269C4C /* SQMetricTileRenderingTests.swift in Sources */,
 				1E9EC9B8F870F690DFC1405E /* SQObservedDefaultsKeysTests.swift in Sources */,
 				635235E510C002AAA8BBE672 /* SQQuickActionsTests.swift in Sources */,
 				281E03A4709C9B5885EC9E07 /* SQShareCardBuilderTests.swift in Sources */,
