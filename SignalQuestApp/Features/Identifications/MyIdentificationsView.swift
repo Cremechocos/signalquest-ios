@@ -316,7 +316,7 @@ private struct IdentificationNodeRow: View {
                 Text(group.subtitle)
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 HStack(spacing: SQSpace.sm) {
                     Label("validée \(group.validations)×", systemImage: "checkmark.seal.fill")
                         .foregroundStyle(SQColor.success)
@@ -326,7 +326,7 @@ private struct IdentificationNodeRow: View {
                 }
                 .font(SQType.micro)
                 .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(1)
+                .lineLimit(2)
             }
             Spacer()
             if isWithdrawing { ProgressView() }
@@ -362,7 +362,7 @@ private struct IdentificationCellRow: View {
                 }
                 .font(SQType.micro)
                 .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(1)
+                .lineLimit(2)
             }
             Spacer()
             if isWithdrawing { ProgressView() }

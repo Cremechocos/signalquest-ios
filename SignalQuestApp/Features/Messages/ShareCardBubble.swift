@@ -115,12 +115,12 @@ struct SignalCardBubble: View {
                     Text(card.title)
                         .font(SQFont.body(14, .semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
-                        .lineLimit(1)
+                        .lineLimit(2)
                     if let sub = signal.subtitleLine ?? card.subtitle {
                         Text(sub)
                             .font(SQType.micro)
                             .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
-                            .lineLimit(1)
+                            .lineLimit(2)
                     }
                 }
                 Spacer(minLength: 0)
@@ -233,7 +233,7 @@ struct SharedPostCardBubble: View {
                 Text(sourceLine)
                     .font(SQType.micro)
                     .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
             Spacer(minLength: 0)
         }
@@ -303,7 +303,7 @@ struct SharedPostCardBubble: View {
                 Text(visibleChips.joined(separator: " · "))
                     .font(SQType.micro)
                     .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -393,14 +393,14 @@ struct LocationBubble: View {
                         .foregroundStyle(mine ? SQColor.onAccent.opacity(0.85) : SQColor.brandRed)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(location.place ?? "Position partagée")
+                        Text(location.place ?? String(localized: "Position partagée"))
                             .font(SQType.caption.weight(.semibold))
                             .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
-                            .lineLimit(1)
+                            .lineLimit(2)
                         Text("Ouvrir dans Plans · \(coordinateText)")
                             .font(SQType.micro)
                             .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
-                            .lineLimit(1)
+                            .lineLimit(2)
                         if let observedAtText {
                             Text(observedAtText)
                                 .font(SQType.caption)

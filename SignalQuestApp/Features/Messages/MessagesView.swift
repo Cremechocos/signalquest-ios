@@ -476,7 +476,7 @@ struct MessagesView: View {
             }
             VStack(alignment: .leading, spacing: SQSpace.xxs) {
                 HStack(spacing: 5) {
-                    Text(title.isEmpty ? "Conversation" : title)
+                    Text(title.isEmpty ? String(localized: "Conversation") : title)
                         .font(SQFont.body(16, .semibold))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)

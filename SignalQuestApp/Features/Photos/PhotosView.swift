@@ -807,7 +807,7 @@ struct PhotoDetailView: View {
                 Label(metaParts.joined(separator: " · "), systemImage: "mappin")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
 
             // Auteur
@@ -904,7 +904,7 @@ struct PhotoDetailView: View {
                     Text([photo.siteAddress, photo.siteId].compactMap { $0 }.first ?? "")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                     if photoMarketCode == nil {
                         Text("Marché non renseigné · attribution automatique désactivée")
                             .font(SQType.micro)
@@ -1128,14 +1128,14 @@ struct PhotoUploadView: View {
                                 .background(SQColor.accentSoft, in: Circle())
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(selectedSite.map { $0.siteId ?? $0.id } ?? "Choisir un site")
+                                Text(selectedSite.map { $0.siteId ?? $0.id } ?? String(localized: "Choisir un site"))
                                     .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                                     .foregroundStyle(SQColor.label)
                                 if let address = selectedSite?.address {
                                     Text(address)
                                         .font(SQType.caption)
                                         .foregroundStyle(SQColor.labelSecondary)
-                                        .lineLimit(1)
+                                        .lineLimit(2)
                                 }
                             }
                             Spacer()

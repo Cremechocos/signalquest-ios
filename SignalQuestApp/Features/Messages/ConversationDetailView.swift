@@ -1550,11 +1550,12 @@ struct ConversationDetailView: View {
                         .font(SQFont.body(13, .semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(1)
+                            .truncationMode(.middle)
                         .truncationMode(.middle)
                     Text(fileMetaLine(attachment))
                         .font(SQType.micro)
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
                 Spacer(minLength: SQSpace.sm)
                 Image(systemName: "arrow.down.circle.fill")
@@ -2817,12 +2818,12 @@ private struct LiveShareConversationBar: View {
                                 Text(summary(for: session))
                                     .font(SQType.caption)
                                     .foregroundStyle(SQColor.label)
-                                    .lineLimit(1)
+                                    .lineLimit(2)
                                 if let detail = detail(for: session, at: timeline.date) {
                                     Text(detail)
                                         .font(SQType.micro)
                                         .foregroundStyle(SQColor.labelSecondary)
-                                        .lineLimit(1)
+                                        .lineLimit(2)
                                 }
                             }
                             Spacer(minLength: SQSpace.xs)
