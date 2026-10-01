@@ -114,7 +114,12 @@
 >   destinataires membres de l'état, `409 E2EE_MEMBERSHIP_STALE` pour une
 >   époque fondée sur un état dépassé, genèse de migration dans la confiance
 >   v1 (§14). Précisions d'Android et du web ; avis du serveur attendu.
->   Vecteurs `epoch-manifest-v2` et `epoch-binding-v1`.
+>   Vecteurs `epoch-manifest-v2` et `epoch-binding-v1`. Puis, après une
+>   relecture indépendante du code iOS : numéros bornés, âge d'une époque
+>   compté depuis son acceptation locale, liaison à la longueur de la genèse,
+>   genèse revérifiée à chaque relecture, clé vérifiée pour l'envoi et les
+>   appels, migration idempotente, réponses en JSON strict, limite du premier
+>   contact écrite (§3.1, §3.3, §3.5, §12, §14, E.2).
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -372,6 +377,8 @@ Format de l'enveloppe : annexe A.3. Vecteur : `epoch-envelope-v1.json`.
   membre actuel**, jamais par le serveur.
 - Le numéro vaut **exactement le précédent + 1**, et la première époque vaut 1.
   Un saut est refusé, sans quoi un numéro démesuré figerait la conversation.
+  Numéros d'époque et de changement d'appartenance bornés de 1 à 2³¹ − 2,
+  comme les versions de liste (D.3) : `n + 1` ne déborde jamais (v0.4.7).
 - Elle est enveloppée pour chaque appareil certifié de chaque membre, y compris
   les autres appareils du créateur. L'engagement de clé (annexe A.3) accompagne
   chaque enveloppe, et chaque enveloppe est signée par l'appareil créateur.
@@ -414,7 +421,9 @@ Format de l'enveloppe : annexe A.3. Vecteur : `epoch-envelope-v1.json`.
   - membre ajouté ou retiré ;
   - réglage « exclure les navigateurs » modifié ;
   - réinitialisation d'identité, usage de la récupération ;
-  - au plus tard, 30 jours ou 10 000 messages par époque.
+  - au plus tard, 30 jours ou 10 000 messages par époque. Les 30 jours se
+    comptent depuis l'acceptation locale de l'époque, jamais depuis la date
+    que son créateur a signée.
 - Le serveur publie aussi des exigences de rotation (confort). Leur absence ne
   dispense jamais un client de la règle ci-dessus.
 - Un membre sans appareil certifié ne bloque pas une rotation : il est exclu de
@@ -468,11 +477,27 @@ conversation est v2 (§12).
     condensat : un écart est refusé ;
   - le numéro ne recule jamais d'une époque acceptée à la suivante ; il peut
     rester égal (rotation d'appareil, 30 jours) ;
+  - l'époque 1 repose sur toute la genèse (`membershipChangeNumber` égal à
+    sa longueur), et aucune autre sur une genèse partielle ;
   - le créateur et chaque destinataire sont membres à cet état ;
+  - la ligne de l'appareil qui lit est exactement son appareil certifié
+    (utilisateur, plateforme, empreinte) ;
   - `excludesWeb` égale l'état de la chaîne à ce numéro, et le manifeste n'a
     aucune ligne `web` quand il vaut `1` ;
   - un appareil certifié d'un membre absent de la liste est signalé, pas
     refusé : sa certification a pu suivre la création de l'époque.
+- **Genèse gardée** : l'appareil garde la chaîne avant la genèse, et ne garde
+  rien tant que toute la chaîne n'est pas relue. À chaque passage, il exige
+  que la chaîne gardée reproduise la genèse enregistrée (longueur, condensat
+  de son dernier changement, auteur). La partie gardée ne se revérifie pas
+  contre l'annuaire du jour : un auteur révoqué depuis ne casse pas la
+  relecture.
+- **Premier contact** (limite, v0.4.7) : un appareil qui découvre une
+  conversation se fie à la première genèse vérifiée que le serveur lui sert.
+  Un serveur malveillant peut ainsi présenter une conversation divergente à un
+  nouvel arrivant. Parades prévues côté app : genèse (auteur, administrateurs)
+  et « qui m'a ajouté » en messages système vérifiés, annuaire limité aux
+  membres affichés, numéros de sécurité (§2.4).
 - Le serveur stocke le manifeste, sa signature et la liste des lignes. Il les
   sert avec l'époque, y compris à un appareil qui n'en est pas destinataire.
   Dans la transaction qui accepte une époque, il refuse un
@@ -1027,7 +1052,12 @@ conversation, et sans permettre un faux signalement ni un message insignalable.
 - **États collants** :
   - « chiffrée » et « v2 » dérivent d'éléments signés (le manifeste de
     l'époque 1, signé par le créateur, §3.5), sont mémorisés par l'appareil,
-    et aucune réponse serveur ne peut les faire régresser ;
+    et aucune réponse serveur ne peut les faire régresser. Un état illisible
+    vaut v2 : aucune clé, aucune migration ;
+  - pour une conversation v2, l'envoi et les appels prennent la clé de
+    l'époque courante vérifiée, lue par son numéro. Les chemins pilotés par le
+    serveur (livraison sans manifeste, rotation vers la liste du serveur) ne
+    touchent jamais une conversation v2 ;
   - un appareil qui découvre une conversation (nouvel appareil) se fie à ce
     manifeste signé, pas à un booléen du serveur ;
   - tout message v1 postérieur à l'époque 1 v2 est rejeté ;
@@ -1091,6 +1121,9 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
    - Un client ne peut pas vérifier les administrateurs v1 : la genèse de
      migration hérite de la confiance v1. L'app l'affiche en message système
      vérifié : « X a migré la conversation ; administrateurs : … ».
+   - Une seule genèse est jamais signée par appareil et par conversation : le
+     corps signé est gardé avant l'envoi et renvoyé tel quel, octet pour
+     octet, à chaque nouvel essai.
 3. La recopie de l'historique en v2 est facultative. Elle est faite par un
    appareil (vecteur `history-migration-v1.json`), jamais par le serveur. Les
    messages recopiés portent « importé par <appareil> » et n'héritent d'aucune
@@ -2041,9 +2074,10 @@ version publiée qui ouvre les verrous.
     où `manifest` est `{manifest, signatureB64, recipients}` (format 2,
     §3.5) et `envelopes` suit la forme A.3.
 
-  La création est atomique. Réponse proposée par iOS, sur le modèle du reçu
-  de rotation :
-  `{conversation: {id, e2eeProtocolVersion: 2, …}, epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
+  La création est atomique. Réponse proposée par iOS :
+  `{conversationId, epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
+  Comme pour toutes les réponses proposées ici, JSON strict (clés exactes,
+  sans doublon) et entiers en chaînes décimales (D.0).
   Le client ne garde la clé de l'époque 1 et l'état « v2 » qu'à réception
   de ce reçu, exact (§3.1). Sur `409 CONVERSATION_ID_TAKEN`, rien n'est
   gardé ; une nouvelle tentative tire un autre identifiant.
