@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "« %@ »" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ »"
+          }
+        }
+      }
+    },
     "%@ a activé le chiffrement de bout en bout de cette conversation." : {
       "localizations" : {
         "en" : {
@@ -273,6 +289,22 @@
         }
       }
     },
+    "Approuver un appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approve a device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approuver un appareil"
+          }
+        }
+      }
+    },
     "Aucune" : {
       "localizations" : {
         "en" : {
@@ -289,6 +321,22 @@
         }
       }
     },
+    "Aucune caméra n’est disponible. Colle le contenu du code sur l’écran des appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No camera is available. Paste the code’s content on the Devices screen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune caméra n’est disponible. Colle le contenu du code sur l’écran des appareils."
+          }
+        }
+      }
+    },
     "Ce message ne peut pas être signalé : il n’est plus gardé sur cet appareil." : {
       "localizations" : {
         "en" : {
@@ -301,6 +349,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce message ne peut pas être signalé : il n’est plus gardé sur cet appareil."
+          }
+        }
+      }
+    },
+    "Ce navigateur pourra lire tes conversations chiffrées et y participer, sauf celles qui excluent les navigateurs. Il ne détient pas la clé de ton compte : tu pourras le révoquer depuis ce téléphone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This browser will be able to read and take part in your encrypted conversations, except those that exclude browsers. It doesn’t hold your account key: you can revoke it from this phone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce navigateur pourra lire tes conversations chiffrées et y participer, sauf celles qui excluent les navigateurs. Il ne détient pas la clé de ton compte : tu pourras le révoquer depuis ce téléphone."
           }
         }
       }
@@ -945,6 +1009,38 @@
         }
       }
     },
+    "Scanne le code affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan the code shown on the device to approve, browsers included. Without a camera, paste its content below."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanne le code affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous."
+          }
+        }
+      }
+    },
+    "Scanner le code" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan the code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanner le code"
+          }
+        }
+      }
+    },
     "Seul un admin du groupe peut changer ce réglage." : {
       "localizations" : {
         "en" : {
@@ -957,6 +1053,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seul un admin du groupe peut changer ce réglage."
+          }
+        }
+      }
+    },
+    "SignalQuest n’a pas accès à la caméra. Autorise-la dans les Réglages d’iOS, ou colle le contenu du code sur l’écran des appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest can’t access the camera. Allow it in iOS Settings, or paste the code’s content on the Devices screen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest n’a pas accès à la caméra. Autorise-la dans les Réglages d’iOS, ou colle le contenu du code sur l’écran des appareils."
           }
         }
       }
@@ -51313,6 +51425,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vérifiée"
+          }
+        }
+      }
+    },
+    "Vise le code affiché sur l’appareil à approuver." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point at the code shown on the device to approve."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vise le code affiché sur l’appareil à approuver."
           }
         }
       }

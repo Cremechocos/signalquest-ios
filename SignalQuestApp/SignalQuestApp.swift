@@ -406,6 +406,9 @@ struct RootView: View {
                 E2EEV2BrowserExclusionQAScreen()
             } else if AppEnvironment.showsAccountKeyQA {
                 E2EEV2AccountKeyQAScreen()
+            } else if AppEnvironment.showsApprovalScannerQA {
+                // Au simulateur, sans caméra : le message de repli.
+                E2EEV2ApprovalScannerView { _ in }
             } else if case .updateRequired(let message, let storeURL) = versionPolicy.state {
                 // Un ancien build ne construit rien d'autre : le dock restait
                 // atteignable sous un simple overlay de mise à jour forcée.

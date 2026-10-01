@@ -256,6 +256,7 @@ struct E2EEV2TrustedDevicesView: View {
     @State private var deviceToRevoke: E2EEV2RemoteDevice?
     @State private var approvalInput = ""
     @State private var initialApprovalConsumed = false
+    @State private var showsApprovalScanner = false
     private let api: APIClient
     private let initialApprovalId: String?
 
@@ -382,7 +383,7 @@ struct E2EEV2TrustedDevicesView: View {
 
             if model.currentDeviceCanRevoke {
                 Section {
-                    Text("Colle le contenu du QR SignalQuest ou saisis le code affiché sur le nouvel appareil.")
+                    Text("Scanne le code affiché sur l’appareil à approuver, navigateur compris. Sans caméra, colle son contenu ci-dessous.")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
                     if let detail = model.approvalDetail {
@@ -400,6 +401,14 @@ struct E2EEV2TrustedDevicesView: View {
                         }
                         .frame(minHeight: 48)
                     } else {
+                        Button {
+                            showsApprovalScanner = true
+                        } label: {
+                            Label("Scanner le code", systemImage: "qrcode.viewfinder")
+                                .frame(minHeight: 48)
+                        }
+                        .disabled(model.isActing)
+                        .accessibilityIdentifier("devices.scanApproval")
                         TextField("QR SignalQuest ou code de proximité", text: $approvalInput, axis: .vertical)
                             .lineLimit(2...4)
                             .textInputAutocapitalization(.never)
@@ -414,7 +423,7 @@ struct E2EEV2TrustedDevicesView: View {
                     }
                     approvalErrorRow
                 } header: {
-                    Text("Approuver un nouvel appareil")
+                    Text("Approuver un appareil")
                 }
             }
 
@@ -471,9 +480,15 @@ struct E2EEV2TrustedDevicesView: View {
         .scrollContentBackground(.hidden)
         .background(SQColor.bg.ignoresSafeArea())
         .tint(SQColor.brandRed)
-        .navigationTitle("Appareils E2EE v2")
+        .navigationTitle("Appareils")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await model.load() }
+        .sheet(isPresented: $showsApprovalScanner) {
+            E2EEV2ApprovalScannerView { code in
+                approvalInput = code
+                Task { await model.resolveApproval(code) }
+            }
+        }
         .task {
             await model.load()
             if !initialApprovalConsumed,
@@ -615,11 +630,22 @@ struct E2EEV2TrustedDevicesView: View {
 
     private func approvalPreview(_ detail: E2EEV2ApprovalDetail) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
+            // Un navigateur se nomme par sa plateforme, lue dans le QR v3 ; le nom
+            // qu'il se donne n'est qu'un nom (§2.7).
             Label(
-                detail.pendingDevice.descriptor.label ?? platformName(detail.pendingDevice.descriptor.platform),
+                detail.pendingDevice.descriptor.platform == "web"
+                    ? platformName("web")
+                    : detail.pendingDevice.descriptor.label ?? platformName(detail.pendingDevice.descriptor.platform),
                 systemImage: platformIcon(detail.pendingDevice.descriptor.platform)
             )
             .font(SQType.heading)
+            if let name = E2EEV2ApprovalCopy.quotedName(
+                platform: detail.pendingDevice.descriptor.platform, label: detail.pendingDevice.descriptor.label
+            ) {
+                Text(verbatim: name)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
             Text("Plateforme · \(platformName(detail.pendingDevice.descriptor.platform))")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
@@ -632,6 +658,12 @@ struct E2EEV2TrustedDevicesView: View {
             Text("Demande \(detail.approval.method.rawValue) · expire \(formattedExpiry(detail.approval.expiresAt))")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
+            if detail.pendingDevice.descriptor.platform == "web" {
+                Text(verbatim: E2EEV2ApprovalCopy.browserNotice())
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.vertical, SQSpace.xs)
         .accessibilityElement(children: .combine)
@@ -1544,7 +1576,7 @@ struct SettingsView: View {
                 if E2EEV2RuntimeWriteGate.enabled {
                     NavigationLink {
                         E2EEV2TrustedDevicesView(api: services.api)
-                    } label: { settingsLabel("Appareils E2EE v2", systemImage: "lock.shield") }
+                    } label: { settingsLabel("Appareils", systemImage: "lock.shield") }
                 }
             } header: {
                 Text("Compte et sécurité")
