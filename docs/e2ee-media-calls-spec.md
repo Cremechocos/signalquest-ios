@@ -100,8 +100,10 @@
 >   Appels, après une seconde relecture : jonction tardive bornée à 12 heures,
 >   appel terminé jamais rejoint, fin d'un appel chiffré à une reconnexion
 >   complète, chiffrement que le serveur ne peut pas retirer, média coupé avant
->   tout aller-retour réseau, pistes publiées muettes jusqu'au chiffreur prêt
->   (§10.1, §10.3, §10.4).
+>   tout aller-retour réseau, pistes publiées muettes jusqu'au chiffreur prêt,
+>   pistes distantes reçues seulement d'un participant prouvé, marqueur SIF
+>   remplacé par 32 octets aléatoires après chaque jonction (§10.1, §10.3,
+>   §10.4). Accord des sessions Android et web ; avis du serveur attendu.
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -758,8 +760,8 @@ version qui expose `discardFrameWhenCryptorNotReady` et
 - Un SDK qui ne permet pas ces réglages n'offre pas d'appel chiffré : il est
   monté de version ou corrigé. En Swift, les deux derniers réglages existent
   depuis 2.15.0 ; iOS est passé à 2.17.0, qui corrige aussi le chiffrement du
-  canal de données (COM-1). Le marqueur SIF reçu à la jonction y est vidé
-  dès la jonction terminée.
+  canal de données (COM-1). Le marqueur SIF reçu à chaque jonction y est
+  remplacé par 32 octets aléatoires dès la jonction terminée.
 
 ### 10.4 Vérification et fermeture par défaut
 
