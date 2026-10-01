@@ -295,4 +295,40 @@ final class E2EEV2DeviceLockedSigningTests: XCTestCase {
             XCTAssertTrue(E2EEV2LowS.verify(derSignature: signature, message: message, publicKey: publicKey))
         }
     }
+    /// Identité logicielle d'avant la v0.4.14 : aucune copie lisible verrouillé,
+    /// une copie ancienne part, et signer verrouillé attend le déverrouillage.
+    func testASoftwareKeyIsNeverReadableWhileLocked() throws {
+        let tokens = LockableTokenStore()
+        let store = E2EEV2DeviceIdentityStore(tokenStore: tokens, allowsOwner: { _ in true }, identityChanged: { _ in },
+                                              usesSecureEnclave: false)
+        let copyKey = E2EEV2DeviceIdentityStore.lockedSigningStorageKey(ownerNamespace: namespace)
+        try tokens.set("{\"version\":1}", for: copyKey, accessibility: .afterFirstUnlock)
+        _ = try store.loadOrCreate(ownerNamespace: namespace)
+        let raw = try XCTUnwrap(tokens.string(for: store.storageKey(ownerNamespace: namespace)))
+        XCTAssertFalse(raw.contains("signingStorage"), "Format des identités d'avant")
+        XCTAssertNil(try tokens.string(for: copyKey), "Une clé extractable n'est jamais lisible verrouillé")
+        tokens.locked = true
+        XCTAssertThrowsError(try store.sign(canonicalRequest: message, ownerNamespace: namespace)) {
+            XCTAssertEqual($0 as? E2EEV2DeviceIdentityError, .locked)
+        }
+    }
+
+    /// Blob de Secure Enclave inutilisable (appareil effacé puis restauré) :
+    /// l'identité est illisible, mais la remplacer reste possible.
+    func testAnUnusableEnclaveKeyCanStillBeReplaced() throws {
+        try XCTSkipUnless(E2EEV2DeviceIdentityStore.createsSecureEnclaveKeys, "Pas de Secure Enclave sur cette machine")
+        let tokens = LockableTokenStore()
+        let store = makeStore(tokens)
+        let old = try store.loadOrCreate(ownerNamespace: namespace)
+        let key = store.storageKey(ownerNamespace: namespace)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(XCTUnwrap(tokens.string(for: key)).utf8)) as? [String: Any])
+        json["signingPrivateRawB64"] = Data(repeating: 7, count: 120).base64EncodedString()
+        try tokens.set(String(decoding: try JSONSerialization.data(withJSONObject: json), as: UTF8.self),
+                       for: key, accessibility: .whenUnlocked)
+        XCTAssertThrowsError(try store.load(ownerNamespace: namespace))
+        let candidate = try store.prepareResetCandidate(ownerNamespace: namespace)
+        XCTAssertNotEqual(candidate.deviceId, old.deviceId)
+        try store.activateResetCandidate(ownerNamespace: namespace, expectedDeviceId: candidate.deviceId)
+        XCTAssertEqual(try store.load(ownerNamespace: namespace)?.deviceId, candidate.deviceId)
+    }
 }

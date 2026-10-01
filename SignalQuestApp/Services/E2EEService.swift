@@ -883,13 +883,17 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
     private let tokenStore: TokenStore
     private let allowsOwner: @Sendable (String) -> Bool
     private let identityChanged: @Sendable (String) -> Void
+    /// Faux dans les tests des identités logicielles d'avant la v0.4.14.
+    private let usesSecureEnclave: Bool
 
     init(tokenStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee"),
          allowsOwner: @escaping @Sendable (String) -> Bool = { E2EEV2VaultBoundary.allows($0) },
-         identityChanged: @escaping @Sendable (String) -> Void = { E2EEV2NotificationContextEvents.identityDidChange(ownerNamespace: $0) }) {
+         identityChanged: @escaping @Sendable (String) -> Void = { E2EEV2NotificationContextEvents.identityDidChange(ownerNamespace: $0) },
+         usesSecureEnclave: Bool = E2EEV2DeviceIdentityStore.createsSecureEnclaveKeys) {
         self.tokenStore = tokenStore
         self.allowsOwner = allowsOwner
         self.identityChanged = identityChanged
+        self.usesSecureEnclave = usesSecureEnclave
     }
 
     func loadOrCreate(label: String? = nil) throws -> E2EEV2DeviceDescriptor {
@@ -965,15 +969,15 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         label: String? = nil
     ) throws -> E2EEV2DeviceDescriptor {
         guard allowsOwner(ownerNamespace) else { throw E2EEV2DeviceIdentityError.unauthenticated }
+        // L'identité active peut être inutilisable (blob de Secure Enclave d'un
+        // appareil effacé puis restauré) : la remplacer reste possible.
+        let activeDeviceId = try activeDeviceIdForReset(ownerNamespace: ownerNamespace)
         if let existing = try loadResetCandidateRecord(ownerNamespace: ownerNamespace) {
-            guard existing.descriptor.deviceId != (try loadRecord(
-                ownerNamespace: ownerNamespace
-            ))?.descriptor.deviceId else {
+            guard existing.descriptor.deviceId != activeDeviceId else {
                 throw E2EEV2DeviceIdentityError.invalidRecord
             }
             return existing.descriptor
         }
-        let activeDeviceId = try loadRecord(ownerNamespace: ownerNamespace)?.descriptor.deviceId
         let (candidate, value) = try makeRecord(label: label)
         guard candidate.descriptor.deviceId != activeDeviceId else {
             throw E2EEV2DeviceIdentityError.invalidRecord
@@ -988,6 +992,13 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
             throw E2EEV2DeviceIdentityError.invalidRecord
         }
         return persisted.descriptor
+    }
+
+    /// Identifiant de l'identité active, lu sans en valider les clés.
+    private func activeDeviceIdForReset(ownerNamespace: String) throws -> String? {
+        guard let raw = try tokenStore.string(for: storageKey(ownerNamespace: ownerNamespace)),
+              let data = raw.data(using: .utf8) else { return nil }
+        return (try? JSONDecoder().decode(Record.self, from: data))?.descriptor.deviceId
     }
 
     func loadResetCandidate(ownerNamespace: String) throws -> E2EEV2DeviceDescriptor? {
@@ -1130,9 +1141,15 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         }
     }
 
-    /// Sous `signingCopyLock`.
+    /// Sous `signingCopyLock`. Seule une clé de la Secure Enclave est recopiée
+    /// (v0.4.14) : une clé logicielle d'avant reste derrière le déverrouillage,
+    /// et une copie ancienne part.
     private func writeLockedSigning(_ record: Record, ownerNamespace: String) throws {
         let key = Self.lockedSigningStorageKey(ownerNamespace: ownerNamespace)
+        guard record.signingStorage == .secureEnclave else {
+            if try tokenStore.string(for: key) != nil { try tokenStore.remove(key) }
+            return
+        }
         if let raw = try tokenStore.string(for: key), let data = raw.data(using: .utf8),
            let current = try? JSONDecoder().decode(LockedSigningRecord.self, from: data),
            current.version == 1, current.deviceId == record.descriptor.deviceId,
@@ -1338,7 +1355,7 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
 
     private func makeRecord(label: String?) throws -> (Record, String) {
         let identityPrivate = P256.KeyAgreement.PrivateKey()
-        let signing = try Self.newSigningKey()
+        let signing = try newSigningKey()
         let descriptor = E2EEV2DeviceDescriptor(
             deviceId: "ios_\(try randomBytes(count: 24).base64URLEncodedNoPadding())",
             platform: "ios",
@@ -1401,16 +1418,15 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
     /// l'appareil en a une, utilisable dès le premier déverrouillage après le
     /// démarrage pour rejoindre un appel chiffré verrouillé (§2.6), jamais
     /// extractable ; sinon logicielle.
-    private static func newSigningKey() throws -> (publicKey: P256.Signing.PublicKey, material: Data, storage: SigningStorage?) {
-        guard createsSecureEnclaveKeys else {
+    private func newSigningKey() throws -> (publicKey: P256.Signing.PublicKey, material: Data, storage: SigningStorage?) {
+        guard usesSecureEnclave else {
             let key = P256.Signing.PrivateKey()
             return (key.publicKey, key.rawRepresentation, nil)
         }
-        var error: Unmanaged<CFError>?
         guard let access = SecAccessControlCreateWithFlags(
-            kCFAllocatorDefault, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly, .privateKeyUsage, &error
+            kCFAllocatorDefault, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly, .privateKeyUsage, nil
         ) else {
-            throw E2EEV2DeviceIdentityError.randomGenerationFailed
+            throw E2EEV2DeviceIdentityError.invalidRecord
         }
         let key = try SecureEnclave.P256.Signing.PrivateKey(accessControl: access)
         return (key.publicKey, key.dataRepresentation, .secureEnclave)

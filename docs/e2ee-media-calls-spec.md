@@ -439,7 +439,10 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
     déverrouillage, sans nouvel enrôlement. La clé de signature n'est
     jamais extractable : Secure Enclave sur iOS (v0.4.14), Keystore sur
     Android, clé WebCrypto non exportable sur le web ; ses signatures
-    suivent D.0 (DER canonique, low-S, normalisées avant envoi). Compromis
+    suivent D.0 (DER canonique, low-S, normalisées avant envoi). Une
+    identité iOS créée avant la v0.4.14 (clé logicielle, version d'aperçu)
+    n'a pas de copie lisible verrouillé : rejoindre exige le déverrouillage,
+    et la remplacer donne une clé de la Secure Enclave. Compromis
     assumé : un appareil saisi après un premier déverrouillage depuis son
     démarrage permet d'utiliser sa clé de signature tant qu'on le détient,
     jusqu'à sa révocation ;
