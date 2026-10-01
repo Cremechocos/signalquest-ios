@@ -34,10 +34,18 @@ enum MessageNotificationCategory {
     }
 
     /// Contenu avec sa catégorie, inchangé pour tout ce qui n'est pas un message.
+    /// Pour une conversation chiffrée (§13), le texte du serveur ne passe jamais :
+    /// ni titre de conversation, ni nom, ni emoji, ni pièce jointe.
     static func categorized(_ content: UNNotificationContent) -> UNNotificationContent {
         guard let category = category(for: content.userInfo),
               let mutable = content.mutableCopy() as? UNMutableNotificationContent else { return content }
         mutable.categoryIdentifier = category
+        if category == encrypted {
+            mutable.title = "SignalQuest"
+            mutable.subtitle = ""
+            mutable.body = String(localized: "Nouveau message chiffré")
+            mutable.attachments = []
+        }
         return mutable
     }
 }

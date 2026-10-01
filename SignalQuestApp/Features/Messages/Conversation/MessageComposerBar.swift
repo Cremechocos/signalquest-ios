@@ -12,6 +12,8 @@ struct MessageComposerBar: View {
     let isSending: Bool
     let isSharingLocation: Bool
     let isE2EE: Bool
+    /// Faux dans une conversation v2 (§13) : « Programmer l'envoi » disparaît.
+    var canSchedule = true
     let seedText: String
     let seedToken: Int
     @Binding var ephemeralEnabled: Bool
@@ -101,8 +103,10 @@ struct MessageComposerBar: View {
     private var inputRow: some View {
         HStack(spacing: SQSpace.sm + 2) {
             Menu {
-                Button { onSchedule(text) } label: {
-                    Label("Programmer l'envoi", systemImage: "clock")
+                if canSchedule {
+                    Button { onSchedule(text) } label: {
+                        Label("Programmer l'envoi", systemImage: "clock")
+                    }
                 }
                 // Les contenus structurés et médias v1 exposeraient encore
                 // leurs métadonnées : ils restent masqués jusqu'au runtime v2.

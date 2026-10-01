@@ -233,6 +233,15 @@ struct MessagesView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        // §13 : un aperçu déchiffré ou un brouillon chiffré n'apparaît jamais
+        // dans le sélecteur d'apps.
+        .background {
+            if EncryptedConversationSurfaces.listHidesSnapshot(
+                model.conversations, decryptedPreviews: model.decryptedPreviews, drafts: drafts
+            ) {
+                AppSensitiveContentMarker()
+            }
+        }
         .sqReadableWidth()
         // Comme la conversation : balayage retour rétabli malgré la barre
         // masquée (SOC-30).

@@ -50,6 +50,9 @@ struct ConversationDetailView: View {
     /// présence ne démarrent pour une conversation qui n'est plus affichée (SOC-03).
     @State private var isOnScreen = false
     @State private var isE2EEUnlocked = false
+    /// Conversation v2 (§12), lue une fois à l'ouverture : messages programmés
+    /// désactivés (§13).
+    @State private var conversationIsV2 = false
     @State private var showEncryptionInfo = false
     /// Suivi du bas de la conversation : un message qui arrive pendant la
     /// lecture de l'historique n'y ramène plus de force (SOC-20).
@@ -495,12 +498,18 @@ struct ConversationDetailView: View {
             }
         }
         .signalQuestBackground()
+        // §13 : l'aperçu du sélecteur d'apps ne montre jamais une conversation
+        // chiffrée, même sans verrouillage de l'app.
+        .background {
+            if EncryptedConversationSurfaces.hidesSnapshot(of: conversation) { AppSensitiveContentMarker() }
+        }
         .onAppear {
             // Le dock flottant global est masqué le temps de la conversation.
             router.isDockHidden = true
             isOnScreen = true
         }
         .task {
+            conversationIsV2 = EncryptedConversationSurfaces.isV2(conversation)
             await restoreDraftIfNeeded()
             // SwiftUI annule cette tâche quand on quitte l'écran, mais les appels
             // en cours finissent quand même : sans ces gardes, une sortie rapide
@@ -780,6 +789,7 @@ struct ConversationDetailView: View {
                 isSending: isSending,
                 isSharingLocation: isSharingLocation,
                 isE2EE: isE2EE,
+                canSchedule: EncryptedConversationSurfaces.allowsScheduling(isV2: conversationIsV2),
                 seedText: composerSeed,
                 seedToken: composerSeedToken,
                 ephemeralEnabled: $ephemeralEnabled,
@@ -2679,7 +2689,8 @@ struct ConversationDetailView: View {
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { needsKeyResync = true }
             return
         } catch {
-            MessageSyncLog.logger.error("decrypt \(pending[0].id, privacy: .public) erreur: \(error.localizedDescription, privacy: .private)")
+            // §13 : aucun identifiant de message en clair dans les journaux.
+            MessageSyncLog.logger.error("decrypt \(pending[0].id, privacy: .private) erreur: \(error.localizedDescription, privacy: .private)")
         }
 
         // Le reste est déchiffré en parallèle (clé déjà en cache), puis appliqué

@@ -25,6 +25,24 @@ final class MessageNotificationCategoryTests: XCTestCase {
         XCTAssertNil(MessageNotificationCategory.category(for: ["type": "community_outage"]))
     }
 
+    func testEncryptedMessagesNeverShowTheServerText() {
+        let content = UNMutableNotificationContent()
+        content.title = "Équipe secrète 🎉"
+        content.subtitle = "Léa"
+        content.body = "Léa : le code de la porte est 4521 😀"
+        content.threadIdentifier = "c1"
+        content.userInfo = ["type": "message_new", "conversationId": "c1", "isE2EE": "1"]
+        let categorized = MessageNotificationCategory.categorized(content)
+        XCTAssertEqual(categorized.categoryIdentifier, MessageNotificationCategory.encrypted)
+        XCTAssertEqual(categorized.title, "SignalQuest", "Ni titre de conversation ni emoji")
+        XCTAssertEqual(categorized.subtitle, "", "Ni nom")
+        XCTAssertEqual(categorized.body, String(localized: "Nouveau message chiffré"))
+        for leaked in ["Équipe", "Léa", "4521", "🎉", "😀"] {
+            XCTAssertFalse([categorized.title, categorized.subtitle, categorized.body].joined().contains(leaked), leaked)
+        }
+        XCTAssertEqual(categorized.userInfo["conversationId"] as? String, "c1", "Ouvre toujours la bonne conversation")
+    }
+
     func testCategorizedContentKeepsTheRest() {
         let content = UNMutableNotificationContent()
         content.title = "Équipe terrain"
