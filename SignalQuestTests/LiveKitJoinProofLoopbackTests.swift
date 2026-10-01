@@ -1,4 +1,5 @@
 #if canImport(LiveKit) && DEBUG
+import CoreVideo
 import CryptoKit
 import LiveKit
 import XCTest
@@ -9,8 +10,9 @@ import XCTest
 /// leurs preuves de jonction sur le canal de données chiffré (spec §10.4).
 ///
 /// Lancé seulement avec `TEST_RUNNER_SQ_LIVEKIT_LOOPBACK_URL=ws://127.0.0.1:7880`
-/// et `livekit-server --dev` (clé `devkey`, secret `secret`). Canal de données
-/// seulement : le simulateur ne publie pas de média de façon fiable.
+/// et `livekit-server --dev` (clé `devkey`, secret `secret`). Pas de micro ni de
+/// caméra au simulateur : les médias se limitent à une piste vidéo d'images
+/// synthétiques.
 final class LiveKitJoinProofLoopbackTests: XCTestCase {
     private struct Device {
         let userId: String
@@ -123,6 +125,39 @@ final class LiveKitJoinProofLoopbackTests: XCTestCase {
         try await waitUntil("paquet en clair refusé", timeout: 8) { aliceLog.losses == [.verification] }
         XCTAssertFalse(aliceLog.data.contains { $0.topic == "sq.test.plain" }, "Rien de ce paquet n'atteint l'app")
         XCTAssertEqual(aliceClient.state, .ended)
+    }
+
+    /// Une piste vidéo publiée en clair par un appareil connu de l'appel y met
+    /// fin dès son arrivée, avant le délai de la preuve de jonction : rien n'en
+    /// est rendu (spec §10.4).
+    @MainActor
+    func testUnencryptedVideoTrackEndsTheCall() async throws {
+        let url = try loopbackURL()
+        let call = try makeCall()
+        let alice = device("alice"), bruno = device("bruno")
+        let (aliceClient, aliceLog) = try await join(url, call, as: alice, trusting: [alice, bruno])
+
+        // Bruno, connu d'Alice, rejoint sans chiffrement et publie une piste vidéo.
+        let plain = Room()
+        addTeardownBlock { await plain.disconnect() }
+        try await plain.connect(url: url.absoluteString, token: try token(identity: bruno.identity, room: call.roomName))
+        let track = await LocalVideoTrack.createBufferTrack(name: "sq-test-clair", source: .camera)
+        let capturer = try XCTUnwrap(track.capturer as? BufferCapturer)
+        let frame = try pixelBuffer()
+        // Le SDK attend les dimensions de la première image avant de publier.
+        let feeder = Task { @MainActor in
+            while !Task.isCancelled {
+                capturer.capture(frame)
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+        }
+        defer { feeder.cancel() }
+        _ = try await plain.localParticipant.publish(videoTrack: track)
+
+        try await waitUntil("piste en clair refusée", timeout: 9) { !aliceLog.losses.isEmpty }
+        XCTAssertEqual(aliceLog.losses.first, .verification, "Coupé par la piste en clair, pas par le délai de preuve")
+        XCTAssertEqual(aliceClient.state, .ended)
+        XCTAssertFalse(aliceClient.isE2EEVerified)
     }
 
     /// Un arrivant tardif dans un appel à deux déjà prouvé : les trois se
@@ -282,6 +317,13 @@ final class LiveKitJoinProofLoopbackTests: XCTestCase {
         )
         XCTAssertEqual(client.state, .connected, "Connexion de \(identity)")
         return (client, log)
+    }
+
+    private func pixelBuffer() throws -> CVPixelBuffer {
+        var buffer: CVPixelBuffer?
+        let attributes = [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary
+        CVPixelBufferCreate(kCFAllocatorDefault, 64, 64, kCVPixelFormatType_32BGRA, attributes, &buffer)
+        return try XCTUnwrap(buffer)
     }
 
     /// Jeton du mode développement de livekit-server (HS256, `devkey`/`secret`).
