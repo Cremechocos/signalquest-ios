@@ -217,6 +217,18 @@ final class ServingAntennaSiteIdTests: XCTestCase {
         XCTAssertEqual(site(id: "cmpo873aw0jnx2fll7pthh8ii", siteId: nil).writeSiteId, "cmpo873aw0jnx2fll7pthh8ii")
     }
 
+    func testSearchResultIsWrittenUnderItsSiteKeyToo() throws {
+        let hex = "3f2a9c1e4b5d6f708192a3b4c5d6e7f801234567"
+        let canadian = try JSONDecoder().decode(AntennaSite.self, from: Data("""
+        { "sup_id": "M1229", "site_key": "\(hex)", "latitude": 45.5, "longitude": -73.6 }
+        """.utf8))
+        XCTAssertEqual(canadian.writeSiteId, hex, "Même clé que depuis la carte")
+        let french = try JSONDecoder().decode(AntennaSite.self, from: Data("""
+        { "sup_id": "1002637", "latitude": 44.06, "longitude": 5.9 }
+        """.utf8))
+        XCTAssertEqual(french.writeSiteId, "1002637")
+    }
+
     func testOfficialSourceOutageTellsToRetryShortly() {
         XCTAssertEqual(
             APIError.userFacingMessage(status: 503, code: "OFFICIAL_ANTENNA_SOURCE_UNAVAILABLE", serverMessage: ""),

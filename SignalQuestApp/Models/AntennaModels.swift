@@ -38,12 +38,18 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
     /// Opérateurs du site qui émettent en 5G (support partagé uniquement).
     var operators5G: [String] = []
 
-    /// Identifiant à écrire (validation, identification). Au Canada (ISED), le
-    /// `sup_id` n'est pas unique entre titulaires de licence : le marqueur de
-    /// carte porte l'empreinte hexadécimale du site dans `id`, et c'est elle que
-    /// le serveur attend. En France, le `sup_id` reste la référence.
+    /// Empreinte du site quand la réponse la porte (`site_key` du registre ISED) :
+    /// un résultat de la recherche rapide n'a sinon que son `sup_id`.
+    var siteKey: String?
+
+    /// Identifiant à écrire (validation, identification, favori, panne). Au
+    /// Canada (ISED), le `sup_id` n'est pas unique entre titulaires de licence :
+    /// le marqueur de carte porte l'empreinte hexadécimale du site dans `id`, la
+    /// recherche dans `site_key`, et c'est elle que le serveur attend. En France,
+    /// le `sup_id` reste la référence.
     var writeSiteId: String {
-        Self.isHexSiteKey(id) ? id : (siteId ?? id)
+        if let siteKey, Self.isHexSiteKey(siteKey) { return siteKey }
+        return Self.isHexSiteKey(id) ? id : (siteId ?? id)
     }
 
     /// Empreinte hexadécimale de 40 caractères d'un site (ISED, communauté).
@@ -94,6 +100,7 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
         case address, location, adr_lb_add1, adr_lb_lieu, adr_nm_cp, commune
         case height, sup_nm_haut, hauteur_antenne, structure_height
         case owner, proprietaire, sta_nm_anfr
+        case siteKey, site_key
     }
 
     init(
@@ -139,6 +146,7 @@ struct AntennaSite: Decodable, Identifiable, Equatable {
             ?? UUID().uuidString
         siteId = c.decodeFlexibleString(forKey: .siteId) ?? c.decodeFlexibleString(forKey: .sup_id)
         anfrCode = c.decodeFlexibleString(forKey: .anfrCode) ?? c.decodeFlexibleString(forKey: .sta_nm_anfr)
+        siteKey = c.decodeFlexibleString(forKey: .siteKey) ?? c.decodeFlexibleString(forKey: .site_key)
         let latPrimary: Double? = (try? c.decodeIfPresent(Double.self, forKey: .latitude)) ?? nil
         let latFallback: Double? = (try? c.decodeIfPresent(Double.self, forKey: .lat)) ?? nil
         latitude = latPrimary ?? latFallback

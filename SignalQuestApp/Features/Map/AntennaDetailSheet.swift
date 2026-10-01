@@ -219,7 +219,7 @@ struct AntennaDetailSheet: View {
                     // opposés, et les mettre côte à côte fait rater l'un pour l'autre.
                     FavoriteAntennaButton(
                         favorites: services.favoriteAntennas,
-                        siteId: site.siteId ?? site.id,
+                        siteId: site.writeSiteId,
                         market: market,
                         operatorName: selectedOperator,
                         name: site.address,
@@ -274,7 +274,7 @@ struct AntennaDetailSheet: View {
         }
         .sheet(isPresented: $showOutageReport) {
             OutageReportSheet(
-                siteId: site.siteId ?? site.id,
+                siteId: site.writeSiteId,
                 targetKind: outageTargetKind,
                 // `headerTitle` et non `site.address` : sur un site communautaire, l'adresse
                 // n'arrive qu'avec les détails chargés, et le repli tombait sur l'identifiant
@@ -716,6 +716,8 @@ struct AntennaDetailSheet: View {
     /// par ailleurs saine coûterait plus qu'il n'informe.
     private func loadOutages() async {
         let siteId = site.siteId ?? site.id
+        // Pannes de la communauté : lues sous la clé où elles s'écrivent (SEC-31).
+        let outageSiteId = site.writeSiteId
         let kind = outageTargetKind
         let market = market
         let operatorKey = selectedOperator
@@ -725,7 +727,7 @@ struct AntennaDetailSheet: View {
         let mapService = services.map
 
         async let community = try? await outageService.outages(
-            forSiteId: siteId,
+            forSiteId: outageSiteId,
             targetKind: kind,
             marketCode: market,
             operatorKey: operatorKey
