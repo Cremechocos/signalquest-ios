@@ -2078,7 +2078,19 @@ version publiée qui ouvre les verrous.
 - **`POST /api/e2ee/v2/conversations/{id}/membership`**. Corps :
   `{change, signatureB64}`, en comparaison-échange sur `changeNumber`.
 - **`GET /api/e2ee/v2/conversations/{id}/membership?after=<changeNumber>`** :
-  la suite de la chaîne.
+  la suite de la chaîne. Réponse proposée par iOS :
+  `{changes: [{change, signatureB64}], hasMore}`, 100 changements au plus
+  par page ; une page vide n'annonce jamais de suite.
+- **`GET /api/e2ee/v2/conversations/{id}/epochs/{epochNumber}/manifest`**,
+  proposée par iOS : `{epochNumber, manifest: {manifest, signatureB64, recipients}}`.
+  Elle sert le manifeste à tout membre, destinataire ou non : c'est par celui
+  de l'époque 1 qu'un nouvel appareil vérifie la genèse et sait la
+  conversation v2 (§3.5, §12).
+- **Réception par un membre** : il relit la suite de la chaîne, vérifie la
+  genèse une fois sur le manifeste de l'époque 1, relit toute la chaîne avant
+  de la garder, puis vérifie et garde l'époque courante. Un appareil qui
+  n'est pas encore destinataire (`404 E2EE_EPOCH_ENVELOPE_NOT_FOUND`) attend
+  la prochaine époque ; la conversation est déjà v2 pour lui.
 
 ### E.3 Messages et signalements
 
