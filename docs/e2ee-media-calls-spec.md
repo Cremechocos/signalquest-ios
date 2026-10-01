@@ -2036,6 +2036,12 @@ version publiée qui ouvre les verrous.
   Le client ne garde la clé de l'époque 1 et l'état « v2 » qu'à réception
   de ce reçu, exact (§3.1). Sur `409 CONVERSATION_ID_TAKEN`, rien n'est
   gardé ; une nouvelle tentative tire un autre identifiant.
+- **`POST /api/e2ee/v2/conversations/{id}/genesis`**, migration d'une
+  conversation chiffrée v1 (§14.2), proposée par iOS. Corps :
+  `{membership, epoch}`, de même forme qu'à la création. Le serveur refuse
+  une genèse qui ne reproduit pas exactement les membres et les
+  administrateurs v1 (propriétaire compris), et une conversation déjà v2.
+  Même reçu qu'à la création.
 - **`POST /api/e2ee/v2/conversations/{id}/epochs`**, étendu. Corps :
   - `previousEpochNumber`, `epochNumber` ;
   - `manifest`, au format 2 (§3.5) ;
