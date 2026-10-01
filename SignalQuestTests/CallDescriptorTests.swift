@@ -148,6 +148,49 @@ final class CallDescriptorTests: XCTestCase {
         )
     }
 
+    /// Relecture indépendante : un registre illisible n'est jamais pris pour vide,
+    /// et un appel terminé ne se rejoint plus.
+    func testUnreadableLedgerRefusesThenRestartsAndEndedCallsStayClosed() throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CallNonces-\(UUID().uuidString).json")
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        try Data("pas du JSON".utf8).write(to: file)
+        let nonce = Data(repeating: 8, count: 32).base64EncodedString()
+        let start: Int64 = 1_790_000_000_000
+
+        let ledger = E2EEV2CallNonceLedger(fileURL: file)
+        XCTAssertFalse(ledger.claim(nonce, callId: "call_A", nowMs: start), "Illisible : refus")
+        XCTAssertFalse(ledger.claim(nonce, callId: "call_A", nowMs: start + 30_000))
+        XCTAssertEqual(try Data(contentsOf: file), Data("pas du JSON".utf8), "Jamais écrasé pendant la quarantaine")
+        XCTAssertTrue(ledger.claim(nonce, callId: "call_A", nowMs: start + E2EEV2CallDescriptor.ringingValidityMs + 1),
+                      "Un registre neuf repart après la fenêtre d'une sonnerie")
+
+        ledger.markTerminated(callId: "call_A", nowMs: start + 70_000)
+        XCTAssertFalse(E2EEV2CallNonceLedger(fileURL: file).claim(nonce, callId: "call_A", nowMs: start + 80_000),
+                       "Appel terminé, même après un redémarrage")
+    }
+
+    func testLateJoinIsBoundedInTime() throws {
+        let caller = P256.Signing.PrivateKey()
+        let created: Int64 = 1_790_000_000_000
+        let descriptor = E2EEV2CallDescriptor(
+            conversationId: "conversation_late_01J7ABCD", callId: try E2EEV2CallDescriptorFactory.newCallId(),
+            callerDeviceId: "device_alice_ios_01J7ABCD", epochId: "epoch_late_01J7ABCD", epochNumber: 1,
+            keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(Data(repeating: 1, count: 32)),
+            callNonceB64: try E2EEV2CallDescriptorFactory.newCallNonceB64(), createdAtMs: created
+        )
+        let signed = try E2EEV2SignedString.sign(descriptor.canonical, with: caller)
+        XCTAssertNoThrow(try E2EEV2CallDescriptor.verify(
+            signed, callerSigningKey: caller.publicKey, nowMs: created + 3_600_000, ringing: false
+        ), "Jonction tardive une heure après")
+        XCTAssertThrowsError(try E2EEV2CallDescriptor.verify(
+            signed, callerSigningKey: caller.publicKey, nowMs: created + E2EEV2CallDescriptor.lateJoinValidityMs + 1, ringing: false
+        ), "Plus de 12 heures : un ancien appel rejoué")
+        XCTAssertThrowsError(try E2EEV2CallDescriptor.verify(
+            signed, callerSigningKey: caller.publicKey, nowMs: created + 61_000, ringing: true
+        ), "Une sonnerie reste limitée à 60 secondes")
+    }
+
     #if canImport(LiveKit)
     func testFrameKeyV2ComesFromTheSignedDescriptorAndItsNonce() throws {
         let url = vectorURL("call-frame-key-v2")

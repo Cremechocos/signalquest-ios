@@ -121,6 +121,22 @@ final class CallJoinProofTests: XCTestCase {
         XCTAssertEqual(verifier.overdue(at: arrival.addingTimeInterval(60)), [], "Parti avant son délai")
     }
 
+    /// Relecture indépendante : partir puis revenir ne relance pas le délai.
+    func testLeavingAndComingBackDoesNotRestartTheDeadline() throws {
+        let vector = try loadVector()
+        let verifier = makeVerifier(keys: [owner(deviceId): vector.publicKey])
+        let arrival = Date(timeIntervalSince1970: 1_790_000_000)
+        let carla = "lk_user_carla_01J7ABCD23456789"
+
+        verifier.expect(carla, at: arrival)
+        verifier.remove(carla)
+        verifier.expect(carla, at: arrival.addingTimeInterval(8))
+        XCTAssertEqual(verifier.overdue(at: arrival.addingTimeInterval(10)), [carla], "Délai compté depuis la première arrivée")
+        verifier.reset()
+        verifier.expect(carla, at: arrival.addingTimeInterval(20))
+        XCTAssertEqual(verifier.overdue(at: arrival.addingTimeInterval(25)), [], "Un nouvel appel repart de zéro")
+    }
+
     #if canImport(LiveKit)
     func testProvenCallShowsOnlyProvenParticipants() {
         let verification = E2EEV2LiveKitVerification(requiresJoinProof: true)

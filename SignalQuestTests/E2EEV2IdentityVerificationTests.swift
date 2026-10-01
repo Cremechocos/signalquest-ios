@@ -208,6 +208,15 @@ final class E2EEV2IdentityVerificationTests: XCTestCase {
         ), "Une liste signée aux entrées mal formées est refusée")
     }
 
+    func testCanonicalFieldsRefuseTrailingLineTerminators() {
+        for terminator in ["\n", "\r", "\u{2028}", "\u{0085}"] {
+            XCTAssertFalse(E2EEV2Canonical.isOpaque("device_bruno_ios_01J7ABCD" + terminator), terminator.debugDescription)
+            XCTAssertFalse(E2EEV2Canonical.isDecimal("42" + terminator), terminator.debugDescription)
+        }
+        XCTAssertTrue(E2EEV2Canonical.isOpaque("device_bruno_ios_01J7ABCD"))
+        XCTAssertTrue(E2EEV2Canonical.isDecimal("42"))
+    }
+
     func testAHugeListVersionIsRefusedInsteadOfOverflowing() throws {
         let uik = P256.Signing.PrivateKey()
         let (first, canonical) = try makeBundle(uik: uik, devices: [phone], version: 1, previous: nil)

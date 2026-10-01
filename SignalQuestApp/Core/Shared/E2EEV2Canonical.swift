@@ -381,8 +381,8 @@ enum E2EEV2LowS {
 
 /// Chaînes canoniques et condensats communs (annexe D.0).
 enum E2EEV2Canonical {
-    static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
-    static let decimalPattern = #"^(0|[1-9][0-9]{0,18})$"#
+    static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
+    static let decimalPattern = #"^(0|[1-9][0-9]{0,18})\z"#
 
     static func line(_ fields: [String]) -> Data {
         Data(fields.joined(separator: "\n").utf8)

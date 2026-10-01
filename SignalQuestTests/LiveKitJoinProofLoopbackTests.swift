@@ -160,6 +160,28 @@ final class LiveKitJoinProofLoopbackTests: XCTestCase {
         XCTAssertFalse(aliceClient.isE2EEVerified)
     }
 
+    /// Une reconnexion complète réarme le marqueur SIF dans le SDK : un appel
+    /// chiffré prend fin. Une reconnexion rapide le laisse continuer.
+    @MainActor
+    func testFullReconnectEndsAnEncryptedCallButAQuickOneDoesNot() async throws {
+        let url = try loopbackURL()
+        let call = try makeCall()
+        let alice = device("alice"), bruno = device("bruno")
+        let directory = [alice, bruno]
+        let (aliceClient, aliceLog) = try await join(url, call, as: alice, trusting: directory)
+        let (brunoClient, brunoLog) = try await join(url, call, as: bruno, trusting: directory)
+        try await waitUntil("preuves échangées") { aliceClient.isE2EEVerified && brunoClient.isE2EEVerified }
+
+        try await brunoClient.debugSimulate(.quickReconnect)
+        try await Task.sleep(for: .seconds(3))
+        XCTAssertTrue(brunoLog.losses.isEmpty, "Reconnexion rapide : l'appel continue (\(brunoLog.losses))")
+        XCTAssertEqual(brunoClient.state, .connected)
+
+        try await aliceClient.debugSimulate(.fullReconnect)
+        try await waitUntil("appel coupé par la reconnexion complète", timeout: 8) { aliceLog.losses == [.reconnected] }
+        XCTAssertEqual(aliceClient.state, .ended)
+    }
+
     /// Un arrivant tardif dans un appel à deux déjà prouvé : les trois se
     /// prouvent, grâce aux rediffusions, sans couper l'appel.
     @MainActor

@@ -72,7 +72,7 @@ final class E2EEV2NotificationContextStore: @unchecked Sendable {
     static func configured(bundle: Bundle = .main) -> E2EEV2NotificationContextStore? {
         guard let group = bundle.object(forInfoDictionaryKey: "SQ_NOTIFICATION_KEYCHAIN_ACCESS_GROUP") as? String,
               !group.isEmpty, !group.contains("$("),
-              group.range(of: #"^[A-Za-z0-9.-]+$"#, options: .regularExpression) != nil,
+              group.range(of: #"^[A-Za-z0-9.-]+\z"#, options: .regularExpression) != nil,
               let appGroup = bundle.object(forInfoDictionaryKey: "SQ_APP_GROUP") as? String,
               !appGroup.isEmpty, !appGroup.contains("$("),
               let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else { return nil }

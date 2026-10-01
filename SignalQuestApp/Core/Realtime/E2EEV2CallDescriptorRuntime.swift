@@ -173,11 +173,15 @@ final class E2EEV2CallNonceLedger: @unchecked Sendable {
     private struct Record: Codable, Equatable {
         let callId: String
         let seenAtMs: Int64
+        /// Appel terminé : il ne se rejoint plus (v0.4.6).
+        var terminated: Bool?
     }
 
     private let fileURL: URL?
     private let lock = NSLock()
     private var records: [String: Record]?
+    /// Registre présent mais illisible : jamais pris pour un registre vide.
+    private var unreadableSinceMs: Int64?
 
     /// `fileURL` nil : en mémoire seulement (tests).
     init(fileURL: URL? = E2EEV2CallNonceLedger.defaultFileURL()) {
@@ -189,8 +193,9 @@ final class E2EEV2CallNonceLedger: @unchecked Sendable {
     func claim(_ nonceB64: String, callId: String, nowMs: Int64) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        var current = loadLocked().filter { nowMs - $0.value.seenAtMs < Self.retentionMs }
-        if let known = current[nonceB64] { return known.callId == callId }
+        guard let stored = loadLocked(nowMs: nowMs) else { return false }
+        var current = stored.filter { nowMs - $0.value.seenAtMs < Self.retentionMs }
+        if let known = current[nonceB64] { return known.callId == callId && known.terminated != true }
         current[nonceB64] = Record(callId: callId, seenAtMs: nowMs)
         if current.count > Self.maxEntries {
             let kept = current.sorted { $0.value.seenAtMs > $1.value.seenAtMs }.prefix(Self.maxEntries)
@@ -201,13 +206,42 @@ final class E2EEV2CallNonceLedger: @unchecked Sendable {
         return true
     }
 
-    private func loadLocked() -> [String: Record] {
+    /// Un appel qui a pris fin ne se rejoint plus, même par une notification
+    /// rejouée (v0.4.6).
+    func markTerminated(callId: String, nowMs: Int64) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard var current = loadLocked(nowMs: nowMs) else { return }
+        var changed = false
+        for (nonce, record) in current where record.callId == callId && record.terminated != true {
+            current[nonce]?.terminated = true
+            changed = true
+        }
+        guard changed else { return }
+        records = current
+        save(current)
+    }
+
+    /// Absent : registre neuf. Illisible : les appels sont refusés le temps
+    /// d'une sonnerie, puis un registre neuf repart ; il n'est jamais écrasé
+    /// sans attendre, ce qui effacerait des nonces encore valides.
+    private func loadLocked(nowMs: Int64) -> [String: Record]? {
         if let records { return records }
-        guard let fileURL,
-              let data = try? Data(contentsOf: fileURL),
-              let decoded = try? JSONDecoder().decode([String: Record].self, from: data) else { return [:] }
-        records = decoded
-        return decoded
+        guard let fileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
+            records = [:]
+            return [:]
+        }
+        if let data = try? Data(contentsOf: fileURL),
+           let decoded = try? JSONDecoder().decode([String: Record].self, from: data) {
+            records = decoded
+            return decoded
+        }
+        let since = unreadableSinceMs ?? nowMs
+        unreadableSinceMs = since
+        guard nowMs - since > E2EEV2CallDescriptor.ringingValidityMs else { return nil }
+        unreadableSinceMs = nil
+        records = [:]
+        return [:]
     }
 
     private func save(_ records: [String: Record]) {

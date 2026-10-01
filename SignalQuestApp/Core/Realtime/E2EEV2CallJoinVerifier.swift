@@ -46,6 +46,9 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
     private let lock = NSLock()
     private var arrivals: [String: Date] = [:]
     private var devices: [String: Device] = [:]
+    /// Première arrivée de chaque identité pendant l'appel : partir puis revenir
+    /// ne relance pas le délai de 10 secondes.
+    private var firstArrivals: [String: Date] = [:]
 
     init(configuration: E2EEV2CallJoinConfiguration) {
         self.configuration = configuration
@@ -81,7 +84,9 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard devices[identity] == nil, arrivals[identity] == nil else { return }
-        arrivals[identity] = now
+        let first = firstArrivals[identity] ?? now
+        firstArrivals[identity] = first
+        arrivals[identity] = first
     }
 
     func remove(_ identity: String) {
@@ -140,5 +145,6 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
         defer { lock.unlock() }
         arrivals.removeAll()
         devices.removeAll()
+        firstArrivals.removeAll()
     }
 }

@@ -140,4 +140,14 @@ final class CallDiscretionTests: XCTestCase {
             lastMessage: nil
         )
     }
+
+    /// Relecture indépendante : le serveur peut rendre le chiffrement
+    /// obligatoire, jamais le retirer à un appel annoncé chiffré.
+    func testServerCannotDowngradeACallAnnouncedEncrypted() {
+        XCTAssertTrue(IncomingCallE2EEExpectation.merged(known: true, server: false))
+        XCTAssertTrue(IncomingCallE2EEExpectation.merged(known: nil, server: true))
+        XCTAssertTrue(IncomingCallE2EEExpectation.merged(known: false, server: true))
+        XCTAssertFalse(IncomingCallE2EEExpectation.merged(known: nil, server: false))
+        XCTAssertFalse(IncomingCallE2EEExpectation.merged(known: false, server: false))
+    }
 }

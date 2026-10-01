@@ -8,7 +8,7 @@ struct E2EEV2OpaqueNotificationRequest: Equatable, Sendable {
 
     init?(envelopeId: String, recipientOwnerScope: String) {
         guard E2EEV2PortableInventoryContract.validOpaqueId(envelopeId),
-              recipientOwnerScope.range(of: #"^user:[a-f0-9]{64}$"#, options: .regularExpression) != nil else {
+              recipientOwnerScope.range(of: #"^user:[a-f0-9]{64}\z"#, options: .regularExpression) != nil else {
             return nil
         }
         self.envelopeId = envelopeId
@@ -39,7 +39,7 @@ struct E2EEV2NotificationContext: Codable, Equatable, Sendable {
         guard version == 1,
               UUID(uuidString: revisionId) != nil,
               UUID(uuidString: sessionId) != nil,
-              ownerScopeId.range(of: #"^user:[a-f0-9]{64}$"#, options: .regularExpression) != nil,
+              ownerScopeId.range(of: #"^user:[a-f0-9]{64}\z"#, options: .regularExpression) != nil,
               !authToken.isEmpty, authToken.utf8.count <= 16_384,
               authToken.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
               !authToken.contains(";"), !authToken.contains("\u{0}"),

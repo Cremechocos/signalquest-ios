@@ -25,7 +25,7 @@ enum E2EEV2MessageRef {
     }
 
     static func isValid(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil
+        value.range(of: #"^[A-Za-z0-9_-]{43}\z"#, options: .regularExpression) != nil
     }
 }
 
@@ -365,7 +365,7 @@ enum E2EEV2MessageCryptoV2 {
     }
 
     private static func validate(_ context: E2EEV2MessageContextV2) throws {
-        let requestPattern = #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"#
+        let requestPattern = #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\z"#
         guard E2EEV2Canonical.isOpaque(context.conversationId),
               E2EEV2Canonical.isOpaque(context.senderDeviceId),
               context.clientRequestId.range(of: requestPattern, options: .regularExpression) != nil,

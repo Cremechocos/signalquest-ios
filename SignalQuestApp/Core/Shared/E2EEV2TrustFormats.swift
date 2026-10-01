@@ -463,7 +463,7 @@ struct E2EEV2CapabilitiesDocument: Equatable, Sendable {
               let payloads = sortedUniqueStrings(root["payloadVersions"]),
               payloads.allSatisfy(E2EEV2Canonical.isDecimal),
               let kinds = sortedUniqueStrings(root["kinds"]),
-              kinds.allSatisfy({ $0.range(of: #"^[A-Z][A-Z_]{0,31}$"#, options: .regularExpression) != nil }),
+              kinds.allSatisfy({ $0.range(of: #"^[A-Z][A-Z_]{0,31}\z"#, options: .regularExpression) != nil }),
               let features = sortedUniqueStrings(root["features"]),
               Set(features).isSubset(of: knownFeatures) else {
             throw E2EEV2TrustFormatError.invalidField
@@ -725,7 +725,7 @@ enum E2EEV2ApprovalV2 {
 
     /// 32 octets en base64url canonique, sans bourrage.
     static func isDigest(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"#, options: .regularExpression) != nil
+        value.range(of: #"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]\z"#, options: .regularExpression) != nil
     }
 }
 

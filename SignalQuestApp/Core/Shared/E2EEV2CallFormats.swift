@@ -14,6 +14,9 @@ enum E2EEV2CallFormatError: Error, Equatable {
 struct E2EEV2CallDescriptor: Equatable, Sendable {
     static let tag = "SQ-E2EE-V2-CALL-DESCRIPTOR"
     static let ringingValidityMs: Int64 = 60_000
+    /// Jonction tardive (v0.4.6) : un appel ne se rejoint plus 12 heures après
+    /// son descripteur, pour qu'un ancien appel ne puisse pas être rejoué.
+    static let lateJoinValidityMs: Int64 = 12 * 60 * 60 * 1_000
 
     let conversationId: String
     let callId: String
@@ -47,8 +50,8 @@ struct E2EEV2CallDescriptor: Equatable, Sendable {
         )
     }
 
-    /// Vérifie la signature de l'appareil appelant. La règle des 60 secondes ne
-    /// vaut que pour une sonnerie ; une jonction tardive dépend de l'appel actif.
+    /// Vérifie la signature de l'appareil appelant. Une sonnerie vaut 60 secondes ;
+    /// une jonction tardive, 12 heures, et jamais pour un appel terminé (registre).
     static func verify(
         _ signed: E2EEV2SignedString,
         callerSigningKey: P256.Signing.PublicKey,
@@ -57,7 +60,8 @@ struct E2EEV2CallDescriptor: Equatable, Sendable {
     ) throws -> E2EEV2CallDescriptor {
         guard signed.verify(with: callerSigningKey) else { throw E2EEV2CallFormatError.invalidSignature }
         let descriptor = try parse(signed.canonical)
-        if ringing, nowMs - descriptor.createdAtMs > ringingValidityMs || descriptor.createdAtMs - nowMs > ringingValidityMs {
+        let validity = ringing ? ringingValidityMs : lateJoinValidityMs
+        if nowMs - descriptor.createdAtMs > validity || descriptor.createdAtMs - nowMs > ringingValidityMs {
             throw E2EEV2CallFormatError.expired
         }
         return descriptor

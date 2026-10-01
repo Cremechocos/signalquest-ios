@@ -36,6 +36,9 @@ enum E2EEV2CallTrustLoss: Equatable, Sendable {
     case verification
     /// Preuve de jonction invalide, ou absente 10 secondes après une arrivée.
     case joinProof
+    /// Reconnexion complète : le SDK y réarme le marqueur SIF et réintègre les
+    /// participants sans événement. Un appel chiffré n'y survit pas.
+    case reconnected
 }
 
 @MainActor
@@ -302,6 +305,13 @@ final class LiveKitClient: ObservableObject {
                         if !reconnecting { self?.broadcastJoinProofOnSchedule() }
                     }
                 },
+                onFullReconnectStarted: { [weak self] in
+                    // Une reconnexion complète réarme le marqueur SIF et réintègre
+                    // les participants sans événement : un appel chiffré prend fin.
+                    guard e2eeSession != nil else { return }
+                    e2eeSession?.verification.failGlobally()
+                    Task { @MainActor in self?.handleE2EETrustLoss(.reconnected) }
+                },
                 onMediaChanged: { [weak self] in
                     Task { @MainActor in self?.refreshRemoteMedia() }
                 },
@@ -429,6 +439,11 @@ final class LiveKitClient: ObservableObject {
             )
             try await liveRoom.connect(url: url.absoluteString, token: token)
             e2eeSession?.neutralizeServerInjectedFrames()
+            if didE2EEFailDuringConnect {
+                await liveRoom.disconnect()
+                state = .failed("La vérification du chiffrement média a échoué.")
+                return
+            }
             // Un raccrochage est survenu pendant le connect : fermer la room orpheline
             // au lieu de la marquer connectée (CALL-RTC-05).
             if myGeneration != connectGeneration {
@@ -440,10 +455,11 @@ final class LiveKitClient: ObservableObject {
             switch mediaSetupMode {
             case .standard:
                 let standardMedia = LocalMedia(room: liveRoom)
-                if !standardMedia.isMicrophoneEnabled {
+                // Pas de nouvelle piste après un échec du chiffrement.
+                if !standardMedia.isMicrophoneEnabled, !didE2EEFailDuringConnect {
                     await standardMedia.toggleMicrophone()
                 }
-                if video && !standardMedia.isCameraEnabled {
+                if video && !standardMedia.isCameraEnabled, !didE2EEFailDuringConnect {
                     await standardMedia.toggleCamera()
                 }
                 media = standardMedia
@@ -621,6 +637,13 @@ final class LiveKitClient: ObservableObject {
         }
     }
 
+    #if DEBUG && canImport(LiveKit)
+    /// Banc local : provoque une reconnexion que le SDK sait simuler.
+    func debugSimulate(_ scenario: SimulateScenario) async throws {
+        try await room?.debug_simulate(scenario: scenario)
+    }
+    #endif
+
     private func handleE2EETrustLoss(_ reason: E2EEV2CallTrustLoss = .verification) {
 #if canImport(LiveKit)
         guard activeE2eeSession != nil else { return }
@@ -637,6 +660,9 @@ final class LiveKitClient: ObservableObject {
             if allowsLocalQADataBootstrap, onE2EETrustLost == nil { break }
             #endif
             state = .ended
+            // Le média s'arrête tout de suite, avant toute réponse du serveur.
+            let room = self.room
+            Task { await room?.disconnect() }
             onE2EETrustLost?(reason)
         default:
             break
@@ -1059,6 +1085,7 @@ final class LiveKitClient: ObservableObject {
 private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked Sendable {
     private let onDisconnect: @Sendable () -> Void
     private let onReconnectingChanged: @Sendable (Bool) -> Void
+    private let onFullReconnectStarted: @Sendable () -> Void
     private let onMediaChanged: @Sendable () -> Void
     private let onParticipantExpected: @Sendable (String) -> Void
     private let onParticipantRemoved: @Sendable (String) -> Void
@@ -1072,6 +1099,7 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
     init(
         onDisconnect: @escaping @Sendable () -> Void,
         onReconnectingChanged: @escaping @Sendable (Bool) -> Void,
+        onFullReconnectStarted: @escaping @Sendable () -> Void,
         onMediaChanged: @escaping @Sendable () -> Void,
         onParticipantExpected: @escaping @Sendable (String) -> Void,
         onParticipantRemoved: @escaping @Sendable (String) -> Void,
@@ -1084,6 +1112,7 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
     ) {
         self.onDisconnect = onDisconnect
         self.onReconnectingChanged = onReconnectingChanged
+        self.onFullReconnectStarted = onFullReconnectStarted
         self.onMediaChanged = onMediaChanged
         self.onParticipantExpected = onParticipantExpected
         self.onParticipantRemoved = onParticipantRemoved
@@ -1109,8 +1138,20 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
     }
     // CALL-RTC-C : le SDK N'émet PAS didUpdateConnectionState pour le mode de
     // reconnexion `.quick` ; ces deux callbacks couvrent quick ET full.
-    func room(_ room: Room, didStartReconnectWithMode reconnectMode: ReconnectMode) { onReconnectingChanged(true) }
-    func room(_ room: Room, didCompleteReconnectWithMode reconnectMode: ReconnectMode) { onReconnectingChanged(false) }
+    // Une reconnexion peut commencer rapide puis passer en complète : seul
+    // `didUpdateReconnectMode` l'annonce alors. La fin d'une reconnexion
+    // complète sert de filet de sécurité.
+    func room(_ room: Room, didStartReconnectWithMode reconnectMode: ReconnectMode) {
+        onReconnectingChanged(true)
+        if reconnectMode == .full { onFullReconnectStarted() }
+    }
+    func room(_ room: Room, didUpdateReconnectMode reconnectMode: ReconnectMode) {
+        if reconnectMode == .full { onFullReconnectStarted() }
+    }
+    func room(_ room: Room, didCompleteReconnectWithMode reconnectMode: ReconnectMode) {
+        onReconnectingChanged(false)
+        if reconnectMode == .full { onFullReconnectStarted() }
+    }
     func room(_ room: Room, participantDidConnect participant: RemoteParticipant) {
         if let identity = participant.identity?.stringValue { onParticipantExpected(identity) }
         else { onCryptorGlobalFailure() }

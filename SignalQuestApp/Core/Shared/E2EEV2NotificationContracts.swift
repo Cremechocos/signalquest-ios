@@ -116,7 +116,7 @@ enum E2EEV2SignedRequest {
         bodySHA256Base64URL: String
     ) throws -> Data {
         let normalizedMethod = method.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard normalizedMethod.range(of: #"^[A-Z]{3,16}$"#, options: .regularExpression) != nil else {
+        guard normalizedMethod.range(of: #"^[A-Z]{3,16}\z"#, options: .regularExpression) != nil else {
             throw E2EEV2SignedRequestError.invalidMethod
         }
         guard !path.isEmpty,
@@ -129,11 +129,11 @@ enum E2EEV2SignedRequest {
             throw E2EEV2SignedRequestError.invalidPath
         }
         guard timestampMs >= 0 else { throw E2EEV2SignedRequestError.invalidTimestamp }
-        guard nonce.range(of: #"^[A-Za-z0-9_-]{16,128}$"#, options: .regularExpression) != nil else {
+        guard nonce.range(of: #"^[A-Za-z0-9_-]{16,128}\z"#, options: .regularExpression) != nil else {
             throw E2EEV2SignedRequestError.invalidNonce
         }
         guard bodySHA256Base64URL.range(
-            of: #"^[A-Za-z0-9_-]{43}$"#,
+            of: #"^[A-Za-z0-9_-]{43}\z"#,
             options: .regularExpression
         ) != nil else {
             throw E2EEV2SignedRequestError.invalidBodyHash
@@ -352,7 +352,7 @@ enum E2EEV2EpochCrypto {
     }
 
     private static func validate(_ context: E2EEV2EpochContext) throws {
-        let pattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+        let pattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
         guard context.conversationId.range(of: pattern, options: .regularExpression) != nil,
               context.senderDeviceId.range(of: pattern, options: .regularExpression) != nil,
               context.recipientDeviceId.range(of: pattern, options: .regularExpression) != nil,
@@ -431,7 +431,7 @@ enum E2EEV2EpochDeliveryContract {
         let envelope: E2EEV2SignedEpochEnvelope
     }
 
-    private static let opaqueIdPattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+    private static let opaqueIdPattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
     private static let epochAlgorithm = "AES_256_GCM_HKDF_SHA256"
     private static let reasons: Set<String> = [
         "INITIAL",
@@ -598,7 +598,7 @@ enum E2EEV2MessageCrypto {
     static let kdfInfo = "signalquest-e2ee-v2-message-key-v1"
 
     static func blobRoutingHash(_ encryptedBlobIds: [String]) throws -> String {
-        let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+        let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
         guard encryptedBlobIds.count <= 20,
               Set(encryptedBlobIds).count == encryptedBlobIds.count,
               encryptedBlobIds.allSatisfy({
@@ -774,8 +774,8 @@ enum E2EEV2MessageCrypto {
     }
 
     private static func validate(_ context: E2EEV2MessageContext) throws {
-        let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
-        let requestPattern = #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"#
+        let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
+        let requestPattern = #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\z"#
         guard context.conversationId.range(of: opaquePattern, options: .regularExpression) != nil,
               context.senderDeviceId.range(of: opaquePattern, options: .regularExpression) != nil,
               context.clientRequestId.range(of: requestPattern, options: .regularExpression) != nil,
@@ -910,7 +910,7 @@ enum E2EEV2BlobCrypto {
     }
 
     private static func validateBlobID(_ blobID: String) throws {
-        let pattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+        let pattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
         guard blobID.range(of: pattern, options: .regularExpression) != nil else {
             throw E2EEV2BlobCryptoError.invalidBlobID
         }
@@ -955,11 +955,11 @@ enum E2EEV2ContentContract {
     private static let maxMediaBytes: Int64 = 512 * 1_024 * 1_024
     private static let blobAlgorithm = "AES_256_GCM_CHUNKED_HKDF_SHA256"
     private static let opaquePattern = try! NSRegularExpression(
-        pattern: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+        pattern: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
     )
-    private static let sha256Pattern = try! NSRegularExpression(pattern: #"^[a-f0-9]{64}$"#)
-    private static let decimalPattern = try! NSRegularExpression(pattern: #"^(0|[1-9][0-9]{0,11})$"#)
-    private static let plmnPattern = try! NSRegularExpression(pattern: #"^[0-9]{5,6}$"#)
+    private static let sha256Pattern = try! NSRegularExpression(pattern: #"^[a-f0-9]{64}\z"#)
+    private static let decimalPattern = try! NSRegularExpression(pattern: #"^(0|[1-9][0-9]{0,11})\z"#)
+    private static let plmnPattern = try! NSRegularExpression(pattern: #"^[0-9]{5,6}\z"#)
     private static let rootKeys: Set<String> = [
         "schema", "version", "kind", "replyToId", "mentions", "body",
     ]
@@ -1317,9 +1317,9 @@ enum E2EEV2MessageReceiver {
         "contentType", "keyCommitmentB64", "ttlSeconds", "encryptedBlobIds",
         "nonceB64", "aadB64", "ciphertextB64", "senderSignatureB64",
     ]
-    private static let ownerPattern = #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$"#
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
-    private static let requestPattern = #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"#
+    private static let ownerPattern = #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}\z"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
+    private static let requestPattern = #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\z"#
 
     static func decryptRuntimeWithEpochLoader(
         input: E2EEV2IncomingMessageInput,
@@ -1513,7 +1513,7 @@ struct E2EEV2PortableInventoryPage: Equatable, Sendable {
 
 enum E2EEV2PortableInventoryContract {
     static let pageSize = 100
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
 
     static func parse(
         _ data: Data,
@@ -1594,7 +1594,7 @@ enum E2EEV2PortableInventoryContract {
 
     static func parseInstant(_ value: String) -> Date? {
         guard value.range(
-            of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$"#,
+            of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\z"#,
             options: .regularExpression
         ) != nil else { return nil }
         let formatter = ISO8601DateFormatter()
@@ -1658,8 +1658,8 @@ struct E2EEV2DeliveredMessage: @unchecked Sendable {
 }
 
 enum E2EEV2MessageDeliveryContract {
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
-    private static let sha256Pattern = #"^[a-f0-9]{64}$"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
+    private static let sha256Pattern = #"^[a-f0-9]{64}\z"#
     private static let statuses: Set<String> = ["active", "retired", "compromised"]
 
     static func parseAndVerify(
@@ -1672,7 +1672,7 @@ enum E2EEV2MessageDeliveryContract {
     ) -> E2EEV2VerifiedMessageDelivery? {
         guard data.count <= 768 * 1_024,
               ownerScopeId.range(
-                of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$"#,
+                of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}\z"#,
                 options: .regularExpression
               ) != nil,
               validOpaqueId(expectedEnvelopeId),
@@ -1786,7 +1786,7 @@ enum E2EEV2MessageDeliveryContract {
                   let hash = blob["ciphertextSha256"] as? String,
                   hash.range(of: sha256Pattern, options: .regularExpression) != nil,
                   let rawSize = blob["ciphertextSize"] as? String,
-                  rawSize.range(of: #"^[1-9][0-9]{0,11}$"#, options: .regularExpression) != nil,
+                  rawSize.range(of: #"^[1-9][0-9]{0,11}\z"#, options: .regularExpression) != nil,
                   let size = Int64(rawSize), (1...E2EEV2BlobCrypto.maxPlaintextBytes + 64 * 1_024).contains(size),
                   let chunkSize = integer(blob["chunkSize"]),
                   (5 * 1_024 * 1_024...8 * 1_024 * 1_024).contains(chunkSize) else { return nil }

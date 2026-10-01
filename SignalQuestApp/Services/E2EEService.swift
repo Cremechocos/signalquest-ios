@@ -1235,7 +1235,7 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
               record.descriptor.signingKeyAlgorithm == Self.signingKeyAlgorithm,
               record.descriptor.keyVersion == 1,
               record.descriptor.deviceId.range(
-                of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#,
+                of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#,
                 options: .regularExpression
               ) != nil else {
             throw E2EEV2DeviceIdentityError.invalidRecord
@@ -2247,9 +2247,9 @@ struct E2EEV2IdentityResetOutcome: Equatable, Sendable {
 }
 
 enum E2EEV2DeviceApprovalContract {
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
-    private static let challengePattern = #"^[A-Za-z0-9_-]{43}$"#
-    private static let proximityPattern = #"^[0-9A-HJKMNP-TV-Z]{16}$"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
+    private static let challengePattern = #"^[A-Za-z0-9_-]{43}\z"#
+    private static let proximityPattern = #"^[0-9A-HJKMNP-TV-Z]{16}\z"#
     private static let challengeTTL: Int64 = 10 * 60 * 1_000
     private static let revocationReasons: Set<String> = ["LOST", "REPLACED", "COMPROMISED", "USER_REQUEST"]
 
@@ -2402,7 +2402,7 @@ enum E2EEV2DeviceApprovalContract {
             return ["method": "apple", "identityToken": token]
         case .email(let challengeId, let code):
             let normalizedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard validOpaqueId(challengeId), matches(normalizedCode, #"^\d{6}$"#) else {
+            guard validOpaqueId(challengeId), matches(normalizedCode, #"^\d{6}\z"#) else {
                 throw E2EEV2DeviceIdentityError.invalidRecord
             }
             return ["method": "email", "challengeId": challengeId, "code": normalizedCode]
@@ -3259,7 +3259,7 @@ enum E2EEV2RecoveryCrypto {
 
     static func aad(ownerNamespace: String) throws -> Data {
         guard ownerNamespace.range(
-            of: #"^[A-Za-z0-9._:-]{1,128}$"#,
+            of: #"^[A-Za-z0-9._:-]{1,128}\z"#,
             options: .regularExpression
         ) != nil else {
             throw E2EEV2RecoveryCryptoError.invalidOwnerNamespace
@@ -3532,8 +3532,8 @@ enum E2EEV2RecoveryV2Crypto {
     static func proofCanonical(_ challenge: E2EEV2RecoveryChallengeV2) throws -> Data {
         guard validOpaqueId(challenge.challengeId),
               validOpaqueId(challenge.pendingDeviceId),
-              challenge.bundleHash.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil,
-              challenge.challengeB64URL.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil,
+              challenge.bundleHash.range(of: #"^[a-f0-9]{64}\z"#, options: .regularExpression) != nil,
+              challenge.challengeB64URL.range(of: #"^[A-Za-z0-9_-]{43}\z"#, options: .regularExpression) != nil,
               Data(base64URLEncoded: challenge.challengeB64URL)?.count == 32,
               challenge.expiresAtMs >= 0 else {
             throw E2EEV2RecoveryV2Error.invalidBundle
@@ -3661,7 +3661,7 @@ enum E2EEV2RecoveryV2Crypto {
 
     private static func aad(ownerBinding: String, role: Role) throws -> Data {
         guard ownerBinding.range(
-            of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$"#,
+            of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}\z"#,
             options: .regularExpression
         ) != nil else { throw E2EEV2RecoveryV2Error.invalidOwner }
         return Data("SQ-E2EE-V2-RECOVERY\n2\n\(ownerBinding)\n\(role.rawValue)".utf8)
@@ -3677,7 +3677,7 @@ enum E2EEV2RecoveryV2Crypto {
     }
 
     fileprivate static func validOpaqueId(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#, options: .regularExpression) != nil
+        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#, options: .regularExpression) != nil
     }
 }
 
@@ -3710,9 +3710,9 @@ enum E2EEV2RecoveryV2Contract {
               challenge["pendingDeviceId"] as? String == expectedPendingDeviceId,
               E2EEV2RecoveryV2Crypto.validOpaqueId(expectedPendingDeviceId),
               let bundleHash = challenge["bundleHash"] as? String,
-              bundleHash.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil,
+              bundleHash.range(of: #"^[a-f0-9]{64}\z"#, options: .regularExpression) != nil,
               let challengeB64URL = challenge["challengeB64Url"] as? String,
-              challengeB64URL.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil,
+              challengeB64URL.range(of: #"^[A-Za-z0-9_-]{43}\z"#, options: .regularExpression) != nil,
               Data(base64URLEncoded: challengeB64URL)?.count == 32,
               let expiresAt = challenge["expiresAt"] as? String,
               let expiresDate = parseTimestamp(expiresAt) else { return nil }
@@ -4288,12 +4288,12 @@ enum E2EEV2RecoveryEpochCrypto {
     }
 
     private static func validate(_ context: E2EEV2RecoveryEpochContext) throws {
-        let opaque = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+        let opaque = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
         guard context.conversationId.range(of: opaque, options: .regularExpression) != nil,
               context.senderDeviceId.range(of: opaque, options: .regularExpression) != nil,
               context.recipientUserId.range(of: opaque, options: .regularExpression) != nil,
               context.recoveryBundleHash.range(
-                of: #"^[a-f0-9]{64}$"#,
+                of: #"^[a-f0-9]{64}\z"#,
                 options: .regularExpression
               ) != nil,
               context.epochNumber > 0 else {
@@ -4740,7 +4740,7 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
     }
 
     private func validOpaqueId(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#, options: .regularExpression) != nil
+        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#, options: .regularExpression) != nil
     }
 }
 
@@ -4780,7 +4780,7 @@ final class E2EEV2EpochDeliveryClient: @unchecked Sendable {
               LocalAccountScope.currentOwnerScopeId == expectedOwnerScopeId,
               LocalAccountScope.currentUserId != nil,
               conversationId.range(
-                of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#,
+                of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#,
                 options: .regularExpression
               ) != nil else {
             return localFailure("invalid-e2ee-epoch-fetch-scope")
@@ -4972,11 +4972,11 @@ enum E2EEV2RecoveryEpochParser {
     }
 
     fileprivate static func validOpaqueId(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#, options: .regularExpression) != nil
+        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#, options: .regularExpression) != nil
     }
 
     fileprivate static func validBundleHash(_ value: String) -> Bool {
-        value.range(of: #"^[a-f0-9]{64}$"#, options: .regularExpression) != nil
+        value.range(of: #"^[a-f0-9]{64}\z"#, options: .regularExpression) != nil
     }
 
     fileprivate static func validBase64(_ value: String, bytes: Int, x963: Bool = false) -> Bool {
@@ -5886,7 +5886,7 @@ struct E2EEV2EpochRotationReceipt: Equatable, Sendable {
 
 enum E2EEV2EpochRotationContract {
     static let keyAlgorithm = "AES_256_GCM_HKDF_SHA256"
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
     private static let reasons: Set<String> = ["DEVICE_ADDED", "DEVICE_REVOKED", "RECOVERY", "IDENTITY_RESET"]
     private static let statuses: Set<String> = ["active", "compromised", "retired"]
 
@@ -6328,7 +6328,7 @@ final class E2EEV2EpochRotationCoordinator: @unchecked Sendable {
     }
 
     private func validOpaqueId(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#, options: .regularExpression) != nil
+        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#, options: .regularExpression) != nil
     }
 
     private func randomBytes(count: Int) throws -> Data {
@@ -6433,7 +6433,7 @@ enum E2EEV2CallBridge {
     static let version = 1
     static let provider = "LIVEKIT_FRAME_CRYPTOR_V1"
 
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
     private static let contextKeys: Set<String> = [
         "version", "provider", "epochId", "epochNumber", "keyCommitmentB64",
     ]
@@ -6702,7 +6702,7 @@ enum E2EEV2CallFrameKey {
     }
 
     private static func validate(_ context: E2EEV2CallFrameKeyContext) throws {
-        let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+        let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
         guard context.conversationId.range(of: opaquePattern, options: .regularExpression) != nil,
               context.epochNumber > 0,
               context.callId.range(of: opaquePattern, options: .regularExpression) != nil else {
@@ -7155,7 +7155,7 @@ final class E2EEV2MediaOutboxStore: @unchecked Sendable {
         case .history:
             validOpaqueId(record.sourceMessageId)
                 && record.sourceHash.range(
-                    of: #"^[a-f0-9]{64}$"#,
+                    of: #"^[a-f0-9]{64}\z"#,
                     options: .regularExpression
                 ) != nil
                 && record.clientRequestId == (try? E2EEV2HistoryMigrationContract.clientRequestId(
@@ -7189,7 +7189,7 @@ final class E2EEV2MediaOutboxStore: @unchecked Sendable {
             guard validOpaqueId(blob.blobId),
                   blob.algorithm == E2EEV2BlobCrypto.algorithm,
                   blob.ciphertextSha256.range(
-                    of: #"^[a-f0-9]{64}$"#,
+                    of: #"^[a-f0-9]{64}\z"#,
                     options: .regularExpression
                   ) != nil,
                   (1...maxCiphertextBytes).contains(blob.ciphertextSize),
@@ -7261,16 +7261,16 @@ final class E2EEV2MediaOutboxStore: @unchecked Sendable {
     }
 
     private static func validOpaqueId(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#, options: .regularExpression) != nil
+        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#, options: .regularExpression) != nil
     }
 
     private static func validRequestId(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"#, options: .regularExpression) != nil
+        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\z"#, options: .regularExpression) != nil
     }
 
     private static func validBase64(_ value: String, max: Int) -> Bool {
         (4...max).contains(value.count)
-            && value.range(of: #"^[A-Za-z0-9+/_-]+={0,2}$"#, options: .regularExpression) != nil
+            && value.range(of: #"^[A-Za-z0-9+/_-]+={0,2}\z"#, options: .regularExpression) != nil
     }
 
     static func sha256Hex(_ url: URL) throws -> String {
@@ -7748,8 +7748,8 @@ enum E2EEV2HistoryMigrationContract {
     static let batchLimit = 5
     static let maxClearBytes = 80 * 1_024
 
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
-    private static let hashPattern = #"^[a-f0-9]{64}$"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
+    private static let hashPattern = #"^[a-f0-9]{64}\z"#
     private static let kinds: Set<String> = [
         "TEXT", "ATTACHMENT", "SPEEDTEST", "LINK", "SYSTEM", "LOCATION",
     ]
@@ -8369,7 +8369,7 @@ final class E2EEV2MessageDeliveryClient: @unchecked Sendable {
               LocalAccountScope.currentUserId != nil,
               LocalAccountScope.currentOwnerScopeId == ownerScopeId,
               envelopeId.range(
-                of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#,
+                of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#,
                 options: .regularExpression
               ) != nil else {
             return .failure(.invalid("e2ee-v2-security-review-required"))
@@ -8403,7 +8403,7 @@ final class E2EEV2MessageDeliveryClient: @unchecked Sendable {
               value["id"] as? String == envelopeId,
               let conversationId = value["conversationId"] as? String,
               conversationId.range(
-                of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#,
+                of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#,
                 options: .regularExpression
               ) != nil,
               let createdAt = value["createdAt"] as? String,
@@ -8570,8 +8570,8 @@ enum E2EEV2LiveShareStateError: Error, Equatable {
 final class E2EEV2LiveShareStateStore: @unchecked Sendable {
     private let tokenStore: TokenStore
     private let lock = NSLock()
-    private static let ownerPattern = #"^user:[A-Za-z0-9_-]{8,150}$"#
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+    private static let ownerPattern = #"^user:[A-Za-z0-9_-]{8,150}\z"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
 
     init(tokenStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee")) {
         self.tokenStore = tokenStore
@@ -8754,9 +8754,9 @@ struct E2EEV2LiveShareFetchDependencies {
 /// Keychain, chiffrement ou réseau. Une époque reçue est déballée seulement en
 /// mémoire et aucune position en clair n'est persistée par ce client.
 final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
-    private static let ownerPattern = #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$"#
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
-    private static let requestPattern = #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"#
+    private static let ownerPattern = #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}\z"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
+    private static let requestPattern = #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\z"#
     private static let maxClockSkew: TimeInterval = 5 * 60
 
     private let transport: E2EEV2APITransport
@@ -9304,7 +9304,7 @@ enum E2EEV2LiveShareEvent: Equatable, Sendable {
 }
 
 enum E2EEV2LiveShareEventContract {
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#
+    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
 
     static func parse(event: String, data: String, eventId: String?) -> E2EEV2LiveShareEvent? {
         guard data.utf8.count <= 32 * 1_024,
@@ -9362,11 +9362,11 @@ final class E2EEV2LiveShareEventClient: @unchecked Sendable {
                           LocalAccountScope.currentUserId != nil,
                           LocalAccountScope.currentOwnerScopeId == ownerScopeId,
                           ownerScopeId.range(
-                            of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$"#,
+                            of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}\z"#,
                             options: .regularExpression
                           ) != nil,
                           sessionId.range(
-                            of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}$"#,
+                            of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#,
                             options: .regularExpression
                           ) != nil else {
                         continuation.finish()
@@ -10133,7 +10133,7 @@ private final class E2EEV2PortableArchiveWriter {
         generatedAt: Date
     ) async throws {
         guard ownerScopeId.range(
-            of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$"#,
+            of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}\z"#,
             options: .regularExpression
         ) != nil else {
             throw E2EEV2PortableExportError(reason: "invalid-e2ee-v2-portable-owner-scope")
@@ -10437,11 +10437,11 @@ private final class E2EEV2PortableArchiveWriter {
               manifest.ciphertextSize == manifest.plaintextSize
                 + chunkCount * Int64(E2EEV2BlobCrypto.tagBytes),
               manifest.plaintextSha256.range(
-                of: #"^[a-f0-9]{64}$"#,
+                of: #"^[a-f0-9]{64}\z"#,
                 options: .regularExpression
               ) != nil,
               manifest.ciphertextSha256.range(
-                of: #"^[a-f0-9]{64}$"#,
+                of: #"^[a-f0-9]{64}\z"#,
                 options: .regularExpression
               ) != nil,
               descriptor.blobId == manifest.blobId,
@@ -10660,7 +10660,7 @@ enum E2EEV2PortableExportCoordinator {
         _ dependencies: E2EEV2PortableExportCoordinatorDependencies
     ) throws {
         guard ownerScopeId.range(
-            of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$"#,
+            of: #"^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}\z"#,
             options: .regularExpression
         ) != nil else {
             throw E2EEV2PortableExportError(reason: "invalid-e2ee-v2-portable-owner-scope")

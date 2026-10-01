@@ -218,6 +218,13 @@ enum IncomingCallE2EEExpectation: Equatable {
     case required(E2EEV2CallSessionDescriptor)
     case invalid
 
+    /// Le serveur peut rendre le chiffrement obligatoire, jamais le retirer :
+    /// `/pending` ne fait pas redescendre un appel que sa notification
+    /// annonçait chiffré (spec §10.0).
+    static func merged(known: Bool?, server: Bool) -> Bool {
+        known == true || server
+    }
+
     /// Une notification invalide est traitée comme chiffrée : ni son nom ni
     /// l'historique d'appels.
     var requiresE2EE: Bool? {
@@ -717,7 +724,9 @@ final class CallManager: NSObject, ObservableObject {
                     // passe alors ACTIVE pendant que cet appareil sonne encore. On
                     // conserve ce statut pour choisir leave plutôt que reject.
                     activeCall?.serverStatus = call.status?.lowercased()
-                    activeCall?.requiresE2EE = call.e2eeRequired
+                    activeCall?.requiresE2EE = IncomingCallE2EEExpectation.merged(
+                        known: active.requiresE2EE, server: call.e2eeRequired
+                    )
                     activeCall?.e2eeDescriptor = call.e2ee
                     return
                 }
@@ -826,7 +835,9 @@ final class CallManager: NSObject, ObservableObject {
         guard let serverCall else { throw CallError.connectionEnded }
         var reconciled = call
         reconciled.serverStatus = serverCall.status?.lowercased()
-        reconciled.requiresE2EE = serverCall.e2eeRequired
+        reconciled.requiresE2EE = IncomingCallE2EEExpectation.merged(
+            known: call.requiresE2EE, server: serverCall.e2eeRequired
+        )
         reconciled.e2eeDescriptor = serverCall.e2ee
         activeCall = reconciled
         return reconciled
@@ -983,9 +994,10 @@ final class CallManager: NSObject, ObservableObject {
             hasVideo: call.hasVideo,
             requiresE2EE: true
         )
+        // Le média s'arrête avant tout aller-retour réseau.
         Task {
-            await notifyBackendCallTerminated(call)
             await tearDown(notice: notice)
+            await notifyBackendCallTerminated(call)
         }
     }
 
@@ -1007,10 +1019,20 @@ final class CallManager: NSObject, ObservableObject {
                 hasVideo: call.hasVideo,
                 requiresE2EE: call.isOutgoing && call.requiresE2EE == true
             )
+        case .reconnected:
+            notice = EndNotice(
+                title: String(localized: "Appel interrompu"),
+                message: String(localized: "La connexion a été rétablie, mais un appel chiffré ne reprend pas après une reconnexion complète. Rappelle pour continuer."),
+                handle: call.handle,
+                conversationId: call.conversationId,
+                hasVideo: call.hasVideo,
+                requiresE2EE: call.isOutgoing && call.requiresE2EE == true
+            )
         }
+        // Le média s'arrête avant tout aller-retour réseau.
         Task {
-            await notifyBackendCallTerminated(call)
             await tearDown(notice: notice)
+            await notifyBackendCallTerminated(call)
         }
     }
 
@@ -1047,6 +1069,8 @@ final class CallManager: NSObject, ObservableObject {
         let now = Date()
         recentlyTerminatedCallIDs = recentlyTerminatedCallIDs.filter { now.timeIntervalSince($0.value) < 90 }
         recentlyTerminatedCallIDs[callId] = now
+        // Sur le disque aussi : un appel chiffré terminé ne se rejoint plus (v0.4.6).
+        E2EEV2CallNonceLedger.shared.markTerminated(callId: callId, nowMs: Int64(now.timeIntervalSince1970 * 1_000))
     }
 
     private func wasRecentlyTerminated(_ callId: String) -> Bool {

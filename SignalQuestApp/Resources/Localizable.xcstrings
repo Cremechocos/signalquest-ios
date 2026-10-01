@@ -23622,6 +23622,22 @@
         }
       }
     },
+    "La connexion a été rétablie, mais un appel chiffré ne reprend pas après une reconnexion complète. Rappelle pour continuer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The connection is back, but an encrypted call doesn't resume after a full reconnection. Call again to continue."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La connexion a été rétablie, mais un appel chiffré ne reprend pas après une reconnexion complète. Rappelle pour continuer."
+          }
+        }
+      }
+    },
     "La Réunion" : {
       "localizations" : {
         "en" : {
