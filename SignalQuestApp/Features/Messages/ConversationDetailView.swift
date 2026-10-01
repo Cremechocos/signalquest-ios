@@ -2616,10 +2616,15 @@ struct ConversationDetailView: View {
             Haptics.error()
             return
         }
-        switch CallLifecyclePolicy.outgoingCallMode(conversationE2EE: isE2EE, verifiedV2: verifiedV2) {
+        switch CallLifecyclePolicy.outgoingCallMode(
+            conversationE2EE: isE2EE, conversationV2: EncryptedConversationSurfaces.isV2(conversation), verifiedV2: verifiedV2
+        ) {
         case .standard: launchCall(mode: mode, endToEnd: false)
         case .endToEnd: launchCall(mode: mode, endToEnd: true)
         case .confirmTransportOnly: pendingTransportOnlyCall = mode
+        case .unavailable:
+            showActionError(String(localized: "Cette conversation n’accepte que des appels chiffrés de bout en bout, et ils ne sont pas encore prêts sur cet appareil. Réessaie plus tard."))
+            Haptics.error()
         }
     }
 

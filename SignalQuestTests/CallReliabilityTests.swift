@@ -194,9 +194,12 @@ final class CallReliabilityTests: XCTestCase {
     /// Dans une conversation chiffrée, un appel sans v2 n'est jamais silencieux :
     /// il demande une confirmation (décision du 30/09, E2E-02).
     func testEncryptedConversationAsksBeforeTransportOnlyCall() {
-        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: false, verifiedV2: false), .standard)
-        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: true, verifiedV2: false), .confirmTransportOnly)
-        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: true, verifiedV2: true), .endToEnd)
+        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: false, conversationV2: false, verifiedV2: false), .standard)
+        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: true, conversationV2: false, verifiedV2: false), .confirmTransportOnly)
+        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: true, conversationV2: false, verifiedV2: true), .endToEnd)
+        // §10.0 : une conversation v2 n'a jamais d'appel en transport seul.
+        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: true, conversationV2: true, verifiedV2: false), .unavailable)
+        XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: true, conversationV2: true, verifiedV2: true), .endToEnd)
     }
 
     func testE2EECallQAGateRequiresExplicitDebugFlagAndStrictLoopbackEndpoints() throws {

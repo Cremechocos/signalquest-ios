@@ -33,11 +33,13 @@ struct E2EEV2CertifiedDeviceSet: Equatable, Sendable {
     }
 
     /// §10.0 et §12 : tous les appareils certifiés et non mis à l'écart des
-    /// membres ont la capacité « appels vérifiés ». Un membre dont le paquet
+    /// membres ont la capacité « appels vérifiés ». Un navigateur ne compte pas
+    /// quand la conversation exclut les navigateurs. Un membre dont le paquet
     /// est refusé rend l'appel indisponible : ses appareils sont inconnus.
-    func supportsVerifiedCalls(nowMs: Int64) -> Bool {
+    func supportsVerifiedCalls(nowMs: Int64, excludesWeb: Bool) -> Bool {
         guard refusals.isEmpty else { return false }
-        let active = devicesByUser.values.flatMap { $0 }.filter { !$0.isSidelined(nowMs: nowMs) }
+        let active = devicesByUser.values.flatMap { $0 }
+            .filter { !$0.isSidelined(nowMs: nowMs) && !(excludesWeb && $0.platform == "web") }
         return !active.isEmpty && active.allSatisfy { $0.supports("calls", nowMs: nowMs) }
     }
 }

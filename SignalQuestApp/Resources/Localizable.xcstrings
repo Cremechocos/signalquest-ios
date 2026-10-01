@@ -369,6 +369,22 @@
         }
       }
     },
+    "Cette conversation n’accepte que des appels chiffrés de bout en bout, et ils ne sont pas encore prêts sur cet appareil. Réessaie plus tard." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This conversation only allows end-to-end encrypted calls, and they aren’t ready on this device yet. Try again later."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette conversation n’accepte que des appels chiffrés de bout en bout, et ils ne sont pas encore prêts sur cet appareil. Réessaie plus tard."
+          }
+        }
+      }
+    },
     "Clé de ton compte" : {
       "localizations" : {
         "en" : {

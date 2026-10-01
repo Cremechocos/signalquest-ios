@@ -63,7 +63,7 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         XCTAssertEqual(set.signingKey(userId: bruno.userId, deviceId: bruno.deviceId)?.x963Representation,
                        bruno.signing.publicKey.x963Representation)
         XCTAssertEqual(set.device(deviceId: carla.deviceId)?.userId, carla.userId)
-        XCTAssertTrue(set.supportsVerifiedCalls(nowMs: now))
+        XCTAssertTrue(set.supportsVerifiedCalls(nowMs: now, excludesWeb: false))
         XCTAssertEqual(try pins.pin(userId: bruno.userId, ownerNamespace: namespace)?.listVersion, 1)
         XCTAssertNil(try pins.pin(userId: bruno.userId, ownerNamespace: "ns-other"), "Épinglage propre au compte")
 
@@ -89,7 +89,7 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         server.serve(try bundle(impostor, version: 1, features: ["calls"]), for: bruno.userId)
         let set = try await directory.certifiedDevices(for: [bruno.userId])
         XCTAssertEqual(set.refusals, [bruno.userId: .uikChanged])
-        XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now), "Aucun appareil certifié : pas d'appel vérifié")
+        XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now, excludesWeb: false), "Aucun appareil certifié : pas d'appel vérifié")
     }
 
     func testADeviceIdCertifiedByTwoAccountsIsBelievedForNeither() async throws {
@@ -104,7 +104,7 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         ) { userId, _ in try server.response(for: userId) }
         let set = try await directory.certifiedDevices(for: [bruno.userId, carla.userId])
         XCTAssertNil(set.device(deviceId: bruno.deviceId), "Identifiant ambigu : aucun des deux n'est cru")
-        XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now))
+        XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now, excludesWeb: false))
     }
 
     func testOwnAccountMustCarryTheKeyHeldHere() async throws {
@@ -153,13 +153,13 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
 
     func testARefusedMemberMakesVerifiedCallsUnavailable() {
         let set = E2EEV2CertifiedDeviceSet(devicesByUser: [:], refusals: ["user_bruno_01J7ABCD2345": .uikChanged])
-        XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now))
+        XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now, excludesWeb: false))
     }
 
     func testVerifiedCallsNeedEveryActiveDeviceToSupportThem() {
-        func device(_ id: String, features: [String]?, issuedAtMs: Int64) -> E2EEV2CertifiedDevice {
+        func device(_ id: String, features: [String]?, issuedAtMs: Int64, platform: String = "ios") -> E2EEV2CertifiedDevice {
             E2EEV2CertifiedDevice(
-                userId: "user_bruno_01J7ABCD2345", deviceId: id, keyVersion: 1, platform: "ios",
+                userId: "user_bruno_01J7ABCD2345", deviceId: id, keyVersion: 1, platform: platform,
                 identityKeyB64: "", signingKeyB64: "", fingerprint: "",
                 capabilities: features.map {
                     E2EEV2CapabilitiesDocument(
@@ -174,17 +174,25 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         func set(_ devices: [E2EEV2CertifiedDevice]) -> E2EEV2CertifiedDeviceSet {
             E2EEV2CertifiedDeviceSet(devicesByUser: ["user_bruno_01J7ABCD2345": devices], refusals: [:])
         }
-        XCTAssertTrue(set([device("device_a_01J7ABCD2345", features: ["calls"], issuedAtMs: fresh)]).supportsVerifiedCalls(nowMs: now))
+        XCTAssertTrue(set([device("device_a_01J7ABCD2345", features: ["calls"], issuedAtMs: fresh)]).supportsVerifiedCalls(nowMs: now, excludesWeb: false))
         XCTAssertFalse(set([
             device("device_a_01J7ABCD2345", features: ["calls"], issuedAtMs: fresh),
             device("device_b_01J7ABCD2345", features: ["voice"], issuedAtMs: fresh),
-        ]).supportsVerifiedCalls(nowMs: now), "Un appareil actif sans « appels vérifiés » rend l'appel indisponible")
+        ]).supportsVerifiedCalls(nowMs: now, excludesWeb: false), "Un appareil actif sans « appels vérifiés » rend l'appel indisponible")
         XCTAssertTrue(set([
             device("device_a_01J7ABCD2345", features: ["calls"], issuedAtMs: fresh),
             device("device_b_01J7ABCD2345", features: ["voice"], issuedAtMs: stale),
             device("device_c_01J7ABCD2345", features: nil, issuedAtMs: fresh),
-        ]).supportsVerifiedCalls(nowMs: now), "Les appareils mis à l'écart ne comptent pas")
-        XCTAssertFalse(set([]).supportsVerifiedCalls(nowMs: now))
+        ]).supportsVerifiedCalls(nowMs: now, excludesWeb: false), "Les appareils mis à l'écart ne comptent pas")
+        XCTAssertFalse(set([]).supportsVerifiedCalls(nowMs: now, excludesWeb: false))
+
+        // §12 : un navigateur approuvé compte, sauf si la conversation exclut les navigateurs.
+        let phone = device("device_a_01J7ABCD2345", features: ["calls"], issuedAtMs: fresh)
+        let browser = device("device_w_01J7ABCD2345", features: ["voice"], issuedAtMs: fresh, platform: "web")
+        XCTAssertFalse(set([phone, browser]).supportsVerifiedCalls(nowMs: now, excludesWeb: false))
+        XCTAssertTrue(set([phone, browser]).supportsVerifiedCalls(nowMs: now, excludesWeb: true),
+                      "Navigateurs exclus : celui-ci ne rend plus l'appel indisponible")
+        XCTAssertFalse(set([browser]).supportsVerifiedCalls(nowMs: now, excludesWeb: true), "Il reste au moins un appareil")
     }
 
     // MARK: - Numéro de sécurité (§2.4, D.12)

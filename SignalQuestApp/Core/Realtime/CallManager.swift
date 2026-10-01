@@ -143,11 +143,15 @@ struct CallLifecyclePolicy {
         case standard
         case endToEnd
         case confirmTransportOnly
+        /// §10.0 : une conversation v2 n'appelle que chiffré. Tant que l'appel
+        /// chiffré n'est pas prêt, il est indisponible, jamais en transport seul.
+        case unavailable
     }
 
-    static func outgoingCallMode(conversationE2EE: Bool, verifiedV2: Bool) -> OutgoingCallMode {
-        guard conversationE2EE else { return .standard }
-        return verifiedV2 ? .endToEnd : .confirmTransportOnly
+    static func outgoingCallMode(conversationE2EE: Bool, conversationV2: Bool, verifiedV2: Bool) -> OutgoingCallMode {
+        guard conversationE2EE || conversationV2 else { return .standard }
+        if verifiedV2 { return .endToEnd }
+        return conversationV2 ? .unavailable : .confirmTransportOnly
     }
 
     /// Stable mapping so the same backend call cannot create several CallKit
