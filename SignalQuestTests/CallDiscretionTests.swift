@@ -141,6 +141,41 @@ final class CallDiscretionTests: XCTestCase {
         )
     }
 
+    private final class LockedTokenStore: TokenStore, @unchecked Sendable {
+        func string(for key: String) throws -> String? { throw CocoaError(.fileReadNoPermission) }
+        func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws {}
+        func remove(_ key: String) throws {}
+        func keys(withPrefix prefix: String) throws -> [String] { [] }
+        func removeAll() throws {}
+    }
+
+    /// §10.0 : un appel d'une conversation que l'appareil sait v2 n'est accepté
+    /// que chiffré, même si sa notification ne le dit pas ; illisible, l'état
+    /// compte comme v2.
+    func testAV2ConversationOnlyTakesEncryptedCalls() throws {
+        XCTAssertEqual(IncomingCallE2EEExpectation.requiresEncryption(announced: false, knownV2: true), true)
+        XCTAssertEqual(IncomingCallE2EEExpectation.requiresEncryption(announced: nil, knownV2: true), true)
+        XCTAssertEqual(IncomingCallE2EEExpectation.requiresEncryption(announced: true, knownV2: false), true)
+        XCTAssertEqual(IncomingCallE2EEExpectation.requiresEncryption(announced: false, knownV2: false), false)
+        XCTAssertNil(IncomingCallE2EEExpectation.requiresEncryption(announced: nil, knownV2: false))
+
+        let namespace = "ns-calls"
+        let store = E2EEV2ConversationStateStore(tokenStore: InMemoryTokenStore()) { _ in true }
+        try store.record(
+            .init(conversationId: "conv-v2-0000000001", creatorUserId: "user-alice-000001", creatorDeviceId: "device-alice-0001",
+                  manifestDigest: "digest", membershipChangeNumber: 2, membershipDigest: "membership", recordedAtMs: 0),
+            ownerNamespace: namespace
+        )
+        XCTAssertTrue(IncomingCallE2EEExpectation.knownV2(conversationId: "conv-v2-0000000001", ownerNamespace: namespace, stateStore: store))
+        XCTAssertFalse(IncomingCallE2EEExpectation.knownV2(conversationId: "conv-v1-0000000001", ownerNamespace: namespace, stateStore: store))
+        XCTAssertFalse(IncomingCallE2EEExpectation.knownV2(conversationId: nil, ownerNamespace: namespace, stateStore: store))
+        let locked = E2EEV2ConversationStateStore(tokenStore: LockedTokenStore()) { _ in true }
+        XCTAssertTrue(
+            IncomingCallE2EEExpectation.knownV2(conversationId: "conv-v1-0000000001", ownerNamespace: namespace, stateStore: locked),
+            "Illisible : compte comme v2"
+        )
+    }
+
     /// Relecture indépendante : le serveur peut rendre le chiffrement
     /// obligatoire, jamais le retirer à un appel annoncé chiffré.
     func testServerCannotDowngradeACallAnnouncedEncrypted() {

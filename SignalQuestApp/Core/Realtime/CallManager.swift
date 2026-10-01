@@ -229,6 +229,24 @@ enum IncomingCallE2EEExpectation: Equatable {
         known == true || server
     }
 
+    /// §10.0 : une conversation que cet appareil sait v2 n'accepte que des
+    /// appels chiffrés, même si la notification ou le serveur ne le disent pas.
+    static func requiresEncryption(announced: Bool?, knownV2: Bool) -> Bool? {
+        knownV2 ? true : announced
+    }
+
+    /// L'état « v2 » collant (§12) que garde l'appareil, lisible écran
+    /// verrouillé après le premier déverrouillage. Illisible, il compte comme
+    /// v2 : avant ce premier déverrouillage, aucun appel n'aboutit de toute façon.
+    static func knownV2(
+        conversationId: String?,
+        ownerNamespace: String,
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
+    ) -> Bool {
+        guard let conversationId, !conversationId.isEmpty else { return false }
+        return (try? stateStore.isV2(conversationId: conversationId, ownerNamespace: ownerNamespace)) ?? true
+    }
+
     /// Une notification invalide est traitée comme chiffrée : ni son nom ni
     /// l'historique d'appels.
     var requiresE2EE: Bool? {
@@ -582,9 +600,22 @@ final class CallManager: NSObject, ObservableObject {
         e2eeDescriptor: E2EEV2CallSessionDescriptor? = nil,
         completion: (() -> Void)?
     ) {
+        let conversation = knownConversation(conversationId)
+        let announced = requiresE2EE
+        let requiresE2EE = IncomingCallE2EEExpectation.requiresEncryption(
+            announced: announced,
+            knownV2: LocalAccountScope.currentUserId != nil && IncomingCallE2EEExpectation.knownV2(
+                conversationId: conversationId, ownerNamespace: LocalAccountScope.storageNamespace
+            )
+        )
+        // Un appel que la notification ne disait pas chiffré prend lui aussi son
+        // nom sur l'appareil.
+        let handle = requiresE2EE == true && announced != true
+            ? CallDiscretionPolicy.displayName(payloadName: handle, requiresE2EE: true, conversation: conversation)
+            : handle
         updateDiscretion(CallDiscretionPolicy.isDiscreet(
             requiresE2EE: requiresE2EE,
-            conversation: knownConversation(conversationId)
+            conversation: conversation
         ))
         let update = CXCallUpdate()
         update.remoteHandle = CXHandle(type: .generic, value: handle)
