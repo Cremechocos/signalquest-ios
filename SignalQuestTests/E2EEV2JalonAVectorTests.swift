@@ -35,7 +35,8 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
             ("device-list-v1", try buildDeviceList()),
             ("device-capabilities-v1", try buildCapabilities()),
             ("uik-wrap-v1", try buildUIKWrap()),
-            ("epoch-manifest-v1", try buildEpochManifest()),
+            ("epoch-manifest-v2", try buildEpochManifest()),
+            ("epoch-binding-v1", try buildEpochBinding()),
             ("membership-change-v1", try buildMembership()),
             ("message-ref-v1", buildMessageRef()),
             ("message-envelope-v2", try buildMessageEnvelopeV2()),
@@ -261,20 +262,25 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
     }
 
     func testEpochManifestVector() throws {
-        let v = try load("epoch-manifest-v1")
+        let v = try load("epoch-manifest-v2")
         let creator = try P256.Signing.PublicKey(x963Representation: b64(v, "creatorSigningPublicX963B64"))
         let recipients = try strings(v, "recipients")
         let rebuilt = E2EEV2EpochManifest.make(
             conversationId: try str(v, "conversationId"), epochNumber: try int(v, "epochNumber"),
             creatorUserId: try str(v, "creatorUserId"), creatorDeviceId: try str(v, "creatorDeviceId"),
             keyCommitmentB64: try str(v, "keyCommitmentB64"), recipients: recipients,
-            excludesWeb: try str(v, "excludesWeb") == "1", createdAtMs: try int64(v, "createdAtMs")
+            excludesWeb: try str(v, "excludesWeb") == "1",
+            membershipChangeNumber: try int(v, "membershipChangeNumber"),
+            membershipDigest: try str(v, "membershipDigest"), createdAtMs: try int64(v, "createdAtMs")
         )
         XCTAssertEqual(rebuilt.canonical, try str(v, "manifestUtf8"))
         XCTAssertEqual(rebuilt.recipientsDigest, try str(v, "recipientsDigest"))
         XCTAssertEqual(try E2EEV2EpochCrypto.keyCommitment(b64(v, "epochKeyB64")), try str(v, "keyCommitmentB64"))
         let signed = E2EEV2SignedString(canonical: try str(v, "manifestUtf8"), signatureB64: try str(v, "signatureDerB64"))
         XCTAssertEqual(try E2EEV2EpochManifest.verify(signed, recipients: recipients, creatorSigningKey: creator), rebuilt)
+        let wire = E2EEV2EpochManifest.json(signed, recipients: recipients)
+        XCTAssertEqual(E2EEV2EpochManifest.signed(from: wire)?.manifest, signed)
+        XCTAssertEqual(E2EEV2EpochManifest.signed(from: wire)?.recipients, recipients)
         try forEachNegative(v) { neg in
             let candidate = E2EEV2SignedString(
                 canonical: try str(neg, "manifestUtf8", default: v),
@@ -282,6 +288,53 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
             )
             let negRecipients = (neg["recipients"] as? [String]) ?? recipients
             XCTAssertThrowsError(try E2EEV2EpochManifest.verify(candidate, recipients: negRecipients, creatorSigningKey: creator), caseName(neg))
+        }
+    }
+
+    /// v0.4.7 : une époque engage l'état d'appartenance ; l'époque 1, sa genèse.
+    func testEpochBindingVector() throws {
+        let v = try load("epoch-binding-v1")
+        var keys: [String: P256.Signing.PublicKey] = [:]
+        for device in try XCTUnwrap(v["devices"] as? [[String: Any]]) {
+            keys["\(try str(device, "userId"))/\(try str(device, "deviceId"))"] =
+                try P256.Signing.PublicKey(x963Representation: b64(device, "signingPublicX963B64"))
+        }
+        func signedChain(_ items: [[String: Any]]) throws -> [E2EEV2SignedString] {
+            try items.map { E2EEV2SignedString(canonical: try str($0, "changeUtf8"), signatureB64: try str($0, "signatureDerB64")) }
+        }
+        let chain = try signedChain(try XCTUnwrap(v["chain"] as? [[String: Any]]))
+        let cases = try XCTUnwrap(v["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10)
+        for item in cases {
+            let name = caseName(item)
+            let outcome: String
+            do {
+                let signed = E2EEV2SignedString(canonical: try str(item, "manifestUtf8"), signatureB64: try str(item, "signatureDerB64"))
+                let recipients = try strings(item, "recipients")
+                let creatorFields = signed.canonical.components(separatedBy: "\n")
+                let creatorKey = try XCTUnwrap(keys["\(creatorFields[4])/\(creatorFields[5])"], name)
+                let manifest = try E2EEV2EpochManifest.verify(signed, recipients: recipients, creatorSigningKey: creatorKey)
+                let caseChain = try (item["chain"] as? [[String: Any]]).map(signedChain) ?? chain
+                let isGroup = try str(item, "isGroup", default: v) == "1"
+                let genesisLength = manifest.epochNumber == 1 ? manifest.membershipChangeNumber : try int(v, "genesisLength")
+                let previous = (item["previousMembershipChangeNumber"] as? String).flatMap(Int.init)
+                do {
+                    let state = try E2EEV2MembershipChain.apply(
+                        Array(caseChain.prefix(manifest.membershipChangeNumber)),
+                        conversationId: try str(v, "conversationId"), isGroup: isGroup,
+                        genesisLength: genesisLength, signingKey: { keys["\($0)/\($1)"] }
+                    )
+                    try E2EEV2EpochBinding.check(manifest, recipients: recipients, state: state, previousMembershipChangeNumber: previous)
+                    outcome = "ok"
+                } catch let failure as E2EEV2EpochBinding.Failure {
+                    outcome = "\(failure)"
+                } catch {
+                    outcome = "invalidChain"
+                }
+            } catch {
+                outcome = "invalidManifest"
+            }
+            XCTAssertEqual(outcome, try str(item, "expected"), name)
         }
     }
 
@@ -712,24 +765,62 @@ private extension E2EEV2JalonAVectorTests {
         ])
     }
 
-    func buildEpochManifest() throws -> VJ {
-        let creator = try signingKey(0x31)
-        let epochKey = Data((0..<32).map { UInt8(0x80 + $0) })
-        let commitment = try E2EEV2EpochCrypto.keyCommitment(epochKey)
-        let recipients = [
+    /// Chaîne du vecteur d'appartenance : Alice crée un groupe avec Bruno
+    /// (genèse, n° 1 à 3), puis exclut les navigateurs (n° 4).
+    func membershipChain(actor: P256.Signing.PrivateKey) throws -> [E2EEV2SignedString] {
+        let genesis = try E2EEV2MembershipChain.genesis(
+            conversationId: conversationId, memberIds: [userA, userB], adminIds: [userA], isGroup: true,
+            actor: .init(userId: userA, deviceId: deviceA1), createdAtMs: createdAtMs
+        )
+        let exclude = E2EEV2MembershipChange(
+            conversationId: conversationId, changeNumber: 4, action: "EXCLUDE_WEB_ON", targetUserId: "-",
+            actorUserId: userA, actorDeviceId: deviceA1,
+            previousChangeDigest: E2EEV2MembershipChange.digest(of: genesis[2].canonical), createdAtMs: createdAtMs + 3
+        )
+        return try (genesis + [exclude]).map { try E2EEV2SignedString.sign($0.canonical, with: actor) }
+    }
+
+    func manifestRecipients() throws -> [String] {
+        [
             E2EEV2EpochManifest.recipient(userId: userA, deviceId: deviceA1, platform: "ios", fingerprint: try deviceFingerprint(identitySeed: 0x21, signingSeed: 0x31)),
             E2EEV2EpochManifest.recipient(userId: userA, deviceId: deviceA2, platform: "web", fingerprint: try deviceFingerprint(identitySeed: 0x22, signingSeed: 0x32)),
             E2EEV2EpochManifest.recipient(userId: userB, deviceId: deviceB1, platform: "android", fingerprint: try deviceFingerprint(identitySeed: 0x23, signingSeed: 0x33)),
         ]
-        func manifest(_ excludesWeb: Bool, _ list: [String]) -> E2EEV2EpochManifest {
+    }
+
+    func buildEpochManifest() throws -> VJ {
+        let creator = try signingKey(0x31)
+        let epochKey = Data((0..<32).map { UInt8(0x80 + $0) })
+        let commitment = try E2EEV2EpochCrypto.keyCommitment(epochKey)
+        let recipients = try manifestRecipients()
+        let genesisDigest = E2EEV2MembershipChange.digest(of: try membershipChain(actor: creator)[2].canonical)
+        func manifest(_ excludesWeb: Bool, _ list: [String], membership: Int = 3) -> E2EEV2EpochManifest {
             E2EEV2EpochManifest.make(
                 conversationId: conversationId, epochNumber: 1, creatorUserId: userA, creatorDeviceId: deviceA1,
-                keyCommitmentB64: commitment, recipients: list, excludesWeb: excludesWeb, createdAtMs: createdAtMs
+                keyCommitmentB64: commitment, recipients: list, excludesWeb: excludesWeb,
+                membershipChangeNumber: membership, membershipDigest: genesisDigest, createdAtMs: createdAtMs + 3
             )
+        }
+        func negative(_ name: String, _ value: E2EEV2EpochManifest, recipients list: [String]? = nil) throws -> VJ {
+            var fields: [(String, VJ)] = [
+                ("case", .s(name)), ("manifestUtf8", .s(value.canonical)),
+                ("signatureDerB64", .s(try E2EEV2SignedString.sign(value.canonical, with: creator).signatureB64)),
+            ]
+            if let list { fields.append(("recipients", .a(list.map(VJ.s)))) }
+            return .o(fields)
         }
         let valid = manifest(false, recipients)
         let signed = try E2EEV2SignedString.sign(valid.canonical, with: creator)
-        let excludes = manifest(true, recipients)
+        let duplicate = [recipients[0], E2EEV2EpochManifest.recipient(
+            userId: userA, deviceId: deviceA1, platform: "ios", fingerprint: try deviceFingerprint(identitySeed: 0x24, signingSeed: 0x34)
+        )]
+        let unknownPlatform = [recipients[0], E2EEV2EpochManifest.recipient(
+            userId: userB, deviceId: deviceB1, platform: "macos", fingerprint: try deviceFingerprint(identitySeed: 0x23, signingSeed: 0x33)
+        )]
+        let version1 = [
+            E2EEV2EpochManifest.tag, "1", conversationId, "1", userA, deviceA1, commitment, "3",
+            valid.recipientsDigest, "0", String(createdAtMs + 3),
+        ].joined(separator: "\n")
         return .o([
             ("fixtureVersion", .s("1")), ("conversationId", .s(conversationId)), ("epochNumber", .s("1")),
             ("creatorUserId", .s(userA)), ("creatorDeviceId", .s(deviceA1)),
@@ -737,12 +828,111 @@ private extension E2EEV2JalonAVectorTests {
             ("creatorSigningPublicX963B64", .s(creator.publicKey.x963Representation.base64EncodedString())),
             ("epochKeyB64", .s(epochKey.base64EncodedString())), ("keyCommitmentB64", .s(commitment)),
             ("recipients", .a(recipients.map(VJ.s))), ("recipientsDigest", .s(valid.recipientsDigest)),
-            ("excludesWeb", .s("0")), ("createdAtMs", .s(String(createdAtMs))),
+            ("excludesWeb", .s("0")), ("membershipChangeNumber", .s("3")), ("membershipDigest", .s(genesisDigest)),
+            ("createdAtMs", .s(String(createdAtMs + 3))),
             ("manifestUtf8", .s(valid.canonical)), ("signatureDerB64", .s(signed.signatureB64)),
             ("negative", .a([
-                .o([("case", .s("excludesWebWithWebRecipient")), ("manifestUtf8", .s(excludes.canonical)), ("signatureDerB64", .s(try E2EEV2SignedString.sign(excludes.canonical, with: creator).signatureB64))]),
+                try negative("excludesWebWithWebRecipient", manifest(true, recipients)),
                 .o([("case", .s("recipientsMismatch")), ("recipients", .a([recipients[0], recipients[2]].map(VJ.s)))]),
                 .o([("case", .s("highS")), ("signatureDerB64", .s(try highS(signed.signatureB64)))]),
+                .o([("case", .s("formatVersion1")), ("manifestUtf8", .s(version1)), ("signatureDerB64", .s(try E2EEV2SignedString.sign(version1, with: creator).signatureB64))]),
+                try negative("membershipZero", manifest(false, recipients, membership: 0)),
+                try negative("duplicateDevice", manifest(false, duplicate), recipients: duplicate),
+                try negative("unknownPlatform", manifest(false, unknownPlatform), recipients: unknownPlatform),
+            ])),
+        ])
+    }
+
+    /// Liaison d'une époque à la chaîne d'appartenance (v0.4.7). Chaque cas :
+    /// relire `chain` (ou sa variante) jusqu'au n° du manifeste, genèse =
+    /// n° du manifeste pour l'époque 1, `genesisLength` sinon, puis vérifier.
+    func buildEpochBinding() throws -> VJ {
+        let alice = try signingKey(0x31), bruno = try signingKey(0x33)
+        let commitment = try E2EEV2EpochCrypto.keyCommitment(Data((0..<32).map { UInt8(0x80 + $0) }))
+        let chain = try membershipChain(actor: alice)
+        let recipients = try manifestRecipients()
+        let withoutWeb = [recipients[0], recipients[2]]
+        let carla = E2EEV2EpochManifest.recipient(
+            userId: "user_carla_01J7ABCD23456789", deviceId: "device_carla_ios_01J7ABCD2345", platform: "ios",
+            fingerprint: try deviceFingerprint(identitySeed: 0x25, signingSeed: 0x35)
+        )
+        func digest(_ list: [E2EEV2SignedString], _ number: Int) -> String {
+            E2EEV2MembershipChange.digest(of: list[number - 1].canonical)
+        }
+        func signedJSON(_ list: [E2EEV2SignedString]) -> VJ {
+            .a(list.map { .o([("changeUtf8", .s($0.canonical)), ("signatureDerB64", .s($0.signatureB64))]) })
+        }
+        func change(_ number: Int, _ action: String, _ target: String, actor: (String, String), previous: String?) -> E2EEV2MembershipChange {
+            E2EEV2MembershipChange(
+                conversationId: conversationId, changeNumber: number, action: action, targetUserId: target,
+                actorUserId: actor.0, actorDeviceId: actor.1,
+                previousChangeDigest: previous.map(E2EEV2MembershipChange.digest(of:)) ?? "-",
+                createdAtMs: createdAtMs + Int64(number - 1)
+            )
+        }
+        func item(
+            _ name: String, epoch: Int, membership: Int, digest membershipDigest: String, excludesWeb: Bool,
+            recipients list: [String], expected: String, creator: (String, String, P256.Signing.PrivateKey)? = nil,
+            extra: [(String, VJ)] = []
+        ) throws -> VJ {
+            let signer = creator ?? (userA, deviceA1, alice)
+            let manifest = E2EEV2EpochManifest.make(
+                conversationId: conversationId, epochNumber: epoch, creatorUserId: signer.0, creatorDeviceId: signer.1,
+                keyCommitmentB64: commitment, recipients: list, excludesWeb: excludesWeb,
+                membershipChangeNumber: membership, membershipDigest: membershipDigest,
+                createdAtMs: createdAtMs + 10 + Int64(epoch)
+            )
+            return .o([
+                ("case", .s(name)), ("manifestUtf8", .s(manifest.canonical)),
+                ("signatureDerB64", .s(try E2EEV2SignedString.sign(manifest.canonical, with: signer.2).signatureB64)),
+                ("recipients", .a(list.map(VJ.s))),
+            ] + extra + [("expected", .s(expected))])
+        }
+        // Genèse à deux appareils auteurs : Bruno signe son propre ADD.
+        let first = change(1, "ADD", userA, actor: (userA, deviceA1), previous: nil)
+        let second = change(2, "ADD", userB, actor: (userB, deviceB1), previous: first.canonical)
+        let third = change(3, "ROLE_ADMIN", userA, actor: (userA, deviceA1), previous: second.canonical)
+        let twoAuthors = [
+            try E2EEV2SignedString.sign(first.canonical, with: alice),
+            try E2EEV2SignedString.sign(second.canonical, with: bruno),
+            try E2EEV2SignedString.sign(third.canonical, with: alice),
+        ]
+        // Genèse non triée : Bruno ajouté avant Alice.
+        let unsortedChanges = [
+            change(1, "ADD", userB, actor: (userA, deviceA1), previous: nil),
+        ]
+        let unsorted2 = change(2, "ADD", userA, actor: (userA, deviceA1), previous: unsortedChanges[0].canonical)
+        let unsorted3 = change(3, "ROLE_ADMIN", userA, actor: (userA, deviceA1), previous: unsorted2.canonical)
+        let unsorted = try [unsortedChanges[0], unsorted2, unsorted3].map { try E2EEV2SignedString.sign($0.canonical, with: alice) }
+        return .o([
+            ("fixtureVersion", .s("1")), ("conversationId", .s(conversationId)), ("isGroup", .s("1")),
+            ("genesisLength", .s("3")),
+            ("devices", .a([
+                .o([("userId", .s(userA)), ("deviceId", .s(deviceA1)), ("signingPublicX963B64", .s(alice.publicKey.x963Representation.base64EncodedString()))]),
+                .o([("userId", .s(userB)), ("deviceId", .s(deviceB1)), ("signingPublicX963B64", .s(bruno.publicKey.x963Representation.base64EncodedString()))]),
+            ])),
+            ("chain", signedJSON(chain)),
+            ("cases", .a([
+                try item("genesis", epoch: 1, membership: 3, digest: digest(chain, 3), excludesWeb: false, recipients: recipients, expected: "ok"),
+                try item("secondEpoch", epoch: 2, membership: 4, digest: digest(chain, 4), excludesWeb: true, recipients: withoutWeb, expected: "ok",
+                         extra: [("previousMembershipChangeNumber", .s("3"))]),
+                try item("sameMembershipAsPrevious", epoch: 3, membership: 4, digest: digest(chain, 4), excludesWeb: true, recipients: withoutWeb, expected: "ok",
+                         extra: [("previousMembershipChangeNumber", .s("4"))]),
+                try item("wrongDigest", epoch: 1, membership: 3, digest: digest(chain, 2), excludesWeb: false, recipients: recipients, expected: "membershipMismatch"),
+                try item("recipientNotMember", epoch: 1, membership: 3, digest: digest(chain, 3), excludesWeb: false, recipients: recipients + [carla], expected: "recipientNotMember"),
+                try item("excludesWebMismatch", epoch: 2, membership: 4, digest: digest(chain, 4), excludesWeb: false, recipients: withoutWeb, expected: "excludesWebMismatch",
+                         extra: [("previousMembershipChangeNumber", .s("3"))]),
+                try item("membershipRegressed", epoch: 2, membership: 3, digest: digest(chain, 3), excludesWeb: false, recipients: recipients, expected: "membershipRegressed",
+                         extra: [("previousMembershipChangeNumber", .s("4"))]),
+                try item("genesisMismatch", epoch: 1, membership: 3, digest: digest(chain, 3), excludesWeb: false, recipients: recipients, expected: "genesisMismatch",
+                         creator: (userB, deviceB1, bruno)),
+                try item("genesisByTwoDevices", epoch: 1, membership: 3, digest: digest(twoAuthors, 3), excludesWeb: false, recipients: recipients, expected: "invalidChain",
+                         extra: [("chain", signedJSON(twoAuthors))]),
+                try item("unsortedGenesis", epoch: 1, membership: 3, digest: digest(unsorted, 3), excludesWeb: false, recipients: recipients, expected: "invalidChain",
+                         extra: [("chain", signedJSON(unsorted))]),
+                try item("roleAdminInDirect", epoch: 1, membership: 3, digest: digest(chain, 3), excludesWeb: false, recipients: recipients, expected: "invalidChain",
+                         extra: [("isGroup", .s("0"))]),
+                try item("membershipBeyondChain", epoch: 1, membership: 5, digest: digest(chain, 4), excludesWeb: true, recipients: withoutWeb, expected: "membershipMismatch"),
             ])),
         ])
     }

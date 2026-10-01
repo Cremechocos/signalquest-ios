@@ -1,0 +1,184 @@
+import CryptoKit
+import XCTest
+@testable import SignalQuest
+
+/// Lot 4 (plan 3) : chaîne d'appartenance signée (D.4) et état « v2 » collant
+/// d'une conversation (§12, v0.4.7).
+final class E2EEV2ConversationStateTests: XCTestCase {
+    private let conversationId = "conversation_01J7ABCD23456789"
+    private let alice = "user_alice_01J7ABCD23456789"
+    private let bruno = "user_bruno_01J7ABCD23456789"
+    private let carla = "user_carla_01J7ABCD23456789"
+    private let aliceDevice = "device_alice_ios_01J7ABCD2345"
+    private let brunoDevice = "device_bruno_android_01J7ABCD"
+    private let carlaDevice = "device_carla_ios_01J7ABCD2345"
+    private let createdAtMs: Int64 = 1_790_000_000_000
+
+    private var keys: [String: P256.Signing.PrivateKey] = [:]
+
+    override func setUp() {
+        super.setUp()
+        keys = [aliceDevice: P256.Signing.PrivateKey(), brunoDevice: P256.Signing.PrivateKey(), carlaDevice: P256.Signing.PrivateKey()]
+    }
+
+    // MARK: Chaîne d'appartenance
+
+    func testGenesisReproducesTheMembershipVector() throws {
+        let vector = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(contentsOf: vectorURL("membership-change-v1"))) as? [String: Any])
+        let chain = try XCTUnwrap(vector["chain"] as? [[String: Any]]).compactMap { $0["changeUtf8"] as? String }
+        let genesis = try E2EEV2MembershipChain.genesis(
+            conversationId: conversationId, memberIds: [bruno, alice], adminIds: [alice], isGroup: true,
+            actor: .init(userId: alice, deviceId: aliceDevice), createdAtMs: createdAtMs
+        )
+        XCTAssertEqual(genesis.map(\.canonical), Array(chain.prefix(3)), "ADD triés par userId, puis ROLE_ADMIN")
+
+        let excluding = try E2EEV2MembershipChain.genesis(
+            conversationId: conversationId, memberIds: [bruno, alice], adminIds: [alice], isGroup: true, excludesWeb: true,
+            actor: .init(userId: alice, deviceId: aliceDevice), createdAtMs: createdAtMs
+        )
+        XCTAssertEqual(excluding.map(\.canonical), chain, "Navigateurs exclus dès l'époque 1 : EXCLUDE_WEB_ON en dernier")
+    }
+
+    func testGenesisBuilderRefusesInvalidShapes() {
+        let actor = E2EEV2MembershipChain.Actor(userId: alice, deviceId: aliceDevice)
+        func build(_ members: [String], _ admins: [String], group: Bool) -> Bool {
+            (try? E2EEV2MembershipChain.genesis(
+                conversationId: conversationId, memberIds: members, adminIds: admins, isGroup: group,
+                actor: actor, createdAtMs: createdAtMs
+            )) != nil
+        }
+        XCTAssertTrue(build([alice, bruno], [], group: false))
+        XCTAssertFalse(build([alice, bruno], [alice], group: false), "Pas d'administrateur en tête-à-tête")
+        XCTAssertFalse(build([alice, bruno, carla], [], group: false), "Un tête-à-tête a deux membres")
+        XCTAssertFalse(build([alice, bruno], [], group: true), "Un groupe a au moins un administrateur")
+        XCTAssertFalse(build([bruno, carla], [bruno], group: true), "L'auteur fait partie des membres")
+        XCTAssertFalse(build([alice, bruno], [carla], group: true), "Un administrateur est membre")
+        XCTAssertFalse(build([alice, alice, bruno], [alice], group: true), "Pas de doublon")
+    }
+
+    func testGroupChainFollowsTheAdminRules() throws {
+        let genesis = try signedGenesis(members: [alice, bruno, carla], admins: [alice], group: true, by: aliceDevice, user: alice)
+        var state = try apply(genesis, group: true, genesisLength: 3 + 1)
+        XCTAssertEqual(state.members, [alice, bruno, carla])
+        XCTAssertEqual(state.admins, [alice])
+
+        XCTAssertThrowsError(try apply([next(state, "REMOVE", carla, by: bruno, brunoDevice)], to: state, group: true, genesisLength: 4),
+                             "Un membre non administrateur ne retire personne")
+        XCTAssertThrowsError(try apply([next(state, "REMOVE", alice, by: alice, aliceDevice)], to: state, group: true, genesisLength: 4),
+                             "On part par LEAVE, pas en se retirant")
+        state = try apply([next(state, "ROLE_ADMIN", bruno, by: alice, aliceDevice)], to: state, group: true, genesisLength: 4)
+        state = try apply([next(state, "REMOVE", carla, by: bruno, brunoDevice)], to: state, group: true, genesisLength: 4)
+        XCTAssertEqual(state.members, [alice, bruno])
+        XCTAssertThrowsError(try apply([next(state, "LEAVE", carla, by: carla, carlaDevice)], to: state, group: true, genesisLength: 4),
+                             "Un ancien membre n'agit plus")
+        state = try apply([next(state, "LEAVE", bruno, by: bruno, brunoDevice)], to: state, group: true, genesisLength: 4)
+        XCTAssertEqual(state.admins, [alice])
+
+        let forged = next(state, "ADD", carla, by: alice, aliceDevice)
+        let tampered = E2EEV2SignedString(canonical: forged.canonical, signatureB64: next(state, "ADD", bruno, by: alice, aliceDevice).signatureB64)
+        XCTAssertThrowsError(try apply([tampered], to: state, group: true, genesisLength: 4), "Signature d'un autre changement")
+        XCTAssertThrowsError(
+            try E2EEV2MembershipChain.apply([forged], to: state, conversationId: conversationId, isGroup: true, genesisLength: 4) { _, _ in nil },
+            "Appareil inconnu"
+        )
+    }
+
+    /// Un membre non administrateur qui a migré un groupe ne peut pas, plus
+    /// tard, se nommer administrateur : la genèse s'arrête au n° de l'époque 1.
+    func testMigrationAuthorCannotLaterGrantHimselfAdmin() throws {
+        let genesis = try signedGenesis(members: [alice, bruno], admins: [alice], group: true, by: brunoDevice, user: bruno)
+        let state = try apply(genesis, group: true, genesisLength: 3)
+        XCTAssertEqual(state.admins, [alice])
+        let grant = next(state, "ROLE_ADMIN", bruno, by: bruno, brunoDevice)
+        XCTAssertThrowsError(try apply([grant], to: state, group: true, genesisLength: 3))
+    }
+
+    func testDirectConversationRules() throws {
+        let genesis = try signedGenesis(members: [alice, bruno], admins: [], group: false, by: aliceDevice, user: alice)
+        var state = try apply(genesis, group: false, genesisLength: 2)
+        state = try apply([next(state, "EXCLUDE_WEB_ON", "-", by: bruno, brunoDevice)], to: state, group: false, genesisLength: 2)
+        XCTAssertTrue(state.excludesWeb, "En tête-à-tête, les deux membres règlent les navigateurs")
+        XCTAssertThrowsError(try apply([next(state, "ADD", carla, by: alice, aliceDevice)], to: state, group: false, genesisLength: 2),
+                             "On n'ajoute personne à un tête-à-tête")
+    }
+
+    // MARK: État collant
+
+    func testStickyStateNeverRegressesAndRefusesASecondGenesis() throws {
+        let tokens = InMemoryTokenStore()
+        let namespace = LocalAccountScope.storageNamespace(for: "user:\(alice)")
+        let store = E2EEV2ConversationStateStore(tokenStore: tokens, allowsOwner: { $0 == namespace })
+        XCTAssertFalse(try store.isV2(conversationId: conversationId, ownerNamespace: namespace))
+
+        let genesis = E2EEV2ConversationStateStore.Genesis(
+            conversationId: conversationId, creatorUserId: alice, creatorDeviceId: aliceDevice,
+            manifestDigest: E2EEV2Canonical.sha256B64URL(Data("manifeste 1".utf8)),
+            membershipChangeNumber: 3, recordedAtMs: createdAtMs
+        )
+        try store.record(genesis, ownerNamespace: namespace)
+        XCTAssertTrue(try store.isV2(conversationId: conversationId, ownerNamespace: namespace))
+        XCTAssertEqual(try store.record(genesis, ownerNamespace: namespace), genesis, "Le même manifeste : sans effet")
+
+        let other = E2EEV2ConversationStateStore.Genesis(
+            conversationId: conversationId, creatorUserId: bruno, creatorDeviceId: brunoDevice,
+            manifestDigest: E2EEV2Canonical.sha256B64URL(Data("manifeste 2".utf8)),
+            membershipChangeNumber: 4, recordedAtMs: createdAtMs + 1
+        )
+        XCTAssertThrowsError(try store.record(other, ownerNamespace: namespace)) {
+            XCTAssertEqual($0 as? E2EEV2ConversationStateStore.Failure, .genesisConflict)
+        }
+        XCTAssertThrowsError(try store.record(genesis, ownerNamespace: "autre-compte")) {
+            XCTAssertEqual($0 as? E2EEV2ConversationStateStore.Failure, .otherAccount)
+        }
+
+        let key = try XCTUnwrap(try tokens.keys(withPrefix: E2EEV2ConversationStateStore.prefix(ownerNamespace: namespace)).first)
+        try tokens.set("illisible", for: key, accessibility: .afterFirstUnlock)
+        XCTAssertTrue(try store.isV2(conversationId: conversationId, ownerNamespace: namespace), "Illisible : toujours v2")
+        XCTAssertThrowsError(try store.genesis(conversationId: conversationId, ownerNamespace: namespace))
+
+        try E2EEV2VaultBoundary.purge(store: tokens, ownerScopeId: "user:\(alice)")
+        XCTAssertFalse(try store.isV2(conversationId: conversationId, ownerNamespace: namespace), "Effacé avec le compte")
+    }
+
+    // MARK: Outils
+
+    private func signedGenesis(members: [String], admins: [String], group: Bool, by device: String, user: String) throws -> [E2EEV2SignedString] {
+        try E2EEV2MembershipChain.genesis(
+            conversationId: conversationId, memberIds: members, adminIds: admins, isGroup: group,
+            actor: .init(userId: user, deviceId: device), createdAtMs: createdAtMs
+        ).map { try E2EEV2SignedString.sign($0.canonical, with: XCTUnwrap(keys[device])) }
+    }
+
+    private func next(_ state: E2EEV2MembershipState, _ action: String, _ target: String, by user: String, _ device: String) -> E2EEV2SignedString {
+        let change = E2EEV2MembershipChange(
+            conversationId: conversationId, changeNumber: state.changeNumber + 1, action: action, targetUserId: target,
+            actorUserId: user, actorDeviceId: device,
+            previousChangeDigest: state.lastCanonical.map(E2EEV2MembershipChange.digest(of:)) ?? "-",
+            createdAtMs: createdAtMs + Int64(state.changeNumber)
+        )
+        // Une clé absente échoue au test, pas au chaînage.
+        return (try? E2EEV2SignedString.sign(change.canonical, with: keys[device] ?? P256.Signing.PrivateKey()))
+            ?? E2EEV2SignedString(canonical: change.canonical, signatureB64: "")
+    }
+
+    private func apply(
+        _ changes: [E2EEV2SignedString],
+        to state: E2EEV2MembershipState = E2EEV2MembershipState(),
+        group: Bool,
+        genesisLength: Int
+    ) throws -> E2EEV2MembershipState {
+        let devices: [String: String] = [aliceDevice: alice, brunoDevice: bruno, carlaDevice: carla]
+        return try E2EEV2MembershipChain.apply(
+            changes, to: state, conversationId: conversationId, isGroup: group, genesisLength: genesisLength
+        ) { userId, deviceId in
+            devices[deviceId] == userId ? self.keys[deviceId]?.publicKey : nil
+        }
+    }
+
+    private func vectorURL(_ name: String) -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("contracts/e2ee-v2/\(name).json")
+    }
+}

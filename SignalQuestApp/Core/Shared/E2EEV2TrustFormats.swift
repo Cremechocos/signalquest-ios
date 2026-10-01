@@ -405,6 +405,171 @@ struct E2EEV2MembershipChange: Equatable, Sendable {
             actorUserId: f[6], actorDeviceId: f[7], previousChangeDigest: f[8], createdAtMs: createdAt
         )
     }
+
+    /// `{"change": "<chaîne>", "signatureB64": "…"}` (D.4).
+    static func json(_ signed: E2EEV2SignedString) -> E2EEV2JSON {
+        .object(["change": .string(signed.canonical), "signatureB64": .string(signed.signatureB64)])
+    }
+
+    static func signed(from json: E2EEV2JSON) -> E2EEV2SignedString? {
+        guard let object = json.objectValue, Set(object.keys) == ["change", "signatureB64"],
+              let change = object["change"]?.stringValue,
+              let signature = object["signatureB64"]?.stringValue else { return nil }
+        return E2EEV2SignedString(canonical: change, signatureB64: signature)
+    }
+}
+
+/// Ce que fixe la chaîne des changements signés d'une conversation (D.4).
+struct E2EEV2MembershipState: Equatable, Sendable {
+    var members: Set<String> = []
+    var admins: Set<String> = []
+    var excludesWeb = false
+    /// Dernier changement accepté, auquel le suivant se chaîne.
+    var lastCanonical: String?
+    var changeNumber = 0
+    /// Appareil qui a signé la genèse.
+    var genesisActor: E2EEV2MembershipChain.Actor?
+}
+
+/// Genèse et relecture de la chaîne d'appartenance (D.4, §2.5, §14.2).
+enum E2EEV2MembershipChain {
+    struct Actor: Equatable, Sendable {
+        let userId: String
+        let deviceId: String
+    }
+
+    /// Un `ADD` par membre, auteur compris, dans l'ordre des `userId` (octets
+    /// UTF-8) ; puis, dans un groupe, un `ROLE_ADMIN` par administrateur : le
+    /// créateur, ou les administrateurs v1 d'une migration (§14.2) ; enfin,
+    /// si les navigateurs sont exclus dès l'époque 1, `EXCLUDE_WEB_ON`.
+    static func genesis(
+        conversationId: String,
+        memberIds: [String],
+        adminIds: [String],
+        isGroup: Bool,
+        excludesWeb: Bool = false,
+        actor: Actor,
+        createdAtMs: Int64
+    ) throws -> [E2EEV2MembershipChange] {
+        let members = memberIds.sorted(by: precedes), admins = adminIds.sorted(by: precedes)
+        guard Set(members).count == members.count, Set(admins).count == admins.count,
+              members.contains(actor.userId), Set(admins).isSubset(of: Set(members)),
+              isGroup ? !admins.isEmpty : (admins.isEmpty && members.count == 2),
+              ([conversationId, actor.deviceId] + members).allSatisfy(E2EEV2Canonical.isOpaque) else {
+            throw E2EEV2TrustFormatError.invalidField
+        }
+        var changes: [E2EEV2MembershipChange] = []
+        let steps = members.map { ("ADD", $0) } + admins.map { ("ROLE_ADMIN", $0) }
+            + (excludesWeb ? [("EXCLUDE_WEB_ON", "-")] : [])
+        for (action, target) in steps {
+            changes.append(E2EEV2MembershipChange(
+                conversationId: conversationId, changeNumber: changes.count + 1, action: action,
+                targetUserId: target, actorUserId: actor.userId, actorDeviceId: actor.deviceId,
+                previousChangeDigest: changes.last.map { E2EEV2MembershipChange.digest(of: $0.canonical) } ?? "-",
+                createdAtMs: createdAtMs + Int64(changes.count)
+            ))
+        }
+        return changes
+    }
+
+    /// Applique des changements signés, dans l'ordre, à l'état connu. La
+    /// genèse (changements 1 à `genesisLength`, que fixe l'époque 1) vient d'un
+    /// seul appareil et précède tout administrateur ; la suite respecte les
+    /// autorisations de D.4.
+    static func apply(
+        _ signed: [E2EEV2SignedString],
+        to state: E2EEV2MembershipState = E2EEV2MembershipState(),
+        conversationId: String,
+        isGroup: Bool,
+        genesisLength: Int,
+        signingKey: (_ userId: String, _ deviceId: String) -> P256.Signing.PublicKey?
+    ) throws -> E2EEV2MembershipState {
+        guard genesisLength >= 1 else { throw E2EEV2TrustFormatError.invalidField }
+        var state = state
+        for item in signed {
+            let change = try E2EEV2MembershipChange.parse(item.canonical, previousCanonical: state.lastCanonical)
+            guard change.conversationId == conversationId, change.changeNumber == state.changeNumber + 1 else {
+                throw E2EEV2TrustFormatError.invalidField
+            }
+            guard let key = signingKey(change.actorUserId, change.actorDeviceId), item.verify(with: key) else {
+                throw E2EEV2TrustFormatError.invalidSignature
+            }
+            if change.changeNumber <= genesisLength {
+                try applyGenesis(change, to: &state, isGroup: isGroup)
+                if change.changeNumber == genesisLength { try checkGenesis(state, isGroup: isGroup) }
+            } else {
+                try applyRule(change, to: &state, isGroup: isGroup)
+            }
+            state.lastCanonical = item.canonical
+            state.changeNumber = change.changeNumber
+        }
+        return state
+    }
+
+    private static func applyGenesis(
+        _ change: E2EEV2MembershipChange,
+        to state: inout E2EEV2MembershipState,
+        isGroup: Bool
+    ) throws {
+        let actor = Actor(userId: change.actorUserId, deviceId: change.actorDeviceId)
+        if change.changeNumber == 1 { state.genesisActor = actor }
+        guard actor == state.genesisActor else { throw E2EEV2TrustFormatError.invalidField }
+        let target = change.targetUserId
+        switch change.action {
+        case "ADD" where state.admins.isEmpty && !state.excludesWeb
+            && state.members.allSatisfy({ precedes($0, target) }):
+            state.members.insert(target)
+        case "ROLE_ADMIN" where isGroup && !state.excludesWeb && state.members.contains(target)
+            && state.admins.allSatisfy({ precedes($0, target) }):
+            state.admins.insert(target)
+        // Exclusion des navigateurs dès l'époque 1 : en dernier.
+        case "EXCLUDE_WEB_ON" where !state.excludesWeb
+            && (isGroup ? !state.admins.isEmpty : state.members.count == 2):
+            state.excludesWeb = true
+        default:
+            throw E2EEV2TrustFormatError.invalidField
+        }
+    }
+
+    private static func checkGenesis(_ state: E2EEV2MembershipState, isGroup: Bool) throws {
+        guard let actor = state.genesisActor, state.members.contains(actor.userId),
+              isGroup ? !state.admins.isEmpty : (state.admins.isEmpty && state.members.count == 2) else {
+            throw E2EEV2TrustFormatError.invalidField
+        }
+    }
+
+    private static func applyRule(
+        _ change: E2EEV2MembershipChange,
+        to state: inout E2EEV2MembershipState,
+        isGroup: Bool
+    ) throws {
+        let actor = change.actorUserId, target = change.targetUserId
+        let isAdmin = state.admins.contains(actor)
+        guard state.members.contains(actor) else { throw E2EEV2TrustFormatError.invalidField }
+        switch change.action {
+        case "ADD" where isGroup && isAdmin && !state.members.contains(target):
+            state.members.insert(target)
+        case "REMOVE" where isGroup && isAdmin && target != actor && state.members.contains(target):
+            state.members.remove(target)
+            state.admins.remove(target)
+        case "LEAVE":
+            state.members.remove(actor)
+            state.admins.remove(actor)
+        case "ROLE_ADMIN" where isGroup && isAdmin && state.members.contains(target):
+            state.admins.insert(target)
+        case "ROLE_MEMBER" where isGroup && isAdmin && state.admins.contains(target):
+            state.admins.remove(target)
+        // En tête-à-tête, l'exclusion des navigateurs est ouverte aux deux membres.
+        case "EXCLUDE_WEB_ON" where !isGroup || isAdmin, "EXCLUDE_WEB_OFF" where !isGroup || isAdmin:
+            state.excludesWeb = change.action == "EXCLUDE_WEB_ON"
+        default:
+            throw E2EEV2TrustFormatError.invalidField
+        }
+    }
+
+    private static func precedes(_ lhs: String, _ rhs: String) -> Bool {
+        Array(lhs.utf8).lexicographicallyPrecedes(Array(rhs.utf8))
+    }
 }
 
 // MARK: D.5 Document de capacités
@@ -488,9 +653,14 @@ struct E2EEV2CapabilitiesDocument: Equatable, Sendable {
 
 // MARK: §3.5 et D.6 Manifeste d'époque
 
+/// Manifeste d'époque, format 2 (v0.4.7) : la liste des destinataires et
+/// l'état d'appartenance sur lequel elle repose.
 struct E2EEV2EpochManifest: Equatable, Sendable {
     static let tag = "SQ-E2EE-V2-EPOCH-MANIFEST"
+    static let version = "2"
     static let recipientsTag = "SQ-E2EE-V2-EPOCH-RECIPIENTS"
+    /// Une époque vise au plus 500 appareils (§3.1).
+    static let maxRecipients = 500
 
     let conversationId: String
     let epochNumber: Int
@@ -500,7 +670,32 @@ struct E2EEV2EpochManifest: Equatable, Sendable {
     let recipientCount: Int
     let recipientsDigest: String
     let excludesWeb: Bool
+    /// Dernier changement d'appartenance pris en compte ; pour l'époque 1, la
+    /// fin de la genèse.
+    let membershipChangeNumber: Int
+    /// `previousChangeDigest` qu'aurait le changement suivant.
+    let membershipDigest: String
     let createdAtMs: Int64
+
+    /// Ligne de destinataire, lue strictement : quatre champs, plateforme de
+    /// l'ensemble fermé (D.2), empreinte au format d'un condensat.
+    struct Recipient: Hashable, Sendable {
+        let userId: String
+        let deviceId: String
+        let platform: String
+        let fingerprint: String
+
+        var line: String { E2EEV2EpochManifest.recipient(userId: userId, deviceId: deviceId, platform: platform, fingerprint: fingerprint) }
+
+        static func parse(_ line: String) -> Recipient? {
+            let f = line.components(separatedBy: "\n")
+            guard f.count == 4, E2EEV2Canonical.isOpaque(f[0]), E2EEV2Canonical.isOpaque(f[1]),
+                  E2EEV2DeviceCertificate.platforms.contains(f[2]), E2EEV2ApprovalV2.isDigest(f[3]) else {
+                return nil
+            }
+            return Recipient(userId: f[0], deviceId: f[1], platform: f[2], fingerprint: f[3])
+        }
+    }
 
     static func recipient(userId: String, deviceId: String, platform: String, fingerprint: String) -> String {
         [userId, deviceId, platform, fingerprint].joined(separator: "\n")
@@ -508,9 +703,9 @@ struct E2EEV2EpochManifest: Equatable, Sendable {
 
     var canonical: String {
         [
-            Self.tag, "1", conversationId, String(epochNumber), creatorUserId, creatorDeviceId,
+            Self.tag, Self.version, conversationId, String(epochNumber), creatorUserId, creatorDeviceId,
             keyCommitmentB64, String(recipientCount), recipientsDigest, excludesWeb ? "1" : "0",
-            String(createdAtMs),
+            String(membershipChangeNumber), membershipDigest, String(createdAtMs),
         ].joined(separator: "\n")
     }
 
@@ -522,6 +717,8 @@ struct E2EEV2EpochManifest: Equatable, Sendable {
         keyCommitmentB64: String,
         recipients: [String],
         excludesWeb: Bool,
+        membershipChangeNumber: Int,
+        membershipDigest: String,
         createdAtMs: Int64
     ) -> E2EEV2EpochManifest {
         E2EEV2EpochManifest(
@@ -529,40 +726,130 @@ struct E2EEV2EpochManifest: Equatable, Sendable {
             creatorDeviceId: creatorDeviceId, keyCommitmentB64: keyCommitmentB64,
             recipientCount: recipients.count,
             recipientsDigest: E2EEV2Canonical.listDigest(tag: recipientsTag, lines: recipients),
-            excludesWeb: excludesWeb, createdAtMs: createdAtMs
+            excludesWeb: excludesWeb, membershipChangeNumber: membershipChangeNumber,
+            membershipDigest: membershipDigest, createdAtMs: createdAtMs
         )
     }
 
+    /// Signature, 13 champs, lignes strictes, un appareil par ligne, condensat
+    /// de la liste ; aucun navigateur quand ils sont exclus. Toute autre
+    /// version du format est refusée.
     static func verify(
         _ signed: E2EEV2SignedString,
         recipients: [String],
         creatorSigningKey: P256.Signing.PublicKey
     ) throws -> E2EEV2EpochManifest {
         guard signed.verify(with: creatorSigningKey) else { throw E2EEV2TrustFormatError.invalidSignature }
-        guard let f = E2EEV2Canonical.split(signed.canonical, tag: tag, version: "1", fieldCount: 11),
+        guard let f = E2EEV2Canonical.split(signed.canonical, tag: tag, version: version, fieldCount: 13),
               E2EEV2Canonical.isOpaque(f[2]),
               E2EEV2Canonical.isDecimal(f[3]), let epochNumber = Int(f[3]), epochNumber >= 1,
               E2EEV2Canonical.isOpaque(f[4]), E2EEV2Canonical.isOpaque(f[5]),
               Data(base64Encoded: f[6])?.count == 32,
-              E2EEV2Canonical.isDecimal(f[7]), let count = Int(f[7]),
+              E2EEV2Canonical.isDecimal(f[7]), let count = Int(f[7]), (1...maxRecipients).contains(count),
               f[9] == "0" || f[9] == "1",
-              E2EEV2Canonical.isDecimal(f[10]), let createdAt = Int64(f[10]) else {
+              E2EEV2Canonical.isDecimal(f[10]), let membershipNumber = Int(f[10]), membershipNumber >= 1,
+              E2EEV2ApprovalV2.isDigest(f[11]),
+              E2EEV2Canonical.isDecimal(f[12]), let createdAt = Int64(f[12]) else {
             throw E2EEV2TrustFormatError.invalidField
         }
         let excludesWeb = f[9] == "1"
-        guard count == recipients.count, Set(recipients).count == recipients.count,
+        let lines = recipients.compactMap(Recipient.parse)
+        guard lines.count == recipients.count, Set(lines.map(\.deviceId)).count == lines.count,
+              !(excludesWeb && lines.contains { $0.platform == "web" }) else {
+            throw E2EEV2TrustFormatError.invalidField
+        }
+        guard count == recipients.count,
               f[8] == E2EEV2Canonical.listDigest(tag: recipientsTag, lines: recipients) else {
             throw E2EEV2TrustFormatError.digestMismatch
-        }
-        // Un manifeste qui exclut les navigateurs ne peut pas en viser un.
-        if excludesWeb, recipients.contains(where: { $0.components(separatedBy: "\n").dropFirst(2).first == "web" }) {
-            throw E2EEV2TrustFormatError.invalidField
         }
         return E2EEV2EpochManifest(
             conversationId: f[2], epochNumber: epochNumber, creatorUserId: f[4], creatorDeviceId: f[5],
             keyCommitmentB64: f[6], recipientCount: count, recipientsDigest: f[8],
-            excludesWeb: excludesWeb, createdAtMs: createdAt
+            excludesWeb: excludesWeb, membershipChangeNumber: membershipNumber, membershipDigest: f[11],
+            createdAtMs: createdAt
         )
+    }
+
+    /// `{"manifest": "<chaîne>", "signatureB64": "…", "recipients": ["<ligne>", …]}` (D.6).
+    static func json(_ signed: E2EEV2SignedString, recipients: [String]) -> E2EEV2JSON {
+        .object([
+            "manifest": .string(signed.canonical),
+            "signatureB64": .string(signed.signatureB64),
+            "recipients": .array(recipients.map(E2EEV2JSON.string)),
+        ])
+    }
+
+    static func signed(from json: E2EEV2JSON) -> (manifest: E2EEV2SignedString, recipients: [String])? {
+        guard let object = json.objectValue, Set(object.keys) == ["manifest", "signatureB64", "recipients"],
+              let manifest = object["manifest"]?.stringValue,
+              let signature = object["signatureB64"]?.stringValue,
+              let items = object["recipients"]?.arrayValue else { return nil }
+        let recipients = items.compactMap(\.stringValue)
+        guard recipients.count == items.count else { return nil }
+        return (E2EEV2SignedString(canonical: manifest, signatureB64: signature), recipients)
+    }
+}
+
+/// Ce qu'engage une époque (§3.5, v0.4.7) : l'état d'appartenance sur lequel
+/// repose sa liste de destinataires et, pour l'époque 1, la genèse.
+enum E2EEV2EpochBinding {
+    enum Failure: Error, Equatable {
+        /// N° ou condensat différent de la chaîne relue jusqu'à ce n°.
+        case membershipMismatch
+        /// N° inférieur à celui d'une époque déjà acceptée.
+        case membershipRegressed
+        /// Époque 1 signée par un autre appareil que celui de la genèse.
+        case genesisMismatch
+        case creatorNotMember
+        case recipientNotMember
+        case excludesWebMismatch
+    }
+
+    /// `state` : la chaîne relue jusqu'au n° `membershipChangeNumber` du
+    /// manifeste. Une chaîne locale plus courte se synchronise d'abord ; un
+    /// n° égal à celui de l'époque précédente reste permis.
+    static func check(
+        _ manifest: E2EEV2EpochManifest,
+        recipients: [String],
+        state: E2EEV2MembershipState,
+        previousMembershipChangeNumber: Int?
+    ) throws {
+        guard state.changeNumber == manifest.membershipChangeNumber, let last = state.lastCanonical,
+              E2EEV2MembershipChange.digest(of: last) == manifest.membershipDigest else {
+            throw Failure.membershipMismatch
+        }
+        if let previous = previousMembershipChangeNumber, manifest.membershipChangeNumber < previous {
+            throw Failure.membershipRegressed
+        }
+        if manifest.epochNumber == 1,
+           state.genesisActor != E2EEV2MembershipChain.Actor(userId: manifest.creatorUserId, deviceId: manifest.creatorDeviceId) {
+            throw Failure.genesisMismatch
+        }
+        guard state.members.contains(manifest.creatorUserId) else { throw Failure.creatorNotMember }
+        let lines = recipients.compactMap(E2EEV2EpochManifest.Recipient.parse)
+        guard lines.count == recipients.count, lines.allSatisfy({ state.members.contains($0.userId) }) else {
+            throw Failure.recipientNotMember
+        }
+        guard manifest.excludesWeb == state.excludesWeb else { throw Failure.excludesWebMismatch }
+    }
+
+    /// Époque 1 : la genèse est exactement les changements 1 à N du manifeste.
+    static func verifyGenesis(
+        _ manifest: E2EEV2EpochManifest,
+        recipients: [String],
+        chain: [E2EEV2SignedString],
+        isGroup: Bool,
+        signingKey: (_ userId: String, _ deviceId: String) -> P256.Signing.PublicKey?
+    ) throws -> E2EEV2MembershipState {
+        guard manifest.epochNumber == 1, chain.count == manifest.membershipChangeNumber else {
+            throw Failure.membershipMismatch
+        }
+        let state = try E2EEV2MembershipChain.apply(
+            chain, conversationId: manifest.conversationId, isGroup: isGroup,
+            genesisLength: manifest.membershipChangeNumber, signingKey: signingKey
+        )
+        try check(manifest, recipients: recipients, state: state, previousMembershipChangeNumber: nil)
+        return state
     }
 }
 
