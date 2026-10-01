@@ -17,6 +17,22 @@
         }
       }
     },
+    "Ce message ne peut pas être signalé : il n’est plus gardé sur cet appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This message can’t be reported: it’s no longer kept on this device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce message ne peut pas être signalé : il n’est plus gardé sur cet appareil."
+          }
+        }
+      }
+    },
     "Ce numéro n’est pas encore disponible : cet appareil n’a pas la clé de ton compte." : {
       "localizations" : {
         "en" : {
@@ -65,6 +81,22 @@
         }
       }
     },
+    "Conversation chiffrée : le message signalé, déchiffré sur ton appareil, est envoyé à l’équipe de modération, chiffré pour elle seule. Elle pourra le lire et vérifier qu’il vient bien de son auteur. Ni le reste de la conversation ni sa clé ne sont transmis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted conversation: the reported message, decrypted on your device, is sent to the moderation team, encrypted for them only. They will be able to read it and check that it really comes from its author. Neither the rest of the conversation nor its key is shared."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversation chiffrée : le message signalé, déchiffré sur ton appareil, est envoyé à l’équipe de modération, chiffré pour elle seule. Elle pourra le lire et vérifier qu’il vient bien de son auteur. Ni le reste de la conversation ni sa clé ne sont transmis."
+          }
+        }
+      }
+    },
     "Des messages envoyés par %@ n’ont pas été reçus." : {
       "localizations" : {
         "en" : {
@@ -77,6 +109,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Des messages envoyés par %@ n’ont pas été reçus."
+          }
+        }
+      }
+    },
+    "Impossible d’envoyer le signalement. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t send the report. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’envoyer le signalement. Réessaie."
           }
         }
       }
@@ -157,6 +205,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chargement du numéro de sécurité"
+          }
+        }
+      }
+    },
+    "Le signalement d’un message chiffré n’est pas encore disponible dans cette version de l’app." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reporting an encrypted message isn’t available yet in this version of the app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le signalement d’un message chiffré n’est pas encore disponible dans cette version de l’app."
           }
         }
       }

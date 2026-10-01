@@ -155,6 +155,13 @@ enum AppEnvironment {
         false
         #endif
     }
+    static var showsE2EEReportQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-e2ee-report") || hasArgument("--qa-e2ee-report-unavailable")
+        #else
+        false
+        #endif
+    }
     static var showsSafetyNumberQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-safety-number") || hasArgument("--qa-safety-number-changed")

@@ -3,6 +3,9 @@ import SwiftUI
 struct ReportSheet: View {
     private let reasons: [ReportReason]
     private let notice: String?
+    /// Sans champ libre : le signalement d'un message chiffré v2 ne porte que
+    /// son motif en clair (§11, D.10).
+    private let allowsComment: Bool
     private let submit: @MainActor (ReportReason, String?) async throws -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var reason: ReportReason
@@ -21,10 +24,12 @@ struct ReportSheet: View {
     init(
         reasons: [ReportReason],
         notice: String? = nil,
+        allowsComment: Bool = true,
         submit: @escaping @MainActor (ReportReason, String?) async throws -> Void
     ) {
         self.reasons = reasons
         self.notice = notice
+        self.allowsComment = allowsComment
         self.submit = submit
         _reason = State(initialValue: reasons.first ?? .spam)
     }
@@ -37,6 +42,7 @@ struct ReportSheet: View {
                         Label(notice, systemImage: "lock")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityIdentifier("report.notice")
                     }
                 }
                 Section("Motif") {
@@ -50,12 +56,18 @@ struct ReportSheet: View {
                     // le libellé.
                     .labelsHidden()
                 }
-                Section("Précisions (optionnel)") {
-                    TextField("Décris ce qui te pose problème", text: $note, axis: .vertical)
-                        .lineLimit(3...6)
+                if allowsComment {
+                    Section("Précisions (optionnel)") {
+                        TextField("Décris ce qui te pose problème", text: $note, axis: .vertical)
+                            .lineLimit(3...6)
+                    }
                 }
                 if let error {
-                    Section { Text(error).foregroundStyle(SQColor.danger) }
+                    Section {
+                        Text(error)
+                            .foregroundStyle(SQColor.danger)
+                            .accessibilityIdentifier("report.error")
+                    }
                 }
                 Section {
                     Button(role: .destructive) {
@@ -74,6 +86,7 @@ struct ReportSheet: View {
                     }
                     .disabled(isBusy)
                     .listRowBackground(SQColor.dangerSoft)
+                    .accessibilityIdentifier("report.send")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -93,7 +106,8 @@ struct ReportSheet: View {
         isBusy = true
         defer { isBusy = false }
         do {
-            try await submit(reason, note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note)
+            let comment = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            try await submit(reason, allowsComment && !comment.isEmpty ? note : nil)
             Haptics.success()
             dismiss()
         } catch {
