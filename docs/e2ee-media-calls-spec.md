@@ -97,6 +97,11 @@
 >   version épinglée (D.3, E.1). Vérification de l'UIK de son propre compte
 >   sur un nouvel appareil (§2.3). Bundle de récupération signé par l'UIK
 >   (§2.8). Lecture stricte des lignes de liste et du base64 des clés.
+>   Appels, après une seconde relecture : jonction tardive bornée à 12 heures,
+>   appel terminé jamais rejoint, fin d'un appel chiffré à une reconnexion
+>   complète, chiffrement que le serveur ne peut pas retirer, média coupé avant
+>   tout aller-retour réseau, pistes publiées muettes jusqu'au chiffreur prêt
+>   (§10.1, §10.3, §10.4).
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -684,7 +689,10 @@ affichage**, et dans l'outil de modération.
   - une époque qui n'est pas la **plus récente active** qu'il connaît ;
   - pour une sonnerie, un descripteur de plus de 60 secondes. Pour une
     jonction tardive ou un transfert, le descripteur est accepté tant que le
-    serveur donne l'appel pour actif, sous la même règle d'époque ;
+    serveur donne l'appel pour actif, sous la même règle d'époque, et au plus
+    12 heures après sa création : un ancien appel ne peut pas être rejoué ;
+  - un `callId` que l'appareil a déjà vu se terminer : il le garde sur le
+    disque avec ses nonces, et ne le rejoint plus jamais ;
   - un `callNonce` déjà vu pour un autre `callId`. Le serveur refuse lui
     aussi un `callNonce` déjà enregistré (`409 CALL_NONCE_TAKEN`).
 
@@ -739,6 +747,10 @@ version qui expose `discardFrameWhenCryptorNotReady` et
 - **SIF** : un SDK peut appliquer d'office celui du serveur (c'est le cas
   en Swift). Il est neutralisé, par une valeur vide posée après la jonction
   ou par un correctif du SDK, et le test négatif de COM-1 le prouve.
+  - Le SDK Swift le repose à chaque réponse de jonction, donc à chaque
+    **reconnexion complète**, qui réintègre aussi les participants sans
+    événement. Un appel chiffré prend donc fin dès le début d'une reconnexion
+    complète ; une reconnexion rapide le laisse continuer.
 - **Canal de données chiffré** sur les trois SDK. Un paquet non chiffré est
   refusé. La preuve de jonction y passe.
 - Un SDK qui ne permet pas ces réglages n'offre pas d'appel chiffré : il est
@@ -751,14 +763,26 @@ version qui expose `discardFrameWhenCryptorNotReady` et
 
 - Un appel dans une conversation v2 **est** chiffré. Le client le vérifie
   localement (§12) : il ne rejoint jamais en clair une conversation qu'il sait
-  chiffrée, quoi que dise le serveur.
+  chiffrée, quoi que dise le serveur. Le serveur peut rendre le chiffrement
+  obligatoire, jamais le retirer : une notification qui annonce un appel
+  chiffré ne redescend pas en clair sur la foi de `pending`.
+- **Fin d'appel** : à la moindre perte de confiance, le média s'arrête avant
+  tout aller-retour réseau ; le serveur n'est prévenu qu'ensuite.
 - **Ordre de démarrage** :
   - aucune piste locale (micro, caméra) n'est publiée avant que la clé de
     trame soit posée ;
   - elle n'est publiée que chiffrée, avec `encryptionType` = `gcm` vérifié
     sur la publication ;
   - une piste locale que le serveur annonce non chiffrée est retirée
-    aussitôt, et l'appel se termine.
+    aussitôt, et l'appel se termine ;
+  - le SDK Swift n'attache le chiffreur qu'après la réponse du serveur à la
+    publication, alors que la négociation peut partir avant : une piste est
+    donc publiée muette, puis réactivée seulement une fois sa publication en
+    `gcm` et son chiffreur dans l'état « OK » ;
+  - une piste distante n'est jouée qu'une fois son participant prouvé (§10.4,
+    preuve de jonction) et son chiffreur dans l'état « OK ». Un participant qui
+    part puis revient garde l'heure de sa première arrivée pour le délai de
+    10 secondes.
 - Toute piste distante non chiffrée est refusée : désabonnement et fin de
   l'appel.
 - Une piste n'est rendue que lorsque son cryptor est dans l'état « OK ».
