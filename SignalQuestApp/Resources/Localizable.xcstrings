@@ -1,6 +1,166 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "%@ a activé le chiffrement de bout en bout de cette conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ turned on end-to-end encryption for this conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a activé le chiffrement de bout en bout de cette conversation."
+          }
+        }
+      }
+    },
+    "%@ a ajouté %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ added %2$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a ajouté %@."
+          }
+        }
+      }
+    },
+    "%@ a retiré %@ du groupe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ removed %2$@ from the group."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a retiré %@ du groupe."
+          }
+        }
+      }
+    },
+    "%@ a quitté le groupe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ left the group."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a quitté le groupe."
+          }
+        }
+      }
+    },
+    "%@ a quitté la conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ left the conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a quitté la conversation."
+          }
+        }
+      }
+    },
+    "%@ a nommé %@ admin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ made %2$@ an admin."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a nommé %@ admin."
+          }
+        }
+      }
+    },
+    "%@ a renoncé au rôle d’admin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ stepped down as admin."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a renoncé au rôle d’admin."
+          }
+        }
+      }
+    },
+    "%@ a retiré le rôle d’admin à %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ removed %2$@’s admin role."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a retiré le rôle d’admin à %@."
+          }
+        }
+      }
+    },
+    "%@ a exclu les navigateurs de cette conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ excluded web browsers from this conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a exclu les navigateurs de cette conversation."
+          }
+        }
+      }
+    },
+    "%@ a de nouveau autorisé les navigateurs dans cette conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ allowed web browsers in this conversation again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a de nouveau autorisé les navigateurs dans cette conversation."
+          }
+        }
+      }
+    },
     "%@ a un nouveau numéro de sécurité" : {
       "localizations" : {
         "en" : {
@@ -29,6 +189,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu."
+          }
+        }
+      }
+    },
+    "Admins : %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Admins: %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Admins : %@."
+          }
+        }
+      }
+    },
+    "%@ t’a fait entrer dans le groupe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ added you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ t’a fait entrer dans le groupe."
+          }
+        }
+      }
+    },
+    "%@ t’a fait sortir du groupe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ removed you from the group."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ t’a fait sortir du groupe."
+          }
+        }
+      }
+    },
+    "%@ t’a donné le rôle d’admin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ made you an admin."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ t’a donné le rôle d’admin."
+          }
+        }
+      }
+    },
+    "%@ t’a retiré le rôle d’admin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ removed your admin role."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ t’a retiré le rôle d’admin."
           }
         }
       }
@@ -401,6 +641,38 @@
         }
       }
     },
+    "Tu as activé le chiffrement de bout en bout de cette conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You turned on end-to-end encryption for this conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as activé le chiffrement de bout en bout de cette conversation."
+          }
+        }
+      }
+    },
+    "Tu as ajouté %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You added %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as ajouté %@."
+          }
+        }
+      }
+    },
     "Tu as atteint la limite de signalements pour aujourd’hui. Réessaie demain." : {
       "localizations" : {
         "en" : {
@@ -413,6 +685,134 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tu as atteint la limite de signalements pour aujourd’hui. Réessaie demain."
+          }
+        }
+      }
+    },
+    "Tu as retiré %@ du groupe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You removed %@ from the group."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as retiré %@ du groupe."
+          }
+        }
+      }
+    },
+    "Tu as quitté le groupe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You left the group."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as quitté le groupe."
+          }
+        }
+      }
+    },
+    "Tu as quitté la conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You left the conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as quitté la conversation."
+          }
+        }
+      }
+    },
+    "Tu as nommé %@ admin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You made %@ an admin."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as nommé %@ admin."
+          }
+        }
+      }
+    },
+    "Tu as renoncé au rôle d’admin." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You stepped down as admin."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as renoncé au rôle d’admin."
+          }
+        }
+      }
+    },
+    "Tu as retiré le rôle d’admin à %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You removed %@’s admin role."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as retiré le rôle d’admin à %@."
+          }
+        }
+      }
+    },
+    "Tu as exclu les navigateurs de cette conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You excluded web browsers from this conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as exclu les navigateurs de cette conversation."
+          }
+        }
+      }
+    },
+    "Tu as de nouveau autorisé les navigateurs dans cette conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You allowed web browsers in this conversation again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as de nouveau autorisé les navigateurs dans cette conversation."
           }
         }
       }
@@ -573,6 +973,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Accepter sans vérifier"
+          }
+        }
+      }
+    },
+    "Un membre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un membre"
+          }
+        }
+      }
+    },
+    "un membre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a member"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un membre"
           }
         }
       }
