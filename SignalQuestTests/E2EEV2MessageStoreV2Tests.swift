@@ -157,6 +157,19 @@ final class E2EEV2MessageStoreV2Tests: XCTestCase {
         XCTAssertNil(try store.stored(lasting.messageRef, conversationId: conversationId, ownerScopeId: owner), "Ses éditions partent avec lui")
     }
 
+    func testAnEditsExpiryShowsAtOnceWithoutWaitingForTheNextRead() throws {
+        let store = makeStore()
+        let original = try message(1, from: bruno, .text("Salut"))
+        let edit = try message(2, from: bruno, .edit(targetRef: original.messageRef, text: "Bientôt parti"), sentAtMs: nowMs + 10, expiresAtMs: nowMs + 60_000)
+        try store.apply([original, edit], equivocal: [], cursor: 2, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        // Aucune relève depuis l'expiration de l'édition.
+        let later = nowMs + 61_000
+        XCTAssertEqual(try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: later).messages.map(\.text), ["Salut"])
+        let group = try XCTUnwrap(try store.reportGroups([original.messageRef], conversationId: conversationId, ownerScopeId: owner, nowMs: later)[original.messageRef],
+                                  "Le message affiché reste signalable")
+        XCTAssertEqual(group.displayed, original)
+    }
+
     func testAnEquivocalEditStopsCounting() throws {
         let store = makeStore()
         let original = try message(1, from: bruno, .text("Salut"))

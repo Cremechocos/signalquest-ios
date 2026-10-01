@@ -84,7 +84,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     func snapshot(conversationId: String, ownerScopeId: String, nowMs: Int64) throws -> Snapshot {
         Self.lock.lock()
         defer { Self.lock.unlock() }
-        let file = try read(conversationId: conversationId, ownerScopeId: ownerScopeId)
+        let file = Self.expiring(try read(conversationId: conversationId, ownerScopeId: ownerScopeId), nowMs: nowMs)
         let visible = file.messages.values
             .filter { $0.kind == "TEXT" && !file.equivocal.contains($0.messageRef) && ($0.expiresAtMs.map { $0 > nowMs } ?? true) }
             .sorted { $0.sequence < $1.sequence }
@@ -133,24 +133,32 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
             touched.insert(target ?? message.messageRef)
         }
         for ref in touched { Self.settle(ref, in: &file.messages, equivocal: file.equivocal) }
-        // Un message éphémère expiré quitte l'appareil avec ses éditions ; une
-        // édition expirée ne compte plus, et sa cible se rejoue (§13, D.8).
-        let expired = file.messages.values.filter { $0.expiresAtMs.map { $0 <= nowMs } ?? false }
-        if !expired.isEmpty {
-            let expiredRefs = Set(expired.map(\.messageRef))
-            let expiredTexts = Set(expired.filter { $0.kind == "TEXT" }.map(\.messageRef))
-            let replayed = Set(expired.compactMap(\.targetRef)).subtracting(expiredTexts)
-            file.messages = file.messages.filter {
-                !expiredRefs.contains($0.key) && !($0.value.targetRef.map(expiredTexts.contains) ?? false)
-            }
-            for ref in replayed { Self.settle(ref, in: &file.messages, equivocal: file.equivocal) }
-        }
+        file = Self.expiring(file, nowMs: nowMs)
         file.cursor = max(file.cursor, cursor)
         if file.messages.count > Self.maxMessages {
             let kept = file.messages.values.sorted { $0.sequence > $1.sequence }.prefix(Self.maxMessages)
             file.messages = Dictionary(uniqueKeysWithValues: kept.map { ($0.messageRef, $0) })
         }
         try write(file, conversationId: conversationId, ownerScopeId: ownerScopeId)
+    }
+
+    /// L'état à l'instant `nowMs` (§13, D.8) : un message éphémère expiré part
+    /// avec ses éditions ; une édition expirée cesse de compter et sa cible se
+    /// rejoue. `apply` l'écrit ; `snapshot` et `reportGroups` le calculent sans
+    /// attendre la relève suivante, pour qu'affichage et signalement suivent
+    /// l'heure.
+    private static func expiring(_ file: ConversationFile, nowMs: Int64) -> ConversationFile {
+        let expired = file.messages.values.filter { $0.expiresAtMs.map { $0 <= nowMs } ?? false }
+        guard !expired.isEmpty else { return file }
+        var file = file
+        let expiredRefs = Set(expired.map(\.messageRef))
+        let expiredTexts = Set(expired.filter { $0.kind == "TEXT" }.map(\.messageRef))
+        let replayed = Set(expired.compactMap(\.targetRef)).subtracting(expiredTexts)
+        file.messages = file.messages.filter {
+            !expiredRefs.contains($0.key) && !($0.value.targetRef.map(expiredTexts.contains) ?? false)
+        }
+        for ref in replayed { settle(ref, in: &file.messages, equivocal: file.equivocal) }
+        return file
     }
 
     /// Rejoue sur un message ses éditions et sa suppression autorisées, dans
@@ -161,7 +169,9 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     private static func settle(_ ref: String, in messages: inout [String: Stored], equivocal: Set<String>) {
         guard var target = messages[ref], target.kind == "TEXT" else { return }
         let related = messages.values.filter { $0.targetRef == ref }
-        erase(related.filter { $0.senderUserId != target.senderUserId }, in: &messages)
+        // Seules les éditions et suppressions sont réservées à l'auteur : une
+        // réaction ou un vote d'un autre membre, au jalon B, gardera son contenu.
+        erase(related.filter { $0.senderUserId != target.senderUserId && ["EDIT", "DELETE"].contains($0.kind) }, in: &messages)
         let actions = related
             .filter { $0.senderUserId == target.senderUserId && !equivocal.contains($0.messageRef) }
             .sorted { ($0.sentAtMs, $0.sequence) < ($1.sentAtMs, $1.sequence) }
@@ -248,7 +258,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     ) throws -> [String: ReportGroup] {
         Self.lock.lock()
         defer { Self.lock.unlock() }
-        let file = try read(conversationId: conversationId, ownerScopeId: ownerScopeId)
+        let file = Self.expiring(try read(conversationId: conversationId, ownerScopeId: ownerScopeId), nowMs: nowMs)
         func kept(_ stored: Stored) -> E2EEV2ReceivedMessageV2? {
             guard !file.equivocal.contains(stored.messageRef), stored.expiresAtMs.map({ $0 > nowMs }) ?? true,
                   let payloadBytes = stored.payloadB64.flatMap({ Data(base64Encoded: $0) }),
