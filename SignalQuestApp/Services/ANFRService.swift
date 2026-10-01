@@ -138,6 +138,9 @@ protocol ANFRServicing: Sendable {
     func siteHistory(supId: String) async throws -> ANFRSiteHistory
     /// Statistiques nationales agrégées (séries, dernier relevé, régions).
     func stats() async throws -> ANFRStats
+    /// Progression par génération et par bande (contrat `view=bands` v1) ;
+    /// `weeks` : les N derniers relevés (1 à 520), nul pour tout l'historique.
+    func bandStats(weeks: Int?) async throws -> ANFRBandStats
     /// Snapshot carte : tous les sites du relevé `date` (ou le dernier si `nil`).
     func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot
     /// Dates d'archives disponibles + relevé courant (sélecteur de date carte).
@@ -179,6 +182,12 @@ final class ANFRService: ANFRServicing {
 
     func stats() async throws -> ANFRStats {
         try await api.request(APIEndpoint(path: "/api/anfr/stats"), as: ANFRStats.self)
+    }
+
+    func bandStats(weeks: Int?) async throws -> ANFRBandStats {
+        var query = [URLQueryItem(name: "view", value: "bands")]
+        if let weeks { query.append(URLQueryItem(name: "weeks", value: String(min(max(weeks, 1), 520)))) }
+        return try await api.request(APIEndpoint(path: "/api/anfr/stats", query: query), as: ANFRBandStats.self)
     }
 
     func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot {
