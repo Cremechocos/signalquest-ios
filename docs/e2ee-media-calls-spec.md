@@ -124,7 +124,19 @@
 >   palier de bourrage, charge bornée pour que l'enveloppe tienne en 512 Kio,
 >   accusé d'envoi, liste et lecture des messages, renvoi à l'identique et
 >   rechiffrement sur refus d'époque (D.7, E.0, E.3). Vecteur
->   `message-envelope-v2` complété par l'enveloppe transportée.
+>   `message-envelope-v2` complété par l'enveloppe transportée. Après les
+>   avis du web et d'Android : corps d'envoi en JCS à l'octet, grammaire des
+>   entiers en ASCII, base64 défini par le réencodage, `fk` gardé au
+>   rechiffrement, doublon et équivoque définis par le `frankTag`, conflit
+>   tenu pour une remise, ordre des contrôles, compteur jamais sous ce que la
+>   liste montre, trous évalués une fois la liste rattrapée (D.7, E.3, §18).
+>   Puis, après une relecture indépendante du code iOS du lot 5 : instants et
+>   séquences bornés à 2⁵³ − 1, rechiffrement local d'un envoi dont l'époque
+>   a été remplacée, expiration des éphémères à l'heure signée de l'émetteur,
+>   membres partis acceptés seulement en vol, rotation dès un retrait ou un
+>   départ, identités gardées à vie, époques sautées relues, signature
+>   vérifiée avant toute question d'époque, taille du signalement (§3.3, §3.4,
+>   D.7, D.8, D.10, E.2, E.3).
 >
 > Portée : chiffrer de bout en bout, en plus du texte, les photos et fichiers,
 > les notes vocales, les sondages, les réactions, les positions et les appels
@@ -423,7 +435,8 @@ Format de l'enveloppe : annexe A.3. Vecteur : `epoch-envelope-v1.json`.
   actuels, le client crée une époque avant tout envoi.
 - Déclencheurs :
   - appareil certifié ajouté, révoqué ou mis à l'écart (§12) ;
-  - membre ajouté ou retiré ;
+  - membre ajouté ou retiré. Celui qui retire un membre, ou qui part, crée
+    l'époque suivante aussitôt, sans attendre un envoi ;
   - réglage « exclure les navigateurs » modifié ;
   - réinitialisation d'identité, usage de la récupération ;
   - au plus tard, 30 jours ou 10 000 messages par époque. Les 30 jours se
@@ -442,7 +455,12 @@ Un client rejette un message :
 - chiffré sous une époque marquée compromise, s'il est postérieur à la date de
   compromission ;
 - chiffré sous une époque qui n'est plus la courante depuis plus de 24 heures
-  (fenêtre de tolérance pour les messages en vol).
+  (fenêtre de tolérance pour les messages en vol) ;
+- envoyé par un membre parti (retrait ou départ) plus de 24 heures après que
+  l'appareil a appris ce départ, même sous l'époque courante.
+
+Les 24 heures se comptent à l'horloge de l'appareil, depuis l'acceptation
+locale de l'époque suivante ou du changement d'appartenance.
 
 ### 3.5 Manifeste d'époque
 
@@ -1317,6 +1335,21 @@ protocole, états des cryptors d'appel.
 
 ## 18. Questions ouvertes
 
+- **Époque compromise** (v0.4.7) : le §3.4 rejette un message chiffré sous
+  une époque marquée compromise après la date de compromission, mais aucun
+  format ne porte encore ce marquage. À définir avec la réinitialisation
+  d'identité et la récupération.
+- **`moderationKeyId`** (v0.4.7) : il n'est lié ni à la partie en clair ni à
+  l'`info` HPKE. Un serveur qui le change ne fait qu'empêcher l'ouverture du
+  rapport ; le lier demanderait une version 2 de `report-v1`.
+
+- **Pierres tombales des messages expirés** (v0.4.7) : un message éphémère
+  purgé par le serveur laisse un trou dans les compteurs (E.3). Une pierre
+  tombale (séquence, appareil, compteur, identité) éviterait la fausse
+  alerte, mais elle ne se vérifie pas sans la signature : elle laisserait le
+  serveur faire passer une rétention pour une expiration. À trancher avec le
+  serveur.
+
 Tranchées le 30/09 (décisions produit) :
 
 1. Fin de la génération serveur des clés v1 : avec la v2, au jalon A, donc
@@ -1818,7 +1851,9 @@ Mêmes routes et même type de contenu que la v1 (A.4), avec
 - **Clair** : `fk (32 octets) ‖ charge ‖ 0x80 ‖ 0x00…`. La charge est le JSON
   canonique de D.8, de 262 111 octets au plus (256 Kio − 33) : le clair
   bourré tient en 256 Kio, et l'enveloppe transportée sous 512 Kio, limite
-  d'un corps JSON.
+  d'un corps JSON. La borne porte sur la charge canonique, échappements
+  compris (un caractère de contrôle en vaut six) : l'émetteur refuse avant de
+  chiffrer, le destinataire après avoir déchiffré.
 - **Bourrage** : soit `L = 32 + longueur(charge) + 1`. Si `L` ≤ 4 096, la
   longueur bourrée est le multiple de 256 supérieur ou égal à `L`. Sinon,
   c'est la puissance de deux supérieure ou égale à `L`.
@@ -1851,25 +1886,52 @@ Mêmes routes et même type de contenu que la v1 (A.4), avec
   | `ciphertextB64` | b64 ; sa longueur moins 16 est un palier de bourrage |
   | `senderSignatureB64` | b64 de la signature, DER canonique et low-S (D.0) |
 
-  - Tout b64 y est canonique : remplissage présent, aucun autre alphabet.
+  - Corps de l'envoi : l'enveloppe en JCS (RFC 8785), à l'octet. Le serveur
+    refuse un JSON valide mais non canonique (`\/`, clés non triées,
+    espaces) ; c'est ce qui donne un sens à « la même enveloppe, à
+    l'octet » (E.3). Imbriquée dans une réponse, elle est relue par
+    l'analyseur strict, sans exigence de forme : la signature porte sur la
+    chaîne en lignes, pas sur le JSON.
+  - En ASCII seul ; un BOM est refusé. Sa taille en octets est donc la
+    longueur de son texte.
+  - Entiers : `^(0|[1-9][0-9]*)$` en ASCII, contrôlé avant toute conversion
+    (une conversion de bibliothèque accepte souvent `+1`, `1e3`, des espaces
+    ou des chiffres non ASCII), puis les bornes du tableau.
+  - Base64 standard avec remplissage, jamais base64url, défini par le
+    réencodage : décodée puis réencodée, la chaîne reste identique (bits de
+    fin nuls, ni saut de ligne ni espace). Un décodeur indulgent ne suffit
+    pas.
+  - Une clé en double est refusée, même si un analyseur courant garde la
+    dernière sans erreur.
   - L'appareil émetteur n'est jamais lu dans l'enveloppe. À l'envoi, il vient
     de la requête signée ; à la lecture, du message remis (E.3).
   - Le compteur est tenu par appareil et par conversation (§4.3). Une
     nouvelle identité d'appareil repart de 1.
 - **Réception**, dans cet ordre :
-  1. certificat et signature ;
+  0. structure : analyse stricte, tailles, palier de bourrage, avant tout
+     accès à une clé ;
+  1. certificat de l'appareil annoncé et signature, avant toute question
+     d'époque : un message non signé n'oblige à rien, pas même à une
+     synchronisation ; l'AAD décodée est égale, à l'octet, à l'AAD
+     reconstruite à partir de la conversation demandée, du `senderDeviceId`
+     du message remis et des champs de l'enveloppe ;
+  1 bis. époque connue et dans sa fenêtre, émetteur membre de l'époque, et
+     parti depuis moins de 24 heures s'il n'est plus membre (§3.4). Une
+     époque plus récente que la courante demande une synchronisation ;
   2. déchiffrement ;
   3. bourrage : le dernier `0x80` n'est suivi que de `0x00`, sinon rejet ;
   4. `fk` ;
   5. `frankTag` recalculé ;
-  6. charge analysée strictement ;
+  6. charge analysée strictement. Une version ou un `kind` inconnus, dans
+     une charge authentique, comptent au registre (identité, compteur) et
+     s'affichent « Contenu non pris en charge » (§5.2) ;
   7. `counter` de la charge égal à celui de l'AAD.
 
 ### D.8 Charge v2, texte (`content-payload-v2`)
 
 - Racine, clés exactes :
   - `schema` = `signalquest.e2ee-content`, `version` = `2`, `kind` ;
-  - `sentAtMs`, `counter` ;
+  - `sentAtMs` (de 0 à 2⁵³ − 1), `counter` ;
   - `replyToRef` (`messageRef` ou `null`) ;
   - `mentions` (100 `userId` au plus) ;
   - `body`.
@@ -1880,6 +1942,11 @@ Mêmes routes et même type de contenu que la v1 (A.4), avec
 - Les autres `kind` (médias, vocal, réactions, sondages, positions, cartes)
   arrivent au jalon B, chacun avec son vecteur.
 - `messageRef` : §4.2.
+- **Message éphémère** (`ttlSeconds` > 0 dans l'enveloppe) : il expire à
+  `sentAtMs + ttlSeconds × 1 000`, l'heure signée de son émetteur. L'heure du
+  serveur n'y entre pas : il ne peut ni prolonger un éphémère, ni l'effacer
+  en silence. Un éphémère expiré compte au registre sans s'afficher, et quitte
+  l'appareil qui le gardait.
 
 ### D.9 `serverTag`
 
@@ -1906,6 +1973,9 @@ Format au §11. Le vecteur `franking-v1` donne `fk`, la charge, `frankTag`,
   - AAD vide, un seul `Seal`.
 - **JSON transporté** :
   `{"clear": "<JSON canonique>", "encB64": "…", "sealedB64": "…", "moderationKeyId": "…"}`.
+  Il tient en 512 Kio, comme tout corps JSON : la charge, déjà en base64
+  dans la partie scellée, y est encodée une seconde fois. Au-delà, le client
+  réduit la sélection plutôt que d'échouer à l'envoi.
 - La clé publique de modération et son `moderationKeyId` sont embarqués dans
   les apps. Changer de clé demande une mise à jour de l'app.
 
@@ -2146,10 +2216,23 @@ version publiée qui ouvre les verrous.
   (§2.6).
 - **`POST /api/e2ee/v2/conversations/{id}/membership`**. Corps :
   `{change, signatureB64}`, en comparaison-échange sur `changeNumber`.
+  Réponse proposée par iOS : `{changeNumber}`, en chaîne ; le même changement
+  renvoyé à l'octet rend la même réponse. Le client compose sur la tête de sa
+  chaîne gardée, vérifie localement les règles de D.4, garde le changement
+  signé avant l'envoi et le renvoie tel quel jusqu'à sa réponse : jamais deux
+  signatures pour un même numéro. Sur `409 E2EE_MEMBERSHIP_STALE`, il relit
+  la suite de la chaîne, puis recompose.
 - **`GET /api/e2ee/v2/conversations/{id}/membership?after=<changeNumber>`** :
   la suite de la chaîne. Réponse proposée par iOS :
   `{changes: [{change, signatureB64}], hasMore}`, 100 changements au plus
   par page ; une page vide n'annonce jamais de suite.
+- **`GET /api/e2ee/v2/conversations/{id}/epochs/{epochNumber}`**, proposée
+  par iOS : une époque désignée, de même forme que `epochs/current`, avec
+  l'enveloppe de l'appareil qui lit. Un appareil resté hors ligne pendant
+  plusieurs rotations relit ainsi, dans l'ordre, chaque époque sautée dont il
+  est destinataire, avant la courante : leurs messages en vol se lisent
+  encore (§3.4). `404 E2EE_EPOCH_ENVELOPE_NOT_FOUND` s'il n'en est pas
+  destinataire.
 - **`GET /api/e2ee/v2/conversations/{id}/epochs/{epochNumber}/manifest`**,
   proposée par iOS : `{epochNumber, manifest: {manifest, signatureB64, recipients}}`.
   Elle sert le manifeste à tout membre, destinataire ou non : c'est par celui
@@ -2169,25 +2252,64 @@ version publiée qui ouvre les verrous.
   - le serveur vérifie la requête signée, l'appartenance de l'appareil, la
     forme stricte et la signature de l'enveloppe. L'époque doit être la
     courante, sinon `409 E2EE_EPOCH_STALE`, avec l'époque courante ;
-  - identité `(conversationId, appareil, clientRequestId)` : la même
-    enveloppe, à l'octet, rend le même accusé ; une autre enveloppe pour une
-    identité déjà acceptée est refusée (`409 E2EE_MESSAGE_CONFLICT`). Une
-    enveloppe refusée ne compte pas ;
+  - identité `(conversationId, appareil, clientRequestId)`, cherchée avant
+    tout contrôle d'époque : la même enveloppe, à l'octet, rend le même
+    accusé, même si l'époque a tourné depuis ; une autre enveloppe pour une
+    identité déjà acceptée est refusée (`409 E2EE_MESSAGE_CONFLICT`). Un
+    couple (appareil, compteur) déjà pris par une autre identité est refusé
+    de même. Une enveloppe refusée ne compte pas ;
   - réponse : `{envelopeId, clientRequestId, serverTagB64, serverTimeMs, keyId}`,
     entiers en chaînes (§11) ;
   - **côté client** : l'enveloppe préparée est gardée avant le premier envoi
-    et renvoyée telle quelle à chaque essai, car son accusé a pu se perdre.
-    Elle n'est rechiffrée que sur `409 E2EE_EPOCH_STALE`, sous l'époque
-    courante vérifiée, avec la même identité, le même compteur et la même
-    charge.
+    et renvoyée telle quelle tant que son époque est la courante vérifiée,
+    car son accusé a pu se perdre. Si l'appareil sait cette époque remplacée,
+    elle est rechiffrée sous l'époque courante vérifiée avant de partir, avec
+    la même identité, le même compteur, la même charge et le même `fk`, donc
+    le même `frankTag` : jamais envoyée sous une époque remplacée, qu'un
+    membre retiré ou un appareil révoqué pourrait lire ; il part alors vers
+    les membres de l'époque courante, y compris ceux arrivés depuis sa
+    rédaction. Sur
+    `409 E2EE_EPOCH_STALE`, le client se synchronise d'abord. L'accusé reçu
+    est gardé : un nouvel essai du même message le rend, sans rien renvoyer.
+    Deux essais simultanés ne signent jamais deux enveloppes. Un envoi
+    abandonné (refus définitif, départ, plus de 7 jours) efface sa charge en
+    clair ;
+  - sur `409 E2EE_MESSAGE_CONFLICT` : seul cet appareil signe ses
+    identités, donc l'enveloppe acceptée est une version antérieure du même
+    message, à charge identique. Le client le tient pour remis, abandonne
+    l'enveloppe en attente sans jamais en signer d'autre, et retrouve le
+    message dans la liste ;
+  - le compteur est réservé et gardé avant l'envoi, sous un verrou commun à
+    tout ce qui partage l'appareil (plusieurs onglets d'un navigateur, par
+    exemple). Il ne descend jamais sous le plus haut compteur de cet appareil
+    vu dans la liste : une sauvegarde restaurée sur le même appareil ne le
+    fait pas reculer.
 - **`GET /api/e2ee/v2/conversations/{id}/messages?after=<séquence>&limit=<1 à 100>`**,
   la liste des messages v2 : `{messages, hasMore}`.
   - Chaque message :
     `{envelopeId, sequence, senderUserId, senderDeviceId, envelope, serverTagB64, serverTimeMs, keyId}`,
     entiers en chaînes, `envelope` étant l'enveloppe transportée.
-  - Séquences du serveur croissantes, toutes après `after`.
+  - `after` est la séquence serveur du dernier message lu, `0` pour partir
+    du début. Séquences du serveur croissantes, toutes après `after`.
   - Une page tient en 512 Kio : le serveur s'arrête avant, avec `hasMore` à
-    vrai. Une page vide n'annonce jamais de suite.
+    vrai. `hasMore` peut donc valoir vrai avec moins de `limit` messages ; le
+    client continue tant qu'il vaut vrai. Une page vide n'annonce jamais de
+    suite.
+  - **Registre du destinataire**, rempli seulement après la signature, le
+    déchiffrement et l'analyse de la charge :
+    - doublon : même identité et même `frankTag`, affiché une fois. Les
+      identités vues sont gardées à vie (une empreinte courte suffit) : une
+      identité ancienne ne se réaffiche jamais, même sous un compteur neuf ;
+    - équivoque : même identité et `frankTag` différent, ou même couple
+      (appareil, compteur) sous deux identités. Aucun des deux n'est affiché,
+      l'utilisateur est prévenu (§4.2) ;
+    - trous : comptés entre les compteurs vus d'un appareil, et évalués
+      seulement une fois la liste rattrapée (`hasMore` faux). Un message
+      éphémère expiré en laisse un : le message reste neutre (« certains
+      messages n'ont pas pu être reçus »).
+    - un échec passager (annuaire des appareils en retard, coffre
+      verrouillé, stockage) ne fait pas avancer le curseur : le message se
+      relira.
 - **`GET /api/e2ee/v2/envelopes/{id}/fetch`** d'un message v2 :
   `{"message": …}`, le même objet. La réponse pour un message v1 ne change
   pas (règle de compatibilité, §16).
