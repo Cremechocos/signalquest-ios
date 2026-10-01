@@ -43,8 +43,8 @@ enum SQBrand {
         "orange": .init(start: Color(hex: 0xFF7900), end: Color(hex: 0xFFA44F), name: "Orange", badgeForeground: .black),
         "free": .init(start: Color(hex: 0x6B7280), end: Color(hex: 0x4B5563), name: "Free"),
         // Free Caraïbes : le contrat quality-scale v1 donne aux opérateurs des
-        // DOM la teinte métropolitaine de leur marque (le registre avait le rouge
-        // #DC2626, à aligner côté serveur). Entrée gardée pour son nom affiché.
+        // DOM la teinte métropolitaine de leur marque, comme le registre des
+        // marchés. Entrée gardée pour son nom affiché.
         "freecaraibes": .init(start: Color(hex: 0x6B7280), end: Color(hex: 0x4B5563), name: "Free Caraibes"),
         "digicel": .init(start: Color(hex: 0xB91C1C), end: Color(hex: 0xF97316), name: "Digicel"),
         "outremer": .init(start: Color(hex: 0x8B5CF6), end: Color(hex: 0x22D3EE), name: "Outremer Telecom", badgeForeground: .black),
