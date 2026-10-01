@@ -259,6 +259,18 @@ struct E2EEV2DeviceList: Equatable, Sendable {
         [deviceId, String(keyVersion), platform, fingerprint].joined(separator: "\n")
     }
 
+    /// Analyse stricte d'une ligne d'appareil : quatre champs exacts. Les
+    /// lignes contiennent elles-mêmes des retours à la ligne ; sans ce contrôle,
+    /// deux découpages différents donneraient le même condensat.
+    static func parseEntry(_ entry: String) -> (deviceId: String, keyVersion: Int, platform: String, fingerprint: String)? {
+        let f = entry.components(separatedBy: "\n")
+        guard f.count == 4, E2EEV2Canonical.isOpaque(f[0]),
+              E2EEV2Canonical.isDecimal(f[1]), let keyVersion = Int(f[1]), (1..<Int(Int32.max)).contains(keyVersion),
+              E2EEV2DeviceCertificate.platforms.contains(f[2]),
+              E2EEV2ApprovalV2.isDigest(f[3]) else { return nil }
+        return (f[0], keyVersion, f[2], f[3])
+    }
+
     static func digest(of canonical: String) -> String {
         E2EEV2Canonical.sha256B64URL(Data(canonical.utf8))
     }
@@ -317,13 +329,18 @@ struct E2EEV2DeviceList: Equatable, Sendable {
         guard signed.verify(with: uik) else { throw E2EEV2TrustFormatError.invalidSignature }
         guard let f = E2EEV2Canonical.split(signed.canonical, tag: tag, version: "1", fieldCount: 8),
               E2EEV2Canonical.isOpaque(f[2]),
-              E2EEV2Canonical.isDecimal(f[3]), let version = Int(f[3]), version >= 1,
+              E2EEV2Canonical.isDecimal(f[3]), let version = Int(f[3]), (1..<Int(Int32.max)).contains(version),
               E2EEV2Canonical.isDecimal(f[5]), let count = Int(f[5]),
               E2EEV2Canonical.isDecimal(f[7]), let issuedAt = Int64(f[7]) else {
             throw E2EEV2TrustFormatError.invalidField
         }
         guard expectedPrevious.map({ f[4] == $0 }) ?? true, (version == 1) == (f[4] == "-") else {
             throw E2EEV2TrustFormatError.digestMismatch
+        }
+        let parsed = entries.compactMap(parseEntry)
+        guard parsed.count == entries.count,
+              Set(parsed.map(\.deviceId)).count == entries.count else {
+            throw E2EEV2TrustFormatError.invalidField
         }
         guard count == entries.count,
               Set(entries).count == entries.count,
@@ -695,7 +712,7 @@ struct E2EEV2IdentityReset: Equatable, Sendable {
               E2EEV2Canonical.isX963PublicKey(f[3]),
               let keyData = Data(base64Encoded: f[3]),
               let newUik = try? P256.Signing.PublicKey(x963Representation: keyData),
-              E2EEV2Canonical.isDecimal(f[5]), let requested = Int64(f[5]),
+              E2EEV2Canonical.isDecimal(f[5]), let requested = Int64(f[5]), requested < Int64(1) << 53,
               E2EEV2Canonical.isDecimal(f[6]), let effective = Int64(f[6]),
               effective == requested + delayMs else {
             throw E2EEV2TrustFormatError.invalidField

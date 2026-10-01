@@ -4872,20 +4872,29 @@ extension E2EETests {
         )?.epochKey, epochKey)
     }
 
-    func testV2RecoveryBackfillWrapsOnlyForTheOwnAccountRecoveryKey() {
+    func testV2RecoveryBackfillWrapsOnlyForTheOwnAccountRecoveryKey() throws {
+        var material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: "user:\(String(repeating: "a", count: 64))")
+        defer { material.zeroize() }
+        let hash = E2EEV2RecoveryV2Crypto.bundleHash(material.bundle)
         let own = E2EEV2RecoveryEpochRecipient(
-            recipientUserId: "user_alice_01J7ABCD2345", recoveryBundleHash: "hash-alice",
-            recoveryPublicIdentityKeyB64: "cle-alice"
+            recipientUserId: "user_alice_01J7ABCD2345", recoveryBundleHash: hash,
+            recoveryPublicIdentityKeyB64: material.bundle.recoveryPublicIdentityKeyB64
         )
         let other = E2EEV2RecoveryEpochRecipient(
             recipientUserId: "user_bruno_01J7ABCD2345", recoveryBundleHash: "hash-bruno",
             recoveryPublicIdentityKeyB64: "cle-bruno"
         )
-        XCTAssertEqual(
-            E2EEV2RecoveryEpochContract.ownRecipients([other, own], userId: "user_alice_01J7ABCD2345"), [own],
-            "La clé de récupération d'un autre membre, fournie par le serveur, n'est jamais utilisée"
+        let substituted = E2EEV2RecoveryEpochRecipient(
+            recipientUserId: "user_alice_01J7ABCD2345", recoveryBundleHash: hash,
+            recoveryPublicIdentityKeyB64: P256.KeyAgreement.PrivateKey().publicKey.x963Representation.base64EncodedString()
         )
-        XCTAssertEqual(E2EEV2RecoveryEpochContract.ownRecipients([other], userId: "user_alice_01J7ABCD2345"), [])
+        func kept(_ recipients: [E2EEV2RecoveryEpochRecipient]) -> [E2EEV2RecoveryEpochRecipient] {
+            E2EEV2RecoveryEpochContract.ownRecipients(recipients, userId: "user_alice_01J7ABCD2345", ownBundle: material.bundle)
+        }
+        XCTAssertEqual(kept([other, own]), [own],
+                       "La clé de récupération d'un autre membre, fournie par le serveur, n'est jamais utilisée")
+        XCTAssertEqual(kept([other]), [])
+        XCTAssertEqual(kept([substituted]), [], "Ni une clé glissée par le serveur au nom de son propre compte")
     }
 
     func testV2RecoveryEpochBackfillPaginatesWithARealQuery() async throws {
@@ -4910,7 +4919,9 @@ extension E2EETests {
 
         let coordinator = E2EEV2RecoveryEpochCoordinator(
             api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys)
-        switch await coordinator.backfillAll() {
+        var material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: "user:\(String(repeating: "a", count: 64))")
+        defer { material.zeroize() }
+        switch await coordinator.backfillAll(ownBundle: material.bundle) {
         case .success(let summary):
             XCTAssertEqual(summary.backedUpEpochCount, 0)
             XCTAssertEqual(summary.missingParticipantUserIds, [])

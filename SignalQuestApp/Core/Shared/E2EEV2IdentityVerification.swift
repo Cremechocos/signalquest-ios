@@ -126,12 +126,21 @@ enum E2EEV2IdentityVerification {
         let pin: E2EEV2TrustPin
     }
 
-    static func verify(_ bundle: E2EEV2IdentityBundle, pinned: E2EEV2TrustPin?) -> Result<Outcome, Failure> {
-        guard let uikData = Data(base64Encoded: bundle.uikX963B64),
+    /// `expectedUIK` : la clé de compte détenue ici, pour son propre compte ;
+    /// le serveur ne peut alors pas en substituer une autre, même au premier
+    /// contact.
+    static func verify(
+        _ bundle: E2EEV2IdentityBundle,
+        pinned: E2EEV2TrustPin?,
+        expectedUIK: P256.Signing.PublicKey? = nil
+    ) -> Result<Outcome, Failure> {
+        guard E2EEV2Canonical.isX963PublicKey(bundle.uikX963B64),
+              let uikData = Data(base64Encoded: bundle.uikX963B64),
               let uik = try? P256.Signing.PublicKey(x963Representation: uikData) else {
             return .failure(.malformed)
         }
-        if let pinned, pinned.uikX963B64 != bundle.uikX963B64 { return .failure(.uikChanged) }
+        if let pinned, Data(base64Encoded: pinned.uikX963B64) != uikData { return .failure(.uikChanged) }
+        if let expectedUIK, expectedUIK.x963Representation != uikData { return .failure(.uikChanged) }
 
         // Liste d'appareils : signature de l'UIK, entrées, version monotone.
         guard let list = try? E2EEV2DeviceList.verifyWithoutChain(
@@ -144,21 +153,17 @@ enum E2EEV2IdentityVerification {
             if list.version == pinned.listVersion, bundle.deviceList.canonical != pinned.listCanonical {
                 return .failure(.deviceListRollback)
             }
-            if list.version == pinned.listVersion + 1,
+            if list.version - 1 == pinned.listVersion,
                list.previousListDigest != E2EEV2DeviceList.digest(of: pinned.listCanonical) {
                 return .failure(.invalidDeviceList)
             }
         }
         var entries: [String: (keyVersion: Int, platform: String, fingerprint: String)] = [:]
         for entry in bundle.deviceEntries {
-            let lines = entry.components(separatedBy: "\n")
-            guard lines.count == 4, E2EEV2Canonical.isOpaque(lines[0]),
-                  E2EEV2Canonical.isDecimal(lines[1]), let keyVersion = Int(lines[1]), keyVersion >= 1,
-                  E2EEV2DeviceCertificate.platforms.contains(lines[2]),
-                  entries[lines[0]] == nil else {
+            guard let parsed = E2EEV2DeviceList.parseEntry(entry), entries[parsed.deviceId] == nil else {
                 return .failure(.invalidDeviceList)
             }
-            entries[lines[0]] = (keyVersion, lines[2], lines[3])
+            entries[parsed.deviceId] = (parsed.keyVersion, parsed.platform, parsed.fingerprint)
         }
 
         // Certificats : signés par l'UIK et identiques à une entrée de la liste.

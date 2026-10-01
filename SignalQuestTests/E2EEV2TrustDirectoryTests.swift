@@ -30,6 +30,11 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
             userId = "user_\(name)_01J7ABCD2345"
             deviceId = "device_\(name)_ios_01J7ABCD"
         }
+
+        init(userId: String, deviceId: String) {
+            self.userId = userId
+            self.deviceId = deviceId
+        }
     }
 
     func testMembersAreCertifiedAndPinnedAcrossReads() async throws {
@@ -72,6 +77,39 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         let set = try await directory.certifiedDevices(for: [bruno.userId])
         XCTAssertEqual(set.refusals, [bruno.userId: .uikChanged])
         XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now), "Aucun appareil certifié : pas d'appel vérifié")
+    }
+
+    func testADeviceIdCertifiedByTwoAccountsIsBelievedForNeither() async throws {
+        let bruno = Account("bruno")
+        var carla = Account("carla")
+        carla = Account(userId: carla.userId, deviceId: bruno.deviceId)
+        let server = Server()
+        server.serve(try bundle(bruno, version: 1, features: ["calls"]), for: bruno.userId)
+        server.serve(try bundle(carla, version: 1, features: ["calls"]), for: carla.userId)
+        let directory = E2EEV2TrustDirectory(
+            ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())
+        ) { try server.response(for: $0) }
+        let set = try await directory.certifiedDevices(for: [bruno.userId, carla.userId])
+        XCTAssertNil(set.device(deviceId: bruno.deviceId), "Identifiant ambigu : aucun des deux n'est cru")
+        XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now))
+    }
+
+    func testOwnAccountMustCarryTheKeyHeldHere() async throws {
+        let alice = Account("alice"), impostor = Account("alice")
+        let server = Server()
+        server.serve(try bundle(impostor, version: 1, features: ["calls"]), for: alice.userId)
+        let held = alice.uik.publicKey
+        let directory = E2EEV2TrustDirectory(
+            ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()),
+            ownUserId: alice.userId, ownAccountKey: { held }
+        ) { try server.response(for: $0) }
+        let set = try await directory.certifiedDevices(for: [alice.userId])
+        XCTAssertEqual(set.refusals, [alice.userId: .uikChanged])
+    }
+
+    func testARefusedMemberMakesVerifiedCallsUnavailable() {
+        let set = E2EEV2CertifiedDeviceSet(devicesByUser: [:], refusals: ["user_bruno_01J7ABCD2345": .uikChanged])
+        XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now))
     }
 
     func testVerifiedCallsNeedEveryActiveDeviceToSupportThem() {

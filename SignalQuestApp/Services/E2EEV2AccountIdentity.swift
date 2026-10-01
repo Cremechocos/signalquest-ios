@@ -43,9 +43,14 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
         return key
     }
 
-    /// Appareil approuvé : l'UIK reçue chiffrée à l'approbation (D.1).
+    /// Appareil approuvé : l'UIK reçue chiffrée à l'approbation (D.1). Jamais
+    /// par-dessus une autre : seule une réinitialisation d'identité change l'UIK.
     func install(_ key: P256.Signing.PrivateKey, ownerNamespace: String) throws {
         guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        if let existing = try load(ownerNamespace: ownerNamespace) {
+            guard existing.rawRepresentation == key.rawRepresentation else { throw Failure.alreadyExists }
+            return
+        }
         try tokenStore.set(
             key.rawRepresentation.base64EncodedString(),
             for: Self.key(ownerNamespace: ownerNamespace),
@@ -279,7 +284,7 @@ enum E2EEV2DeviceApprovalTrust {
             throw Failure.approverNotListed
         }
         guard account.devices.contains(where: {
-            $0.deviceId == device.deviceId && $0.keyVersion == device.keyVersion
+            $0.deviceId == device.deviceId && $0.keyVersion == device.keyVersion && $0.platform == device.platform
                 && $0.identityKeyB64 == device.publicIdentityKeyB64 && $0.signingKeyB64 == device.publicSigningKeyB64
         }) else {
             throw Failure.notCertified

@@ -172,6 +172,51 @@ final class E2EEV2IdentityVerificationTests: XCTestCase {
 
     // MARK: - Outils
 
+    // MARK: - Relecture indépendante du 01/10 (X-2)
+
+    func testOwnAccountKeyIsComparedToTheKeyHeldHereEvenAtFirstContact() throws {
+        let uik = P256.Signing.PrivateKey()
+        let (bundle, _) = try makeBundle(uik: P256.Signing.PrivateKey(), devices: [phone], version: 1, previous: nil)
+        XCTAssertEqual(failure(E2EEV2IdentityVerification.verify(bundle, pinned: nil, expectedUIK: uik.publicKey)),
+                       .uikChanged, "Le serveur ne glisse pas une autre clé dans son propre compte")
+        let (own, _) = try makeBundle(uik: uik, devices: [phone], version: 1, previous: nil)
+        XCTAssertNotNil(try? E2EEV2IdentityVerification.verify(own, pinned: nil, expectedUIK: uik.publicKey).get())
+    }
+
+    func testNonCanonicalKeysAndGroupedEntriesAreRefused() throws {
+        let uik = P256.Signing.PrivateKey()
+        let (bundle, _) = try makeBundle(uik: uik, devices: [phone], version: 1, previous: nil)
+        // Même clé, base64 non canonique : refusée plutôt que prise pour une autre.
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+        var b64 = Array(bundle.uikX963B64)
+        let last = b64.count - 2 // avant le « = » : 2 bits de bourrage
+        b64[last] = alphabet[try XCTUnwrap(alphabet.firstIndex(of: b64[last])) ^ 1]
+        let variant = String(b64)
+        XCTAssertEqual(Data(base64Encoded: variant), Data(base64Encoded: bundle.uikX963B64), "Même octets")
+        let renamed = E2EEV2IdentityBundle(
+            userId: bundle.userId, uikX963B64: variant, deviceList: bundle.deviceList,
+            deviceEntries: bundle.deviceEntries, certificates: bundle.certificates,
+            capabilities: bundle.capabilities, hasPendingIdentityReset: false
+        )
+        XCTAssertEqual(failure(E2EEV2IdentityVerification.verify(renamed, pinned: nil)), .malformed)
+
+        // Entrées regroupées : même condensat, découpage différent.
+        let grouped = ["a1234567890123456\n1\nios", "fa\n\(phone.entry)"]
+        let list = E2EEV2DeviceList.make(userId: userId, version: 1, previousCanonical: nil, entries: grouped, issuedAtMs: now)
+        XCTAssertThrowsError(try E2EEV2DeviceList.verifyWithoutChain(
+            E2EEV2SignedString.sign(list.canonical, with: uik), entries: grouped, uik: uik.publicKey
+        ), "Une liste signée aux entrées mal formées est refusée")
+    }
+
+    func testAHugeListVersionIsRefusedInsteadOfOverflowing() throws {
+        let uik = P256.Signing.PrivateKey()
+        let (first, canonical) = try makeBundle(uik: uik, devices: [phone], version: 1, previous: nil)
+        let pin = try XCTUnwrap(try? E2EEV2IdentityVerification.verify(first, pinned: nil).get()).pin
+        let (huge, _) = try makeBundle(uik: uik, devices: [phone], version: Int.max, previous: canonical)
+        XCTAssertEqual(failure(E2EEV2IdentityVerification.verify(huge, pinned: pin)), .invalidDeviceList)
+        XCTAssertEqual(failure(E2EEV2IdentityVerification.verify(huge, pinned: nil)), .invalidDeviceList)
+    }
+
     private func makeBundle(
         uik: P256.Signing.PrivateKey,
         devices: [Device],

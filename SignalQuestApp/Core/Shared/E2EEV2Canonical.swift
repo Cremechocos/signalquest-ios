@@ -426,8 +426,12 @@ enum E2EEV2Canonical {
         sha256B64URL(identityKeyX963 + signingKeyX963)
     }
 
+    /// Clé publique P-256 en base64 canonique : `Data(base64Encoded:)` accepte
+    /// aussi des variantes (`QR==` comme `QQ==`), qu'une comparaison de chaînes
+    /// prendrait pour une autre clé.
     static func isX963PublicKey(_ b64: String) -> Bool {
-        guard let data = Data(base64Encoded: b64), data.count == 65, data.first == 0x04 else { return false }
+        guard let data = Data(base64Encoded: b64), data.count == 65, data.first == 0x04,
+              data.base64EncodedString() == b64 else { return false }
         return (try? P256.Signing.PublicKey(x963Representation: data)) != nil
     }
 }

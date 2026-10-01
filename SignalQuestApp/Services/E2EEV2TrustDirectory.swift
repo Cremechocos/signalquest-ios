@@ -26,9 +26,10 @@ struct E2EEV2CertifiedDeviceSet: Equatable, Sendable {
     }
 
     /// §10.0 et §12 : tous les appareils certifiés et non mis à l'écart des
-    /// membres ont la capacité « appels vérifiés ». Un membre sans appareil
-    /// certifié ne compte pas ; un appareil mis à l'écart non plus.
+    /// membres ont la capacité « appels vérifiés ». Un membre dont le paquet
+    /// est refusé rend l'appel indisponible : ses appareils sont inconnus.
     func supportsVerifiedCalls(nowMs: Int64) -> Bool {
+        guard refusals.isEmpty else { return false }
         let active = devicesByUser.values.flatMap { $0 }.filter { !$0.isSidelined(nowMs: nowMs) }
         return !active.isEmpty && active.allSatisfy { $0.supports("calls", nowMs: nowMs) }
     }
@@ -77,15 +78,24 @@ actor E2EEV2TrustDirectory {
 
     private let ownerNamespace: String
     private let pins: E2EEV2TrustPinStore
+    private let ownUserId: String?
+    private let ownAccountKey: @Sendable () -> P256.Signing.PublicKey?
     private let fetch: @Sendable (_ userId: String) async throws -> Data
 
+    /// `ownAccountKey` : la clé de compte détenue ici. Son propre paquet doit la
+    /// porter, sinon le serveur pourrait y glisser une autre clé au premier
+    /// contact.
     init(
         ownerNamespace: String,
         pins: E2EEV2TrustPinStore = E2EEV2TrustPinStore(),
+        ownUserId: String? = nil,
+        ownAccountKey: @escaping @Sendable () -> P256.Signing.PublicKey? = { nil },
         fetch: @escaping @Sendable (_ userId: String) async throws -> Data
     ) {
         self.ownerNamespace = ownerNamespace
         self.pins = pins
+        self.ownUserId = ownUserId
+        self.ownAccountKey = ownAccountKey
         self.fetch = fetch
     }
 
@@ -99,13 +109,21 @@ actor E2EEV2TrustDirectory {
                 throw Failure.malformedResponse(userId: userId)
             }
             let pinned = try pins.pin(userId: userId, ownerNamespace: ownerNamespace)
-            switch E2EEV2IdentityVerification.verify(bundle, pinned: pinned) {
+            let expected = userId == ownUserId ? ownAccountKey() : nil
+            switch E2EEV2IdentityVerification.verify(bundle, pinned: pinned, expectedUIK: expected) {
             case .success(let outcome):
                 try pins.save(outcome.pin, userId: userId, ownerNamespace: ownerNamespace)
                 devices[userId] = outcome.devices
             case .failure(let refusal):
                 refusals[userId] = refusal
             }
+        }
+        // Un identifiant d'appareil certifié par deux comptes est ambigu : un
+        // descripteur d'appel ne le désigne que par lui. Aucun des deux n'est cru.
+        let owners = devices.values.flatMap { $0 }.reduce(into: [String: Int]()) { $0[$1.deviceId, default: 0] += 1 }
+        let ambiguous = Set(owners.filter { $0.value > 1 }.keys)
+        if !ambiguous.isEmpty {
+            devices = devices.mapValues { $0.filter { !ambiguous.contains($0.deviceId) } }
         }
         return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals)
     }

@@ -5150,13 +5150,19 @@ enum E2EEV2RecoveryEpochContract {
     }
 
     /// §2.8 : un appareil n'enveloppe une clé d'époque que vers la clé de
-    /// récupération de son propre compte, jamais vers celle d'un autre membre,
-    /// même fournie par le serveur.
+    /// récupération de son propre compte, jamais vers celle d'un autre membre.
+    /// Le serveur ne choisit pas non plus cette clé : seul le bundle que
+    /// l'appareil connaît (empreinte et clé publique) est accepté.
     static func ownRecipients(
         _ recipients: [E2EEV2RecoveryEpochRecipient],
-        userId: String
+        userId: String,
+        ownBundle: E2EEV2RecoveryBundleV2
     ) -> [E2EEV2RecoveryEpochRecipient] {
-        recipients.filter { $0.recipientUserId == userId }
+        let hash = E2EEV2RecoveryV2Crypto.bundleHash(ownBundle)
+        return recipients.filter {
+            $0.recipientUserId == userId && $0.recoveryBundleHash == hash
+                && $0.recoveryPublicIdentityKeyB64 == ownBundle.recoveryPublicIdentityKeyB64
+        }
     }
 
     static func uploadData(_ envelopes: [E2EEV2RecoveryEpochEnvelope]) throws -> Data {
@@ -5400,7 +5406,9 @@ final class E2EEV2RecoveryEpochCoordinator: @unchecked Sendable {
         return localFailure("e2ee-recovery-pagination-limit-exceeded")
     }
 
-    func backfillAll() async -> E2EEV2RecoveryEpochResult<E2EEV2RecoveryEpochBackfillSummary> {
+    /// `ownBundle` : le bundle de récupération que cet appareil vient de créer ;
+    /// les clés d'époque ne sont enveloppées que vers lui.
+    func backfillAll(ownBundle: E2EEV2RecoveryBundleV2) async -> E2EEV2RecoveryEpochResult<E2EEV2RecoveryEpochBackfillSummary> {
         guard let account = currentAccount() else {
             return localFailure("authenticated-account-required")
         }
@@ -5463,7 +5471,7 @@ final class E2EEV2RecoveryEpochCoordinator: @unchecked Sendable {
 
                     // §2.8 : seulement vers la clé de récupération de son propre compte.
                     let recipients = E2EEV2RecoveryEpochContract.ownRecipients(
-                        item.recoveryRecipients, userId: account.userId
+                        item.recoveryRecipients, userId: account.userId, ownBundle: ownBundle
                     )
                     guard !recipients.isEmpty else { continue }
                     let envelopes = try recipients.map { recipient in

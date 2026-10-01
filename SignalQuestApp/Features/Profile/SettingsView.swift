@@ -968,12 +968,13 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
 
         wipeRecoveryKey()
         recoveryKey = material.recoveryKey
+        let ownBundle = material.bundle
         material.zeroize()
         recoveryKeyAcknowledged = false
         acknowledgedNoRecovery = false
         resetNeedsRecovery = false
 
-        switch await recoveryEpochs.backfillAll() {
+        switch await recoveryEpochs.backfillAll(ownBundle: ownBundle) {
         case .success(let summary):
             confirmationMessage = "Clé créée : \(summary.backedUpEpochCount) clé(s) d’historique sauvegardée(s), \(summary.missingParticipantUserIds.count) participant(s) sans clé disponible."
         case .failure(let failure):

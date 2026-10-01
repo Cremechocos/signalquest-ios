@@ -23,6 +23,10 @@ final class E2EEV2AccountIdentityTests: XCTestCase {
             XCTAssertEqual($0 as? E2EEV2AccountIdentityStore.Failure, .otherAccount)
         }
         XCTAssertThrowsError(try store.install(P256.Signing.PrivateKey(), ownerNamespace: "ns-other"))
+        XCTAssertThrowsError(try store.install(P256.Signing.PrivateKey(), ownerNamespace: namespace)) {
+            XCTAssertEqual($0 as? E2EEV2AccountIdentityStore.Failure, .alreadyExists, "Une UIK reçue n'écrase jamais l'autre")
+        }
+        XCTAssertNoThrow(try store.install(created, ownerNamespace: namespace), "La même clé, idempotente")
 
         try tokens.set("pas une clé", for: E2EEV2AccountIdentityStore.key(ownerNamespace: namespace), accessibility: .whenUnlocked)
         XCTAssertThrowsError(try store.load(ownerNamespace: namespace)) {
