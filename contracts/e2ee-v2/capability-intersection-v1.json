@@ -1,0 +1,474 @@
+{
+  "fixtureVersion": "1",
+  "freshnessMs": "7776000000",
+  "cases": [
+    {
+      "case": "intersection",
+      "nowMs": "1790000000000",
+      "excludesWeb": "0",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1789999999000\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": "{\"deviceId\":\"device_bruno_android_01J7ABCD\",\"envelopeVersions\":[\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1789999998000\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"2\",\"userId\":\"user_bruno_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "available": "1",
+        "deviceIds": [
+          "device_alice_ios_01J7ABCD2345",
+          "device_bruno_android_01J7ABCD"
+        ],
+        "envelopeVersions": [
+          "2"
+        ],
+        "payloadVersions": [
+          "2"
+        ],
+        "kinds": [
+          "TEXT"
+        ],
+        "features": [
+          "calls"
+        ]
+      }
+    },
+    {
+      "case": "browserWithoutCalls",
+      "nowMs": "1790000000000",
+      "excludesWeb": "0",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1789999999000\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            },
+            {
+              "deviceId": "device_alice_web_01J7ABCD2345",
+              "platform": "web",
+              "capabilities": "{\"deviceId\":\"device_alice_web_01J7ABCD2345\",\"envelopeVersions\":[\"2\"],\"features\":[\"voice\"],\"issuedAtMs\":\"1789999997000\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"1\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": "{\"deviceId\":\"device_bruno_android_01J7ABCD\",\"envelopeVersions\":[\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1789999998000\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"2\",\"userId\":\"user_bruno_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "available": "1",
+        "deviceIds": [
+          "device_alice_ios_01J7ABCD2345",
+          "device_alice_web_01J7ABCD2345",
+          "device_bruno_android_01J7ABCD"
+        ],
+        "envelopeVersions": [
+          "2"
+        ],
+        "payloadVersions": [
+          "2"
+        ],
+        "kinds": [
+          "TEXT"
+        ],
+        "features": []
+      }
+    },
+    {
+      "case": "browsersExcluded",
+      "nowMs": "1790000000000",
+      "excludesWeb": "1",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1789999999000\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            },
+            {
+              "deviceId": "device_alice_web_01J7ABCD2345",
+              "platform": "web",
+              "capabilities": "{\"deviceId\":\"device_alice_web_01J7ABCD2345\",\"envelopeVersions\":[\"2\"],\"features\":[\"voice\"],\"issuedAtMs\":\"1789999997000\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"1\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": "{\"deviceId\":\"device_bruno_android_01J7ABCD\",\"envelopeVersions\":[\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1789999998000\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"2\",\"userId\":\"user_bruno_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "available": "1",
+        "deviceIds": [
+          "device_alice_ios_01J7ABCD2345",
+          "device_bruno_android_01J7ABCD"
+        ],
+        "envelopeVersions": [
+          "2"
+        ],
+        "payloadVersions": [
+          "2"
+        ],
+        "kinds": [
+          "TEXT"
+        ],
+        "features": [
+          "calls"
+        ]
+      }
+    },
+    {
+      "case": "staleDocumentSidelined",
+      "nowMs": "1790000000000",
+      "excludesWeb": "0",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1789999999000\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": "{\"deviceId\":\"device_bruno_android_01J7ABCD\",\"envelopeVersions\":[\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1782223999999\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"2\",\"userId\":\"user_bruno_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "available": "1",
+        "deviceIds": [
+          "device_alice_ios_01J7ABCD2345"
+        ],
+        "envelopeVersions": [
+          "1",
+          "2"
+        ],
+        "payloadVersions": [
+          "2"
+        ],
+        "kinds": [
+          "POLL",
+          "TEXT"
+        ],
+        "features": [
+          "calls",
+          "voice"
+        ]
+      }
+    },
+    {
+      "case": "justUnderNinetyDaysCounts",
+      "nowMs": "1790000000000",
+      "excludesWeb": "0",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1789999999000\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": "{\"deviceId\":\"device_bruno_android_01J7ABCD\",\"envelopeVersions\":[\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1782224000001\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"2\",\"userId\":\"user_bruno_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "available": "1",
+        "deviceIds": [
+          "device_alice_ios_01J7ABCD2345",
+          "device_bruno_android_01J7ABCD"
+        ],
+        "envelopeVersions": [
+          "2"
+        ],
+        "payloadVersions": [
+          "2"
+        ],
+        "kinds": [
+          "TEXT"
+        ],
+        "features": [
+          "calls"
+        ]
+      }
+    },
+    {
+      "case": "exactlyNinetyDaysSidelined",
+      "nowMs": "1790000000000",
+      "excludesWeb": "0",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1789999999000\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": "{\"deviceId\":\"device_bruno_android_01J7ABCD\",\"envelopeVersions\":[\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1782224000000\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"2\",\"userId\":\"user_bruno_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "available": "1",
+        "deviceIds": [
+          "device_alice_ios_01J7ABCD2345"
+        ],
+        "envelopeVersions": [
+          "1",
+          "2"
+        ],
+        "payloadVersions": [
+          "2"
+        ],
+        "kinds": [
+          "POLL",
+          "TEXT"
+        ],
+        "features": [
+          "calls",
+          "voice"
+        ]
+      }
+    },
+    {
+      "case": "deviceWithoutDocumentSidelined",
+      "nowMs": "1790000000000",
+      "excludesWeb": "0",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1789999999000\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "available": "1",
+        "deviceIds": [
+          "device_alice_ios_01J7ABCD2345"
+        ],
+        "envelopeVersions": [
+          "1",
+          "2"
+        ],
+        "payloadVersions": [
+          "2"
+        ],
+        "kinds": [
+          "POLL",
+          "TEXT"
+        ],
+        "features": [
+          "calls",
+          "voice"
+        ]
+      }
+    },
+    {
+      "case": "memberWithoutCertifiedDevice",
+      "nowMs": "1790000000000",
+      "excludesWeb": "0",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1789999999000\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": "{\"deviceId\":\"device_bruno_android_01J7ABCD\",\"envelopeVersions\":[\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1789999998000\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"2\",\"userId\":\"user_bruno_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_chloe_01J7ABCD23456789",
+          "refused": "0",
+          "devices": []
+        }
+      ],
+      "expected": {
+        "available": "1",
+        "deviceIds": [
+          "device_alice_ios_01J7ABCD2345",
+          "device_bruno_android_01J7ABCD"
+        ],
+        "envelopeVersions": [
+          "2"
+        ],
+        "payloadVersions": [
+          "2"
+        ],
+        "kinds": [
+          "TEXT"
+        ],
+        "features": [
+          "calls"
+        ]
+      }
+    },
+    {
+      "case": "refusedMember",
+      "nowMs": "1790000000000",
+      "excludesWeb": "0",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1789999999000\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "1",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": "{\"deviceId\":\"device_bruno_android_01J7ABCD\",\"envelopeVersions\":[\"2\"],\"features\":[\"calls\"],\"issuedAtMs\":\"1789999998000\",\"kinds\":[\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"2\",\"userId\":\"user_bruno_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "available": "0"
+      }
+    },
+    {
+      "case": "noActiveDevice",
+      "nowMs": "1790000000000",
+      "excludesWeb": "0",
+      "members": [
+        {
+          "userId": "user_alice_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_alice_ios_01J7ABCD2345",
+              "platform": "ios",
+              "capabilities": "{\"deviceId\":\"device_alice_ios_01J7ABCD2345\",\"envelopeVersions\":[\"1\",\"2\"],\"features\":[\"calls\",\"voice\"],\"issuedAtMs\":\"1782223999999\",\"kinds\":[\"POLL\",\"TEXT\"],\"payloadVersions\":[\"2\"],\"schema\":\"signalquest.e2ee-capabilities\",\"sequence\":\"3\",\"userId\":\"user_alice_01J7ABCD23456789\",\"version\":\"1\"}"
+            }
+          ]
+        },
+        {
+          "userId": "user_bruno_01J7ABCD23456789",
+          "refused": "0",
+          "devices": [
+            {
+              "deviceId": "device_bruno_android_01J7ABCD",
+              "platform": "android",
+              "capabilities": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "available": "0"
+      }
+    }
+  ]
+}

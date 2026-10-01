@@ -32,15 +32,49 @@ struct E2EEV2CertifiedDeviceSet: Equatable, Sendable {
         members.filter { refusals[$0] != nil }.sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
     }
 
-    /// §10.0 et §12 : tous les appareils certifiés et non mis à l'écart des
-    /// membres ont la capacité « appels vérifiés ». Un navigateur ne compte pas
-    /// quand la conversation exclut les navigateurs. Un membre dont le paquet
-    /// est refusé rend l'appel indisponible : ses appareils sont inconnus.
-    func supportsVerifiedCalls(nowMs: Int64, excludesWeb: Bool) -> Bool {
-        guard refusals.isEmpty else { return false }
-        let active = devicesByUser.values.flatMap { $0 }
+    /// Capacité d'une conversation (§12) : ce que savent faire tous les
+    /// appareils pris en compte, triés par octets UTF-8.
+    struct CapabilityIntersection: Equatable, Sendable {
+        let deviceIds: [String]
+        let envelopeVersions: [String]
+        let payloadVersions: [String]
+        let kinds: [String]
+        let features: [String]
+    }
+
+    /// Comptent les appareils certifiés et non mis à l'écart des membres ; un
+    /// navigateur ne compte pas quand la conversation exclut les navigateurs ;
+    /// un membre sans appareil ne compte pas. Un membre dont le paquet est
+    /// refusé, ou l'absence de tout appareil actif, la rend indisponible.
+    /// Vecteur : `capability-intersection-v1`.
+    func capabilityIntersection(nowMs: Int64, excludesWeb: Bool) -> CapabilityIntersection? {
+        guard refusals.isEmpty else { return nil }
+        let documents = devicesByUser.values.flatMap { $0 }
             .filter { !$0.isSidelined(nowMs: nowMs) && !(excludesWeb && $0.platform == "web") }
-        return !active.isEmpty && active.allSatisfy { $0.supports("calls", nowMs: nowMs) }
+            .compactMap { device in device.capabilities.map { (device.deviceId, $0) } }
+        guard let first = documents.first?.1 else { return nil }
+        var envelopes = Set(first.envelopeVersions), payloads = Set(first.payloadVersions)
+        var kinds = Set(first.kinds), features = Set(first.features)
+        for (_, document) in documents.dropFirst() {
+            envelopes.formIntersection(document.envelopeVersions)
+            payloads.formIntersection(document.payloadVersions)
+            kinds.formIntersection(document.kinds)
+            features.formIntersection(document.features)
+        }
+        func sorted<S: Sequence>(_ values: S) -> [String] where S.Element == String {
+            values.sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
+        }
+        return CapabilityIntersection(
+            deviceIds: sorted(documents.map(\.0)), envelopeVersions: sorted(envelopes),
+            payloadVersions: sorted(payloads), kinds: sorted(kinds), features: sorted(features)
+        )
+    }
+
+    /// §10.0 : l'appel chiffré n'est possible que si l'intersection contient
+    /// « appels vérifiés ». Un membre refusé le rend indisponible : ses
+    /// appareils sont inconnus.
+    func supportsVerifiedCalls(nowMs: Int64, excludesWeb: Bool) -> Bool {
+        capabilityIntersection(nowMs: nowMs, excludesWeb: excludesWeb)?.features.contains("calls") == true
     }
 }
 

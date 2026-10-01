@@ -49,6 +49,7 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
             ("device-approval-v2", try buildApprovalV2()),
             ("safety-number-v1", try buildSafetyNumber()),
             ("identity-reset-v1", try buildIdentityReset()),
+            ("capability-intersection-v1", buildCapabilityIntersection()),
         ]
         for (name, value) in vectors {
             try Data((render(value) + "\n").utf8).write(to: vectorURL(name))
@@ -580,6 +581,44 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
         try forEachNegative(v) { neg in
             let candidate = E2EEV2SignedString(canonical: try str(neg, "resetUtf8", default: v), signatureB64: try str(neg, "signatureDerB64", default: v))
             XCTAssertThrowsError(try E2EEV2IdentityReset.verify(candidate), caseName(neg))
+        }
+    }
+
+    /// §12 : ce que savent faire tous les appareils pris en compte, avec les
+    /// mises à l'écart, l'exclusion des navigateurs et les membres refusés.
+    func testCapabilityIntersectionVector() throws {
+        let v = try load("capability-intersection-v1")
+        XCTAssertEqual(try int64(v, "freshnessMs"), E2EEV2IdentityVerification.capabilityFreshnessMs)
+        let cases = try XCTUnwrap(v["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10)
+        for item in cases {
+            let name = caseName(item)
+            var devicesByUser: [String: [E2EEV2CertifiedDevice]] = [:]
+            var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
+            for member in try XCTUnwrap(item["members"] as? [[String: Any]], name) {
+                let userId = try str(member, "userId")
+                if try str(member, "refused") == "1" { refusals[userId] = .uikChanged }
+                devicesByUser[userId] = try XCTUnwrap(member["devices"] as? [[String: Any]], name).map { device in
+                    E2EEV2CertifiedDevice(
+                        userId: userId, deviceId: try str(device, "deviceId"), keyVersion: 1,
+                        platform: try str(device, "platform"), identityKeyB64: "", signingKeyB64: "", fingerprint: "",
+                        capabilities: try (device["capabilities"] as? String).map { try E2EEV2CapabilitiesDocument.parse(document: $0) }
+                    )
+                }
+            }
+            let intersection = E2EEV2CertifiedDeviceSet(devicesByUser: devicesByUser, refusals: refusals)
+                .capabilityIntersection(nowMs: try int64(item, "nowMs"), excludesWeb: try str(item, "excludesWeb") == "1")
+            let expected = try XCTUnwrap(item["expected"] as? [String: Any], name)
+            guard try str(expected, "available") == "1" else {
+                XCTAssertNil(intersection, name)
+                continue
+            }
+            let result = try XCTUnwrap(intersection, name)
+            XCTAssertEqual(result.deviceIds, try strings(expected, "deviceIds"), name)
+            XCTAssertEqual(result.envelopeVersions, try strings(expected, "envelopeVersions"), name)
+            XCTAssertEqual(result.payloadVersions, try strings(expected, "payloadVersions"), name)
+            XCTAssertEqual(result.kinds, try strings(expected, "kinds"), name)
+            XCTAssertEqual(result.features, try strings(expected, "features"), name)
         }
     }
 
@@ -1391,6 +1430,88 @@ private extension E2EEV2JalonAVectorTests {
                 .o([("case", .s("wrongDelay")), ("resetUtf8", .s(wrongDelay)), ("signatureDerB64", .s(try E2EEV2SignedString.sign(wrongDelay, with: newUik).signatureB64))]),
                 .o([("case", .s("signedByPreviousUik")), ("signatureDerB64", .s(signedByOld.signatureB64))]),
                 .o([("case", .s("highS")), ("signatureDerB64", .s(try highS(signed.signatureB64)))]),
+            ])),
+        ])
+    }
+
+    /// Résultats attendus écrits à la main : le vecteur ne recopie pas
+    /// l'implémentation qu'il vérifie.
+    func buildCapabilityIntersection() -> VJ {
+        let freshness = E2EEV2IdentityVerification.capabilityFreshnessMs
+        let now = createdAtMs
+        let userC = "user_chloe_01J7ABCD23456789"
+        func document(
+            _ userId: String, _ deviceId: String, sequence: Int, issuedAtMs: Int64,
+            envelopes: [String], payloads: [String], kinds: [String], features: [String]
+        ) -> String {
+            E2EEV2CapabilitiesDocument(
+                userId: userId, deviceId: deviceId, sequence: sequence, issuedAtMs: issuedAtMs,
+                envelopeVersions: envelopes, payloadVersions: payloads, kinds: kinds, features: features
+            ).document
+        }
+        func aliceIOS(issuedAtMs: Int64) -> String {
+            document(userA, deviceA1, sequence: 3, issuedAtMs: issuedAtMs, envelopes: ["1", "2"], payloads: ["2"],
+                     kinds: ["POLL", "TEXT"], features: ["calls", "voice"])
+        }
+        func brunoAndroid(issuedAtMs: Int64) -> String {
+            document(userB, deviceB1, sequence: 2, issuedAtMs: issuedAtMs, envelopes: ["2"], payloads: ["2"],
+                     kinds: ["TEXT"], features: ["calls"])
+        }
+        let aliceWeb = document(userA, deviceA2, sequence: 1, issuedAtMs: now - 3_000, envelopes: ["2"], payloads: ["2"],
+                                kinds: ["TEXT"], features: ["voice"])
+        func device(_ deviceId: String, _ platform: String, _ capabilities: String?) -> VJ {
+            .o([("deviceId", .s(deviceId)), ("platform", .s(platform)), ("capabilities", capabilities.map(VJ.s) ?? .null)])
+        }
+        func member(_ userId: String, refused: Bool = false, _ devices: [VJ]) -> VJ {
+            .o([("userId", .s(userId)), ("refused", .s(refused ? "1" : "0")), ("devices", .a(devices))])
+        }
+        func available(_ deviceIds: [String], envelopes: [String], payloads: [String], kinds: [String], features: [String]) -> VJ {
+            .o([
+                ("available", .s("1")), ("deviceIds", .a(deviceIds.map(VJ.s))),
+                ("envelopeVersions", .a(envelopes.map(VJ.s))), ("payloadVersions", .a(payloads.map(VJ.s))),
+                ("kinds", .a(kinds.map(VJ.s))), ("features", .a(features.map(VJ.s))),
+            ])
+        }
+        let unavailable: VJ = .o([("available", .s("0"))])
+        let both = available([deviceA1, deviceB1], envelopes: ["2"], payloads: ["2"], kinds: ["TEXT"], features: ["calls"])
+        let aliceOnly = available([deviceA1], envelopes: ["1", "2"], payloads: ["2"], kinds: ["POLL", "TEXT"], features: ["calls", "voice"])
+        func testCase(_ name: String, excludesWeb: Bool = false, _ members: [VJ], _ expected: VJ) -> VJ {
+            .o([
+                ("case", .s(name)), ("nowMs", .s(String(now))), ("excludesWeb", .s(excludesWeb ? "1" : "0")),
+                ("members", .a(members)), ("expected", expected),
+            ])
+        }
+        let alice = member(userA, [device(deviceA1, "ios", aliceIOS(issuedAtMs: now - 1_000))])
+        let bruno = member(userB, [device(deviceB1, "android", brunoAndroid(issuedAtMs: now - 2_000))])
+        let aliceWithBrowser = member(userA, [
+            device(deviceA1, "ios", aliceIOS(issuedAtMs: now - 1_000)), device(deviceA2, "web", aliceWeb),
+        ])
+        return .o([
+            ("fixtureVersion", .s("1")),
+            ("freshnessMs", .s(String(freshness))),
+            ("cases", .a([
+                testCase("intersection", [alice, bruno], both),
+                testCase("browserWithoutCalls", [aliceWithBrowser, bruno],
+                         available([deviceA1, deviceA2, deviceB1], envelopes: ["2"], payloads: ["2"], kinds: ["TEXT"], features: [])),
+                testCase("browsersExcluded", excludesWeb: true, [aliceWithBrowser, bruno], both),
+                testCase("staleDocumentSidelined", [
+                    alice, member(userB, [device(deviceB1, "android", brunoAndroid(issuedAtMs: now - freshness - 1))]),
+                ], aliceOnly),
+                testCase("justUnderNinetyDaysCounts", [
+                    alice, member(userB, [device(deviceB1, "android", brunoAndroid(issuedAtMs: now - freshness + 1))]),
+                ], both),
+                testCase("exactlyNinetyDaysSidelined", [
+                    alice, member(userB, [device(deviceB1, "android", brunoAndroid(issuedAtMs: now - freshness))]),
+                ], aliceOnly),
+                testCase("deviceWithoutDocumentSidelined", [alice, member(userB, [device(deviceB1, "android", nil)])], aliceOnly),
+                testCase("memberWithoutCertifiedDevice", [alice, bruno, member(userC, [])], both),
+                testCase("refusedMember", [alice, member(userB, refused: true, [
+                    device(deviceB1, "android", brunoAndroid(issuedAtMs: now - 2_000)),
+                ])], unavailable),
+                testCase("noActiveDevice", [
+                    member(userA, [device(deviceA1, "ios", aliceIOS(issuedAtMs: now - freshness - 1))]),
+                    member(userB, [device(deviceB1, "android", nil)]),
+                ], unavailable),
             ])),
         ])
     }

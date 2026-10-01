@@ -104,11 +104,12 @@ struct E2EEV2CertifiedDevice: Equatable, Sendable {
         Data(base64Encoded: signingKeyB64).flatMap { try? P256.Signing.PublicKey(x963Representation: $0) }
     }
 
-    /// Mis à l'écart (§12) : pas de document de capacités de moins de 90 jours.
-    /// Il sort de l'intersection et des nouvelles époques.
+    /// Mis à l'écart (§12) : pas de document de capacités de moins de 90 jours
+    /// (à 90 jours pile, il l'est déjà). Il sort de l'intersection et des
+    /// nouvelles époques.
     func isSidelined(nowMs: Int64) -> Bool {
         guard let capabilities else { return true }
-        return nowMs - capabilities.issuedAtMs > E2EEV2IdentityVerification.capabilityFreshnessMs
+        return nowMs - capabilities.issuedAtMs >= E2EEV2IdentityVerification.capabilityFreshnessMs
     }
 
     func supports(_ feature: String, nowMs: Int64) -> Bool {
