@@ -6,7 +6,12 @@ import UIKit
 /// Core Graphics avec culling viewport — tient des milliers de points (pattern repris
 /// de SessionTraceMapView, le moteur de « Mes mesures »).
 final class SQMapKitDotsOverlay: NSObject, MKOverlay {
-    struct Dot { let point: MKMapPoint; let color: CGColor }
+    struct Dot {
+        let point: MKMapPoint
+        let color: CGColor
+        /// « Sans réseau constaté » : anneau et hachures plutôt qu'un disque plein.
+        var hatched = false
+    }
     let dots: [Dot]
     let boundingMapRect: MKMapRect
     let coordinate: CLLocationCoordinate2D
@@ -34,8 +39,33 @@ final class SQMapKitDotsRenderer: MKOverlayRenderer {
             guard cull.contains(dot.point) else { continue }
             let p = point(for: dot.point)
             let r = CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2)
-            context.setFillColor(dot.color)
-            context.fillEllipse(in: r)
+            if dot.hatched {
+                Self.drawHatched(dot.color, in: r, context: context)
+            } else {
+                context.setFillColor(dot.color)
+                context.fillEllipse(in: r)
+            }
         }
+    }
+
+    /// Hachures du contrat pour « sans réseau constaté » : anneau et trois
+    /// diagonales dans le disque, lisibles sans la couleur.
+    static func drawHatched(_ color: CGColor, in rect: CGRect, context: CGContext) {
+        let line = max(rect.width / 7, 0.4)
+        context.saveGState()
+        context.setStrokeColor(color)
+        context.setLineWidth(line)
+        context.strokeEllipse(in: rect.insetBy(dx: line / 2, dy: line / 2))
+        context.addEllipse(in: rect)
+        context.clip()
+        let step = rect.width / 3
+        var x = rect.minX - rect.height
+        while x < rect.maxX {
+            context.move(to: CGPoint(x: x, y: rect.maxY))
+            context.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
+            x += step
+        }
+        context.strokePath()
+        context.restoreGState()
     }
 }

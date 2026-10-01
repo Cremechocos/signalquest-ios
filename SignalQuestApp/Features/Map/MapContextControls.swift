@@ -237,9 +237,36 @@ private struct MapCoverageKeyControl: View {
                 }
             } else {
                 ForEach(CoverageQualityBand.visibleBands) { band in
-                    Capsule().fill(band.swiftUIColor).frame(width: 4, height: 14)
+                    if band.isHatched {
+                        SQHatchedSwatch(color: band.swiftUIColor).clipShape(Capsule()).frame(width: 4, height: 14)
+                    } else {
+                        Capsule().fill(band.swiftUIColor).frame(width: 4, height: 14)
+                    }
                 }
             }
+        }
+    }
+}
+
+/// Échantillon hachuré de la légende : « sans réseau constaté » (contrat
+/// quality-scale v1), reconnaissable sans la couleur.
+struct SQHatchedSwatch: View {
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let rect = CGRect(origin: .zero, size: size)
+            context.fill(Path(rect), with: .color(color.opacity(0.25)))
+            var stripes = Path()
+            let step = max(size.height / 2, 3)
+            var x = -size.height
+            while x < size.width {
+                stripes.move(to: CGPoint(x: x, y: size.height))
+                stripes.addLine(to: CGPoint(x: x + size.height, y: 0))
+                x += step
+            }
+            context.stroke(stripes, with: .color(color), lineWidth: 1.2)
+            context.stroke(Path(rect.insetBy(dx: 0.5, dy: 0.5)), with: .color(color), lineWidth: 1)
         }
     }
 }
@@ -275,7 +302,7 @@ private struct MapCoverageDetails: View {
                             }
                         } else {
                             ForEach(CoverageQualityBand.visibleBands) { band in
-                                legendEntry(band.title, color: band.swiftUIColor)
+                                legendEntry(band.title, color: band.swiftUIColor, hatched: band.isHatched)
                             }
                         }
                     }
@@ -315,10 +342,17 @@ private struct MapCoverageDetails: View {
         .accessibilityAddTraits(byGeneration == value ? .isSelected : [])
     }
 
-    private func legendEntry(_ title: String, color: Color) -> some View {
+    private func legendEntry(_ title: String, color: Color, hatched: Bool = false) -> some View {
         HStack(spacing: SQSpace.md) {
-            RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 24, height: 8)
-                .accessibilityHidden(true)
+            Group {
+                if hatched {
+                    SQHatchedSwatch(color: color).clipShape(RoundedRectangle(cornerRadius: 3))
+                } else {
+                    RoundedRectangle(cornerRadius: 3).fill(color)
+                }
+            }
+            .frame(width: 24, height: 8)
+            .accessibilityHidden(true)
             Text(title).font(SQType.subhead).foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
         }

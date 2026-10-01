@@ -40,6 +40,8 @@ struct CoverageHeatFeature: Equatable {
     let colorHex: UInt32
     /// Opacité réduite pour les bandes « inconnu » (RSRP) / « aucun » (génération).
     let dimmed: Bool
+    /// « Sans réseau constaté » : pastille hachurée (contrat quality-scale v1).
+    var hatched: Bool = false
     /// Rang de génération (5..2, 0 = aucun/RSRP) — pilote le z-order en mode « par
     /// génération » : les features de rang supérieur sont dessinées EN DERNIER (au
     /// -dessus), donc un vrai 5G n'est jamais recouvert par une 4G chevauchante. Vaut

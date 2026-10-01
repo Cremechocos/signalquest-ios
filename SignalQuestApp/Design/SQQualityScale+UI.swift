@@ -45,8 +45,9 @@ extension SQQualityScale.Signal {
         case .good: return String(localized: "Bon")
         case .fair: return String(localized: "Moyen")
         case .weak: return String(localized: "Faible")
-        case .poor: return String(localized: "Très faible")
-        case .unknown: return String(localized: "Inconnu")
+        case .poor: return String(localized: "Critique")
+        case .noService: return String(localized: "Sans réseau constaté")
+        case .unknown: return String(localized: "Pas de mesure")
         }
     }
 }
@@ -61,7 +62,7 @@ extension SQQualityScale.Generation {
         case .fourG: return "4G"
         case .threeG: return "3G"
         case .twoG: return "2G"
-        case .none: return String(localized: "Aucun")
+        case .none: return String(localized: "Aucune")
         }
     }
 }

@@ -267,7 +267,8 @@ struct MapKitMapView: UIViewRepresentable {
             guard !features.isEmpty else { return }
             let dots = features.map { f -> SQMapKitDotsOverlay.Dot in
                 let alpha: CGFloat = f.dimmed ? 0.32 : 0.78
-                return .init(point: MKMapPoint(f.coordinate), color: Self.uiColor(hex: f.colorHex).withAlphaComponent(alpha).cgColor)
+                return .init(point: MKMapPoint(f.coordinate), color: Self.uiColor(hex: f.colorHex).withAlphaComponent(alpha).cgColor,
+                             hatched: f.hatched)
             }
             let overlay = SQMapKitDotsOverlay(dots: dots)
             coverageOverlay = overlay

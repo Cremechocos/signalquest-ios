@@ -133,7 +133,8 @@ final class CarPlayMapController: UIViewController, MKMapViewDelegate {
         let dots = features.map { feature -> SQMapKitDotsOverlay.Dot in
             let alpha: CGFloat = feature.dimmed ? 0.32 : 0.78
             return .init(point: MKMapPoint(feature.coordinate),
-                         color: SQNetworkColors.uiColor(feature.colorHex).withAlphaComponent(alpha).cgColor)
+                         color: SQNetworkColors.uiColor(feature.colorHex).withAlphaComponent(alpha).cgColor,
+                         hatched: feature.hatched)
         }
         let overlay = SQMapKitDotsOverlay(dots: dots)
         coverageOverlay = overlay

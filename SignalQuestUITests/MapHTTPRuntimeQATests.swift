@@ -131,7 +131,8 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         // Les options deviennent des rangées accessibles aux très grandes tailles.
         // Ne pas supposer que la préférence persistée est encore « Signal ».
         try tap(app.buttons["Signal"], in: app)
-        for title in ["Excellent", "Good", "Fair", "Weak", "Very weak"] {
+        // Libellés du contrat quality-scale v1.
+        for title in ["Excellent", "Good", "Fair", "Poor", "Critical", "No network found"] {
             XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 10))
         }
         capture(app, name: "map-coverage-accessibility-legend-detail")

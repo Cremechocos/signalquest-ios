@@ -3651,16 +3651,18 @@ struct MapExplorerView: View {
     /// Couleur + clé de regroupement d'un point de couverture selon le mode courant :
     /// par RSRP (signal) ou par génération réseau. Modes mutuellement exclusifs
     /// (jamais mélangés) — la légende suit `coverageByGeneration`.
-    private func coverageColorParts(rsrp: Double?, tech: String?) -> (key: String, hex: UInt32, dimmed: Bool, rank: Int) {
+    private func coverageColorParts(rsrp: Double?, tech: String?) -> (key: String, hex: UInt32, dimmed: Bool, rank: Int, hatched: Bool) {
         if coverageByGeneration {
             let band = CoverageGenerationBand.band(for: tech)
             // `band.rank` (5G=5 > 4G=4 > … > aucun=0) pilote le z-order (cf. tri en
             // fin de `coverageHeatFeatures`).
-            return ("g-\(band.rawValue)", band.colorHex, band == .none, band.rank)
+            return ("g-\(band.rawValue)", band.colorHex, band == .none, band.rank, false)
         } else {
-            let band = CoverageQualityBand.band(for: rsrp)
+            // Seuils de la technologie du point, « sans réseau constaté » avant
+            // toute valeur (contrat quality-scale v1, comme Android et le web).
+            let band = CoverageQualityBand.band(forDbm: rsrp, technology: tech)
             // Rang neutre en mode RSRP → le tri par génération est un no-op.
-            return ("q-\(band.rawValue)", band.colorHex, band == .unknown, 0)
+            return ("q-\(band.rawValue)", band.colorHex, band == .unknown, 0, band.isHatched)
         }
     }
 
@@ -3670,7 +3672,7 @@ struct MapExplorerView: View {
             id: "coverage-heat-\(point.id)",
             coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng),
             weight: coverageHeatWeight(rsrp: point.rsrp),
-            colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed,
+            colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed, hatched: parts.hatched,
             generationRank: parts.rank
         )
     }
@@ -3745,7 +3747,7 @@ struct MapExplorerView: View {
                         id: "coverage-heat-cluster-\(cluster.id)",
                         coordinate: CLLocationCoordinate2D(latitude: cluster.lat, longitude: cluster.lng),
                         weight: min(max(Double(cluster.count), 1), 40) / 8,
-                        colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed,
+                        colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed, hatched: parts.hatched,
                         generationRank: parts.rank
                     )
                 }
@@ -3791,7 +3793,7 @@ struct MapExplorerView: View {
                     id: "coverage-heat-api-\(point.id)",
                     coordinate: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude),
                     weight: coverageHeatWeight(rsrp: point.signalStrength),
-                    colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed,
+                    colorKey: parts.key, colorHex: parts.hex, dimmed: parts.dimmed, hatched: parts.hatched,
                     generationRank: parts.rank
                 )
             }

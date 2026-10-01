@@ -33,6 +33,22 @@
         }
       }
     },
+    "Aucune" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune"
+          }
+        }
+      }
+    },
     "Ce message ne peut pas être signalé : il n’est plus gardé sur cet appareil." : {
       "localizations" : {
         "en" : {
@@ -125,6 +141,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conversation chiffrée : le message signalé, tel que tu le vois, et ses versions précédentes dans la limite de taille d’un signalement sont envoyés à l’équipe de modération, déchiffrés sur ton appareil et chiffrés pour elle seule. Elle pourra les lire. Ni le reste de la conversation ni sa clé ne sont transmis."
+          }
+        }
+      }
+    },
+    "Critique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Critical"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Critique"
           }
         }
       }
@@ -333,6 +365,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cela arrive quand %@ réinitialise son chiffrement, par exemple après avoir perdu tous ses appareils. Cela peut aussi signaler une tentative d’interception : compare le nouveau numéro avec %@."
+          }
+        }
+      }
+    },
+    "Sans réseau constaté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No network found"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans réseau constaté"
+          }
+        }
+      }
+    },
+    "Pas de mesure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No measurement"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de mesure"
           }
         }
       }
@@ -21265,7 +21329,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Weak"
+            "value" : "Poor"
           }
         },
         "fr" : {

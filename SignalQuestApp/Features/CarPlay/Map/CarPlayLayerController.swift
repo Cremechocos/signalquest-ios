@@ -154,17 +154,20 @@ final class CarPlayLayerController {
         var features: [CoverageHeatFeature] = []
         for tile in tiles {
             for point in tile.points where seen.insert(point.id).inserted {
+                // Mêmes règles que la carte de l'iPhone (contrat quality-scale v1).
+                let band = CoverageQualityBand.band(forDbm: point.rsrp, technology: point.tech)
                 features.append(
                     CoverageHeatFeature(
                         id: point.id,
                         coordinate: CLLocationCoordinate2D(latitude: point.lat, longitude: point.lng),
                         weight: 1,
                         colorKey: point.tech ?? "unknown",
-                        colorHex: SQNetworkColors.rsrpHex(point.rsrp),
-                        // Une mesure sans RSRP ne vaut pas une mesure mesurée :
+                        colorHex: band.colorHex,
+                        // Une mesure sans valeur ne vaut pas une mesure mesurée :
                         // on l'atténue plutôt que de la faire passer pour un
                         // relevé fiable.
-                        dimmed: point.rsrp == nil
+                        dimmed: band == .unknown,
+                        hatched: band.isHatched
                     )
                 )
             }

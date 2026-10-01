@@ -29,7 +29,9 @@ final class QualityScaleTests: XCTestCase {
         XCTAssertEqual(SQQualityScale.Signal(rsrp: 0), .unknown)
         XCTAssertEqual(SQQualityScale.Signal(rsrp: -44), .excellent)
         XCTAssertEqual(SQQualityScale.Signal(rsrp: -90), .good)
-        XCTAssertEqual(SQQualityScale.Signal(rsrp: -110.5), .poor)
+        // Arrondi de Math.round (contrat quality-scale v1) : −110,5 → −110, « faible ».
+        XCTAssertEqual(SQQualityScale.Signal(rsrp: -110.5), .weak)
+        XCTAssertEqual(SQQualityScale.Signal(rsrp: -110.6), .poor)
     }
 
     func testMapBandsReadTheSharedScale() {

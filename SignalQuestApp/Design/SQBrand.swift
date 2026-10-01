@@ -12,8 +12,7 @@ enum SQBrand {
         // Délègue à l'échelle de génération canonique (SQNetworkColors), la même
         // que la carte (MapAnnotation/DriveTest) : un badge « 3G »/« 2G » d'une
         // fiche a la MÊME couleur que le point correspondant sur la carte (UI-05).
-        // Le fallback « inconnu » est le gris 0x94A3B8 de la carte (auparavant
-        // 0x6B7280, divergent).
+        // Le repli « aucune » est le gris du contrat quality-scale v1 (0x9CA3AF).
         SQNetworkColors.generationColor(tech)
     }
 
@@ -37,21 +36,23 @@ enum SQBrand {
     }
 
     static let operators: [String: OperatorColors] = [
-        "sfr": .init(start: Color(hex: 0xE2001A), end: Color(hex: 0xFF5A33), name: "SFR"),
-        "bouygues": .init(start: Color(hex: 0x1A3A7F), end: Color(hex: 0x3B5BDB), name: "Bouygues"),
-        "orange": .init(start: Color(hex: 0xFF6B35), end: Color(hex: 0xFFA44F), name: "Orange", badgeForeground: .black),
-        "free": .init(start: Color(hex: 0x52525B), end: Color(hex: 0x27272A), name: "Free"),
-        // Free Caraïbes n'est pas Free Mobile : le registre lui donne le rouge
-        // #DC2626, pas le gris métropolitain. Sans entrée dédiée, la branche
-        // `contains("free")` le peignait en gris.
-        "freecaraibes": .init(start: Color(hex: 0xDC2626), end: Color(hex: 0xF87171), name: "Free Caraibes"),
+        // Départs du contrat quality-scale v1 (teintes officielles, celles du web
+        // et d'Android). Bouygues cyan : encre noire, le blanc n'y tient pas 4,5:1.
+        "sfr": .init(start: Color(hex: 0xE60012), end: Color(hex: 0xFF5A33), name: "SFR"),
+        "bouygues": .init(start: Color(hex: 0x009DDC), end: Color(hex: 0x38BDF8), name: "Bouygues", badgeForeground: .black),
+        "orange": .init(start: Color(hex: 0xFF7900), end: Color(hex: 0xFFA44F), name: "Orange", badgeForeground: .black),
+        "free": .init(start: Color(hex: 0x6B7280), end: Color(hex: 0x4B5563), name: "Free"),
+        // Free Caraïbes : le contrat quality-scale v1 donne aux opérateurs des
+        // DOM la teinte métropolitaine de leur marque (le registre avait le rouge
+        // #DC2626, à aligner côté serveur). Entrée gardée pour son nom affiché.
+        "freecaraibes": .init(start: Color(hex: 0x6B7280), end: Color(hex: 0x4B5563), name: "Free Caraibes"),
         "digicel": .init(start: Color(hex: 0xB91C1C), end: Color(hex: 0xF97316), name: "Digicel"),
         "outremer": .init(start: Color(hex: 0x8B5CF6), end: Color(hex: 0x22D3EE), name: "Outremer Telecom", badgeForeground: .black),
         "srr": .init(start: Color(hex: 0x0EA5E9), end: Color(hex: 0x38BDF8), name: "SRR", badgeForeground: .black),
         "telcooi": .init(start: Color(hex: 0x22C55E), end: Color(hex: 0x14B8A6), name: "Telco OI", badgeForeground: .black),
         "zeop": .init(start: Color(hex: 0xF59E0B), end: Color(hex: 0xFCD34D), name: "Zeop", badgeForeground: .black),
         "maore": .init(start: Color(hex: 0x0891B2), end: Color(hex: 0x67E8F9), name: "Maore Mobile", badgeForeground: .black),
-        "shared": .init(start: Color(hex: 0xE2001A), end: Color(hex: 0x1A3A7F), name: "SFR / Bouygues"),
+        "shared": .init(start: Color(hex: 0xE60012), end: Color(hex: 0x009DDC), name: "SFR / Bouygues"),
         "bell": .init(start: Color(hex: 0x0F5BDC), end: Color(hex: 0x3B82F6), name: "Bell"),
         "rogers": .init(start: Color(hex: 0xD62D20), end: Color(hex: 0xEF4444), name: "Rogers"),
         "telus": .init(start: Color(hex: 0x00A67E), end: Color(hex: 0x34D399), name: "TELUS", badgeForeground: .black),

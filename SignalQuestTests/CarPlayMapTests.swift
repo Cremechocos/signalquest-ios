@@ -86,20 +86,23 @@ final class CarPlayMapTests: XCTestCase {
     }
 
     /// Une mesure sans RSRP ne vaut pas une mesure relevée : elle doit être
-    /// atténuée, pas affichée comme un point fiable.
+    /// atténuée, pas affichée comme un point fiable. Sans technologie, la
+    /// valeur n'a pas de seuils (contrat quality-scale v1) : atténuée aussi.
     func testCoveragePointsWithoutRsrpAreDimmed() throws {
         let json = """
         {"tile":{"z":14,"x":8000,"y":5600},
-         "points":[{"id":"p1","lat":48.85,"lng":2.35,"rsrp":-95},
-                   {"id":"p2","lat":48.86,"lng":2.36}],
+         "points":[{"id":"p1","lat":48.85,"lng":2.35,"rsrp":-95,"tech":"4G"},
+                   {"id":"p2","lat":48.86,"lng":2.36,"tech":"4G"},
+                   {"id":"p3","lat":48.87,"lng":2.37,"rsrp":-95}],
          "clusters":[]}
         """
         let tile = try JSONDecoder.signalQuest.decode(AndroidCoverageTileResponse.self,
                                                      from: Data(json.utf8))
         let features = CarPlayLayerController.coverageFeatures(from: [tile])
-        XCTAssertEqual(features.count, 2)
+        XCTAssertEqual(features.count, 3)
         XCTAssertFalse(features[0].dimmed)
         XCTAssertTrue(features[1].dimmed)
+        XCTAssertTrue(features[2].dimmed)
     }
 
     // MARK: - Grille des couches

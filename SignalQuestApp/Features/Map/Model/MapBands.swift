@@ -55,25 +55,40 @@ enum CoverageQualityBand: String, CaseIterable, Identifiable {
     case fair
     case weak
     case poor
+    /// « Sans réseau constaté » : dessiné hachuré, distinct de « pas de mesure ».
+    case noService
     case unknown
 
     var id: String { rawValue }
 
     static var visibleBands: [CoverageQualityBand] {
-        [.excellent, .good, .fair, .weak, .poor]
+        [.excellent, .good, .fair, .weak, .poor, .noService]
     }
 
-    /// Seuils et garde-fou (« pas de mesure » → inconnu) : `SQQualityScale.Signal`.
+    /// Un RSRP déjà connu comme tel : `SQQualityScale.Signal(rsrp:)`.
     static func band(for rsrp: Double?) -> CoverageQualityBand {
-        switch SQQualityScale.Signal(rsrp: rsrp) {
+        band(SQQualityScale.Signal(rsrp: rsrp))
+    }
+
+    /// Un point de la carte : seuils de sa technologie, « sans réseau constaté »
+    /// avant toute valeur (contrat quality-scale v1).
+    static func band(forDbm dbm: Double?, technology: String?) -> CoverageQualityBand {
+        band(SQQualityScale.Signal(dbm: dbm, technology: technology))
+    }
+
+    private static func band(_ signal: SQQualityScale.Signal) -> CoverageQualityBand {
+        switch signal {
         case .excellent: return .excellent
         case .good: return .good
         case .fair: return .fair
         case .weak: return .weak
         case .poor: return .poor
+        case .noService: return .noService
         case .unknown: return .unknown
         }
     }
+
+    var isHatched: Bool { scale.isHatched }
 
     private var scale: SQQualityScale.Signal {
         switch self {
@@ -82,6 +97,7 @@ enum CoverageQualityBand: String, CaseIterable, Identifiable {
         case .fair: return .fair
         case .weak: return .weak
         case .poor: return .poor
+        case .noService: return .noService
         case .unknown: return .unknown
         }
     }

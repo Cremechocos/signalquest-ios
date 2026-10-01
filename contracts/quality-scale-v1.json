@@ -1,0 +1,565 @@
+{
+  "contract": "quality-scale",
+  "version": 1,
+  "status": "frozen",
+  "decisions": [
+    "01/10/2026, Alexandre : débits descendants sur 7 paliers jusqu'à 1 Gbit/s, seuils et teintes déjà communs aux trois plateformes.",
+    "01/10/2026, Alexandre : signal sur 5 niveaux avec les teintes et l'interprétation d'Android (seuils propres à chaque technologie, « sans réseau constaté » distinct de « pas de mesure »).",
+    "01/10/2026, Alexandre : générations et opérateurs avec les teintes du web (couleurs officielles des opérateurs, générations foncées pour un libellé blanc lisible)."
+  ],
+  "darkVariants": "Identiques au clair dans cette version, comme sur Android et iOS aujourd'hui. À vérifier sur les fonds de carte sombres avant la v2.",
+  "signal": {
+    "metricByTechnology": {
+      "2G": "RSSI",
+      "3G": "RSCP",
+      "4G": "RSRP",
+      "4G+": "RSRP",
+      "5G": "SS-RSRP",
+      "5G NSA": "SS-RSRP"
+    },
+    "thresholdsDbm": {
+      "RSRP": [
+        -80,
+        -90,
+        -100,
+        -110
+      ],
+      "SS-RSRP": [
+        -80,
+        -90,
+        -100,
+        -110
+      ],
+      "RSCP": [
+        -75,
+        -85,
+        -95,
+        -105
+      ],
+      "RSSI": [
+        -70,
+        -80,
+        -90,
+        -100
+      ]
+    },
+    "validRangeDbm": {
+      "RSSI": [
+        -120,
+        -51
+      ],
+      "RSCP": [
+        -130,
+        -24
+      ],
+      "RSRP": [
+        -140,
+        -40
+      ],
+      "SS-RSRP": [
+        -156,
+        -31
+      ]
+    },
+    "rule": "Ordre d'évaluation, le même sur les trois plateformes : 1. technologie : alias normalisés (technologyAliases) ; « Aucun », NONE ou NO SERVICE → « sans réseau constaté », quelle que soit la valeur de signal (absente, 0 ou autre) ; technologie absente ou inconnue → « pas de mesure ». 2. dBm absent → « pas de mesure » ; sinon arrondi. 3. hors de la plage de validité de sa métrique → « pas de mesure ». 4. sentinelle (sentinelsDbm, dont 0) → « pas de mesure », même à l'intérieur de la plage. 5. seuils : ≥ seuil[0] excellent ; ≥ seuil[1] bon ; ≥ seuil[2] moyen ; ≥ seuil[3] faible ; sinon critique. Les plages gardent la tolérance d'Android au-delà des bornes nominales 3GPP (RSRP −140 … −40 au lieu de −44).",
+    "levels": [
+      {
+        "key": "excellent",
+        "label": {
+          "fr": "Excellent",
+          "en": "Excellent"
+        },
+        "light": "#16A34A",
+        "dark": "#16A34A"
+      },
+      {
+        "key": "good",
+        "label": {
+          "fr": "Bon",
+          "en": "Good"
+        },
+        "light": "#65A30D",
+        "dark": "#65A30D"
+      },
+      {
+        "key": "fair",
+        "label": {
+          "fr": "Moyen",
+          "en": "Fair"
+        },
+        "light": "#EAB308",
+        "dark": "#EAB308"
+      },
+      {
+        "key": "poor",
+        "label": {
+          "fr": "Faible",
+          "en": "Poor"
+        },
+        "light": "#FB923C",
+        "dark": "#FB923C"
+      },
+      {
+        "key": "critical",
+        "label": {
+          "fr": "Critique",
+          "en": "Critical"
+        },
+        "light": "#EF4444",
+        "dark": "#EF4444"
+      }
+    ],
+    "states": {
+      "noService": {
+        "label": {
+          "fr": "Sans réseau constaté",
+          "en": "No network found"
+        },
+        "light": "#64748B",
+        "dark": "#64748B",
+        "pattern": "hatched"
+      },
+      "unknown": {
+        "label": {
+          "fr": "Pas de mesure",
+          "en": "No measurement"
+        },
+        "light": "#9CA3AF",
+        "dark": "#9CA3AF"
+      }
+    },
+    "technologyAliases": {
+      "LTE": "4G",
+      "LTE-A": "4G+",
+      "LTE_CA": "4G+",
+      "NR": "5G",
+      "NR_NSA": "5G NSA",
+      "UMTS": "3G",
+      "WCDMA": "3G",
+      "HSPA": "3G",
+      "GSM": "2G",
+      "EDGE": "2G"
+    },
+    "noServiceTechnologies": [
+      "Aucun",
+      "NONE",
+      "NO SERVICE"
+    ],
+    "sentinelsDbm": {
+      "any": {
+        "equals": 0,
+        "why": "Import iOS : CoreTelephony ne donne pas le RSRP."
+      },
+      "RSSI": {
+        "atMost": -113,
+        "why": "Plancher GSM."
+      },
+      "RSCP": {
+        "atLeast": -24,
+        "why": "Clamp UMTS (29 757 points en base exactement à −24)."
+      },
+      "RSRP": {
+        "atMost": -140,
+        "why": "Plancher LTE."
+      },
+      "SS-RSRP": {
+        "atMost": -140,
+        "why": "Plancher NR."
+      }
+    },
+    "rounding": "arrondi(x) = plancher(x + 0,5), comme Math.round de JavaScript et de Java : −80,4 → −80 ; −80,5 → −80 ; −80,6 → −81. En Swift, ne PAS utiliser .rounded() (qui s'éloigne de zéro : −80,5 → −81) mais (x + 0.5).rounded(.down)."
+  },
+  "downloadSpeed": {
+    "unit": "Mbit/s",
+    "metric": "Moyenne descendante du test (averageSpeed), celle que servent les tuiles /api/android/map/tiles/speedtests aux applis (downloadMbps). Le web colorait d'abord le P90 (maxSpeed) : il s'aligne.",
+    "rule": "Paliers francs, sans interpolation entre les teintes (le web les fondait : il s'aligne). Le palier est le dernier dont le seuil bas est atteint (seuil bas inclus).",
+    "levels": [
+      {
+        "key": "very-slow",
+        "min": 0,
+        "label": {
+          "fr": "Très lent",
+          "en": "Very slow"
+        },
+        "light": "#EF4444",
+        "dark": "#EF4444"
+      },
+      {
+        "key": "slow",
+        "min": 10,
+        "label": {
+          "fr": "Lent",
+          "en": "Slow"
+        },
+        "light": "#F97316",
+        "dark": "#F97316"
+      },
+      {
+        "key": "fair",
+        "min": 30,
+        "label": {
+          "fr": "Moyen",
+          "en": "Fair"
+        },
+        "light": "#EAB308",
+        "dark": "#EAB308"
+      },
+      {
+        "key": "good",
+        "min": 100,
+        "label": {
+          "fr": "Bon",
+          "en": "Good"
+        },
+        "light": "#84CC16",
+        "dark": "#84CC16"
+      },
+      {
+        "key": "very-good",
+        "min": 300,
+        "label": {
+          "fr": "Très bon",
+          "en": "Very good"
+        },
+        "light": "#22C55E",
+        "dark": "#22C55E"
+      },
+      {
+        "key": "excellent",
+        "min": 600,
+        "label": {
+          "fr": "Excellent",
+          "en": "Excellent"
+        },
+        "light": "#06B6D4",
+        "dark": "#06B6D4"
+      },
+      {
+        "key": "exceptional",
+        "min": 1000,
+        "label": {
+          "fr": "Exceptionnel",
+          "en": "Exceptional"
+        },
+        "light": "#3B82F6",
+        "dark": "#3B82F6"
+      }
+    ],
+    "unknown": {
+      "label": {
+        "fr": "Pas de mesure",
+        "en": "No measurement"
+      },
+      "light": "#9CA3AF",
+      "dark": "#9CA3AF"
+    }
+  },
+  "generation": {
+    "rule": "Remplissage du point d'un site, toujours doublé de son libellé (« 4G », « 5G ») en blanc.",
+    "levels": [
+      {
+        "key": "2G",
+        "light": "#64748B",
+        "dark": "#64748B"
+      },
+      {
+        "key": "3G",
+        "light": "#0F766E",
+        "dark": "#0F766E"
+      },
+      {
+        "key": "4G",
+        "light": "#2563EB",
+        "dark": "#2563EB"
+      },
+      {
+        "key": "5G",
+        "light": "#7C3AED",
+        "dark": "#7C3AED"
+      }
+    ],
+    "none": {
+      "label": {
+        "fr": "Aucune",
+        "en": "None"
+      },
+      "light": "#9CA3AF",
+      "dark": "#9CA3AF"
+    }
+  },
+  "operators": {
+    "rule": "Liseré seulement (anneau, bordure), jamais en aplat. FR : jetons du web (apps/web/app/tokens.css, .op-*), déjà ceux d'Android ; la carte web aligne Free sur #6B7280 (son registre commençait le dégradé à #52525B). Autres marchés : début de dégradé du registre web (packages/core/operator-colors.ts), recopié ici pour être vérifiable par test.",
+    "FR": {
+      "SFR": {
+        "light": "#E60012",
+        "dark": "#E60012"
+      },
+      "BOUYGUES": {
+        "light": "#009DDC",
+        "dark": "#009DDC"
+      },
+      "ORANGE": {
+        "light": "#FF7900",
+        "dark": "#FF7900"
+      },
+      "FREE": {
+        "light": "#6B7280",
+        "dark": "#6B7280"
+      }
+    },
+    "DROM": {
+      "DIGICEL": {
+        "light": "#B91C1C",
+        "dark": "#B91C1C"
+      },
+      "OUTREMER": {
+        "light": "#8B5CF6",
+        "dark": "#8B5CF6"
+      },
+      "SRR": {
+        "light": "#0EA5E9",
+        "dark": "#0EA5E9"
+      },
+      "TELCO_OI": {
+        "light": "#22C55E",
+        "dark": "#22C55E"
+      },
+      "ZEOP": {
+        "light": "#F59E0B",
+        "dark": "#F59E0B"
+      },
+      "MAORE": {
+        "light": "#0891B2",
+        "dark": "#0891B2"
+      }
+    },
+    "DROM_note": "Orange, SFR et Free des DOM reprennent les teintes FR de leur marque.",
+    "CA": {
+      "BELL": {
+        "light": "#0F5BDC",
+        "dark": "#0F5BDC"
+      },
+      "ROGERS": {
+        "light": "#D62D20",
+        "dark": "#D62D20"
+      },
+      "TELUS": {
+        "light": "#00A67E",
+        "dark": "#00A67E"
+      },
+      "VIDEOTRON_FREEDOM": {
+        "light": "#7A3DF0",
+        "dark": "#7A3DF0"
+      },
+      "REGIONAL": {
+        "light": "#D97706",
+        "dark": "#D97706"
+      }
+    }
+  },
+  "openQuestions": [
+    "Débit montant et latence : Android a ses échelles (montant 2 / 5 / 10 / 20 / 50 / 100 Mbit/s, latence inversée), mêmes teintes ; v2 si iOS et le web les affichent.",
+    "Variantes sombres à vérifier sur les fonds de carte sombres de chaque plateforme.",
+    "Serveur, au gel : colorHex des tuiles de couverture (lu par CarPlay) à aligner ; Free à #6B7280 dans packages/core/market.ts et operator-colors.ts (le registre qu'iOS lit en premier a encore #52525B).",
+    "v1.1 : sites prévus (Android : remplissage opérateur et anneau d'état ; iOS : remplissage d'état), évolutions ANFR et maintenance des incidents opérateurs (#F97316 sur Android, #B45309 sur iOS) n'ont pas encore de convention commune."
+  ],
+  "source": "Dépôt web SignalQuest, contracts/quality-scale-v1.json. Chaque appli en garde une copie dans son propre contracts/, avec son SHA-256 noté et un test qui compare son échelle à cette copie (comme les vecteurs E2EE) : toute nouvelle version passe par un changement visible de la copie.",
+  "vectors": {
+    "note": "Chaque plateforme fait passer ces couples dans son test du contrat. Attendus calculés selon l'ordre de signal.rule ; un écart se signale avant d'appliquer.",
+    "signal": [
+      {
+        "technology": "4G",
+        "dbm": -80.4,
+        "expected": "excellent"
+      },
+      {
+        "technology": "4G",
+        "dbm": -80.5,
+        "expected": "excellent"
+      },
+      {
+        "technology": "4G",
+        "dbm": -80.6,
+        "expected": "good"
+      },
+      {
+        "technology": "4G",
+        "dbm": -95,
+        "expected": "fair"
+      },
+      {
+        "technology": "4G",
+        "dbm": -110.5,
+        "expected": "poor"
+      },
+      {
+        "technology": "4G",
+        "dbm": -110.6,
+        "expected": "critical"
+      },
+      {
+        "technology": "4G",
+        "dbm": -139,
+        "expected": "critical"
+      },
+      {
+        "technology": "4G",
+        "dbm": -140,
+        "expected": "unknown"
+      },
+      {
+        "technology": "4G",
+        "dbm": -40,
+        "expected": "excellent"
+      },
+      {
+        "technology": "4G",
+        "dbm": -39,
+        "expected": "unknown"
+      },
+      {
+        "technology": "4G",
+        "dbm": 0,
+        "expected": "unknown"
+      },
+      {
+        "technology": "4G",
+        "dbm": null,
+        "expected": "unknown"
+      },
+      {
+        "technology": "LTE",
+        "dbm": -95,
+        "expected": "fair"
+      },
+      {
+        "technology": "5G",
+        "dbm": -80,
+        "expected": "excellent"
+      },
+      {
+        "technology": "5G NSA",
+        "dbm": -141,
+        "expected": "unknown"
+      },
+      {
+        "technology": "3G",
+        "dbm": -24,
+        "expected": "unknown"
+      },
+      {
+        "technology": "3G",
+        "dbm": -25,
+        "expected": "excellent"
+      },
+      {
+        "technology": "3G",
+        "dbm": -76,
+        "expected": "good"
+      },
+      {
+        "technology": "3G",
+        "dbm": -106,
+        "expected": "critical"
+      },
+      {
+        "technology": "2G",
+        "dbm": -70,
+        "expected": "excellent"
+      },
+      {
+        "technology": "2G",
+        "dbm": -112,
+        "expected": "critical"
+      },
+      {
+        "technology": "2G",
+        "dbm": -113,
+        "expected": "unknown"
+      },
+      {
+        "technology": "Aucun",
+        "dbm": null,
+        "expected": "noService"
+      },
+      {
+        "technology": "Aucun",
+        "dbm": 0,
+        "expected": "noService"
+      },
+      {
+        "technology": null,
+        "dbm": -90,
+        "expected": "unknown"
+      }
+    ],
+    "downloadSpeed": [
+      {
+        "mbps": 9.99,
+        "expected": "very-slow"
+      },
+      {
+        "mbps": 10,
+        "expected": "slow"
+      },
+      {
+        "mbps": 29.9,
+        "expected": "slow"
+      },
+      {
+        "mbps": 30,
+        "expected": "fair"
+      },
+      {
+        "mbps": 100,
+        "expected": "good"
+      },
+      {
+        "mbps": 299.9,
+        "expected": "good"
+      },
+      {
+        "mbps": 300,
+        "expected": "very-good"
+      },
+      {
+        "mbps": 600,
+        "expected": "excellent"
+      },
+      {
+        "mbps": 999.9,
+        "expected": "excellent"
+      },
+      {
+        "mbps": 1000,
+        "expected": "exceptional"
+      },
+      {
+        "mbps": null,
+        "expected": "unknown"
+      }
+    ]
+  },
+  "outages": {
+    "status": "constaté commun à Android et iOS (01/10), à confirmer pour la v1.1",
+    "rule": "Couleur = gravité ; remplissage = confirmation (plein si confirmée, creux avec anneau coloré si seulement signalée).",
+    "severity": {
+      "down": {
+        "label": {
+          "fr": "Panne totale",
+          "en": "Down"
+        },
+        "light": "#EF4444",
+        "dark": "#EF4444"
+      },
+      "degraded": {
+        "label": {
+          "fr": "Service dégradé",
+          "en": "Degraded"
+        },
+        "light": "#B45309",
+        "dark": "#B45309"
+      }
+    }
+  }
+}

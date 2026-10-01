@@ -309,7 +309,7 @@ extension CoverageQualityBand {
         case .good: return 3
         case .fair: return 2
         case .weak: return 1
-        case .poor: return 0
+        case .poor, .noService: return 0
         case .unknown: return nil
         }
     }
@@ -347,6 +347,7 @@ extension CoverageQualityBand {
         case .fair: return String(localized: "Réseau correct")
         case .weak: return String(localized: "Réseau faible")
         case .poor: return String(localized: "Réseau très faible")
+        case .noService: return String(localized: "Sans réseau constaté")
         case .unknown: return String(localized: "Réseau")
         }
     }
