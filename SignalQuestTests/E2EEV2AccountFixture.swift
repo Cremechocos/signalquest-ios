@@ -217,12 +217,26 @@ struct E2EEV2SeededConversation {
     let membership: E2EEV2MembershipState
     let current: E2EEV2ConversationStateStore.CurrentEpoch
     let epochKey: Data
+    /// `epochs/current` de l'époque 1, tel que le serveur le sert à l'appareil local.
+    let servedCurrent: Data
 }
 
 extension E2EEV2AccountFixture {
     func seedConversation(with peer: String, devices: E2EEV2CertifiedDeviceSet) throws -> E2EEV2SeededConversation {
+        try seed(participants: [peer], isGroup: false, devices: devices)
+    }
+
+    /// Groupe créé par ce compte, qui en est l'administrateur.
+    func seedGroup(with peers: [String], devices: E2EEV2CertifiedDeviceSet) throws -> E2EEV2SeededConversation {
+        try seed(participants: peers, isGroup: true, devices: devices)
+    }
+
+    private func seed(participants: [String], isGroup: Bool, devices: E2EEV2CertifiedDeviceSet) throws -> E2EEV2SeededConversation {
         let epochKey = Data((0..<32).map { UInt8($0) })
-        let creation = try make(participants: [peer], isGroup: false, title: nil, excludesWeb: false, devices: devices, epochKey: epochKey)
+        let creation = try make(
+            participants: participants, isGroup: isGroup, title: isGroup ? "Groupe" : nil, excludesWeb: false, devices: devices,
+            epochKey: epochKey
+        )
         let namespace = session.ownerNamespace
         XCTAssertTrue(try keys.put(
             recordInput: .init(conversationId: creation.conversationId, epochId: "epoch_seeded_000000000001", epochNumber: 1, keyCommitmentB64: creation.epoch.keyCommitmentB64),
@@ -246,7 +260,24 @@ extension E2EEV2AccountFixture {
             ownerNamespace: namespace
         )
         try states.recordCurrentEpoch(current, ownerNamespace: namespace)
-        return .init(conversationId: creation.conversationId, membership: creation.genesis, current: current, epochKey: epochKey)
+        let own = try XCTUnwrap(creation.epoch.envelopes.first { $0.recipientDeviceId == descriptor.deviceId })
+        let served = E2EEV2CanonicalJSON.encode(.object([
+            "conversationId": .string(creation.conversationId),
+            "epoch": .object([
+                "id": .string("epoch_seeded_000000000001"), "epochNumber": .string("1"), "status": .string("active"),
+                "createdAt": .string("2026-10-01T06:00:00.000Z"),
+            ]),
+            "manifest": E2EEV2EpochManifest.json(creation.epoch.manifest, recipients: creation.epoch.recipients),
+            "envelope": .object([
+                "recipientDeviceId": .string(own.recipientDeviceId), "wrapAlgorithm": .string(own.wrapAlgorithm),
+                "ephemeralPublicKeyB64": .string(own.ephemeralPublicKeyB64), "wrappedEpochKeyB64": .string(own.wrappedEpochKeyB64),
+                "nonceB64": .string(own.nonceB64), "aadB64": .string(own.aadB64), "signatureB64": .string(own.signatureB64),
+            ]),
+        ]))
+        return .init(
+            conversationId: creation.conversationId, membership: creation.genesis, current: current, epochKey: epochKey,
+            servedCurrent: served
+        )
     }
 
     /// Époque suivante gardée localement, mêmes membres et destinataires.

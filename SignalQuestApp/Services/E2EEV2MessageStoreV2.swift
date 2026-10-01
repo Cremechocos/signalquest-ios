@@ -55,6 +55,9 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         var cursor: Int64 = 0
         var messages: [String: Stored] = [:]
         var equivocal: Set<String> = []
+        /// Message où la relève s'est arrêtée, et combien de fois de suite.
+        var rereadSequence: Int64?
+        var rereadCount: Int?
     }
 
     private let rootURL: URL
@@ -157,6 +160,31 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
             }
         }
         messages[ref] = target
+    }
+
+    /// Avance le curseur de la liste (E.3), jamais en arrière. Séparé de
+    /// `apply`, gardé avant le registre : la relève ne le pousse qu'après la
+    /// page, jusqu'au premier message à relire.
+    func advanceCursor(to cursor: Int64, conversationId: String, ownerScopeId: String) throws {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        var file = try read(conversationId: conversationId, ownerScopeId: ownerScopeId)
+        guard cursor > file.cursor else { return }
+        file.cursor = cursor
+        try write(file, conversationId: conversationId, ownerScopeId: ownerScopeId)
+    }
+
+    /// Compte les arrêts de la relève sur un même message : au-delà d'une
+    /// borne, elle le dépasse, pour qu'aucun message ne bloque la conversation.
+    func noteReread(sequence: Int64, conversationId: String, ownerScopeId: String) throws -> Int {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        var file = try read(conversationId: conversationId, ownerScopeId: ownerScopeId)
+        let count = file.rereadSequence == sequence ? (file.rereadCount ?? 0) + 1 : 1
+        file.rereadSequence = sequence
+        file.rereadCount = count
+        try write(file, conversationId: conversationId, ownerScopeId: ownerScopeId)
+        return count
     }
 
     /// Messages gardés, pour un signalement (§11) : seulement ceux reçus par
