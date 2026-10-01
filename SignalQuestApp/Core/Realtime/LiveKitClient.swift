@@ -137,6 +137,9 @@ final class LiveKitClient: ObservableObject {
     /// Le SDK a déjà déchiffré `data` avant cet appel ; les paquets non-GCM sont
     /// refusés lorsque la session exige E2EE v2.
     var onDataReceived: (@MainActor (_ senderIdentity: String?, _ data: Data, _ topic: String) -> Void)?
+    /// Appel prouvé : nom d'un utilisateur prouvé, lu sur l'appareil. Le nom
+    /// du jeton, choisi par le serveur, n'y sert jamais (§10.4).
+    var participantName: (@MainActor (_ userId: String) -> String?)?
 
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "LiveKit")
     private let session = AVAudioSession.sharedInstance()
@@ -182,8 +185,14 @@ final class LiveKitClient: ObservableObject {
     private var localMedia: LocalMedia?
     private var roomObserver: RoomConnectionObserver?
     private var activeE2eeSession: E2EEV2LiveKitSession?
+    /// Appel chiffré : sources en cours de bascule. Une seconde bascule est
+    /// ignorée au lieu de publier une seconde piste.
+    private var encryptedSourcesInFlight = Set<Track.Source>()
     #if DEBUG
     private var disabledAudioEngineForLocalQA = false
+    enum DebugLocalTrackEvent: Equatable { case publishedMuted, cryptorOK, unmuted }
+    /// Banc local : étapes de la publication d'une piste locale chiffrée.
+    private(set) var debugLocalTrackEvents: [DebugLocalTrackEvent] = []
     #endif
 #endif
 
@@ -298,15 +307,17 @@ final class LiveKitClient: ObservableObject {
                     }
                 },
                 onReconnectingChanged: { [weak self] reconnecting in
-                    if reconnecting {
-                        e2eeSession?.verification.markAllPending()
-                    }
                     Task { @MainActor in
                         if reconnecting { self?.isE2EEVerified = false }
                         self?.setReconnecting(reconnecting)
-                        // Après une reconnexion complète, les autres nous voient
-                        // arriver de nouveau et attendent notre preuve.
-                        if !reconnecting { self?.broadcastJoinProofOnSchedule() }
+                        guard !reconnecting else { return }
+                        // Une reconnexion rapide garde les chiffreurs du SDK, qui
+                        // ne réannoncent « OK » qu'après une erreur : leurs états
+                        // restent valables. Une complète met fin à l'appel chiffré.
+                        self?.isE2EEVerified = e2eeSession?.verification.isVerified ?? false
+                        self?.refreshRemoteMedia()
+                        // Des paquets ont pu se perdre : notre preuve repart.
+                        self?.broadcastJoinProofOnSchedule()
                     }
                 },
                 onFullReconnectStarted: { [weak self] in
@@ -479,11 +490,20 @@ final class LiveKitClient: ObservableObject {
             case .standard:
                 let standardMedia = LocalMedia(room: liveRoom)
                 // Pas de nouvelle piste après un échec du chiffrement.
-                if !standardMedia.isMicrophoneEnabled, !didE2EEFailDuringConnect {
-                    await standardMedia.toggleMicrophone()
-                }
-                if video && !standardMedia.isCameraEnabled, !didE2EEFailDuringConnect {
-                    await standardMedia.toggleCamera()
+                if let e2eeSession {
+                    if !didE2EEFailDuringConnect {
+                        await setEncryptedLocalTrack(.microphone, enabled: true, in: liveRoom, session: e2eeSession, media: standardMedia)
+                    }
+                    if video, !didE2EEFailDuringConnect {
+                        await setEncryptedLocalTrack(.camera, enabled: true, in: liveRoom, session: e2eeSession, media: standardMedia)
+                    }
+                } else {
+                    if !standardMedia.isMicrophoneEnabled, !didE2EEFailDuringConnect {
+                        await standardMedia.toggleMicrophone()
+                    }
+                    if video && !standardMedia.isCameraEnabled, !didE2EEFailDuringConnect {
+                        await standardMedia.toggleCamera()
+                    }
                 }
                 media = standardMedia
             #if DEBUG
@@ -690,6 +710,88 @@ final class LiveKitClient: ObservableObject {
         guard let room else { return }
         await enforceRemoteTracks(in: room)
     }
+
+    /// Micro ou caméra d'un appel chiffré : jamais par `LocalMedia`, qui
+    /// publierait ou réactiverait la piste sans attendre son chiffreur (§10.4).
+    private func setEncryptedLocalTrack(
+        _ source: Track.Source,
+        enabled: Bool,
+        in room: Room,
+        session: E2EEV2LiveKitSession,
+        media: LocalMedia?
+    ) async {
+        guard encryptedSourcesInFlight.insert(source).inserted else { return }
+        defer { encryptedSourcesInFlight.remove(source) }
+        do {
+            let existing = room.localParticipant.trackPublications.values
+                .first { $0.source == source } as? LocalTrackPublication
+            if !enabled {
+                try await existing?.mute()
+            } else if let existing {
+                try await unmuteWhenEncrypting(existing, session: session)
+            } else if source == .camera {
+                // Même appareil que `LocalMedia.toggleCamera()`.
+                let device = try await CameraCapturer.captureDevices().first { $0.uniqueID == media?.selectedVideoDeviceID }
+                let track = await LocalVideoTrack.createCameraTrack(options: CameraCaptureOptions(device: device))
+                try await publishEncrypted(track, in: room, session: session)
+            } else {
+                let track = await LocalAudioTrack.createTrack()
+                try await publishEncrypted(track, in: room, session: session)
+            }
+        } catch {
+            mediaErrorMessage = LocalMedia.Error.mediaDevice(error).localizedDescription
+        }
+    }
+
+    /// Le SDK lance la capture et la négociation avant d'attacher le chiffreur,
+    /// qui n'arrive qu'après la réponse du serveur à la publication : la piste
+    /// est donc publiée muette (silence ou image noire, sans contenu).
+    private func publishEncrypted(_ track: LocalTrack, in room: Room, session: E2EEV2LiveKitSession) async throws {
+        try await track.mute()
+        let publication: LocalTrackPublication
+        if let video = track as? LocalVideoTrack {
+            publication = try await room.localParticipant.publish(videoTrack: video)
+        } else if let audio = track as? LocalAudioTrack {
+            publication = try await room.localParticipant.publish(audioTrack: audio)
+        } else {
+            throw LiveKitError(.invalidState, message: "Piste locale inconnue")
+        }
+        #if DEBUG
+        if publication.isMuted { debugLocalTrackEvents.append(.publishedMuted) }
+        #endif
+        try await unmuteWhenEncrypting(publication, session: session)
+    }
+
+    /// Réactive une piste locale une fois publiée en GCM et son chiffreur à
+    /// « OK ». Sinon elle reste muette et l'appel prend fin.
+    private func unmuteWhenEncrypting(_ publication: LocalTrackPublication, session: E2EEV2LiveKitSession) async throws {
+        let deadline = ContinuousClock.now + Self.localCryptorTimeout
+        while true {
+            guard state == .connecting || state == .connected, !didE2EEFailDuringConnect else { return }
+            let cryptorState = session.verification.state(of: publication.sid.stringValue)
+            if E2EEV2CallLocalTrackPolicy.mayUnmute(encryptionType: publication.encryptionType, cryptorState: cryptorState) {
+                break
+            }
+            let failed = cryptorState.map(E2EEV2CallCryptorPolicy.isTerminalFailure) ?? false
+            guard publication.encryptionType == .gcm, !failed, ContinuousClock.now < deadline else {
+                session.verification.failGlobally()
+                handleE2EETrustLoss()
+                return
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #if DEBUG
+        debugLocalTrackEvents.append(.cryptorOK)
+        #endif
+        try await publication.unmute()
+        #if DEBUG
+        debugLocalTrackEvents.append(.unmuted)
+        #endif
+    }
+
+    /// Délai pour qu'une piste publiée muette soit chiffrée : silence et image
+    /// noire passent par le chiffreur dès qu'il est attaché.
+    private static let localCryptorTimeout: Duration = .seconds(10)
     #endif
 
     #if DEBUG && canImport(LiveKit)
@@ -713,7 +815,11 @@ final class LiveKitClient: ObservableObject {
             }
         }
         debugFeeders.append(feeder)
-        _ = try await room.localParticipant.publish(videoTrack: track)
+        if let session = activeE2eeSession {
+            try await publishEncrypted(track, in: room, session: session)
+        } else {
+            _ = try await room.localParticipant.publish(videoTrack: track)
+        }
     }
 
     /// Banc local : pour chaque participant distant, s'il a une piste abonnée.
@@ -935,6 +1041,12 @@ final class LiveKitClient: ObservableObject {
         // l'abonnement Combine sur l'état réel du track.
         Task {
 #if canImport(LiveKit)
+            if let room, let session = activeE2eeSession, let localMedia {
+                await setEncryptedLocalTrack(
+                    .microphone, enabled: !localMedia.isMicrophoneEnabled, in: room, session: session, media: localMedia
+                )
+                return
+            }
             await localMedia?.toggleMicrophone()
 #endif
         }
@@ -943,6 +1055,12 @@ final class LiveKitClient: ObservableObject {
     func toggleCamera() {
         Task {
 #if canImport(LiveKit)
+            if let room, let session = activeE2eeSession, let localMedia {
+                await setEncryptedLocalTrack(
+                    .camera, enabled: !localMedia.isCameraEnabled, in: room, session: session, media: localMedia
+                )
+                return
+            }
             await localMedia?.toggleCamera()
 #endif
         }
@@ -968,6 +1086,8 @@ final class LiveKitClient: ObservableObject {
             throw MediaControlError.screenSharingDisabled
         }
 #if canImport(LiveKit)
+        // Appel chiffré : le partage d'écran ne suit pas la publication muette (§10.4).
+        guard activeE2eeSession == nil else { throw MediaControlError.screenSharingDisabled }
         await localMedia?.toggleScreenShare(disableCamera: false)
 #endif
     }
@@ -1068,6 +1188,12 @@ final class LiveKitClient: ObservableObject {
             ?? localVideoTrack
     }
 
+    private func displayName(of participant: RemoteParticipant) -> String {
+        guard let joinVerifier = activeE2eeSession?.joinVerifier else { return participant.name ?? "Participant" }
+        let userId = participant.identity.flatMap { joinVerifier.provenUserId($0.stringValue) }
+        return userId.flatMap { participantName?($0) } ?? "Participant"
+    }
+
     private func refreshRemoteMedia() {
         guard let room else {
             remoteVideos = []
@@ -1102,7 +1228,7 @@ final class LiveKitClient: ObservableObject {
                 let participantID = participant.identity?.stringValue
                     ?? participant.sid?.stringValue
                     ?? "participant"
-                let displayName = participant.name ?? "Participant"
+                let displayName = displayName(of: participant)
                 var videos: [RemoteVideo] = []
                 if SQFeatures.callScreenSharingEnabled,
                    shown(participant.firstScreenSharePublication),
@@ -1365,6 +1491,15 @@ enum E2EEV2CallMediaPolicy {
     }
 }
 
+enum E2EEV2CallLocalTrackPolicy {
+    /// Une piste locale d'un appel chiffré, publiée muette, n'est réactivée
+    /// qu'une fois publiée en GCM et son chiffreur à « OK » (§10.4) : avant,
+    /// rien ne prouve qu'il est attaché.
+    static func mayUnmute(encryptionType: EncryptionType, cryptorState: E2EEState?) -> Bool {
+        encryptionType == .gcm && cryptorState.map(E2EEV2CallCryptorPolicy.isVerified) == true
+    }
+}
+
 final class E2EEV2LiveKitVerification: @unchecked Sendable {
     /// Appel prouvé (§10.4) : chaque participant, nous compris, doit avoir
     /// prouvé son appareil par une preuve de jonction.
@@ -1445,13 +1580,6 @@ final class E2EEV2LiveKitVerification: @unchecked Sendable {
         states.removeValue(forKey: trackID)
     }
 
-    func markAllPending() {
-        lock.lock()
-        defer { lock.unlock() }
-        for trackID in Array(states.keys) { states[trackID] = .new }
-        dataVerifiedParticipants.removeAll()
-    }
-
     func markDataVerified(_ participantID: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -1479,6 +1607,13 @@ final class E2EEV2LiveKitVerification: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         globalFailure = true
+    }
+
+    /// Dernier état connu du chiffreur d'une piste, la nôtre comprise.
+    func state(of trackID: String) -> E2EEState? {
+        lock.lock()
+        defer { lock.unlock() }
+        return globalFailure ? nil : states[trackID]
     }
 
     /// Piste déchiffrée avec la clé de l'appel, d'un participant prouvé quand

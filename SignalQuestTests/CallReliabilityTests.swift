@@ -325,9 +325,9 @@ final class CallReliabilityTests: XCTestCase {
         XCTAssertTrue(verification.isVerified)
         XCTAssertTrue(verification.isTrackVerified("remote-audio"))
 
-        verification.markAllPending()
+        verification.expect(participantID: "remote", trackID: "remote-video")
         XCTAssertFalse(verification.isVerified)
-        XCTAssertFalse(verification.isTrackVerified("remote-audio"), "Rien n'est montré avant « OK »")
+        XCTAssertFalse(verification.isTrackVerified("remote-video"), "Rien n'est montré avant « OK »")
         // Spec §10.3 : pas de ratchet, une clé par appel. Une clé qui bouge
         // est un échec, pas une rotation acceptable.
         verification.update("local-audio", state: .key_ratcheted)
@@ -356,6 +356,28 @@ final class CallReliabilityTests: XCTestCase {
         XCTAssertFalse(E2EEV2CallMediaPolicy.accepts(requiresE2EE: true, encryptionType: .custom))
         XCTAssertTrue(E2EEV2CallMediaPolicy.accepts(requiresE2EE: false, encryptionType: .none),
                       "Un appel non chiffré garde ses pistes")
+        #endif
+    }
+
+    func testEncryptedLocalTrackStaysMutedUntilItsCryptorIsOK() {
+        #if canImport(LiveKit)
+        XCTAssertFalse(E2EEV2CallLocalTrackPolicy.mayUnmute(encryptionType: .gcm, cryptorState: nil),
+                       "Chiffreur pas encore attaché : la piste reste muette")
+        XCTAssertFalse(E2EEV2CallLocalTrackPolicy.mayUnmute(encryptionType: .gcm, cryptorState: .new))
+        XCTAssertFalse(E2EEV2CallLocalTrackPolicy.mayUnmute(encryptionType: .gcm, cryptorState: .key_ratcheted))
+        XCTAssertFalse(E2EEV2CallLocalTrackPolicy.mayUnmute(encryptionType: .gcm, cryptorState: .encryption_failed))
+        XCTAssertFalse(E2EEV2CallLocalTrackPolicy.mayUnmute(encryptionType: .none, cryptorState: .ok),
+                       "Publiée en clair : jamais réactivée")
+        XCTAssertTrue(E2EEV2CallLocalTrackPolicy.mayUnmute(encryptionType: .gcm, cryptorState: .ok))
+
+        let verification = E2EEV2LiveKitVerification(requiresJoinProof: true)
+        verification.expect(participantID: "local", trackID: "local-audio")
+        XCTAssertEqual(verification.state(of: "local-audio"), .new)
+        verification.update("local-audio", state: .ok)
+        XCTAssertEqual(verification.state(of: "local-audio"), .ok, "Notre piste chiffre, preuve de jonction ou non")
+        XCTAssertNil(verification.state(of: "absente"))
+        verification.failGlobally()
+        XCTAssertNil(verification.state(of: "local-audio"), "Après un échec global, plus rien n'est réactivé")
         #endif
     }
 

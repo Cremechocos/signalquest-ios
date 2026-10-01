@@ -16,9 +16,11 @@ final class CallJoinProofTests: XCTestCase {
     func testVectorProofBindsTheSenderToItsCertifiedDevice() throws {
         let vector = try loadVector()
         let verifier = makeVerifier(keys: [owner(deviceId): vector.publicKey])
+        XCTAssertNil(verifier.provenUserId(identity), "Aucun utilisateur avant la preuve")
 
         XCTAssertEqual(verifier.receive(vector.message, from: identity), .proven)
         XCTAssertTrue(verifier.isProven(identity))
+        XCTAssertEqual(verifier.provenUserId(identity), userId, "L'utilisateur vient de la preuve signée")
         XCTAssertEqual(verifier.receive(vector.message, from: identity), .confirmed, "Une preuve renvoyée ne change rien")
     }
 
@@ -154,12 +156,6 @@ final class CallJoinProofTests: XCTestCase {
         XCTAssertFalse(verification.isVerified, "Notre propre preuve n'est pas encore partie")
         verification.markJoinProven("local")
         XCTAssertTrue(verification.isVerified)
-
-        verification.markAllPending()
-        XCTAssertFalse(verification.isVerified)
-        verification.update("local-audio", state: .ok)
-        verification.update("remote-audio", state: .ok)
-        XCTAssertTrue(verification.isVerified, "Une reconnexion ne change pas l'appareil d'une identité")
 
         verification.markDataVerified("observer")
         XCTAssertFalse(verification.isVerified, "Un paquet quelconque ne prouve rien")

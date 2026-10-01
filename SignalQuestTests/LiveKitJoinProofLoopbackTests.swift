@@ -171,10 +171,18 @@ final class LiveKitJoinProofLoopbackTests: XCTestCase {
         let (aliceClient, aliceLog) = try await join(url, call, as: alice, trusting: directory)
         let (brunoClient, _) = try await join(url, call, as: bruno, trusting: directory)
         try await waitUntil("preuves échangées") { aliceClient.isE2EEVerified && brunoClient.isE2EEVerified }
+        aliceClient.participantName = { $0 == bruno.userId ? "Bruno" : nil }
         try await brunoClient.debugPublishSyntheticVideo(frame: try pixelBuffer())
         try await waitUntil("vidéo du participant prouvé reçue", timeout: 15) {
             aliceClient.debugRemoteSubscriptions()[bruno.identity] == true
         }
+        try await waitUntil("vidéo déchiffrée avec la clé de l'appel", timeout: 10) {
+            aliceClient.remoteVideos.contains { $0.participantID == bruno.identity }
+        }
+        XCTAssertEqual(brunoClient.debugLocalTrackEvents, [.publishedMuted, .cryptorOK, .unmuted],
+                       "Publiée muette, réactivée seulement une fois son chiffreur à « OK »")
+        XCTAssertEqual(aliceClient.remoteVideos.first { $0.participantID == bruno.identity }?.displayName, "Bruno",
+                       "Nom de l'utilisateur prouvé, jamais celui du jeton")
 
         // Même clé de trame, mais aucune preuve : sa vidéo n'est jamais abonnée.
         let (silent, _) = try await join(url, call, as: nil, identity: "lk_silent_video", trusting: [])
@@ -206,6 +214,32 @@ final class LiveKitJoinProofLoopbackTests: XCTestCase {
         try await aliceClient.debugSimulate(.fullReconnect)
         try await waitUntil("appel coupé par la reconnexion complète", timeout: 8) { aliceLog.losses == [.reconnected] }
         XCTAssertEqual(aliceClient.state, .ended)
+    }
+
+    /// Une reconnexion rapide garde les chiffreurs du SDK : l'appel reste
+    /// vérifié et la vidéo du participant prouvé reste montrée.
+    @MainActor
+    func testQuickReconnectKeepsTheEncryptedCallVerified() async throws {
+        let url = try loopbackURL()
+        let call = try makeCall()
+        let alice = device("alice"), bruno = device("bruno")
+        let directory = [alice, bruno]
+        let (aliceClient, aliceLog) = try await join(url, call, as: alice, trusting: directory)
+        let (brunoClient, brunoLog) = try await join(url, call, as: bruno, trusting: directory)
+        try await waitUntil("preuves échangées") { aliceClient.isE2EEVerified && brunoClient.isE2EEVerified }
+        try await brunoClient.debugPublishSyntheticVideo(frame: try pixelBuffer())
+        try await waitUntil("vidéo chiffrée montrée", timeout: 15) {
+            aliceClient.isE2EEVerified && aliceClient.remoteVideos.contains { $0.participantID == bruno.identity }
+        }
+
+        try await aliceClient.debugSimulate(.quickReconnect)
+        try await Task.sleep(for: .seconds(3))
+        try await waitUntil("appel de nouveau vérifié", timeout: 8) {
+            !aliceClient.isReconnecting && aliceClient.isE2EEVerified
+                && aliceClient.remoteVideos.contains { $0.participantID == bruno.identity }
+        }
+        XCTAssertEqual(aliceLog.losses + brunoLog.losses, [], "Aucune coupure")
+        XCTAssertEqual(aliceClient.state, .connected)
     }
 
     /// Un arrivant tardif dans un appel à deux déjà prouvé : les trois se

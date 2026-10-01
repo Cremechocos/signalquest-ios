@@ -130,6 +130,13 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
         return devices[identity] != nil
     }
 
+    /// Utilisateur que la preuve de jonction de cette identité a prouvé.
+    func provenUserId(_ identity: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return devices[identity]?.userId
+    }
+
     /// Participants arrivés depuis au moins 10 secondes sans preuve valide.
     func overdue(at now: Date) -> [String] {
         lock.lock()
