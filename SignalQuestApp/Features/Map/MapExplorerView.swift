@@ -2313,7 +2313,7 @@ struct MapExplorerView: View {
                     Text(notice)
                         .font(SQFont.body(14, .semibold))
                         .foregroundStyle(SQColor.label)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.vertical, SQSpace.sm + 2)

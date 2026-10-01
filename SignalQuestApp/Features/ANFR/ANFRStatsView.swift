@@ -575,7 +575,7 @@ struct ANFRStatsView: View {
                             Text(region.label)
                                 .font(SQFont.body(14, .semibold))
                                 .foregroundStyle(SQColor.label)
-                                .lineLimit(1)
+                                .lineLimit(2)
                             GeometryReader { proxy in
                                 ZStack(alignment: .leading) {
                                     Capsule().fill(SQColor.surfaceMuted).frame(height: 6)

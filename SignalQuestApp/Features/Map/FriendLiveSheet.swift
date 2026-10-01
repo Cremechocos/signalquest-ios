@@ -42,14 +42,14 @@ struct FriendLiveSheet: View {
                         .overlay(Circle().strokeBorder(SQColor.bg, lineWidth: 2.5))
                 }
             VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                Text(friend.name ?? "Ami")
+                Text(friend.name ?? String(localized: "Ami"))
                     .font(SQFont.display(22, .bold))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                 Text(statusLine)
                     .font(SQFont.body(14))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
             Spacer(minLength: 0)
             if let technology = friend.radio?.technology, !technology.isEmpty {
