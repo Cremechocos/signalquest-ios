@@ -153,10 +153,18 @@ final class ComposerViewModel: ObservableObject {
         }
     }
 
+    /// N'écrit que ce qui change : chaque écriture dans `UserDefaults` notifie
+    /// SwiftUI, et réécrire le brouillon qu'on vient de lire relançait la vue
+    /// parente en boucle.
     private func saveDraft() {
         guard !isEditing else { return }
-        UserDefaults.standard.set(text, forKey: draftTextKey)
-        UserDefaults.standard.set(visibility.rawValue, forKey: draftVisibilityKey)
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: draftTextKey) != text {
+            defaults.set(text, forKey: draftTextKey)
+        }
+        if defaults.string(forKey: draftVisibilityKey) != visibility.rawValue {
+            defaults.set(visibility.rawValue, forKey: draftVisibilityKey)
+        }
     }
 
     private func loadDraft() {
@@ -392,9 +400,14 @@ struct ComposerSheet: View {
         userService: UserServicing? = nil,
         editing: UnifiedSocialFeedItem? = nil
     ) {
-        let model = ComposerViewModel(service: service, userService: userService)
-        if let editing { model.beginEditing(editing) }
-        _model = StateObject(wrappedValue: model)
+        // Créé une seule fois, dans l'autoclosure : la vue parente réévalue
+        // cet init à chaque rendu, et un modèle neuf relit puis réécrit le
+        // brouillon à chaque fois.
+        _model = StateObject(wrappedValue: {
+            let model = ComposerViewModel(service: service, userService: userService)
+            if let editing { model.beginEditing(editing) }
+            return model
+        }())
     }
 
     /// Saisie du sondage.

@@ -55,6 +55,24 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertEqual(reopened.text, "Brouillon en cours")
     }
 
+    /// Rouvrir le composer avec un brouillon n'écrit rien dans `UserDefaults` :
+    /// chaque écriture notifiait SwiftUI, et la vue parente, qui recrée le
+    /// composer à chaque rendu, tournait en boucle (l'éditeur ne s'ouvrait plus).
+    func testReopeningWithADraftWritesNothing() {
+        let draft = ComposerViewModel(service: ComposerFeedFixture())
+        draft.text = "Brouillon en cours"
+        final class Count: @unchecked Sendable { var value = 0 }
+        let writes = Count()
+        let observer = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: UserDefaults.standard, queue: nil
+        ) { _ in writes.value += 1 }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        for _ in 0..<3 {
+            XCTAssertEqual(ComposerViewModel(service: ComposerFeedFixture()).text, "Brouillon en cours")
+        }
+        XCTAssertEqual(writes.value, 0, "Relire le brouillon ne doit pas le réécrire")
+    }
+
     /// Légende de story : coupée au plafond du serveur, compté en unités UTF-16
     /// comme en JavaScript, sans casser un emoji (SOC-34).
     func testStoryCaptionIsCappedLikeTheServerCountsIt() {
