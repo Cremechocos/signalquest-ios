@@ -139,11 +139,12 @@
 >   D.7, D.8, D.10, E.2, E.3). Puis : miroir de l'extension de notification
 >   sans clé privée d'appareil, lecture d'une enveloppe au cookie seul, avec sa
 >   conversation (§2.6, E.3). Puis, après deux relectures indépendantes :
->   entrée du miroir liée au compte et à la session, retirée avant tout
->   changement d'état et réécrite après succès dans l'ordre des opérations,
->   inutilisable après 24 heures ; départs vérifiés par l'extension ; un
->   message montré une fois au plus, retenu d'un seul geste, et, avec
->   l'aperçu complet, jamais signé il y a plus de 48 heures ; aucun texte
+>   entrée du miroir liée au compte et à la session, retirée avant toute
+>   opération de la messagerie v2 et réécrite après succès dans l'ordre des
+>   opérations, inutilisable après 24 heures ; départs vérifiés par
+>   l'extension ; un message montré une fois au plus par activation du
+>   miroir, retenu d'un seul geste, et, avec l'aperçu complet, jamais signé
+>   il y a plus de 48 heures ; aucun texte
 >   d'éphémère, d'édition ou de suppression ; aucune clé d'époque en mode
 >   « expéditeur seulement », dont les limites sont écrites ; lecture
 >   d'enveloppe réservée aux membres, sans effet de bord, jamais mise en
@@ -354,8 +355,10 @@ persistante par message et la guérison continue. Il est à évaluer pour une v3
     d'écriture, ou un registre de l'app illisible, la retire ; si elle ne
     part pas, tout le miroir est révoqué. Une conversation quittée perd son
     entrée et ce que l'extension en a montré. Une révocation efface tout le
-    miroir ; une activation pour un autre compte, une autre session ou un
-    autre mode d'aperçu efface d'abord tout, sinon rien ne s'active. Une
+    miroir, ce que l'extension a montré compris : après une réactivation,
+    seul le compteur reçu par l'app écarte un message déjà vu. Une
+    activation pour un autre compte, une autre session ou un autre mode
+    d'aperçu efface d'abord tout, sinon rien ne s'active. Une
     entrée écrite il y a plus de 24 heures ne sert plus et part dès qu'on la
     croise ;
   - l'extension applique les règles de l'app à cet état figé : une
