@@ -75,10 +75,13 @@ final class E2EEV2IdentityVerificationTests: XCTestCase {
                        "La version suivante doit chaîner la dernière vue")
 
         let (v3, v3Canonical) = try makeBundle(uik: uik, devices: [tablet], version: 3, previous: v2Canonical)
-        let (v4, _) = try makeBundle(uik: uik, devices: [tablet], version: 4, previous: v3Canonical)
+        var (v4, _) = try makeBundle(uik: uik, devices: [tablet], version: 4, previous: v3Canonical)
         XCTAssertNoThrow(try E2EEV2IdentityVerification.verify(v3, pinned: pin2).get())
+        XCTAssertEqual(failure(E2EEV2IdentityVerification.verify(v4, pinned: pin2)), .deviceListGap,
+                       "Une version manquée sans son maillon : rien n'est cru (D.3, E.1)")
+        v4.deviceListChain = [v3.deviceList]
         let skipped = try XCTUnwrap(try? E2EEV2IdentityVerification.verify(v4, pinned: pin2).get())
-        XCTAssertEqual(skipped.pin.listVersion, 4, "Versions manquées : signature de l'UIK et version croissante suffisent")
+        XCTAssertEqual(skipped.pin.listVersion, 4, "Versions manquées : chaque maillon vérifié depuis la version épinglée")
         XCTAssertEqual(skipped.devices.map(\.deviceId), [tablet.id], "Le téléphone, retiré de la liste, n'est plus certifié")
     }
 
