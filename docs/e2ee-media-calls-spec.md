@@ -2021,15 +2021,21 @@ version publiée qui ouvre les verrous.
 
 - **`POST /api/e2ee/v2/conversations`**, création d'une conversation v2
   (§3.2). Corps :
-  - `conversationId`, choisi par le client ;
-  - `isGroup`, `title` (ou `null`) et `participantIds` ;
-  - `membership` : liste de `{change, signatureB64}` ;
+  - `conversationId`, choisi par le client : `conv_` suivi de 128 bits
+    aléatoires en base64url ;
+  - `isGroup` (booléen), `title` (ou `null`) et `participantIds`, les
+    membres invités, sans l'auteur, triés ;
+  - `membership` : la genèse, liste de `{change, signatureB64}` (D.4) ;
   - `epoch` : `{epochNumber: "1", previousEpochNumber: "0", manifest, envelopes}`,
-    où `manifest` est `{manifest, signatureB64, recipients}` et `envelopes`
-    suit la forme A.3.
+    où `manifest` est `{manifest, signatureB64, recipients}` (format 2,
+    §3.5) et `envelopes` suit la forme A.3.
 
-  La création est atomique. Réponse : la conversation, marquée
-  `e2eeProtocolVersion: 2`.
+  La création est atomique. Réponse proposée par iOS, sur le modèle du reçu
+  de rotation :
+  `{conversation: {id, e2eeProtocolVersion: 2, …}, epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
+  Le client ne garde la clé de l'époque 1 et l'état « v2 » qu'à réception
+  de ce reçu, exact (§3.1). Sur `409 CONVERSATION_ID_TAKEN`, rien n'est
+  gardé ; une nouvelle tentative tire un autre identifiant.
 - **`POST /api/e2ee/v2/conversations/{id}/epochs`**, étendu. Corps :
   - `previousEpochNumber`, `epochNumber` ;
   - `manifest`, au format 2 (§3.5) ;
