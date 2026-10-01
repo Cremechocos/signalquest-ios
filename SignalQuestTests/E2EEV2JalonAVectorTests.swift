@@ -388,6 +388,14 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
         let opened = try E2EEV2MessageCryptoV2.decrypt(envelope: envelope, epochKey: epochKey, context: context)
         XCTAssertEqual(opened.payloadBytes, payload)
         XCTAssertEqual(try b64(v, "ciphertextB64").count - 16, try int(v, "paddedClearLength"))
+        let wire = Data(try str(v, "wireJsonUtf8").utf8)
+        let parsed = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(wire))
+        XCTAssertEqual(parsed.envelope, envelope)
+        XCTAssertEqual(parsed.senderSignatureB64, try str(v, "signatureDerB64"))
+        XCTAssertEqual(parsed.encoded, wire, "JSON canonique, à l'octet")
+        for neg in try XCTUnwrap(v["wireNegative"] as? [[String: Any]]) {
+            XCTAssertNil(E2EEV2SignedMessageEnvelopeV2.parse(Data(try str(neg, "wireJsonUtf8").utf8)), caseName(neg))
+        }
         try forEachNegative(v) { neg in
             let candidate = envelopeV2(envelope, overrides: neg)
             let negContext = try messageContextV2(v, counterOverride: neg["contextCounter"] as? String)
@@ -1012,6 +1020,29 @@ private extension E2EEV2JalonAVectorTests {
         // Compteur de la charge (2) différent de celui de l'enveloppe (1).
         let counterPayload = try E2EEV2ContentPayloadV2(sentAtMs: createdAtMs, counter: 2, replyToRef: nil, mentions: [], body: .text("Bonjour")).encoded()
         let counterEnvelope = try E2EEV2MessageCryptoV2.encrypt(payload: counterPayload, fk: fk, epochKey: epochKey, nonce: nonce, context: context)
+        // L'enveloppe telle qu'elle voyage (E.3), et ce qu'un analyseur strict refuse.
+        let wire = String(decoding: E2EEV2SignedMessageEnvelopeV2(envelope: envelope, senderSignatureB64: signature).encoded, as: UTF8.self)
+        var offStep = try XCTUnwrap(Data(base64Encoded: envelope.ciphertextB64))
+        offStep.append(0)
+        func wireCase(_ name: String, _ text: String) -> VJ {
+            XCTAssertNotEqual(text, wire, name)
+            return .o([("case", .s(name)), ("wireJsonUtf8", .s(text))])
+        }
+        let wireNegative: [VJ] = [
+            wireCase("counterAsNumber", wire.replacingOccurrences(of: #""counter":"1""#, with: #""counter":1"#)),
+            wireCase("epochNumberAsNumber", wire.replacingOccurrences(of: #""epochNumber":"1""#, with: #""epochNumber":1"#)),
+            wireCase("envelopeVersionOne", wire.replacingOccurrences(of: #""envelopeVersion":"2""#, with: #""envelopeVersion":"1""#)),
+            wireCase("counterZero", wire.replacingOccurrences(of: #""counter":"1""#, with: #""counter":"0""#)),
+            wireCase("counterLeadingZero", wire.replacingOccurrences(of: #""counter":"1""#, with: #""counter":"01""#)),
+            wireCase("counterOverflow", wire.replacingOccurrences(of: #""counter":"1""#, with: #""counter":"2147483647""#)),
+            wireCase("ttlTooLong", wire.replacingOccurrences(of: #""ttlSeconds":"0""#, with: #""ttlSeconds":"2592001""#)),
+            wireCase("senderDeviceIdInEnvelope", wire.replacingOccurrences(of: #"{"aadB64""#, with: #"{"senderDeviceId":"\#(deviceA1)","aadB64""#)),
+            wireCase("duplicateKey", wire.replacingOccurrences(of: #"{"aadB64""#, with: #"{"counter":"2","aadB64""#)),
+            wireCase("missingFrankTag", wire.replacingOccurrences(of: #""frankTagB64":"\#(envelope.frankTagB64)","#, with: "")),
+            wireCase("unpaddedCommitment", wire.replacingOccurrences(of: envelope.keyCommitmentB64, with: String(envelope.keyCommitmentB64.dropLast()))),
+            wireCase("ciphertextOffPaddingStep", wire.replacingOccurrences(of: envelope.ciphertextB64, with: offStep.base64EncodedString())),
+            wireCase("signatureTooLong", wire.replacingOccurrences(of: signature, with: Data(repeating: 0x30, count: 80).base64EncodedString())),
+        ]
         return .o([
             ("fixtureVersion", .s("1")), ("conversationId", .s(conversationId)), ("epochNumber", .s("1")),
             ("senderDeviceId", .s(deviceA1)), ("clientRequestId", .s(context.clientRequestId)), ("counter", .s("1")),
@@ -1033,6 +1064,8 @@ private extension E2EEV2JalonAVectorTests {
             ("senderSigningPrivateRawB64", .s(sender.rawRepresentation.base64EncodedString())),
             ("senderSigningPublicX963B64", .s(sender.publicKey.x963Representation.base64EncodedString())),
             ("signatureDerB64", .s(signature)),
+            ("wireJsonUtf8", .s(wire)),
+            ("wireNegative", .a(wireNegative)),
             ("negative", .a([
                 .o([("case", .s("tamperedFrankTag")), ("frankTagB64", .s(Data(repeating: 7, count: 32).base64EncodedString()))]),
                 .o([("case", .s("badPadding")), ("ciphertextB64", .s((badSealed.ciphertext + badSealed.tag).base64EncodedString()))]),

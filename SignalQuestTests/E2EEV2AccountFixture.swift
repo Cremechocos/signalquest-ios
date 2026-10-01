@@ -185,3 +185,106 @@ final class E2EEV2AccountFixture: @unchecked Sendable {
     }
 }
 
+
+/// Appareil distant certifié et ses clés privées (lot 5).
+struct E2EEV2TestRemote {
+    let device: E2EEV2CertifiedDevice
+    let agreement: P256.KeyAgreement.PrivateKey
+    let signing: P256.Signing.PrivateKey
+
+    init(user: String, device deviceId: String, platform: String = "android") {
+        agreement = P256.KeyAgreement.PrivateKey()
+        signing = P256.Signing.PrivateKey()
+        device = E2EEV2CertifiedDevice(
+            userId: user, deviceId: deviceId, keyVersion: 1, platform: platform,
+            identityKeyB64: agreement.publicKey.x963Representation.base64EncodedString(),
+            signingKeyB64: signing.publicKey.x963Representation.base64EncodedString(),
+            fingerprint: E2EEV2Canonical.deviceFingerprint(
+                identityKeyX963: agreement.publicKey.x963Representation,
+                signingKeyX963: signing.publicKey.x963Representation
+            ),
+            capabilities: E2EEV2CapabilitiesDocument(
+                userId: user, deviceId: deviceId, sequence: 1, issuedAtMs: Int64(Date().timeIntervalSince1970 * 1_000),
+                envelopeVersions: ["2"], payloadVersions: ["2"], kinds: [], features: ["calls"]
+            )
+        )
+    }
+}
+
+/// Conversation v2 à deux, époque 1 vérifiée et gardée (lot 5).
+struct E2EEV2SeededConversation {
+    let conversationId: String
+    let membership: E2EEV2MembershipState
+    let current: E2EEV2ConversationStateStore.CurrentEpoch
+    let epochKey: Data
+}
+
+extension E2EEV2AccountFixture {
+    func seedConversation(with peer: String, devices: E2EEV2CertifiedDeviceSet) throws -> E2EEV2SeededConversation {
+        let epochKey = Data((0..<32).map { UInt8($0) })
+        let creation = try make(participants: [peer], isGroup: false, title: nil, excludesWeb: false, devices: devices, epochKey: epochKey)
+        let namespace = session.ownerNamespace
+        XCTAssertTrue(try keys.put(
+            recordInput: .init(conversationId: creation.conversationId, epochId: "epoch_seeded_000000000001", epochNumber: 1, keyCommitmentB64: creation.epoch.keyCommitmentB64),
+            epochKey: epochKey, ownerNamespace: namespace, expectedSession: session
+        ))
+        let current = E2EEV2ConversationStateStore.CurrentEpoch(
+            conversationId: creation.conversationId, epochNumber: 1, membershipChangeNumber: creation.genesis.changeNumber,
+            memberIds: creation.genesis.members.sorted(),
+            recipientsDigest: E2EEV2Canonical.listDigest(tag: E2EEV2EpochManifest.recipientsTag, lines: creation.epoch.recipients),
+            excludesWeb: false, createdAtMs: creation.epoch.createdAtMs, acceptedAtMs: creation.epoch.createdAtMs
+        )
+        try states.appendMembership(creation.membership, conversationId: creation.conversationId, ownerNamespace: namespace)
+        try states.record(
+            .init(
+                conversationId: creation.conversationId, creatorUserId: user, creatorDeviceId: descriptor.deviceId,
+                manifestDigest: E2EEV2Canonical.sha256B64URL(Data(creation.epoch.manifest.canonical.utf8)),
+                membershipChangeNumber: creation.genesis.changeNumber,
+                membershipDigest: E2EEV2MembershipChange.digest(of: try XCTUnwrap(creation.membership.last?.canonical)),
+                recordedAtMs: creation.epoch.createdAtMs
+            ),
+            ownerNamespace: namespace
+        )
+        try states.recordCurrentEpoch(current, ownerNamespace: namespace)
+        return .init(conversationId: creation.conversationId, membership: creation.genesis, current: current, epochKey: epochKey)
+    }
+
+    /// Époque suivante gardée localement, mêmes membres et destinataires.
+    func advance(_ seeded: E2EEV2SeededConversation, to epochNumber: Int, epochKey: Data) throws {
+        let namespace = session.ownerNamespace
+        XCTAssertTrue(try keys.put(
+            recordInput: .init(
+                conversationId: seeded.conversationId, epochId: "epoch_seeded_00000000000\(epochNumber)", epochNumber: epochNumber,
+                keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(epochKey)
+            ),
+            epochKey: epochKey, ownerNamespace: namespace, expectedSession: session
+        ))
+        let current = seeded.current
+        try states.recordCurrentEpoch(
+            .init(
+                conversationId: current.conversationId, epochNumber: epochNumber,
+                membershipChangeNumber: current.membershipChangeNumber, memberIds: current.memberIds,
+                recipientsDigest: current.recipientsDigest, excludesWeb: current.excludesWeb,
+                createdAtMs: current.createdAtMs + 1_000, acceptedAtMs: current.acceptedAtMs + 1_000
+            ),
+            ownerNamespace: namespace
+        )
+    }
+}
+
+extension E2EEV2AccountFixture {
+    /// Octets exacts du corps envoyé, pour l'analyseur strict.
+    static func rawBody(_ request: URLRequest) -> Data {
+        var data = request.httpBody ?? Data()
+        if data.isEmpty, let stream = request.httpBodyStream {
+            stream.open(); defer { stream.close() }
+            var buffer = [UInt8](repeating: 0, count: 4_096)
+            while true {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count <= 0 { break }
+                data.append(contentsOf: buffer.prefix(count))
+            }
+        }
+        return data
+    }
+}

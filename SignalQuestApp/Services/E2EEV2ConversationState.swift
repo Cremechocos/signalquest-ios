@@ -37,6 +37,39 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         let acceptedAtMs: Int64
     }
 
+    /// Époque acceptée, gardée après son remplacement : membres de l'époque
+    /// (§5.3) et fenêtre de 24 heures des messages en vol (§3.4).
+    struct AcceptedEpoch: Codable, Equatable, Sendable {
+        let epochNumber: Int
+        let membershipChangeNumber: Int
+        let memberIds: [String]
+        let acceptedAtMs: Int64
+    }
+
+    static let acceptedEpochLimit = 64
+
+    /// Dernier compteur d'envoi réservé par cet appareil (§4.3).
+    struct SendCounter: Codable, Equatable, Sendable {
+        let conversationId: String
+        let deviceId: String
+        let last: Int
+    }
+
+    /// Envoi en attente (E.3) : la charge exacte et son compteur, gardés avant le
+    /// premier envoi et jusqu'à l'accusé. Un nouvel essai renvoie la même
+    /// enveloppe, ou rechiffre la même charge sous l'époque courante.
+    struct PendingSend: Codable, Equatable, Sendable {
+        let conversationId: String
+        let clientRequestId: String
+        let deviceId: String
+        let counter: Int
+        let ttlSeconds: Int
+        let payloadB64: String
+        let epochNumber: Int
+        /// Enveloppe signée, en JSON canonique, telle qu'envoyée.
+        let wire: String
+    }
+
     enum Failure: Error, Equatable {
         /// Un autre manifeste d'époque 1 a déjà été vérifié pour cette conversation.
         case genesisConflict
@@ -44,6 +77,7 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         case regressed
         case invalidRecord
         case otherAccount
+        case counterExhausted
     }
 
     private let tokenStore: TokenStore
@@ -131,21 +165,91 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         try beforeRecord()
         let data = try JSONEncoder().encode(epoch)
         guard let value = String(data: data, encoding: .utf8) else { throw Failure.invalidRecord }
+        let accepted = try acceptedEpochs(conversationId: epoch.conversationId, ownerNamespace: ownerNamespace)
+            .filter { $0.epochNumber < epoch.epochNumber }
+            + [AcceptedEpoch(
+                epochNumber: epoch.epochNumber, membershipChangeNumber: epoch.membershipChangeNumber,
+                memberIds: epoch.memberIds, acceptedAtMs: epoch.acceptedAtMs
+            )]
+        let history = try JSONEncoder().encode(Array(accepted.suffix(Self.acceptedEpochLimit)))
+        try tokenStore.set(
+            String(decoding: history, as: UTF8.self),
+            for: acceptedKey(conversationId: epoch.conversationId, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
         try tokenStore.set(
             value, for: currentKey(conversationId: epoch.conversationId, ownerNamespace: ownerNamespace),
             accessibility: .afterFirstUnlock
         )
     }
 
+    /// Époques acceptées, les plus anciennes d'abord (64 au plus).
+    func acceptedEpochs(conversationId: String, ownerNamespace: String) throws -> [AcceptedEpoch] {
+        guard let raw = try tokenStore.string(for: acceptedKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
+        else { return [] }
+        guard let data = raw.data(using: .utf8), let epochs = try? JSONDecoder().decode([AcceptedEpoch].self, from: data)
+        else { throw Failure.invalidRecord }
+        return epochs
+    }
+
     /// Réinitialisation d'identité : les clés d'époque partent avec l'ancienne
-    /// identité, les époques courantes aussi ; genèses et chaînes restent.
+    /// identité, les époques courantes aussi, et ses envois en attente ;
+    /// genèses et chaînes restent. La nouvelle identité compte depuis 1.
     func removeCurrentEpochs(ownerNamespace: String) throws {
         guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
         Self.lock.lock()
         defer { Self.lock.unlock() }
-        for key in try tokenStore.keys(withPrefix: Self.prefix(ownerNamespace: ownerNamespace)) where key.hasSuffix(":current") {
+        for key in try tokenStore.keys(withPrefix: Self.prefix(ownerNamespace: ownerNamespace))
+        where key.hasSuffix(":current") || key.hasSuffix(":accepted") || key.hasSuffix(":counter") || key.contains(":send:") {
             try tokenStore.remove(key)
         }
+    }
+
+    /// Réserve le compteur du prochain message de cet appareil (§4.3) : avant
+    /// de composer, jamais rendu ni réutilisé pour un autre message.
+    func reserveSendCounter(conversationId: String, deviceId: String, ownerNamespace: String) throws -> Int {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        let key = counterKey(conversationId: conversationId, ownerNamespace: ownerNamespace)
+        var last = 0
+        if let raw = try tokenStore.string(for: key) {
+            guard let data = raw.data(using: .utf8), let known = try? JSONDecoder().decode(SendCounter.self, from: data),
+                  known.conversationId == conversationId else {
+                throw Failure.invalidRecord
+            }
+            if known.deviceId == deviceId { last = known.last }
+        }
+        guard last < E2EEV2Canonical.maxSequenceNumber else { throw Failure.counterExhausted }
+        let data = try JSONEncoder().encode(SendCounter(conversationId: conversationId, deviceId: deviceId, last: last + 1))
+        try tokenStore.set(String(decoding: data, as: UTF8.self), for: key, accessibility: .afterFirstUnlock)
+        return last + 1
+    }
+
+    func pendingSend(conversationId: String, clientRequestId: String, ownerNamespace: String) throws -> PendingSend? {
+        guard let raw = try tokenStore.string(
+            for: sendKey(conversationId: conversationId, clientRequestId: clientRequestId, ownerNamespace: ownerNamespace)
+        ) else { return nil }
+        guard let data = raw.data(using: .utf8), let pending = try? JSONDecoder().decode(PendingSend.self, from: data),
+              pending.conversationId == conversationId, pending.clientRequestId == clientRequestId else {
+            throw Failure.invalidRecord
+        }
+        return pending
+    }
+
+    /// La charge est en clair : réservée à l'appareil déverrouillé.
+    func savePendingSend(_ pending: PendingSend, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        let data = try JSONEncoder().encode(pending)
+        try tokenStore.set(
+            String(decoding: data, as: UTF8.self),
+            for: sendKey(conversationId: pending.conversationId, clientRequestId: pending.clientRequestId, ownerNamespace: ownerNamespace),
+            accessibility: .whenUnlocked
+        )
+    }
+
+    func clearPendingSend(conversationId: String, clientRequestId: String, ownerNamespace: String) throws {
+        try tokenStore.remove(sendKey(conversationId: conversationId, clientRequestId: clientRequestId, ownerNamespace: ownerNamespace))
     }
 
     /// Migration en cours (§14.2) : le corps signé une fois est renvoyé tel quel,
@@ -210,6 +314,19 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
 
     private func pendingKey(conversationId: String, ownerNamespace: String) -> String {
         key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":pending"
+    }
+
+    private func acceptedKey(conversationId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":accepted"
+    }
+
+    private func counterKey(conversationId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":counter"
+    }
+
+    private func sendKey(conversationId: String, clientRequestId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":send:"
+            + SHA256.hash(data: Data(clientRequestId.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     private func key(conversationId: String, ownerNamespace: String) -> String {

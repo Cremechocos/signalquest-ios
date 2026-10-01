@@ -34,6 +34,21 @@ enum E2EEV2RotationPolicy {
         if nowMs - current.acceptedAtMs >= maxEpochAgeMs { reasons.append(.age) }
         return reasons
     }
+
+    /// Destinataires attendus : les appareils certifiés des membres actuels.
+    static func reasons(
+        current: E2EEV2ConversationStateStore.CurrentEpoch,
+        membership: E2EEV2MembershipState,
+        devices: E2EEV2CertifiedDeviceSet,
+        nowMs: Int64
+    ) -> [Reason] {
+        let expected = E2EEV2EpochProposals.recipients(
+            devices, members: membership.members, excludesWeb: membership.excludesWeb, nowMs: nowMs
+        ).map {
+            E2EEV2EpochManifest.recipient(userId: $0.userId, deviceId: $0.deviceId, platform: $0.platform, fingerprint: $0.fingerprint)
+        }
+        return reasons(current: current, membership: membership, expectedRecipients: expected, nowMs: nowMs)
+    }
 }
 
 /// Réponses du serveur aux routes d'époque v2 (proposition iOS, E.2) : JSON

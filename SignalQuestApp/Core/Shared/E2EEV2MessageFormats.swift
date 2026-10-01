@@ -65,7 +65,9 @@ enum E2EEV2Franking {
 /// D.8 : charge v2 du texte (`TEXT`, `EDIT`, `DELETE`).
 struct E2EEV2ContentPayloadV2: Equatable, Sendable {
     static let schema = "signalquest.e2ee-content"
-    static let maxBytes = 262_144
+    /// Le clair bourré (`fk`, charge, 0x80) tient en 256 Kio : son enveloppe
+    /// reste sous la limite de 512 Kio des requêtes et réponses JSON.
+    static let maxBytes = 262_144 - 33
     static let maxTextBytes = 65_536
 
     enum Body: Equatable, Sendable {
@@ -125,7 +127,7 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
               let sentText = root["sentAtMs"]?.stringValue, E2EEV2Canonical.isDecimal(sentText),
               let sentAt = Int64(sentText),
               let counterText = root["counter"]?.stringValue, E2EEV2Canonical.isDecimal(counterText),
-              let counter = Int64(counterText), counter >= 1,
+              let counter = Int64(counterText), (1...Int64(E2EEV2Canonical.maxSequenceNumber)).contains(counter),
               let mentionItems = root["mentions"]?.arrayValue, mentionItems.count <= 100,
               let bodyObject = root["body"]?.objectValue else {
             throw E2EEV2MessageV2Error.invalidPayload
@@ -364,15 +366,204 @@ enum E2EEV2MessageCryptoV2 {
         }
     }
 
+    static func isClientRequestId(_ value: String) -> Bool {
+        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\z"#, options: .regularExpression) != nil
+    }
+
     private static func validate(_ context: E2EEV2MessageContextV2) throws {
-        let requestPattern = #"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}\z"#
         guard E2EEV2Canonical.isOpaque(context.conversationId),
               E2EEV2Canonical.isOpaque(context.senderDeviceId),
-              context.clientRequestId.range(of: requestPattern, options: .regularExpression) != nil,
-              context.epochNumber > 0, context.counter >= 1,
-              (0...(30 * 24 * 60 * 60)).contains(context.ttlSeconds) else {
+              isClientRequestId(context.clientRequestId),
+              (1...E2EEV2Canonical.maxSequenceNumber).contains(context.epochNumber),
+              (1...Int64(E2EEV2Canonical.maxSequenceNumber)).contains(context.counter),
+              (0...E2EEV2SignedMessageEnvelopeV2.maxTTLSeconds).contains(context.ttlSeconds) else {
             throw E2EEV2MessageV2Error.invalidContext
         }
+    }
+}
+
+/// D.7 et E.3 : l'enveloppe v2 telle qu'elle voyage, corps de l'envoi et
+/// `envelope` des lectures. Format nouveau (D.0) : clés exactes, analyseur
+/// strict, entiers en chaînes décimales. Mêmes noms de champs que la v1, plus
+/// `counter` et `frankTagB64`.
+struct E2EEV2SignedMessageEnvelopeV2: Equatable, Sendable {
+    static let keys: Set<String> = [
+        "envelopeVersion", "epochNumber", "clientRequestId", "counter", "algorithm", "contentType",
+        "keyCommitmentB64", "ttlSeconds", "encryptedBlobIds", "frankTagB64", "nonceB64", "aadB64",
+        "ciphertextB64", "senderSignatureB64",
+    ]
+    static let maxTTLSeconds = 30 * 24 * 60 * 60
+    /// Clair bourré de 256 Kio au plus, plus l'étiquette GCM.
+    static let maxCiphertextBytes = 262_144 + 16
+    static let maxWireBytes = E2EEV2WireLimits.maxJSONResponseBytes
+
+    let envelope: E2EEV2MessageEnvelopeV2
+    let senderSignatureB64: String
+
+    var json: E2EEV2JSON {
+        .object([
+            "envelopeVersion": .string(String(envelope.envelopeVersion)),
+            "epochNumber": .string(String(envelope.epochNumber)),
+            "clientRequestId": .string(envelope.clientRequestId),
+            "counter": .string(String(envelope.counter)),
+            "algorithm": .string(envelope.algorithm),
+            "contentType": .string(envelope.contentType),
+            "keyCommitmentB64": .string(envelope.keyCommitmentB64),
+            "ttlSeconds": .string(String(envelope.ttlSeconds)),
+            "encryptedBlobIds": .array(envelope.encryptedBlobIds.map(E2EEV2JSON.string)),
+            "frankTagB64": .string(envelope.frankTagB64),
+            "nonceB64": .string(envelope.nonceB64),
+            "aadB64": .string(envelope.aadB64),
+            "ciphertextB64": .string(envelope.ciphertextB64),
+            "senderSignatureB64": .string(senderSignatureB64),
+        ])
+    }
+
+    var encoded: Data { E2EEV2CanonicalJSON.encode(json) }
+
+    /// Contexte dont l'appareil émetteur, connu par ailleurs (signature, liste
+    /// d'appareils), n'est jamais lu dans l'enveloppe.
+    func context(conversationId: String, senderDeviceId: String) -> E2EEV2MessageContextV2 {
+        .init(
+            conversationId: conversationId, epochNumber: envelope.epochNumber, senderDeviceId: senderDeviceId,
+            clientRequestId: envelope.clientRequestId, counter: envelope.counter, ttlSeconds: envelope.ttlSeconds,
+            encryptedBlobIds: envelope.encryptedBlobIds
+        )
+    }
+
+    static func parse(_ data: Data) -> E2EEV2SignedMessageEnvelopeV2? {
+        guard data.count <= maxWireBytes, let value = try? E2EEV2CanonicalJSON.parseStrict(data) else { return nil }
+        return parse(value)
+    }
+
+    static func parse(_ value: E2EEV2JSON) -> E2EEV2SignedMessageEnvelopeV2? {
+        guard let root = value.objectValue, Set(root.keys) == keys,
+              root["envelopeVersion"]?.stringValue == String(E2EEV2MessageCryptoV2.envelopeVersion),
+              let epochNumber = root["epochNumber"]?.stringValue.flatMap(E2EEV2Canonical.sequenceNumber),
+              let clientRequestId = root["clientRequestId"]?.stringValue,
+              E2EEV2MessageCryptoV2.isClientRequestId(clientRequestId),
+              let counter = root["counter"]?.stringValue.flatMap(E2EEV2Canonical.sequenceNumber),
+              root["algorithm"]?.stringValue == E2EEV2MessageCryptoV2.algorithm,
+              root["contentType"]?.stringValue == E2EEV2MessageCryptoV2.contentType,
+              let commitment = base64(root["keyCommitmentB64"], 32...32),
+              let ttlText = root["ttlSeconds"]?.stringValue, E2EEV2Canonical.isDecimal(ttlText),
+              let ttlSeconds = Int(ttlText), (0...maxTTLSeconds).contains(ttlSeconds),
+              let blobValues = root["encryptedBlobIds"]?.arrayValue,
+              let frankTag = base64(root["frankTagB64"], 32...32),
+              let nonce = base64(root["nonceB64"], 12...12),
+              let aad = base64(root["aadB64"], 1...2_048),
+              let ciphertext = base64(root["ciphertextB64"], 272...maxCiphertextBytes),
+              let signature = base64(root["senderSignatureB64"], 8...72) else { return nil }
+        let blobIds = blobValues.compactMap(\.stringValue)
+        // Le chiffré suit un palier de bourrage (§4.5), plus l'étiquette GCM.
+        let clearLength = (Data(base64Encoded: ciphertext)?.count ?? 0) - 16
+        guard blobIds.count == blobValues.count, (try? E2EEV2MessageCrypto.blobRoutingHash(blobIds)) != nil,
+              clearLength >= 256, E2EEV2MessageCryptoV2.paddedLength(forUnpadded: clearLength) == clearLength else {
+            return nil
+        }
+        return .init(
+            envelope: .init(
+                envelopeVersion: E2EEV2MessageCryptoV2.envelopeVersion, epochNumber: epochNumber,
+                clientRequestId: clientRequestId, counter: Int64(counter), algorithm: E2EEV2MessageCryptoV2.algorithm,
+                contentType: E2EEV2MessageCryptoV2.contentType, keyCommitmentB64: commitment, ttlSeconds: ttlSeconds,
+                encryptedBlobIds: blobIds, frankTagB64: frankTag, nonceB64: nonce, aadB64: aad, ciphertextB64: ciphertext
+            ),
+            senderSignatureB64: signature
+        )
+    }
+
+    /// Base64 standard canonique (D.0) : `Data(base64Encoded:)` accepte des variantes.
+    static func base64(_ value: E2EEV2JSON?, _ byteCount: ClosedRange<Int>) -> String? {
+        guard let text = value?.stringValue, let data = Data(base64Encoded: text),
+              byteCount.contains(data.count), data.base64EncodedString() == text else { return nil }
+        return text
+    }
+}
+
+/// E.3 : accusé d'un envoi, `{envelopeId, clientRequestId, serverTagB64,
+/// serverTimeMs, keyId}`. Le même envoi rejoué rend le même accusé.
+struct E2EEV2MessageReceiptV2: Codable, Equatable, Sendable {
+    let envelopeId: String
+    let clientRequestId: String
+    let serverTagB64: String
+    let serverTimeMs: Int64
+    let keyId: String
+
+    static func parse(_ data: Data, clientRequestId: String) -> E2EEV2MessageReceiptV2? {
+        guard data.count <= 4_096, let root = (try? E2EEV2CanonicalJSON.parseStrict(data))?.objectValue,
+              Set(root.keys) == ["envelopeId", "clientRequestId", "serverTagB64", "serverTimeMs", "keyId"],
+              let envelopeId = root["envelopeId"]?.stringValue, E2EEV2Canonical.isOpaque(envelopeId),
+              root["clientRequestId"]?.stringValue == clientRequestId,
+              let serverTag = E2EEV2SignedMessageEnvelopeV2.base64(root["serverTagB64"], 32...32),
+              let timeText = root["serverTimeMs"]?.stringValue, E2EEV2Canonical.isDecimal(timeText),
+              let serverTimeMs = Int64(timeText),
+              let keyId = root["keyId"]?.stringValue, E2EEV2Canonical.isOpaque(keyId) else { return nil }
+        return .init(
+            envelopeId: envelopeId, clientRequestId: clientRequestId, serverTagB64: serverTag,
+            serverTimeMs: serverTimeMs, keyId: keyId
+        )
+    }
+}
+
+/// E.3 : un message v2 tel que le serveur le remet, dans la liste d'une
+/// conversation comme à la lecture d'une enveloppe (`{"message": …}`).
+struct E2EEV2DeliveredMessageV2: Equatable, Sendable {
+    static let keys: Set<String> = [
+        "envelopeId", "sequence", "senderUserId", "senderDeviceId", "envelope", "serverTagB64", "serverTimeMs", "keyId",
+    ]
+    static let pageLimit = 100
+
+    let envelopeId: String
+    /// Séquence du serveur dans la conversation : ordre de lecture et curseur.
+    let sequence: Int64
+    let senderUserId: String
+    let senderDeviceId: String
+    let signed: E2EEV2SignedMessageEnvelopeV2
+    let serverTagB64: String
+    let serverTimeMs: Int64
+    let keyId: String
+
+    static func parse(_ value: E2EEV2JSON) -> E2EEV2DeliveredMessageV2? {
+        guard let root = value.objectValue, Set(root.keys) == keys,
+              let envelopeId = root["envelopeId"]?.stringValue, E2EEV2Canonical.isOpaque(envelopeId),
+              let sequenceText = root["sequence"]?.stringValue, E2EEV2Canonical.isDecimal(sequenceText),
+              let sequence = Int64(sequenceText), sequence >= 1,
+              let senderUserId = root["senderUserId"]?.stringValue, E2EEV2Canonical.isOpaque(senderUserId),
+              let senderDeviceId = root["senderDeviceId"]?.stringValue, E2EEV2Canonical.isOpaque(senderDeviceId),
+              let signed = root["envelope"].flatMap(E2EEV2SignedMessageEnvelopeV2.parse),
+              let serverTag = E2EEV2SignedMessageEnvelopeV2.base64(root["serverTagB64"], 32...32),
+              let timeText = root["serverTimeMs"]?.stringValue, E2EEV2Canonical.isDecimal(timeText),
+              let serverTimeMs = Int64(timeText),
+              let keyId = root["keyId"]?.stringValue, E2EEV2Canonical.isOpaque(keyId) else { return nil }
+        return .init(
+            envelopeId: envelopeId, sequence: sequence, senderUserId: senderUserId, senderDeviceId: senderDeviceId,
+            signed: signed, serverTagB64: serverTag, serverTimeMs: serverTimeMs, keyId: keyId
+        )
+    }
+
+    /// `GET …/messages?after=&limit=` : `{messages, hasMore}`, séquences croissantes
+    /// et toutes après le curseur ; une page tient en 512 Kio.
+    static func parsePage(_ data: Data, after: Int64) -> (messages: [E2EEV2DeliveredMessageV2], hasMore: Bool)? {
+        guard data.count <= E2EEV2WireLimits.maxJSONResponseBytes,
+              let root = (try? E2EEV2CanonicalJSON.parseStrict(data))?.objectValue,
+              Set(root.keys) == ["messages", "hasMore"],
+              let items = root["messages"]?.arrayValue, items.count <= pageLimit,
+              let hasMore = root["hasMore"]?.boolValue else { return nil }
+        let messages = items.compactMap(parse)
+        guard messages.count == items.count, !(hasMore && messages.isEmpty),
+              zip([after] + messages.map(\.sequence), messages.map(\.sequence)).allSatisfy({ $0 < $1 }) else {
+            return nil
+        }
+        return (messages, hasMore)
+    }
+
+    /// `GET /api/e2ee/v2/envelopes/{id}/fetch` d'un message v2 : `{"message": …}`.
+    static func parseFetch(_ data: Data, envelopeId: String) -> E2EEV2DeliveredMessageV2? {
+        guard data.count <= E2EEV2WireLimits.maxJSONResponseBytes,
+              let root = (try? E2EEV2CanonicalJSON.parseStrict(data))?.objectValue,
+              Set(root.keys) == ["message"], let message = root["message"].flatMap(parse),
+              message.envelopeId == envelopeId else { return nil }
+        return message
     }
 }
 

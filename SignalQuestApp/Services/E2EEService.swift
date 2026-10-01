@@ -315,6 +315,7 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
         do {
             try E2EEV2VaultBoundary.purge(store: tokenStore, ownerScopeId: ownerScopeId)
             try E2EEV2MediaOutboxStore().purge(ownerScopeId: ownerScopeId)
+            try E2EEV2MessageLedgerStore().purge(ownerScopeId: ownerScopeId)
         } catch {
             MessageSyncLog.logger.error("Owner-scoped E2EE erasure incomplete: \(String(describing: error), privacy: .private)")
         }
