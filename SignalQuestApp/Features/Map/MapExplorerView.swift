@@ -1600,6 +1600,11 @@ struct MapExplorerView: View {
     /// naviguer pendant la transition de la feuille échouait.
     @State private var pendingANFR: MapANFRDestination?
 
+    private static let resetStoresOnce: Void = {
+        MapRegionStore.reset()
+        MapMarketStore.reset()
+    }()
+
     init(service: MapSnapshotServicing,
          antennas: AntennasServicing,
          markets: MarketRegistryServicing,
@@ -1607,11 +1612,10 @@ struct MapExplorerView: View {
         _model = StateObject(wrappedValue: MapExplorerViewModel(
             map: service, antennas: antennas, markets: markets, communityOutages: communityOutages
         ))
-        // QA : `--reset-map` oublie région + marché/opérateur pour rejouer la détection.
-        if AppEnvironment.resetsMapOnLaunch {
-            MapRegionStore.reset()
-            MapMarketStore.reset()
-        }
+        // QA : `--reset-map` oublie région + marché/opérateur pour rejouer la détection,
+        // une seule fois par lancement : SwiftUI recrée cette vue à chaque rendu de son
+        // parent, et l'effacement répété faisait tourner l'app en boucle sous XCTest.
+        if AppEnvironment.resetsMapOnLaunch { _ = Self.resetStoresOnce }
         // Restaure la dernière région, sinon vue pays du marché initial (dernier
         // choix persisté ou pays de la locale) — jamais une ville ni la France imposée.
         let region = MapRegionStore.lastRegion() ?? Self.region(for: MapMarketStore.initialMarketCode())
