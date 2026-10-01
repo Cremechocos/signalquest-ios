@@ -312,12 +312,19 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     }
 
     func eraseLocalVault(ownerScopeId: String) async {
-        do {
-            try E2EEV2VaultBoundary.purge(store: tokenStore, ownerScopeId: ownerScopeId)
-            try E2EEV2MediaOutboxStore().purge(ownerScopeId: ownerScopeId)
-            try E2EEV2MessageLedgerStore().purge(ownerScopeId: ownerScopeId)
-        } catch {
-            MessageSyncLog.logger.error("Owner-scoped E2EE erasure incomplete: \(String(describing: error), privacy: .private)")
+        // Chaque effacement est tenté, même si un autre a échoué.
+        let erasures: [() throws -> Void] = [
+            { [tokenStore] in try E2EEV2VaultBoundary.purge(store: tokenStore, ownerScopeId: ownerScopeId) },
+            { try E2EEV2MediaOutboxStore().purge(ownerScopeId: ownerScopeId) },
+            { try E2EEV2MessageLedgerStore().purge(ownerScopeId: ownerScopeId) },
+            { try E2EEV2MessageStoreV2().purge(ownerScopeId: ownerScopeId) },
+        ]
+        for erase in erasures {
+            do {
+                try erase()
+            } catch {
+                MessageSyncLog.logger.error("Owner-scoped E2EE erasure incomplete: \(String(describing: error), privacy: .private)")
+            }
         }
     }
 

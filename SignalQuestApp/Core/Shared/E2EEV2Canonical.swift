@@ -432,6 +432,16 @@ enum E2EEV2Canonical {
         return number
     }
 
+    /// Plus grand instant (ms) ou séquence du serveur accepté : 2⁵³ − 1, entier
+    /// exact en JavaScript. Une durée ajoutée ne fait jamais déborder un Int64.
+    static let maxSafeInteger: Int64 = 9_007_199_254_740_991
+
+    /// Décimal canonique de 0 à `maxSafeInteger`.
+    static func safeInteger(_ value: String) -> Int64? {
+        guard isDecimal(value), let number = Int64(value), number <= maxSafeInteger else { return nil }
+        return number
+    }
+
     static func base64URL(_ data: Data) -> String {
         data.base64URLEncodedNoPadding()
     }

@@ -394,7 +394,15 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
         XCTAssertEqual(parsed.senderSignatureB64, try str(v, "signatureDerB64"))
         XCTAssertEqual(parsed.encoded, wire, "JSON canonique, à l'octet")
         for neg in try XCTUnwrap(v["wireNegative"] as? [[String: Any]]) {
-            XCTAssertNil(E2EEV2SignedMessageEnvelopeV2.parse(Data(try str(neg, "wireJsonUtf8").utf8)), caseName(neg))
+            let data = try b64(neg, "wireJsonB64")
+            XCTAssertNil(E2EEV2SignedMessageEnvelopeV2.parse(data), caseName(neg))
+            XCTAssertNil((try? E2EEV2CanonicalJSON.parseStrict(data)).flatMap(E2EEV2SignedMessageEnvelopeV2.parse), caseName(neg))
+        }
+        // JSON valide hors JCS : refusé comme corps d'envoi, relu une fois imbriqué.
+        for neg in try XCTUnwrap(v["wireNonCanonical"] as? [[String: Any]]) {
+            let data = try b64(neg, "wireJsonB64")
+            XCTAssertNil(E2EEV2SignedMessageEnvelopeV2.parse(data), caseName(neg))
+            XCTAssertEqual(E2EEV2SignedMessageEnvelopeV2.parse(try E2EEV2CanonicalJSON.parseStrict(data)), parsed, caseName(neg))
         }
         try forEachNegative(v) { neg in
             let candidate = envelopeV2(envelope, overrides: neg)
@@ -1024,9 +1032,11 @@ private extension E2EEV2JalonAVectorTests {
         let wire = String(decoding: E2EEV2SignedMessageEnvelopeV2(envelope: envelope, senderSignatureB64: signature).encoded, as: UTF8.self)
         var offStep = try XCTUnwrap(Data(base64Encoded: envelope.ciphertextB64))
         offStep.append(0)
+        // Les octets exacts aussi : un chargeur JSON peut retirer un BOM en tête
+        // d'une chaîne (JSONSerialization le fait).
         func wireCase(_ name: String, _ text: String) -> VJ {
             XCTAssertNotEqual(text, wire, name)
-            return .o([("case", .s(name)), ("wireJsonUtf8", .s(text))])
+            return .o([("case", .s(name)), ("wireJsonUtf8", .s(text)), ("wireJsonB64", .s(Data(text.utf8).base64EncodedString()))])
         }
         let wireNegative: [VJ] = [
             wireCase("counterAsNumber", wire.replacingOccurrences(of: #""counter":"1""#, with: #""counter":1"#)),
@@ -1042,6 +1052,33 @@ private extension E2EEV2JalonAVectorTests {
             wireCase("unpaddedCommitment", wire.replacingOccurrences(of: envelope.keyCommitmentB64, with: String(envelope.keyCommitmentB64.dropLast()))),
             wireCase("ciphertextOffPaddingStep", wire.replacingOccurrences(of: envelope.ciphertextB64, with: offStep.base64EncodedString())),
             wireCase("signatureTooLong", wire.replacingOccurrences(of: signature, with: Data(repeating: 0x30, count: 80).base64EncodedString())),
+            wireCase("counterPlusSign", wire.replacingOccurrences(of: #""counter":"1""#, with: #""counter":"+1""#)),
+            wireCase("counterExponent", wire.replacingOccurrences(of: #""counter":"1""#, with: #""counter":"1e0""#)),
+            wireCase("counterSpace", wire.replacingOccurrences(of: #""counter":"1""#, with: #""counter":" 1""#)),
+            wireCase("counterEmpty", wire.replacingOccurrences(of: #""counter":"1""#, with: "\"counter\":\"\"")),
+            wireCase("counterArabicDigit", wire.replacingOccurrences(of: #""counter":"1""#, with: "\"counter\":\"\u{0661}\"")),
+            wireCase("frankTagTrailingBits", wire.replacingOccurrences(of: envelope.frankTagB64, with: try nonZeroTrailingBits(envelope.frankTagB64))),
+            wireCase("nonceEscapedNewline", wire.replacingOccurrences(
+                of: envelope.nonceB64, with: String(envelope.nonceB64.prefix(8)) + #"\n"# + String(envelope.nonceB64.dropFirst(8))
+            )),
+            wireCase("ciphertextUrlAlphabet", wire.replacingOccurrences(of: envelope.ciphertextB64, with: try urlAlphabet(envelope.ciphertextB64))),
+            wireCase("bomPrefix", "\u{FEFF}" + wire),
+            wireCase("comment", wire.replacingOccurrences(of: #"{"aadB64""#, with: #"{/* x */"aadB64""#)),
+            wireCase("apostrophes", wire.replacingOccurrences(of: #""counter":"1""#, with: "'counter':'1'")),
+            wireCase("trailingComma", String(wire.dropLast()) + ",}"),
+        ]
+        // JSON valide, mais pas en JCS : refusé comme corps d'envoi (D.7).
+        func nonCanonical(_ name: String, _ text: String) -> VJ {
+            XCTAssertNotEqual(text, wire, name)
+            return .o([("case", .s(name)), ("wireJsonUtf8", .s(text)), ("wireJsonB64", .s(Data(text.utf8).base64EncodedString()))])
+        }
+        let algorithmField = #""algorithm":"\#(E2EEV2MessageCryptoV2.algorithm)","#
+        let wireNonCanonical: [VJ] = [
+            nonCanonical("escapedSlash", wire.replacingOccurrences(
+                of: envelope.ciphertextB64, with: envelope.ciphertextB64.replacingOccurrences(of: "/", with: #"\/"#)
+            )),
+            nonCanonical("unsortedKeys", "{" + algorithmField + wire.dropFirst().replacingOccurrences(of: algorithmField, with: "")),
+            nonCanonical("whitespace", "{ " + wire.dropFirst()),
         ]
         return .o([
             ("fixtureVersion", .s("1")), ("conversationId", .s(conversationId)), ("epochNumber", .s("1")),
@@ -1066,6 +1103,7 @@ private extension E2EEV2JalonAVectorTests {
             ("signatureDerB64", .s(signature)),
             ("wireJsonUtf8", .s(wire)),
             ("wireNegative", .a(wireNegative)),
+            ("wireNonCanonical", .a(wireNonCanonical)),
             ("negative", .a([
                 .o([("case", .s("tamperedFrankTag")), ("frankTagB64", .s(Data(repeating: 7, count: 32).base64EncodedString()))]),
                 .o([("case", .s("badPadding")), ("ciphertextB64", .s((badSealed.ciphertext + badSealed.tag).base64EncodedString()))]),
@@ -1074,6 +1112,24 @@ private extension E2EEV2JalonAVectorTests {
                 .o([("case", .s("highS")), ("signatureDerB64", .s(try highS(signature)))]),
             ])),
         ])
+    }
+
+    /// Mêmes octets pour un décodeur indulgent, mais bits de fin non nuls.
+    func nonZeroTrailingBits(_ b64: String) throws -> String {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+        var chars = Array(b64)
+        XCTAssertEqual(chars.last, "=", "Remplissage attendu : des bits de fin existent")
+        let last = try XCTUnwrap(chars.lastIndex { $0 != "=" })
+        let value = try XCTUnwrap(alphabet.firstIndex(of: chars[last]))
+        chars[last] = alphabet[value ^ 1]
+        return String(chars)
+    }
+
+    /// Un caractère de l'alphabet base64url à la place de son équivalent standard.
+    func urlAlphabet(_ b64: String) throws -> String {
+        if let slash = b64.firstIndex(of: "/") { return b64.replacingCharacters(in: slash...slash, with: "_") }
+        let plus = try XCTUnwrap(b64.firstIndex(of: "+"))
+        return b64.replacingCharacters(in: plus...plus, with: "-")
     }
 
     func buildContentPayloadV2() throws -> VJ {

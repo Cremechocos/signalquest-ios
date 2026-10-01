@@ -91,6 +91,10 @@ final class E2EEV2ReportSenderV2: @unchecked Sendable {
         } catch {
             return .failure(localError("e2ee-report-preparation-failed"))
         }
+        // Le corps tient en 512 Kio (D.10) : sinon, moins de messages.
+        guard body.count <= E2EEV2WireLimits.maxJSONResponseBytes else {
+            return .failure(localError("e2ee-report-too-large"))
+        }
         switch await transport.bound(to: session).postJSON(
             path: "/api/e2ee/v2/reports", body: body, expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
         ) {

@@ -118,14 +118,22 @@ struct E2EEV2ContentPayloadV2: Equatable, Sendable {
         return data
     }
 
+    /// Charge bien formée d'une version ou d'un `kind` inconnus de cette app :
+    /// « Contenu non pris en charge » (§5.2), sans rien interpréter.
+    static func isUnsupported(_ data: Data) -> Bool {
+        guard data.count <= maxBytes, let root = (try? E2EEV2CanonicalJSON.parseCanonical(data))?.objectValue,
+              root["schema"]?.stringValue == schema, let version = root["version"]?.stringValue,
+              let kind = root["kind"]?.stringValue else { return false }
+        return version != "2" || !["TEXT", "EDIT", "DELETE"].contains(kind)
+    }
+
     static func parse(_ data: Data) throws -> E2EEV2ContentPayloadV2 {
         guard data.count <= maxBytes,
               let root = (try? E2EEV2CanonicalJSON.parseCanonical(data))?.objectValue,
               Set(root.keys) == ["schema", "version", "kind", "sentAtMs", "counter", "replyToRef", "mentions", "body"],
               root["schema"]?.stringValue == schema, root["version"]?.stringValue == "2",
               let kind = root["kind"]?.stringValue,
-              let sentText = root["sentAtMs"]?.stringValue, E2EEV2Canonical.isDecimal(sentText),
-              let sentAt = Int64(sentText),
+              let sentAt = root["sentAtMs"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger),
               let counterText = root["counter"]?.stringValue, E2EEV2Canonical.isDecimal(counterText),
               let counter = Int64(counterText), (1...Int64(E2EEV2Canonical.maxSequenceNumber)).contains(counter),
               let mentionItems = root["mentions"]?.arrayValue, mentionItems.count <= 100,
@@ -315,6 +323,20 @@ enum E2EEV2MessageCryptoV2 {
         epochKey: Data,
         context: E2EEV2MessageContextV2
     ) throws -> (fk: Data, payload: E2EEV2ContentPayloadV2, payloadBytes: Data) {
+        let (fk, payloadBytes) = try openFranked(envelope: envelope, epochKey: epochKey, context: context)
+        let payload = try E2EEV2ContentPayloadV2.parse(payloadBytes)
+        guard payload.counter == context.counter else { throw E2EEV2MessageV2Error.counterMismatch }
+        return (fk, payload, payloadBytes)
+    }
+
+    /// D.7, étapes 2 à 5 : déchiffrement, bourrage, `fk` et `frankTag`. La
+    /// charge exacte en sort authentique, avant toute analyse : un `kind`
+    /// inconnu se distingue ainsi d'un message altéré.
+    static func openFranked(
+        envelope: E2EEV2MessageEnvelopeV2,
+        epochKey: Data,
+        context: E2EEV2MessageContextV2
+    ) throws -> (fk: Data, payloadBytes: Data) {
         guard envelope.envelopeVersion == envelopeVersion, envelope.epochNumber == context.epochNumber,
               envelope.clientRequestId == context.clientRequestId, envelope.counter == context.counter,
               envelope.algorithm == algorithm, envelope.contentType == contentType,
@@ -345,9 +367,7 @@ enum E2EEV2MessageCryptoV2 {
             clientRequestId: context.clientRequestId, payload: payloadBytes
         ).base64EncodedString()
         guard expectedTag == envelope.frankTagB64 else { throw E2EEV2MessageV2Error.frankTagMismatch }
-        let payload = try E2EEV2ContentPayloadV2.parse(payloadBytes)
-        guard payload.counter == context.counter else { throw E2EEV2MessageV2Error.counterMismatch }
-        return (fk, payload, payloadBytes)
+        return (fk, payloadBytes)
     }
 
     static func verifySignature(
@@ -431,8 +451,10 @@ struct E2EEV2SignedMessageEnvelopeV2: Equatable, Sendable {
         )
     }
 
+    /// Corps d'envoi : en JCS, à l'octet (D.7). Imbriquée dans une réponse,
+    /// l'enveloppe se relit avec `parse(_: E2EEV2JSON)`, sans exigence de forme.
     static func parse(_ data: Data) -> E2EEV2SignedMessageEnvelopeV2? {
-        guard data.count <= maxWireBytes, let value = try? E2EEV2CanonicalJSON.parseStrict(data) else { return nil }
+        guard data.count <= maxWireBytes, let value = try? E2EEV2CanonicalJSON.parseCanonical(data) else { return nil }
         return parse(value)
     }
 
@@ -495,8 +517,7 @@ struct E2EEV2MessageReceiptV2: Codable, Equatable, Sendable {
               let envelopeId = root["envelopeId"]?.stringValue, E2EEV2Canonical.isOpaque(envelopeId),
               root["clientRequestId"]?.stringValue == clientRequestId,
               let serverTag = E2EEV2SignedMessageEnvelopeV2.base64(root["serverTagB64"], 32...32),
-              let timeText = root["serverTimeMs"]?.stringValue, E2EEV2Canonical.isDecimal(timeText),
-              let serverTimeMs = Int64(timeText),
+              let serverTimeMs = root["serverTimeMs"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger),
               let keyId = root["keyId"]?.stringValue, E2EEV2Canonical.isOpaque(keyId) else { return nil }
         return .init(
             envelopeId: envelopeId, clientRequestId: clientRequestId, serverTagB64: serverTag,
@@ -526,14 +547,12 @@ struct E2EEV2DeliveredMessageV2: Equatable, Sendable {
     static func parse(_ value: E2EEV2JSON) -> E2EEV2DeliveredMessageV2? {
         guard let root = value.objectValue, Set(root.keys) == keys,
               let envelopeId = root["envelopeId"]?.stringValue, E2EEV2Canonical.isOpaque(envelopeId),
-              let sequenceText = root["sequence"]?.stringValue, E2EEV2Canonical.isDecimal(sequenceText),
-              let sequence = Int64(sequenceText), sequence >= 1,
+              let sequence = root["sequence"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger), sequence >= 1,
               let senderUserId = root["senderUserId"]?.stringValue, E2EEV2Canonical.isOpaque(senderUserId),
               let senderDeviceId = root["senderDeviceId"]?.stringValue, E2EEV2Canonical.isOpaque(senderDeviceId),
               let signed = root["envelope"].flatMap(E2EEV2SignedMessageEnvelopeV2.parse),
               let serverTag = E2EEV2SignedMessageEnvelopeV2.base64(root["serverTagB64"], 32...32),
-              let timeText = root["serverTimeMs"]?.stringValue, E2EEV2Canonical.isDecimal(timeText),
-              let serverTimeMs = Int64(timeText),
+              let serverTimeMs = root["serverTimeMs"]?.stringValue.flatMap(E2EEV2Canonical.safeInteger),
               let keyId = root["keyId"]?.stringValue, E2EEV2Canonical.isOpaque(keyId) else { return nil }
         return .init(
             envelopeId: envelopeId, sequence: sequence, senderUserId: senderUserId, senderDeviceId: senderDeviceId,

@@ -7,17 +7,22 @@ import Foundation
 /// (signature et déchiffrement vérifiés) y entre.
 struct E2EEV2MessageLedgerV2: Codable, Equatable, Sendable {
     static let recentLimit = 2_000
+    /// Au-delà, les deux plus anciens intervalles d'un appareil fusionnent : le
+    /// trou qui les séparait n'est plus signalé, le fichier reste borné.
+    static let rangeLimit = 1_000
 
     struct Entry: Codable, Equatable, Sendable {
         let deviceId: String
         let counter: Int
-        /// `b64url(SHA-256(chaîne signée de l'enveloppe))`.
-        let envelopeDigest: String
+        /// `frankTag` vérifié : il lie la charge exacte, quelle que soit
+        /// l'époque sous laquelle elle a été chiffrée.
+        let frankTagB64: String
     }
 
     enum Outcome: Equatable, Sendable {
         case accepted
-        /// La même enveloppe, déjà reçue.
+        /// La même identité et le même `frankTag`, donc la même charge : déjà
+        /// reçue, au besoin rechiffrée sous une autre époque.
         case duplicate
         /// Compteur déjà vu, hors des identités récentes : rien à afficher.
         case replayed
@@ -31,16 +36,33 @@ struct E2EEV2MessageLedgerV2: Codable, Equatable, Sendable {
     private(set) var recent: [String: Entry] = [:]
     private(set) var order: [String] = []
     private(set) var equivocal: Set<String> = []
+    /// Messages acceptés par époque : au plus 10 000 avant une rotation (§3.3).
+    private(set) var acceptedPerEpoch: [String: Int] = [:]
+    /// Toutes les identités vues, à vie (§4.2) : les 96 premiers bits de leur
+    /// `messageRef`. Au-delà des identités récentes, une identité déjà vue n'est
+    /// plus jamais affichée de nouveau.
+    private(set) var seenRefs: Set<String> = []
 
-    mutating func record(messageRef: String, deviceId: String, counter: Int, envelopeDigest: String) -> Outcome {
+    static func refPrefix(_ messageRef: String) -> String { String(messageRef.prefix(16)) }
+
+    /// Intervalles bien formés, triés et disjoints ; identités récentes cohérentes.
+    var isConsistent: Bool {
+        counters.values.allSatisfy { ranges in
+            ranges.allSatisfy { $0.count == 2 && 1 <= $0[0] && $0[0] <= $0[1] && $0[1] <= E2EEV2Canonical.maxSequenceNumber }
+                && zip(ranges, ranges.dropFirst()).allSatisfy { $0.0[1] + 1 < $0.1[0] }
+        } && order.count == recent.count && Set(order) == Set(recent.keys)
+    }
+
+    mutating func record(messageRef: String, deviceId: String, counter: Int, frankTagB64: String, epochNumber: Int) -> Outcome {
         if equivocal.contains(messageRef) { return .equivocation([messageRef]) }
         if let known = recent[messageRef] {
-            guard known.envelopeDigest == envelopeDigest, known.deviceId == deviceId, known.counter == counter else {
+            guard known.frankTagB64 == frankTagB64, known.deviceId == deviceId, known.counter == counter else {
                 equivocal.insert(messageRef)
                 return .equivocation([messageRef])
             }
             return .duplicate
         }
+        if seenRefs.contains(Self.refPrefix(messageRef)) { return .replayed }
         if seen(deviceId: deviceId, counter: counter) {
             guard let other = order.first(where: { recent[$0]?.deviceId == deviceId && recent[$0]?.counter == counter })
             else { return .replayed }
@@ -48,8 +70,10 @@ struct E2EEV2MessageLedgerV2: Codable, Equatable, Sendable {
             return .equivocation([other, messageRef])
         }
         insert(deviceId: deviceId, counter: counter)
-        recent[messageRef] = Entry(deviceId: deviceId, counter: counter, envelopeDigest: envelopeDigest)
+        recent[messageRef] = Entry(deviceId: deviceId, counter: counter, frankTagB64: frankTagB64)
         order.append(messageRef)
+        seenRefs.insert(Self.refPrefix(messageRef))
+        acceptedPerEpoch[String(epochNumber), default: 0] += 1
         if order.count > Self.recentLimit {
             let evicted = order.removeFirst()
             recent[evicted] = nil
@@ -63,6 +87,16 @@ struct E2EEV2MessageLedgerV2: Codable, Equatable, Sendable {
     func missingCount(deviceId: String) -> Int {
         let ranges = counters[deviceId] ?? []
         return zip(ranges, ranges.dropFirst()).reduce(0) { $0 + ($1.1[0] - $1.0[1] - 1) }
+    }
+
+    func acceptedCount(epochNumber: Int) -> Int {
+        acceptedPerEpoch[String(epochNumber)] ?? 0
+    }
+
+    /// Plus haut compteur vu d'un appareil : celui de cet appareil ne doit
+    /// jamais redescendre en dessous (sauvegarde restaurée, E.3).
+    func highestCounter(deviceId: String) -> Int? {
+        counters[deviceId]?.last?[1]
     }
 
     private func seen(deviceId: String, counter: Int) -> Bool {
@@ -80,6 +114,10 @@ struct E2EEV2MessageLedgerV2: Codable, Equatable, Sendable {
             } else {
                 merged.append(range)
             }
+        }
+        if merged.count > Self.rangeLimit {
+            merged[1][0] = merged[0][0]
+            merged.removeFirst()
         }
         counters[deviceId] = merged
     }
@@ -116,10 +154,11 @@ final class E2EEV2MessageLedgerStore: @unchecked Sendable {
         let directory = baseDirectory.appendingPathComponent(Self.digest(ownerScopeId), isDirectory: true)
         let file = directory.appendingPathComponent(Self.digest(conversationId) + ".json")
         var ledger = E2EEV2MessageLedgerV2()
-        if fileManager.fileExists(atPath: file.path) {
-            guard let decoded = try? JSONDecoder().decode(E2EEV2MessageLedgerV2.self, from: Data(contentsOf: file)) else {
-                throw E2EEV2ConversationStateStore.Failure.invalidRecord
-            }
+        // Illisible ou incohérent : repart de zéro plutôt que de bloquer la
+        // conversation. Le magasin des messages garde les siens et ses équivoques.
+        if fileManager.fileExists(atPath: file.path),
+           let decoded = try? JSONDecoder().decode(E2EEV2MessageLedgerV2.self, from: Data(contentsOf: file)),
+           decoded.isConsistent {
             ledger = decoded
         }
         let before = ledger
@@ -177,20 +216,30 @@ enum E2EEV2MessageReceptionV2: Equatable, Sendable {
     case duplicate
     case replayed
     case equivocation([String])
+    /// Message éphémère dont l'heure d'effacement, d'après l'horloge signée de
+    /// son émetteur, est passée : rien à afficher, son compteur est compté.
     case expired
+    /// Message authentique d'une version ou d'un `kind` inconnus : « Contenu
+    /// non pris en charge » (§5.2). Son compteur est compté.
+    case unsupported(messageRef: String, senderUserId: String)
     /// Époque que l'appareil ne connaît pas encore : synchroniser la conversation.
     case needsEpoch
+    /// Échec passager (annuaire en retard, coffre verrouillé, stockage, session
+    /// changée) : le curseur ne dépasse pas ce message, qui se relira.
+    case retryLater(String)
     case rejected(String)
 }
 
-/// Réception des messages v2 d'une conversation (§3.4, §4, D.7) : appareil
-/// certifié d'un membre de l'époque, époque connue et dans sa fenêtre,
-/// signature vérifiée avant tout déchiffrement, puis franking, charge,
-/// compteur et registre.
+/// Réception des messages v2 d'une conversation (§3.4, §4, D.7), dans cet
+/// ordre : appareil certifié, signature, époque connue et dans sa fenêtre,
+/// membre de l'époque et de l'état le plus récent, puis déchiffrement,
+/// franking, charge, compteur et registre.
 final class E2EEV2MessageReceiverV2: @unchecked Sendable {
-    /// Fenêtre des messages en vol sous une époque remplacée (§3.4).
+    /// Fenêtre des messages en vol, sous une époque remplacée ou d'un membre
+    /// parti (§3.4).
     static let replacedEpochWindowMs: Int64 = 24 * 60 * 60 * 1_000
 
+    private let identityStore: E2EEV2DeviceIdentityStore
     private let keyStore: E2EEV2EpochKeyStore
     private let stateStore: E2EEV2ConversationStateStore
     private let ledgerStore: E2EEV2MessageLedgerStore
@@ -198,12 +247,14 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
     private let now: @Sendable () -> Date
 
     init(
+        identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
         keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
         stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
         ledgerStore: E2EEV2MessageLedgerStore,
         expectedSession: LocalAccountSession? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
+        self.identityStore = identityStore
         self.keyStore = keyStore
         self.stateStore = stateStore
         self.ledgerStore = ledgerStore
@@ -212,12 +263,16 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
     }
 
     /// Une page de messages, dans l'ordre du serveur ; le registre est relu et
-    /// réécrit une fois par page.
+    /// réécrit une fois par page. `persist` garde les messages reçus et les
+    /// identités en équivoque avant l'écriture du registre : s'il échoue, rien
+    /// n'est retenu et la page se relira.
     func receive(
         _ messages: [E2EEV2DeliveredMessageV2],
         conversationId: String,
+        isGroup: Bool,
         devices: E2EEV2CertifiedDeviceSet,
-        expectedOwnerScopeId: String
+        expectedOwnerScopeId: String,
+        persist: (_ received: [E2EEV2ReceivedMessageV2], _ equivocal: [String]) throws -> Void = { _, _ in }
     ) -> [E2EEV2MessageReceptionV2] {
         guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
               session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:"),
@@ -225,122 +280,200 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
             return messages.map { _ in .rejected("invalid-e2ee-receive-scope") }
         }
         let ownerNamespace = session.ownerNamespace
-        let current: E2EEV2ConversationStateStore.CurrentEpoch
-        let accepted: [E2EEV2ConversationStateStore.AcceptedEpoch]
+        let context: Context
         do {
-            guard try stateStore.genesis(conversationId: conversationId, ownerNamespace: ownerNamespace) != nil,
-                  let known = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace) else {
+            guard let genesis = try stateStore.genesis(conversationId: conversationId, ownerNamespace: ownerNamespace),
+                  let current = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace) else {
                 return messages.map { _ in .needsEpoch }
             }
-            current = known
-            accepted = try stateStore.acceptedEpochs(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            let chain = try stateStore.membershipChain(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            // Chaîne gardée, déjà vérifiée : sa tête donne les membres actuels.
+            let head = try E2EEV2MembershipChain.apply(
+                chain, conversationId: conversationId, isGroup: isGroup, genesisLength: genesis.membershipChangeNumber,
+                verifiedCount: chain.count
+            ) { _, _ in nil }
+            context = Context(
+                conversationId: conversationId, current: current,
+                accepted: try stateStore.acceptedEpochs(conversationId: conversationId, ownerNamespace: ownerNamespace),
+                latestMembers: head.members,
+                departures: try stateStore.departures(conversationId: conversationId, ownerNamespace: ownerNamespace),
+                devices: devices, ownerNamespace: ownerNamespace, nowMs: Int64(now().timeIntervalSince1970 * 1_000)
+            )
         } catch {
-            return messages.map { _ in .rejected("e2ee-receive-state-unavailable") }
+            return messages.map { _ in .retryLater("e2ee-receive-state-unavailable") }
         }
-        let nowMs = Int64(now().timeIntervalSince1970 * 1_000)
-        let opened = messages.map {
-            open($0, conversationId: conversationId, current: current, accepted: accepted, devices: devices,
-                 ownerNamespace: ownerNamespace, nowMs: nowMs)
-        }
+        let opened = messages.map { open($0, context) }
+        let ownDeviceId = (try? identityStore.load(ownerNamespace: ownerNamespace))?.deviceId
         do {
-            return try ledgerStore.update(conversationId: conversationId, ownerScopeId: expectedOwnerScopeId) { ledger in
-                opened.map { result in
-                    guard case .received(let message, let digest) = result else {
-                        if case .done(let reception) = result { return reception }
-                        return .rejected("invalid-e2ee-message")
+            let (results, ownHighest) = try ledgerStore.update(
+                conversationId: conversationId, ownerScopeId: expectedOwnerScopeId
+            ) { ledger -> ([E2EEV2MessageReceptionV2], Int?) in
+                let results = opened.map { result -> E2EEV2MessageReceptionV2 in
+                    let entry: Counted
+                    switch result {
+                    case .done(let reception): return reception
+                    case .counted(let counted): entry = counted
                     }
                     switch ledger.record(
-                        messageRef: message.messageRef, deviceId: message.senderDeviceId,
-                        counter: Int(message.payload.counter), envelopeDigest: digest
+                        messageRef: entry.messageRef, deviceId: entry.deviceId, counter: entry.counter,
+                        frankTagB64: entry.frankTagB64, epochNumber: entry.epochNumber
                     ) {
                     case .accepted:
-                        if let expiresAtMs = message.expiresAtMs, expiresAtMs <= nowMs { return .expired }
-                        return .received(message)
+                        if case .received(let message) = entry.outcome, let expiresAtMs = message.expiresAtMs,
+                           expiresAtMs <= context.nowMs {
+                            return .expired
+                        }
+                        return entry.outcome
                     case .duplicate: return .duplicate
                     case .replayed: return .replayed
                     case .equivocation(let refs): return .equivocation(refs)
                     }
                 }
+                // Rien n'est retenu pour un compte qui n'est plus le courant.
+                guard session.isCurrent else { throw E2EEV2ConversationStateStore.Failure.otherAccount }
+                try persist(
+                    results.compactMap { if case .received(let message) = $0 { return message } else { return nil } },
+                    results.flatMap { if case .equivocation(let refs) = $0 { return refs } else { return [] } }
+                )
+                return (results, ownDeviceId.flatMap { ledger.highestCounter(deviceId: $0) })
             }
+            // Le compteur de cet appareil ne redescend jamais sous ce que la liste montre.
+            if let ownDeviceId, let ownHighest {
+                try? stateStore.raiseSendCounter(
+                    conversationId: conversationId, deviceId: ownDeviceId, atLeast: ownHighest, ownerNamespace: ownerNamespace
+                )
+            }
+            return results
         } catch {
-            return messages.map { _ in .rejected("e2ee-ledger-unavailable") }
+            return messages.map { _ in .retryLater("e2ee-ledger-unavailable") }
         }
+    }
+
+    private struct Context {
+        let conversationId: String
+        let current: E2EEV2ConversationStateStore.CurrentEpoch
+        let accepted: [E2EEV2ConversationStateStore.AcceptedEpoch]
+        let latestMembers: Set<String>
+        let departures: [String: Int64]
+        let devices: E2EEV2CertifiedDeviceSet
+        let ownerNamespace: String
+        let nowMs: Int64
+    }
+
+    /// Un message authentique, qui entre au registre avec son issue.
+    private struct Counted {
+        let messageRef: String
+        let deviceId: String
+        let counter: Int
+        let frankTagB64: String
+        let epochNumber: Int
+        let outcome: E2EEV2MessageReceptionV2
     }
 
     private enum Opened {
-        case received(E2EEV2ReceivedMessageV2, digest: String)
+        case counted(Counted)
         case done(E2EEV2MessageReceptionV2)
     }
 
-    private func open(
-        _ message: E2EEV2DeliveredMessageV2,
-        conversationId: String,
-        current: E2EEV2ConversationStateStore.CurrentEpoch,
-        accepted: [E2EEV2ConversationStateStore.AcceptedEpoch],
-        devices: E2EEV2CertifiedDeviceSet,
-        ownerNamespace: String,
-        nowMs: Int64
-    ) -> Opened {
+    private func open(_ message: E2EEV2DeliveredMessageV2, _ context: Context) -> Opened {
         let envelope = message.signed.envelope
         let epochNumber = envelope.epochNumber
-        // Appareil certifié, non révoqué, de l'utilisateur annoncé (§3.4).
-        guard let senderKey = devices.signingKey(userId: message.senderUserId, deviceId: message.senderDeviceId) else {
-            return .done(.rejected("e2ee-sender-not-certified"))
+        let current = context.current
+        // 1. Appareil certifié, non révoqué, de l'utilisateur annoncé (§3.4) ;
+        //    un annuaire en retard se relit.
+        guard let senderKey = context.devices.signingKey(userId: message.senderUserId, deviceId: message.senderDeviceId) else {
+            return .done(.retryLater("e2ee-sender-not-certified"))
         }
-        // Époque connue : la courante, ou une remplacée depuis moins de 24 heures.
+        // 2. Signature, avant tout accès à une clé : un message non signé
+        //    n'oblige à rien, pas même à une synchronisation.
+        let signatureContext = message.signed.context(
+            conversationId: context.conversationId, senderDeviceId: message.senderDeviceId
+        )
+        do {
+            try E2EEV2MessageCryptoV2.verifySignature(
+                context: signatureContext, envelope: envelope, signatureDerB64: message.signed.senderSignatureB64,
+                senderSigningKey: senderKey
+            )
+        } catch {
+            return .done(.rejected("invalid-e2ee-message-signature"))
+        }
+        // 3. Époque connue : la courante, ou une remplacée depuis moins de 24 heures.
         guard epochNumber <= current.epochNumber else { return .done(.needsEpoch) }
         let members: [String]
         if epochNumber == current.epochNumber {
             members = current.memberIds
         } else {
-            guard let epoch = accepted.first(where: { $0.epochNumber == epochNumber }),
-                  let replacedAtMs = accepted.filter({ $0.epochNumber > epochNumber }).map(\.acceptedAtMs).min()
+            guard let epoch = context.accepted.first(where: { $0.epochNumber == epochNumber }),
+                  let replacedAtMs = context.accepted.filter({ $0.epochNumber > epochNumber }).map(\.acceptedAtMs).min()
                     ?? (current.epochNumber > epochNumber ? current.acceptedAtMs : nil) else {
                 return .done(.rejected("e2ee-epoch-unknown"))
             }
-            guard nowMs - replacedAtMs <= Self.replacedEpochWindowMs else { return .done(.rejected("e2ee-epoch-replaced")) }
+            guard context.nowMs - replacedAtMs <= Self.replacedEpochWindowMs else {
+                return .done(.rejected("e2ee-epoch-replaced"))
+            }
             members = epoch.memberIds
         }
-        // Membre de l'époque, par utilisateur (§5.3).
+        // 4. Membre de l'époque ; et, s'il est parti depuis, en vol depuis moins
+        //    de 24 heures après que cet appareil l'a appris (§3.4, §5.3).
         guard members.contains(message.senderUserId) else { return .done(.rejected("e2ee-sender-not-member")) }
-        let context = message.signed.context(conversationId: conversationId, senderDeviceId: message.senderDeviceId)
-        let canonical: Data
-        do {
-            canonical = try E2EEV2MessageCryptoV2.signatureCanonical(context: context, envelope: envelope)
-            try E2EEV2MessageCryptoV2.verifySignature(
-                context: context, envelope: envelope, signatureDerB64: message.signed.senderSignatureB64, senderSigningKey: senderKey
-            )
-        } catch {
-            return .done(.rejected("invalid-e2ee-message-signature"))
+        if !context.latestMembers.contains(message.senderUserId) {
+            guard let departedAtMs = context.departures[message.senderUserId],
+                  context.nowMs - departedAtMs <= Self.replacedEpochWindowMs else {
+                return .done(.rejected("e2ee-sender-departed"))
+            }
         }
-        guard var epoch = try? keyStore.loadEpoch(conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace)
-        else { return .done(.rejected("e2ee-epoch-key-unavailable")) }
-        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
-        let opened: (fk: Data, payload: E2EEV2ContentPayloadV2, payloadBytes: Data)
+        // 5. Clé de l'époque : absente, c'est définitif ; coffre verrouillé, passager.
+        var epoch: E2EEV2StoredEpochKey
         do {
-            opened = try E2EEV2MessageCryptoV2.decrypt(envelope: envelope, epochKey: epoch.epochKey, context: context)
+            guard let stored = try keyStore.loadEpoch(
+                conversationId: context.conversationId, epochNumber: epochNumber, ownerNamespace: context.ownerNamespace
+            ) else { return .done(.rejected("e2ee-epoch-key-unavailable")) }
+            epoch = stored
+        } catch {
+            return .done(.retryLater("e2ee-epoch-key-locked"))
+        }
+        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
+        // 6. Déchiffrement, bourrage, fk et frankTag : la charge exacte, authentique.
+        let opened: (fk: Data, payloadBytes: Data)
+        do {
+            opened = try E2EEV2MessageCryptoV2.openFranked(envelope: envelope, epochKey: epoch.epochKey, context: signatureContext)
         } catch {
             return .done(.rejected("invalid-e2ee-message"))
         }
-        // Jalon A : texte, édition et suppression, sans blob.
-        guard envelope.encryptedBlobIds.isEmpty else { return .done(.rejected("invalid-e2ee-message")) }
-        let ttlMs = Int64(envelope.ttlSeconds) * 1_000
-        return .received(
-            E2EEV2ReceivedMessageV2(
-                envelopeId: message.envelopeId, sequence: message.sequence,
-                messageRef: E2EEV2MessageRef.make(
-                    conversationId: conversationId, senderDeviceId: message.senderDeviceId,
-                    clientRequestId: envelope.clientRequestId
-                ),
-                senderUserId: message.senderUserId, senderDeviceId: message.senderDeviceId,
-                clientRequestId: envelope.clientRequestId, epochNumber: epochNumber, frankTagB64: envelope.frankTagB64,
-                serverTagB64: message.serverTagB64, serverTimeMs: message.serverTimeMs, keyId: message.keyId,
-                payload: opened.payload, payloadBytes: opened.payloadBytes, fk: opened.fk,
-                // Le plus tôt des deux : un serveur ne prolonge pas un message éphémère.
-                expiresAtMs: ttlMs > 0 ? min(opened.payload.sentAtMs, message.serverTimeMs) + ttlMs : nil
-            ),
-            digest: E2EEV2Canonical.sha256B64URL(canonical)
+        let messageRef = E2EEV2MessageRef.make(
+            conversationId: context.conversationId, senderDeviceId: message.senderDeviceId,
+            clientRequestId: envelope.clientRequestId
         )
+        func counted(_ outcome: E2EEV2MessageReceptionV2) -> Opened {
+            .counted(Counted(
+                messageRef: messageRef, deviceId: message.senderDeviceId, counter: Int(envelope.counter),
+                frankTagB64: envelope.frankTagB64, epochNumber: epochNumber, outcome: outcome
+            ))
+        }
+        // 7. Charge : un contenu inconnu mais authentique compte, sans être interprété.
+        let payload: E2EEV2ContentPayloadV2
+        do {
+            payload = try E2EEV2ContentPayloadV2.parse(opened.payloadBytes)
+        } catch {
+            return E2EEV2ContentPayloadV2.isUnsupported(opened.payloadBytes)
+                ? counted(.unsupported(messageRef: messageRef, senderUserId: message.senderUserId))
+                : counted(.rejected("invalid-e2ee-payload"))
+        }
+        // Compteur de la charge égal à celui de l'AAD ; jalon A : aucun blob.
+        guard payload.counter == envelope.counter, envelope.encryptedBlobIds.isEmpty else {
+            return counted(.rejected("invalid-e2ee-payload"))
+        }
+        let ttlMs = Int64(envelope.ttlSeconds) * 1_000
+        return counted(.received(E2EEV2ReceivedMessageV2(
+            envelopeId: message.envelopeId, sequence: message.sequence, messageRef: messageRef,
+            senderUserId: message.senderUserId, senderDeviceId: message.senderDeviceId,
+            clientRequestId: envelope.clientRequestId, epochNumber: epochNumber, frankTagB64: envelope.frankTagB64,
+            serverTagB64: message.serverTagB64, serverTimeMs: message.serverTimeMs, keyId: message.keyId,
+            payload: payload, payloadBytes: opened.payloadBytes, fk: opened.fk,
+            // Horloge signée de l'émetteur seule : le serveur ne peut ni
+            // prolonger ni effacer en silence un message éphémère.
+            expiresAtMs: ttlMs > 0 ? payload.sentAtMs + ttlMs : nil
+        )))
     }
 }
 

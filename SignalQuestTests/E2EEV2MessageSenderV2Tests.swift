@@ -103,18 +103,15 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         XCTAssertEqual(opened.payload.counter, 1)
     }
 
-    func testAStaleEpochIsReencryptedUnderTheKnownCurrentEpochWithTheSameIdentity() async throws {
+    func testAPendingMessageIsReencryptedLocallyWhenItsEpochWasReplaced() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
         let devices = fixture.deviceSet(adding: [phone.device])
         let seeded = try fixture.seedConversation(with: bruno, devices: devices)
         let bodies = Bodies()
         MockURLProtocol.requestHandler = { request in
-            switch bodies.append(E2EEV2AccountFixture.rawBody(request)) {
-            case 1: throw URLError(.networkConnectionLost)
-            case 2: return E2EEV2AccountFixture.response(request, Self.error("E2EE_EPOCH_STALE"), status: 409)
-            default: return E2EEV2AccountFixture.response(request, Self.receipt("message_01J7ABCD00000001"))
-            }
+            if bodies.append(E2EEV2AccountFixture.rawBody(request)) == 1 { throw URLError(.networkConnectionLost) }
+            return E2EEV2AccountFixture.response(request, Self.receipt("message_01J7ABCD00000001"))
         }
         let sender = E2EEV2MessageSenderV2(
             api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
@@ -132,13 +129,14 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         )
         guard case .sent = result else { return XCTFail("Rechiffré puis accepté : \(result)") }
         let sent = bodies.all
-        XCTAssertEqual(sent.count, 3)
-        XCTAssertEqual(sent[0], sent[1], "L'enveloppe gardée part d'abord telle quelle : son accusé a pu se perdre")
+        XCTAssertEqual(sent.count, 2, "Jamais renvoyé sous une époque que l'appareil sait remplacée")
         let first = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(sent[0]))
-        let last = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(sent[2]))
+        let last = try XCTUnwrap(E2EEV2SignedMessageEnvelopeV2.parse(sent[1]))
+        XCTAssertEqual(first.envelope.epochNumber, 1)
         XCTAssertEqual(last.envelope.epochNumber, 2)
         XCTAssertEqual(last.envelope.clientRequestId, first.envelope.clientRequestId)
         XCTAssertEqual(last.envelope.counter, first.envelope.counter)
+        XCTAssertEqual(last.envelope.frankTagB64, first.envelope.frankTagB64, "Même fk et même charge : un doublon chez les destinataires")
         let deviceId = fixture.descriptor.deviceId
         let context = { (signed: E2EEV2SignedMessageEnvelopeV2) in
             signed.context(conversationId: seeded.conversationId, senderDeviceId: deviceId)
@@ -146,6 +144,100 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         let before = try E2EEV2MessageCryptoV2.decrypt(envelope: first.envelope, epochKey: seeded.epochKey, context: context(first))
         let after = try E2EEV2MessageCryptoV2.decrypt(envelope: last.envelope, epochKey: epochTwo, context: context(last))
         XCTAssertEqual(after.payloadBytes, before.payloadBytes, "Même charge, même compteur, même date")
+    }
+
+    func testAConflictMeansAnEarlierVersionWasDelivered() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        MockURLProtocol.requestHandler = { request in
+            E2EEV2AccountFixture.response(request, Self.error("E2EE_MESSAGE_CONFLICT"), status: 409)
+        }
+        let sender = E2EEV2MessageSenderV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let result = await sender.send(
+            draft("Bonjour"), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000001",
+            membership: seeded.membership, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(result, .alreadyAccepted(messageRef: E2EEV2MessageRef.make(
+            conversationId: seeded.conversationId, senderDeviceId: fixture.descriptor.deviceId, clientRequestId: "message_01J7ABCD00000001"
+        )))
+        XCTAssertNil(try fixture.states.pendingSend(
+            conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000001", ownerNamespace: fixture.session.ownerNamespace
+        ), "Plus rien à renvoyer, ni charge en clair gardée")
+    }
+
+    func testADeliveredMessageIsNeverSentTwiceEvenConcurrently() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let bodies = Bodies()
+        MockURLProtocol.requestHandler = { request in
+            _ = bodies.append(E2EEV2AccountFixture.rawBody(request))
+            return E2EEV2AccountFixture.response(request, Self.receipt("message_01J7ABCD00000001"))
+        }
+        let sender = E2EEV2MessageSenderV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let owner = fixture.session.ownerScopeId
+        let message = draft("Double tape"), conversationId = seeded.conversationId, membership = seeded.membership
+        async let one = sender.send(message, conversationId: conversationId, clientRequestId: "message_01J7ABCD00000001",
+                                    membership: membership, devices: devices, expectedOwnerScopeId: owner)
+        async let two = sender.send(message, conversationId: conversationId, clientRequestId: "message_01J7ABCD00000001",
+                                    membership: membership, devices: devices, expectedOwnerScopeId: owner)
+        let results = await [one, two]
+        XCTAssertEqual(Set(bodies.all).count, 1, "Une seule enveloppe signée pour une identité")
+        for result in results { guard case .sent = result else { return XCTFail("Remis : \(result)") } }
+        let count = bodies.all.count
+        guard case .sent = await sender.send(draft("Double tape"), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000001",
+                                             membership: seeded.membership, devices: devices, expectedOwnerScopeId: owner)
+        else { return XCTFail("Déjà remis : le même accusé") }
+        XCTAssertEqual(bodies.all.count, count, "Aucun nouvel envoi après l'accusé")
+        XCTAssertEqual(try fixture.states.reserveSendCounter(conversationId: seeded.conversationId, deviceId: fixture.descriptor.deviceId,
+                                                             ownerNamespace: fixture.session.ownerNamespace), 2, "Un seul compteur réservé")
+    }
+
+    func testOversizedOrAbandonedMessagesKeepNothing() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let namespace = fixture.session.ownerNamespace
+        MockURLProtocol.requestHandler = { request in
+            E2EEV2AccountFixture.response(request, Data(#"{"error":"bad","code":"E2EE_INVALID_ENVELOPE"}"#.utf8), status: 422)
+        }
+        let sender = E2EEV2MessageSenderV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let owner = fixture.session.ownerScopeId
+        // 65 536 octets de texte, mais des caractères de contrôle échappés en six : la charge canonique dépasse sa borne.
+        let controls = String(repeating: "\u{1}", count: 65_536)
+        let tooLong = await sender.send(draft(controls), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000001",
+                                        membership: seeded.membership, devices: devices, expectedOwnerScopeId: owner)
+        XCTAssertEqual(tooLong, .failure(.init(kind: .localState, message: "e2ee-message-too-long")))
+        let refused = await sender.send(draft("Bonjour"), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000002",
+                                        membership: seeded.membership, devices: devices, expectedOwnerScopeId: owner)
+        guard case .failure(let failure) = refused, failure.kind == .permanent else { return XCTFail("Refus définitif : \(refused)") }
+        XCTAssertNil(try fixture.states.pendingSend(conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000002", ownerNamespace: namespace),
+                     "Refus définitif : la charge en clair est effacée")
+        XCTAssertEqual(try fixture.states.reserveSendCounter(conversationId: seeded.conversationId, deviceId: fixture.descriptor.deviceId, ownerNamespace: namespace), 2,
+                       "Le message trop long n'a réservé aucun compteur")
+    }
+
+    func testTenThousandMessagesCallForANewEpoch() throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let nowMs = seeded.current.acceptedAtMs + 1_000
+        XCTAssertEqual(E2EEV2RotationPolicy.reasons(current: seeded.current, membership: seeded.membership, devices: devices, nowMs: nowMs, messageCount: 9_999), [])
+        XCTAssertEqual(E2EEV2RotationPolicy.reasons(current: seeded.current, membership: seeded.membership, devices: devices, nowMs: nowMs, messageCount: 10_000), [.volume])
     }
 
     func testAStaleEpochTheDeviceDoesNotKnowAsksForASync() async throws {

@@ -175,6 +175,37 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
 
     // MARK: Outils
 
+    func testSkippedEpochsAreReadOneByOne() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
+        let devices = fixture.deviceSet(adding: [creator.device])
+        let served = try serve(fixture, creator: creator, devices: devices)
+        MockURLProtocol.requestHandler = Self.server(served)
+        let first = await sync(fixture, devices: devices)
+        XCTAssertEqual(first, .received(epochNumber: 1))
+
+        // Hors ligne pendant deux rotations : le serveur est à l'époque 3.
+        let keyTwo = Data(repeating: 0x22, count: 32), keyThree = Data(repeating: 0x33, count: 32)
+        let two = try epoch(2, key: keyTwo, fixture, creator: creator, devices: devices, chain: served.chain)
+        let three = try epoch(3, key: keyThree, fixture, creator: creator, devices: devices, chain: served.chain)
+        let paths = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            paths.append(request, body: [:])
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/epochs/2") { return E2EEV2AccountFixture.response(request, two) }
+            if path.hasSuffix("/epochs/current") { return E2EEV2AccountFixture.response(request, three) }
+            return try Self.server(served)(request)
+        }
+        let caughtUp = await sync(fixture, devices: devices)
+        XCTAssertEqual(caughtUp, .received(epochNumber: 3))
+        let namespace = fixture.session.ownerNamespace
+        XCTAssertTrue(paths.all.contains { $0.0.url?.path.hasSuffix("/epochs/2") == true }, "L'époque sautée est demandée")
+        XCTAssertEqual(try fixture.keys.loadEpoch(conversationId: conversationId, epochNumber: 2, ownerNamespace: namespace)?.epochKey, keyTwo,
+                       "Ses messages en vol se liront")
+        XCTAssertEqual(try fixture.states.acceptedEpochs(conversationId: conversationId, ownerNamespace: namespace).map(\.epochNumber), [1, 2, 3])
+        XCTAssertEqual(try fixture.states.currentEpoch(conversationId: conversationId, ownerNamespace: namespace)?.epochNumber, 3)
+    }
+
     private func sync(_ fixture: E2EEV2AccountFixture, devices: E2EEV2CertifiedDeviceSet) async -> E2EEV2ConversationSyncResult {
         await E2EEV2ConversationSyncV2(
             api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
@@ -230,6 +261,52 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
             ]),
             epochKey: epochKey
         )
+    }
+
+    /// Époque `number` créée par Alice sur la même chaîne, telle que
+    /// `epochs/current` ou `epochs/{n}` la sert à l'appareil local.
+    private func epoch(
+        _ number: Int,
+        key epochKey: Data,
+        _ fixture: E2EEV2AccountFixture,
+        creator: Remote,
+        devices: E2EEV2CertifiedDeviceSet,
+        chain: [E2EEV2SignedString]
+    ) throws -> Data {
+        let createdAtMs: Int64 = 1_790_000_000_000 + Int64(number) * 1_000
+        let commitment = try E2EEV2EpochCrypto.keyCommitment(epochKey)
+        let lines = E2EEV2EpochProposals.recipients(
+            devices, members: [alice, fixture.user], excludesWeb: false, nowMs: Int64(Date().timeIntervalSince1970 * 1_000)
+        ).map { E2EEV2EpochManifest.recipient(userId: $0.userId, deviceId: $0.deviceId, platform: $0.platform, fingerprint: $0.fingerprint) }
+        let manifest = E2EEV2EpochManifest.make(
+            conversationId: conversationId, epochNumber: number, creatorUserId: alice, creatorDeviceId: creator.device.deviceId,
+            keyCommitmentB64: commitment, recipients: lines, excludesWeb: false, membershipChangeNumber: chain.count,
+            membershipDigest: E2EEV2MembershipChange.digest(of: try XCTUnwrap(chain.last?.canonical)), createdAtMs: createdAtMs
+        )
+        let signed = try E2EEV2SignedString.sign(manifest.canonical, with: creator.signing)
+        let context = E2EEV2EpochContext(
+            conversationId: conversationId, epochNumber: number,
+            senderDeviceId: creator.device.deviceId, recipientDeviceId: fixture.descriptor.deviceId
+        )
+        let envelope = try E2EEV2EpochCrypto.wrap(
+            epochKey: epochKey,
+            recipientPublicKey: P256.KeyAgreement.PublicKey(x963Representation: try XCTUnwrap(Data(base64Encoded: fixture.descriptor.publicIdentityKeyB64))),
+            ephemeralPrivateKey: P256.KeyAgreement.PrivateKey(), nonce: Data((0..<12).map { UInt8($0) }), context: context
+        )
+        let signature = try E2EEV2LowS.sign(
+            E2EEV2EpochCrypto.signatureCanonical(context: context, keyCommitmentB64: commitment, envelope: envelope),
+            with: creator.signing
+        )
+        return try JSONSerialization.data(withJSONObject: [
+            "conversationId": conversationId,
+            "epoch": ["id": "epoch_sync_0000000000000\(number)", "epochNumber": String(number), "status": "active", "createdAt": "2026-10-01T06:10:00.000Z"],
+            "manifest": ["manifest": signed.canonical, "signatureB64": signed.signatureB64, "recipients": lines],
+            "envelope": [
+                "recipientDeviceId": envelope.recipientDeviceId, "wrapAlgorithm": envelope.wrapAlgorithm,
+                "ephemeralPublicKeyB64": envelope.ephemeralPublicKeyB64, "wrappedEpochKeyB64": envelope.wrappedEpochKeyB64,
+                "nonceB64": envelope.nonceB64, "aadB64": envelope.aadB64, "signatureB64": signature.base64EncodedString(),
+            ],
+        ])
     }
 
     /// Faux serveur : suite de la chaîne, manifeste de l'époque 1, époque courante.

@@ -40,6 +40,9 @@ enum E2EEV2ConversationSyncResult: Sendable, Equatable {
 /// vérifiée comme un destinataire, puis gardée.
 final class E2EEV2ConversationSyncV2: @unchecked Sendable {
     static let maxPages = 20
+    /// Au-delà, les époques sautées ne sont pas relues une à une : leurs
+    /// messages, sans doute hors de la fenêtre de 24 heures, sont perdus.
+    static let maxSkippedEpochs = 32
 
     private let transport: E2EEV2APITransport
     private let identityStore: E2EEV2DeviceIdentityStore
@@ -170,27 +173,29 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
         }
         guard session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
 
-        // 3. L'époque courante.
-        let data: Data
+        // 3. L'époque courante, et celles qu'elle a sautées depuis la dernière
+        //    relue : leurs messages en vol se lisent encore (§3.4, E.2).
+        let served: E2EEV2EpochContractV2.Current
         switch await bound.getJSON(
             path: "\(base)/epochs/current", expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
         ) {
         case .failure(let error) where error.statusCode == 404 && error.code == "E2EE_EPOCH_ENVELOPE_NOT_FOUND":
             return .waitingForEpoch
         case .failure(let error): return .failure(error)
-        case .success(let value, _, _): data = value
+        case .success(let value, _, _):
+            guard let parsed = E2EEV2EpochContractV2.parseCurrent(value, conversationId: conversationId) else {
+                return .failure(localError("invalid-e2ee-current-epoch"))
+            }
+            served = parsed
         }
-        guard let served = E2EEV2EpochContractV2.parseCurrent(data, conversationId: conversationId) else {
-            return .failure(localError("invalid-e2ee-current-epoch"))
-        }
-        let current: E2EEV2ConversationStateStore.CurrentEpoch?
+        let knownEpoch: E2EEV2ConversationStateStore.CurrentEpoch?
         do {
-            current = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            knownEpoch = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
         } catch {
             return .failure(localError("e2ee-sync-state-unavailable"))
         }
-        if let current, served.accepted.epochNumber <= current.epochNumber {
-            return .upToDate(epochNumber: current.epochNumber)
+        if let knownEpoch, served.accepted.epochNumber <= knownEpoch.epochNumber {
+            return .upToDate(epochNumber: knownEpoch.epochNumber)
         }
         let membershipAt = { (number: Int) -> E2EEV2MembershipState? in
             guard number >= genesis.membershipChangeNumber, number <= all.count else { return nil }
@@ -199,28 +204,54 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
                 genesisLength: genesis.membershipChangeNumber, verifiedCount: all.count, signingKey: signingKey
             )
         }
-        switch E2EEV2EpochVerifierV2.open(
-            served, conversationId: conversationId, ownUserId: String(expectedOwnerScopeId.dropFirst("user:".count)),
-            ownDeviceId: device.deviceId, genesis: genesis,
-            previousMembershipChangeNumber: current?.membershipChangeNumber, devices: devices,
-            membershipAt: membershipAt,
-            unwrap: { [identityStore] in try identityStore.unwrapEpochKey(delivery: $0, ownerNamespace: ownerNamespace) }
-        ) {
-        case .notRecipient:
-            return .waitingForEpoch
-        case .needsMembershipSync:
-            return .failure(localError("e2ee-membership-behind"))
-        case .invalid:
-            return .failure(localError("invalid-e2ee-current-epoch"))
-        case .opened(var epochKey, let manifest, let state):
-            defer { epochKey.resetBytes(in: 0..<epochKey.count) }
-            return E2EEV2EpochVerifierV2.keep(
-                epochKey: epochKey, accepted: served.accepted, conversationId: conversationId,
-                commitment: manifest.keyCommitmentB64, membership: state, recipients: served.recipients,
-                createdAtMs: manifest.createdAtMs, acceptedAtMs: Int64(now().timeIntervalSince1970 * 1_000),
-                session: session, keyStore: keyStore, stateStore: stateStore
-            ) ? .received(epochNumber: manifest.epochNumber) : .failure(localError("e2ee-received-epoch-storage-failed"))
+        let open = { (epoch: E2EEV2EpochContractV2.Current) -> E2EEV2ConversationSyncResult? in
+            let previous = try? self.stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            switch E2EEV2EpochVerifierV2.open(
+                epoch, conversationId: conversationId, ownUserId: String(expectedOwnerScopeId.dropFirst("user:".count)),
+                ownDeviceId: device.deviceId, genesis: genesis,
+                previousMembershipChangeNumber: previous?.membershipChangeNumber, devices: devices,
+                membershipAt: membershipAt,
+                unwrap: { [identityStore = self.identityStore] in
+                    try identityStore.unwrapEpochKey(delivery: $0, ownerNamespace: ownerNamespace)
+                }
+            ) {
+            case .notRecipient:
+                return .waitingForEpoch
+            case .needsMembershipSync:
+                return .failure(self.localError("e2ee-membership-behind"))
+            case .invalid:
+                return .failure(self.localError("invalid-e2ee-current-epoch"))
+            case .opened(var epochKey, let manifest, let state):
+                defer { epochKey.resetBytes(in: 0..<epochKey.count) }
+                return E2EEV2EpochVerifierV2.keep(
+                    epochKey: epochKey, accepted: epoch.accepted, conversationId: conversationId,
+                    commitment: manifest.keyCommitmentB64, membership: state, recipients: epoch.recipients,
+                    createdAtMs: manifest.createdAtMs, acceptedAtMs: Int64(self.now().timeIntervalSince1970 * 1_000),
+                    session: session, keyStore: self.keyStore, stateStore: self.stateStore
+                ) ? nil : .failure(self.localError("e2ee-received-epoch-storage-failed"))
+            }
         }
+        // Époques sautées, dans l'ordre. Celle dont l'appareil n'est pas
+        // destinataire ne se lit pas : ses messages non plus.
+        if let knownEpoch, served.accepted.epochNumber - knownEpoch.epochNumber <= Self.maxSkippedEpochs {
+            for number in (knownEpoch.epochNumber + 1)..<served.accepted.epochNumber {
+                switch await bound.getJSON(
+                    path: "\(base)/epochs/\(number)", expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
+                ) {
+                case .failure(let error) where error.statusCode == 404 && error.code == "E2EE_EPOCH_ENVELOPE_NOT_FOUND":
+                    continue
+                case .failure(let error): return .failure(error)
+                case .success(let value, _, _):
+                    guard let skipped = E2EEV2EpochContractV2.parseCurrent(value, conversationId: conversationId),
+                          skipped.accepted.epochNumber == number else {
+                        return .failure(localError("invalid-e2ee-current-epoch"))
+                    }
+                    if let result = open(skipped), result != .waitingForEpoch { return result }
+                }
+            }
+        }
+        guard session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
+        return open(served) ?? .received(epochNumber: served.accepted.epochNumber)
     }
 
     private func localError(_ message: String) -> E2EEV2TransportFailure {

@@ -46,7 +46,12 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         let acceptedAtMs: Int64
     }
 
-    static let acceptedEpochLimit = 64
+    /// Au-delà des 10 époques par heure du quota (§16), sur la fenêtre de 24 heures.
+    static let acceptedEpochLimit = 256
+    /// Accusés gardés après un envoi : un nouvel essai du même message les rend.
+    static let sentReceiptLimit = 64
+    /// Un envoi en attente plus vieux est abandonné, sa charge effacée.
+    static let pendingSendMaxAgeMs: Int64 = 7 * 24 * 60 * 60 * 1_000
 
     /// Dernier compteur d'envoi réservé par cet appareil (§4.3).
     struct SendCounter: Codable, Equatable, Sendable {
@@ -65,7 +70,10 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         let counter: Int
         let ttlSeconds: Int
         let payloadB64: String
+        /// Gardée avec la charge : un rechiffrement garde le même `frankTag`.
+        let fkB64: String
         let epochNumber: Int
+        let createdAtMs: Int64
         /// Enveloppe signée, en JSON canonique, telle qu'envoyée.
         let wire: String
     }
@@ -193,14 +201,16 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
     }
 
     /// Réinitialisation d'identité : les clés d'époque partent avec l'ancienne
-    /// identité, les époques courantes aussi, et ses envois en attente ;
+    /// identité, les époques courantes aussi, et ses envois en attente
+    /// (messages et changement d'appartenance) ;
     /// genèses et chaînes restent. La nouvelle identité compte depuis 1.
     func removeCurrentEpochs(ownerNamespace: String) throws {
         guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
         Self.lock.lock()
         defer { Self.lock.unlock() }
         for key in try tokenStore.keys(withPrefix: Self.prefix(ownerNamespace: ownerNamespace))
-        where key.hasSuffix(":current") || key.hasSuffix(":accepted") || key.hasSuffix(":counter") || key.contains(":send:") {
+        where key.hasSuffix(":current") || key.hasSuffix(":accepted") || key.hasSuffix(":counter") || key.contains(":send:")
+            || key.hasSuffix(":sent") || key.hasSuffix(":membership-pending") {
             try tokenStore.remove(key)
         }
     }
@@ -224,6 +234,23 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         let data = try JSONEncoder().encode(SendCounter(conversationId: conversationId, deviceId: deviceId, last: last + 1))
         try tokenStore.set(String(decoding: data, as: UTF8.self), for: key, accessibility: .afterFirstUnlock)
         return last + 1
+    }
+
+    /// Relève le compteur au plus haut compteur de cet appareil vu dans la
+    /// liste (E.3) : une sauvegarde restaurée ne le fait pas reculer.
+    func raiseSendCounter(conversationId: String, deviceId: String, atLeast floor: Int, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        guard (1...E2EEV2Canonical.maxSequenceNumber).contains(floor) else { return }
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        let key = counterKey(conversationId: conversationId, ownerNamespace: ownerNamespace)
+        if let raw = try tokenStore.string(for: key),
+           let known = raw.data(using: .utf8).flatMap({ try? JSONDecoder().decode(SendCounter.self, from: $0) }),
+           known.conversationId == conversationId, known.deviceId == deviceId, known.last >= floor {
+            return
+        }
+        let data = try JSONEncoder().encode(SendCounter(conversationId: conversationId, deviceId: deviceId, last: floor))
+        try tokenStore.set(String(decoding: data, as: UTF8.self), for: key, accessibility: .afterFirstUnlock)
     }
 
     func pendingSend(conversationId: String, clientRequestId: String, ownerNamespace: String) throws -> PendingSend? {
@@ -270,6 +297,68 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         try tokenStore.remove(pendingKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
     }
 
+    /// Accusé d'un message déjà remis (E.3), gardé pour les derniers envois.
+    func sentReceipt(conversationId: String, clientRequestId: String, ownerNamespace: String) throws -> E2EEV2MessageReceiptV2? {
+        try sentReceipts(conversationId: conversationId, ownerNamespace: ownerNamespace).first { $0.clientRequestId == clientRequestId }
+    }
+
+    /// Remplace l'envoi en attente par son accusé, sous verrou.
+    func completeSend(_ receipt: E2EEV2MessageReceiptV2, conversationId: String, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        var receipts = try sentReceipts(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            .filter { $0.clientRequestId != receipt.clientRequestId }
+        receipts.append(receipt)
+        let data = try JSONEncoder().encode(Array(receipts.suffix(Self.sentReceiptLimit)))
+        try tokenStore.set(
+            String(decoding: data, as: UTF8.self), for: sentKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
+        try tokenStore.remove(sendKey(conversationId: conversationId, clientRequestId: receipt.clientRequestId, ownerNamespace: ownerNamespace))
+    }
+
+    private func sentReceipts(conversationId: String, ownerNamespace: String) throws -> [E2EEV2MessageReceiptV2] {
+        guard let raw = try tokenStore.string(for: sentKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
+        else { return [] }
+        guard let data = raw.data(using: .utf8), let receipts = try? JSONDecoder().decode([E2EEV2MessageReceiptV2].self, from: data)
+        else { throw Failure.invalidRecord }
+        return receipts
+    }
+
+    /// Membres partis (retrait ou départ), à l'heure locale où cet appareil l'a
+    /// appris : leurs messages en vol restent acceptés 24 heures (§3.4).
+    func departures(conversationId: String, ownerNamespace: String) throws -> [String: Int64] {
+        guard let raw = try tokenStore.string(for: departuresKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
+        else { return [:] }
+        guard let data = raw.data(using: .utf8), let departures = try? JSONDecoder().decode([String: Int64].self, from: data)
+        else { throw Failure.invalidRecord }
+        return departures
+    }
+
+    /// Changement d'appartenance signé, gardé avant son envoi et renvoyé tel
+    /// quel jusqu'à sa réponse (E.2) : jamais deux signatures pour un numéro.
+    func pendingMembership(conversationId: String, ownerNamespace: String) throws -> E2EEV2SignedString? {
+        guard let raw = try tokenStore.string(for: membershipPendingKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
+        else { return nil }
+        guard let value = try? E2EEV2CanonicalJSON.parseCanonical(raw), let signed = E2EEV2MembershipChange.signed(from: value)
+        else { throw Failure.invalidRecord }
+        return signed
+    }
+
+    func savePendingMembership(_ signed: E2EEV2SignedString, conversationId: String, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        try tokenStore.set(
+            E2EEV2CanonicalJSON.encodeString(E2EEV2MembershipChange.json(signed)),
+            for: membershipPendingKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
+    }
+
+    func clearPendingMembership(conversationId: String, ownerNamespace: String) throws {
+        try tokenStore.remove(membershipPendingKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
+    }
+
     /// Chaîne d'appartenance signée, telle que relue : rejouée pour vérifier une
     /// époque fondée sur un état plus ancien que la tête (§3.5).
     func membershipChain(conversationId: String, ownerNamespace: String) throws -> [E2EEV2SignedString] {
@@ -284,19 +373,37 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         return chain
     }
 
-    /// Ajout seul : la suite doit prolonger la chaîne gardée, déjà vérifiée.
-    func appendMembership(_ changes: [E2EEV2SignedString], conversationId: String, ownerNamespace: String) throws {
+    /// Ajout seul : la suite doit prolonger la chaîne gardée, déjà vérifiée. Les
+    /// départs qu'elle porte sont datés de `nowMs`, l'heure locale (§3.4).
+    func appendMembership(
+        _ changes: [E2EEV2SignedString],
+        conversationId: String,
+        ownerNamespace: String,
+        nowMs: Int64 = Int64(Date().timeIntervalSince1970 * 1_000)
+    ) throws {
         guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
         guard !changes.isEmpty else { return }
         Self.lock.lock()
         defer { Self.lock.unlock() }
         let known = try membershipChain(conversationId: conversationId, ownerNamespace: ownerNamespace)
         var previous = known.last?.canonical
+        var departures = try self.departures(conversationId: conversationId, ownerNamespace: ownerNamespace)
         for change in changes {
             guard let parsed = try? E2EEV2MembershipChange.parse(change.canonical, previousCanonical: previous),
                   parsed.conversationId == conversationId else { throw Failure.regressed }
+            switch parsed.action {
+            case "REMOVE", "LEAVE": departures[parsed.targetUserId] = nowMs
+            case "ADD": departures[parsed.targetUserId] = nil
+            default: break
+            }
             previous = change.canonical
         }
+        let departed = try JSONEncoder().encode(departures)
+        try tokenStore.set(
+            String(decoding: departed, as: UTF8.self),
+            for: departuresKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
         let value = E2EEV2CanonicalJSON.encodeString(.array((known + changes).map(E2EEV2MembershipChange.json)))
         try tokenStore.set(
             value, for: chainKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
@@ -318,6 +425,18 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
 
     private func acceptedKey(conversationId: String, ownerNamespace: String) -> String {
         key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":accepted"
+    }
+
+    private func sentKey(conversationId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":sent"
+    }
+
+    private func departuresKey(conversationId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":departures"
+    }
+
+    private func membershipPendingKey(conversationId: String, ownerNamespace: String) -> String {
+        key(conversationId: conversationId, ownerNamespace: ownerNamespace) + ":membership-pending"
     }
 
     private func counterKey(conversationId: String, ownerNamespace: String) -> String {

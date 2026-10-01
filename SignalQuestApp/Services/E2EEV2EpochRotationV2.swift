@@ -14,15 +14,19 @@ enum E2EEV2RotationPolicy {
         case browsers
         /// 30 jours au plus par époque, comptés depuis son acceptation locale.
         case age
+        /// 10 000 messages au plus par époque.
+        case volume
     }
 
     static let maxEpochAgeMs: Int64 = 30 * 24 * 60 * 60 * 1_000
+    static let maxEpochMessages = 10_000
 
     static func reasons(
         current: E2EEV2ConversationStateStore.CurrentEpoch,
         membership: E2EEV2MembershipState,
         expectedRecipients: [String],
-        nowMs: Int64
+        nowMs: Int64,
+        messageCount: Int = 0
     ) -> [Reason] {
         var reasons: [Reason] = []
         if Set(current.memberIds) != membership.members { reasons.append(.members) }
@@ -32,22 +36,27 @@ enum E2EEV2RotationPolicy {
         }
         if current.excludesWeb != membership.excludesWeb { reasons.append(.browsers) }
         if nowMs - current.acceptedAtMs >= maxEpochAgeMs { reasons.append(.age) }
+        if messageCount >= maxEpochMessages { reasons.append(.volume) }
         return reasons
     }
 
     /// Destinataires attendus : les appareils certifiés des membres actuels.
+    /// `messageCount` : messages acceptés sous l'époque courante (registre).
     static func reasons(
         current: E2EEV2ConversationStateStore.CurrentEpoch,
         membership: E2EEV2MembershipState,
         devices: E2EEV2CertifiedDeviceSet,
-        nowMs: Int64
+        nowMs: Int64,
+        messageCount: Int = 0
     ) -> [Reason] {
         let expected = E2EEV2EpochProposals.recipients(
             devices, members: membership.members, excludesWeb: membership.excludesWeb, nowMs: nowMs
         ).map {
             E2EEV2EpochManifest.recipient(userId: $0.userId, deviceId: $0.deviceId, platform: $0.platform, fingerprint: $0.fingerprint)
         }
-        return reasons(current: current, membership: membership, expectedRecipients: expected, nowMs: nowMs)
+        return reasons(
+            current: current, membership: membership, expectedRecipients: expected, nowMs: nowMs, messageCount: messageCount
+        )
     }
 }
 
@@ -294,13 +303,15 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
     }
 
     /// `membershipAt` rend l'état de la chaîne relue jusqu'à un numéro, ou nil
-    /// si la chaîne locale n'y arrive pas encore.
+    /// si la chaîne locale n'y arrive pas encore. `messageCount` : messages
+    /// acceptés sous l'époque courante, comme pour l'envoi.
     func rotateIfNeeded(
         conversationId: String,
         membership: E2EEV2MembershipState,
         membershipAt: (Int) -> E2EEV2MembershipState?,
         devices: E2EEV2CertifiedDeviceSet,
-        expectedOwnerScopeId: String
+        expectedOwnerScopeId: String,
+        messageCount: Int = 0
     ) async -> E2EEV2EpochRotationV2Result {
         guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
               session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:") else {
@@ -322,8 +333,9 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         let lines = expected.map {
             E2EEV2EpochManifest.recipient(userId: $0.userId, deviceId: $0.deviceId, platform: $0.platform, fingerprint: $0.fingerprint)
         }
-        guard !E2EEV2RotationPolicy.reasons(current: current, membership: membership, expectedRecipients: lines, nowMs: nowMs).isEmpty
-        else { return .upToDate }
+        guard !E2EEV2RotationPolicy.reasons(
+            current: current, membership: membership, expectedRecipients: lines, nowMs: nowMs, messageCount: messageCount
+        ).isEmpty else { return .upToDate }
         guard let ownCertified = devices.device(userId: ownUserId, deviceId: device.deviceId),
               ownCertified.signingKeyB64 == device.publicSigningKeyB64,
               let signingKey = ownCertified.signingKey,
