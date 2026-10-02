@@ -78,6 +78,10 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
             identityGeneration = nil
             return
         }
+        // Lot A1 : UIK d'une demande par QR restée en cours, reçue dès le chargement.
+        if case .success(.approved)? = await lifecycle.resumePendingApproval() {
+            confirmationMessage = String(localized: "Appareil approuvé. La clé du compte est installée sur cet appareil.")
+        }
         switch await lifecycle.listDeviceInventory() {
         case .success(let inventory):
             devices = inventory.devices
@@ -85,6 +89,8 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
             identityGeneration = inventory.identity?.generation
             if inventory.activationEnabled, currentDeviceCanRevoke {
                 E2EEV2NotificationContextEvents.requestRefresh(.identity)
+                // §2.6 : clé d'accord de 30 jours ou plus, recertifiée en passant.
+                if case .success(true) = await lifecycle.recertifyIfDue() { E2EEV2NotificationContextEvents.requestRefresh(.identity) }
             }
         case .failed(let failure):
             devices = []
@@ -258,7 +264,10 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         while !Task.isCancelled, generatedApproval?.id == approvalId {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             guard !Task.isCancelled, generatedApproval?.id == approvalId else { return }
-            switch await lifecycle.receiveApprovedTrust(approvalId: approvalId) {
+            let result = await lifecycle.receiveApprovedTrust(approvalId: approvalId)
+            // Un QR plus récent ou la sortie de l'écran : ce résultat ne s'applique plus.
+            guard !Task.isCancelled, generatedApproval?.id == approvalId else { return }
+            switch result {
             case .success(.pending):
                 continue
             case .success(.approved):

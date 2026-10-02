@@ -1696,7 +1696,8 @@ enum E2EEV2MessageDeliveryContract {
               let senderPublicKey = sender["publicSigningKeyB64"] as? String,
               decodedBase64(senderPublicKey)?.count == 65,
               sender["signingKeyAlgorithm"] as? String == E2EEV2DeviceAlgorithms.signingKeyAlgorithm,
-              integer(sender["keyVersion"]) == 1,
+              // Recertification (§2.6, lot A1) : toute version positive.
+              integer(sender["keyVersion"]).map({ (1...1_000_000).contains($0) }) == true,
               let epoch = value["epoch"] as? [String: Any],
               exactKeys(epoch, [
                 "id", "epochNumber", "algorithm", "keyCommitmentB64", "reason", "status", "createdAt",

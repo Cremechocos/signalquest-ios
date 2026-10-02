@@ -19,6 +19,10 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
     static func verifiedKey(ownerNamespace: String) -> String { "uik-verified-v1:\(ownerNamespace)" }
     /// Bootstrap en cours : l'heure des textes signés, tant que le serveur n'a pas répondu.
     static func pendingBootstrapKey(ownerNamespace: String) -> String { "uik-bootstrap-v1:\(ownerNamespace)" }
+    /// Demande d'approbation par QR de cet appareil, tant que l'UIK n'est pas reçue.
+    static func pendingApprovalKey(ownerNamespace: String) -> String { "uik-approval-v1:\(ownerNamespace)" }
+    /// Deux bootstraps simultanés ne créent qu'une UIK et une heure.
+    private static let bootstrapLock = NSLock()
 
     private let tokenStore: TokenStore
     private let allowsOwner: @Sendable (String) -> Bool
@@ -53,13 +57,34 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
     /// liste v1, gardées jusqu'à la réponse du serveur. Une reprise renvoie
     /// ainsi les mêmes textes, ce que le serveur accepte comme un rejeu.
     func pendingBootstrap(ownerNamespace: String, nowMs: Int64) throws -> (uik: P256.Signing.PrivateKey, issuedAtMs: Int64) {
-        if let key = try load(ownerNamespace: ownerNamespace) {
-            guard let raw = try tokenStore.string(for: Self.pendingBootstrapKey(ownerNamespace: ownerNamespace)),
-                  let issuedAtMs = Int64(raw), issuedAtMs > 0 else { return (key, nowMs) }
-            return (key, issuedAtMs)
+        try Self.bootstrapLock.withLock {
+            let marker = Self.pendingBootstrapKey(ownerNamespace: ownerNamespace)
+            if let key = try load(ownerNamespace: ownerNamespace) {
+                guard let raw = try tokenStore.string(for: marker),
+                      let issuedAtMs = Int64(raw), issuedAtMs > 0 else { return (key, nowMs) }
+                return (key, issuedAtMs)
+            }
+            try tokenStore.set(String(nowMs), for: marker, accessibility: .whenUnlocked)
+            return (try create(ownerNamespace: ownerNamespace), nowMs)
         }
-        try tokenStore.set(String(nowMs), for: Self.pendingBootstrapKey(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
-        return (try create(ownerNamespace: ownerNamespace), nowMs)
+    }
+
+    func hasPendingBootstrap(ownerNamespace: String) throws -> Bool {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        return try tokenStore.string(for: Self.pendingBootstrapKey(ownerNamespace: ownerNamespace)) != nil
+    }
+
+    /// Lot A1 : la demande par QR survit à la fermeture de l'écran ou de l'app,
+    /// pour que l'UIK déposée soit reçue dès le prochain chargement.
+    func pendingApprovalId(ownerNamespace: String) throws -> String? {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        return try tokenStore.string(for: Self.pendingApprovalKey(ownerNamespace: ownerNamespace))
+    }
+
+    func setPendingApprovalId(_ approvalId: String?, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        let key = Self.pendingApprovalKey(ownerNamespace: ownerNamespace)
+        if let approvalId { try tokenStore.set(approvalId, for: key, accessibility: .whenUnlocked) } else { try tokenStore.remove(key) }
     }
 
     /// Le serveur a enregistré l'identité : l'UIK est celle du compte.
@@ -286,7 +311,10 @@ enum E2EEV2DeviceApprovalTrust {
         let listed = Set(currentEntries.compactMap { $0.components(separatedBy: "\n").first })
         guard listed.contains(approverDeviceId) else { throw Failure.approverNotListed }
         guard !listed.contains(newDevice.deviceId) else { throw Failure.alreadyListed }
-        guard let identityKey = Data(base64Encoded: newDevice.publicIdentityKeyB64),
+        // Un appareil en attente n'a jamais été certifié : sa version est 1, que
+        // le QR ne couvre pas et que le serveur ne choisit donc pas.
+        guard newDevice.keyVersion == 1,
+              let identityKey = Data(base64Encoded: newDevice.publicIdentityKeyB64),
               let signingKey = Data(base64Encoded: newDevice.publicSigningKeyB64),
               let agreementKey = try? P256.KeyAgreement.PublicKey(x963Representation: identityKey) else {
             throw Failure.invalidDevice
@@ -383,5 +411,84 @@ enum E2EEV2DeviceRevocationTrust {
             entries: entries, issuedAtMs: nowMs
         )
         return Artifacts(deviceList: try E2EEV2SignedString.sign(next.canonical, with: uik), deviceEntries: entries)
+    }
+}
+
+/// §2.6 et E.1 : la clé d'accord de l'appareil a tourné. L'appareil, qui
+/// détient l'UIK, certifie lui-même sa nouvelle clé (`keyVersion` + 1, même
+/// clé de signature) et signe la liste suivante, où sa ligne est remplacée.
+enum E2EEV2DeviceRecertificationTrust {
+    struct Artifacts: Equatable, Sendable {
+        let certificate: E2EEV2SignedString
+        let deviceList: E2EEV2SignedString
+        let deviceEntries: [String]
+
+        /// E.1 : corps exact de `PUT /api/e2ee/v2/devices/{deviceId}/certificate`.
+        var body: [String: Any] {
+            [
+                "certificate": ["certificate": certificate.canonical, "signatureB64": certificate.signatureB64],
+                "deviceList": ["list": deviceList.canonical, "signatureB64": deviceList.signatureB64, "devices": deviceEntries],
+            ]
+        }
+    }
+
+    /// `true` si la liste courante porte déjà la nouvelle clé : le serveur a
+    /// enregistré la rotation, mais sa réponse s'est perdue.
+    static func isListed(_ rotation: E2EEV2DeviceIdentityStore.AgreementKeyRotation, device: E2EEV2DeviceDescriptor, in entries: [String]) -> Bool {
+        guard let identityKey = Data(base64Encoded: rotation.identityKeyB64),
+              let signingKey = Data(base64Encoded: device.publicSigningKeyB64) else { return false }
+        return entries.contains(E2EEV2DeviceList.entry(
+            deviceId: device.deviceId, keyVersion: rotation.keyVersion, platform: device.platform,
+            fingerprint: E2EEV2Canonical.deviceFingerprint(identityKeyX963: identityKey, signingKeyX963: signingKey)
+        ))
+    }
+
+    static func make(
+        userId: String,
+        device: E2EEV2DeviceDescriptor,
+        rotation: E2EEV2DeviceIdentityStore.AgreementKeyRotation,
+        currentList: E2EEV2SignedString,
+        currentEntries: [String],
+        uik: P256.Signing.PrivateKey,
+        nowMs: Int64
+    ) throws -> Artifacts {
+        guard let current = try? E2EEV2DeviceList.verifyWithoutChain(currentList, entries: currentEntries, uik: uik.publicKey),
+              current.userId == userId else {
+            throw E2EEV2DeviceApprovalTrust.Failure.foreignList
+        }
+        guard device.platform != "web", rotation.deviceId == device.deviceId,
+              rotation.keyVersion == device.keyVersion + 1,
+              currentEntries.contains(where: { $0.components(separatedBy: "\n").first == device.deviceId }),
+              let identityKey = Data(base64Encoded: rotation.identityKeyB64),
+              let signingKey = Data(base64Encoded: device.publicSigningKeyB64),
+              (try? P256.KeyAgreement.PublicKey(x963Representation: identityKey)) != nil else {
+            throw E2EEV2DeviceApprovalTrust.Failure.notCertified
+        }
+        let certificate = E2EEV2DeviceCertificate(
+            userId: userId,
+            deviceId: device.deviceId,
+            keyVersion: rotation.keyVersion,
+            identityKeyB64: rotation.identityKeyB64,
+            signingKeyB64: device.publicSigningKeyB64,
+            platform: device.platform,
+            createdAtMs: rotation.createdAtMs
+        )
+        guard (try? E2EEV2DeviceCertificate.parse(certificate.canonical)) == certificate else {
+            throw E2EEV2DeviceApprovalTrust.Failure.invalidDevice
+        }
+        // Les autres lignes dans leur ordre, puis la nouvelle : ce que le serveur attend.
+        let entries = currentEntries.filter { $0.components(separatedBy: "\n").first != device.deviceId } + [E2EEV2DeviceList.entry(
+            deviceId: device.deviceId, keyVersion: rotation.keyVersion, platform: device.platform,
+            fingerprint: E2EEV2Canonical.deviceFingerprint(identityKeyX963: identityKey, signingKeyX963: signingKey)
+        )]
+        let next = E2EEV2DeviceList.make(
+            userId: userId, version: current.version + 1, previousCanonical: currentList.canonical,
+            entries: entries, issuedAtMs: nowMs
+        )
+        return Artifacts(
+            certificate: try E2EEV2SignedString.sign(certificate.canonical, with: uik),
+            deviceList: try E2EEV2SignedString.sign(next.canonical, with: uik),
+            deviceEntries: entries
+        )
     }
 }

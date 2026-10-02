@@ -836,7 +836,39 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         let createdAtMs: Int64
         /// Absent : clé logicielle (identités d'avant la v0.4.14, appareil sans Secure Enclave).
         var signingStorage: SigningStorage? = nil
+        /// Date de la clé d'accord courante ; absente, celle de l'identité (§2.6).
+        var identityKeyCreatedAtMs: Int64? = nil
+        /// Nouvelle clé d'accord préparée, gardée jusqu'à la réponse du serveur.
+        var pendingIdentityKey: PendingAgreementKey? = nil
+        /// Anciennes clés d'accord, pour les enveloppes encore adressées à elles.
+        var retiredIdentityKeys: [RetiredAgreementKey]? = nil
     }
+
+    private struct PendingAgreementKey: Codable, Equatable {
+        let privateRawB64: String
+        let createdAtMs: Int64
+    }
+
+    private struct RetiredAgreementKey: Codable, Equatable {
+        let keyVersion: Int
+        let privateRawB64: String
+        let retiredAtMs: Int64
+    }
+
+    /// Rotation de la clé d'accord en cours (§2.6) : la nouvelle clé publique,
+    /// sa version et sa date, celle de son certificat.
+    struct AgreementKeyRotation: Equatable, Sendable {
+        let deviceId: String
+        let keyVersion: Int
+        let identityKeyB64: String
+        let createdAtMs: Int64
+    }
+
+    /// §2.6 : la clé d'accord tourne tous les 30 jours.
+    static let agreementKeyLifetimeMs: Int64 = 30 * 86_400_000
+    /// Anciennes clés gardées : trois au plus, 90 jours au plus.
+    static let retiredAgreementKeyLimit = 3
+    static let retiredAgreementKeyRetentionMs: Int64 = 90 * 86_400_000
 
     /// Où vit la clé de signature (spec §2.6, v0.4.14).
     enum SigningStorage: String, Codable, Sendable {
@@ -1187,15 +1219,110 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         guard record.descriptor.deviceId == delivery.envelope.recipientDeviceId else {
             throw E2EEV2DeviceIdentityError.invalidRecord
         }
-        let privateKey = try P256.KeyAgreement.PrivateKey(
-            rawRepresentation: decoded(record.identityPrivateRawB64)
+        // Une enveloppe peut viser la clé d'avant la dernière rotation (§2.6).
+        var lastError: Error = E2EEV2DeviceIdentityError.invalidRecord
+        for privateKey in try agreementKeys(record) {
+            do {
+                return try E2EEV2EpochCrypto.unwrap(
+                    envelope: delivery.envelope.cryptoEnvelope,
+                    keyCommitmentB64: delivery.keyCommitmentB64,
+                    recipientPrivateKey: privateKey,
+                    context: delivery.epochContext
+                )
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
+    }
+
+    /// Clé courante d'abord, puis la préparée, puis les anciennes, de la plus récente.
+    private func agreementKeys(_ record: Record) throws -> [P256.KeyAgreement.PrivateKey] {
+        let raws = [record.identityPrivateRawB64]
+            + [record.pendingIdentityKey?.privateRawB64].compactMap { $0 }
+            + (record.retiredIdentityKeys ?? []).reversed().map(\.privateRawB64)
+        return try raws.map { try P256.KeyAgreement.PrivateKey(rawRepresentation: decoded($0)) }
+    }
+
+    // MARK: Rotation de la clé d'accord (§2.6, lot A1)
+
+    /// La rotation à envoyer : celle déjà préparée, sinon une nouvelle clé si
+    /// la courante a 30 jours. Préparée et gardée avant l'envoi, pour qu'une
+    /// reprise renvoie le même certificat.
+    func agreementKeyRotation(ownerNamespace: String, nowMs: Int64) throws -> AgreementKeyRotation? {
+        try Self.signingCopyLock.withLock { () throws -> AgreementKeyRotation? in
+            let record = try requiredRecord(ownerNamespace: ownerNamespace)
+            if let pending = record.pendingIdentityKey { return try rotation(record, pending) }
+            guard nowMs - (record.identityKeyCreatedAtMs ?? record.createdAtMs) >= Self.agreementKeyLifetimeMs else {
+                return nil
+            }
+            var updated = record
+            updated.pendingIdentityKey = PendingAgreementKey(
+                privateRawB64: P256.KeyAgreement.PrivateKey().rawRepresentation.base64EncodedString(), createdAtMs: nowMs
+            )
+            try writeActive(updated, replacing: record, ownerNamespace: ownerNamespace)
+            return try rotation(updated, updated.pendingIdentityKey!)
+        }
+    }
+
+    /// Le serveur a enregistré le certificat : la clé préparée devient la clé
+    /// d'accord, l'ancienne est gardée pour les enveloppes encore en route.
+    func activateAgreementKey(_ rotation: AgreementKeyRotation, ownerNamespace: String, nowMs: Int64) throws {
+        let changed = try Self.signingCopyLock.withLock { () throws -> Bool in
+            let record = try requiredRecord(ownerNamespace: ownerNamespace)
+            if record.descriptor.keyVersion == rotation.keyVersion,
+               record.descriptor.publicIdentityKeyB64 == rotation.identityKeyB64 { return false }
+            guard let pending = record.pendingIdentityKey, try self.rotation(record, pending) == rotation else {
+                throw E2EEV2DeviceIdentityError.invalidRecord
+            }
+            let old = record.descriptor
+            let retired = ((record.retiredIdentityKeys ?? []) + [RetiredAgreementKey(
+                keyVersion: old.keyVersion, privateRawB64: record.identityPrivateRawB64, retiredAtMs: nowMs
+            )]).filter { nowMs - $0.retiredAtMs < Self.retiredAgreementKeyRetentionMs }.suffix(Self.retiredAgreementKeyLimit)
+            let updated = Record(
+                version: record.version,
+                descriptor: E2EEV2DeviceDescriptor(
+                    deviceId: old.deviceId, platform: old.platform, label: old.label,
+                    publicIdentityKeyB64: rotation.identityKeyB64, publicSigningKeyB64: old.publicSigningKeyB64,
+                    identityKeyAlgorithm: old.identityKeyAlgorithm, signingKeyAlgorithm: old.signingKeyAlgorithm,
+                    keyVersion: rotation.keyVersion
+                ),
+                identityPrivateRawB64: pending.privateRawB64,
+                signingPrivateRawB64: record.signingPrivateRawB64,
+                createdAtMs: record.createdAtMs,
+                signingStorage: record.signingStorage,
+                identityKeyCreatedAtMs: pending.createdAtMs,
+                pendingIdentityKey: nil,
+                retiredIdentityKeys: Array(retired)
+            )
+            try writeActive(updated, replacing: record, ownerNamespace: ownerNamespace)
+            return true
+        }
+        if changed { identityChanged(ownerNamespace) }
+    }
+
+    private func rotation(_ record: Record, _ pending: PendingAgreementKey) throws -> AgreementKeyRotation {
+        let key = try P256.KeyAgreement.PrivateKey(rawRepresentation: decoded(pending.privateRawB64))
+        return AgreementKeyRotation(
+            deviceId: record.descriptor.deviceId, keyVersion: record.descriptor.keyVersion + 1,
+            identityKeyB64: key.publicKey.x963Representation.base64EncodedString(), createdAtMs: pending.createdAtMs
         )
-        return try E2EEV2EpochCrypto.unwrap(
-            envelope: delivery.envelope.cryptoEnvelope,
-            keyCommitmentB64: delivery.keyCommitmentB64,
-            recipientPrivateKey: privateKey,
-            context: delivery.epochContext
-        )
+    }
+
+    /// Sous `signingCopyLock` : réécrit l'identité active si elle n'a pas changé entre-temps.
+    private func writeActive(_ record: Record, replacing previous: Record, ownerNamespace: String) throws {
+        try validate(record)
+        let key = storageKey(ownerNamespace: ownerNamespace)
+        guard let raw = try tokenStore.string(for: key), let data = raw.data(using: .utf8),
+              let stored = try? JSONDecoder().decode(Record.self, from: data),
+              stored.descriptor == previous.descriptor, stored.identityPrivateRawB64 == previous.identityPrivateRawB64,
+              stored.pendingIdentityKey == previous.pendingIdentityKey else {
+            throw E2EEV2DeviceIdentityError.invalidRecord
+        }
+        let encoded = try JSONEncoder().encode(record)
+        guard let value = String(data: encoded, encoding: .utf8) else { throw E2EEV2DeviceIdentityError.invalidRecord }
+        try tokenStore.set(value, for: key, accessibility: .whenUnlocked)
+        guard try tokenStore.string(for: key) == value else { throw E2EEV2DeviceIdentityError.invalidRecord }
     }
 
     /// Opens the account identity key handed over at approval (D.1) without
@@ -1386,7 +1513,7 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
               record.descriptor.platform == "ios",
               record.descriptor.identityKeyAlgorithm == Self.identityKeyAlgorithm,
               record.descriptor.signingKeyAlgorithm == Self.signingKeyAlgorithm,
-              record.descriptor.keyVersion == 1,
+              (1...1_000_000).contains(record.descriptor.keyVersion),
               record.descriptor.deviceId.range(
                 of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#,
                 options: .regularExpression
@@ -2876,6 +3003,18 @@ enum E2EEV2DeviceApprovalContract {
         )
     }
 
+    /// `PUT …/certificate` (E.1) : `{deviceId, keyVersion, deviceListVersion}`,
+    /// entiers en chaînes décimales (D.0).
+    static func parseRecertification(_ data: Data, expected: E2EEV2DeviceIdentityStore.AgreementKeyRotation) -> Bool {
+        guard let root = dictionary(data),
+              Set(root.keys) == ["deviceId", "keyVersion", "deviceListVersion"],
+              root["deviceId"] as? String == expected.deviceId,
+              root["keyVersion"] as? String == String(expected.keyVersion),
+              let listVersion = root["deviceListVersion"] as? String,
+              E2EEV2Canonical.sequenceNumber(listVersion) != nil else { return false }
+        return true
+    }
+
     static func parseRevocation(_ data: Data) -> E2EEV2RevocationOutcome? {
         guard let root = dictionary(data),
               root["revoked"] as? Bool == true,
@@ -3358,7 +3497,7 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                 deviceId: descriptor.deviceId,
                 method: method
             )
-            return map(
+            let result = map(
                 await transport.postJSON(
                     path: "/api/e2ee/v2/device-approvals",
                     body: body,
@@ -3368,9 +3507,22 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                 parser: E2EEV2DeviceApprovalContract.parseApprovalCreation,
                 invalidMessage: "invalid-e2ee-approval-response"
             )
+            if case .success(let approval) = result, approval.method == .qr {
+                try? accountIdentityStore.setPendingApprovalId(approval.id, ownerNamespace: namespace)
+            }
+            return result
         } catch {
             return localFailure("e2ee-device-identity-unavailable")
         }
+    }
+
+    /// Lot A1 : reprend la réception de l'UIK d'une demande par QR restée en
+    /// cours (écran ou app fermés). `nil` : aucune demande en cours.
+    func resumePendingApproval() async -> E2EEV2DeviceLifecycleResult<E2EEV2ApprovalStatus>? {
+        guard let owner = ownerScope(),
+              let approvalId = try? accountIdentityStore.pendingApprovalId(ownerNamespace: LocalAccountScope.storageNamespace(for: owner))
+        else { return nil }
+        return await receiveApprovedTrust(approvalId: approvalId)
     }
 
     func requestBootstrapEmailChallenge() async -> E2EEV2DeviceLifecycleResult<E2EEV2BootstrapEmailChallenge> {
@@ -3450,11 +3602,23 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
             )
             switch result {
             case .success:
-                try? accountIdentityStore.confirmBootstrap(ownerNamespace: namespace)
+                if (try? accountIdentityStore.confirmBootstrap(ownerNamespace: namespace)) == nil {
+                    try? accountIdentityStore.confirmBootstrap(ownerNamespace: namespace)
+                }
                 rotationCommitted(session, [], true)
             case .failed(let failure) where failure.code == "E2EE_IDENTITY_ALREADY_ESTABLISHED":
-                // Un autre appareil a établi le compte : son UIK arrivera à l'approbation.
-                try? accountIdentityStore.discardPendingBootstrap(ownerNamespace: namespace)
+                // Le même code répond à notre propre UIK portée par d'autres textes :
+                // elle n'est retirée que si le compte en porte une autre, dont la
+                // clé arrivera à l'approbation.
+                let local = pending.uik.publicKey.x963Representation.base64EncodedString()
+                switch await servedAccountKey(owner: owner, userId: userId, transport: transport) {
+                case local?:
+                    try? accountIdentityStore.confirmBootstrap(ownerNamespace: namespace)
+                case .some:
+                    try? accountIdentityStore.discardPendingBootstrap(ownerNamespace: namespace)
+                case nil:
+                    break
+                }
             case .failed:
                 break
             }
@@ -3609,12 +3773,19 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
             case .success(let value): detail = value
             }
             guard detail.pendingDevice.descriptor.deviceId == descriptor.deviceId else {
+                try? accountIdentityStore.setPendingApprovalId(nil, ownerNamespace: namespace)
                 return localFailure("e2ee-approval-other-device")
             }
-            guard detail.approval.status == .approved else { return .success(detail.approval.status) }
+            guard detail.approval.status == .approved else {
+                if detail.approval.status != .pending { try? accountIdentityStore.setPendingApprovalId(nil, ownerNamespace: namespace) }
+                return .success(detail.approval.status)
+            }
             guard let wrap = detail.trust?.uikWrap else {
-                // Dépôt déjà consommé : l'UIK est ici, ou ne peut plus arriver.
+                // Dépôt déjà consommé ou expiré : l'UIK est ici seulement si elle
+                // n'est pas celle d'un bootstrap jamais confirmé.
+                try? accountIdentityStore.setPendingApprovalId(nil, ownerNamespace: namespace)
                 return try accountIdentityStore.load(ownerNamespace: namespace) != nil
+                    && !accountIdentityStore.hasPendingBootstrap(ownerNamespace: namespace)
                     ? .success(.approved)
                     : localFailure("e2ee-account-key-not-delivered")
             }
@@ -3629,6 +3800,7 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
             guard session.isCurrent else { return localFailure("e2ee-session-changed") }
             try accountIdentityStore.discardPendingBootstrap(ownerNamespace: namespace)
             try accountIdentityStore.install(uik, ownerNamespace: namespace)
+            try? accountIdentityStore.setPendingApprovalId(nil, ownerNamespace: namespace)
             return .success(.approved)
         } catch {
             return trustFailure(error, fallback: "e2ee-account-key-not-delivered")
@@ -3684,6 +3856,64 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         }
     }
 
+    /// §2.6 : la clé d'accord tourne tous les 30 jours. Son certificat
+    /// (`keyVersion` + 1) et la liste qui le porte sont signés par l'UIK détenue
+    /// ici. Rend vrai quand la nouvelle clé est en service.
+    func recertifyIfDue() async -> E2EEV2DeviceLifecycleResult<Bool> {
+        guard let owner = ownerScope(), let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == owner,
+              let userId = Self.userId(owner) else {
+            return localFailure("authenticated-account-required")
+        }
+        let transport = self.transport.bound(to: session)
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        do {
+            guard let uik = try accountIdentityStore.load(ownerNamespace: namespace),
+                  let device = try identityStore.load(ownerNamespace: namespace),
+                  let rotation = try identityStore.agreementKeyRotation(ownerNamespace: namespace, nowMs: nowMs()) else {
+                return .success(false)
+            }
+            for attempt in 0..<2 {
+                let account = try await accountTrust(owner: owner, transport: transport, uik: uik)
+                guard session.isCurrent else { return localFailure("e2ee-session-changed") }
+                // Réponse perdue d'une rotation déjà enregistrée : la liste porte la nouvelle clé.
+                if E2EEV2DeviceRecertificationTrust.isListed(rotation, device: device, in: account.deviceEntries) {
+                    try identityStore.activateAgreementKey(rotation, ownerNamespace: namespace, nowMs: nowMs())
+                    return .success(true)
+                }
+                // Un appareil absent de la liste ne se recertifie pas (le serveur demanderait une réparation).
+                guard account.deviceEntries.contains(where: { $0.components(separatedBy: "\n").first == device.deviceId }) else {
+                    return .success(false)
+                }
+                let trust = try E2EEV2DeviceRecertificationTrust.make(
+                    userId: userId, device: device, rotation: rotation, currentList: account.deviceList,
+                    currentEntries: account.deviceEntries, uik: uik, nowMs: nowMs()
+                )
+                let response = await transport.putJSON(
+                    path: "/api/e2ee/v2/devices/\(device.deviceId)/certificate",
+                    body: try JSONSerialization.data(withJSONObject: trust.body, options: [.sortedKeys]),
+                    expectedOwnerScopeId: owner,
+                    capabilitySet: .deviceLifecycle
+                )
+                switch response {
+                case .failure(let failure) where failure.code == "E2EE_DEVICE_LIST_STALE" && attempt == 0:
+                    continue
+                case .failure(let failure):
+                    return .failed(failure)
+                case .success(let data, _, _):
+                    guard E2EEV2DeviceApprovalContract.parseRecertification(data, expected: rotation) else {
+                        return localFailure("invalid-e2ee-certificate-response")
+                    }
+                    guard session.isCurrent else { return localFailure("e2ee-session-changed") }
+                    try identityStore.activateAgreementKey(rotation, ownerNamespace: namespace, nowMs: nowMs())
+                    return .success(true)
+                }
+            }
+            return localFailure("e2ee-device-list-stale")
+        } catch {
+            return trustFailure(error, fallback: "e2ee-recertification-unavailable")
+        }
+    }
+
     private func ownerScope() -> String? {
         LocalAccountScope.currentUserId == nil ? nil : LocalAccountScope.currentOwnerScopeId
     }
@@ -3692,6 +3922,14 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         guard ownerScopeId.hasPrefix("user:") else { return nil }
         let userId = String(ownerScopeId.dropFirst(5))
         return E2EEV2Canonical.isOpaque(userId) ? userId : nil
+    }
+
+    /// UIK que le serveur sert pour son propre compte, sans la croire : seulement
+    /// pour décider de garder la sienne après un bootstrap refusé.
+    private func servedAccountKey(owner: String, userId: String, transport: E2EEV2APITransport) async -> String? {
+        guard let data = try? await E2EEV2TrustDirectory.identityFetch(transport: transport, ownerScopeId: owner)(userId, nil),
+              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        return root["accountIdentityKeyB64"] as? String
     }
 
     /// Son propre compte relu par l'annuaire de confiance (E.1), vérifié contre
