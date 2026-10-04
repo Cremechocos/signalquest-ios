@@ -80,3 +80,18 @@ final class E2EEV2MessagingRuntimeTests: XCTestCase {
         XCTAssertEqual(reads.count(fixture.user), 1, "Les autres restent en cache")
     }
 }
+
+extension E2EEV2MessagingRuntimeTests {
+    /// La recette locale ne s'ouvre qu'avec l'argument, hors production et vers
+    /// une API en boucle locale ; en Release elle n'existe pas.
+    func testTheLocalQAGateNeedsTheArgumentAndALoopbackAPI() {
+        let local = AppConfig(environment: .test, appBaseURL: URL(string: "http://127.0.0.1:3201")!,
+                              apiBaseURL: URL(string: "http://127.0.0.1:3201")!, debugLogsEnabled: false)
+        let remote = AppConfig(environment: .test, appBaseURL: URL(string: "https://api.signalquest.fr")!,
+                               apiBaseURL: URL(string: "https://api.signalquest.fr")!, debugLogsEnabled: false)
+        XCTAssertTrue(E2EEV2MessagingQAGate.allows(config: local, qaArgumentEnabled: true))
+        XCTAssertFalse(E2EEV2MessagingQAGate.allows(config: local, qaArgumentEnabled: false))
+        XCTAssertFalse(E2EEV2MessagingQAGate.allows(config: remote, qaArgumentEnabled: true))
+        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled, "Les verrous globaux restent fermés")
+    }
+}

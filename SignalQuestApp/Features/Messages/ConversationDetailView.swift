@@ -53,6 +53,8 @@ struct ConversationDetailView: View {
     /// Conversation v2 (§12), lue une fois à l'ouverture : messages programmés
     /// désactivés (§13).
     @State private var conversationIsV2 = false
+    /// Avis du fil v2 (§2.4, §4.2, §4.3, §3.2), posés en tête.
+    @State private var v2Notices: [E2EEV2ThreadPresentation.Notice] = []
     @State private var showEncryptionInfo = false
     /// Suivi du bas de la conversation : un message qui arrive pendant la
     /// lecture de l'historique n'y ramène plus de force (SOC-20).
@@ -243,6 +245,14 @@ struct ConversationDetailView: View {
                                 .tint(SQColor.brandRed)
                                 .padding(.vertical, SQSpace.sm)
                         }
+                        ForEach(Array(v2Notices.enumerated()), id: \.offset) { _, notice in
+                            Label(notice.text, systemImage: "lock.trianglebadge.exclamationmark")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, SQSpace.xs)
+                                .accessibilityIdentifier("conversation.v2Notice")
+                        }
                         // PERF-MSG-04 — Itère directement sur `messages` (identité
                         // stable `\.id`, comme l'ancien `id: \.element.id`) au lieu
                         // de `Array(messages.enumerated())`, qui matérialisait un
@@ -287,7 +297,7 @@ struct ConversationDetailView: View {
                             .onDisappear { isNearBottom = false }
                         if let errorMessage {
                             ErrorStateView(title: "Messages indisponibles", message: errorMessage) {
-                                Task { await load() }
+                                Task { usesV2 ? await loadV2() : await load() }
                             }
                             .padding(.horizontal)
                         }
@@ -510,7 +520,19 @@ struct ConversationDetailView: View {
         }
         .task {
             conversationIsV2 = EncryptedConversationSurfaces.isV2(conversation)
+            // §14.2 : une conversation chiffrée v1 passe en v2 à son ouverture,
+            // si tous ses membres lisent le v2 (règle commune, v0.4.17).
+            if !conversationIsV2, conversation.e2eeEnabled == true,
+               await services.e2eeV2Messaging.migrateIfReady(conversation) {
+                conversationIsV2 = true
+            }
             await restoreDraftIfNeeded()
+            if usesV2 {
+                await loadV2()
+                guard !Task.isCancelled else { return }
+                await markRead()
+                return
+            }
             // SwiftUI annule cette tâche quand on quitte l'écran, mais les appels
             // en cours finissent quand même : sans ces gardes, une sortie rapide
             // démarrait ensuite la synchro et la présence que plus rien n'arrêtait
@@ -1798,6 +1820,53 @@ struct ConversationDetailView: View {
 
     // MARK: Chargement / sync
 
+    /// Conversation v2 lue et écrite par la messagerie v2 (verrous ouverts).
+    private var usesV2: Bool { conversationIsV2 && services.e2eeV2Messaging.readsEnabled }
+
+    /// Relève v2 : chaîne, époques, liste vérifiée, puis le fil présenté. Les
+    /// bulles locales en cours d'envoi restent jusqu'à leur accusé.
+    private func loadV2() async {
+        switch await services.e2eeV2Messaging.thread(
+            conversationId: conversation.id, isGroup: conversation.isGroup, participants: conversation.participants
+        ) {
+        case .thread(let presentation):
+            let localPending = messages.filter { pendingSends[$0.id] != nil }
+            messages = Self.normalized(presentation.messages + localPending)
+            v2Notices = presentation.notices
+            errorMessage = nil
+        case .failure(let failure):
+            errorMessage = failure.kind == .retryable
+                ? String(localized: "Connexion instable. La conversation chiffrée se mettra à jour dès que possible.")
+                : String(localized: "Cette conversation chiffrée n’a pas pu être lue pour l’instant.")
+        }
+    }
+
+    /// Envoi v2 d'un texte, d'une édition ou d'une suppression, sous le même
+    /// identifiant à chaque essai : jamais deux signatures pour un message.
+    private func sendV2(_ body: E2EEV2ContentPayloadV2.Body, replyToId: String?, ttlSeconds: Int, clientRequestId: String) async -> Bool {
+        let result = await services.e2eeV2Messaging.send(
+            .init(body: body, replyToRef: replyToId, mentions: [], ttlSeconds: ttlSeconds),
+            clientRequestId: clientRequestId, conversationId: conversation.id, isGroup: conversation.isGroup,
+            participantIds: conversation.participants.map(\.userId)
+        )
+        switch result {
+        case .sent, .alreadyAccepted:
+            await loadV2()
+            return true
+        case .capabilityMissing:
+            showActionError(String(localized: "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Il partira dès que possible."))
+        case .membersNotTrusted:
+            showActionError(String(localized: "Un membre a un nouveau numéro de sécurité. Vérifie-le avant d’envoyer."))
+        case .needsEpoch, .needsRotation:
+            showActionError(String(localized: "La conversation chiffrée se met à jour. Réessaie dans un instant."))
+        case .failure(let failure):
+            showActionError(failure.kind == .retryable
+                ? String(localized: "Connexion instable. Réessaie.")
+                : String(localized: "Ce message chiffré n’a pas pu être envoyé."))
+        }
+        return false
+    }
+
     private func load() async {
         if AppEnvironment.usesDemoData {
             messages = conversation.lastMessage.map { [$0] } ?? MessageItem.demo
@@ -1920,7 +1989,7 @@ struct ConversationDetailView: View {
                 case .stateEvent:
                     await refreshLatestPageState()
                 case .serverEvent, .polling:
-                    await refreshDelta()
+                    if usesV2 { await loadV2() } else { await refreshDelta() }
                 }
             }
             MessageSyncLog.logger.debug("sync stream ended \(conversationId, privacy: .public)")
@@ -2207,6 +2276,19 @@ struct ConversationDetailView: View {
 
         // L'édition n'est pas optimiste : on attend la confirmation serveur
         // avant de remplacer le texte affiché (recharge pour réordonner).
+        if let editTarget, usesV2 {
+            isSending = true
+            defer { isSending = false }
+            if await sendV2(.edit(targetRef: editTarget.id, text: text), replyToId: nil, ttlSeconds: 0,
+                            clientRequestId: UUID().uuidString) {
+                self.editTarget = nil
+                restoreComposerAfterEdit()
+                Haptics.success()
+            } else {
+                Haptics.error()
+            }
+            return
+        }
         if let editTarget {
             isSending = true
             defer { isSending = false }
@@ -2248,6 +2330,20 @@ struct ConversationDetailView: View {
     private func performSend(localId: String) async {
         guard let pending = pendingSends[localId] else { return }
         sendStatus[localId] = .sending
+        if usesV2 {
+            // Même clientRequestId à chaque essai : l'enveloppe gardée repart à l'octet.
+            if await sendV2(.text(pending.text), replyToId: pending.replyToId, ttlSeconds: pending.ttlSeconds,
+                            clientRequestId: pending.idempotencyKey) {
+                messages.removeAll { $0.id == localId }
+                sendStatus[localId] = nil
+                pendingSends[localId] = nil
+                Haptics.success()
+            } else {
+                withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
+                Haptics.error()
+            }
+            return
+        }
         do {
             let sent = pending.restored
                 ? try await service.resendPendingText(clientRequestId: pending.idempotencyKey)

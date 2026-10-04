@@ -1,5 +1,25 @@
 import Foundation
 
+/// Recette strictement locale de la messagerie v2, comme celle des appels :
+/// Debug, argument explicite, environnement hors production, API en boucle
+/// locale. Elle ne change pas les verrous globaux ; en Release, la branche
+/// fermée est la seule compilée.
+enum E2EEV2MessagingQAGate {
+    static func allows(config: AppConfig = .current, qaArgumentEnabled: Bool = AppEnvironment.runsE2EEV2MessagingQA) -> Bool {
+        #if DEBUG
+        guard qaArgumentEnabled, config.environment != .production,
+              let components = URLComponents(url: config.apiBaseURL, resolvingAgainstBaseURL: false),
+              let host = components.host?.lowercased(), ["localhost", "127.0.0.1", "::1"].contains(host),
+              components.port != nil, components.user == nil, components.password == nil,
+              components.query == nil, components.fragment == nil,
+              components.path.isEmpty || components.path == "/" else { return false }
+        return true
+        #else
+        return false
+        #endif
+    }
+}
+
 /// Messagerie v2 de la session courante (§3, §4, E.2, E.3) : assemble la
 /// façade, le créateur, l'annuaire des appareils certifiés en cache et
 /// l'écriture du miroir de notification, et les rebâtit quand le compte ou la
@@ -216,6 +236,75 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         } catch {
             return .failure(Self.directoryFailure(error))
         }
+    }
+
+    // MARK: Pour l'écran
+
+    enum ThreadResult: Sendable {
+        case thread(E2EEV2ThreadPresentation)
+        case failure(E2EEV2TransportFailure)
+    }
+
+    /// Relève la conversation, puis la présente : messages sous la forme
+    /// commune, avis à poser dans le fil (identité changée, messages manquants…).
+    func thread(conversationId: String, isGroup: Bool, participants: [ConversationParticipant]) async -> ThreadResult {
+        guard readsEnabled else { return .failure(Self.closed) }
+        guard let parts = current() else { return .failure(Self.noSession) }
+        let participantIds = participants.map(\.userId)
+        var used = E2EEV2CertifiedDeviceSet(devicesByUser: [:], refusals: [:])
+        let refreshed: E2EEV2RefreshResultV2
+        do {
+            refreshed = try await withDevices(conversationId: conversationId, participantIds: participantIds, parts: parts, staleUserIds: {
+                if case .failure(let failure) = $0 { return Self.stale(failure) }
+                return nil
+            }) { devices in
+                used = devices
+                return await parts.messaging.refresh(
+                    conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: parts.session.ownerScopeId
+                )
+            }
+        } catch {
+            return .failure(Self.directoryFailure(error))
+        }
+        switch refreshed {
+        case .failure(let failure):
+            return .failure(failure)
+        case .refreshed(let result):
+            let members = Dictionary(participants.map { ($0.userId, $0.user) }, uniquingKeysWith: { first, _ in first })
+            let owners = Dictionary(
+                used.devicesByUser.flatMap { user, devices in devices.map { ($0.deviceId, user) } },
+                uniquingKeysWith: { first, _ in first }
+            )
+            return .thread(E2EEV2ThreadPresenter.present(
+                result, conversationId: conversationId, members: members, deviceOwners: owners,
+                refusals: used.refusals.filter { participantIds.contains($0.key) }
+            ))
+        }
+    }
+
+    /// Migration d'une conversation chiffrée v1 à son ouverture (§14.2), selon
+    /// la règle commune : tous les membres certifiés et lisant le v2. Vrai si
+    /// la conversation est v2 après l'appel.
+    func migrateIfReady(_ conversation: MessageConversation) async -> Bool {
+        guard writesEnabled, conversation.e2eeEnabled == true, let parts = current() else { return false }
+        let namespace = parts.session.ownerNamespace
+        let isV2 = try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)
+        if isV2 == true { return true }
+        let participantIds = conversation.participants.map(\.userId)
+        guard let result = try? await withDevices(
+            conversationId: conversation.id, participantIds: participantIds, parts: parts,
+            staleUserIds: { (result: E2EEV2ConversationCreationResult?) -> [String]? in
+                if case .failure(let failure)? = result { return Self.stale(failure) }
+                return nil
+            }, { devices -> E2EEV2ConversationCreationResult? in
+                let nowMs = Int64(Date().timeIntervalSince1970 * 1_000)
+                guard E2EEV2ConversationMigration.decide(conversation, isV2: isV2, devices: devices, nowMs: nowMs) == .migrate
+                else { return nil }
+                return await parts.creator.migrate(conversation, devices: devices, expectedOwnerScopeId: parts.session.ownerScopeId)
+            }
+        ) else { return false }
+        if case .created = result { return true }
+        return false
     }
 
     // MARK: Erreurs

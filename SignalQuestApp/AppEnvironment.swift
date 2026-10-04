@@ -221,6 +221,9 @@ enum AppEnvironment {
     /// Ouvre uniquement le chemin d'appel E2EE v2 local. Le gate réseau vérifie
     /// encore séparément que l'API et LiveKit utilisent des origines loopback.
     static var runsE2EEV2CallQA: Bool { hasArgument("--qa-e2ee-v2-calls") }
+    /// Messagerie v2 contre une pile serveur locale (Debug seulement, voir
+    /// `E2EEV2MessagingQAGate`).
+    static var runsE2EEV2MessagingQA: Bool { hasArgument("--qa-e2ee-v2-messaging") }
     /// Écran de fin d'appel (« Pas de réponse ») pour la relecture au
     /// simulateur, où aucun vrai appel n'aboutit.
     static var showsCallEndQA: Bool { hasArgument("--qa-call-ended") }

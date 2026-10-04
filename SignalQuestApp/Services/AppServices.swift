@@ -104,6 +104,8 @@ final class AppServices: ObservableObject {
     let radioLogs: RadioLogsServicing
     let e2ee: E2EEServicing
     let epochRotations: E2EEV2EpochRotationRuntime
+    /// Messagerie v2 de la session (plan 3, IOS-A3), fermée par les verrous.
+    let e2eeV2Messaging: E2EEV2MessagingRuntime
     let friends: FriendsServicing
     let gamification: GamificationServicing
     let gamificationV2: GamificationV2Servicing
@@ -167,6 +169,7 @@ final class AppServices: ObservableObject {
         let e2eeService = E2EEService(api: api)
         e2ee = e2eeService
         epochRotations = E2EEV2EpochRotationRuntime(api: api)
+        e2eeV2Messaging = E2EEV2MessagingRuntime(api: api, ignoresGates: E2EEV2MessagingQAGate.allows(config: config))
         let sseClient = SSEClient(api: api)
         sse = sseClient
         let authService = AuthService(api: api, e2ee: e2eeService)
