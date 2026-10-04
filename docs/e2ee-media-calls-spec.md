@@ -208,7 +208,8 @@
 >   charge « 2 » et le type `TEXT` (§12, §14) ; sinon la migration attend et
 >   une nouvelle conversation chiffrée naît en v1, tant que le serveur
 >   l'accepte. Un message que l'intersection ne permet pas n'est jamais
->   envoyé et reste gardé. Aucun vecteur ne change.
+>   envoyé et reste gardé. E.1 nomme les lecteurs autorisés du paquet
+>   d'identité. Aucun vecteur ne change.
 > - v0.4.16 (04/10/2026), proposition : alignement sur ce que le serveur
 >   sert aux lots A3 (époques), A4 (capacités) et A5 (messages), relevé dans
 >   son code par iOS et Android et accepté par la session serveur.
@@ -2499,6 +2500,12 @@ version publiée qui ouvre les verrous.
     de chaque appareil ;
   - `pendingIdentityReset` : `{reset, signatureB64}` ou `null`.
 
+  Lecteurs autorisés : soi-même, les membres d'une conversation commune, ou
+  tout compte autorisé à lui écrire selon sa politique de demandes de
+  messages (ami, ou politique « tout le monde », jamais à travers un
+  blocage). Un autre lecteur, ou un compte sans identité v2, reçoit
+  `404 E2EE_IDENTITY_NOT_FOUND` sans distinguer les deux ; le client le
+  traite comme un membre qui ne lit pas le v2 (v0.4.17).
   Un `sinceVersion` plus grand que la version courante de la liste (identité
   réinitialisée depuis, v0.4.9) est ignoré : la réponse porte l'UIK et la
   liste courantes, sans chaîne ni erreur. Le client compare l'UIK avant de
