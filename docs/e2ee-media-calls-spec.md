@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.15**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.16**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,23 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.16 (04/10/2026), proposition : alignement sur ce que le serveur
+>   sert aux lots A3 (époques), A4 (capacités) et A5 (messages), relevé dans
+>   son code par iOS et Android et accepté par la session serveur.
+>   - E.0 : les codes d'erreur de ces lots, la règle « corps trop grand »,
+>     `E2EE_V2_CLIENT_CAPABILITY_REQUIRED` (426) et les lectures d'époque
+>     signées.
+>   - Capacités (§12, D.5, E.1) : bornes du document, `issuedAtMs` au plus
+>     10 min dans le futur, renvoi identique idempotent, forme de
+>     `details.missing`.
+>   - Époques (E.2) : `envelope` peut valoir `null`, et l'appareil juge sa
+>     présence d'après le manifeste signé ; `status` vaut `active` ou
+>     `retired` ; forme de l'accusé ; création rejouée à l'octet après un
+>     reçu perdu ; un tête-à-tête n'accepte après la genèse que `LEAVE` et
+>     `EXCLUDE_WEB_*` ; départ rejoué après un reçu perdu.
+>   - Messages (E.3) : 201, ou 200 pour un rejeu ; lecture d'une enveloppe
+>     en GET, v2 seulement.
+>   - Aucun vecteur ne change.
 > - v0.4.15 (02/10/2026), proposition : sept codes d'erreur que le serveur
 >   sert au jalon A (lot A1, PR serveur #259) entrent dans E.0 :
 >   `E2EE_DEVICE_LIST_INVALID`, `E2EE_UIK_WRAP_INVALID`,
@@ -1271,7 +1288,9 @@ conversation, et sans permettre un faux signalement ni un message insignalable.
   repli en clair.
 - **Le serveur ne refuse que ce qu'il voit**, avec
   `409 E2EE_CAPABILITY_MISSING` : version d'enveloppe, blobs, appels, partage
-  de position. Les `kind` chiffrés (sondages, réactions…) sont contrôlés par
+  de position. Il n'applique pas l'intersection aux époques, qui ne portent
+  aucun contenu : ce sont les clients qui écartent les appareils mis à
+  l'écart des nouvelles époques (v0.4.16). Les `kind` chiffrés (sondages, réactions…) sont contrôlés par
   les clients seulement. L'émetteur ne les envoie pas si l'intersection ne les
   contient pas. Un récepteur qui ne les connaît pas affiche « Contenu non pris
   en charge ».
@@ -2033,7 +2052,9 @@ certificat et la liste, sans `uikWrap` (§2.7).
 - **Autorisations**, vérifiées par les clients :
   - dans un groupe, `ADD`, `REMOVE`, `ROLE_*` et `EXCLUDE_WEB_*` sont
     réservés à un administrateur ;
-  - en tête-à-tête, `EXCLUDE_WEB_*` est ouvert aux deux membres ;
+  - en tête-à-tête, `EXCLUDE_WEB_*` est ouvert aux deux membres, et après la
+    genèse seuls `LEAVE` et `EXCLUDE_WEB_*` sont admis, par les clients comme
+    par le serveur (v0.4.16) ;
   - `LEAVE` est fait par la personne elle-même ;
   - l'auteur est membre à l'état précédent, et l'on part par `LEAVE`, jamais
     en se visant par `REMOVE`.
@@ -2050,6 +2071,15 @@ certificat et la liste, sans `uikWrap` (§2.7).
   - `kinds` : noms de `kind`, triés, sans doublon ;
   - `features` : parmi `blobs`, `calls`, `liveLocation`, `polls`,
     `reactions` et `voice`, triés, sans doublon.
+- Bornes (v0.4.16) : `sequence` de 1 à 2⁵³−1 ; `issuedAtMs` de 0 à 2⁵³−1,
+  et au plus 10 min en avance sur l'horloge de qui le lit ; document de
+  4 096 octets au plus ; listes de 64 éléments au plus ; `kinds` au format
+  `^[A-Z][A-Z_]{0,31}$`. Un document daté de plus de 10 min dans le futur
+  est refusé par le serveur (422) et ignoré par les clients : sinon il ne
+  vieillirait jamais.
+- Un appareil n'annonce que ce qu'il sait lire et faire : une fonction
+  annoncée avant d'être prête ferait envoyer un contenu qu'il ne saurait pas
+  lire.
 - Chaîne signée par la clé de signature de l'appareil :
   `SQ-E2EE-V2-DEVICE-CAPABILITIES\n1\n<b64url(SHA-256(document))>`.
 - JSON : `{"document": "<JSON canonique>", "signatureB64": "…"}`.
@@ -2314,7 +2344,16 @@ version publiée qui ouvre les verrous.
 ### E.0 Conventions
 
 - **Authentification** : cookie de session, plus une requête signée par
-  l'appareil (A.2) sur toute écriture.
+  l'appareil (A.2) sur toute écriture, et sur les lectures qui servent ce qui
+  est adressé à un appareil : `epochs/current`, `epochs/{epochNumber}` (son
+  enveloppe) et `device-approvals/{id}` lu par l'appareil en attente
+  (v0.4.16). Les autres lectures se font avec la session seule.
+- **Capacités du client** : une route v2 ouverte (revue approuvée, ou mode
+  QA local) à laquelle il manque une capacité déclarée dans
+  `X-SQ-Capabilities` répond `426 E2EE_V2_CLIENT_CAPABILITY_REQUIRED`, avec
+  `details.missing` (tableau de capacités). Une route que le serveur n'a pas
+  ouverte répond `503 E2EE_V2_SECURITY_REVIEW_REQUIRED`, quelles que soient
+  les capacités déclarées (v0.4.16).
 - **Corps et réponses** : JSON à clés exactes. Les objets signés reprennent
   les formes de l'annexe D (`{"certificate", "signatureB64"}`,
   `{"list", "signatureB64", "devices"}`, etc.).
@@ -2322,16 +2361,28 @@ version publiée qui ouvre les verrous.
   HTTP qui convient. Les codes propres au jalon A :
   - `E2EE_DEVICE_LIST_STALE` (409) : la version ou le condensat précédent ne
     correspond pas ; ou bien une époque est proposée sur une liste d'appareils
-    qui n'est plus la courante (`memberListVersions`, E.2, v0.4.10), et
+    qui n'est plus la courante (`memberListVersions`, E.2, v0.4.10), ou vers
+    un destinataire qui n'est plus certifié ou plus actif (v0.4.16), et
     `details.userId` (le premier) et `details.userIds` (tous) nomment les
-    membres dont il faut relire l'identité ;
+    membres dont il faut relire l'identité. Le client les relit et recompose
+    une seule fois ; un second refus est un échec affiché ;
   - `E2EE_EPOCH_STALE` (409) : une autre époque a été acceptée, et la réponse
     la donne ;
   - `E2EE_MEMBERSHIP_STALE` (409) : `changeNumber` n'est pas le suivant, ou
     une époque repose sur un état d'appartenance qui n'est plus le dernier
     (§3.5) ; la réponse donne l'état courant ;
   - `E2EE_CAPABILITY_MISSING` (409) : la conversation ne peut pas recevoir ce
-    contenu (§12) ;
+    contenu (§12). `details.missing` est un tableau trié pris parmi
+    `envelopeVersion`, `payloadVersion`, les fonctions de D.5 et
+    `intersection` (intersection indisponible, §12) (v0.4.16) ;
+  - `E2EE_CAPABILITIES_STALE` (409) : document de capacités de séquence
+    inférieure à la dernière enregistrée, ou autre document à la même
+    séquence ; `details.currentSequence`, chaîne décimale (v0.4.16) ;
+  - `E2EE_CAPABILITIES_INVALID` (422) : document de capacités non canonique,
+    hors D.5, d'un autre compte ou d'un autre appareil, daté de plus de
+    10 min dans le futur, ou dont la signature ne se vérifie pas (v0.4.16) ;
+  - `E2EE_CAPABILITIES_REQUEST_INVALID` (400) : corps qui n'est pas
+    exactement `{document, signatureB64}` (v0.4.16) ;
   - `E2EE_CERTIFICATE_INVALID` (422) : certificat qui ne se vérifie pas
     jusqu'à l'UIK ;
   - `E2EE_CERT_PLATFORM_MISMATCH` (409) : la plateforme du certificat n'est
@@ -2372,8 +2423,38 @@ version publiée qui ouvre les verrous.
     de 512 Kio (D.10, v0.4.11). Un client conforme ne le reçoit jamais : il
     réduit la sélection avant d'envoyer (§11) ;
   - `E2EE_UPDATE_REQUIRED` (409) : écriture d'une app sans v2 dans ce qui
-    exige la v2 (§14). `error` porte le texte à afficher, que les apps
-    publiées montrent tel quel.
+    exige la v2 (§14) : toute écriture v1 dans une conversation v2 (message,
+    partage de clé, synchronisation, rôles, ajout, retrait ou départ,
+    message programmé qui part), et toute nouvelle conversation v1 chiffrée
+    une fois la revue approuvée. `error` porte le texte à afficher, que les
+    apps publiées montrent tel quel ;
+  - conversations et époques (v0.4.16) :
+    - `E2EE_CONVERSATION_NOT_FOUND` (404) : conversation inconnue, ou dont
+      l'appelant n'est pas membre, sans distinguer les deux ;
+    - `E2EE_CONVERSATION_REQUEST_INVALID`, `E2EE_GENESIS_REQUEST_INVALID`,
+      `E2EE_EPOCH_REQUEST_INVALID`, `E2EE_EPOCH_ACK_INVALID` et
+      `E2EE_MEMBERSHIP_REQUEST_INVALID` (400) : requête mal formée ;
+    - `E2EE_GENESIS_MISMATCH` (422) : genèse qui ne reproduit pas exactement
+      les membres attendus ;
+    - `E2EE_MEMBERSHIP_INVALID` (422) : changement contraire à D.4, avec
+      `details.reason` ;
+    - `E2EE_EPOCH_MANIFEST_INVALID`, `E2EE_EPOCH_ENVELOPE_INVALID` et
+      `E2EE_EPOCH_RECIPIENT_INVALID` (422) : manifeste, enveloppe ou
+      destinataire qui ne se vérifient pas ;
+    - `E2EE_CONVERSATION_ALREADY_V2` (409) : genèse d'une conversation déjà
+      v2 ;
+    - `E2EE_GENESIS_NOT_ELIGIBLE` (409) : genèse refusée, avec
+      `details.reason` à `NOT_ENCRYPTED` (conversation v1 non chiffrée) ou
+      `HAS_EPOCH` (conversation v1 qui a déjà une époque, §14.2) ;
+    - `E2EE_CONVERSATION_NOT_V2` (409) : route d'époque ou d'appartenance
+      appelée sur une conversation v1 ;
+    - `E2EE_EPOCH_NOT_FOUND` et `E2EE_EPOCH_ENVELOPE_NOT_FOUND` (404) ;
+  - messages (v0.4.16) : `E2EE_MESSAGE_REQUEST_INVALID` et
+    `E2EE_MESSAGE_QUERY_INVALID` (400), `E2EE_ENVELOPE_ID_INVALID` (400),
+    `E2EE_MESSAGE_SIGNATURE_INVALID` et `E2EE_MESSAGE_INVALID` (422),
+    `E2EE_MESSAGE_NOT_FOUND` (404), `E2EE_SERVER_TAG_UNAVAILABLE` (503).
+- **Corps trop grand** : 413, avec le code `…_REQUEST_INVALID` de la route
+  (v0.4.16).
 - Une erreur peut porter des `details` (objet) ; les clients ignorent les
   clés qu'ils ne connaissent pas.
 - **Vérification serveur** : le serveur vérifie ce qu'il peut, c'est-à-dire
@@ -2423,8 +2504,15 @@ version publiée qui ouvre les verrous.
   d'accord (`keyVersion` + 1). Corps : `{certificate, deviceList}`.
 - **`POST /api/e2ee/v2/devices/{deviceId}/revoke`**, étendu. Corps :
   `{deviceList}`, la nouvelle liste sans l'appareil, signée par l'UIK.
-- **`PUT /api/e2ee/v2/devices/{deviceId}/capabilities`**. Corps :
-  `{document, signatureB64}`. Refus si `sequence` n'augmente pas.
+- **`PUT /api/e2ee/v2/devices/{deviceId}/capabilities`**, signée par
+  l'appareil, navigateur compris. Corps : `{document, signatureB64}`.
+  Réponse : `{deviceId, sequence}`, la séquence en chaîne. Le même document,
+  identique à l'octet, rend le même reçu (200) : le serveur vérifie la
+  signature et garde celle déjà enregistrée. Une séquence inférieure, ou un
+  autre document à la même séquence : `409 E2EE_CAPABILITIES_STALE` avec
+  `details.currentSequence` ; le client repart une fois au-dessus. Le client
+  garde son document avant l'envoi et le renvoie tel quel tant qu'il n'a pas
+  de reçu (v0.4.16).
 - **`GET /api/e2ee/v2/device-approvals/{id}`**, signé par l'appareil en
   attente : une fois l'approbation faite, il y retire `uikWrap`, son
   certificat et la `deviceList`. Idempotent jusqu'à consommation ou
@@ -2445,9 +2533,11 @@ version publiée qui ouvre les verrous.
 - **`POST /api/e2ee/v2/conversations`**, création d'une conversation v2
   (§3.2). Corps :
   - `conversationId`, choisi par le client : `conv_` suivi de 128 bits
-    aléatoires en base64url ;
-  - `isGroup` (booléen), `title` (ou `null`) et `participantIds`, les
-    membres invités, sans l'auteur, triés ;
+    aléatoires en base64url, soit `^conv_[A-Za-z0-9_-]{21}[AQgw]$` ;
+  - `isGroup` (booléen) ; `title`, rogné, de 1 à 100 caractères, ou `null`,
+    toujours `null` en tête-à-tête ; `participantIds`, les membres invités,
+    sans l'auteur, triés par octets UTF-8, de 1 à 499, un seul en
+    tête-à-tête ;
   - `membership` : la genèse, liste de `{change, signatureB64}` (D.4) ;
   - `epoch` : `{epochNumber: "1", previousEpochNumber: "0", manifest, envelopes}`,
     où `manifest` est `{manifest, signatureB64, recipients}` (format 2,
@@ -2461,15 +2551,23 @@ version publiée qui ouvre les verrous.
   Le client ne garde la clé de l'époque 1 et l'état « v2 » qu'à réception
   de ce reçu, exact (§3.1). La genèse est idempotente à l'octet (v0.4.8) :
   le même corps rend le même reçu, à la création comme à la migration, et
-  un reçu perdu se relit en renvoyant la même requête. Sur
-  `409 CONVERSATION_ID_TAKEN`, pour un autre corps, rien n'est gardé ; une
-  nouvelle tentative tire un autre identifiant.
+  un reçu perdu se relit en renvoyant la même requête. Le client garde donc
+  le corps exact avant l'envoi et le renvoie tel quel pour une reprise de la
+  même demande, sans tirer d'autre identifiant : jamais de conversation
+  orpheline (v0.4.16). Sur `409 CONVERSATION_ID_TAKEN`, pour un autre corps,
+  rien n'est gardé ; une nouvelle demande tire un autre identifiant. Le reçu
+  porte `status` `active` ou `retired` (une époque remplacée depuis, relue
+  après coup) et `createdAt` en RFC 3339 UTC avec millisecondes ; le client
+  ne fonde aucune décision sur `status` (v0.4.16).
 - **`POST /api/e2ee/v2/conversations/{id}/genesis`**, migration d'une
   conversation chiffrée v1 (§14.2), proposée par iOS. Corps :
   `{membership, epoch}`, de même forme qu'à la création. Le serveur refuse
   une genèse qui ne reproduit pas exactement les membres et les
-  administrateurs v1 (propriétaire compris), et une conversation déjà v2.
-  Même reçu qu'à la création.
+  administrateurs v1 (propriétaire compris) ; les membres v1 sont les
+  participants non archivés (v0.4.16). Une conversation déjà v2 répond
+  `409 E2EE_CONVERSATION_ALREADY_V2` : le client relit la conversation et
+  efface sa genèse en attente. Une conversation qui ne peut pas migrer
+  répond `409 E2EE_GENESIS_NOT_ELIGIBLE` (E.0). Même reçu qu'à la création.
 - **`POST /api/e2ee/v2/conversations/{id}/epochs`**, étendu. Corps :
   - `previousEpochNumber`, `epochNumber` ;
   - `manifest`, au format 2 (§3.5) ;
@@ -2490,7 +2588,9 @@ version publiée qui ouvre les verrous.
 
   Reçu proposé par iOS : `{epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
   En cas de conflit : 409 `E2EE_EPOCH_STALE`, avec
-  `details.currentEpoch` au format de `epochs/current`. Le client peut aussi
+  `details.currentEpoch` au format de `epochs/current`, ou `null`.
+  `E2EE_MEMBERSHIP_STALE` porte `details: {changeNumber, changeDigest}`
+  (v0.4.16). Le client peut aussi
   relire `epochs/current`, puisqu'un manifeste de 500 lignes dépasse la
   taille d'un corps d'erreur ; il vérifie l'époque acceptée comme un
   destinataire avant de l'adopter. Si le manifeste repose sur un état
@@ -2501,12 +2601,18 @@ version publiée qui ouvre les verrous.
 - **`GET /api/e2ee/v2/conversations/{id}/epochs/current`**, étendu.
   Réponse proposée par iOS :
   `{conversationId, epoch: {id, epochNumber, status, createdAt}, manifest: {manifest, signatureB64, recipients}, envelope}`,
-  où `envelope` est celle de l'appareil qui lit (A.3). La clé du créateur se
-  lit dans l'annuaire des appareils certifiés (§2.2), jamais dans la
-  réponse.
+  où `envelope` est celle de l'appareil qui lit (A.3), ou `null` quand il
+  n'en a pas : pas destinataire, ou accusé déjà reçu (v0.4.16). L'appareil
+  juge sa présence d'après le manifeste signé, jamais d'après cette absence.
+  Absent du manifeste, il attend la prochaine époque. Présent mais sans
+  enveloppe, il ne peut plus en tirer la clé : il attend sans rien croire,
+  et son époque courante ne change pas. La clé du créateur se lit dans
+  l'annuaire des appareils certifiés (§2.2), jamais dans la réponse.
 - **`POST /api/e2ee/v2/conversations/{id}/epochs/{epochNumber}/ack`**, accusé
-  de réception. Le serveur passe l'enveloppe de l'appareil en ligne témoin
-  (§2.6).
+  de réception, signé, corps vide. Le serveur passe l'enveloppe de
+  l'appareil en ligne témoin (§2.6). Réponse : `{epochNumber, acknowledgedAt}`,
+  `acknowledgedAt` en RFC 3339. Idempotent ; l'enveloppe revient ensuite
+  `null` (v0.4.16). L'appareil n'accuse réception qu'une fois la clé gardée.
 - **`POST /api/e2ee/v2/conversations/{id}/membership`**. Corps :
   `{change, signatureB64}`, en comparaison-échange sur `changeNumber`.
   Réponse proposée par iOS : `{changeNumber}`, en chaîne ; le même changement
@@ -2514,7 +2620,11 @@ version publiée qui ouvre les verrous.
   chaîne gardée, vérifie localement les règles de D.4, garde le changement
   signé avant l'envoi et le renvoie tel quel jusqu'à sa réponse : jamais deux
   signatures pour un même numéro. Sur `409 E2EE_MEMBERSHIP_STALE`, il relit
-  la suite de la chaîne, puis recompose.
+  la suite de la chaîne, puis recompose. Un `LEAVE` rejoué après un reçu
+  perdu répond `404 E2EE_CONVERSATION_NOT_FOUND`, l'appelant n'étant plus
+  membre : le départ est tenu pour fait, le client garde son changement
+  signé, efface ses clés d'époque et n'écrit plus dans la conversation
+  (v0.4.16).
 - **`GET /api/e2ee/v2/conversations/{id}/membership?after=<changeNumber>`** :
   la suite de la chaîne. Réponse proposée par iOS :
   `{changes: [{change, signatureB64}], hasMore}`, 100 changements au plus
@@ -2524,8 +2634,9 @@ version publiée qui ouvre les verrous.
   l'enveloppe de l'appareil qui lit. Un appareil resté hors ligne pendant
   plusieurs rotations relit ainsi, dans l'ordre, chaque époque sautée dont il
   est destinataire, avant la courante : leurs messages en vol se lisent
-  encore (§3.4). `404 E2EE_EPOCH_ENVELOPE_NOT_FOUND` s'il n'en est pas
-  destinataire.
+  encore (§3.4). `404 E2EE_EPOCH_ENVELOPE_NOT_FOUND` s'il n'en a jamais été
+  destinataire ou si l'appareil est révoqué ; `envelope: null` après un
+  accusé (v0.4.16).
 - **`GET /api/e2ee/v2/conversations/{id}/epochs/{epochNumber}/manifest`**,
   proposée par iOS : `{epochNumber, manifest: {manifest, signatureB64, recipients}}`.
   Elle sert le manifeste à tout membre, destinataire ou non : c'est par celui
@@ -2534,8 +2645,8 @@ version publiée qui ouvre les verrous.
 - **Réception par un membre** : il relit la suite de la chaîne, vérifie la
   genèse une fois sur le manifeste de l'époque 1, relit toute la chaîne avant
   de la garder, puis vérifie et garde l'époque courante. Un appareil qui
-  n'est pas encore destinataire (`404 E2EE_EPOCH_ENVELOPE_NOT_FOUND`) attend
-  la prochaine époque ; la conversation est déjà v2 pour lui.
+  n'est pas encore destinataire (absent du manifeste, `envelope: null`)
+  attend la prochaine époque ; la conversation est déjà v2 pour lui.
 
 ### E.3 Messages et signalements
 
@@ -2554,7 +2665,7 @@ version publiée qui ouvre les verrous.
     (conversation, appareil), toutes époques confondues : aucune des deux
     contraintes d'unicité ne porte l'époque (v0.4.8) ;
   - réponse : `{envelopeId, clientRequestId, serverTagB64, serverTimeMs, keyId}`,
-    entiers en chaînes (§11) ;
+    entiers en chaînes (§11), en 201, ou en 200 pour un rejeu (v0.4.16) ;
   - **côté client** : l'enveloppe préparée est gardée avant le premier envoi
     et renvoyée telle quelle tant que son époque est la courante vérifiée,
     car son accusé a pu se perdre. Si l'appareil sait cette époque remplacée,
@@ -2580,7 +2691,8 @@ version publiée qui ouvre les verrous.
     vu dans la liste : une sauvegarde restaurée sur le même appareil ne le
     fait pas reculer.
 - **`GET /api/e2ee/v2/conversations/{id}/messages?after=<séquence>&limit=<1 à 100>`**,
-  la liste des messages v2 : `{messages, hasMore}`.
+  la liste des messages v2 : `{messages, hasMore}`. `limit` vaut 50 par
+  défaut ; réponse en `Cache-Control: no-store` (v0.4.16).
   - Chaque message :
     `{envelopeId, sequence, senderUserId, senderDeviceId, envelope, serverTagB64, serverTimeMs, keyId}`,
     entiers en chaînes, `envelope` étant l'enveloppe transportée.
@@ -2616,8 +2728,9 @@ version publiée qui ouvre les verrous.
   (§2.6). La conversation annoncée n'est qu'un aiguillage, que l'AAD et la
   signature lient. Le serveur ne la sert qu'à la session d'un membre de la
   conversation ; elle n'a aucun effet de bord (ni accusé de réception, ni
-  remise) et sa réponse porte `Cache-Control: no-store, private`. La
-  réponse pour un message v1 ne change pas (règle de compatibilité, §16).
+  remise) et sa réponse porte `Cache-Control: no-store, private`. Route v2
+  seulement, en GET, avec les en-têtes de protocole v2 : un message v1 se lit
+  toujours par ses routes v1 (v0.4.16).
 - **`POST /api/e2ee/v2/reports`**. Corps :
   `{clear, encB64, sealedB64, moderationKeyId}` (D.10).
   - Le serveur vérifie les `serverTag` et l'appartenance du signaleur, puis
