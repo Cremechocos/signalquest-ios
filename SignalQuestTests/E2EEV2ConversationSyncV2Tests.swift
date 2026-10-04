@@ -206,6 +206,50 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
         XCTAssertEqual(try fixture.states.currentEpoch(conversationId: conversationId, ownerNamespace: namespace)?.epochNumber, 3)
     }
 
+    /// Serveur A3 (#270) : une époque sautée relue après coup est « retired »,
+    /// et l'enveloppe d'un appareil qui a déjà accusé réception revient `null`.
+    func testRetiredEpochsAndAcknowledgedEnvelopesFromTheServer() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
+        let devices = fixture.deviceSet(adding: [creator.device])
+        let served = try serve(fixture, creator: creator, devices: devices)
+        MockURLProtocol.requestHandler = Self.server(served)
+        let first = await sync(fixture, devices: devices)
+        XCTAssertEqual(first, .received(epochNumber: 1))
+
+        func reshape(_ data: Data, status: String? = nil, nullEnvelope: Bool = false) throws -> Data {
+            var root = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+            if let status, var epoch = root["epoch"] as? [String: Any] { epoch["status"] = status; root["epoch"] = epoch }
+            if nullEnvelope { root["envelope"] = NSNull() }
+            return try JSONSerialization.data(withJSONObject: root)
+        }
+        let keyTwo = Data(repeating: 0x22, count: 32), keyThree = Data(repeating: 0x33, count: 32)
+        let two = try reshape(try epoch(2, key: keyTwo, fixture, creator: creator, devices: devices, chain: served.chain), status: "retired")
+        let three = try epoch(3, key: keyThree, fixture, creator: creator, devices: devices, chain: served.chain)
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/epochs/2") { return E2EEV2AccountFixture.response(request, two) }
+            if path.hasSuffix("/epochs/current") { return E2EEV2AccountFixture.response(request, three) }
+            return try Self.server(served)(request)
+        }
+        let caughtUp = await sync(fixture, devices: devices)
+        XCTAssertEqual(caughtUp, .received(epochNumber: 3), "Une époque « retired » se relit")
+        XCTAssertEqual(try fixture.keys.loadEpoch(conversationId: conversationId, epochNumber: 2,
+                                                  ownerNamespace: fixture.session.ownerNamespace)?.epochKey, keyTwo)
+
+        // Époque 4 dont l'enveloppe a été accusée ailleurs : rien n'est cru, on attend.
+        let four = try reshape(try epoch(4, key: Data(repeating: 0x44, count: 32), fixture, creator: creator, devices: devices,
+                                         chain: served.chain), nullEnvelope: true)
+        MockURLProtocol.requestHandler = { request in
+            if request.url?.path.hasSuffix("/epochs/current") == true { return E2EEV2AccountFixture.response(request, four) }
+            return try Self.server(served)(request)
+        }
+        let waiting = await sync(fixture, devices: devices)
+        XCTAssertEqual(waiting, .waitingForEpoch)
+        XCTAssertEqual(try fixture.states.currentEpoch(conversationId: conversationId, ownerNamespace: fixture.session.ownerNamespace)?
+            .epochNumber, 3, "Sans clé, l'époque courante ne change pas")
+    }
+
     private func sync(_ fixture: E2EEV2AccountFixture, devices: E2EEV2CertifiedDeviceSet) async -> E2EEV2ConversationSyncResult {
         await E2EEV2ConversationSyncV2(
             api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,

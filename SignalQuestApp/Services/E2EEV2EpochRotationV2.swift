@@ -70,12 +70,14 @@ enum E2EEV2EpochContractV2 {
     }
 
     /// Époque courante servie à un appareil : l'époque acceptée, son manifeste
-    /// et l'enveloppe de cet appareil.
+    /// et l'enveloppe de cet appareil. Sans enveloppe (`null`, serveur A3) :
+    /// l'appareil n'est pas destinataire, ou a déjà accusé réception ; il en
+    /// juge d'après le manifeste signé, jamais d'après cette absence.
     struct Current: Equatable, Sendable {
         let accepted: Accepted
         let manifest: E2EEV2SignedString
         let recipients: [String]
-        let envelope: E2EEV2SignedEpochEnvelope
+        let envelope: E2EEV2SignedEpochEnvelope?
     }
 
     /// `{epoch: {id, epochNumber, status, createdAt}, recipientCount}`.
@@ -92,8 +94,15 @@ enum E2EEV2EpochContractV2 {
               root["conversationId"]?.stringValue == conversationId,
               let accepted = epoch(root["epoch"]),
               let manifest = root["manifest"].flatMap(E2EEV2EpochManifest.signed(from:)),
-              let envelope = envelope(root["envelope"]) else {
+              let served = root["envelope"] else {
             return nil
+        }
+        let envelope: E2EEV2SignedEpochEnvelope?
+        if case .null = served {
+            envelope = nil
+        } else {
+            guard let parsed = Self.envelope(served) else { return nil }
+            envelope = parsed
         }
         return Current(accepted: accepted, manifest: manifest.manifest, recipients: manifest.recipients, envelope: envelope)
     }
@@ -108,7 +117,9 @@ enum E2EEV2EpochContractV2 {
         guard let epoch = value?.objectValue, Set(epoch.keys) == ["id", "epochNumber", "status", "createdAt"],
               let epochId = epoch["id"]?.stringValue, E2EEV2Canonical.isOpaque(epochId),
               let number = epoch["epochNumber"]?.stringValue.flatMap(E2EEV2Canonical.sequenceNumber),
-              epoch["status"]?.stringValue == "active",
+              // « retired » : une époque remplacée depuis (relue après coup) ;
+              // le client n'en décide rien.
+              ["active", "retired"].contains(epoch["status"]?.stringValue ?? ""),
               let createdAt = epoch["createdAt"]?.stringValue, !createdAt.isEmpty, createdAt.count <= 64 else {
             return nil
         }
@@ -192,15 +203,20 @@ enum E2EEV2EpochVerifierV2 {
             guard let own = devices.device(userId: ownUserId, deviceId: ownDeviceId),
                   ownLine == E2EEV2EpochManifest.Recipient(
                       userId: own.userId, deviceId: own.deviceId, platform: own.platform, fingerprint: own.fingerprint
-                  ),
-                  served.envelope.recipientDeviceId == ownDeviceId,
-                  let signature = Data(base64Encoded: served.envelope.signatureB64),
-                  signature.base64EncodedString() == served.envelope.signatureB64,
+                  ) else {
+                return .invalid
+            }
+            // Destinataire selon le manifeste, mais enveloppe déjà accusée
+            // ailleurs ou retirée : la clé ne peut plus venir de là.
+            guard let envelope = served.envelope else { return .notRecipient }
+            guard envelope.recipientDeviceId == ownDeviceId,
+                  let signature = Data(base64Encoded: envelope.signatureB64),
+                  signature.base64EncodedString() == envelope.signatureB64,
                   E2EEV2LowS.verify(
                       derSignature: signature,
                       message: try E2EEV2EpochCrypto.signatureCanonical(
                           context: context, keyCommitmentB64: manifest.keyCommitmentB64,
-                          envelope: served.envelope.cryptoEnvelope
+                          envelope: envelope.cryptoEnvelope
                       ),
                       publicKey: creatorKey
                   ) else {
@@ -212,7 +228,7 @@ enum E2EEV2EpochVerifierV2 {
                 reason: "ROTATION", status: "active", createdAt: served.accepted.createdAt,
                 senderDeviceId: manifest.creatorDeviceId,
                 senderPublicSigningKeyB64: creatorKey.x963Representation.base64EncodedString(),
-                envelope: served.envelope
+                envelope: envelope
             ))
             return .opened(epochKey: epochKey, manifest: manifest, membership: state)
         } catch {
