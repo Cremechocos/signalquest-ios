@@ -177,6 +177,46 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertTrue(try fixture.states.isV2(conversationId: conversationId, ownerNamespace: fixture.session.ownerNamespace))
     }
 
+    /// Point 5 du relevé Android (04/10) : un reçu perdu ne laisse jamais de
+    /// conversation orpheline ; la même demande renvoie le même corps.
+    func testALostReceiptIsReplayedWithTheSameConversationAndBytes() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let brunoPhone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let devices = fixture.deviceSet(adding: [brunoPhone.device])
+        let creator = E2EEV2ConversationCreator(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let bodies = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            bodies.append(request, body: [:])
+            _ = E2EEV2AccountFixture.rawBody(request)
+            return E2EEV2AccountFixture.response(request, Data(#"{"error":"x","code":"INTERNAL_ERROR"}"#.utf8), status: 503)
+        }
+        guard case .failure = await creator.create(
+            participantIds: [bruno], isGroup: false, title: nil, excludesWeb: false, devices: devices,
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        ) else { return XCTFail("503 attendu") }
+        let raw = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            let body = try E2EEV2AccountFixture.body(request)
+            raw.append(request, body: body)
+            let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []
+            return E2EEV2AccountFixture.response(request, try E2EEV2AccountFixture.receipt(for: body, recipientCount: envelopes.count))
+        }
+        guard case .created(let conversationId, _) = await creator.create(
+            participantIds: [bruno], isGroup: false, title: nil, excludesWeb: false, devices: devices,
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        ) else { return XCTFail("Création reprise") }
+        let first = try XCTUnwrap(bodies.first?.0), second = try XCTUnwrap(raw.first?.0)
+        XCTAssertEqual(E2EEV2AccountFixture.rawBody(second), E2EEV2AccountFixture.rawBody(first), "Les mêmes octets")
+        XCTAssertEqual(raw.first?.1["conversationId"] as? String, conversationId)
+        XCTAssertNil(try fixture.states.pendingCreation(
+            request: E2EEV2ConversationCreator.creationRequest(participantIds: [bruno], isGroup: false, title: nil, excludesWeb: false),
+            ownerNamespace: fixture.session.ownerNamespace
+        ), "Plus rien en attente après le reçu")
+    }
+
     // MARK: Migration (§14.2)
 
     func testAnEncryptedV1ConversationMigratesOnceEveryMemberHasACertifiedDevice() throws {

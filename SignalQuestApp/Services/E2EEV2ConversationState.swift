@@ -303,6 +303,34 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         try tokenStore.remove(pendingKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
     }
 
+    /// Création v2 envoyée sans reçu (E.2) : le corps exact, sous l'empreinte
+    /// de la demande, pour qu'une reprise renvoie le même identifiant et les
+    /// mêmes octets, que le serveur accepte comme un rejeu.
+    struct PendingCreation: Codable, Equatable {
+        let body: String
+        let pendingUserIds: [String]
+        let savedAtMs: Int64
+    }
+
+    func pendingCreation(request: String, ownerNamespace: String) throws -> PendingCreation? {
+        guard let raw = try tokenStore.string(for: pendingKey(conversationId: "creation:" + request, ownerNamespace: ownerNamespace))
+        else { return nil }
+        return try? JSONDecoder().decode(PendingCreation.self, from: Data(raw.utf8))
+    }
+
+    func savePendingCreation(_ pending: PendingCreation, request: String, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        try tokenStore.set(
+            String(decoding: try JSONEncoder().encode(pending), as: UTF8.self),
+            for: pendingKey(conversationId: "creation:" + request, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
+    }
+
+    func clearPendingCreation(request: String, ownerNamespace: String) throws {
+        try tokenStore.remove(pendingKey(conversationId: "creation:" + request, ownerNamespace: ownerNamespace))
+    }
+
     /// Accusé d'un message déjà remis (E.3), gardé pour les derniers envois.
     func sentReceipt(conversationId: String, clientRequestId: String, ownerNamespace: String) throws -> E2EEV2MessageReceiptV2? {
         try sentReceipts(conversationId: conversationId, ownerNamespace: ownerNamespace).first { $0.clientRequestId == clientRequestId }

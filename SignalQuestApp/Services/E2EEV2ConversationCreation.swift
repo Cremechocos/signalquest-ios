@@ -325,6 +325,28 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
             self.body = body
         }
 
+        /// Corps de création gardé (reçu perdu), relu strictement.
+        init?(creationBody: String, pendingUserIds: [String]) {
+            guard let root = try? E2EEV2CanonicalJSON.parseCanonical(creationBody).objectValue,
+                  Set(root.keys) == ["conversationId", "isGroup", "title", "participantIds", "membership", "epoch"],
+                  let conversationId = root["conversationId"]?.stringValue, E2EEV2Canonical.isOpaque(conversationId),
+                  case .bool(let isGroup)? = root["isGroup"],
+                  let migration = Self(
+                      migrationBody: E2EEV2CanonicalJSON.encodeString(.object([
+                          "membership": root["membership"] ?? .null, "epoch": root["epoch"] ?? .null,
+                      ])),
+                      conversationId: conversationId, isGroup: isGroup
+                  ) else { return nil }
+            self.conversationId = conversationId
+            self.isGroup = isGroup
+            membership = migration.membership
+            manifest = migration.manifest
+            recipients = migration.recipients
+            envelopes = migration.envelopes
+            self.pendingUserIds = pendingUserIds
+            body = Data(creationBody.utf8)
+        }
+
         /// Corps de migration gardé, relu strictement.
         init?(migrationBody: String, conversationId: String, isGroup: Bool) {
             guard let root = try? E2EEV2CanonicalJSON.parseCanonical(migrationBody).objectValue,
@@ -382,20 +404,58 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         guard let context = context(expectedOwnerScopeId) else {
             return .failure(localError("invalid-e2ee-creation-scope"))
         }
+        // Une même demande reprise dans l'heure renvoie le même corps (reçu perdu).
+        let request = Self.creationRequest(participantIds: participantIds, isGroup: isGroup, title: title, excludesWeb: excludesWeb)
+        let nowMs = Int64(now().timeIntervalSince1970 * 1_000)
         let prepared: Prepared
         do {
-            let creation = try build(context) {
-                try E2EEV2ConversationCreation.make(
-                    conversationId: try E2EEV2ConversationCreation.newConversationId(), ownUserId: context.ownUserId,
-                    device: context.device, participantIds: participantIds, isGroup: isGroup, title: title,
-                    excludesWeb: excludesWeb, devices: devices, epochKey: $0, nowMs: $1, sign: $2, wrap: $3
+            if let pending = try stateStore.pendingCreation(request: request, ownerNamespace: context.ownerNamespace),
+               nowMs - pending.savedAtMs < Self.pendingCreationLifetimeMs,
+               let restored = Prepared(creationBody: pending.body, pendingUserIds: pending.pendingUserIds) {
+                prepared = restored
+            } else {
+                let creation = try build(context) {
+                    try E2EEV2ConversationCreation.make(
+                        conversationId: try E2EEV2ConversationCreation.newConversationId(), ownUserId: context.ownUserId,
+                        device: context.device, participantIds: participantIds, isGroup: isGroup, title: title,
+                        excludesWeb: excludesWeb, devices: devices, epochKey: $0, nowMs: $1, sign: $2, wrap: $3
+                    )
+                }
+                prepared = Prepared(creation, body: creation.body)
+                // Gardé avant tout envoi : jamais deux conversations pour une demande.
+                try stateStore.savePendingCreation(
+                    .init(body: String(decoding: creation.body, as: UTF8.self), pendingUserIds: creation.pendingUserIds, savedAtMs: nowMs),
+                    request: request, ownerNamespace: context.ownerNamespace
                 )
             }
-            prepared = Prepared(creation, body: creation.body)
         } catch {
             return .failure(localError("e2ee-conversation-creation-invalid"))
         }
-        return await submit(prepared, path: "/api/e2ee/v2/conversations", context: context, devices: devices)
+        let result = await submit(prepared, path: "/api/e2ee/v2/conversations", context: context, devices: devices)
+        switch result {
+        case .created:
+            try? stateStore.clearPendingCreation(request: request, ownerNamespace: context.ownerNamespace)
+        case .failure(let failure) where failure.kind == .retryable || failure.kind == .authentication:
+            // Sans réponse exploitable : la reprise renverra le même corps.
+            break
+        case .failure:
+            // Refus (liste périmée, identifiant pris, reçu inexact…) : la prochaine demande repart d'un corps neuf.
+            try? stateStore.clearPendingCreation(request: request, ownerNamespace: context.ownerNamespace)
+        }
+        return result
+    }
+
+    static let pendingCreationLifetimeMs: Int64 = 60 * 60 * 1_000
+
+    /// Empreinte d'une demande de création : mêmes participants (triés), même
+    /// nature, même titre, même exclusion des navigateurs.
+    static func creationRequest(participantIds: [String], isGroup: Bool, title: String?, excludesWeb: Bool) -> String {
+        let description = E2EEV2CanonicalJSON.encodeString(.object([
+            "participantIds": .array(Array(Set(participantIds)).sorted { Array($0.utf8).lexicographicallyPrecedes(Array($1.utf8)) }
+                .map(E2EEV2JSON.string)),
+            "isGroup": .bool(isGroup), "title": title.map(E2EEV2JSON.string) ?? .null, "excludesWeb": .bool(excludesWeb),
+        ]))
+        return E2EEV2Canonical.sha256B64URL(Data(description.utf8))
     }
 
     /// Migration d'une conversation chiffrée v1 (§14.2), sous son identifiant.
