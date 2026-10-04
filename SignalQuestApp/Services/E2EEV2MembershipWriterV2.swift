@@ -159,6 +159,20 @@ final class E2EEV2MembershipWriterV2: @unchecked Sendable {
         ) {
         case .failure(let error) where error.statusCode == 409 && error.code == "E2EE_MEMBERSHIP_STALE":
             return .needsSync
+        case .failure(let error)
+            where error.statusCode == 404 && error.code == "E2EE_CONVERSATION_NOT_FOUND" && pending != nil
+                && E2EEV2Canonical.split(signed.canonical, tag: E2EEV2MembershipChange.tag, version: "1", fieldCount: 10)?[4]
+                    == "LEAVE":
+            // v0.4.16 : départ gardé et renvoyé après un reçu perdu ; l'appelant
+            // n'est plus membre, le départ est tenu pour fait.
+            guard session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
+            do {
+                try stateStore.appendMembership([signed], conversationId: conversationId, ownerNamespace: ownerNamespace)
+                try stateStore.clearPendingMembership(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            } catch {
+                return .failure(localError("e2ee-membership-storage-failed"))
+            }
+            return .applied(changeNumber: head.changeNumber + 1)
         case .failure(let error):
             return .failure(error)
         case .success(let data, _, _):

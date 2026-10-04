@@ -322,6 +322,27 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertTrue(try fixture.states.isV2(conversationId: direct.id, ownerNamespace: namespace))
     }
 
+    /// v0.4.16 : une genèse refusée pour de bon n'est jamais renvoyée.
+    func testAGenesisRefusedForGoodIsForgotten() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let brunoPhone = remote(user: bruno, device: "device_bruno_android_01J7ABCD", platform: "android")
+        let devices = fixture.deviceSet(adding: [brunoPhone.device])
+        let direct = v1Conversation(group: false, participants: [(fixture.user, "member"), (bruno, "member")])
+        let creator = E2EEV2ConversationCreator(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        for code in ["E2EE_CONVERSATION_ALREADY_V2", "E2EE_GENESIS_NOT_ELIGIBLE"] {
+            MockURLProtocol.requestHandler = { request in
+                E2EEV2AccountFixture.response(request, Data(#"{"error":"x","code":"\#(code)"}"#.utf8), status: 409)
+            }
+            guard case .failure(let failure) = await creator.migrate(direct, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId)
+            else { return XCTFail("409 attendu") }
+            XCTAssertEqual(failure.code, code)
+            XCTAssertNil(try fixture.states.pendingGenesis(conversationId: direct.id, ownerNamespace: fixture.session.ownerNamespace), code)
+        }
+    }
+
     // MARK: Outils
 
     private func v1Conversation(group: Bool, participants: [(String, String)], encrypted: Bool = true) -> MessageConversation {

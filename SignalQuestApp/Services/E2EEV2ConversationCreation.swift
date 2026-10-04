@@ -494,8 +494,15 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         let result = await submit(
             prepared, path: "/api/e2ee/v2/conversations/\(conversation.id)/genesis", context: context, devices: devices
         )
-        if case .created = result {
+        switch result {
+        case .created:
             try? stateStore.clearPendingGenesis(conversationId: conversation.id, ownerNamespace: context.ownerNamespace)
+        case .failure(let failure)
+            where ["E2EE_CONVERSATION_ALREADY_V2", "E2EE_GENESIS_NOT_ELIGIBLE"].contains(failure.code ?? ""):
+            // v0.4.16 : refus définitif, la conversation se relit ; la genèse ne repartira plus.
+            try? stateStore.clearPendingGenesis(conversationId: conversation.id, ownerNamespace: context.ownerNamespace)
+        case .failure:
+            break
         }
         return result
     }

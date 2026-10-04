@@ -116,6 +116,33 @@ final class E2EEV2MembershipWriterV2Tests: XCTestCase {
     }
 }
 
+extension E2EEV2MembershipWriterV2Tests {
+    /// v0.4.16 : un départ rejoué après un reçu perdu reçoit 404 (plus
+    /// membre) et est tenu pour fait ; un premier envoi qui reçoit 404 échoue.
+    func testAReplayedLeaveAnsweredNotFoundCountsAsDone() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let seeded = try fixture.seedConversation(with: bruno, devices: fixture.deviceSet(adding: [phone.device]))
+        let namespace = fixture.session.ownerNamespace
+        let writer = E2EEV2MembershipWriterV2(api: fixture.api, identityStore: fixture.identity, stateStore: fixture.states, expectedSession: fixture.session)
+        let owner = fixture.session.ownerScopeId
+        let notFound = Data(#"{"error":"x","code":"E2EE_CONVERSATION_NOT_FOUND"}"#.utf8)
+
+        MockURLProtocol.requestHandler = { request in E2EEV2AccountFixture.response(request, notFound, status: 404) }
+        guard case .failure = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
+        else { return XCTFail("Premier envoi : un 404 reste un échec") }
+        XCTAssertEqual(try fixture.states.membershipChain(conversationId: seeded.conversationId, ownerNamespace: namespace).count,
+                       seeded.membership.changeNumber, "Rien n'est ajouté à la chaîne")
+
+        // Le même départ, gardé, repart : le serveur l'avait accepté.
+        let replayed = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
+        XCTAssertEqual(replayed, .applied(changeNumber: seeded.membership.changeNumber + 1))
+        XCTAssertNil(try fixture.states.pendingMembership(conversationId: seeded.conversationId, ownerNamespace: namespace))
+        let chain = try fixture.states.membershipChain(conversationId: seeded.conversationId, ownerNamespace: namespace)
+        XCTAssertTrue(try XCTUnwrap(chain.last).canonical.contains("\nLEAVE\n"))
+    }
+}
+
 private extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
