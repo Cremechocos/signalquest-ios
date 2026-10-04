@@ -60,6 +60,10 @@ enum E2EEV2MessageSendResultV2: Sendable, Equatable {
     /// Des membres dont l'identité n'est pas crue : rien n'est envoyé tant que
     /// l'utilisateur n'a pas accepté leur nouveau numéro (§2.4).
     case membersNotTrusted([String])
+    /// La conversation ne peut pas recevoir ce contenu (§12) : un membre doit
+    /// mettre à jour SignalQuest. Rien n'est envoyé, le message reste gardé
+    /// (jamais de repli en clair). Ce qui manque, trié.
+    case capabilityMissing([String])
     case failure(E2EEV2TransportFailure)
 }
 
@@ -147,6 +151,10 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
         guard E2EEV2RotationPolicy.reasons(
             current: current, membership: membership, devices: devices, nowMs: nowMs, messageCount: messageCount
         ).isEmpty else { return .needsRotation }
+        // §12 : l'émetteur n'envoie pas ce que l'intersection ne contient pas.
+        let missing = Self.missingCapabilities(draft, devices: devices, members: membership.members,
+                                               excludesWeb: membership.excludesWeb, nowMs: nowMs)
+        guard missing.isEmpty else { return .capabilityMissing(missing) }
 
         // Préparé sous verrou : deux appels pour un même message ne signent
         // jamais deux enveloppes, ni ne réservent deux compteurs.
@@ -185,6 +193,13 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
             // une version antérieure du même message, de même charge.
             forget(conversationId, clientRequestId, ownerNamespace)
             return .alreadyAccepted(messageRef: messageRef(conversationId, device, clientRequestId))
+        case .failure(let error) where error.statusCode == 409 && error.code == "E2EE_CAPABILITY_MISSING":
+            // Le serveur voit ce que l'appareil n'a pas su voir : rien ne part, le message reste gardé.
+            var missing: [String] = []
+            if case .array(let values)? = error.details?["missing"] {
+                missing = values.compactMap { if case .string(let value) = $0 { return value }; return nil }
+            }
+            return .capabilityMissing(missing.isEmpty ? ["intersection"] : missing.sorted())
         case .failure(let error) where error.statusCode == 409
             && (error.code == "E2EE_EPOCH_STALE" || error.code == "E2EE_MEMBERSHIP_STALE"):
             // Le serveur connaît une époque ou un état plus récent : synchroniser,
@@ -199,6 +214,24 @@ final class E2EEV2MessageSenderV2: @unchecked Sendable {
     }
 
     private static let lock = NSLock()
+
+    /// Ce que l'intersection des appareils comptés (§12) ne contient pas pour
+    /// ce message : version d'enveloppe, de charge, ou son type ; `intersection`
+    /// si elle est indisponible.
+    static func missingCapabilities(
+        _ draft: Draft, devices: E2EEV2CertifiedDeviceSet, members: Set<String>, excludesWeb: Bool, nowMs: Int64
+    ) -> [String] {
+        let scoped = E2EEV2CertifiedDeviceSet(
+            devicesByUser: devices.devicesByUser.filter { members.contains($0.key) },
+            refusals: devices.refusals.filter { members.contains($0.key) }
+        )
+        guard let intersection = scoped.capabilityIntersection(nowMs: nowMs, excludesWeb: excludesWeb) else { return ["intersection"] }
+        var missing: [String] = []
+        if !intersection.envelopeVersions.contains("2") { missing.append("envelopeVersion") }
+        if !intersection.payloadVersions.contains("2") { missing.append("payloadVersion") }
+        if !intersection.kinds.contains(draft.body.kind) { missing.append(draft.body.kind) }
+        return missing.sorted()
+    }
 
     private struct SendFailure: Error {
         let reason: String

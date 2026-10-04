@@ -146,6 +146,53 @@ final class E2EEV2MessageSenderV2Tests: XCTestCase {
         XCTAssertEqual(after.payloadBytes, before.payloadBytes, "Même charge, même compteur, même date")
     }
 
+    /// §12 : rien ne part vers un membre qui ne lit pas ce contenu, et un refus
+    /// du serveur garde le message au lieu de l'effacer.
+    func testAMissingCapabilitySendsNothingAndKeepsTheMessage() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let sender = E2EEV2MessageSenderV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        // Un appareil de Bruno qui ne lit pas encore le v2 (document vide).
+        var silent = devices.devicesByUser
+        silent[bruno] = silent[bruno]?.map {
+            E2EEV2CertifiedDevice(
+                userId: $0.userId, deviceId: $0.deviceId, keyVersion: $0.keyVersion, platform: $0.platform,
+                identityKeyB64: $0.identityKeyB64, signingKeyB64: $0.signingKeyB64, fingerprint: $0.fingerprint,
+                capabilities: E2EEV2CapabilitiesDocument(
+                    userId: $0.userId, deviceId: $0.deviceId, sequence: 2, issuedAtMs: Int64(Date().timeIntervalSince1970 * 1_000),
+                    envelopeVersions: [], payloadVersions: [], kinds: [], features: []
+                )
+            )
+        }
+        MockURLProtocol.requestHandler = { request in
+            XCTFail("Rien ne part")
+            return E2EEV2AccountFixture.response(request, Data("{}".utf8), status: 500)
+        }
+        let local = await sender.send(
+            draft("Salut"), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000031",
+            membership: seeded.membership, devices: E2EEV2CertifiedDeviceSet(devicesByUser: silent, refusals: [:]),
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(local, .capabilityMissing(["TEXT", "envelopeVersion", "payloadVersion"]))
+
+        MockURLProtocol.requestHandler = { request in
+            E2EEV2AccountFixture.response(request, Data(#"{"error":"x","code":"E2EE_CAPABILITY_MISSING","details":{"missing":["envelopeVersion"]}}"#.utf8), status: 409)
+        }
+        let refused = await sender.send(
+            draft("Salut"), conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000032",
+            membership: seeded.membership, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(refused, .capabilityMissing(["envelopeVersion"]))
+        XCTAssertNotNil(try fixture.states.pendingSend(
+            conversationId: seeded.conversationId, clientRequestId: "message_01J7ABCD00000032", ownerNamespace: fixture.session.ownerNamespace
+        ), "Le message reste gardé : il partira quand le membre aura mis à jour")
+    }
+
     func testAConflictMeansAnEarlierVersionWasDelivered() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
