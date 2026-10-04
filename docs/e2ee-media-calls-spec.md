@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.20**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.21**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,13 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.21 (05/10/2026), proposition : lot serveur A2 (réinitialisation
+>   d'identité, récupération). Bundle de récupération v3, qui enveloppe
+>   l'UIK sous la clé de récupération : un appareil récupéré signe lui-même
+>   son certificat et la liste suivante (§2.8). Routes, formes et codes de
+>   la réinitialisation et de la récupération (E.0, E.1) ; entiers en
+>   chaînes (D.0) dans leurs réponses. Nouveau vecteur
+>   `recovery-bundle-v3`.
 > - v0.4.20 (04/10/2026), proposition : règles du lot serveur A3c. Raisons
 >   de `E2EE_MEMBERSHIP_INVALID` ; le créateur d'une époque en est
 >   destinataire ; tout changement d'appartenance rejoué à l'octet rend son
@@ -612,6 +619,46 @@ conversations chiffrées **sur demande seulement**.
 - La clé de récupération ouvre tout l'historique **et** permet d'approuver un
   appareil. Son usage déclenche la même alerte qu'un nouvel appareil, puis une
   nouvelle clé de récupération est proposée.
+- **Bundle v3** (v0.4.21) : `"version": 3`, les huit clés du bundle v2 plus
+  `accountPrivateKey`, la clé privée de l'UIK enveloppée sous la clé de
+  récupération : `{saltB64, nonceB64, wrappedPrivateJwkB64, aadB64,
+  publicKeyB64}`, exactement ces cinq clés, `publicKeyB64` étant l'UIK en
+  X9.63 (base64 standard). Les trois nonces du bundle sont distincts deux à
+  deux. Forme hachée : celle du v2 avec `"version":3`, `accountInfo` en
+  cinquième clé de `kdfParameters` (après `signingInfo`) et
+  `accountPrivateKey` en dernier, dans l'ordre ci-dessus ; `version` et
+  `outputBytes` y restent des nombres (entrée de hachage figée par le
+  vecteur). Rôle `ACCOUNT` : HKDF-SHA256 avec son propre sel,
+  info `signalquest-e2ee-v2-recovery-account-v3`, AES-256-GCM, AAD
+  `SQ-E2EE-V2-RECOVERY\n2\nuser:<userId>\nACCOUNT`. Sa clé publique est l'UIK
+  courante du compte. Le texte signé par l'UIK ne change pas : le
+  `bundleHash` couvre déjà tout le bundle.
+  - Le serveur accepte les versions 2 et 3 ; pour une v3, il vérifie que
+    `publicKeyB64` est l'UIK enregistrée (`422
+    E2EE_RECOVERY_ACCOUNT_KEY_MISMATCH`). Un bundle v2 ne sert plus qu'à
+    restaurer l'historique : un défi ou une complétion avec lui répond `409
+    E2EE_RECOVERY_BUNDLE_VERSION_UNSUPPORTED`.
+  - Le client déballe l'UIK et vérifie, dans l'ordre, que le scalaire redonne
+    `x`/`y` du JWK, qu'ils sont ceux de `publicKeyB64`, puis que c'est l'UIK
+    servie par `…/identity` ; sinon il refuse sans rien signer. Le « 2 » de
+    l'AAD versionne le schéma d'enveloppement, inchangé ; le rôle et le
+    compte lient la clé.
+  - **Récupération** : l'appareil en attente déballe l'UIK, vérifie qu'elle
+    est celle que sert `…/users/{userId}/identity`, puis signe lui-même son
+    certificat et la liste suivante, envoyés avec la preuve de récupération.
+    Les autres appareils voient le nouvel appareil dans la liste et
+    l'annoncent comme une approbation.
+  - Vecteur : `recovery-bundle-v3.json`. Cas négatifs : AAD d'un autre rôle
+    (`ACCOUNT` contre `IDENTITY` ou `SIGNING`) ou d'un autre compte ; UIK
+    déballée différente de celle servie ; version 2 avec une neuvième clé ;
+    version 3 sans `accountPrivateKey` ; scalaire hors de [1, n−1] ;
+    `bundleHash` calculé sans `accountPrivateKey` ; deux nonces égaux.
+  - Un appareil qui reçoit un bundle v2 garde le comportement d'avant :
+    restauration de l'historique s'il est déjà approuvé, jamais de
+    signature d'appareil.
+  - Une réinitialisation d'identité révoque le bundle et efface ses
+    enveloppes : l'historique n'est plus récupérable après elle, ce que la
+    demande fait acquitter.
 
 ---
 
@@ -1398,6 +1445,12 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
    pas perdre l'écriture dans ses conversations (v0.4.17). La même règle vaut
    pour une nouvelle conversation chiffrée, qui naît en v1 tant que le
    serveur l'accepte.
+   - **Découvrir avant toute genèse** (v0.4.21, règle commune iOS et
+     Android) : une conversation chiffrée qui n'est pas v2 sur cet appareil
+     peut l'être déjà, créée ou migrée par un autre membre. Le client la
+     synchronise d'abord (chaîne et époque vérifiées puis gardées) et ne
+     tente la genèse que sur `409 E2EE_CONVERSATION_NOT_V2` ; toute autre
+     issue n'en tente aucune.
    - **Genèse de l'historique d'appartenance** (D.4) : ce client signe un
      `ADD` par membre actuel, lui compris, dans l'ordre des `userId` (octets
      UTF-8). Dans un groupe, il signe ensuite un `ROLE_ADMIN` pour chaque
@@ -2473,6 +2526,31 @@ version publiée qui ouvre les verrous.
     autre que celui auquel la session est liée (E.1, v0.4.19) ;
   - `E2EE_DEVICE_ID_INVALID` (400) : identifiant d'appareil mal formé dans
     le chemin (v0.4.19) ;
+  - réinitialisation et récupération (E.1, v0.4.21) :
+    - 400, ou 413 pour un corps trop grand : `E2EE_IDENTITY_RESET_REQUEST_INVALID`,
+      `E2EE_IDENTITY_RESET_OBJECTION_REQUEST_INVALID`,
+      `E2EE_IDENTITY_RESET_EMAIL_REQUEST_INVALID`,
+      `E2EE_RECOVERY_BUNDLE_REQUEST_INVALID`,
+      `E2EE_RECOVERY_CHALLENGE_REQUEST_INVALID`,
+      `E2EE_RECOVERY_ENVELOPE_REQUEST_INVALID` ; 400
+      `E2EE_RECOVERY_EPOCH_QUERY_INVALID` ;
+    - 403 : `E2EE_DEVICE_NOT_CERTIFIED`, `E2EE_IDENTITY_RESET_PASSWORD_INVALID`,
+      `E2EE_IDENTITY_RESET_APPLE_INVALID`, `E2EE_IDENTITY_RESET_EMAIL_INVALID`,
+      `E2EE_RECOVERY_RECIPIENT_FORBIDDEN` ;
+    - 404 : `E2EE_IDENTITY_RESET_NOT_FOUND`, `E2EE_RECOVERY_BUNDLE_NOT_FOUND` ;
+    - 409 : `E2EE_IDENTITY_RESET_PENDING`, `E2EE_IDENTITY_GENERATION_STALE`
+      (`details.currentGeneration`), `E2EE_IDENTITY_RESET_NOT_PENDING`
+      (`details.status` : `completed`, `objected`, `aborted` ou `due`),
+      `E2EE_RECOVERY_BUNDLE_STALE`, `E2EE_RECOVERY_CHALLENGE_INVALID`,
+      `E2EE_RECOVERY_ENVELOPE_CONFLICT` ;
+    - 422 : `E2EE_IDENTITY_RESET_INVALID`,
+      `E2EE_IDENTITY_RESET_OBJECTION_INVALID`, `E2EE_RECOVERY_PROOF_INVALID`,
+      `E2EE_RECOVERY_ENVELOPE_INVALID` ;
+    - 503 : `E2EE_IDENTITY_RESET_EMAIL_UNAVAILABLE` ;
+  - déjà servis ailleurs (v0.4.21) : `E2EE_MANAGED_SESSION_REQUIRED` (428),
+    `E2EE_DEVICE_NOT_PENDING`, `E2EE_DEVICE_KEY_MISMATCH`,
+    `E2EE_DEVICE_ID_CONFLICT`,
+    `E2EE_DEVICE_APPROVAL_ROTATION_BACKLOG_TOO_LARGE` ;
   - appels chiffrés (E.4, v0.4.18) :
     - `CALL_E2EE_REQUIRED` (409) : appel sans descripteur dans une
       conversation v2 ;
@@ -2559,7 +2637,8 @@ version publiée qui ouvre les verrous.
     la liste courante ;
   - `capabilities` : liste de `{document, signatureB64}`, le dernier document
     de chaque appareil ;
-  - `pendingIdentityReset` : `{reset, signatureB64}` ou `null`.
+  - `pendingIdentityReset` : `{resetId, reset, signatureB64}` ou `null`
+    (`resetId` sert à l'opposition, v0.4.21).
 
   Lecteurs autorisés : soi-même, les membres d'une conversation commune, ou
   tout compte autorisé à lui écrire selon sa politique de demandes de
@@ -2632,6 +2711,52 @@ version publiée qui ouvre les verrous.
   - `certificate` et `deviceList` (version 1) du nouvel ensemble.
 - **`POST /api/e2ee/v2/identity/reset/{resetId}/objection`**. Corps :
   `{objection, signatureB64}`.
+- **Réinitialisation, formes du lot A2** (v0.4.21) :
+  - `POST …/identity/reset`, `GET …/identity/reset/{resetId}` (session seule,
+    ses propres réinitialisations) et `POST …/objection` rendent le même
+    objet : `{resetId, status, replacementDeviceId, reset: {reset,
+    signatureB64}, effectiveAtMs, objection, objectingDeviceId, resolvedAt,
+    abortReason}`, `status` parmi `pending`, `completed`, `objected` et
+    `aborted`, `effectiveAtMs` en chaîne. 201 à la création, 200 pour un
+    renvoi identique (sans nouvelle réauthentification).
+  - La demande est signée par l'appareil de remplacement, neuf ou en
+    attente, jamais un navigateur ; il est créé en attente s'il manque, et
+    la session ne lui est pas liée pendant les 72 h. Une seule
+    réinitialisation en attente par compte ; heures signées à 10 min de
+    l'horloge du serveur.
+  - `POST …/identity/reset/email-challenge` : `{version: 1,
+    expectedGeneration, replacementDevice}`, signé par l'appareil de
+    remplacement ; 201 `{challengeId, expiresAt, maskedEmail,
+    expectedGeneration, replacementDeviceId}`.
+  - Opposition : un appareil de la liste courante, navigateur certifié
+    compris, avant l'échéance. Elle annule la réinitialisation et révoque
+    l'appareil de remplacement encore en attente.
+  - Bascule à l'échéance, côté serveur (`/api/cron/e2ee-identity-resets`,
+    jamais appelée par un client) : nouvelle UIK et génération + 1,
+    appareil de remplacement approuvé, autres appareils et leurs sessions
+    révoqués (`IDENTITY_RESET`), époques qui leur étaient adressées
+    compromises, rotation `IDENTITY_RESET` exigée partout, bundle de
+    récupération révoqué.
+- **Récupération, routes du lot A2** (v0.4.21), entiers en chaînes (D.0) :
+  - `PUT /api/e2ee/v2/recovery-bundle`, signé par un appareil certifié
+    (jamais un navigateur) : le bundle plus `signatureB64` ; 201 `{stored,
+    unchanged, createdAt, rotatedAt}`, 200 pour un bundle identique.
+  - `GET /api/e2ee/v2/recovery-bundle` : `{state: "AVAILABLE", bundle}` ou
+    404.
+  - `POST /api/e2ee/v2/recovery-challenges`, signé par l'appareil en
+    attente, corps `{}` : 201 `{challenge: {challengeId, pendingDeviceId,
+    bundleHash, challengeB64Url, expiresAt, expiresAtMs}, bundle}`.
+  - `POST …/recovery-challenges/{id}/complete` : `{challengeB64Url,
+    recoverySignatureB64, certificate, deviceList}` ; réponse
+    `{recovered: true, device: {deviceId, status, approvedAt},
+    epochRotationRequired, affectedConversationIds}`. Exige un bundle v3.
+  - `GET /api/e2ee/v2/recovery-epochs?cursor=` (restauration, pages de 50)
+    et `GET …/recovery-epochs/backfill?cursor=` (rattrapage, pages de 5,
+    `recoveryRecipients` limité au compte appelant, `missingParticipantUserIds`
+    toujours `[]`).
+  - Reçu d'enveloppe : `POST …/conversations/{id}/epochs/{epochNumber}/recovery-envelopes`,
+    corps `{recoveryEnvelopes: [une enveloppe]}`, AAD liée au compte
+    (`…\nuser:<userId>\n<ROLE>`).
 
 ### E.2 Conversations, membres et époques
 
