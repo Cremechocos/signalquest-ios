@@ -35,7 +35,13 @@ final class MessagesViewModel: ObservableObject {
 
     /// Déchiffre les aperçus des derniers messages des conversations E2EE une
     /// fois la clé déverrouillée. Best-effort : un échec laisse le cadenas.
-    func decryptPreviews(e2ee: E2EEServicing?) async {
+    func decryptPreviews(e2ee: E2EEServicing?, v2: E2EEV2MessagingRuntime? = nil) async {
+        // v2 : le dernier message vérifié et gardé ici, sans requête ni clé v1.
+        if let v2 {
+            for conversation in conversations where EncryptedConversationSurfaces.isV2(conversation) {
+                if let text = v2.latestText(conversationId: conversation.id) { decryptedPreviews[conversation.id] = text }
+            }
+        }
         guard let e2ee, await e2ee.isUnlocked() else { return }
         for conversation in conversations where conversation.e2eeEnabled == true {
             guard let last = conversation.lastMessage, last.isEncrypted,
@@ -258,7 +264,7 @@ struct MessagesView: View {
             if model.conversations.isEmpty { await model.load() }
             await maybePresentE2EEUnlock()
             openNewConversationIfRequested()
-            await model.decryptPreviews(e2ee: e2ee)
+            await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
             await openRoutedConversationIfNeeded()
         }
         // Au retour d'une conversation : la liste restait figée jusqu'au
@@ -267,13 +273,13 @@ struct MessagesView: View {
             guard !model.conversations.isEmpty else { return }
             Task {
                 await model.load()
-                await model.decryptPreviews(e2ee: e2ee)
+                await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
                 await services.refreshInboxBadge(force: true)
             }
         }
         .refreshable {
             await model.load()
-            await model.decryptPreviews(e2ee: e2ee)
+            await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
         }
         .onReceive(NotificationCenter.default.publisher(for: MessageDraftStore.didChange)) { _ in
             Task { await reloadDrafts() }
@@ -313,7 +319,7 @@ struct MessagesView: View {
                 E2EEUnlockSheet(userId: user.id, service: e2ee) {
                     Task {
                         await model.load()
-                        await model.decryptPreviews(e2ee: e2ee)
+                        await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
                     }
                 }
             }

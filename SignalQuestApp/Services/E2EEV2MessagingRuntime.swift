@@ -318,6 +318,17 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         return false
     }
 
+    /// Dernier message lisible d'une conversation v2, déjà vérifié et gardé
+    /// sur cet appareil : l'aperçu de la liste, sans aucune requête.
+    func latestText(conversationId: String) -> String? {
+        guard readsEnabled, let parts = current(),
+              let snapshot = try? parts.messageStore.snapshot(
+                  conversationId: conversationId, ownerScopeId: parts.session.ownerScopeId,
+                  nowMs: Int64(Date().timeIntervalSince1970 * 1_000)
+              ) else { return nil }
+        return snapshot.messages.last { !$0.deleted && $0.text != nil }?.text
+    }
+
     /// Signalement en deux parties (§11, D.10) de messages gardés par cet
     /// appareil : jamais la clé de la conversation.
     func report(refs: [String], reason: ReportReason, conversationId: String) async throws {
