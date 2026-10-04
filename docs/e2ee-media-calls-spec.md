@@ -2049,7 +2049,9 @@ certificat et la liste, sans `uikWrap` (§2.7).
   les respecte. Un vérificateur ne distingue pas création et migration : il
   n'impose que cette forme. À la création, le client créateur et le serveur
   imposent en plus que l'auteur figure parmi les `ROLE_ADMIN`.
-- **Autorisations**, vérifiées par les clients :
+- **Autorisations**, vérifiées par les clients, et par le serveur avec les
+  mêmes règles : sinon il accepterait une chaîne que les clients rejettent
+  ensuite, et la conversation se bloquerait (v0.4.16) :
   - dans un groupe, `ADD`, `REMOVE`, `ROLE_*` et `EXCLUDE_WEB_*` sont
     réservés à un administrateur ;
   - en tête-à-tête, `EXCLUDE_WEB_*` est ouvert aux deux membres, et après la
@@ -2564,7 +2566,8 @@ version publiée qui ouvre les verrous.
   `{membership, epoch}`, de même forme qu'à la création. Le serveur refuse
   une genèse qui ne reproduit pas exactement les membres et les
   administrateurs v1 (propriétaire compris) ; les membres v1 sont les
-  participants non archivés (v0.4.16). Une conversation déjà v2 répond
+  participants qui n'ont pas quitté la conversation, un archivage personnel
+  ne comptant pas (v0.4.16). Une conversation déjà v2 répond
   `409 E2EE_CONVERSATION_ALREADY_V2` : le client relit la conversation et
   efface sa genèse en attente. Une conversation qui ne peut pas migrer
   répond `409 E2EE_GENESIS_NOT_ELIGIBLE` (E.0). Même reçu qu'à la création.
@@ -2621,10 +2624,11 @@ version publiée qui ouvre les verrous.
   signé avant l'envoi et le renvoie tel quel jusqu'à sa réponse : jamais deux
   signatures pour un même numéro. Sur `409 E2EE_MEMBERSHIP_STALE`, il relit
   la suite de la chaîne, puis recompose. Un `LEAVE` rejoué après un reçu
-  perdu répond `404 E2EE_CONVERSATION_NOT_FOUND`, l'appelant n'étant plus
-  membre : le départ est tenu pour fait, le client garde son changement
-  signé, efface ses clés d'époque et n'écrit plus dans la conversation
-  (v0.4.16).
+  perdu rend le même reçu, ou `404 E2EE_CONVERSATION_NOT_FOUND` (serveur
+  antérieur), l'appelant n'étant plus membre : dans les deux cas le départ
+  est tenu pour fait, le client ajoute son changement signé à sa chaîne et
+  n'écrit plus dans la conversation (v0.4.16). Un premier envoi qui reçoit
+  ce 404 reste un échec.
 - **`GET /api/e2ee/v2/conversations/{id}/membership?after=<changeNumber>`** :
   la suite de la chaîne. Réponse proposée par iOS :
   `{changes: [{change, signatureB64}], hasMore}`, 100 changements au plus
