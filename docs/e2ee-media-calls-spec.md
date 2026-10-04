@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.17**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.19**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,21 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.19 (04/10/2026), proposition : décisions du serveur après la
+>   relecture iOS des routes d'appel. Une requête signée valide d'un
+>   appareil approuvé lie sa session à cet appareil (E.1) ; `push-tokens`
+>   remplace tout l'ensemble et iOS n'y lie que ses jetons APNs ; `answer`
+>   sans preuve répond 401 ; noms vides pour un appel chiffré dans
+>   `pending` et le flux ; nouveaux codes `CALL_PARTICIPANT_ALREADY_ANSWERED`
+>   et `E2EE_DEVICE_SESSION_MISMATCH`. Un 404 sur le paquet d'identité d'un
+>   compte déjà épinglé vaut refus, jamais retour au v1 (E.1). Aucun vecteur
+>   ne change.
+> - v0.4.18 (04/10/2026), proposition : alignement sur les routes d'appel
+>   écrites par le serveur (CALL-1 à CALL-7). E.0 reçoit les codes d'erreur
+>   des appels chiffrés ; `push-tokens` porte l'environnement APNs ; la
+>   réponse d'`answer` porte `e2eeV2` et `livekitIdentity` ; seuls les
+>   appareils qui ont sonné voient l'appel et y répondent, la première
+>   réponse gagne. Aucun vecteur ne change.
 > - v0.4.17 (04/10/2026), proposition : règle commune iOS et Android. Une
 >   conversation ne passe en v2, par création ou par migration, que si
 >   l'intersection des capacités de ses membres contient l'enveloppe et la
@@ -2434,6 +2449,26 @@ version publiée qui ouvre les verrous.
   - `CONVERSATION_ID_TAKEN` et `CALL_ID_TAKEN` (409) : identifiant choisi par
     le client déjà utilisé ;
   - `CALL_NONCE_TAKEN` (409) : `callNonce` déjà enregistré (§10.1) ;
+  - `E2EE_DEVICE_SESSION_MISMATCH` (409) : requête signée par un appareil
+    autre que celui auquel la session est liée (E.1, v0.4.19) ;
+  - `E2EE_DEVICE_ID_INVALID` (400) : identifiant d'appareil mal formé dans
+    le chemin (v0.4.19) ;
+  - appels chiffrés (E.4, v0.4.18) :
+    - `CALL_E2EE_REQUIRED` (409) : appel sans descripteur dans une
+      conversation v2 ;
+    - `E2EE_CALL_REQUEST_INVALID` (400, ou 413 pour un corps trop grand) :
+      demande d'appel mal formée ;
+    - `E2EE_CALL_DESCRIPTOR_INVALID` (422) : descripteur dont la forme, la
+      signature ou l'appareil appelant ne se vérifient pas ;
+    - `E2EE_CALL_DEVICE_NOT_ELIGIBLE` (403) : réponse d'un appareil qui n'a
+      pas sonné ;
+    - `CALL_PARTICIPANT_ALREADY_ANSWERED` (409) : un autre appareil du
+      compte a déjà répondu, la première réponse gagne (v0.4.19) ;
+    - `E2EE_PUSH_TOKENS_REQUEST_INVALID` (400, ou 413) : jetons push mal
+      formés ;
+    - `CALL_RECORDING_E2EE_UNSUPPORTED`, `CALL_SUMMARY_E2EE_UNSUPPORTED` et
+      `CALL_TRANSFER_E2EE_UNSUPPORTED` (409) : enregistrement, résumé ou
+      transfert d'un appel chiffré, refusés au jalon A ;
   - `E2EE_MESSAGE_CONFLICT` (409) : une autre enveloppe a déjà été acceptée
     pour la même identité de message (§4.2) ;
   - `E2EE_REPORT_QUOTA` (429) : quota de signalements atteint (§16), avec
@@ -2505,7 +2540,10 @@ version publiée qui ouvre les verrous.
   messages (ami, ou politique « tout le monde », jamais à travers un
   blocage). Un autre lecteur, ou un compte sans identité v2, reçoit
   `404 E2EE_IDENTITY_NOT_FOUND` sans distinguer les deux ; le client le
-  traite comme un membre qui ne lit pas le v2 (v0.4.17).
+  traite comme un membre qui ne lit pas le v2 (v0.4.17), sauf pour un compte
+  dont l'appareil a déjà épinglé l'identité : son v2 a été vu, et ce 404 est
+  traité comme un paquet refusé, jamais comme un retour au v1, qu'un serveur
+  pourrait sinon imposer (v0.4.19).
   Un `sinceVersion` plus grand que la version courante de la liste (identité
   réinitialisée depuis, v0.4.9) est ignoré : la réponse porte l'UIK et la
   liste courantes, sans chaîne ni erreur. Le client compare l'UIK avant de
@@ -2543,10 +2581,22 @@ version publiée qui ouvre les verrous.
   certificat et la `deviceList`. Idempotent jusqu'à consommation ou
   expiration.
 - **`PUT /api/e2ee/v2/devices/{deviceId}/push-tokens`**, signé par
-  l'appareil : `{apnsVoipToken?, apnsToken?, fcmToken?, environment}`. Il lie
-  les jetons push à l'appareil v2. La sonnerie d'un appel chiffré ne cible
+  l'appareil : `{apnsVoipToken?, apnsToken?, fcmToken?, environment}`, où
+  `environment` vaut `production` ou `sandbox` (environnement APNs du build,
+  v0.4.18). Il lie les jetons push à l'appareil v2. **Le corps remplace tout
+  l'ensemble : un jeton absent est supprimé** (v0.4.19). Réponse
+  `{deviceId, environment, registered}` ; soumise à la porte d'activation
+  des appels et à un limiteur propre à `push-tokens`, par appareil. iOS n'y lie que `apnsVoipToken` et
+  `apnsToken`, jamais `fcmToken`, pour ne pas sonner deux fois. La sonnerie d'un appel chiffré ne cible
   que ces jetons ; l'enregistrement actuel par installation reste pour le
   reste.
+- **Liaison de la session à l'appareil** (v0.4.19) : toute requête signée
+  valide d'un appareil approuvé lie sa session de connexion à cet appareil,
+  si elle n'est liée à aucun ; une session liée à un autre appareil reçoit
+  `409 E2EE_DEVICE_SESSION_MISMATCH`. C'est cette liaison qui limite
+  `pending` et le flux d'appels aux appareils qui sonnent. Après une
+  connexion, le client fait donc une requête signée (`PUT …/capabilities`
+  ou `push-tokens`) avant d'attendre un appel.
 - **`POST /api/e2ee/v2/identity/reset`**, étendu. Corps :
   - `reset` : `{reset, signatureB64}` (D.14) ;
   - `certificate` et `deviceList` (version 1) du nouvel ensemble.
@@ -2783,6 +2833,23 @@ version publiée qui ouvre les verrous.
   Dans une conversation v2, le corps est
   `{conversationId, type, callId, e2eeV2}` (D.11).
 - **`POST /api/calls/answer`**, en requête signée : `{callId}`, rien de plus.
+  Sans preuve, ou avec une preuve invalide : `401
+  E2EE_DEVICE_SIGNATURE_INVALID`, comme toute route signée (v0.4.19).
+  La réponse porte, comme celle de l'initiation, `e2eeV2` (le descripteur
+  tel que relayé) et `livekitIdentity` (v0.4.18). L'appelé vérifie ce
+  descripteur comme celui de la sonnerie, et ne se fie pas à l'identité.
+- **Appareils qui sonnent** : l'intersection des capacités au moment de
+  l'appel fixe les appareils qui sonnent. Eux seuls voient l'appel (`pending`,
+  SSE) et peuvent y répondre ; un autre reçoit
+  `403 E2EE_CALL_DEVICE_NOT_ELIGIBLE`. La première réponse gagne (v0.4.18) ;
+  les suivantes reçoivent `409 CALL_PARTICIPANT_ALREADY_ANSWERED` (v0.4.19).
+- **Erreurs d'`initiate`** (v0.4.19) : `409 E2EE_CONVERSATION_NOT_V2`, et
+  `409 E2EE_EPOCH_STALE` avec `details.currentEpoch` quand le descripteur ne
+  désigne pas l'époque active courante ; l'appelant se synchronise et signe
+  un nouveau descripteur (nouveau `callNonce`).
+- **Noms** (v0.4.19) : pour un appel chiffré, `callerName`, `callerAvatar`
+  et `conversationTitle` valent `null` dans `pending` et le flux ; le client
+  retrouve le nom localement (§10.5).
 - **Contrôles du serveur sur le descripteur** : conversation v2 ; appareil
   appelant certifié, avec la capacité « appels vérifiés » ; signature en
   forme low-S ; époque = l'époque active courante (`epochId`, `epochNumber`,
