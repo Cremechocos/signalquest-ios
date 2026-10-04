@@ -152,7 +152,12 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
             expectedOwnerScopeId: fixture.session.ownerScopeId
         ) else { return XCTFail("Un reçu inexact n'est pas une création") }
         XCTAssertEqual(invalid.message, "invalid-e2ee-conversation-creation-response")
-        XCTAssertTrue(try fixture.storedNothing())
+        // Le serveur a peut-être créé la conversation : seul le corps reste gardé, ni clé ni état « v2 ».
+        XCTAssertTrue(try fixture.vault.keys(withPrefix: "epoch-v2:\(fixture.session.ownerNamespace):").isEmpty)
+        XCTAssertNotNil(try fixture.states.pendingCreation(
+            request: E2EEV2ConversationCreator.creationRequest(participantIds: [bruno], isGroup: false, title: nil, excludesWeb: false),
+            ownerNamespace: fixture.session.ownerNamespace
+        ))
 
         // Reçu exact : la clé de l'époque 1 et l'état « v2 » sont gardés.
         let captured = LockedRequests()

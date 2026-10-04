@@ -407,13 +407,22 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         // Une même demande reprise dans l'heure renvoie le même corps (reçu perdu).
         let request = Self.creationRequest(participantIds: participantIds, isGroup: isGroup, title: title, excludesWeb: excludesWeb)
         let nowMs = Int64(now().timeIntervalSince1970 * 1_000)
+        // Lecture et écriture du corps gardé d'un seul geste : un double appui
+        // reprend le même corps, que le serveur traite comme un rejeu.
         let prepared: Prepared
         do {
-            if let pending = try stateStore.pendingCreation(request: request, ownerNamespace: context.ownerNamespace),
-               nowMs - pending.savedAtMs < Self.pendingCreationLifetimeMs,
-               let restored = Prepared(creationBody: pending.body, pendingUserIds: pending.pendingUserIds) {
-                prepared = restored
-            } else {
+            prepared = try Self.creationLock.withLock { () throws -> Prepared in
+                // Destinataires attendus maintenant : un corps gardé dont les
+                // appareils ont changé (révocation, ajout) n'est jamais renvoyé.
+                let expectedRecipients = Set(E2EEV2EpochProposals.recipients(
+                    devices, members: Set(participantIds + [context.ownUserId]), excludesWeb: excludesWeb, nowMs: nowMs
+                ).map { E2EEV2EpochManifest.recipient(userId: $0.userId, deviceId: $0.deviceId, platform: $0.platform, fingerprint: $0.fingerprint) })
+                if let pending = try stateStore.pendingCreation(request: request, ownerNamespace: context.ownerNamespace),
+                   (0..<Self.pendingCreationLifetimeMs).contains(nowMs - pending.savedAtMs),
+                   let restored = Prepared(creationBody: pending.body, pendingUserIds: pending.pendingUserIds),
+                   Set(restored.recipients) == expectedRecipients {
+                    return restored
+                }
                 let creation = try build(context) {
                     try E2EEV2ConversationCreation.make(
                         conversationId: try E2EEV2ConversationCreation.newConversationId(), ownUserId: context.ownUserId,
@@ -421,12 +430,12 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
                         excludesWeb: excludesWeb, devices: devices, epochKey: $0, nowMs: $1, sign: $2, wrap: $3
                     )
                 }
-                prepared = Prepared(creation, body: creation.body)
                 // Gardé avant tout envoi : jamais deux conversations pour une demande.
                 try stateStore.savePendingCreation(
                     .init(body: String(decoding: creation.body, as: UTF8.self), pendingUserIds: creation.pendingUserIds, savedAtMs: nowMs),
                     request: request, ownerNamespace: context.ownerNamespace
                 )
+                return Prepared(creation, body: creation.body)
             }
         } catch {
             return .failure(localError("e2ee-conversation-creation-invalid"))
@@ -435,17 +444,20 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         switch result {
         case .created:
             try? stateStore.clearPendingCreation(request: request, ownerNamespace: context.ownerNamespace)
-        case .failure(let failure) where failure.kind == .retryable || failure.kind == .authentication:
-            // Sans réponse exploitable : la reprise renverra le même corps.
-            break
-        case .failure:
-            // Refus (liste périmée, identifiant pris, reçu inexact…) : la prochaine demande repart d'un corps neuf.
+        case .failure(let failure) where failure.kind == .permanent:
+            // Refus du serveur (liste périmée, identifiant pris…) : la prochaine demande repart d'un corps neuf.
             try? stateStore.clearPendingCreation(request: request, ownerNamespace: context.ownerNamespace)
+        case .failure:
+            // Réseau, session, ou échec local après la réponse (reçu illisible,
+            // stockage) : le serveur a peut-être créé la conversation, la
+            // reprise renverra le même corps.
+            break
         }
         return result
     }
 
     static let pendingCreationLifetimeMs: Int64 = 60 * 60 * 1_000
+    private static let creationLock = NSLock()
 
     /// Empreinte d'une demande de création : mêmes participants (triés), même
     /// nature, même titre, même exclusion des navigateurs.

@@ -216,7 +216,9 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         defer { Self.lock.unlock() }
         for key in try tokenStore.keys(withPrefix: Self.prefix(ownerNamespace: ownerNamespace))
         where key.hasSuffix(":current") || key.hasSuffix(":accepted") || key.hasSuffix(":counter") || key.contains(":send:")
-            || key.hasSuffix(":sent") || key.hasSuffix(":membership-pending") {
+            || key.hasSuffix(":sent") || key.hasSuffix(":membership-pending")
+            // Genèses et créations en attente, signées par l'identité remplacée.
+            || key.hasSuffix(":pending") {
             try tokenStore.remove(key)
         }
     }

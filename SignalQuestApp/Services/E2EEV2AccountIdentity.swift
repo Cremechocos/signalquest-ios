@@ -536,12 +536,31 @@ final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
         try tokenStore.set(value, for: Self.key(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
     }
 
+    func remove(ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw E2EEV2AccountIdentityStore.Failure.otherAccount }
+        try tokenStore.remove(Self.key(ownerNamespace: ownerNamespace))
+    }
+
+    /// Écart toléré entre l'horloge d'ici et `issuedAtMs` d'un document en attente.
+    static let pendingSkewMs = E2EEV2IdentityVerification.capabilityFutureSkewMs
+    /// Avance maximale acceptée d'une séquence annoncée par le serveur
+    /// (`currentSequence`) : au-delà, elle n'est pas crue.
+    static let maxServerSequenceLead = 1_000
+
     /// À publier : rien encore, un autre appareil, un autre build, une autre
-    /// liste, ou 30 jours passés.
+    /// liste, ou 30 jours passés depuis son émission (horloge qui recule
+    /// comprise).
     static func isCurrent(_ state: State, deviceId: String, appBuild: String, nowMs: Int64) -> Bool {
-        guard state.deviceId == deviceId, state.appBuild == appBuild, let publishedAtMs = state.publishedAtMs,
-              nowMs - publishedAtMs < republishAfterMs,
-              let document = try? E2EEV2CapabilitiesDocument.parse(document: state.document) else { return false }
+        guard state.deviceId == deviceId, state.appBuild == appBuild, state.publishedAtMs != nil,
+              let document = try? E2EEV2CapabilitiesDocument.parse(document: state.document),
+              (0..<republishAfterMs).contains(nowMs - document.issuedAtMs) else { return false }
         return document.kinds == kinds && document.features == features
+    }
+
+    /// Un document envoyé sans réponse ne repart tel quel que s'il est récent.
+    static func isReplayable(_ state: State, deviceId: String, appBuild: String, nowMs: Int64) -> Bool {
+        guard state.publishedAtMs == nil, state.deviceId == deviceId, state.appBuild == appBuild,
+              let document = try? E2EEV2CapabilitiesDocument.parse(document: state.document) else { return false }
+        return abs(nowMs - document.issuedAtMs) <= pendingSkewMs
     }
 }

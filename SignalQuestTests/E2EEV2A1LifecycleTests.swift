@@ -24,6 +24,7 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
         /// Séquence de capacités enregistrée par appareil ; une réponse STALE forcée.
         var capabilitySequences: [String: Int] = [:]
         var staleCapabilitiesOnce: Int?
+        var invalidCapabilitiesOnce = false
 
         func locked<T>(_ body: () throws -> T) rethrows -> T { lock.lock(); defer { lock.unlock() }; return try body() }
 
@@ -174,6 +175,9 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
                 let document = try E2EEV2CapabilitiesDocument.parse(document: try XCTUnwrap(body["document"] as? String))
                 let deviceId = path.components(separatedBy: "/")[5]
                 XCTAssertEqual(document.deviceId, deviceId)
+                if server.locked({ () -> Bool in defer { server.invalidCapabilitiesOnce = false }; return server.invalidCapabilitiesOnce }) {
+                    return try respond(["error": "x", "code": "E2EE_CAPABILITIES_INVALID", "requestId": "r"], 422)
+                }
                 if let stale = server.locked({ () -> Int? in defer { server.staleCapabilitiesOnce = nil }; return server.staleCapabilitiesOnce }) {
                     return try respond(["error": "x", "code": "E2EE_CAPABILITIES_STALE", "requestId": "r",
                                         "details": ["currentSequence": String(stale)]], 409)
@@ -373,6 +377,21 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
         guard case .success(true) = await upgraded.lifecycle.publishCapabilitiesIfNeeded() else { return XCTFail("Nouveau build") }
         XCTAssertEqual(server.locked { server.capabilitySequences[first.descriptor.deviceId] }, 6,
                        "Au-dessus de la séquence du serveur")
+
+        // Relecture du 04/10 : une séquence très en avance ne se croit pas.
+        let next = try device(fixture, primary: true, appBuild: "163")
+        server.locked { server.staleCapabilitiesOnce = 6 + 5_000 }
+        guard case .failed(let implausible) = await next.lifecycle.publishCapabilitiesIfNeeded() else { return XCTFail("Refus attendu") }
+        XCTAssertEqual(implausible.message, "e2ee-capabilities-sequence-implausible")
+        XCTAssertEqual(server.locked { server.capabilitySequences[first.descriptor.deviceId] }, 6)
+        // Un refus définitif ne fait pas repartir le même document.
+        let refused = try device(fixture, primary: true, appBuild: "164")
+        server.locked { server.invalidCapabilitiesOnce = true }
+        guard case .failed = await refused.lifecycle.publishCapabilitiesIfNeeded() else { return XCTFail("422 attendu") }
+        let namespace = fixture.session.ownerNamespace
+        XCTAssertNil(try E2EEV2CapabilitiesPublicationStore(tokenStore: first.vault, allowsOwner: { _ in true }).load(ownerNamespace: namespace),
+                     "Document refusé oublié")
+        guard case .success(true) = await refused.lifecycle.publishCapabilitiesIfNeeded() else { return XCTFail("Document neuf") }
     }
 
     /// Un autre appareil a établi le compte pendant ce bootstrap : l'UIK créée

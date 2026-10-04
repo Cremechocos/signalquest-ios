@@ -798,7 +798,10 @@ enum E2EEV2VaultBoundary {
         }
         for key in ["epoch-v2-owner-index:\(namespace)", "rotation-work-v1:\(namespace)",
                     E2EEV2AccountIdentityStore.key(ownerNamespace: namespace),
-                    E2EEV2AccountIdentityStore.verifiedKey(ownerNamespace: namespace)] {
+                    E2EEV2AccountIdentityStore.verifiedKey(ownerNamespace: namespace),
+                    E2EEV2AccountIdentityStore.pendingBootstrapKey(ownerNamespace: namespace),
+                    E2EEV2AccountIdentityStore.pendingApprovalKey(ownerNamespace: namespace),
+                    E2EEV2CapabilitiesPublicationStore.key(ownerNamespace: namespace)] {
             attempt { try store.remove(key) }
         }
         for prefix in ["epoch-v2:\(namespace):", "epoch-v2-history:\(namespace):", "epoch-v2-index:\(namespace):",
@@ -3887,8 +3890,10 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                 return .success(false)
             }
             var pending: E2EEV2CapabilitiesPublicationStore.State
-            if let stored, stored.publishedAtMs == nil, stored.deviceId == device.deviceId, stored.appBuild == appBuild {
-                // Envoi resté sans réponse : le même document repart.
+            if let stored, E2EEV2CapabilitiesPublicationStore.isReplayable(
+                stored, deviceId: device.deviceId, appBuild: appBuild, nowMs: nowMs()
+            ) {
+                // Envoi récent resté sans réponse : le même document repart.
                 pending = stored
             } else {
                 let previous = stored?.deviceId == device.deviceId ? stored?.sequence ?? 0 : 0
@@ -3912,11 +3917,19 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                     if case .string(let text)? = failure.details?["currentSequence"] {
                         serverSequence = E2EEV2Canonical.sequenceNumber(text) ?? 0
                     }
+                    // Une séquence très en avance ne se croit pas : la signer
+                    // bloquerait toute publication suivante (épinglée chez les autres).
+                    guard serverSequence <= pending.sequence + E2EEV2CapabilitiesPublicationStore.maxServerSequenceLead else {
+                        return localFailure("e2ee-capabilities-sequence-implausible")
+                    }
                     pending = try makeCapabilities(
                         userId: userId, device: device, sequence: max(serverSequence, pending.sequence) + 1,
                         nowMs: nowMs(), namespace: namespace
                     )
                 case .failure(let failure):
+                    // Refus définitif (document invalide, horloge en avance…) : il
+                    // ne repart pas ; la prochaine fois, un document neuf.
+                    if failure.kind == .permanent { try? capabilities.remove(ownerNamespace: namespace) }
                     return .failed(failure)
                 case .success(let data, _, _):
                     guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
