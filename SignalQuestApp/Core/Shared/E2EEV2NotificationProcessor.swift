@@ -359,6 +359,11 @@ enum E2EEV2NotificationProcessor {
         result.setValue("application/json", forHTTPHeaderField: "Accept")
         result.setValue("auth_token=\(context.authToken)", forHTTPHeaderField: "Cookie")
         result.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
+        // Contrat d'en-têtes client v1 : le build de l'extension est celui de l'app.
+        if let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
+           build.range(of: #"^[0-9]{1,9}$"#, options: .regularExpression) != nil {
+            result.setValue(build, forHTTPHeaderField: "X-Client-App-Build")
+        }
         result.setValue(String(E2EEV2ProtocolWire.version), forHTTPHeaderField: E2EEV2ProtocolWire.protocolVersionHeader)
         result.setValue(E2EEV2ProtocolWire.messageCapabilities.sorted().joined(separator: ","),
                         forHTTPHeaderField: E2EEV2ProtocolWire.capabilitiesHeader)

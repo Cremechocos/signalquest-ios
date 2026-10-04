@@ -40,4 +40,15 @@ final class OutageNotificationReceiptTests: XCTestCase {
         XCTAssertEqual(APIClient.appVersionLabel(shortVersion: "1.0", build: nil), "1.0")
         XCTAssertNil(APIClient.appVersionLabel(shortVersion: " ", build: "75"))
     }
+
+    /// Contrat d'en-têtes client v1 : le build part aussi seul, lisible par le
+    /// serveur ; la version garde « 1.0 (161) » tant que le serveur l'y lit.
+    func testTheBuildAlsoTravelsInItsOwnHeader() {
+        XCTAssertEqual(
+            APIClient.appVersionHeaders(shortVersion: "1.0", build: "161"),
+            ["X-Client-App-Version": "1.0 (161)", "X-Client-App-Build": "161"]
+        )
+        XCTAssertEqual(APIClient.appVersionHeaders(shortVersion: "1.0", build: nil), ["X-Client-App-Version": "1.0"])
+        XCTAssertEqual(APIClient.appVersionHeaders(shortVersion: "1.0", build: "0"), ["X-Client-App-Version": "1.0 (0)"])
+    }
 }

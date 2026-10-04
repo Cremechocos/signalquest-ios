@@ -363,6 +363,22 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         return "\(version) (\(build))"
     }
 
+    /// Contrat d'en-têtes client v1 (serveur, P4-1) : le build entier à part,
+    /// dans `X-Client-App-Build`. `X-Client-App-Version` garde « 1.0 (161) » :
+    /// le contrôle des écritures du serveur y lit encore le build, jusqu'à ce
+    /// qu'il lise ce nouvel en-tête.
+    static func appVersionHeaders(shortVersion: String?, build: String?) -> [String: String] {
+        var headers: [String: String] = [:]
+        if let label = appVersionLabel(shortVersion: shortVersion, build: build) {
+            headers["X-Client-App-Version"] = label
+        }
+        if let build = build?.trimmingCharacters(in: .whitespacesAndNewlines),
+           build.range(of: #"^[0-9]{1,9}$"#, options: .regularExpression) != nil, (Int(build) ?? 0) >= 1 {
+            headers["X-Client-App-Build"] = build
+        }
+        return headers
+    }
+
     private static let osVersionLabel: String = {
         let osVersion = ProcessInfo.processInfo.operatingSystemVersion
         var label = "\(osVersion.majorVersion).\(osVersion.minorVersion)"
@@ -394,12 +410,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         if let model = hardwareModelIdentifier(), !model.isEmpty {
             headers["X-Client-Model"] = model
         }
-        if let version = appVersionLabel(
+        headers.merge(appVersionHeaders(
             shortVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
             build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
-        ) {
-            headers["X-Client-App-Version"] = version
-        }
+        )) { current, _ in current }
         return headers
     }()
 
