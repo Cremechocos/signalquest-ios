@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Erreur lisible d'une action v2 depuis un écran.
@@ -16,6 +17,7 @@ enum E2EEV2MessagingQAGate {
         #if DEBUG
         guard qaArgumentEnabled, config.environment != .production,
               let components = URLComponents(url: config.apiBaseURL, resolvingAgainstBaseURL: false),
+              let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme),
               let host = components.host?.lowercased(), ["localhost", "127.0.0.1", "::1"].contains(host),
               components.port != nil, components.user == nil, components.password == nil,
               components.query == nil, components.fragment == nil,
@@ -156,7 +158,11 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         let first = await operation(try await parts.directory.devices(for: accounts))
         guard let stale = staleUserIds(first) else { return first }
         await parts.directory.invalidate(stale.isEmpty ? accounts : stale)
-        return await operation(try await parts.directory.devices(for: accounts))
+        // Relus après l'opération : une synchronisation a pu ajouter des membres
+        // ou des auteurs à la chaîne gardée.
+        let again = Set(self.accounts(conversationId: conversationId, participantIds: participantIds, parts: parts))
+            .union(stale)
+        return await operation(try await parts.directory.devices(for: again.sorted()))
     }
 
     private static func stale(_ failure: E2EEV2TransportFailure) -> [String]? {
@@ -249,6 +255,48 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         }
     }
 
+    /// Rotation demandée par la file durable (§3.3 : appareil ajouté ou
+    /// révoqué, exigence publiée par le serveur). Rien à faire pour une
+    /// conversation qui n'est pas v2 ici ; sinon la décision de l'appareil,
+    /// avec les appareils certifiés des membres de la chaîne gardée.
+    func rotate(conversationId: String) async -> E2EEV2EpochRotationResult {
+        guard writesEnabled else { return .failure(Self.closed) }
+        guard let parts = current() else { return .failure(Self.noSession) }
+        let stored: (isGroup: Bool, members: [String])
+        switch parts.messaging.storedMembership(conversationId: conversationId) {
+        case .notV2: return .noAction
+        case .unreadable: return .failure(.init(kind: .retryable, message: "e2ee-v2-conversation-state-unreadable"))
+        case .v2(let isGroup, let members): stored = (isGroup, members)
+        }
+        // Une rotation demandée suit souvent un appareil ajouté ou révoqué chez
+        // un membre : ses appareils sont relus, jamais pris dans le cache.
+        await parts.directory.invalidate(accounts(conversationId: conversationId, participantIds: stored.members, parts: parts))
+        let result: E2EEV2EpochRotationV2Result
+        do {
+            result = try await withDevices(conversationId: conversationId, participantIds: stored.members, parts: parts, staleUserIds: {
+                if case .failure(let failure) = $0 { return Self.stale(failure) }
+                return nil
+            }) { devices in
+                await parts.messaging.rotate(
+                    conversationId: conversationId, isGroup: stored.isGroup, devices: devices,
+                    expectedOwnerScopeId: parts.session.ownerScopeId
+                )
+            }
+        } catch {
+            return .failure(Self.directoryFailure(error))
+        }
+        switch result {
+        case .upToDate: return .noAction
+        case .rotated: return .rotated(followUpRequired: false)
+        // Encore une époque adoptée au dernier tour : la décision reste à refaire.
+        case .adopted: return .rotated(followUpRequired: true)
+        case .needsMembershipSync: return .failure(.init(kind: .retryable, message: "e2ee-v2-membership-sync-pending"))
+        // Un numéro de sécurité à accepter : jamais d'époque qui exclut en silence (§2.4).
+        case .membersNotTrusted: return .failure(.init(kind: .localState, message: "e2ee-v2-members-not-trusted"))
+        case .failure(let failure): return .failure(failure)
+        }
+    }
+
     // MARK: Pour l'écran
 
     enum ThreadResult: Sendable {
@@ -316,6 +364,24 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         ) else { return false }
         if case .created = result { return true }
         return false
+    }
+
+    /// De quoi montrer le numéro de sécurité d'un membre (§2.4) : l'annuaire de
+    /// la session, son propre compte et sa clé de compte détenue ici.
+    struct SafetyNumberAccess {
+        let trust: any E2EEV2SafetyNumberTrusting
+        let ownUserId: String
+        let ownAccountKey: () -> P256.Signing.PublicKey?
+    }
+
+    func safetyNumberAccess() -> SafetyNumberAccess? {
+        guard readsEnabled, let parts = current() else { return nil }
+        let namespace = parts.session.ownerNamespace
+        return SafetyNumberAccess(
+            trust: parts.directory,
+            ownUserId: String(parts.session.ownerScopeId.dropFirst("user:".count)),
+            ownAccountKey: { [accountIdentityStore] in (try? accountIdentityStore.load(ownerNamespace: namespace))?.publicKey }
+        )
     }
 
     /// Dernier message lisible d'une conversation v2, déjà vérifié et gardé

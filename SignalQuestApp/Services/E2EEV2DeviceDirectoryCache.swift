@@ -12,6 +12,7 @@ actor E2EEV2DeviceDirectoryCache {
     private struct Entry {
         let devices: [E2EEV2CertifiedDevice]?
         let refusal: E2EEV2IdentityVerification.Failure?
+        let listVersion: Int?
         let readAt: Date
     }
 
@@ -19,6 +20,11 @@ actor E2EEV2DeviceDirectoryCache {
     private let directory: E2EEV2TrustDirectory
     private let now: @Sendable () -> Date
     private var entries: [String: Entry] = [:]
+    /// Invalidations par compte : une lecture commencée avant une invalidation
+    /// (révocation, numéro accepté) n'écrit pas son résultat après elle, ce
+    /// que la réentrance de l'acteur permettrait pendant l'`await`.
+    private var generations: [String: Int] = [:]
+    private var generation = 0
 
     init(session: LocalAccountSession, directory: E2EEV2TrustDirectory, now: @escaping @Sendable () -> Date = Date.init) {
         self.session = session
@@ -57,30 +63,71 @@ actor E2EEV2DeviceDirectoryCache {
             guard let entry = entries[user] else { return true }
             return current.timeIntervalSince(entry.readAt) >= Self.lifetime || current < entry.readAt
         }
+        var fresh: E2EEV2CertifiedDeviceSet?
         if !stale.isEmpty {
-            let fresh = try await directory.certifiedDevices(for: Array(stale))
+            let users = stale.sorted()
+            let before = (all: generation, users: users.map { generations[$0] ?? 0 })
+            let read = try await directory.certifiedDevices(for: users)
+            fresh = read
             let readAt = now()
-            for user in stale {
-                entries[user] = Entry(devices: fresh.devicesByUser[user], refusal: fresh.refusals[user], readAt: readAt)
+            for (user, seen) in zip(users, before.users)
+            where before.all == generation && seen == (generations[user] ?? 0) {
+                entries[user] = Entry(
+                    devices: read.devicesByUser[user], refusal: read.refusals[user],
+                    listVersion: read.listVersions[user], readAt: readAt
+                )
             }
         }
         var devices: [String: [E2EEV2CertifiedDevice]] = [:]
         var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
+        var versions: [String: Int] = [:]
         for user in wanted {
-            if let refusal = entries[user]?.refusal { refusals[user] = refusal }
-            if let list = entries[user]?.devices { devices[user] = list }
+            // Ce qui vient d'être lu sert à cet appel même si une invalidation
+            // l'empêche d'entrer dans le cache : il est plus récent que lui.
+            let devicesRead = fresh?.devicesByUser[user] ?? (stale.contains(user) ? nil : entries[user]?.devices)
+            let refusalRead = fresh?.refusals[user] ?? (stale.contains(user) ? nil : entries[user]?.refusal)
+            let versionRead = fresh?.listVersions[user] ?? (stale.contains(user) ? nil : entries[user]?.listVersion)
+            if let refusalRead { refusals[user] = refusalRead }
+            if let devicesRead { devices[user] = devicesRead }
+            if let versionRead { versions[user] = versionRead }
         }
         let owners = devices.values.flatMap { $0 }.reduce(into: [String: Int]()) { $0[$1.deviceId, default: 0] += 1 }
         let ambiguous = Set(owners.filter { $0.value > 1 }.keys)
         if !ambiguous.isEmpty {
             devices = devices.mapValues { $0.filter { !ambiguous.contains($0.deviceId) } }
         }
-        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals)
+        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals, listVersions: versions)
     }
 
     /// Comptes à relire au prochain appel ; tous si `nil`.
     func invalidate(_ userIds: [String]? = nil) {
-        guard let userIds else { entries.removeAll(); return }
-        for user in userIds { entries[user] = nil }
+        guard let userIds else {
+            entries.removeAll()
+            generation += 1
+            return
+        }
+        for user in userIds {
+            entries[user] = nil
+            generations[user, default: 0] += 1
+        }
+    }
+}
+
+/// Numéro de sécurité d'un membre (§2.4), lu et accepté dans l'annuaire de la
+/// session : un choix fait ici relit aussitôt les appareils de ce compte, au
+/// lieu d'attendre la fin des 5 minutes.
+extension E2EEV2DeviceDirectoryCache: E2EEV2SafetyNumberTrusting {
+    func safetyNumberIdentity(userId: String) async throws -> E2EEV2SafetyNumberIdentity {
+        try await directory.safetyNumberIdentity(userId: userId)
+    }
+
+    func setVerified(_ verified: Bool, userId: String, uikX963B64: String) async throws {
+        try await directory.setVerified(verified, userId: userId, uikX963B64: uikX963B64)
+        invalidate([userId])
+    }
+
+    func acceptChangedIdentity(userId: String, uikX963B64: String, verified: Bool) async throws {
+        try await directory.acceptChangedIdentity(userId: userId, uikX963B64: uikX963B64, verified: verified)
+        invalidate([userId])
     }
 }

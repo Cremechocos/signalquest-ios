@@ -158,6 +158,10 @@ enum E2EEV2IdentityVerification {
         /// `E2EE_IDENTITY_NOT_FOUND` : pas d'identité v2, ou ce compte ne peut
         /// pas être lu d'ici ; le serveur ne dit pas lequel (E.1).
         case notFound
+        /// `E2EE_IDENTITY_NOT_FOUND` pour un compte déjà épinglé ici : son v2
+        /// a été vu, un serveur ne le fait pas disparaître pour forcer le v1
+        /// (E.1, v0.4.19). Traité comme un paquet refusé.
+        case identityWithdrawn
     }
 
     struct Outcome: Equatable, Sendable {

@@ -577,6 +577,54 @@
         }
       }
     },
+    "Ce changement n’a pas pu être fait dans la conversation chiffrée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This change couldn’t be made in the encrypted conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce changement n’a pas pu être fait dans la conversation chiffrée."
+          }
+        }
+      }
+    },
+    "Ce message chiffré n’a pas pu être envoyé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This encrypted message couldn’t be sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce message chiffré n’a pas pu être envoyé."
+          }
+        }
+      }
+    },
+    "Ce membre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This member"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce membre"
+          }
+        }
+      }
+    },
     "Ce message ne peut pas être signalé : il n’est plus gardé sur cet appareil." : {
       "localizations" : {
         "en" : {
@@ -685,6 +733,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet appareil n’a pas la clé du compte : il ne peut pas en approuver un autre."
+          }
+        }
+      }
+    },
+    "Cette conversation chiffrée n’a pas pu être lue pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This encrypted conversation can’t be read right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette conversation chiffrée n’a pas pu être lue pour l’instant."
+          }
+        }
+      }
+    },
+    "Cette conversation chiffrée n’est pas disponible dans cette version de SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This encrypted conversation isn’t available in this version of SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette conversation chiffrée n’est pas disponible dans cette version de SignalQuest."
           }
         }
       }
@@ -829,6 +909,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Compare ces chiffres avec ceux qui s’affichent chez %@, en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges."
+          }
+        }
+      }
+    },
+    "Connexion instable. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unstable connection. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion instable. Réessaie."
+          }
+        }
+      }
+    },
+    "Connexion instable. La conversation chiffrée se mettra à jour dès que possible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unstable connection. The encrypted conversation will update as soon as possible."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion instable. La conversation chiffrée se mettra à jour dès que possible."
           }
         }
       }
@@ -1105,6 +1217,54 @@
         }
       }
     },
+    "La conversation chiffrée n’a pas pu être créée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The encrypted conversation couldn’t be created."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation chiffrée n’a pas pu être créée."
+          }
+        }
+      }
+    },
+    "La conversation a changé entre-temps. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversation changed in the meantime. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation a changé entre-temps. Réessaie."
+          }
+        }
+      }
+    },
+    "La conversation chiffrée se met à jour. Réessaie dans un instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The encrypted conversation is updating. Try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation chiffrée se met à jour. Réessaie dans un instant."
+          }
+        }
+      }
+    },
     "La conversation vient de changer. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -1245,6 +1405,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chargement du numéro de sécurité"
+          }
+        }
+      }
+    },
+    "Le signalement chiffré n’est pas encore disponible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted reporting isn’t available yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le signalement chiffré n’est pas encore disponible."
           }
         }
       }
@@ -1457,6 +1633,22 @@
         }
       }
     },
+    "Reconnecte-toi puis réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in again, then try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnecte-toi puis réessaie."
+          }
+        }
+      }
+    },
     "S’ils diffèrent, ne marque rien : retire cet appareil depuis ton autre appareil, puis fais-le approuver de nouveau." : {
       "localizations" : {
         "en" : {
@@ -1565,6 +1757,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seul un admin du groupe peut changer ce réglage."
+          }
+        }
+      }
+    },
+    "Seul un administrateur peut faire ce changement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only an admin can make this change."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seul un administrateur peut faire ce changement."
           }
         }
       }
@@ -2029,6 +2237,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu."
+          }
+        }
+      }
+    },
+    "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Il partira dès que possible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member needs to update SignalQuest to receive this message. It will be sent as soon as possible."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Il partira dès que possible."
+          }
+        }
+      }
+    },
+    "Un membre a un nouveau numéro de sécurité. Vérifie-le avant d’envoyer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member has a new safety number. Check it before sending."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un membre a un nouveau numéro de sécurité. Vérifie-le avant d’envoyer."
           }
         }
       }
@@ -51953,6 +52193,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vise le code affiché sur l’appareil à approuver."
+          }
+        }
+      }
+    },
+    "Voir le numéro de sécurité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View safety number"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir le numéro de sécurité"
           }
         }
       }

@@ -50,6 +50,9 @@ final class E2EEV2MessagingRuntimeTests: XCTestCase {
         guard case .failure(let creation) = await closed.create(participantIds: [bruno], isGroup: false, title: nil, excludesWeb: false)
         else { return XCTFail("Verrou fermé") }
         XCTAssertEqual(creation.kind, .activationBlocked)
+        guard case .failure(let rotation) = await closed.rotate(conversationId: "conversation_runtime_00001")
+        else { return XCTFail("Verrou fermé") }
+        XCTAssertEqual(rotation.kind, .activationBlocked)
         XCTAssertEqual(reads.count(bruno), 0)
     }
 
@@ -93,5 +96,32 @@ extension E2EEV2MessagingRuntimeTests {
         XCTAssertFalse(E2EEV2MessagingQAGate.allows(config: local, qaArgumentEnabled: false))
         XCTAssertFalse(E2EEV2MessagingQAGate.allows(config: remote, qaArgumentEnabled: true))
         XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled, "Les verrous globaux restent fermés")
+    }
+}
+
+extension E2EEV2MessagingRuntimeTests {
+    /// File des rotations (§3.3) : une conversation qui n'est pas v2 ici ne
+    /// demande rien ; le genre d'une conversation v2 se lit dans sa chaîne
+    /// signée, sans dépendre de ce que le serveur en dit.
+    func testARotationRequestReadsTheKindFromTheSignedChainAndSkipsOtherConversations() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let open = try runtime(fixture, reads: Reads(), ignoresGates: true)
+        MockURLProtocol.requestHandler = { request in
+            XCTFail("Aucune requête pour une conversation qui n'est pas v2 : \(request.url?.path ?? "")")
+            return E2EEV2AccountFixture.response(request, Data("{}".utf8), status: 500)
+        }
+        let skipped = await open.rotate(conversationId: "conversation_v1_only_000001")
+        XCTAssertEqual(skipped, .noAction)
+
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let direct = try fixture.seedConversation(with: bruno, devices: devices)
+        let group = try fixture.seedGroup(with: [bruno], devices: devices)
+        let parts = try XCTUnwrap(open.current())
+        XCTAssertEqual(parts.messaging.storedMembership(conversationId: direct.conversationId),
+                       .v2(isGroup: false, members: [fixture.user, bruno].sorted()))
+        XCTAssertEqual(parts.messaging.storedMembership(conversationId: group.conversationId),
+                       .v2(isGroup: true, members: [fixture.user, bruno].sorted()))
+        XCTAssertEqual(parts.messaging.storedMembership(conversationId: "conversation_v1_only_000001"), .notV2)
     }
 }

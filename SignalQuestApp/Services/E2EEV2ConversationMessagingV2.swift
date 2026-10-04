@@ -233,6 +233,8 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         if let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) {
             let untrusted = devices.untrustedMembers(context.head.members)
             guard untrusted.isEmpty else { return .membersNotTrusted(untrusted) }
+            let unread = devices.unread(context.head.members)
+            guard unread.isEmpty else { return .failure(E2EEV2DeviceListReread.failure(unread)) }
         }
         let mirrorGeneration = notificationMirror?.invalidate(conversationId)
         var last = E2EEV2MessageSendResultV2.needsEpoch
@@ -308,6 +310,74 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
             break
         }
         // Conversation quittée : son entrée et ce que l'extension en a montré partent.
+        updateMirror(conversationId: conversationId, isGroup: isGroup, devices: devices, generation: mirrorGeneration)
+        return result
+    }
+
+    // MARK: Rotation demandée
+
+    enum StoredMembership: Equatable {
+        case v2(isGroup: Bool, members: [String])
+        /// Aucune genèse gardée : la conversation n'est pas v2 sur cet appareil.
+        case notV2
+        /// Coffre ou disque illisible : jamais pris pour « pas v2 ».
+        case unreadable
+    }
+
+    /// Genre et membres d'une conversation v2 gardée, d'après sa chaîne
+    /// vérifiée : la genèse d'un groupe a des administrateurs, celle d'une
+    /// conversation à deux n'en a aucun (D.4), si bien qu'une seule lecture
+    /// réussit.
+    func storedMembership(conversationId: String) -> StoredMembership {
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot() else { return .unreadable }
+        do {
+            guard try stateStore.genesis(conversationId: conversationId, ownerNamespace: session.ownerNamespace) != nil
+            else { return .notV2 }
+        } catch {
+            return .unreadable
+        }
+        for isGroup in [true, false] {
+            if let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) {
+                return .v2(isGroup: isGroup, members: context.head.members.sorted())
+            }
+        }
+        return .unreadable
+    }
+
+    /// Rotation hors envoi (§3.3) : appareil ajouté ou révoqué, exigence
+    /// publiée par le serveur. Synchronise, puis décide comme avant un envoi ;
+    /// une époque adoptée ou une chaîne en retard refont la décision.
+    func rotate(
+        conversationId: String,
+        isGroup: Bool,
+        devices: E2EEV2CertifiedDeviceSet,
+        expectedOwnerScopeId: String
+    ) async -> E2EEV2EpochRotationV2Result {
+        let mirrorGeneration = notificationMirror?.invalidate(conversationId)
+        if case .failure(let error) = await syncer.sync(
+            conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
+        ) { return .failure(error) }
+        var result = E2EEV2EpochRotationV2Result.upToDate
+        rounds: for _ in 0..<Self.maxSendRounds {
+            guard let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) else {
+                return .failure(localError("e2ee-rotation-state-unavailable"))
+            }
+            // Conversation quittée : plus rien à créer d'ici.
+            guard context.head.members.contains(ownUserId(expectedOwnerScopeId)) else { result = .upToDate; break }
+            result = await rotator.rotateIfNeeded(
+                conversationId: conversationId, membership: context.head, membershipAt: context.membershipAt,
+                devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
+            )
+            switch result {
+            case .adopted: continue
+            case .needsMembershipSync:
+                if case .failure(let error) = await syncer.sync(
+                    conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
+                ) { return .failure(error) }
+            case .upToDate, .rotated, .membersNotTrusted, .failure:
+                break rounds
+            }
+        }
         updateMirror(conversationId: conversationId, isGroup: isGroup, devices: devices, generation: mirrorGeneration)
         return result
     }

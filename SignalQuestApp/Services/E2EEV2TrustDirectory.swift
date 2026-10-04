@@ -10,6 +10,17 @@ struct E2EEV2CertifiedDeviceSet: Equatable, Sendable {
     /// Comptes dont le paquet de confiance a été refusé (UIK changée, liste
     /// invalide ou en recul) : aucun de leurs appareils n'est cru.
     let refusals: [String: E2EEV2IdentityVerification.Failure]
+    /// Version de la liste d'appareils vérifiée de chaque compte lu, envoyée
+    /// avec une époque (`memberListVersions`, E.2) : le serveur refuse une
+    /// époque bâtie sur une liste qui n'est plus la courante.
+    var listVersions: [String: Int] = [:]
+
+    /// Membres qui n'ont pas été lus du tout, ni crus ni refusés : appris par
+    /// une synchronisation après la lecture. Ils sont à lire avant toute
+    /// époque, jamais tenus pour des membres sans appareil.
+    func unread(_ members: Set<String>) -> [String] {
+        members.filter { devicesByUser[$0] == nil && refusals[$0] == nil }.sorted()
+    }
 
     func device(userId: String, deviceId: String) -> E2EEV2CertifiedDevice? {
         devicesByUser[userId]?.first { $0.deviceId == deviceId }
@@ -180,18 +191,23 @@ actor E2EEV2TrustDirectory {
     func certifiedDevices(for userIds: [String]) async throws -> E2EEV2CertifiedDeviceSet {
         var devices: [String: [E2EEV2CertifiedDevice]] = [:]
         var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
+        var versions: [String: Int] = [:]
         for userId in Set(userIds).sorted() {
             let expected = userId == ownUserId ? ownAccountKey() : nil
             let read: Read
             do {
                 read = try await self.read(userId: userId, expectedUIK: expected)
             } catch is IdentityNotFound {
-                refusals[userId] = .notFound
+                // Un pin illisible compte comme un pin : jamais de retour en v1 sur un doute.
+                let pinned: Bool
+                do { pinned = try pins.pin(userId: userId, ownerNamespace: ownerNamespace) != nil } catch { pinned = true }
+                refusals[userId] = pinned ? .identityWithdrawn : .notFound
                 continue
             }
             switch read.result {
             case .success(let outcome):
                 devices[userId] = outcome.devices
+                versions[userId] = outcome.pin.listVersion
             case .failure(let refusal):
                 refusals[userId] = refusal
             }
@@ -203,7 +219,7 @@ actor E2EEV2TrustDirectory {
         if !ambiguous.isEmpty {
             devices = devices.mapValues { $0.filter { !ambiguous.contains($0.deviceId) } }
         }
-        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals)
+        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals, listVersions: versions)
     }
 
     /// Son propre compte, vérifié : la liste courante sur laquelle signer la

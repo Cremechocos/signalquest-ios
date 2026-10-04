@@ -90,6 +90,27 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         XCTAssertEqual(set.refusals, [carla.userId: .notFound])
         XCTAssertNotNil(set.device(deviceId: bruno.deviceId))
         XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now, excludesWeb: false), "Un membre illisible rend l'appel indisponible")
+        XCTAssertEqual(set.listVersions, [bruno.userId: 1], "Version de liste gardée pour memberListVersions")
+        XCTAssertEqual(set.unread([bruno.userId, carla.userId, "user_dora_01J7ABCD2345"]), ["user_dora_01J7ABCD2345"])
+    }
+
+    /// v0.4.19 : un compte déjà épinglé qui devient introuvable n'est jamais
+    /// pris pour un membre sans v2, ce qui ferait naître la conversation en v1.
+    func testAPinnedAccountThatTurnsNotFoundIsRefusedNotDowngraded() async throws {
+        let bruno = Account("bruno")
+        let server = Server()
+        server.serve(try bundle(bruno, version: 1, features: ["calls"]), for: bruno.userId)
+        let hidden = LockedFlag()
+        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())) { userId, _ in
+            if hidden.value { throw E2EEV2TrustDirectory.IdentityNotFound() }
+            return try server.response(for: userId)
+        }
+        let first = try await directory.certifiedDevices(for: [bruno.userId])
+        XCTAssertEqual(first.refusals, [:])
+        hidden.value = true
+        let second = try await directory.certifiedDevices(for: [bruno.userId])
+        XCTAssertEqual(second.refusals, [bruno.userId: .identityWithdrawn])
+        XCTAssertEqual(second.untrustedMembers([bruno.userId]), [bruno.userId])
     }
 
     /// Cache de l'annuaire (branchement v2) : relu après 5 minutes ou sur
@@ -669,5 +690,14 @@ private final class LockedDate: @unchecked Sendable {
     var value: Date {
         get { lock.lock(); defer { lock.unlock() }; return stored }
         set { lock.lock(); stored = newValue; lock.unlock() }
+    }
+}
+
+private final class LockedFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored = false
+    var value: Bool {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
     }
 }

@@ -168,8 +168,8 @@ final class AppServices: ObservableObject {
         routing = windowRouting
         let e2eeService = E2EEService(api: api)
         e2ee = e2eeService
-        epochRotations = E2EEV2EpochRotationRuntime(api: api)
         e2eeV2Messaging = E2EEV2MessagingRuntime(api: api, ignoresGates: E2EEV2MessagingQAGate.allows(config: config))
+        epochRotations = E2EEV2EpochRotationRuntime(api: api, messaging: e2eeV2Messaging)
         let sseClient = SSEClient(api: api)
         sse = sseClient
         let authService = AuthService(api: api, e2ee: e2eeService)

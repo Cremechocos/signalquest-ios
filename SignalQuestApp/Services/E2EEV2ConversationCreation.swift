@@ -33,6 +33,14 @@ struct E2EEV2EpochProposal: Sendable {
             }),
         ])
     }
+
+    /// Le même corps, avec la version de liste de chaque membre utilisée
+    /// (`memberListVersions`, E.2, entiers en chaînes) ; inchangé sans version.
+    func json(memberListVersions: [String: Int]) -> E2EEV2JSON {
+        guard !memberListVersions.isEmpty, case .object(var object) = json else { return json }
+        object["memberListVersions"] = .object(memberListVersions.mapValues { .string(String($0)) })
+        return .object(object)
+    }
 }
 
 enum E2EEV2EpochProposals {

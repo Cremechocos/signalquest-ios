@@ -5600,112 +5600,6 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
     }
 }
 
-enum E2EEV2EpochFetchResult: Sendable {
-    case success(E2EEV2StoredEpochKey)
-    case failure(E2EEV2TransportFailure)
-}
-
-/// Signed retrieval + verification + local unwrap + durable Keychain commit.
-/// No runtime caller is wired while the external security gate is closed.
-final class E2EEV2EpochDeliveryClient: @unchecked Sendable {
-    private let transport: E2EEV2APITransport
-    private let identityStore: E2EEV2DeviceIdentityStore
-    private let keyStore: E2EEV2EpochKeyStore
-    private let stateStore: E2EEV2ConversationStateStore
-    private let expectedSession: LocalAccountSession?
-
-    init(
-        api: APIClient,
-        identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
-        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
-        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
-        expectedSession: LocalAccountSession? = nil
-    ) {
-        self.identityStore = identityStore
-        self.keyStore = keyStore
-        self.stateStore = stateStore
-        self.expectedSession = expectedSession
-        transport = E2EEV2APITransport(api: api, identityStore: identityStore, expectedSession: expectedSession)
-    }
-
-    func fetchCurrent(
-        conversationId: String,
-        expectedOwnerScopeId: String
-    ) async -> E2EEV2EpochFetchResult {
-        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
-              session.ownerScopeId == expectedOwnerScopeId else { return localFailure("e2ee-session-changed") }
-        guard expectedOwnerScopeId.hasPrefix("user:"),
-              expectedOwnerScopeId.count > "user:".count,
-              LocalAccountScope.currentOwnerScopeId == expectedOwnerScopeId,
-              LocalAccountScope.currentUserId != nil,
-              conversationId.range(
-                of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#,
-                options: .regularExpression
-              ) != nil else {
-            return localFailure("invalid-e2ee-epoch-fetch-scope")
-        }
-        let ownerNamespace = LocalAccountScope.storageNamespace(for: expectedOwnerScopeId)
-        // Une conversation v2 ne reçoit ses époques que vérifiées (lot 4) :
-        // jamais par cette livraison, dont la clé de l'émetteur vient du serveur.
-        guard E2EEV2VerifiedEpochKeys.allowsLegacyEpochPath(
-            conversationId: conversationId, ownerNamespace: ownerNamespace, stateStore: stateStore
-        ) else { return localFailure("e2ee-v2-conversation-uses-verified-epochs") }
-        let device: E2EEV2DeviceDescriptor
-        do {
-            guard let loaded = try identityStore.load(ownerNamespace: ownerNamespace) else {
-                return localFailure("e2ee-device-identity-unavailable")
-            }
-            device = loaded
-        } catch {
-            return localFailure("e2ee-device-identity-unavailable")
-        }
-        let response = await transport.bound(to: session).getJSON(
-            path: "/api/e2ee/v2/conversations/\(conversationId)/epochs/current",
-            expectedOwnerScopeId: expectedOwnerScopeId,
-            capabilitySet: .message
-        )
-        let data: Data
-        switch response {
-        case .failure(let error): return .failure(error)
-        case .success(let value, _, _): data = value
-        }
-        guard let delivery = E2EEV2EpochDeliveryContract.parseAndVerify(
-            data,
-            expectedConversationId: conversationId,
-            expectedRecipientDeviceId: device.deviceId
-        ) else {
-            return localFailure("invalid-or-untrusted-e2ee-epoch-delivery")
-        }
-        do {
-            var epochKey = try identityStore.unwrapEpochKey(
-                delivery: delivery,
-                ownerNamespace: ownerNamespace
-            )
-            defer { epochKey.resetBytes(in: 0..<epochKey.count) }
-            guard try keyStore.put(
-                delivery: delivery,
-                epochKey: epochKey,
-                ownerNamespace: ownerNamespace,
-                expectedSession: session
-            ), let stored = try keyStore.loadEpoch(
-                conversationId: conversationId,
-                epochNumber: delivery.epochNumber,
-                ownerNamespace: ownerNamespace
-            ) else {
-                return localFailure("e2ee-epoch-storage-failed-or-rollback-rejected")
-            }
-            guard session.isCurrent else { return localFailure("e2ee-session-changed") }
-            return .success(stored)
-        } catch {
-            return localFailure("e2ee-epoch-unwrapping-or-storage-failed")
-        }
-    }
-
-    private func localFailure(_ message: String) -> E2EEV2EpochFetchResult {
-        .failure(.init(kind: .localState, message: message))
-    }
-}
-
 // MARK: - E2EE v2 historical epoch recovery (preview, fail-closed)
 
 enum E2EEV2RecoveryEpochParser {
@@ -6589,9 +6483,7 @@ actor E2EEV2RotationDrain {
             case .noAction:
                 guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
                 try backlog.acknowledge(session, conversation: id, ticket: ticket)
-            case .rotated(let stored, let followUp):
-                var key = stored.epochKey
-                defer { key.resetBytes(in: 0..<key.count) }
+            case .rotated(let followUp):
                 guard d.isCurrent(), !Task.isCancelled else { throw CancellationError() }
                 if !followUp { try backlog.acknowledge(session, conversation: id, ticket: ticket) }
             case .failure(let error): failure = error.kind
@@ -6662,12 +6554,16 @@ enum E2EEV2RotationEvents {
 final class E2EEV2EpochRotationRuntime: ObservableObject {
     @Published private(set) var state = E2EEV2RotationState()
     private let api: APIClient
+    /// Décide et crée chaque époque (§3.3), avec les appareils certifiés.
+    private let messaging: E2EEV2MessagingRuntime
     private let backlog: E2EEV2RotationBacklog
     private let drain = E2EEV2RotationDrain()
     private var session: LocalAccountSession?
     private var task: Task<Void, Never>?
 
-    init(api: APIClient, backlog: E2EEV2RotationBacklog = .shared) { self.api = api; self.backlog = backlog }
+    init(api: APIClient, messaging: E2EEV2MessagingRuntime, backlog: E2EEV2RotationBacklog = .shared) {
+        self.api = api; self.messaging = messaging; self.backlog = backlog
+    }
 
     func stop() { task?.cancel(); task = nil; session = nil; state = .init() }
 
@@ -6677,7 +6573,8 @@ final class E2EEV2EpochRotationRuntime: ObservableObject {
         if task != nil, session == current, !manualRetry { return }
         let previous = task
         stop(); session = current
-        let coordinator = E2EEV2EpochRotationCoordinator(api: api, expectedSession: current)
+        let requirements = E2EEV2RotationRequirementsClient(api: api, expectedSession: current)
+        let messaging = messaging
         task = Task { [weak self, backlog, drain] in
             guard let self else { return }
             // Une nouvelle session attend la fin de l'ancien appel annulé ; aucun poll de verrou.
@@ -6686,15 +6583,17 @@ final class E2EEV2EpochRotationRuntime: ObservableObject {
             do {
                 let existing = try await drain.snapshot(session: current, backlog: backlog)
                 guard current.isCurrent, self.session == current else { return }
-                if !E2EEV2RuntimeWriteGate.enabled && !existing.hasWork { self.task = nil; return }
+                if !messaging.writesEnabled && !existing.hasWork { self.task = nil; return }
                 self.state = existing
-                self.state.phase = E2EEV2RuntimeWriteGate.enabled ? .running : .waitingAuthorization
+                self.state.phase = messaging.writesEnabled ? .running : .waitingAuthorization
                 try await drain.request(session: current, backlog: backlog, resetRetry: manualRetry)
+                // Ses propres appareils ont pu changer (approbation, révocation) : relus.
+                await messaging.invalidateDevices([String(current.ownerScopeId.dropFirst("user:".count))])
                 repeat {
                     let retry = try await drain.run(session: current, backlog: backlog, dependencies: .init(
-                        isCurrent: { current.isCurrent }, activationEnabled: { E2EEV2RuntimeWriteGate.enabled },
-                        pending: { await coordinator.pending(expectedOwnerScopeId: current.ownerScopeId) },
-                        rotate: { await coordinator.rotateConversation(conversationId: $0, expectedOwnerScopeId: current.ownerScopeId) }
+                        isCurrent: { current.isCurrent }, activationEnabled: { messaging.writesEnabled },
+                        pending: { await requirements.pending(expectedOwnerScopeId: current.ownerScopeId) },
+                        rotate: { await messaging.rotate(conversationId: $0) }
                     ))
                     let updated = try await drain.snapshot(session: current, backlog: backlog)
                     guard current.isCurrent, self.session == current, !Task.isCancelled else { return }
@@ -6724,34 +6623,11 @@ struct E2EEV2EpochRotationRequirement: Equatable, Sendable {
     let currentEpochStatus: String?
 }
 
-struct E2EEV2EpochDirectory: Equatable, Sendable {
-    struct Device: Equatable, Sendable {
-        let deviceId: String
-        let publicIdentityKeyB64: String
-        let publicSigningKeyB64: String
-    }
-
-    let conversationId: String
-    let currentEpochNumber: Int
-    let rotationRequired: Bool
-    let rotationReason: String?
-    let rotationRevision: Int?
-    let devices: [Device]
-    var currentEpochStatus: String? = nil
-}
-
-struct E2EEV2EpochRotationReceipt: Equatable, Sendable {
-    let epochId: String
-    let epochNumber: Int
-    let createdAt: String
-    let recipientCount: Int
-    let requirementResolved: Bool
-}
-
 enum E2EEV2EpochRotationContract {
-    static let keyAlgorithm = "AES_256_GCM_HKDF_SHA256"
     private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
-    private static let reasons: Set<String> = ["DEVICE_ADDED", "DEVICE_REVOKED", "RECOVERY", "IDENTITY_RESET"]
+    /// Le motif n'est qu'indicatif (la décision est à l'appareil) : un motif
+    /// encore inconnu ne doit pas figer la file des rotations.
+    private static let reasonPattern = #"^[A-Z][A-Z_]{0,39}\z"#
     private static let statuses: Set<String> = ["active", "compromised", "retired"]
 
     static func parseRequirements(_ data: Data) -> [E2EEV2EpochRotationRequirement]? {
@@ -6778,13 +6654,14 @@ enum E2EEV2EpochRotationContract {
             validOpaqueId(conversationId),
             seen.insert(conversationId).inserted,
             let reason = value["reason"] as? String,
-            reasons.contains(reason),
-            let revision = value["revision"] as? Int,
+            reason.range(of: reasonPattern, options: .regularExpression) != nil,
+            let revision = integer(value["revision"]),
             revision > 0,
             let triggeredAt = value["triggeredAt"] as? String,
             validISO8601(triggeredAt),
-            let epochNumber = value["currentEpochNumber"] as? Int,
-            epochNumber > 0 else { return nil }
+            // 0 : conversation encore v1, sans époque.
+            let epochNumber = integer(value["currentEpochNumber"]),
+            epochNumber >= 0 else { return nil }
             let status = nullableString(value["currentEpochStatus"])
             guard status.valid, status.value.map(statuses.contains) ?? true else { return nil }
             requirements.append(.init(
@@ -6797,168 +6674,6 @@ enum E2EEV2EpochRotationContract {
             ))
         }
         return requirements
-    }
-
-    static func parseDirectory(
-        _ data: Data,
-        expectedConversationId: String
-    ) -> E2EEV2EpochDirectory? {
-        guard data.count <= E2EEV2APITransport.maxJSONResponseBytes,
-              validOpaqueId(expectedConversationId),
-              let root = dictionary(data),
-              root["protocolVersion"] as? Int == 2,
-              root["activationEnabled"] as? Bool == true,
-              root["migrationReady"] as? Bool == true,
-              root["directoryTooLarge"] as? Bool == false,
-              let missing = root["missingParticipantUserIds"] as? [String],
-              missing.isEmpty,
-              let incompatible = root["incompatibleSessionUserIds"] as? [String],
-              incompatible.isEmpty,
-              let conversation = root["conversation"] as? [String: Any],
-              exactKeys(
-                conversation,
-                [
-                    "id",
-                    "currentProtocolVersion",
-                    "currentEpochNumber",
-                    "currentEpochStatus",
-                    "rotationRequired",
-                    "rotationReason",
-                    "rotationRevision",
-                    "rotationTriggeredAt",
-                ]
-              ),
-              conversation["id"] as? String == expectedConversationId,
-              let currentEpochNumber = conversation["currentEpochNumber"] as? Int,
-              currentEpochNumber > 0,
-              let rotationRequired = conversation["rotationRequired"] as? Bool,
-              let participants = root["participants"] as? [[String: Any]] else { return nil }
-        let reason = nullableString(conversation["rotationReason"])
-        let revision = nullableInt(conversation["rotationRevision"])
-        let triggeredAt = nullableString(conversation["rotationTriggeredAt"])
-        guard reason.valid,
-              revision.valid,
-              triggeredAt.valid,
-              rotationRequired ? reason.value.map(reasons.contains) == true : reason.value == nil,
-              revision.value.map { $0 > 0 } ?? true,
-              triggeredAt.value.map(validISO8601) ?? true else { return nil }
-
-        var seen = Set<String>()
-        var devices: [E2EEV2EpochDirectory.Device] = []
-        for participant in participants {
-            guard exactKeys(participant, ["userId", "devices"]),
-                  let userId = participant["userId"] as? String,
-                  validOpaqueId(userId),
-                  let deviceValues = participant["devices"] as? [[String: Any]],
-                  !deviceValues.isEmpty else { return nil }
-            for device in deviceValues {
-                guard exactKeys(
-                    device,
-                    [
-                        "deviceId",
-                        "platform",
-                        "label",
-                        "publicIdentityKeyB64",
-                        "publicSigningKeyB64",
-                        "identityKeyAlgorithm",
-                        "signingKeyAlgorithm",
-                        "keyVersion",
-                        "approvedAt",
-                    ]
-                ),
-                let deviceId = device["deviceId"] as? String,
-                validOpaqueId(deviceId),
-                seen.insert(deviceId).inserted,
-                let platform = device["platform"] as? String,
-                ["android", "ios", "web"].contains(platform),
-                let publicIdentity = device["publicIdentityKeyB64"] as? String,
-                Data(base64Encoded: publicIdentity)?.count == 65,
-                let publicSigning = device["publicSigningKeyB64"] as? String,
-                Data(base64Encoded: publicSigning)?.count == 65,
-                device["identityKeyAlgorithm"] as? String == E2EEV2DeviceIdentityStore.identityKeyAlgorithm,
-                device["signingKeyAlgorithm"] as? String == E2EEV2DeviceIdentityStore.signingKeyAlgorithm,
-                E2EEV2DeviceKeyVersion.parse(device["keyVersion"]) != nil else { return nil }
-                let approvedAt = nullableString(device["approvedAt"])
-                guard approvedAt.valid, approvedAt.value.map(validISO8601) ?? true else { return nil }
-                devices.append(.init(
-                    deviceId: deviceId,
-                    publicIdentityKeyB64: publicIdentity,
-                    publicSigningKeyB64: publicSigning
-                ))
-            }
-        }
-        guard !devices.isEmpty, devices.count <= 500 else { return nil }
-        return .init(
-            conversationId: expectedConversationId,
-            currentEpochNumber: currentEpochNumber,
-            rotationRequired: rotationRequired,
-            rotationReason: reason.value,
-            rotationRevision: revision.value,
-            devices: devices,
-            currentEpochStatus: conversation["currentEpochStatus"] as? String
-        )
-    }
-
-    static func rotationData(
-        directory: E2EEV2EpochDirectory,
-        epochKey: Data,
-        envelopes: [E2EEV2SignedEpochEnvelope]
-    ) throws -> Data {
-        guard directory.rotationRequired,
-              let reason = directory.rotationReason,
-              reasons.contains(reason),
-              epochKey.count == 32,
-              envelopes.count == directory.devices.count,
-              Set(envelopes.map(\.recipientDeviceId)) == Set(directory.devices.map(\.deviceId)) else {
-            throw E2EEV2DeviceIdentityError.invalidRecord
-        }
-        let envelopeObjects = envelopes.map { envelope in
-            [
-                "recipientDeviceId": envelope.recipientDeviceId,
-                "wrapAlgorithm": envelope.wrapAlgorithm,
-                "ephemeralPublicKeyB64": envelope.ephemeralPublicKeyB64,
-                "wrappedEpochKeyB64": envelope.wrappedEpochKeyB64,
-                "nonceB64": envelope.nonceB64,
-                "aadB64": envelope.aadB64,
-                "signatureB64": envelope.signatureB64,
-            ]
-        }
-        return try JSONSerialization.data(
-            withJSONObject: [
-                "previousEpochNumber": directory.currentEpochNumber,
-                "epochNumber": directory.currentEpochNumber + 1,
-                "algorithm": keyAlgorithm,
-                "reason": reason,
-                "keyCommitmentB64": try E2EEV2EpochCrypto.keyCommitment(epochKey),
-                "envelopes": envelopeObjects,
-            ],
-            options: [.sortedKeys]
-        )
-    }
-
-    static func parseReceipt(
-        _ data: Data,
-        expectedEpochNumber: Int,
-        expectedRecipientCount: Int
-    ) -> E2EEV2EpochRotationReceipt? {
-        guard let root = dictionary(data),
-              let epoch = root["epoch"] as? [String: Any],
-              exactKeys(epoch, ["id", "epochNumber", "status", "createdAt"]),
-              let epochId = epoch["id"] as? String,
-              validOpaqueId(epochId),
-              epoch["epochNumber"] as? Int == expectedEpochNumber,
-              epoch["status"] as? String == "active",
-              let createdAt = epoch["createdAt"] as? String,
-              validISO8601(createdAt),
-              root["recipientCount"] as? Int == expectedRecipientCount,
-              let resolved = root["rotationRequirementResolved"] as? Bool else { return nil }
-        return .init(
-            epochId: epochId,
-            epochNumber: expectedEpochNumber,
-            createdAt: createdAt,
-            recipientCount: expectedRecipientCount,
-            requirementResolved: resolved
-        )
     }
 
     private static func dictionary(_ data: Data) -> [String: Any]? {
@@ -6988,39 +6703,38 @@ enum E2EEV2EpochRotationContract {
         return (true, string)
     }
 
-    private static func nullableInt(_ value: Any?) -> (valid: Bool, value: Int?) {
-        if value == nil || value is NSNull { return (true, nil) }
-        guard let number = value as? Int else { return (false, nil) }
-        return (true, number)
+    /// Entier JSON, ou chaîne décimale canonique (D.0) : la route passe aux
+    /// entiers en chaînes, les deux formes sont lues pendant la transition.
+    private static func integer(_ value: Any?) -> Int? {
+        if let string = value as? String {
+            guard string.range(of: #"^(0|[1-9][0-9]{0,9})\z"#, options: .regularExpression) != nil else { return nil }
+            return Int(string)
+        }
+        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+        return value as? Int
     }
 }
 
-enum E2EEV2EpochRotationResult: Sendable {
+enum E2EEV2EpochRotationResult: Sendable, Equatable {
     case noAction
-    case rotated(E2EEV2StoredEpochKey, followUpRequired: Bool)
+    case rotated(followUpRequired: Bool)
     case failure(E2EEV2TransportFailure)
 }
 
-final class E2EEV2EpochRotationCoordinator: @unchecked Sendable {
-    private let api: APIClient
+/// Exigences de rotation publiées par le serveur (§3.3, confort), relues
+/// après une mort du processus ou une notification manquée. Elles ne font que
+/// désigner des conversations : la décision et l'époque restent à l'appareil
+/// (`E2EEV2MessagingRuntime.rotate`), vers ses appareils certifiés.
+final class E2EEV2RotationRequirementsClient: @unchecked Sendable {
     private let expectedSession: LocalAccountSession?
     private let transport: E2EEV2APITransport
-    private let identityStore: E2EEV2DeviceIdentityStore
-    private let keyStore: E2EEV2EpochKeyStore
-    private let stateStore: E2EEV2ConversationStateStore
 
     init(
         api: APIClient,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
-        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
-        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
         expectedSession: LocalAccountSession? = nil
     ) {
-        self.api = api
         self.expectedSession = expectedSession
-        self.identityStore = identityStore
-        self.keyStore = keyStore
-        self.stateStore = stateStore
         transport = E2EEV2APITransport(api: api, identityStore: identityStore)
     }
 
@@ -7042,150 +6756,6 @@ final class E2EEV2EpochRotationCoordinator: @unchecked Sendable {
         }
     }
 
-    func rotateConversation(
-        conversationId: String,
-        expectedOwnerScopeId: String
-    ) async -> E2EEV2EpochRotationResult {
-        guard validScope(expectedOwnerScopeId), validOpaqueId(conversationId), let session = requestSession(expectedOwnerScopeId) else {
-            return .failure(localError("invalid-e2ee-rotation-scope"))
-        }
-        let ownerNamespace = LocalAccountScope.storageNamespace(for: expectedOwnerScopeId)
-        // Une conversation v2 décide elle-même de ses rotations, vers des
-        // appareils certifiés (lot 4) : jamais vers la liste du serveur.
-        guard E2EEV2VerifiedEpochKeys.allowsLegacyEpochPath(
-            conversationId: conversationId, ownerNamespace: ownerNamespace, stateStore: stateStore
-        ) else { return .failure(localError("e2ee-v2-conversation-uses-verified-epochs")) }
-        let sender: E2EEV2DeviceDescriptor
-        do {
-            guard let loaded = try identityStore.load(ownerNamespace: ownerNamespace) else {
-                return .failure(localError("e2ee-device-identity-unavailable"))
-            }
-            sender = loaded
-        } catch {
-            return .failure(localError("e2ee-device-identity-unavailable"))
-        }
-        let directoryPath = "/api/e2ee/v2/conversations/\(conversationId)/devices"
-        let directoryData: Data
-        let ownedTransport = transport.bound(to: session)
-        switch await ownedTransport.getJSON(
-            path: directoryPath,
-            expectedOwnerScopeId: expectedOwnerScopeId,
-            capabilitySet: .message
-        ) {
-        case .failure(let error): return .failure(error)
-        case .success(let data, _, _): directoryData = data
-        }
-        if let json = (try? JSONSerialization.jsonObject(with: directoryData)) as? [String: Any],
-           json["activationEnabled"] as? Bool == false {
-            return .failure(.init(kind: .activationBlocked, message: "e2ee-rotation-activation-blocked"))
-        }
-        guard let directory = E2EEV2EpochRotationContract.parseDirectory(
-            directoryData,
-            expectedConversationId: conversationId
-        ) else { return .failure(localError("invalid-e2ee-device-directory")) }
-        guard session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
-        guard directory.rotationRequired || directory.currentEpochStatus == "active" else {
-            return .failure(localError("e2ee-current-epoch-not-active"))
-        }
-        let local = try? keyStore.loadEpoch(conversationId: conversationId,
-            epochNumber: directory.currentEpochNumber, ownerNamespace: ownerNamespace)
-        if local == nil && (directory.currentEpochStatus == "active" || !directory.rotationRequired) {
-            let delivery = E2EEV2EpochDeliveryClient(api: api, identityStore: identityStore,
-                keyStore: keyStore, stateStore: stateStore, expectedSession: session)
-            switch await delivery.fetchCurrent(conversationId: conversationId, expectedOwnerScopeId: expectedOwnerScopeId) {
-            case .success(let stored):
-                var key = stored.epochKey; key.resetBytes(in: 0..<key.count)
-            case .failure(let failure):
-                if !(directory.rotationRequired && failure.statusCode == 404 && failure.code == "E2EE_EPOCH_ENVELOPE_NOT_FOUND") {
-                    return .failure(failure)
-                }
-            }
-        }
-        guard session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
-        guard directory.rotationRequired else { return .noAction }
-        guard directory.devices.contains(where: { $0.deviceId == sender.deviceId }) else {
-            return .failure(localError("e2ee-sender-missing-from-directory"))
-        }
-
-        var epochKey: Data
-        do {
-            epochKey = try randomBytes(count: 32)
-        } catch {
-            return .failure(localError("e2ee-epoch-random-generation-failed"))
-        }
-        defer { epochKey.resetBytes(in: 0..<epochKey.count) }
-        do {
-            let epochNumber = directory.currentEpochNumber + 1
-            let envelopes = try directory.devices.map { recipient in
-                try identityStore.createSignedEpochEnvelope(
-                    context: .init(
-                        conversationId: conversationId,
-                        epochNumber: epochNumber,
-                        senderDeviceId: sender.deviceId,
-                        recipientDeviceId: recipient.deviceId
-                    ),
-                    epochKey: epochKey,
-                    recipientPublicIdentityKeyB64: recipient.publicIdentityKeyB64,
-                    ownerNamespace: ownerNamespace
-                )
-            }
-            let body = try E2EEV2EpochRotationContract.rotationData(
-                directory: directory,
-                epochKey: epochKey,
-                envelopes: envelopes
-            )
-            let response: Data
-            switch await ownedTransport.postJSON(
-                path: "/api/e2ee/v2/conversations/\(conversationId)/epochs",
-                body: body,
-                expectedOwnerScopeId: expectedOwnerScopeId,
-                capabilitySet: .message
-            ) {
-            case .failure(let error):
-                if error.statusCode == 409 && ["E2EE_EPOCH_STALE", "E2EE_EPOCH_REASON_STALE", "E2EE_RECIPIENT_SET_STALE"].contains(error.code ?? "") {
-                    return .failure(.init(kind: .retryable, statusCode: error.statusCode, code: error.code, message: error.message))
-                }
-                return .failure(error)
-            case .success(let data, _, _): response = data
-            }
-            guard let receipt = E2EEV2EpochRotationContract.parseReceipt(
-                response,
-                expectedEpochNumber: epochNumber,
-                expectedRecipientCount: envelopes.count
-            ),
-            let selfEnvelope = envelopes.first(where: { $0.recipientDeviceId == sender.deviceId }),
-            let reason = directory.rotationReason else {
-                return .failure(localError("invalid-e2ee-epoch-rotation-response"))
-            }
-            let delivery = E2EEV2EpochDelivery(
-                conversationId: conversationId,
-                epochId: receipt.epochId,
-                epochNumber: receipt.epochNumber,
-                keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(epochKey),
-                reason: reason,
-                status: "active",
-                createdAt: receipt.createdAt,
-                senderDeviceId: sender.deviceId,
-                senderPublicSigningKeyB64: sender.publicSigningKeyB64,
-                envelope: selfEnvelope
-            )
-            guard try keyStore.put(
-                delivery: delivery,
-                epochKey: epochKey,
-                ownerNamespace: ownerNamespace,
-                expectedSession: session
-            ), let stored = try keyStore.loadEpoch(
-                conversationId: conversationId,
-                epochNumber: receipt.epochNumber,
-                ownerNamespace: ownerNamespace
-            ) else { return .failure(localError("e2ee-rotated-epoch-storage-failed")) }
-            guard session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
-            return .rotated(stored, followUpRequired: !receipt.requirementResolved)
-        } catch {
-            return .failure(localError("e2ee-epoch-rotation-failed"))
-        }
-    }
-
     private func validScope(_ ownerScopeId: String) -> Bool {
         ownerScopeId.hasPrefix("user:")
             && ownerScopeId.count > "user:".count
@@ -7197,19 +6767,6 @@ final class E2EEV2EpochRotationCoordinator: @unchecked Sendable {
         guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(),
               session.isCurrent, session.ownerScopeId == owner else { return nil }
         return session
-    }
-
-    private func validOpaqueId(_ value: String) -> Bool {
-        value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#, options: .regularExpression) != nil
-    }
-
-    private func randomBytes(count: Int) throws -> Data {
-        var data = Data(count: count)
-        let status = data.withUnsafeMutableBytes { bytes in
-            SecRandomCopyBytes(kSecRandomDefault, count, bytes.baseAddress!)
-        }
-        guard status == errSecSuccess else { throw E2EEV2DeviceIdentityError.randomGenerationFailed }
-        return data
     }
 
     private func localError(_ message: String) -> E2EEV2TransportFailure {

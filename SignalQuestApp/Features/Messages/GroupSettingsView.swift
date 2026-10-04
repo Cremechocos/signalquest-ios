@@ -391,6 +391,10 @@ struct GroupSettingsView: View {
         isBusy = true
         defer { isBusy = false }
         do {
+            // §12 : une conversation v2 ne change jamais de membres par la voie v1.
+            if EncryptedConversationSurfaces.isV2(conversation) && !usesV2 {
+                throw E2EEV2MessagingError(String(localized: "Cette conversation chiffrée n’est pas disponible dans cette version de SignalQuest."))
+            }
             try await work()
             errorMessage = nil
             Haptics.success()

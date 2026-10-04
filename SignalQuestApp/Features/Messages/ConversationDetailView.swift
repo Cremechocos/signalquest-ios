@@ -55,6 +55,8 @@ struct ConversationDetailView: View {
     @State private var conversationIsV2 = false
     /// Avis du fil v2 (§2.4, §4.2, §4.3, §3.2), posés en tête.
     @State private var v2Notices: [E2EEV2ThreadPresentation.Notice] = []
+    /// Membre dont le numéro de sécurité est ouvert depuis un avis du fil (§2.4).
+    @State private var safetyNumberPeer: SafetyNumberPeer?
     @State private var showEncryptionInfo = false
     /// Suivi du bas de la conversation : un message qui arrive pendant la
     /// lecture de l'historique n'y ramène plus de force (SOC-20).
@@ -246,12 +248,19 @@ struct ConversationDetailView: View {
                                 .padding(.vertical, SQSpace.sm)
                         }
                         ForEach(Array(v2Notices.enumerated()), id: \.offset) { _, notice in
-                            Label(notice.text, systemImage: "lock.trianglebadge.exclamationmark")
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, SQSpace.xs)
-                                .accessibilityIdentifier("conversation.v2Notice")
+                            if case .identityChanged(let userId, let name) = notice {
+                                // L'envoi attend ce membre : l'avis mène à son numéro.
+                                Button {
+                                    safetyNumberPeer = SafetyNumberPeer(userId: userId, name: name)
+                                } label: {
+                                    v2NoticeLabel(notice, detail: String(localized: "Voir le numéro de sécurité"))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("conversation.v2Notice.safetyNumber")
+                            } else {
+                                v2NoticeLabel(notice, detail: nil)
+                                    .accessibilityIdentifier("conversation.v2Notice")
+                            }
                         }
                         // PERF-MSG-04 — Itère directement sur `messages` (identité
                         // stable `\.id`, comme l'ancien `id: \.element.id`) au lieu
@@ -371,8 +380,21 @@ struct ConversationDetailView: View {
                 .padding(.bottom, SQSpace.xs)
                 .sqReadableWidth()
             }
-            composer
-                .sqReadableWidth()
+            if v2Unavailable {
+                // §12 : une conversation v2 ne repasse jamais par la clé v1.
+                Label(String(localized: "Cette conversation chiffrée n’est pas disponible dans cette version de SignalQuest."),
+                      systemImage: "lock.trianglebadge.exclamationmark")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.vertical, SQSpace.sm)
+                    .accessibilityIdentifier("conversation.v2Unavailable")
+                    .sqReadableWidth()
+            } else {
+                composer
+                    .sqReadableWidth()
+            }
         }
         // Barre masquée pour l'en-tête maison ; le balayage retour, que UIKit
         // coupe avec la barre, est rétabli (SOC-30).
@@ -463,6 +485,19 @@ struct ConversationDetailView: View {
         .sheet(isPresented: $showReportUser) {
             if let id = otherParticipantId {
                 ReportSheet(target: .profile(id), service: services.reports)
+            }
+        }
+        .sheet(item: $safetyNumberPeer, onDismiss: { Task { await loadV2() } }) { peer in
+            if let access = services.e2eeV2Messaging.safetyNumberAccess() {
+                NavigationStack {
+                    E2EEV2SafetyNumberView(
+                        peerUserId: peer.userId,
+                        peerName: peer.name ?? String(localized: "Ce membre"),
+                        ownUserId: access.ownUserId,
+                        ownAccountKey: access.ownAccountKey,
+                        trust: access.trust
+                    )
+                }
             }
         }
         .sheet(item: $reportTarget) { message in
@@ -1822,6 +1857,35 @@ struct ConversationDetailView: View {
 
     /// Conversation v2 lue et écrite par la messagerie v2 (verrous ouverts).
     private var usesV2: Bool { conversationIsV2 && services.e2eeV2Messaging.readsEnabled }
+    /// Conversation v2 que cette version n'ouvre pas (verrous fermés) : rien
+    /// n'y part, et surtout pas sous l'ancienne clé v1 (§12).
+    private var v2Unavailable: Bool { conversationIsV2 && !usesV2 }
+
+    private struct SafetyNumberPeer: Identifiable {
+        let userId: String
+        let name: String?
+        var id: String { userId }
+    }
+
+    private func v2NoticeLabel(_ notice: E2EEV2ThreadPresentation.Notice, detail: String?) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                Text(notice.text)
+                if let detail {
+                    Text(detail)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(SQColor.accentInk)
+                }
+            }
+        } icon: {
+            Image(systemName: "lock.trianglebadge.exclamationmark")
+        }
+        .font(SQType.caption)
+        .foregroundStyle(SQColor.labelSecondary)
+        .frame(maxWidth: .infinity, minHeight: detail == nil ? nil : 44, alignment: .leading)
+        .padding(.vertical, SQSpace.xs)
+        .contentShape(Rectangle())
+    }
 
     /// Relève v2 : chaîne, époques, liste vérifiée, puis le fil présenté. Les
     /// bulles locales en cours d'envoi restent jusqu'à leur accusé.
@@ -2338,6 +2402,10 @@ struct ConversationDetailView: View {
     /// crée jamais de doublon côté serveur.
     private func performSend(localId: String) async {
         guard let pending = pendingSends[localId] else { return }
+        guard !v2Unavailable else {
+            sendStatus[localId] = .failed
+            return
+        }
         sendStatus[localId] = .sending
         if usesV2 {
             // Même clientRequestId à chaque essai : l'enveloppe gardée repart à l'octet.
@@ -2597,6 +2665,7 @@ struct ConversationDetailView: View {
     }
 
     private func delete(message: MessageItem, forEveryone: Bool) async {
+        if v2Unavailable && forEveryone { return }
         if usesV2 {
             // v2 : « pour tous » est une suppression signée (§5) ; « pour moi » reste local.
             if forEveryone {

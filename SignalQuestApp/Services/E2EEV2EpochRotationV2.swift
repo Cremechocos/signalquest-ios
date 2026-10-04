@@ -339,6 +339,10 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         }
         let untrusted = devices.untrustedMembers(membership.members)
         guard untrusted.isEmpty else { return .membersNotTrusted(untrusted) }
+        // Un membre appris après la lecture des appareils n'est jamais exclu
+        // faute d'avoir été lu : ses appareils sont lus d'abord.
+        let unread = devices.unread(membership.members)
+        guard unread.isEmpty else { return .failure(E2EEV2DeviceListReread.failure(unread)) }
         let ownerNamespace = session.ownerNamespace
         let ownUserId = String(expectedOwnerScopeId.dropFirst("user:".count))
         guard let device = try? identityStore.load(ownerNamespace: ownerNamespace),
@@ -393,7 +397,9 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
         let bound = transport.bound(to: session)
         switch await bound.postJSON(
             path: "/api/e2ee/v2/conversations/\(conversationId)/epochs",
-            body: E2EEV2CanonicalJSON.encode(proposal.json),
+            body: E2EEV2CanonicalJSON.encode(proposal.json(
+                memberListVersions: devices.listVersions.filter { membership.members.contains($0.key) }
+            )),
             expectedOwnerScopeId: expectedOwnerScopeId,
             capabilitySet: .message
         ) {
@@ -495,5 +501,17 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
 
     private func localError(_ message: String) -> E2EEV2TransportFailure {
         .init(kind: .localState, message: message)
+    }
+}
+
+/// Membres à lire avant d'agir, sous la forme d'un `E2EE_DEVICE_LIST_STALE`
+/// local : la messagerie relit ces comptes puis recommence une fois, comme
+/// pour la réponse du serveur (E.0).
+enum E2EEV2DeviceListReread {
+    static func failure(_ userIds: [String]) -> E2EEV2TransportFailure {
+        E2EEV2TransportFailure(
+            kind: .retryable, code: "E2EE_DEVICE_LIST_STALE", message: "e2ee-v2-members-unread",
+            details: ["userIds": .array(userIds.map { .string($0) })]
+        )
     }
 }

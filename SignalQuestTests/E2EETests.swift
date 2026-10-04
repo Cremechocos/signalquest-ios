@@ -1767,32 +1767,7 @@ final class E2EETests: XCTestCase {
             "protocolVersion": 2, "requirements": [requirement],
         ])
         XCTAssertEqual(E2EEV2EpochRotationContract.parseRequirements(requirements)?.first?.reason, "IDENTITY_RESET")
-        let directoryData = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2, "activationEnabled": true, "activationBlockReason": NSNull(),
-            "migrationReady": true, "directoryTooLarge": false,
-            "missingParticipantUserIds": [], "incompatibleSessionUserIds": [],
-            "conversation": [
-                "id": fixture.conversationId, "currentProtocolVersion": 2, "currentEpochNumber": 7,
-                "currentEpochStatus": "compromised", "rotationRequired": true,
-                "rotationReason": "IDENTITY_RESET", "rotationRevision": 4,
-                "rotationTriggeredAt": "2026-08-29T10:00:00.000Z",
-            ],
-            "participants": [[
-                "userId": "user_00000000000000001",
-                "devices": [[
-                    "deviceId": fixture.recipientDeviceId, "platform": "ios", "label": "iPhone",
-                    "publicIdentityKeyB64": fixture.recipientPublicX963B64,
-                    "publicSigningKeyB64": fixture.senderPublicSigningKeyB64,
-                    "identityKeyAlgorithm": E2EEV2DeviceAlgorithms.identityKeyAlgorithm,
-                    "signingKeyAlgorithm": E2EEV2DeviceAlgorithms.signingKeyAlgorithm,
-                    "keyVersion": 1, "approvedAt": "2026-08-29T09:00:00.000Z",
-                ]],
-            ]],
-        ])
-        XCTAssertEqual(E2EEV2EpochRotationContract.parseDirectory(
-            directoryData, expectedConversationId: fixture.conversationId
-        )?.rotationReason, "IDENTITY_RESET")
-        requirement["reason"] = "RESET"
+        requirement["reason"] = "identity reset"
         XCTAssertNil(E2EEV2EpochRotationContract.parseRequirements(
             try JSONSerialization.data(withJSONObject: [
                 "protocolVersion": 2, "requirements": [requirement],
@@ -1828,104 +1803,48 @@ final class E2EETests: XCTestCase {
         ))
     }
 
-    func testV2EpochRotationContractParsesDurableBacklogAndExactDirectory() throws {
+    /// Les exigences telles que le serveur A3 les sert : motifs d'appartenance,
+    /// conversation encore v1 (époque 0, statut nul), motif encore inconnu.
+    func testV2EpochRotationContractParsesTheServedRequirements() throws {
         let fixture = try epochFixture()
-        let requirement: [String: Any] = [
+        var requirement: [String: Any] = [
             "conversationId": fixture.conversationId,
-            "reason": "DEVICE_REVOKED",
+            "reason": "MEMBER_REMOVED",
             "revision": 3,
-            "triggeredAt": "2026-08-24T10:00:00.000Z",
+            "triggeredAt": "2026-10-04T10:00:00.000Z",
             "currentEpochNumber": 7,
-            "currentEpochStatus": "compromised",
+            "currentEpochStatus": "active",
         ]
-        let backlog = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2,
-            "requirements": [requirement],
-        ])
-        XCTAssertEqual(
-            E2EEV2EpochRotationContract.parseRequirements(backlog)?.first?.reason,
-            "DEVICE_REVOKED"
-        )
-        let duplicate = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2,
-            "requirements": [requirement, requirement],
-        ])
-        XCTAssertNil(E2EEV2EpochRotationContract.parseRequirements(duplicate))
-
-        let directoryData = try JSONSerialization.data(withJSONObject: [
-            "protocolVersion": 2,
-            "activationEnabled": true,
-            "activationBlockReason": NSNull(),
-            "migrationReady": true,
-            "directoryTooLarge": false,
-            "missingParticipantUserIds": [],
-            "incompatibleSessionUserIds": [],
-            "conversation": [
-                "id": fixture.conversationId,
-                "currentProtocolVersion": 2,
-                "currentEpochNumber": 7,
-                "currentEpochStatus": "compromised",
-                "rotationRequired": true,
-                "rotationReason": "DEVICE_REVOKED",
-                "rotationRevision": 3,
-                "rotationTriggeredAt": "2026-08-24T10:00:00.000Z",
-            ],
-            "participants": [[
-                "userId": "user_00000000000000001",
-                "devices": [[
-                    "deviceId": fixture.recipientDeviceId,
-                    "platform": "ios",
-                    "label": "iPhone",
-                    "publicIdentityKeyB64": fixture.recipientPublicX963B64,
-                    "publicSigningKeyB64": fixture.senderPublicSigningKeyB64,
-                    "identityKeyAlgorithm": E2EEV2DeviceIdentityStore.identityKeyAlgorithm,
-                    "signingKeyAlgorithm": E2EEV2DeviceIdentityStore.signingKeyAlgorithm,
-                    "keyVersion": 1,
-                    "approvedAt": "2026-08-24T09:00:00.000Z",
-                ]],
-            ]],
-        ])
-        let directory = try XCTUnwrap(E2EEV2EpochRotationContract.parseDirectory(
-            directoryData,
-            expectedConversationId: fixture.conversationId
-        ))
-        let epochKey = try XCTUnwrap(Data(base64Encoded: fixture.epochKeyB64))
-        let envelope = E2EEV2SignedEpochEnvelope(
-            recipientDeviceId: fixture.recipientDeviceId,
-            wrapAlgorithm: fixture.wrapAlgorithm,
-            ephemeralPublicKeyB64: fixture.ephemeralPublicX963B64,
-            wrappedEpochKeyB64: fixture.wrappedEpochKeyB64,
-            nonceB64: fixture.nonceB64,
-            aadB64: fixture.aadB64,
-            signatureB64: fixture.signatureDerB64
-        )
-        let body = try E2EEV2EpochRotationContract.rotationData(
-            directory: directory,
-            epochKey: epochKey,
-            envelopes: [envelope]
-        )
-        let bodyObject = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-        XCTAssertNil(bodyObject["epochKeyB64"])
-        XCTAssertEqual(bodyObject["epochNumber"] as? Int, 8)
-
-        let receipt = try JSONSerialization.data(withJSONObject: [
-            "epoch": [
-                "id": "epoch_0000000000000002",
-                "epochNumber": 8,
-                "status": "active",
-                "createdAt": "2026-08-24T10:01:00.000Z",
-            ],
-            "recipientCount": 1,
-            "rotationRequirementResolved": false,
-        ])
-        XCTAssertEqual(
-            E2EEV2EpochRotationContract.parseReceipt(
-                receipt,
-                expectedEpochNumber: 8,
-                expectedRecipientCount: 1
-            )?.requirementResolved,
-            false
-        )
+        func parse(_ values: [[String: Any]]) throws -> [E2EEV2EpochRotationRequirement]? {
+            E2EEV2EpochRotationContract.parseRequirements(try JSONSerialization.data(withJSONObject: [
+                "protocolVersion": 2, "requirements": values,
+            ]))
+        }
+        XCTAssertEqual(try parse([requirement])?.first?.reason, "MEMBER_REMOVED")
+        XCTAssertNil(try parse([requirement, requirement]), "Une conversation nommée deux fois")
+        var legacy = requirement
+        legacy["conversationId"] = "conversation_v1_000000001"
+        legacy["reason"] = "DEVICE_REVOKED"
+        legacy["currentEpochNumber"] = 0
+        legacy["currentEpochStatus"] = NSNull()
+        let both = try XCTUnwrap(try parse([requirement, legacy]))
+        XCTAssertEqual(both.map(\.currentEpochNumber), [7, 0])
+        XCTAssertNil(both[1].currentEpochStatus)
+        requirement["reason"] = "SOME_FUTURE_REASON"
+        XCTAssertEqual(try parse([requirement])?.first?.reason, "SOME_FUTURE_REASON", "Un motif inconnu ne fige pas la file")
+        requirement["reason"] = "member-removed"
+        XCTAssertNil(try parse([requirement]))
+        requirement["reason"] = "MANUAL"
+        requirement["currentEpochNumber"] = -1
+        XCTAssertNil(try parse([requirement]))
+        // Entiers en chaînes (D.0), lus comme les entiers ; jamais une forme non canonique.
+        requirement["currentEpochNumber"] = "12"
+        requirement["revision"] = "4"
+        XCTAssertEqual(try parse([requirement])?.first.map { [$0.currentEpochNumber, $0.revision] }, [12, 4])
+        requirement["revision"] = "04"
+        XCTAssertNil(try parse([requirement]))
+        requirement["revision"] = true
+        XCTAssertNil(try parse([requirement]))
     }
 
     func testV2EpochKeyStoreKeepsHistoricalEpochsWithoutMovingCurrentPointer() throws {
@@ -4597,10 +4516,7 @@ extension E2EETests {
             isCurrent: { current.value == session }, activationEnabled: { true }, pending: { .success([]) },
             rotate: { id in
                 calls.value += 1
-                if calls.value == 1 {
-                    return .rotated(.init(conversationId: id, epochId: "epoch_rotation_fixture_01", epochNumber: 2,
-                        keyCommitmentB64: "synthetic-verified-result", epochKey: Data(repeating: 7, count: 32)), followUpRequired: true)
-                }
+                if calls.value == 1 { return .rotated(followUpRequired: true) }
                 return .noAction
             }, now: { clock.value }
         )
@@ -4909,72 +4825,6 @@ extension E2EETests {
             XCTFail("Empty backfill pagination failed: \(failure.kind)")
         }
         XCTAssertEqual(requestedQueries.value, [nil, "cursor=cursor_backfill_page_02"])
-    }
-
-    func testV2RotationLostAckReconcilesCurrentAndKeepsHistoricalKey() async throws {
-        let fixture = try RotationFixture(); defer { fixture.close() }
-        let conversation = "conversation_rotation_0001"
-        let old = Data(repeating: 9, count: 32)
-        XCTAssertTrue(try fixture.keys.put(recordInput: .init(conversationId: conversation, epochId: "epoch_rotation_000001",
-            epochNumber: 1, keyCommitmentB64: E2EEV2EpochCrypto.keyCommitment(old)), epochKey: old, ownerNamespace: fixture.context.ownerNamespace))
-        let committed = LockedBox<Data?>(nil), posts = LockedBox(0), reads = LockedBox(0)
-        MockURLProtocol.requestHandler = { request in
-            let path = request.url!.path
-            if path.hasSuffix("/devices") {
-                return RotationFixture.response(request, try fixture.directory(number: committed.value == nil ? 1 : 2, required: committed.value == nil))
-            }
-            if path.hasSuffix("/epochs/current") {
-                reads.value += 1
-                let body = try JSONSerialization.jsonObject(with: committed.value!) as! [String: Any]
-                let data = try JSONSerialization.data(withJSONObject: [
-                    "protocolVersion": 2, "conversationId": conversation,
-                    "epoch": ["epochId": "epoch_rotation_000002", "epochNumber": 2, "algorithm": body["algorithm"]!,
-                        "keyCommitmentB64": body["keyCommitmentB64"]!, "reason": body["reason"]!, "status": "active", "createdAt": "2026-08-24T10:00:00Z"],
-                    "senderDevice": ["deviceId": fixture.descriptor.deviceId, "publicSigningKeyB64": fixture.descriptor.publicSigningKeyB64],
-                    "envelope": (body["envelopes"] as! [[String: Any]])[0],
-                ])
-                return RotationFixture.response(request, data)
-            }
-            posts.value += 1
-            committed.value = try JSONSerialization.data(withJSONObject: RotationFixture.body(request))
-            throw URLError(.timedOut) // Faux commit serveur, ACK jamais reçu.
-        }
-        let coordinator = E2EEV2EpochRotationCoordinator(api: fixture.api, identityStore: fixture.identity,
-            keyStore: fixture.keys, expectedSession: fixture.context)
-        let first = await coordinator.rotateConversation(conversationId: conversation, expectedOwnerScopeId: fixture.context.ownerScopeId)
-        guard case .failure = first else { return XCTFail("The lost ACK must remain unresolved") }
-        XCTAssertNil(try fixture.keys.loadEpoch(conversationId: conversation, epochNumber: 2, ownerNamespace: fixture.context.ownerNamespace))
-        let retry = await coordinator.rotateConversation(conversationId: conversation, expectedOwnerScopeId: fixture.context.ownerScopeId)
-        guard case .noAction = retry else { return XCTFail("Current envelope should reconcile the committed epoch") }
-        XCTAssertEqual(posts.value, 1); XCTAssertEqual(reads.value, 1)
-        XCTAssertEqual(try fixture.keys.loadEpoch(conversationId: conversation, epochNumber: 1, ownerNamespace: fixture.context.ownerNamespace)?.epochKey, old)
-        XCTAssertEqual(try fixture.keys.load(conversationId: conversation, ownerNamespace: fixture.context.ownerNamespace)?.epochNumber, 2)
-    }
-
-    func testV2RotationCompromisedCurrentAndRacing404AllowRequiredRotation() async throws {
-        for status in ["compromised", "active"] {
-            let fixture = try RotationFixture(); defer { fixture.close() }
-            let posts = LockedBox(0), currentReads = LockedBox(0)
-            MockURLProtocol.requestHandler = { request in
-                if request.url!.path.hasSuffix("/devices") {
-                    return RotationFixture.response(request, try fixture.directory(number: 1, required: true, status: status, reason: "DEVICE_REVOKED"))
-                }
-                if request.url!.path.hasSuffix("/epochs/current") {
-                    currentReads.value += 1
-                    return RotationFixture.response(request, Data("{\"code\":\"E2EE_EPOCH_ENVELOPE_NOT_FOUND\",\"error\":\"missing\"}".utf8), status: 404)
-                }
-                posts.value += 1
-                let data = try JSONSerialization.data(withJSONObject: ["epoch": ["id": "epoch_rotation_000002", "epochNumber": 2,
-                    "status": "active", "createdAt": "2026-08-24T10:00:00Z"], "recipientCount": 1, "rotationRequirementResolved": true])
-                return RotationFixture.response(request, data)
-            }
-            let coordinator = E2EEV2EpochRotationCoordinator(api: fixture.api, identityStore: fixture.identity,
-                keyStore: fixture.keys, expectedSession: fixture.context)
-            let result = await coordinator.rotateConversation(conversationId: "conversation_rotation_0001", expectedOwnerScopeId: fixture.context.ownerScopeId)
-            guard case .rotated(let key, let followUp) = result else { return XCTFail("Required revocation rotation was blocked") }
-            XCTAssertEqual(key.epochNumber, 2); XCTAssertFalse(followUp)
-            XCTAssertEqual(posts.value, 1); XCTAssertEqual(currentReads.value, status == "active" ? 1 : 0)
-        }
     }
 
     func testV2VaultLogoutLocksBWithoutDestroyingApprovedIdentityOrHistoryOfA() async throws {
@@ -5569,11 +5419,16 @@ extension E2EETests {
                            "localSessionRenewed": before != LocalAccountScope.sessionSnapshot()]
             }
         case .resume:
-            let rotation = E2EEV2EpochRotationCoordinator(
-                api: api,
-                identityStore: identity,
-                keyStore: epochs,
-                expectedSession: session
+            let requirements = E2EEV2RotationRequirementsClient(api: api, identityStore: identity, expectedSession: session)
+            let folder = try config.outboxDirectory().deletingLastPathComponent().appendingPathComponent("v2-messaging", isDirectory: true)
+            let messaging = E2EEV2MessagingRuntime(
+                api: api, identityStore: identity, keyStore: epochs,
+                stateStore: E2EEV2ConversationStateStore(tokenStore: vault), accountIdentityStore: accounts, pins: pins,
+                messageStores: {
+                    (E2EEV2MessageStoreV2(rootURL: folder.appendingPathComponent("store"), keyStore: vault),
+                     try E2EEV2MessageLedgerStore(baseDirectory: folder.appendingPathComponent("ledger")))
+                },
+                notificationContext: { nil }, ignoresGates: true
             )
             let drain = E2EEV2RotationDrain()
             try backlog.request(session, conversations: [])
@@ -5585,8 +5440,8 @@ extension E2EETests {
                     isCurrent: { session.isCurrent },
                     // Test-only localhost driver. The compiled production gate remains false.
                     activationEnabled: { true },
-                    pending: { await rotation.pending(expectedOwnerScopeId: session.ownerScopeId) },
-                    rotate: { await rotation.rotateConversation(conversationId: $0, expectedOwnerScopeId: session.ownerScopeId) },
+                    pending: { await requirements.pending(expectedOwnerScopeId: session.ownerScopeId) },
+                    rotate: { await messaging.rotate(conversationId: $0) },
                     now: { clock.value }
                 ))
                 let state = try backlog.snapshot(session)
