@@ -193,6 +193,10 @@ struct E2EEV2ConversationCreation: Sendable {
         guard members.count == participantIds.count + 1, isGroup || members.count == 2 else {
             throw Failure.invalidMembers
         }
+        // Un membre sans identité v2 (E2EE_IDENTITY_NOT_FOUND) ne lit pas le v2 :
+        // la conversation naît en v1 (v0.4.17). Une identité changée ou
+        // invalide, elle, suspend tout (§2.4).
+        guard !members.contains(where: { devices.refusals[$0] == .notFound }) else { throw Failure.capabilityMissing }
         let untrusted = devices.untrustedMembers(members)
         guard untrusted.isEmpty else { throw Failure.membersNotTrusted(untrusted) }
         guard readsV2(devices, members: members, excludesWeb: excludesWeb, nowMs: nowMs) else { throw Failure.capabilityMissing }
@@ -464,6 +468,9 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         } catch E2EEV2ConversationCreation.Failure.capabilityMissing {
             // Un membre ne lit pas encore le v2 : l'appelant crée en v1 (v0.4.17).
             return .failure(localError("e2ee-v2-capability-missing"))
+        } catch E2EEV2ConversationCreation.Failure.membersNotTrusted {
+            // Identité d'un membre illisible ou changée (§2.4) : rien n'est créé.
+            return .failure(localError("e2ee-v2-members-not-trusted"))
         } catch {
             return .failure(localError("e2ee-conversation-creation-invalid"))
         }
