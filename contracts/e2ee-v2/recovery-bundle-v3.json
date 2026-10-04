@@ -33,7 +33,7 @@
     "wrapAlgorithm" : "AES_256_GCM"
   },
   "bundleHash" : "7cb90cd3dc404f56d485fbc66687de2ab87b5dbaff157284ef8ab6d1a9bef438",
-  "bundleSignatureDerB64" : "MEUCIQDWtnc1nTZxLZbFZ21MF/3DdMcV/h+VQInVuFfqFZvh1QIgNmcCmETqItmgUYW2tv2Hd5DuhYIg24DSwLz/71D+8LI=",
+  "bundleSignatureDerB64" : "MEUCIQDQnP9ufxPdoyFDYMvH+jK/m987dWslba8qvOuDkk4YQgIgaejRIbiBx8YjxNaumacR/SpMRmTPlwwprv8YTgWHiao=",
   "bundleSignatureUtf8" : "SQ-E2EE-V2-RECOVERY-BUNDLE\n1\ninterop-fixture\n7cb90cd3dc404f56d485fbc66687de2ab87b5dbaff157284ef8ab6d1a9bef438\nBFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
   "canonicalUtf8" : "{\"version\":3,\"kdfAlgorithm\":\"HKDF_SHA256\",\"kdfParameters\":{\"hash\":\"SHA-256\",\"outputBytes\":32,\"identityInfo\":\"signalquest-e2ee-v2-recovery-identity-v2\",\"signingInfo\":\"signalquest-e2ee-v2-recovery-signing-v2\",\"accountInfo\":\"signalquest-e2ee-v2-recovery-account-v3\"},\"wrapAlgorithm\":\"AES_256_GCM\",\"recoveryPublicIdentityKeyB64\":\"BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=\",\"recoveryPublicSigningKeyB64\":\"BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=\",\"identityPrivateKey\":{\"saltB64\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"nonceB64\":\"ISEhISEhISEhISEh\",\"wrappedPrivateJwkB64\":\"BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V\",\"aadB64\":\"U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ\"},\"signingPrivateKey\":{\"saltB64\":\"EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=\",\"nonceB64\":\"IiIiIiIiIiIiIiIi\",\"wrappedPrivateJwkB64\":\"RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l\",\"aadB64\":\"U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=\"},\"accountPrivateKey\":{\"saltB64\":\"MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=\",\"nonceB64\":\"RERERERERERERERE\",\"wrappedPrivateJwkB64\":\"Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV\",\"aadB64\":\"U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=\",\"publicKeyB64\":\"BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=\"}}",
   "fixtureVersion" : 1,
@@ -72,6 +72,8 @@
         "version" : 3,
         "wrapAlgorithm" : "AES_256_GCM"
       },
+      "bundleHash" : "4e2fe25d9be956189a14229839475d740867dfe4d1f2d22148956622926394bb",
+      "expect" : "shape",
       "name" : "aad-role-identity"
     },
     {
@@ -108,6 +110,8 @@
         "version" : 3,
         "wrapAlgorithm" : "AES_256_GCM"
       },
+      "bundleHash" : "acfb12081eff5fcfa85159cd86d72abcf7d73366fcfc020a34b8aee24dab37f7",
+      "expect" : "shape",
       "name" : "aad-role-signing"
     },
     {
@@ -144,11 +148,14 @@
         "version" : 3,
         "wrapAlgorithm" : "AES_256_GCM"
       },
+      "bundleHash" : "cd9eae45d5bb29305e8c704b9210a5e2d92819b3f4d5f2ea1dd764d1b0273f71",
+      "expect" : "shape",
       "name" : "aad-other-account"
     },
     {
+      "expect" : "served",
       "name" : "served-uik-differs",
-      "servedUikPublicX963B64" : "BFFzAtAorOW/3DeHEOCqPS084/UV7CbpwfjqeblGfeBubSyUhn7xRVCYWWYqE94/o4TgpsAvggYcd+Kpm5JSXXI="
+      "servedUikPublicX963B64" : "BGfuYMu6EaOk9P5AeS0Vjr0rVbqOsYwwjL+XOXGn5Zc7FvlFqhZZYEfETM9ye21iotbyCENHvp/7PI7C85547oA="
     },
     {
       "bundle" : {
@@ -167,7 +174,6 @@
         },
         "kdfAlgorithm" : "HKDF_SHA256",
         "kdfParameters" : {
-          "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
           "hash" : "SHA-256",
           "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
           "outputBytes" : 32,
@@ -184,6 +190,8 @@
         "version" : 2,
         "wrapAlgorithm" : "AES_256_GCM"
       },
+      "bundleHash" : "62b6a8d3cb05f8047c5e8fc2fed76e6bde505188bfc5260138a2a7ae5257bdb3",
+      "expect" : "shape",
       "name" : "version-2-with-ninth-key"
     },
     {
@@ -213,6 +221,8 @@
         "version" : 3,
         "wrapAlgorithm" : "AES_256_GCM"
       },
+      "bundleHash" : "2583331c91dbf02e3b4d524d430509ab1ef5231ff2551a38299a9cd5d3c7cb81",
+      "expect" : "shape",
       "name" : "version-3-without-account-key"
     },
     {
@@ -249,10 +259,13 @@
         "version" : 3,
         "wrapAlgorithm" : "AES_256_GCM"
       },
+      "bundleHash" : "fc305aec7b584f599535ee1f6380e878e1e6d72d232c4e012a5bb19e84d49c94",
+      "expect" : "unwrap",
       "name" : "scalar-out-of-range"
     },
     {
       "bundleHash" : "62b6a8d3cb05f8047c5e8fc2fed76e6bde505188bfc5260138a2a7ae5257bdb3",
+      "expect" : "hash",
       "name" : "hash-without-account-key"
     },
     {
@@ -289,6 +302,8 @@
         "version" : 3,
         "wrapAlgorithm" : "AES_256_GCM"
       },
+      "bundleHash" : "0389451f9c60de5955ad19dcf0b2d68d997b9ecde0d2ec4afc18fbb4159a5247",
+      "expect" : "shape",
       "name" : "equal-nonces"
     },
     {
@@ -296,7 +311,7 @@
         "accountPrivateKey" : {
           "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=",
           "nonceB64" : "RERERERERERERERE",
-          "publicKeyB64" : "BFFzAtAorOW/3DeHEOCqPS084/UV7CbpwfjqeblGfeBubSyUhn7xRVCYWWYqE94/o4TgpsAvggYcd+Kpm5JSXXI=",
+          "publicKeyB64" : "BGfuYMu6EaOk9P5AeS0Vjr0rVbqOsYwwjL+XOXGn5Zc7FvlFqhZZYEfETM9ye21iotbyCENHvp/7PI7C85547oA=",
           "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
           "wrappedPrivateJwkB64" : "Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV"
         },
@@ -325,6 +340,8 @@
         "version" : 3,
         "wrapAlgorithm" : "AES_256_GCM"
       },
+      "bundleHash" : "e5638e10273eeffefc4d81f7e5372d503cfd983d7c7ea55734f48e50bbb14a4c",
+      "expect" : "unwrap",
       "name" : "public-key-not-the-wrapped-uik"
     }
   ],

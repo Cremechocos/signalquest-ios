@@ -656,6 +656,12 @@ conversations chiffrées **sur demande seulement**.
   - Un appareil qui reçoit un bundle v2 garde le comportement d'avant :
     restauration de l'historique s'il est déjà approuvé, jamais de
     signature d'appareil.
+  - Limite connue (v0.4.21) : un appareil qui récupère n'a encore aucun pin.
+    Un serveur pourrait donc lui servir une liste signée plus ancienne qui
+    contient encore un appareil révoqué depuis ; l'appareil récupéré la
+    prolongerait. Les appareils déjà épinglés refusent ce recul. Piste
+    proposée : lier au texte signé du bundle la version de liste du moment,
+    et refuser toute liste servie plus ancienne.
   - Une réinitialisation d'identité révoque le bundle et efface ses
     enveloppes : l'historique n'est plus récupérable après elle, ce que la
     demande fait acquitter.
@@ -2697,8 +2703,11 @@ version publiée qui ouvre les verrous.
   reste.
 - **Session révoquée avec son appareil** (v0.4.20) : `401 UNAUTHORIZED`
   avec `details.reason` à `E2EE_DEVICE_REVOKED`, y compris sur
-  `POST /api/auth/refresh`. Le client efface le coffre v2 de cet appareil et
-  se déconnecte. Chaque requête signée valide met à jour `lastSeenAt`.
+  `POST /api/auth/refresh`. Le client se déconnecte ; il n'efface jamais
+  son coffre sur ce seul refus, qu'un serveur pourrait forger. Il ne l'efface
+  qu'après avoir lu une liste signée par l'UIK, plus récente que son pin, qui
+  ne contient plus son appareil (v0.4.21). Chaque requête signée valide met à
+  jour `lastSeenAt`.
 - **Liaison de la session à l'appareil** (v0.4.19) : toute requête signée
   valide d'un appareil approuvé lie sa session de connexion à cet appareil,
   si elle n'est liée à aucun ; une session liée à un autre appareil reçoit

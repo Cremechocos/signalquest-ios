@@ -11,18 +11,6 @@ extension Notification.Name {
     /// le `sessionID` des identifiants qui ont reçu le refus. Un serveur qui
     /// n'expose pas `emailVerified` laissait sinon Profil sans lien de confirmation.
     static let sqEmailVerificationRequired = Notification.Name("fr.signalquest.ios.emailVerificationRequired")
-    /// 401 avec `details.reason` à `E2EE_DEVICE_REVOKED` (E.1, v0.4.20) : la
-    /// session est révoquée avec son appareil v2. L'objet est la session locale
-    /// au moment du refus ; le coffre v2 de ce compte est effacé.
-    static let sqE2EEDeviceRevoked = Notification.Name("fr.signalquest.ios.e2eeDeviceRevoked")
-}
-
-enum E2EEDeviceRevocationSignal {
-    static func postIfRevoked(status: Int, details: [String: JSONValue]?) {
-        guard status == 401, case .string("E2EE_DEVICE_REVOKED")? = details?["reason"],
-              let session = LocalAccountScope.sessionSnapshot() else { return }
-        NotificationCenter.default.post(name: .sqE2EEDeviceRevoked, object: session)
-    }
 }
 
 /// Le contexte est vérifié à l'émission ET lorsque le main actor traite le
@@ -734,7 +722,6 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         let retryAfter = response.value(forHTTPHeaderField: "Retry-After").flatMap(Int.init)
         let headerRequestId = response.value(forHTTPHeaderField: "X-Request-Id")
         if let decoded = try? decoder.decode(BackendErrorResponse.self, from: data) {
-            E2EEDeviceRevocationSignal.postIfRevoked(status: response.statusCode, details: decoded.details)
             return .http(
                 status: response.statusCode,
                 code: decoded.code,

@@ -196,9 +196,6 @@ protocol AuthServicing: Sendable {
     func clearLocalSession() async
     /// Only after the server has acknowledged deletion of this exact account.
     func eraseDeletedAccountVault(ownerScopeId: String) async
-    /// Appareil v2 révoqué avec sa session (401 `E2EE_DEVICE_REVOKED`) : ses
-    /// clés ne servent plus à rien ici, son coffre v2 est effacé.
-    func eraseRevokedDeviceVault(ownerScopeId: String) async
     /// PERF-START-01 : mémorise le dernier utilisateur authentifié pour un démarrage
     /// à froid optimiste (affichage immédiat + revalidation en arrière-plan).
     func cacheUser(_ user: AuthUser)
@@ -216,7 +213,6 @@ extension AuthServicing {
     func clearLocalSessionForDebugQA() async {}
     func clearLocalSession() async {}
     func eraseDeletedAccountVault(ownerScopeId: String) async {}
-    func eraseRevokedDeviceVault(ownerScopeId: String) async {}
     func cacheUser(_ user: AuthUser) {}
     func cachedUser() -> AuthUser? { nil }
     func hasStoredCredentials() -> Bool { false }
@@ -428,10 +424,6 @@ final class AuthService: AuthServicing {
         await e2ee?.eraseLocalVault(ownerScopeId: ownerScopeId)
     }
 
-    func eraseRevokedDeviceVault(ownerScopeId: String) async {
-        await e2ee?.eraseLocalVault(ownerScopeId: ownerScopeId)
-    }
-
     func cacheUser(_ user: AuthUser) {
         let previousUserId = LocalAccountScope.currentUserId
         if let previousUserId, previousUserId != user.id {
@@ -535,7 +527,6 @@ final class AuthSessionViewModel: ObservableObject {
     // retrait de l'observateur depuis le deinit nonisolé.
     private nonisolated(unsafe) var sessionExpiredObserver: NSObjectProtocol?
     private nonisolated(unsafe) var emailVerificationObserver: NSObjectProtocol?
-    private nonisolated(unsafe) var deviceRevokedObserver: NSObjectProtocol?
 
     init(service: AuthServicing) {
         self.service = service
@@ -558,17 +549,6 @@ final class AuthSessionViewModel: ObservableObject {
             guard let sessionID = notification.object as? UUID else { return }
             MainActor.assumeIsolated { self?.noteEmailVerificationRequired(credentialSessionID: sessionID) }
         }
-        // E.1 (v0.4.20) : appareil v2 révoqué avec sa session. Son coffre est
-        // effacé ; la déconnexion suit le 401 comme une session expirée.
-        deviceRevokedObserver = NotificationCenter.default.addObserver(
-            forName: .sqE2EEDeviceRevoked, object: nil, queue: .main
-        ) { [weak self] notification in
-            guard let session = notification.object as? LocalAccountSession else { return }
-            MainActor.assumeIsolated {
-                guard let service = self?.service, LocalAccountScope.sessionSnapshot() == session else { return }
-                Task { await service.eraseRevokedDeviceVault(ownerScopeId: session.ownerScopeId) }
-            }
-        }
     }
 
     deinit {
@@ -577,9 +557,6 @@ final class AuthSessionViewModel: ObservableObject {
         }
         if let emailVerificationObserver {
             NotificationCenter.default.removeObserver(emailVerificationObserver)
-        }
-        if let deviceRevokedObserver {
-            NotificationCenter.default.removeObserver(deviceRevokedObserver)
         }
     }
 

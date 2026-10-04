@@ -66,6 +66,9 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
         func aad(_ owner: String, _ role: String) -> String { Data("SQ-E2EE-V2-RECOVERY\n2\n\(owner)\n\(role)".utf8).base64EncodedString() }
         var v2WithNinth = try object(v3)
         v2WithNinth["version"] = 2
+        var kdf = try XCTUnwrap(v2WithNinth["kdfParameters"] as? [String: Any])
+        kdf.removeValue(forKey: "accountInfo")
+        v2WithNinth["kdfParameters"] = kdf
         var v3WithoutAccount = try object(v3)
         v3WithoutAccount.removeValue(forKey: "accountPrivateKey")
         // Scalaire hors de [1, n−1] : n lui-même, enveloppé avec la vraie UIK publique.
@@ -74,20 +77,30 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
             privateRaw: order, publicX963: uik.publicKey.x963Representation, recoveryKey: recoveryKey,
             ownerBinding: ownerBinding, role: .account, salt: salt, nonce: Data(repeating: 0x45, count: 12)
         )
+        // Chaque cas dit où il échoue (`expect`) ; un bundle modifié porte son
+        // propre condensat, pour n'échouer que sur la règle visée.
+        func negative(_ name: String, _ expect: String, bundle: [String: Any]? = nil, extra: [String: Any] = [:]) throws -> [String: Any] {
+            var item: [String: Any] = ["name": name, "expect": expect]
+            if let bundle {
+                item["bundle"] = bundle
+                if let decoded = try? self.bundle(bundle) { item["bundleHash"] = E2EEV2RecoveryV2Crypto.bundleHash(decoded) }
+            }
+            return item.merging(extra) { _, new in new }
+        }
         let negatives: [[String: Any]] = [
-            ["name": "aad-role-identity", "bundle": try withAccount { $0["aadB64"] = aad(ownerBinding, "IDENTITY") }],
-            ["name": "aad-role-signing", "bundle": try withAccount { $0["aadB64"] = aad(ownerBinding, "SIGNING") }],
-            ["name": "aad-other-account", "bundle": try withAccount { $0["aadB64"] = aad("user:other-fixture", "ACCOUNT") }],
-            ["name": "served-uik-differs", "servedUikPublicX963B64": other],
-            ["name": "version-2-with-ninth-key", "bundle": v2WithNinth],
-            ["name": "version-3-without-account-key", "bundle": v3WithoutAccount],
-            ["name": "scalar-out-of-range", "bundle": try withAccount {
+            try negative("aad-role-identity", "shape", bundle: try withAccount { $0["aadB64"] = aad(ownerBinding, "IDENTITY") }),
+            try negative("aad-role-signing", "shape", bundle: try withAccount { $0["aadB64"] = aad(ownerBinding, "SIGNING") }),
+            try negative("aad-other-account", "shape", bundle: try withAccount { $0["aadB64"] = aad("user:other-fixture", "ACCOUNT") }),
+            try negative("served-uik-differs", "served", extra: ["servedUikPublicX963B64": other]),
+            try negative("version-2-with-ninth-key", "shape", bundle: v2WithNinth),
+            try negative("version-3-without-account-key", "shape", bundle: v3WithoutAccount),
+            try negative("scalar-out-of-range", "unwrap", bundle: try withAccount {
                 $0["wrappedPrivateJwkB64"] = outOfRange.wrappedPrivateJwkB64
                 $0["nonceB64"] = outOfRange.nonceB64
-            }],
-            ["name": "hash-without-account-key", "bundleHash": E2EEV2RecoveryV2Crypto.bundleHash(v2)],
-            ["name": "equal-nonces", "bundle": try withAccount { $0["nonceB64"] = v2.identityPrivateKey.nonceB64 }],
-            ["name": "public-key-not-the-wrapped-uik", "bundle": try withAccount { $0["publicKeyB64"] = other }],
+            }),
+            try negative("hash-without-account-key", "hash", extra: ["bundleHash": E2EEV2RecoveryV2Crypto.bundleHash(v2)]),
+            try negative("equal-nonces", "shape", bundle: try withAccount { $0["nonceB64"] = v2.identityPrivateKey.nonceB64 }),
+            try negative("public-key-not-the-wrapped-uik", "unwrap", bundle: try withAccount { $0["publicKeyB64"] = other }),
         ]
         let vector: [String: Any] = [
             "fixtureVersion": 1,
@@ -110,8 +123,12 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
 
     // MARK: Lecture
 
-    /// Ce que fait un appareil en récupération : bundle valide, condensat
-    /// attendu, UIK déballée qui est celle servie. Lève sinon.
+    private enum Stage: String { case shape, hash, unwrap, served }
+    private struct Refused: Error { let stage: Stage }
+
+    /// Ce que fait un appareil en récupération, dans l'ordre : lecture stricte
+    /// du bundle servi (celle de production), condensat attendu, déballage de
+    /// l'UIK, puis UIK servie. Lève l'étape qui refuse.
     private func recover(
         _ bundleObject: [String: Any],
         expectedHash: String,
@@ -119,11 +136,22 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
         recoveryKey: Data,
         ownerBinding: String
     ) throws -> P256.Signing.PrivateKey {
-        let candidate = try bundle(bundleObject)
-        guard E2EEV2RecoveryV2Contract.validate(candidate, ownerBinding: ownerBinding),
-              E2EEV2RecoveryV2Crypto.bundleHash(candidate) == expectedHash else { throw E2EEV2RecoveryV2Error.invalidBundle }
-        let uik = try E2EEV2RecoveryV2Crypto.unwrapAccountPrivateKey(bundle: candidate, recoveryKey: recoveryKey, ownerBinding: ownerBinding)
-        guard uik.publicKey.x963Representation.base64EncodedString() == servedUIK else { throw E2EEV2RecoveryV2Error.keyMismatch }
+        var served = bundleObject
+        served["createdAt"] = "2026-10-05T00:00:00.000Z"
+        served["rotatedAt"] = NSNull()
+        served["revokedAt"] = NSNull()
+        guard let response = try? JSONSerialization.data(withJSONObject: ["state": "AVAILABLE", "bundle": served]),
+              let candidate = E2EEV2RecoveryV2Contract.parseActiveBundle(response, expectedOwnerBinding: ownerBinding) else {
+            throw Refused(stage: .shape)
+        }
+        guard E2EEV2RecoveryV2Crypto.bundleHash(candidate) == expectedHash else { throw Refused(stage: .hash) }
+        let uik: P256.Signing.PrivateKey
+        do {
+            uik = try E2EEV2RecoveryV2Crypto.unwrapAccountPrivateKey(bundle: candidate, recoveryKey: recoveryKey, ownerBinding: ownerBinding)
+        } catch {
+            throw Refused(stage: .unwrap)
+        }
+        guard uik.publicKey.x963Representation.base64EncodedString() == servedUIK else { throw Refused(stage: .served) }
         return uik
     }
 
@@ -158,7 +186,9 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
                 expectedHash: negative["bundleHash"] as? String ?? expectedHash,
                 servedUIK: negative["servedUikPublicX963B64"] as? String ?? served,
                 recoveryKey: recoveryKey, ownerBinding: ownerBinding
-            ), name)
+            ), name) { error in
+                XCTAssertEqual((error as? Refused)?.stage.rawValue, negative["expect"] as? String, "Refusé pour la règle visée : \\(name)")
+            }
         }
     }
 
