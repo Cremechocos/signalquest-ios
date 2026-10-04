@@ -385,7 +385,7 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
                 ),
                 capabilities: E2EEV2CapabilitiesDocument(
                     userId: user, deviceId: device, sequence: 1, issuedAtMs: Int64(Date().timeIntervalSince1970 * 1_000),
-                    envelopeVersions: ["2"], payloadVersions: ["2"], kinds: [], features: ["calls"]
+                    envelopeVersions: ["2"], payloadVersions: ["2"], kinds: ["DELETE", "EDIT", "TEXT"], features: ["calls"]
                 )
             ),
             signing: signing

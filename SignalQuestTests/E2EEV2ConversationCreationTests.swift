@@ -238,6 +238,21 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertEqual(E2EEV2ConversationMigration.decide(group, isV2: true, devices: all, nowMs: nowMs), .alreadyV2)
         let plain = v1Conversation(group: false, participants: [(fixture.user, "member"), (bruno, "member")], encrypted: false)
         XCTAssertEqual(E2EEV2ConversationMigration.decide(plain, isV2: false, devices: all, nowMs: nowMs), .notEncrypted)
+        // Règle commune iOS et Android (v0.4.17) : un appareil qui ne lit pas encore le v2 retient la migration.
+        var silent = all.devicesByUser
+        silent[carla] = silent[carla]?.map { device in
+            E2EEV2CertifiedDevice(
+                userId: device.userId, deviceId: device.deviceId, keyVersion: device.keyVersion, platform: device.platform,
+                identityKeyB64: device.identityKeyB64, signingKeyB64: device.signingKeyB64, fingerprint: device.fingerprint,
+                capabilities: E2EEV2CapabilitiesDocument(
+                    userId: device.userId, deviceId: device.deviceId, sequence: 1, issuedAtMs: nowMs,
+                    envelopeVersions: [], payloadVersions: [], kinds: [], features: []
+                )
+            )
+        }
+        XCTAssertEqual(E2EEV2ConversationMigration.decide(
+            group, isV2: false, devices: E2EEV2CertifiedDeviceSet(devicesByUser: silent, refusals: [:]), nowMs: nowMs
+        ), .capabilityWaiting)
 
         let epochKey = Data(repeating: 3, count: 32)
         let migration = try E2EEV2ConversationMigration.make(
@@ -379,7 +394,7 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
                 ),
                 capabilities: capabilities ? E2EEV2CapabilitiesDocument(
                     userId: user, deviceId: device, sequence: 1, issuedAtMs: nowMs,
-                    envelopeVersions: ["2"], payloadVersions: ["2"], kinds: [], features: ["calls"]
+                    envelopeVersions: ["2"], payloadVersions: ["2"], kinds: ["DELETE", "EDIT", "TEXT"], features: ["calls"]
                 ) : nil
             ),
             agreement: agreement

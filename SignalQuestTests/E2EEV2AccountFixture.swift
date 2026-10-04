@@ -78,7 +78,7 @@ final class E2EEV2AccountFixture: @unchecked Sendable {
             fingerprint: E2EEV2Canonical.deviceFingerprint(identityKeyX963: identityKey, signingKeyX963: signingKey),
             capabilities: E2EEV2CapabilitiesDocument(
                 userId: user, deviceId: descriptor.deviceId, sequence: 1, issuedAtMs: nowMs,
-                envelopeVersions: ["2"], payloadVersions: ["2"], kinds: [], features: ["calls"]
+                envelopeVersions: ["2"], payloadVersions: ["2"], kinds: ["DELETE", "EDIT", "TEXT"], features: ["calls"]
             )
         )
         var byUser: [String: [E2EEV2CertifiedDevice]] = [user: [own]]
@@ -205,7 +205,7 @@ struct E2EEV2TestRemote {
             ),
             capabilities: E2EEV2CapabilitiesDocument(
                 userId: user, deviceId: deviceId, sequence: 1, issuedAtMs: Int64(Date().timeIntervalSince1970 * 1_000),
-                envelopeVersions: ["2"], payloadVersions: ["2"], kinds: [], features: ["calls"]
+                envelopeVersions: ["2"], payloadVersions: ["2"], kinds: ["DELETE", "EDIT", "TEXT"], features: ["calls"]
             )
         )
     }

@@ -118,6 +118,23 @@ struct E2EEV2ConversationCreation: Sendable {
         /// Des membres dont l'identité n'est pas crue : la conversation attend
         /// que l'utilisateur ait accepté leur nouveau numéro (§2.4).
         case membersNotTrusted([String])
+        /// Un appareil compté ne lit pas encore le v2 (v0.4.17) : la
+        /// conversation chiffrée naît en v1 tant que le serveur l'accepte.
+        case capabilityMissing
+    }
+
+    /// Règle commune iOS et Android (v0.4.17) : une conversation ne passe en
+    /// v2, par création ou par migration, que si l'intersection des capacités
+    /// de ses membres (§12) contient l'enveloppe et la charge « 2 » et le texte.
+    /// Un appareil au document vide la vide : rien ne passe en v2 avec lui.
+    static func readsV2(_ devices: E2EEV2CertifiedDeviceSet, members: Set<String>, excludesWeb: Bool, nowMs: Int64) -> Bool {
+        let scoped = E2EEV2CertifiedDeviceSet(
+            devicesByUser: devices.devicesByUser.filter { members.contains($0.key) },
+            refusals: devices.refusals.filter { members.contains($0.key) }
+        )
+        guard let intersection = scoped.capabilityIntersection(nowMs: nowMs, excludesWeb: excludesWeb) else { return false }
+        return intersection.envelopeVersions.contains("2") && intersection.payloadVersions.contains("2")
+            && intersection.kinds.contains("TEXT")
     }
 
     let conversationId: String
@@ -178,6 +195,7 @@ struct E2EEV2ConversationCreation: Sendable {
         }
         let untrusted = devices.untrustedMembers(members)
         guard untrusted.isEmpty else { throw Failure.membersNotTrusted(untrusted) }
+        guard readsV2(devices, members: members, excludesWeb: excludesWeb, nowMs: nowMs) else { throw Failure.capabilityMissing }
         let actor = E2EEV2MembershipChain.Actor(userId: ownUserId, deviceId: device.deviceId)
         guard let ownCertified = devices.device(userId: ownUserId, deviceId: device.deviceId),
               ownCertified.identityKeyB64 == device.publicIdentityKeyB64,
@@ -235,6 +253,9 @@ enum E2EEV2ConversationMigration {
         case notEncrypted
         /// Membres sans appareil certifié à jour : la migration attend.
         case membersWaiting([String])
+        /// Un appareil compté ne lit pas encore le v2 : la conversation reste
+        /// v1 (règle commune, v0.4.17).
+        case capabilityWaiting
     }
 
     /// `isV2` nil : état « v2 » illisible. On ne migre jamais sur un doute, une
@@ -250,7 +271,10 @@ enum E2EEV2ConversationMigration {
         let waiting = conversation.participants.map(\.userId).filter { user in
             !(devices.devicesByUser[user] ?? []).contains { !$0.isSidelined(nowMs: nowMs) }
         }
-        return waiting.isEmpty ? .migrate : .membersWaiting(waiting.sorted())
+        guard waiting.isEmpty else { return .membersWaiting(waiting.sorted()) }
+        let members = Set(conversation.participants.map(\.userId))
+        return E2EEV2ConversationCreation.readsV2(devices, members: members, excludesWeb: false, nowMs: nowMs)
+            ? .migrate : .capabilityWaiting
     }
 
     /// Administrateurs v1 : propriétaire et administrateurs d'un groupe.
@@ -437,6 +461,9 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
                 )
                 return Prepared(creation, body: creation.body)
             }
+        } catch E2EEV2ConversationCreation.Failure.capabilityMissing {
+            // Un membre ne lit pas encore le v2 : l'appelant crée en v1 (v0.4.17).
+            return .failure(localError("e2ee-v2-capability-missing"))
         } catch {
             return .failure(localError("e2ee-conversation-creation-invalid"))
         }

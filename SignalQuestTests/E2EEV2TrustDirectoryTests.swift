@@ -92,6 +92,34 @@ final class E2EEV2TrustDirectoryTests: XCTestCase {
         XCTAssertFalse(set.supportsVerifiedCalls(nowMs: now, excludesWeb: false), "Un membre illisible rend l'appel indisponible")
     }
 
+    /// Cache de l'annuaire (branchement v2) : relu après 5 minutes ou sur
+    /// invalidation, jamais à chaque appel ; une ambiguïté reste refusée.
+    func testTheDirectoryCacheRereadsOnlyStaleOrInvalidatedAccounts() async throws {
+        let bruno = Account("bruno"), carla = Account("carla")
+        let server = Server()
+        server.serve(try bundle(bruno, version: 1, features: ["calls"]), for: bruno.userId)
+        server.serve(try bundle(carla, version: 1, features: ["calls"]), for: carla.userId)
+        let reads = LockedCount()
+        let clock = LockedDate(Date(timeIntervalSince1970: 1_790_000_000))
+        let directory = E2EEV2TrustDirectory(ownerNamespace: namespace, pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore())) { userId, _ in
+            reads.add(userId)
+            return try server.response(for: userId)
+        }
+        let session = LocalAccountSession(ownerScopeId: "user:\(alice)", sessionId: "session_cache_0000000001")
+        let cache = E2EEV2DeviceDirectoryCache(session: session, directory: directory, now: { clock.value })
+        let first = try await cache.devices(for: [bruno.userId, carla.userId])
+        XCTAssertNotNil(first.device(deviceId: bruno.deviceId))
+        _ = try await cache.devices(for: [bruno.userId])
+        XCTAssertEqual(reads.count(bruno.userId), 1, "Gardé 5 minutes")
+        await cache.invalidate([bruno.userId])
+        _ = try await cache.devices(for: [bruno.userId, carla.userId])
+        XCTAssertEqual(reads.count(bruno.userId), 2, "Relu après invalidation")
+        XCTAssertEqual(reads.count(carla.userId), 1, "Les autres restent en cache")
+        clock.value = clock.value.addingTimeInterval(E2EEV2DeviceDirectoryCache.lifetime)
+        _ = try await cache.devices(for: [carla.userId])
+        XCTAssertEqual(reads.count(carla.userId), 2, "Relu passé 5 minutes")
+    }
+
     func testAChangedAccountKeyRemovesOnlyThatMember() async throws {
         let bruno = Account("bruno"), impostor = Account("bruno")
         let server = Server()
@@ -624,5 +652,22 @@ func XCTAssertThrowsAsync<T, E: Error & Equatable>(
         XCTFail("Aucune erreur levée. \(message)", file: file, line: line)
     } catch {
         XCTAssertEqual(error as? E, expected, message, file: file, line: line)
+    }
+}
+
+private final class LockedCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var counts: [String: Int] = [:]
+    func add(_ key: String) { lock.lock(); counts[key, default: 0] += 1; lock.unlock() }
+    func count(_ key: String) -> Int { lock.lock(); defer { lock.unlock() }; return counts[key] ?? 0 }
+}
+
+private final class LockedDate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Date
+    init(_ value: Date) { stored = value }
+    var value: Date {
+        get { lock.lock(); defer { lock.unlock() }; return stored }
+        set { lock.lock(); stored = newValue; lock.unlock() }
     }
 }
