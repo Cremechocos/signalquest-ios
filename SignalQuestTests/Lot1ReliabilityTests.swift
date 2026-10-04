@@ -60,6 +60,12 @@ final class Lot1ReliabilityTests: XCTestCase {
             APIError.http(status: 500, code: nil, message: "", requestId: nil, retryAfter: nil)))
     }
 
+    /// Crashlytics du 04/10 : un bilan MetricKit sans mesure partait quand même.
+    func testAnEmptyMetricKitReportIsNotSent() {
+        XCTAssertFalse(MetricKitReporter.hasMeasurements(["build": "161", "hours": "0.0"]))
+        XCTAssertTrue(MetricKitReporter.hasMeasurements(["build": "161", "hours": "24.0", "cpu_s": "17.0"]))
+    }
+
     func testDecodingContextNamesTheFieldPathWithoutAnyValue() throws {
         struct Probe: Decodable { struct Item: Decodable { let count: Int }; let items: [Item] }
         let json = Data(#"{"items":[{"count":1},{"count":"secret-value"}]}"#.utf8)

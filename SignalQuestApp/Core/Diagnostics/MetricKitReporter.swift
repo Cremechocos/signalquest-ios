@@ -18,7 +18,10 @@ final class MetricKitReporter: NSObject, MXMetricManagerSubscriber, @unchecked S
 
     func didReceive(_ payloads: [MXMetricPayload]) {
         for payload in payloads {
-            SQDiagnostics.recordReport("daily", area: .metricKit, info: Self.summary(of: payload))
+            let info = Self.summary(of: payload)
+            // Un bilan sans aucune mesure (seulement le build et sa durée) n'apprend rien.
+            guard Self.hasMeasurements(info) else { continue }
+            SQDiagnostics.recordReport("daily", area: .metricKit, info: info)
         }
     }
 
@@ -28,6 +31,10 @@ final class MetricKitReporter: NSObject, MXMetricManagerSubscriber, @unchecked S
             guard !info.isEmpty else { continue }
             SQDiagnostics.recordReport("diagnostic", area: .metricKit, info: info)
         }
+    }
+
+    static func hasMeasurements(_ info: [String: String]) -> Bool {
+        info.keys.contains { $0 != "build" && $0 != "hours" }
     }
 
     static func summary(of payload: MXMetricPayload) -> [String: String] {
