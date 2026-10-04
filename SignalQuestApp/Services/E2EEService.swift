@@ -3315,6 +3315,8 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
     private let mediaOutboxStore: E2EEV2MediaOutboxStore?
     private let accountIdentityStore: E2EEV2AccountIdentityStore
     private let trustPins: E2EEV2TrustPinStore
+    private let capabilities: E2EEV2CapabilitiesPublicationStore
+    private let appBuild: String
     private let nowMs: @Sendable () -> Int64
     private let rotationCommitted: @Sendable (LocalAccountSession, [String], Bool) -> Void
 
@@ -3326,6 +3328,8 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         mediaOutboxStore: E2EEV2MediaOutboxStore? = nil,
         accountIdentityStore: E2EEV2AccountIdentityStore = E2EEV2AccountIdentityStore(),
         trustPins: E2EEV2TrustPinStore = E2EEV2TrustPinStore(),
+        capabilities: E2EEV2CapabilitiesPublicationStore = E2EEV2CapabilitiesPublicationStore(),
+        appBuild: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0",
         nowMs: @escaping @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) },
         rotationCommitted: @escaping @Sendable (LocalAccountSession, [String], Bool) -> Void = {
             E2EEV2RotationEvents.recordCommitted(session: $0, conversations: $1, notify: $2)
@@ -3338,6 +3342,8 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         self.mediaOutboxStore = mediaOutboxStore ?? (try? E2EEV2MediaOutboxStore())
         self.accountIdentityStore = accountIdentityStore
         self.trustPins = trustPins
+        self.capabilities = capabilities
+        self.appBuild = appBuild
         self.nowMs = nowMs
         self.rotationCommitted = rotationCommitted
     }
@@ -3577,8 +3583,8 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                 signWithDevice: { [identityStore] in
                     try identityStore.signWithDeviceId(canonicalRequest: $0, ownerNamespace: namespace).signature
                 },
-                kinds: ["TEXT"],
-                features: [],
+                kinds: E2EEV2CapabilitiesPublicationStore.kinds,
+                features: E2EEV2CapabilitiesPublicationStore.features,
                 nowMs: pending.issuedAtMs
             )
             let body = try E2EEV2DeviceApprovalContract.initialBootstrapData(
@@ -3607,6 +3613,8 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                     try? accountIdentityStore.confirmBootstrap(ownerNamespace: namespace)
                 }
                 rotationCommitted(session, [], true)
+                // §12 : sans document de capacités, l'appareil reste à l'écart.
+                _ = await publishCapabilitiesIfNeeded()
             case .failed(let failure) where failure.code == "E2EE_IDENTITY_ALREADY_ESTABLISHED":
                 // Le même code répond à notre propre UIK portée par d'autres textes :
                 // elle n'est retirée que si le compte en porte une autre, dont la
@@ -3802,6 +3810,7 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
             try accountIdentityStore.discardPendingBootstrap(ownerNamespace: namespace)
             try accountIdentityStore.install(uik, ownerNamespace: namespace)
             try? accountIdentityStore.setPendingApprovalId(nil, ownerNamespace: namespace)
+            _ = await publishCapabilitiesIfNeeded()
             return .success(.approved)
         } catch {
             return trustFailure(error, fallback: "e2ee-account-key-not-delivered")
@@ -3855,6 +3864,100 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         } catch {
             return trustFailure(error, fallback: "invalid-e2ee-revocation-reason")
         }
+    }
+
+    /// §12 et E.1 : publie le document de capacités de cet appareil, signé par
+    /// lui, quand il n'en a pas encore, à chaque nouveau build et au moins tous
+    /// les 30 jours. Le document est gardé avant l'envoi : une reprise renvoie
+    /// le même. Une séquence dépassée (`E2EE_CAPABILITIES_STALE`) repart une
+    /// fois au-dessus de celle du serveur. Rend vrai quand un document a été publié.
+    func publishCapabilitiesIfNeeded() async -> E2EEV2DeviceLifecycleResult<Bool> {
+        guard let owner = ownerScope(), let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == owner,
+              let userId = Self.userId(owner) else {
+            return localFailure("authenticated-account-required")
+        }
+        let transport = self.transport.bound(to: session)
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        do {
+            guard let device = try identityStore.load(ownerNamespace: namespace) else { return .success(false) }
+            let stored = try capabilities.load(ownerNamespace: namespace)
+            if let stored, E2EEV2CapabilitiesPublicationStore.isCurrent(
+                stored, deviceId: device.deviceId, appBuild: appBuild, nowMs: nowMs()
+            ) {
+                return .success(false)
+            }
+            var pending: E2EEV2CapabilitiesPublicationStore.State
+            if let stored, stored.publishedAtMs == nil, stored.deviceId == device.deviceId, stored.appBuild == appBuild {
+                // Envoi resté sans réponse : le même document repart.
+                pending = stored
+            } else {
+                let previous = stored?.deviceId == device.deviceId ? stored?.sequence ?? 0 : 0
+                pending = try makeCapabilities(
+                    userId: userId, device: device, sequence: previous + 1, nowMs: nowMs(), namespace: namespace
+                )
+            }
+            for attempt in 0..<2 {
+                let response = await transport.putJSON(
+                    path: "/api/e2ee/v2/devices/\(device.deviceId)/capabilities",
+                    body: try JSONSerialization.data(
+                        withJSONObject: ["document": pending.document, "signatureB64": pending.signatureB64],
+                        options: [.sortedKeys]
+                    ),
+                    expectedOwnerScopeId: owner,
+                    capabilitySet: .deviceLifecycle
+                )
+                switch response {
+                case .failure(let failure) where failure.code == "E2EE_CAPABILITIES_STALE" && attempt == 0:
+                    var serverSequence = 0
+                    if case .string(let text)? = failure.details?["currentSequence"] {
+                        serverSequence = E2EEV2Canonical.sequenceNumber(text) ?? 0
+                    }
+                    pending = try makeCapabilities(
+                        userId: userId, device: device, sequence: max(serverSequence, pending.sequence) + 1,
+                        nowMs: nowMs(), namespace: namespace
+                    )
+                case .failure(let failure):
+                    return .failed(failure)
+                case .success(let data, _, _):
+                    guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                          root["deviceId"] as? String == device.deviceId,
+                          root["sequence"] as? String == String(pending.sequence) else {
+                        return localFailure("invalid-e2ee-capabilities-response")
+                    }
+                    guard session.isCurrent else { return localFailure("e2ee-session-changed") }
+                    pending.publishedAtMs = nowMs()
+                    try capabilities.save(pending, ownerNamespace: namespace)
+                    return .success(true)
+                }
+            }
+            return localFailure("e2ee-capabilities-stale")
+        } catch {
+            return trustFailure(error, fallback: "e2ee-capabilities-unavailable")
+        }
+    }
+
+    /// Document signé par l'appareil, gardé (non publié) avant l'envoi.
+    private func makeCapabilities(
+        userId: String, device: E2EEV2DeviceDescriptor, sequence: Int, nowMs: Int64, namespace: String
+    ) throws -> E2EEV2CapabilitiesPublicationStore.State {
+        let document = E2EEV2CapabilitiesDocument(
+            userId: userId, deviceId: device.deviceId, sequence: sequence, issuedAtMs: nowMs,
+            envelopeVersions: ["2"], payloadVersions: ["2"],
+            kinds: E2EEV2CapabilitiesPublicationStore.kinds, features: E2EEV2CapabilitiesPublicationStore.features
+        ).document
+        guard (try? E2EEV2CapabilitiesDocument.parse(document: document)) != nil else {
+            throw E2EEV2TrustFormatError.invalidField
+        }
+        let signature = try identityStore.signWithDeviceId(
+            canonicalRequest: Data(E2EEV2CapabilitiesDocument.signatureCanonical(document: document).utf8),
+            ownerNamespace: namespace
+        ).signature
+        let state = E2EEV2CapabilitiesPublicationStore.State(
+            deviceId: device.deviceId, sequence: sequence, document: document,
+            signatureB64: signature.base64EncodedString(), appBuild: appBuild, publishedAtMs: nil
+        )
+        try capabilities.save(state, ownerNamespace: namespace)
+        return state
     }
 
     /// §2.6 : la clé d'accord tourne tous les 30 jours. Son certificat

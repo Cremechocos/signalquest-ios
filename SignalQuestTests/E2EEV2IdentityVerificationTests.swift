@@ -144,6 +144,16 @@ final class E2EEV2IdentityVerificationTests: XCTestCase {
         let staleDevice = try XCTUnwrap(try? E2EEV2IdentityVerification.verify(stale, pinned: nil).get()).devices.first
         XCTAssertEqual(staleDevice?.isSidelined(nowMs: now), true, "Document de plus de 90 jours : mis à l'écart")
         XCTAssertEqual(staleDevice?.supports("calls", nowMs: now), false)
+
+        // v0.4.16 : un document daté de plus de 10 min dans le futur ne vieillirait jamais.
+        let (ahead, _) = try makeBundle(uik: uik, devices: [phone], version: 1, previous: nil,
+                                        capabilities: [(phone, 1, now + E2EEV2IdentityVerification.capabilityFutureSkewMs + 1, ["calls"])])
+        let aheadDevice = try XCTUnwrap(try? E2EEV2IdentityVerification.verify(ahead, pinned: nil).get()).devices.first
+        XCTAssertEqual(aheadDevice?.isSidelined(nowMs: now), true, "Daté du futur : mis à l'écart")
+        let (skewed, _) = try makeBundle(uik: uik, devices: [phone], version: 1, previous: nil,
+                                         capabilities: [(phone, 1, now + 60_000, ["calls"])])
+        XCTAssertEqual(try XCTUnwrap(try? E2EEV2IdentityVerification.verify(skewed, pinned: nil).get()).devices.first?
+            .isSidelined(nowMs: now), false, "Une minute d'avance d'horloge est tolérée")
     }
 
     func testServerResponseIsReadStrictly() throws {

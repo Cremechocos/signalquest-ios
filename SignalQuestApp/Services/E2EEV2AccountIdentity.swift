@@ -492,3 +492,56 @@ enum E2EEV2DeviceRecertificationTrust {
         )
     }
 }
+
+/// §12 : le dernier document de capacités de cet appareil, gardé avant l'envoi
+/// pour qu'une reprise renvoie le même, et sa date de publication. Republié à
+/// chaque nouveau build et au moins tous les 30 jours.
+final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
+    struct State: Codable, Equatable {
+        let deviceId: String
+        let sequence: Int
+        let document: String
+        let signatureB64: String
+        let appBuild: String
+        /// Absente : envoi en cours, sans réponse du serveur.
+        var publishedAtMs: Int64?
+    }
+
+    /// Ce qu'iOS sait lire en v2 : texte, modification, suppression. Aucune
+    /// fonction tant que médias chiffrés et appels vérifiés ne sont pas prêts.
+    static let kinds = ["DELETE", "EDIT", "TEXT"]
+    static let features: [String] = []
+    static let republishAfterMs: Int64 = 30 * 86_400_000
+
+    static func key(ownerNamespace: String) -> String { "capabilities-v1:\(ownerNamespace)" }
+
+    private let tokenStore: TokenStore
+    private let allowsOwner: @Sendable (String) -> Bool
+
+    init(tokenStore: TokenStore = KeychainStore(service: "fr.signalquest.ios.e2ee"),
+         allowsOwner: @escaping @Sendable (String) -> Bool = { E2EEV2VaultBoundary.allows($0) }) {
+        self.tokenStore = tokenStore
+        self.allowsOwner = allowsOwner
+    }
+
+    func load(ownerNamespace: String) throws -> State? {
+        guard allowsOwner(ownerNamespace) else { throw E2EEV2AccountIdentityStore.Failure.otherAccount }
+        guard let raw = try tokenStore.string(for: Self.key(ownerNamespace: ownerNamespace)) else { return nil }
+        return try? JSONDecoder().decode(State.self, from: Data(raw.utf8))
+    }
+
+    func save(_ state: State, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw E2EEV2AccountIdentityStore.Failure.otherAccount }
+        let value = String(decoding: try JSONEncoder().encode(state), as: UTF8.self)
+        try tokenStore.set(value, for: Self.key(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
+    }
+
+    /// À publier : rien encore, un autre appareil, un autre build, une autre
+    /// liste, ou 30 jours passés.
+    static func isCurrent(_ state: State, deviceId: String, appBuild: String, nowMs: Int64) -> Bool {
+        guard state.deviceId == deviceId, state.appBuild == appBuild, let publishedAtMs = state.publishedAtMs,
+              nowMs - publishedAtMs < republishAfterMs,
+              let document = try? E2EEV2CapabilitiesDocument.parse(document: state.document) else { return false }
+        return document.kinds == kinds && document.features == features
+    }
+}

@@ -5044,7 +5044,9 @@ extension E2EETests {
         let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: fixture.api, identityStore: fixture.identity,
             epochKeyStore: fixture.keys, mediaOutboxStore: fixture.outbox,
             accountIdentityStore: E2EEV2AccountIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true }),
-            trustPins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()), rotationCommitted: onCommitted)
+            trustPins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()),
+            capabilities: E2EEV2CapabilitiesPublicationStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true }),
+            rotationCommitted: onCommitted)
         let recovery = E2EEV2RecoveryCoordinatorV2(api: fixture.api, identityStore: fixture.identity, rotationCommitted: onCommitted)
         // Lot A1 : le compte tel que le bootstrap l'a déposé, servi à `…/identity`.
         let account = LockedBox<[String: Any]>([:])
@@ -5067,6 +5069,11 @@ extension E2EETests {
                 value = ["accountIdentityKeyB64": deposited["accountIdentityKeyB64"] ?? "", "deviceList": deposited["deviceList"] ?? [:],
                     "deviceListChain": [], "certificates": [deposited["certificate"] ?? [:]], "capabilities": [],
                     "pendingIdentityReset": NSNull()]
+            } else if path.hasSuffix("/capabilities") {
+                let document = try E2EEV2CapabilitiesDocument.parse(
+                    document: try XCTUnwrap(try E2EEV2AccountFixture.body(request)["document"] as? String)
+                )
+                value = ["deviceId": document.deviceId, "sequence": String(document.sequence)]
             } else if path.hasSuffix("/bootstrap") {
                 account.value = try E2EEV2AccountFixture.body(request)
                 value = ["device": ["deviceId": fixture.descriptor.deviceId, "status": "approved", "approvedByDeviceId": NSNull()],
@@ -5416,6 +5423,7 @@ extension E2EETests {
         // entre les appareils simulés d'un même compte.
         let accounts = E2EEV2AccountIdentityStore(tokenStore: vault)
         let pins = E2EEV2TrustPinStore(tokenStore: vault)
+        let capabilityDocuments = E2EEV2CapabilitiesPublicationStore(tokenStore: vault)
         let lifecycle = E2EEV2DeviceLifecycleCoordinator(
             api: api,
             identityStore: identity,
@@ -5423,6 +5431,7 @@ extension E2EETests {
             mediaOutboxStore: outbox,
             accountIdentityStore: accounts,
             trustPins: pins,
+            capabilities: capabilityDocuments,
             rotationCommitted: committed
         )
         let recovery = E2EEV2RecoveryCoordinatorV2(
@@ -5553,7 +5562,9 @@ extension E2EETests {
             payload = ["listVersion": trust.outcome.pin.listVersion,
                        "uikB64": trust.outcome.pin.uikX963B64,
                        "devices": trust.outcome.devices.map { ["deviceId": $0.deviceId, "keyVersion": $0.keyVersion,
-                                                                "platform": $0.platform] }]
+                                                                "platform": $0.platform,
+                                                                "capabilitiesSequence": $0.capabilities?.sequence ?? 0,
+                                                                "kinds": $0.capabilities?.kinds ?? []] }]
         case .prepareReset:
             switch lifecycle.prepareIdentityReset(label: localQAEnvironment("SQ_E2EE_V2_LOCAL_QA_LABEL") ?? "SQ QA iOS reset") {
             case .failed(let failure): throw localQAOperation("prepare-reset", failure)

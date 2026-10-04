@@ -21,6 +21,9 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
         var bootstrapFailures = 0
         /// La rotation est enregistrée, mais la réponse se perd.
         var recertificationLost = false
+        /// Séquence de capacités enregistrée par appareil ; une réponse STALE forcée.
+        var capabilitySequences: [String: Int] = [:]
+        var staleCapabilitiesOnce: Int?
 
         func locked<T>(_ body: () throws -> T) rethrows -> T { lock.lock(); defer { lock.unlock() }; return try body() }
 
@@ -48,7 +51,7 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
         let lifecycle: E2EEV2DeviceLifecycleCoordinator
     }
 
-    private func device(_ fixture: E2EEV2AccountFixture, primary: Bool, nowMs: Int64? = nil) throws -> Device {
+    private func device(_ fixture: E2EEV2AccountFixture, primary: Bool, nowMs: Int64? = nil, appBuild: String = "161") throws -> Device {
         let vault = primary ? fixture.vault : InMemoryTokenStore()
         let identity = primary ? fixture.identity : E2EEV2DeviceIdentityStore(tokenStore: vault, allowsOwner: { _ in true })
         let descriptor = primary ? fixture.descriptor : try identity.loadOrCreate(ownerNamespace: fixture.session.ownerNamespace)
@@ -59,7 +62,9 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
             lifecycle: E2EEV2DeviceLifecycleCoordinator(
                 api: fixture.api, identityStore: identity, epochKeyStore: fixture.keys,
                 conversationStateStore: fixture.states, accountIdentityStore: accounts,
-                trustPins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()), nowMs: { now },
+                trustPins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()),
+                capabilities: E2EEV2CapabilitiesPublicationStore(tokenStore: vault, allowsOwner: { _ in true }),
+                appBuild: appBuild, nowMs: { now },
                 rotationCommitted: { _, _, _ in }
             )
         )
@@ -162,6 +167,19 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
                 guard accepted else { return try respond(["error": "x", "code": "INTERNAL_ERROR", "requestId": "r"], 503) }
                 let version = try XCTUnwrap((list["list"] as? String)?.components(separatedBy: "\n")[3])
                 return try respond(["deviceId": path.components(separatedBy: "/")[5], "keyVersion": "2", "deviceListVersion": version], 200)
+            case ("PUT", let path) where path.hasSuffix("/capabilities"):
+                let body = try E2EEV2AccountFixture.body(request)
+                server.record("capabilities", body)
+                XCTAssertEqual(Set(body.keys), ["document", "signatureB64"])
+                let document = try E2EEV2CapabilitiesDocument.parse(document: try XCTUnwrap(body["document"] as? String))
+                let deviceId = path.components(separatedBy: "/")[5]
+                XCTAssertEqual(document.deviceId, deviceId)
+                if let stale = server.locked({ () -> Int? in defer { server.staleCapabilitiesOnce = nil }; return server.staleCapabilitiesOnce }) {
+                    return try respond(["error": "x", "code": "E2EE_CAPABILITIES_STALE", "requestId": "r",
+                                        "details": ["currentSequence": String(stale)]], 409)
+                }
+                server.locked { server.capabilitySequences[deviceId] = document.sequence }
+                return try respond(["deviceId": deviceId, "sequence": String(document.sequence)], 200)
             case ("POST", let path) where path.hasSuffix("/revoke"):
                 let body = try E2EEV2AccountFixture.body(request)
                 server.record("revoke", body)
@@ -320,6 +338,41 @@ final class E2EEV2A1LifecycleTests: XCTestCase {
         XCTAssertEqual(try first.identity.unwrapEpochKey(delivery: delivery, ownerNamespace: namespace), epochKey,
                        "Une enveloppe adressée à l'ancienne clé s'ouvre encore")
         guard case .success(false) = await later.lifecycle.recertifyIfDue() else { return XCTFail("Nouvelle clé : plus due") }
+    }
+
+    /// §12 : le document de capacités part après le bootstrap, signé par
+    /// l'appareil ; il ne repart qu'avec un nouveau build ; une séquence
+    /// dépassée repart au-dessus de celle du serveur.
+    func testTheCapabilitiesDocumentIsPublishedAtBootstrapAndOnANewBuild() async throws {
+        let fixture = try E2EEV2AccountFixture()
+        defer { fixture.close() }
+        let first = try device(fixture, primary: true)
+        let server = TrustServer()
+        install(server, pending: first.descriptor)
+        guard case .success = await first.lifecycle.bootstrapInitialDevice(
+            .email(challengeId: "challenge_000000000001", code: "123456")
+        ) else { return XCTFail("bootstrap") }
+        let published = try XCTUnwrap(server.locked { server.bodies["capabilities"]?.first })
+        let document = try E2EEV2CapabilitiesDocument.parse(document: try XCTUnwrap(published["document"] as? String))
+        XCTAssertEqual(document.sequence, 1)
+        XCTAssertEqual(document.kinds, ["DELETE", "EDIT", "TEXT"])
+        XCTAssertEqual(document.features, [], "Ni médias ni appels annoncés avant qu'ils marchent")
+        let signature = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(published["signatureB64"] as? String)))
+        let signingKey = try P256.Signing.PublicKey(x963Representation: try XCTUnwrap(Data(base64Encoded: first.descriptor.publicSigningKeyB64)))
+        XCTAssertTrue(E2EEV2LowS.verify(
+            derSignature: signature,
+            message: Data(E2EEV2CapabilitiesDocument.signatureCanonical(document: document.document).utf8),
+            publicKey: signingKey
+        ), "Signé par la clé de l'appareil, en low-S")
+
+        guard case .success(false) = await first.lifecycle.publishCapabilitiesIfNeeded() else { return XCTFail("À jour") }
+        XCTAssertEqual(server.locked { server.bodies["capabilities"]?.count }, 1)
+
+        let upgraded = try device(fixture, primary: true, appBuild: "162")
+        server.locked { server.staleCapabilitiesOnce = 5 }
+        guard case .success(true) = await upgraded.lifecycle.publishCapabilitiesIfNeeded() else { return XCTFail("Nouveau build") }
+        XCTAssertEqual(server.locked { server.capabilitySequences[first.descriptor.deviceId] }, 6,
+                       "Au-dessus de la séquence du serveur")
     }
 
     /// Un autre appareil a établi le compte pendant ce bootstrap : l'UIK créée

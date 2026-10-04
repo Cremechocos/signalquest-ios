@@ -105,11 +105,13 @@ struct E2EEV2CertifiedDevice: Equatable, Sendable {
     }
 
     /// Mis à l'écart (§12) : pas de document de capacités de moins de 90 jours
-    /// (à 90 jours pile, il l'est déjà). Il sort de l'intersection et des
-    /// nouvelles époques.
+    /// (à 90 jours pile, il l'est déjà), ou un document daté de plus de 10 min
+    /// dans le futur, qui ne vieillirait jamais (v0.4.16). Il sort de
+    /// l'intersection et des nouvelles époques.
     func isSidelined(nowMs: Int64) -> Bool {
         guard let capabilities else { return true }
         return nowMs - capabilities.issuedAtMs >= E2EEV2IdentityVerification.capabilityFreshnessMs
+            || capabilities.issuedAtMs - nowMs > E2EEV2IdentityVerification.capabilityFutureSkewMs
     }
 
     func supports(_ feature: String, nowMs: Int64) -> Bool {
@@ -139,6 +141,8 @@ struct E2EEV2TrustPin: Codable, Equatable, Sendable {
 
 enum E2EEV2IdentityVerification {
     static let capabilityFreshnessMs: Int64 = 90 * 24 * 60 * 60 * 1_000
+    /// Avance d'horloge tolérée sur `issuedAtMs` (v0.4.16, comme le serveur).
+    static let capabilityFutureSkewMs: Int64 = 10 * 60 * 1_000
 
     enum Failure: Error, Equatable {
         case malformed
