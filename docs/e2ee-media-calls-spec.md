@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.16**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.17**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,13 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.17 (04/10/2026), proposition : règle commune iOS et Android. Une
+>   conversation ne passe en v2, par création ou par migration, que si
+>   l'intersection des capacités de ses membres contient l'enveloppe et la
+>   charge « 2 » et le type `TEXT` (§12, §14) ; sinon la migration attend et
+>   une nouvelle conversation chiffrée naît en v1, tant que le serveur
+>   l'accepte. Un message que l'intersection ne permet pas n'est jamais
+>   envoyé et reste gardé. Aucun vecteur ne change.
 > - v0.4.16 (04/10/2026), proposition : alignement sur ce que le serveur
 >   sert aux lots A3 (époques), A4 (capacités) et A5 (messages), relevé dans
 >   son code par iOS et Android et accepté par la session serveur.
@@ -1285,7 +1292,10 @@ conversation, et sans permettre un faux signalement ni un message insignalable.
   l'UIK. La révocation proprement dite reste signée par l'UIK.
 - Une fonction absente de l'intersection est désactivée, avec « Un membre doit
   mettre à jour SignalQuest pour recevoir les photos chiffrées ». Jamais de
-  repli en clair.
+  repli en clair. L'émetteur vérifie l'intersection avant d'envoyer ; un
+  message qu'elle ne permet pas, ou que le serveur refuse avec
+  `409 E2EE_CAPABILITY_MISSING`, n'est pas envoyé et reste gardé : il partira
+  quand les membres auront mis à jour (v0.4.17).
 - **Le serveur ne refuse que ce qu'il voit**, avec
   `409 E2EE_CAPABILITY_MISSING` : version d'enveloppe, blobs, appels, partage
   de position. Il n'applique pas l'intersection aux époques, qui ne portent
@@ -1355,8 +1365,14 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
 1. Les conversations v1 restent lisibles, avec la mention « ancien chiffrement,
    clé connue du serveur » et sans cadenas.
 2. À la première ouverture par un client v2, si tous les membres ont un appareil
-   certifié, ce client crée l'époque 1 v2 : la conversation est alors v2 pour
-   toujours (§12).
+   certifié et que l'intersection des capacités de la conversation (§12)
+   contient `envelopeVersions` « 2 », `payloadVersions` « 2 » et le type
+   `TEXT`, ce client crée l'époque 1 v2 : la conversation est alors v2 pour
+   toujours (§12). Sinon la migration attend, et la conversation reste v1 :
+   un appareil qui ne lit pas encore le v2, document vide compris, ne doit
+   pas perdre l'écriture dans ses conversations (v0.4.17). La même règle vaut
+   pour une nouvelle conversation chiffrée, qui naît en v1 tant que le
+   serveur l'accepte.
    - **Genèse de l'historique d'appartenance** (D.4) : ce client signe un
      `ADD` par membre actuel, lui compris, dans l'ordre des `userId` (octets
      UTF-8). Dans un groupe, il signe ensuite un `ROLE_ADMIN` pour chaque
