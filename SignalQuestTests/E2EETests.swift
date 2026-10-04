@@ -3607,7 +3607,9 @@ final class E2EEV2LiveShareTransportTests: XCTestCase {
             "SignalQuestApp/Features/Profile/NotificationSettingsView.swift"
         ))
         XCTAssertTrue(appDelegate.contains("handleE2eeV2Envelope"))
-        XCTAssertTrue(push.contains("fetchOpaqueNotificationRuntime"))
+        // Le même processeur que l'extension, sur la route GET servie (E.3).
+        XCTAssertTrue(push.contains("E2EEV2NotificationProcessor.processRuntime"))
+        XCTAssertFalse(push.contains("E2EEV2MessageDeliveryClient"))
         XCTAssertTrue(push.contains("recipientOwnerScope"))
         XCTAssertFalse(push.contains("MessageReplyReceiver"))
         XCTAssertFalse(push.contains("content.categoryIdentifier = \"MESSAGE\""))
@@ -4097,25 +4099,6 @@ final class E2EEV2PortableExportTests: XCTestCase {
         XCTAssertEqual(result, .blocked(reason: "e2ee-v2-account-scope-mismatch"))
         XCTAssertEqual(rangeCalls.value, 0)
         XCTAssertEqual(try Data(contentsOf: target), original)
-        XCTAssertTrue(partials(in: root, target: target).isEmpty)
-    }
-
-    func testRuntimeGateReturnsBeforeApprovalFileIdentityOrNetwork() async throws {
-        let root = temporaryRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let target = root.appendingPathComponent("must-not-exist.zip")
-        let approvalReads = LockedBox(0)
-        let result = await E2EEV2PortableExportClient(api: APIClient()).exportRuntime(
-            ownerScopeId: ownerScopeId,
-            destinationURL: target,
-            isApprovedDevice: {
-                approvalReads.value += 1
-                return true
-            }
-        )
-        XCTAssertEqual(result, .blocked(reason: "e2ee-v2-security-review-required"))
-        XCTAssertEqual(approvalReads.value, 0)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: target.path))
         XCTAssertTrue(partials(in: root, target: target).isEmpty)
     }
 

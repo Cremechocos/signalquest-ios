@@ -413,7 +413,6 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
     private let routing: WindowRouting
     private let identity: InstallationIdentity
     private let deviceID: String
-    private let e2eeV2Delivery: E2EEV2MessageDeliveryClient
     private let notificationContextBridge: E2EEV2NotificationContextBridge
     private var notificationContextObserver: NSObjectProtocol?
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "Push")
@@ -439,7 +438,6 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         self.routing = routing
         self.identity = identity
         deviceID = identity.deviceID()
-        e2eeV2Delivery = E2EEV2MessageDeliveryClient(api: api)
         notificationContextBridge = E2EEV2NotificationContextBridge(api: api)
         super.init()
         notificationContextObserver = NotificationCenter.default.addObserver(
@@ -498,54 +496,40 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
             playSound: true
         )
         guard scope.isCurrent else { return false }
-        guard E2EEV2RuntimeReadGate.enabled else { return placeholderPosted }
-        let ownerScopeId = LocalAccountScope.currentOwnerScopeId
-        let result = await e2eeV2Delivery.fetchOpaqueNotificationRuntime(
-            ownerScopeId: ownerScopeId,
-            envelopeId: envelopeId
+        guard E2EEV2RuntimeReadGate.enabled,
+              let request = E2EEV2OpaqueNotificationRequest(envelopeId: envelopeId, recipientOwnerScope: scope.ownerScopeId),
+              let contextStore = E2EEV2NotificationContextStore.configured() else { return placeholderPosted }
+        // Le même processeur que l'extension : enveloppe lue par la route servie
+        // (GET …/envelopes/{id}/fetch, E.3), vérifiée contre le miroir écrit par
+        // l'app, aperçu selon la confidentialité choisie.
+        #if DEBUG
+        let allowLocalHTTP = true
+        #else
+        let allowLocalHTTP = false
+        #endif
+        let result = await E2EEV2NotificationProcessor.processRuntime(
+            request: request,
+            apiBaseURL: api.config.apiBaseURL,
+            allowLocalHTTP: allowLocalHTTP,
+            dependencies: .init(
+                loadContext: { try contextStore.load() },
+                isCurrent: { try contextStore.isCurrent($0) },
+                loadConversation: { try contextStore.conversation($0) },
+                claimShown: { try contextStore.claimShown(conversationId: $0, deviceId: $1, counter: $2, floor: $3) },
+                fetch: { try await E2EEV2NotificationNetwork.fetch($0) }
+            )
         )
         guard scope.isCurrent else { return false }
-        switch result {
-        case .failure:
-            return placeholderPosted // le placeholder générique reste visible avant déverrouillage
-        case .success(let delivered):
-            let requestedPrivacy = E2EEV2NotificationPrivacyStore.get(ownerScopeId: scope.ownerScopeId)
-            let senderName = requestedPrivacy == .hidden ? nil : await resolveE2eeV2SenderName(
-                conversationId: delivered.delivery.incoming.conversationId,
-                senderId: delivered.delivery.senderId
-            )
-            guard scope.isCurrent else { return false }
-            let privacy = E2EEV2NotificationPrivacyStore.get(ownerScopeId: scope.ownerScopeId)
-            let presentation = E2EEV2NotificationPresentationPolicy.present(
-                delivered.message,
-                privacy: privacy,
-                senderName: senderName
-            )
-            return await postE2eeV2LocalNotification(
-                identifier: identifier,
-                scope: scope,
-                conversationId: delivered.delivery.incoming.conversationId,
-                presentation: presentation,
-                playSound: false
-            )
+        guard case .preview(let prepared) = result else {
+            return placeholderPosted // le placeholder générique reste visible
         }
-    }
-
-    private func resolveE2eeV2SenderName(
-        conversationId: String,
-        senderId: String
-    ) async -> String? {
-        guard let response = try? await api.request(
-            APIEndpoint(path: "/api/messages/conversations"),
-            as: ConversationsResponse.self
-        ),
-        let conversation = response.conversations.first(where: { $0.id == conversationId }),
-        let sender = conversation.participants.first(where: { $0.userId == senderId })?.user else {
-            return nil
-        }
-        let value = sender.name?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let value, !value.isEmpty { return value }
-        return sender.email.split(separator: "@").first.map(String.init)
+        return await postE2eeV2LocalNotification(
+            identifier: identifier,
+            scope: scope,
+            conversationId: prepared.conversationId,
+            presentation: prepared.presentation,
+            playSound: false
+        )
     }
 
     private func postE2eeV2LocalNotification(
