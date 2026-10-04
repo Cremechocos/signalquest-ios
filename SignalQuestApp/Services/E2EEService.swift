@@ -1109,6 +1109,12 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
         return try signing.key.sign(canonicalRequest)
     }
 
+    /// Appareil qui signe ici, lisible écran verrouillé comme sa clé de
+    /// signature (§2.6) : la preuve de jonction d'un appel décroché verrouillé.
+    func signingDeviceId(ownerNamespace: String) throws -> String {
+        try signingKey(ownerNamespace: ownerNamespace, createsIdentity: false).deviceId
+    }
+
     /// Requête signée, appareil verrouillé compris (spec §2.6, v0.4.13) :
     /// l'identifiant et la signature viennent de la même clé, lue une fois.
     func signWithDeviceId(canonicalRequest: Data, ownerNamespace: String) throws -> (deviceId: String, signature: Data) {
@@ -6633,7 +6639,7 @@ enum E2EEV2EpochRotationContract {
     static func parseRequirements(_ data: Data) -> [E2EEV2EpochRotationRequirement]? {
         guard data.count <= E2EEV2APITransport.maxJSONResponseBytes,
               let root = dictionary(data),
-              root["protocolVersion"] as? Int == 2,
+              integer(root["protocolVersion"]) == 2,
               let values = root["requirements"] as? [[String: Any]],
               values.count <= 500 else { return nil }
         var seen = Set<String>()
@@ -6780,256 +6786,13 @@ struct E2EEV2CallFrameKeyContext: Equatable, Sendable {
     let callId: String
 }
 
-struct E2EEV2CallEpochContext: Equatable, Sendable {
-    let version: Int
-    let provider: String
-    let epochId: String
-    let epochNumber: Int
-    let keyCommitmentB64: String
-
-    var jsonObject: [String: Any] {
-        [
-            "version": version,
-            "provider": provider,
-            "epochId": epochId,
-            "epochNumber": epochNumber,
-            "keyCommitmentB64": keyCommitmentB64,
-        ]
-    }
-}
-
-struct E2EEV2CallSessionDescriptor: Equatable, Sendable {
-    let version: Int
-    let provider: String
-    let epochId: String
-    let epochNumber: Int
-    let keyCommitmentB64: String
-    let required: Bool
-    let keyId: String
-}
-
-enum E2EEV2CallRequestPreparation: Equatable, Sendable {
-    case prepared(E2EEV2CallEpochContext)
-    case runtimeClosed
-    case localEpochUnavailable
-    /// La clé existe mais l'appareil est verrouillé, sans copie lisible dans
-    /// le miroir des aperçus : l'appel attend le déverrouillage (§2.6, v0.4.13).
-    case deviceLocked
-}
-
-enum E2EEV2CallSessionFailure: Equatable, Sendable {
-    case runtimeClosed
-    case localEpochUnavailable
-    case descriptorMismatch
-    case deviceLocked
-}
-
-enum E2EEV2CallSessionResolution: Sendable {
-    case ready(E2EEV2CallSessionMaterial)
-    case blocked(E2EEV2CallSessionFailure)
-}
-
-/// One-shot handoff from the account-scoped epoch store to LiveKit. Every
-/// transient copy is overwritten after the consumer returns.
-final class E2EEV2CallSessionMaterial: @unchecked Sendable {
-    let frameKeyContext: E2EEV2CallFrameKeyContext
-
-    private let lock = NSLock()
-    private var keyBytes: [UInt8]?
-
-    init(epochKey: Data, frameKeyContext: E2EEV2CallFrameKeyContext) {
-        keyBytes = Array(epochKey)
-        self.frameKeyContext = frameKeyContext
-    }
-
-    func consume<T>(_ body: (inout Data, E2EEV2CallFrameKeyContext) throws -> T) rethrows -> T {
-        lock.lock()
-        guard var owned = keyBytes else {
-            lock.unlock()
-            preconditionFailure("E2EE v2 call key material already consumed")
-        }
-        keyBytes = nil
-        lock.unlock()
-
-        var consumer = Data(owned)
-        defer {
-            for index in owned.indices { owned[index] = 0 }
-            consumer.resetBytes(in: 0..<consumer.count)
-        }
-        return try body(&consumer, frameKeyContext)
-    }
-}
-
-/// Shared strict contract between the signed call request and the local epoch.
-/// Runtime access stays fail-closed until the external review is approved.
+/// Clé de l'époque désignée par un descripteur d'appel (§10.2), jamais une
+/// autre : l'appel garde son époque (§10.3).
 enum E2EEV2CallBridge {
-    static let version = 1
-    static let provider = "LIVEKIT_FRAME_CRYPTOR_V1"
-
-    private static let opaquePattern = #"^[A-Za-z0-9][A-Za-z0-9_-]{15,127}\z"#
-    private static let contextKeys: Set<String> = [
-        "version", "provider", "epochId", "epochNumber", "keyCommitmentB64",
-    ]
-    private static let descriptorKeys = contextKeys.union(["required", "keyId"])
-
-    static func prepareRuntimeRequest(
-        conversationId: String,
-        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
-        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore()
-    ) -> E2EEV2CallRequestPreparation {
-        guard E2EEV2CallRuntimeGate.allowsControlPlane() else { return .runtimeClosed }
-        guard LocalAccountScope.currentUserId != nil else { return .localEpochUnavailable }
-        let owner = LocalAccountScope.currentOwnerScopeId
-        let namespace = LocalAccountScope.storageNamespace(for: owner)
-        return prepareContractPreview(conversationId: conversationId) {
-            try? E2EEV2VerifiedEpochKeys.current(
-                conversationId: conversationId, ownerNamespace: namespace, keyStore: keyStore, stateStore: stateStore
-            )
-        }
-    }
-
-    static func prepareContractPreview(
-        conversationId: String,
-        epochLoader: () -> E2EEV2StoredEpochKey?
-    ) -> E2EEV2CallRequestPreparation {
-        guard validOpaqueId(conversationId), var epoch = epochLoader() else {
-            return .localEpochUnavailable
-        }
-        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
-        guard valid(epoch: epoch), epoch.conversationId == conversationId else {
-            return .localEpochUnavailable
-        }
-        return .prepared(.init(
-            version: version,
-            provider: provider,
-            epochId: epoch.epochId,
-            epochNumber: epoch.epochNumber,
-            keyCommitmentB64: epoch.keyCommitmentB64
-        ))
-    }
-
-    /// Prepares the signed answer body from the exact historical epoch carried
-    /// by the incoming descriptor. Falling back to the current key would bind
-    /// an answer to a different call epoch and is therefore forbidden.
-    static func prepareRuntimeAnswerRequest(
-        conversationId: String,
-        descriptor: E2EEV2CallSessionDescriptor,
-        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
-        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
-        contextStore: E2EEV2NotificationContextStore? = .configured()
-    ) -> E2EEV2CallRequestPreparation {
-        guard E2EEV2CallRuntimeGate.allowsControlPlane() else { return .runtimeClosed }
-        guard LocalAccountScope.currentUserId != nil else { return .localEpochUnavailable }
-        let owner = LocalAccountScope.currentOwnerScopeId
-        return prepareAnswer(
-            conversationId: conversationId, descriptor: descriptor,
-            ownerNamespace: LocalAccountScope.storageNamespace(for: owner),
-            keyStore: keyStore, stateStore: stateStore, contextStore: contextStore
-        )
-    }
-
-    /// Après le verrou d'exécution : la clé du coffre, ou du miroir des aperçus
-    /// appareil verrouillé (§2.6, v0.4.13).
-    static func prepareAnswer(
-        conversationId: String,
-        descriptor: E2EEV2CallSessionDescriptor,
-        ownerNamespace: String,
-        keyStore: E2EEV2EpochKeyStore,
-        stateStore: E2EEV2ConversationStateStore,
-        contextStore: E2EEV2NotificationContextStore?
-    ) -> E2EEV2CallRequestPreparation {
-        var locked = false
-        let prepared = prepareAnswerContractPreview(
-            conversationId: conversationId,
-            descriptor: descriptor
-        ) {
-            callEpoch(
-                conversationId: conversationId, epochNumber: descriptor.epochNumber, ownerNamespace: ownerNamespace,
-                keyStore: keyStore, stateStore: stateStore, contextStore: contextStore, locked: &locked
-            )
-        }
-        return prepared == .localEpochUnavailable && locked ? .deviceLocked : prepared
-    }
-
-    static func prepareAnswerContractPreview(
-        conversationId: String,
-        descriptor: E2EEV2CallSessionDescriptor,
-        epochLoader: () -> E2EEV2StoredEpochKey?
-    ) -> E2EEV2CallRequestPreparation {
-        guard validOpaqueId(conversationId), var epoch = epochLoader() else {
-            return .localEpochUnavailable
-        }
-        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
-        guard valid(epoch: epoch),
-              epoch.conversationId == conversationId,
-              descriptor.version == version,
-              descriptor.provider == provider,
-              descriptor.required,
-              descriptor.epochId == epoch.epochId,
-              descriptor.epochNumber == epoch.epochNumber,
-              descriptor.keyCommitmentB64 == epoch.keyCommitmentB64,
-              descriptor.keyId == epoch.epochId else {
-            return .localEpochUnavailable
-        }
-        return .prepared(.init(
-            version: version,
-            provider: provider,
-            epochId: epoch.epochId,
-            epochNumber: epoch.epochNumber,
-            keyCommitmentB64: epoch.keyCommitmentB64
-        ))
-    }
-
-    static func resolveRuntimeSession(
-        conversationId: String,
-        callId: String,
-        liveKitURL: URL,
-        descriptor: E2EEV2CallSessionDescriptor,
-        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
-        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
-        contextStore: E2EEV2NotificationContextStore? = .configured()
-    ) -> E2EEV2CallSessionResolution {
-        guard E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: liveKitURL) else {
-            return .blocked(.runtimeClosed)
-        }
-        guard LocalAccountScope.currentUserId != nil else { return .blocked(.localEpochUnavailable) }
-        let owner = LocalAccountScope.currentOwnerScopeId
-        return resolveSession(
-            conversationId: conversationId, callId: callId, descriptor: descriptor,
-            ownerNamespace: LocalAccountScope.storageNamespace(for: owner),
-            keyStore: keyStore, stateStore: stateStore, contextStore: contextStore
-        )
-    }
-
-    /// Après le verrou d'exécution, comme `prepareAnswer`.
-    static func resolveSession(
-        conversationId: String,
-        callId: String,
-        descriptor: E2EEV2CallSessionDescriptor,
-        ownerNamespace: String,
-        keyStore: E2EEV2EpochKeyStore,
-        stateStore: E2EEV2ConversationStateStore,
-        contextStore: E2EEV2NotificationContextStore?
-    ) -> E2EEV2CallSessionResolution {
-        var locked = false
-        let resolution = resolveContractPreview(
-            conversationId: conversationId,
-            callId: callId,
-            descriptor: descriptor
-        ) {
-            callEpoch(
-                conversationId: conversationId, epochNumber: descriptor.epochNumber, ownerNamespace: ownerNamespace,
-                keyStore: keyStore, stateStore: stateStore, contextStore: contextStore, locked: &locked
-            )
-        }
-        if case .blocked(.localEpochUnavailable) = resolution, locked { return .blocked(.deviceLocked) }
-        return resolution
-    }
-
     /// Clé de l'époque d'un appel : celle du coffre de l'app ; s'il est fermé
     /// parce que l'appareil est verrouillé, celle du miroir des aperçus (§2.6,
     /// v0.4.13). `locked` : ni l'un ni l'autre ne l'a donnée, verrouillé.
-    private static func callEpoch(
+    static func callEpoch(
         conversationId: String,
         epochNumber: Int,
         ownerNamespace: String,
@@ -7056,112 +6819,6 @@ enum E2EEV2CallBridge {
         } catch {
             return nil
         }
-    }
-
-    static func resolveContractPreview(
-        conversationId: String,
-        callId: String,
-        descriptor: E2EEV2CallSessionDescriptor,
-        epochLoader: () -> E2EEV2StoredEpochKey?
-    ) -> E2EEV2CallSessionResolution {
-        guard validOpaqueId(conversationId), validOpaqueId(callId), var epoch = epochLoader() else {
-            return .blocked(.localEpochUnavailable)
-        }
-        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
-        guard valid(epoch: epoch),
-              epoch.conversationId == conversationId,
-              descriptor.version == version,
-              descriptor.provider == provider,
-              descriptor.required,
-              descriptor.epochId == epoch.epochId,
-              descriptor.epochNumber == epoch.epochNumber,
-              descriptor.keyCommitmentB64 == epoch.keyCommitmentB64,
-              descriptor.keyId == epoch.epochId else {
-            return .blocked(.descriptorMismatch)
-        }
-        return .ready(.init(
-            epochKey: epoch.epochKey,
-            frameKeyContext: .init(
-                conversationId: conversationId,
-                epochNumber: epoch.epochNumber,
-                callId: callId
-            )
-        ))
-    }
-
-    static func parseDescriptor(_ value: JSONValue) -> E2EEV2CallSessionDescriptor? {
-        guard case .object(let item) = value, Set(item.keys) == descriptorKeys,
-              integer(item["version"]) == version,
-              string(item["provider"]) == provider,
-              let epochId = string(item["epochId"]), validOpaqueId(epochId),
-              let epochNumber = integer(item["epochNumber"]), epochNumber > 0,
-              let commitment = string(item["keyCommitmentB64"]), validCommitment(commitment),
-              bool(item["required"]) == true,
-              let keyId = string(item["keyId"]), validOpaqueId(keyId),
-              keyId == epochId else { return nil }
-        return .init(
-            version: version,
-            provider: provider,
-            epochId: epochId,
-            epochNumber: epochNumber,
-            keyCommitmentB64: commitment,
-            required: true,
-            keyId: keyId
-        )
-    }
-
-    static func parseEpochContext(_ value: JSONValue) -> E2EEV2CallEpochContext? {
-        guard case .object(let item) = value, Set(item.keys) == contextKeys,
-              integer(item["version"]) == version,
-              string(item["provider"]) == provider,
-              let epochId = string(item["epochId"]), validOpaqueId(epochId),
-              let epochNumber = integer(item["epochNumber"]), epochNumber > 0,
-              let commitment = string(item["keyCommitmentB64"]), validCommitment(commitment) else {
-            return nil
-        }
-        return .init(
-            version: version,
-            provider: provider,
-            epochId: epochId,
-            epochNumber: epochNumber,
-            keyCommitmentB64: commitment
-        )
-    }
-
-    private static func valid(epoch: E2EEV2StoredEpochKey) -> Bool {
-        validOpaqueId(epoch.conversationId)
-            && validOpaqueId(epoch.epochId)
-            && epoch.epochNumber > 0
-            && epoch.epochKey.count == 32
-            && validCommitment(epoch.keyCommitmentB64)
-            && (try? E2EEV2EpochCrypto.keyCommitment(epoch.epochKey)) == epoch.keyCommitmentB64
-    }
-
-    private static func validOpaqueId(_ value: String) -> Bool {
-        value.range(of: opaquePattern, options: .regularExpression) != nil
-    }
-
-    private static func validCommitment(_ value: String) -> Bool {
-        Data(base64EncodedTolerant: value)?.count == 32
-    }
-
-    private static func string(_ value: JSONValue?) -> String? {
-        guard case .string(let result) = value else { return nil }
-        return result
-    }
-
-    private static func integer(_ value: JSONValue?) -> Int? {
-        guard case .number(let number) = value,
-              number.isFinite,
-              number.rounded(.towardZero) == number,
-              number >= 1,
-              number <= Double(Int32.max) else { return nil }
-        return Int(number)
-    }
-
-    private static func bool(_ value: JSONValue?) -> Bool? {
-        guard case .bool(let result) = value else { return nil }
-        return result
     }
 }
 

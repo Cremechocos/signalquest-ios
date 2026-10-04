@@ -317,7 +317,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
     // MARK: Rotation demandée
 
     enum StoredMembership: Equatable {
-        case v2(isGroup: Bool, members: [String])
+        case v2(isGroup: Bool, members: [String], excludesWeb: Bool = false)
         /// Aucune genèse gardée : la conversation n'est pas v2 sur cet appareil.
         case notV2
         /// Coffre ou disque illisible : jamais pris pour « pas v2 ».
@@ -338,7 +338,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         }
         for isGroup in [true, false] {
             if let context = try? membershipContext(conversationId: conversationId, isGroup: isGroup) {
-                return .v2(isGroup: isGroup, members: context.head.members.sorted())
+                return .v2(isGroup: isGroup, members: context.head.members.sorted(), excludesWeb: context.head.excludesWeb)
             }
         }
         return .unreadable

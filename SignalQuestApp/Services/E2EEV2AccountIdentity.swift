@@ -507,10 +507,11 @@ final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
         var publishedAtMs: Int64?
     }
 
-    /// Ce qu'iOS sait lire en v2 : texte, modification, suppression. Aucune
-    /// fonction tant que médias chiffrés et appels vérifiés ne sont pas prêts.
+    /// Ce qu'iOS sait lire en v2 : texte, modification, suppression ; « appels
+    /// vérifiés » seulement quand le verrou d'appels est ouvert (§10.0), les
+    /// médias chiffrés au jalon B.
     static let kinds = ["DELETE", "EDIT", "TEXT"]
-    static let features: [String] = []
+    static var features: [String] { E2EEV2CallRuntimeGate.allowsControlPlane() ? ["calls"] : [] }
     static let republishAfterMs: Int64 = 30 * 86_400_000
 
     static func key(ownerNamespace: String) -> String { "capabilities-v1:\(ownerNamespace)" }

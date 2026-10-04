@@ -2782,11 +2782,7 @@ struct ConversationDetailView: View {
     private func startCall(mode: String) {
         let verifiedV2: Bool
         if isE2EE {
-            if case .prepared = E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversation.id) {
-                verifiedV2 = true
-            } else {
-                verifiedV2 = false
-            }
+            verifiedV2 = services.callManager.canStartEncryptedCall(conversationId: conversation.id)
         } else {
             verifiedV2 = true
         }

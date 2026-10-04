@@ -1841,6 +1841,9 @@ final class E2EETests: XCTestCase {
         requirement["currentEpochNumber"] = "12"
         requirement["revision"] = "4"
         XCTAssertEqual(try parse([requirement])?.first.map { [$0.currentEpochNumber, $0.revision] }, [12, 4])
+        XCTAssertEqual(E2EEV2EpochRotationContract.parseRequirements(try JSONSerialization.data(withJSONObject: [
+            "protocolVersion": "2", "requirements": [requirement],
+        ]))?.count, 1, "protocolVersion en chaîne (A3c)")
         requirement["revision"] = "04"
         XCTAssertNil(try parse([requirement]))
         requirement["revision"] = true
@@ -2025,100 +2028,6 @@ final class E2EETests: XCTestCase {
             ),
             try E2EEV2CallFrameKey.derive(epochKey: epochKey, context: context)
         )
-    }
-
-    func testV2CallDescriptorAndEpochAreExactAndContainNoSecret() throws {
-        let fixture = try callFrameKeyFixture()
-        let commitment = try E2EEV2EpochCrypto.keyCommitment(
-            XCTUnwrap(Data(base64Encoded: fixture.epochKeyB64))
-        )
-        let descriptor: JSONValue = .object([
-            "version": .number(1),
-            "provider": .string(E2EEV2CallBridge.provider),
-            "epochId": .string("epoch_0123456789abcdef"),
-            "epochNumber": .number(1),
-            "keyCommitmentB64": .string(commitment),
-            "required": .bool(true),
-            "keyId": .string("epoch_0123456789abcdef"),
-        ])
-
-        XCTAssertNotNil(E2EEV2CallBridge.parseDescriptor(descriptor))
-        guard case .object(var withSecret) = descriptor else {
-            return XCTFail("Descriptor fixture must be an object")
-        }
-        withSecret["passphrase"] = .string("must-never-cross-the-api")
-        XCTAssertNil(E2EEV2CallBridge.parseDescriptor(.object(withSecret)))
-    }
-
-    func testV2CallBridgeBindsExactEpochAndProducesOneShotMaterial() throws {
-        let fixture = try callFrameKeyFixture()
-        let epochKey = try XCTUnwrap(Data(base64Encoded: fixture.epochKeyB64))
-        let commitment = try E2EEV2EpochCrypto.keyCommitment(epochKey)
-        let stored = E2EEV2StoredEpochKey(
-            conversationId: fixture.conversationId,
-            epochId: "epoch_0123456789abcdef",
-            epochNumber: fixture.epochNumber,
-            keyCommitmentB64: commitment,
-            epochKey: epochKey
-        )
-        let preparation = E2EEV2CallBridge.prepareContractPreview(
-            conversationId: fixture.conversationId,
-            epochLoader: { stored }
-        )
-        XCTAssertEqual(
-            preparation,
-            .prepared(.init(
-                version: 1,
-                provider: E2EEV2CallBridge.provider,
-                epochId: stored.epochId,
-                epochNumber: stored.epochNumber,
-                keyCommitmentB64: commitment
-            ))
-        )
-
-        let descriptor = E2EEV2CallSessionDescriptor(
-            version: 1,
-            provider: E2EEV2CallBridge.provider,
-            epochId: stored.epochId,
-            epochNumber: stored.epochNumber,
-            keyCommitmentB64: commitment,
-            required: true,
-            keyId: stored.epochId
-        )
-        let resolution = E2EEV2CallBridge.resolveContractPreview(
-            conversationId: fixture.conversationId,
-            callId: fixture.callId,
-            descriptor: descriptor,
-            epochLoader: { stored }
-        )
-        guard case .ready(let material) = resolution else {
-            return XCTFail("Matching descriptor must resolve")
-        }
-        try material.consume { consumed, context in
-            XCTAssertEqual(consumed, epochKey)
-            XCTAssertEqual(context.conversationId, fixture.conversationId)
-            XCTAssertEqual(context.epochNumber, fixture.epochNumber)
-            XCTAssertEqual(context.callId, fixture.callId)
-        }
-
-        let mismatch = E2EEV2CallBridge.resolveContractPreview(
-            conversationId: fixture.conversationId,
-            callId: fixture.callId,
-            descriptor: .init(
-                version: descriptor.version,
-                provider: descriptor.provider,
-                epochId: descriptor.epochId,
-                epochNumber: descriptor.epochNumber + 1,
-                keyCommitmentB64: descriptor.keyCommitmentB64,
-                required: descriptor.required,
-                keyId: descriptor.keyId
-            ),
-            epochLoader: { stored }
-        )
-        guard case .blocked(let reason) = mismatch else {
-            return XCTFail("Mismatched descriptor must fail closed")
-        }
-        XCTAssertEqual(reason, .descriptorMismatch)
     }
 
     func testV2LiveKitVerificationFailsClosed() {

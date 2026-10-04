@@ -260,7 +260,7 @@ final class AppServices: ObservableObject {
                 )
             }
         })
-        callManager = CallManager(callsService: callsService, api: api)
+        callManager = CallManager(callsService: callsService, api: api, callRuntime: E2EEV2CallRuntime(messaging: e2eeV2Messaging))
     }
 
     /// Recalcule le nombre de conversations non lues (dernier message postérieur à

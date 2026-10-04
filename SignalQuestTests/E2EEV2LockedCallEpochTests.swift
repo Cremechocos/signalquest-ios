@@ -10,7 +10,6 @@ import XCTest
 /// attend le déverrouillage.
 final class E2EEV2LockedCallEpochTests: XCTestCase {
     private let bruno = "user_bruno_01J7ABCD23456789"
-    private let callId = "call_locked_0000000000000001"
     private var directories: [URL] = []
 
     override func tearDown() {
@@ -49,7 +48,13 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
         let vault: LockableVault
         let keys: E2EEV2EpochKeyStore
         let contextStore: E2EEV2NotificationContextStore
-        let descriptor: E2EEV2CallSessionDescriptor
+    }
+
+    /// Ce que la lecture de la clé d'un appel rend (`E2EEV2CallBridge.callEpoch`).
+    private enum Lookup: Equatable {
+        case key(Data)
+        case deviceLocked
+        case unavailable
     }
 
     /// Conversation v2 à l'époque 1 et, s'il y a un aperçu, miroir écrit pour ce
@@ -66,7 +71,7 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
         let vault = LockableVault(fixture.vault)
         return Call(
             fixture: fixture, seeded: seeded, devices: devices, vault: vault, keys: E2EEV2EpochKeyStore(tokenStore: vault),
-            contextStore: contextStore, descriptor: descriptor(epochNumber: 1, epochKey: seeded.epochKey)
+            contextStore: contextStore
         )
     }
 
@@ -86,36 +91,16 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
         ))
     }
 
-    private func descriptor(epochNumber: Int, epochKey: Data) -> E2EEV2CallSessionDescriptor {
-        let epochId = "epoch_seeded_00000000000\(epochNumber)"
-        return .init(
-            version: E2EEV2CallBridge.version, provider: E2EEV2CallBridge.provider, epochId: epochId,
-            epochNumber: epochNumber, keyCommitmentB64: (try? E2EEV2EpochCrypto.keyCommitment(epochKey)) ?? "",
-            required: true, keyId: epochId
-        )
-    }
-
-    private func prepare(_ call: Call, descriptor: E2EEV2CallSessionDescriptor? = nil) -> E2EEV2CallRequestPreparation {
-        E2EEV2CallBridge.prepareAnswer(
-            conversationId: call.seeded.conversationId, descriptor: descriptor ?? call.descriptor,
+    /// La clé de l'époque désignée par un descripteur, du coffre ou du miroir.
+    private func prepare(_ call: Call, epochNumber: Int = 1) -> Lookup {
+        var locked = false
+        let epoch = E2EEV2CallBridge.callEpoch(
+            conversationId: call.seeded.conversationId, epochNumber: epochNumber,
             ownerNamespace: call.fixture.session.ownerNamespace,
-            keyStore: call.keys, stateStore: call.fixture.states, contextStore: call.contextStore
+            keyStore: call.keys, stateStore: call.fixture.states, contextStore: call.contextStore, locked: &locked
         )
-    }
-
-    private func resolve(_ call: Call) -> E2EEV2CallSessionResolution {
-        E2EEV2CallBridge.resolveSession(
-            conversationId: call.seeded.conversationId, callId: callId, descriptor: call.descriptor,
-            ownerNamespace: call.fixture.session.ownerNamespace,
-            keyStore: call.keys, stateStore: call.fixture.states, contextStore: call.contextStore
-        )
-    }
-
-    private func prepared(_ descriptor: E2EEV2CallSessionDescriptor) -> E2EEV2CallRequestPreparation {
-        .prepared(.init(
-            version: E2EEV2CallBridge.version, provider: E2EEV2CallBridge.provider, epochId: descriptor.epochId,
-            epochNumber: descriptor.epochNumber, keyCommitmentB64: descriptor.keyCommitmentB64
-        ))
+        if let epoch { return .key(epoch.epochKey) }
+        return locked ? .deviceLocked : .unavailable
     }
 
     /// Le miroir de l'époque 1 réécrit avec une autre clé, cohérent en lui-même.
@@ -134,19 +119,14 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
     func testUnlockedTheCallTakesTheKeyFromTheVault() throws {
         let call = try makeCall(privacy: nil)
         defer { call.fixture.close() }
-        XCTAssertEqual(prepare(call), prepared(call.descriptor))
+        XCTAssertEqual(prepare(call), .key(call.seeded.epochKey))
     }
 
     func testLockedWithFullPreviewsTheCallJoinsWithTheMirroredKey() throws {
         let call = try makeCall()
         defer { call.fixture.close() }
         call.vault.locked = true
-        XCTAssertEqual(prepare(call), prepared(call.descriptor))
-        guard case .ready(let material) = resolve(call) else { return XCTFail("Clé du miroir attendue") }
-        material.consume { key, context in
-            XCTAssertEqual(key, call.seeded.epochKey)
-            XCTAssertEqual(context, .init(conversationId: call.seeded.conversationId, epochNumber: 1, callId: callId))
-        }
+        XCTAssertEqual(prepare(call), .key(call.seeded.epochKey))
     }
 
     func testLockedWithoutPreviewKeysTheCallWaitsForTheUnlock() throws {
@@ -155,9 +135,8 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
             defer { call.fixture.close() }
             call.vault.locked = true
             XCTAssertEqual(prepare(call), .deviceLocked, "Aperçu \(privacy?.rawValue ?? "absent")")
-            guard case .blocked(.deviceLocked) = resolve(call) else { return XCTFail("Déverrouillage attendu") }
             call.vault.locked = false
-            XCTAssertEqual(prepare(call), prepared(call.descriptor), "Au déverrouillage, l'appel se rejoint")
+            XCTAssertEqual(prepare(call), .key(call.seeded.epochKey), "Au déverrouillage, l'appel se rejoint")
         }
     }
 
@@ -170,8 +149,7 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
         try forgeMirror(call, key: forged)
         call.vault.locked = true
         XCTAssertEqual(prepare(call), .deviceLocked)
-        XCTAssertEqual(prepare(call, descriptor: descriptor(epochNumber: 1, epochKey: forged)), .deviceLocked,
-                       "Même avec un descripteur qui s'accorde à la clé du miroir")
+        XCTAssertNotEqual(prepare(call), .key(forged), "Jamais la clé du miroir qui ne tient pas l'engagement")
     }
 
     /// Époque gardée avant l'épingle : rien à vérifier, on attend le déverrouillage.
@@ -194,7 +172,7 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
         ), ownerNamespace: call.fixture.session.ownerNamespace)
         try writeMirror(fixture: call.fixture, seeded: call.seeded, devices: call.devices, contextStore: call.contextStore)
         call.vault.locked = true
-        XCTAssertEqual(prepare(call, descriptor: descriptor(epochNumber: 2, epochKey: epochTwo)), .deviceLocked)
+        XCTAssertEqual(prepare(call, epochNumber: 2), .deviceLocked)
     }
 
     /// L'époque courante a avancé, le miroir pas encore : jamais l'ancienne clé.
@@ -204,7 +182,7 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
         let epochTwo = Data(repeating: 0x42, count: 32)
         try call.fixture.advance(call.seeded, to: 2, epochKey: epochTwo)
         call.vault.locked = true
-        XCTAssertEqual(prepare(call, descriptor: descriptor(epochNumber: 2, epochKey: epochTwo)), .deviceLocked)
+        XCTAssertEqual(prepare(call, epochNumber: 2), .deviceLocked)
     }
 
     func testOnlyFullPreviewsChosenOnTheDeviceAllowTheMirror() throws {
@@ -251,7 +229,7 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
         let call = try makeCall()
         defer { call.fixture.close() }
         call.vault.failure = errSecIO
-        XCTAssertEqual(prepare(call), .localEpochUnavailable)
+        XCTAssertEqual(prepare(call), .unavailable)
     }
 
     /// Un appel d'une autre époque que la courante : refusé, verrouillé ou non.
@@ -260,7 +238,7 @@ final class E2EEV2LockedCallEpochTests: XCTestCase {
         defer { older.fixture.close() }
         try older.fixture.advance(older.seeded, to: 2, epochKey: Data(repeating: 0x42, count: 32))
         older.vault.locked = true
-        XCTAssertEqual(prepare(older), .localEpochUnavailable)
+        XCTAssertEqual(prepare(older), .unavailable)
     }
 
     /// Une époque gardée avant l'épingle se relit : les champs manquent, sans erreur.

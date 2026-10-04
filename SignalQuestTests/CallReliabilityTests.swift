@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 @testable import SignalQuest
 #if canImport(LiveKit)
@@ -384,33 +385,61 @@ final class CallReliabilityTests: XCTestCase {
         #endif
     }
 
+    // MARK: Appels chiffrés v2 (D.11, E.4)
+
+    private static let callerKey = P256.Signing.PrivateKey()
+
+    /// Descripteur signé par un appareil appelant de test.
+    private func signedDescriptor(
+        callId: String = "call_1234567890123456",
+        epochNumber: Int = 4
+    ) throws -> E2EEV2SignedCallDescriptor {
+        try E2EEV2CallDescriptorFactory.make(
+            conversationId: "conversation_1234567890123456",
+            callId: callId,
+            callerDeviceId: "device_caller_1234567890",
+            epochId: "epoch_1234567890123456",
+            epochNumber: epochNumber,
+            keyCommitmentB64: Data(repeating: 3, count: 32).base64EncodedString(),
+            callNonceB64: Data(repeating: 7, count: 32).base64EncodedString(),
+            createdAtMs: 1_760_000_000_000,
+            sign: { try E2EEV2LowS.sign($0, with: Self.callerKey) }
+        )
+    }
+
+    private func json(_ descriptor: E2EEV2SignedCallDescriptor) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "descriptor": descriptor.signed.canonical,
+            "signatureB64": descriptor.signed.signatureB64,
+            "callerDeviceId": descriptor.callerDeviceId,
+        ], options: [.sortedKeys])
+        return String(decoding: data, as: UTF8.self)
+    }
+
     func testPendingE2EECallRequiresAnExactDescriptor() throws {
-        let commitment = Data(repeating: 7, count: 32).base64EncodedString()
-        let data = Data(#"""
+        let descriptor = try signedDescriptor()
+        let data = Data("""
         {
           "pending": true,
           "callId": "call_1234567890123456",
           "conversationId": "conversation_1234567890123456",
           "callType": "AUDIO",
           "status": "RINGING",
-          "e2eeRequired": true,
-          "e2ee": {
-            "version": 1,
-            "provider": "LIVEKIT_FRAME_CRYPTOR_V1",
-            "epochId": "epoch_1234567890123456",
-            "epochNumber": 4,
-            "keyCommitmentB64": "\#(commitment)",
-            "required": true,
-            "keyId": "epoch_1234567890123456"
-          }
+          "callerName": null,
+          "e2eeV2": \(try json(descriptor))
         }
-        """#.utf8)
+        """.utf8)
 
         let call = try XCTUnwrap(decoder.decode(PendingCallsResponse.self, from: data).calls.first)
-
         XCTAssertTrue(call.e2eeRequired)
-        XCTAssertEqual(call.e2ee?.epochNumber, 4)
-        XCTAssertEqual(call.e2ee?.keyId, "epoch_1234567890123456")
+        XCTAssertEqual(call.e2eeV2, descriptor)
+
+        // Une clé de trop dans `e2eeV2` : rien n'est lu.
+        let extra = Data("""
+        {"pending": true, "callId": "call_1234567890123456", "status": "RINGING",
+         "e2eeV2": {"descriptor": "x", "signatureB64": "AA==", "callerDeviceId": "device_caller_1234567890", "epochKey": "AA=="}}
+        """.utf8)
+        XCTAssertThrowsError(try decoder.decode(PendingCallsResponse.self, from: extra))
     }
 
     func testPendingE2EERequiredMarkerWithoutDescriptorFailsClosed() {
@@ -430,152 +459,57 @@ final class CallReliabilityTests: XCTestCase {
 
     func testIncomingVoipE2EEPayloadIsFailClosedAndLegacyPushesStayReconcilable() throws {
         XCTAssertEqual(IncomingCallE2EEContract.parse(["callId": "legacy"]), .unresolved)
-        XCTAssertEqual(
-            IncomingCallE2EEContract.parse(["e2eeRequired": true]),
-            .invalid
-        )
+        XCTAssertEqual(IncomingCallE2EEContract.parse(["e2eeRequired": false]), .legacy)
+        XCTAssertEqual(IncomingCallE2EEContract.parse(["e2eeRequired": true]), .invalid)
 
-        let commitment = Data(repeating: 3, count: 32).base64EncodedString()
-        let descriptor: [String: Any] = [
-            "version": 1,
-            "provider": "LIVEKIT_FRAME_CRYPTOR_V1",
-            "epochId": "epoch_1234567890123456",
-            "epochNumber": 9,
-            "keyCommitmentB64": commitment,
-            "required": true,
-            "keyId": "epoch_1234567890123456",
+        let descriptor = try signedDescriptor(epochNumber: 9)
+        let object: [String: Any] = [
+            "descriptor": descriptor.signed.canonical,
+            "signatureB64": descriptor.signed.signatureB64,
+            "callerDeviceId": descriptor.callerDeviceId,
         ]
-        let parsed = IncomingCallE2EEContract.parse([
-            "e2eeRequired": true,
-            "e2ee": descriptor,
-        ])
-        guard case .required(let value) = parsed else {
-            return XCTFail("Le descripteur PushKit exact doit être accepté")
+        guard case .required(let value) = IncomingCallE2EEContract.parse(["callId": "call_1234567890123456", "e2eeV2": object]) else {
+            return XCTFail("Le descripteur VoIP exact doit être accepté")
         }
-        XCTAssertEqual(value.epochNumber, 9)
+        XCTAssertEqual(value, descriptor)
+        XCTAssertEqual(value.descriptor.epochNumber, 9)
 
-        var malformed = descriptor
+        var malformed = object
         malformed["epochKey"] = Data(repeating: 1, count: 32).base64EncodedString()
-        XCTAssertEqual(
-            IncomingCallE2EEContract.parse([
-                "e2eeRequired": true,
-                "e2ee": malformed,
-            ]),
-            .invalid
-        )
+        XCTAssertEqual(IncomingCallE2EEContract.parse(["e2eeV2": malformed]), .invalid)
+        var otherCaller = object
+        otherCaller["callerDeviceId"] = "device_other_123456789012"
+        XCTAssertEqual(IncomingCallE2EEContract.parse(["e2eeV2": otherCaller]), .invalid,
+                       "L'appareil annoncé doit être celui que le descripteur signe")
+        XCTAssertEqual(IncomingCallE2EEContract.parse(["e2eeRequired": false, "e2eeV2": object]), .invalid)
     }
 
-    func testE2EECallWireSignsContextOnlyAndRejectsDowngradedResponse() throws {
-        let commitment = Data(repeating: 9, count: 32).base64EncodedString()
-        let context = E2EEV2CallEpochContext(
-            version: 1,
-            provider: "LIVEKIT_FRAME_CRYPTOR_V1",
-            epochId: "epoch_1234567890123456",
-            epochNumber: 5,
-            keyCommitmentB64: commitment
-        )
-        let body = try CallE2EEV2Wire.initiateBody(
-            conversationId: "conversation_1234567890123456",
-            type: "VIDEO",
-            context: context
-        )
+    func testE2EECallWireSendsTheSignedDescriptorAndRejectsADowngradedResponse() throws {
+        let descriptor = try signedDescriptor(epochNumber: 5)
+        let body = CallE2EEV2Wire.initiateBody(conversationId: "conversation_1234567890123456", type: "VIDEO", descriptor: descriptor)
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
-        let e2ee = try XCTUnwrap(object["e2ee"] as? [String: Any])
-
-        XCTAssertEqual(Set(object.keys), Set(["conversationId", "type", "e2ee"]))
+        XCTAssertEqual(Set(object.keys), ["conversationId", "type", "callId", "e2eeV2"])
+        XCTAssertEqual(object["callId"] as? String, descriptor.descriptor.callId)
+        XCTAssertEqual(Set((object["e2eeV2"] as? [String: Any])?.keys ?? [:].keys), ["descriptor", "signatureB64", "callerDeviceId"])
         XCTAssertEqual(
-            Set(e2ee.keys),
-            Set(["version", "provider", "epochId", "epochNumber", "keyCommitmentB64"])
+            try XCTUnwrap(JSONSerialization.jsonObject(with: CallE2EEV2Wire.answerBody(callId: "call_1234567890123456")) as? [String: String]),
+            ["callId": "call_1234567890123456"]
         )
-        XCTAssertNil(e2ee["epochKey"])
 
-        let validResponse = Data(#"""
-        {
-          "callId": "call_1234567890123456",
-          "roomName": "call-room",
-          "token": "livekit-token-value",
-          "wsUrl": "wss://livekit.example.test",
-          "type": "VIDEO",
-          "e2ee": {
-            "version": 1,
-            "provider": "LIVEKIT_FRAME_CRYPTOR_V1",
-            "epochId": "epoch_1234567890123456",
-            "epochNumber": 5,
-            "keyCommitmentB64": "\#(commitment)",
-            "required": true,
-            "keyId": "epoch_1234567890123456"
-          }
+        func response(_ e2eeV2: String?, callId: String = "call_1234567890123456") -> Data {
+            Data("""
+            {"callId": "\(callId)", "roomName": "call-room", "token": "livekit-token-value",
+             "wsUrl": "wss://livekit.example.test", "type": "VIDEO", "livekitIdentity": "user_a.device_a"\(e2eeV2.map { ", \"e2eeV2\": \($0)" } ?? "")}
+            """.utf8)
         }
-        """#.utf8)
-        XCTAssertEqual(
-            try CallE2EEV2Wire.decodeBoundSession(validResponse, expectedContext: context).id,
-            "call_1234567890123456"
-        )
-
-        let downgraded = Data(#"""
-        {
-          "callId": "call_1234567890123456",
-          "roomName": "call-room",
-          "token": "livekit-token-value",
-          "wsUrl": "wss://livekit.example.test",
-          "type": "VIDEO"
-        }
-        """#.utf8)
-        XCTAssertThrowsError(try CallE2EEV2Wire.decodeBoundSession(downgraded, expectedContext: context))
-    }
-
-    func testIncomingE2EEAnswerUsesTheDescriptorHistoricalEpoch() throws {
-        let key = Data((0..<32).map(UInt8.init))
-        let commitment = try E2EEV2EpochCrypto.keyCommitment(key)
-        let stored = E2EEV2StoredEpochKey(
-            conversationId: "conversation_1234567890123456",
-            epochId: "epoch_1234567890123456",
-            epochNumber: 8,
-            keyCommitmentB64: commitment,
-            epochKey: key
-        )
-        let descriptor = E2EEV2CallSessionDescriptor(
-            version: 1,
-            provider: "LIVEKIT_FRAME_CRYPTOR_V1",
-            epochId: stored.epochId,
-            epochNumber: stored.epochNumber,
-            keyCommitmentB64: stored.keyCommitmentB64,
-            required: true,
-            keyId: stored.epochId
-        )
-
-        XCTAssertEqual(
-            E2EEV2CallBridge.prepareAnswerContractPreview(
-                conversationId: stored.conversationId,
-                descriptor: descriptor,
-                epochLoader: { stored }
-            ),
-            .prepared(.init(
-                version: 1,
-                provider: "LIVEKIT_FRAME_CRYPTOR_V1",
-                epochId: stored.epochId,
-                epochNumber: stored.epochNumber,
-                keyCommitmentB64: stored.keyCommitmentB64
-            ))
-        )
-
-        let wrongDescriptor = E2EEV2CallSessionDescriptor(
-            version: descriptor.version,
-            provider: descriptor.provider,
-            epochId: descriptor.epochId,
-            epochNumber: descriptor.epochNumber + 1,
-            keyCommitmentB64: descriptor.keyCommitmentB64,
-            required: true,
-            keyId: descriptor.keyId
-        )
-        XCTAssertEqual(
-            E2EEV2CallBridge.prepareAnswerContractPreview(
-                conversationId: stored.conversationId,
-                descriptor: wrongDescriptor,
-                epochLoader: { stored }
-            ),
-            .localEpochUnavailable
-        )
+        let valid = try CallE2EEV2Wire.decodeInitiated(response(try json(descriptor)), sent: descriptor)
+        XCTAssertEqual(valid.id, "call_1234567890123456")
+        XCTAssertEqual(valid.livekitIdentity, "user_a.device_a")
+        XCTAssertThrowsError(try CallE2EEV2Wire.decodeInitiated(response(nil), sent: descriptor), "Réponse sans descripteur")
+        let other = try signedDescriptor(epochNumber: 6)
+        XCTAssertThrowsError(try CallE2EEV2Wire.decodeInitiated(response(try json(other)), sent: descriptor), "Autre descripteur")
+        XCTAssertEqual(try CallE2EEV2Wire.decodeAnswered(response(try json(descriptor)), callId: "call_1234567890123456").e2eeV2, descriptor)
+        XCTAssertThrowsError(try CallE2EEV2Wire.decodeAnswered(response(nil), callId: "call_1234567890123456"))
     }
 
     func testCallsServiceSendsTheSignedV2BodyOnceAndBindsTheResponse() async throws {
@@ -602,14 +536,8 @@ final class CallReliabilityTests: XCTestCase {
         _ = try identityStore.loadOrCreate(label: "Call wire test")
         let transport = E2EEV2APITransport(api: api, identityStore: identityStore)
         let service = CallsService(api: api, e2eeTransport: transport)
-        let commitment = Data(repeating: 11, count: 32).base64EncodedString()
-        let context = E2EEV2CallEpochContext(
-            version: 1,
-            provider: "LIVEKIT_FRAME_CRYPTOR_V1",
-            epochId: "epoch_1234567890123456",
-            epochNumber: 12,
-            keyCommitmentB64: commitment
-        )
+        let descriptor = try signedDescriptor(epochNumber: 12)
+        let served = try json(descriptor)
         var requestCount = 0
 
         MockURLProtocol.requestHandler = { request in
@@ -641,42 +569,43 @@ final class CallReliabilityTests: XCTestCase {
                 body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             )
             XCTAssertNil(object["epochKey"])
-            XCTAssertEqual((object["e2ee"] as? [String: Any])?["epochNumber"] as? Int, 12)
+            XCTAssertEqual(object["callId"] as? String, descriptor.descriptor.callId)
+            XCTAssertEqual((object["e2eeV2"] as? [String: Any])?["descriptor"] as? String, descriptor.signed.canonical)
             let response = HTTPURLResponse(
                 url: request.url!,
                 statusCode: 200,
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
             )!
-            return (response, Data(#"""
-            {
-              "callId": "call_1234567890123456",
-              "roomName": "call-room",
-              "token": "livekit-token-value",
-              "wsUrl": "wss://livekit.example.test",
-              "type": "AUDIO",
-              "e2ee": {
-                "version": 1,
-                "provider": "LIVEKIT_FRAME_CRYPTOR_V1",
-                "epochId": "epoch_1234567890123456",
-                "epochNumber": 12,
-                "keyCommitmentB64": "\#(commitment)",
-                "required": true,
-                "keyId": "epoch_1234567890123456"
-              }
-            }
-            """#.utf8))
+            return (response, Data("""
+            {"callId": "call_1234567890123456", "roomName": "call-room", "token": "livekit-token-value",
+             "wsUrl": "wss://livekit.example.test", "type": "AUDIO", "e2eeV2": \(served)}
+            """.utf8))
         }
 
         let session = try await service.initiate(
             conversationId: "conversation_1234567890123456",
             mode: "audio",
-            e2ee: context
+            e2ee: descriptor
         )
 
         XCTAssertEqual(requestCount, 1, "Une preuve signée ne doit jamais être rejouée automatiquement")
         XCTAssertTrue(session.e2eeRequired)
-        XCTAssertEqual(session.e2ee?.epochNumber, context.epochNumber)
+        XCTAssertEqual(session.e2eeV2, descriptor)
+
+        // Refus du serveur : son code remonte, sans nouvel essai automatique.
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            return (HTTPURLResponse(url: request.url!, statusCode: 409, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
+                    Data(#"{"error":"stale","code":"E2EE_EPOCH_STALE"}"#.utf8))
+        }
+        do {
+            _ = try await service.initiate(conversationId: "conversation_1234567890123456", mode: "audio", e2ee: descriptor)
+            XCTFail("Refus attendu")
+        } catch {
+            XCTAssertEqual(error as? CallsServiceError, .refused(code: "E2EE_EPOCH_STALE"))
+        }
+        XCTAssertEqual(requestCount, 2)
     }
 
     func testScreenSharingRemainsDisabledByDefault() {
@@ -925,7 +854,7 @@ private struct LiveKitMediaQAFixture: Decodable {
         guard fixture.version == 1,
               !fixture.runId.isEmpty, fixture.runId.count <= 96,
               fixture.e2ee.descriptor.version == 1,
-              fixture.e2ee.descriptor.provider == E2EEV2CallBridge.provider,
+              fixture.e2ee.descriptor.provider == "LIVEKIT_FRAME_CRYPTOR_V1",
               fixture.e2ee.descriptor.required,
               fixture.e2ee.descriptor.epochNumber > 0,
               fixture.epochKey.count == 32,

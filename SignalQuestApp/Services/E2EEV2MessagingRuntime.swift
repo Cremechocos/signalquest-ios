@@ -266,7 +266,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         switch parts.messaging.storedMembership(conversationId: conversationId) {
         case .notV2: return .noAction
         case .unreadable: return .failure(.init(kind: .retryable, message: "e2ee-v2-conversation-state-unreadable"))
-        case .v2(let isGroup, let members): stored = (isGroup, members)
+        case .v2(let isGroup, let members, _): stored = (isGroup, members)
         }
         // Une rotation demandée suit souvent un appareil ajouté ou révoqué chez
         // un membre : ses appareils sont relus, jamais pris dans le cache.
@@ -294,6 +294,53 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         // Un numéro de sécurité à accepter : jamais d'époque qui exclut en silence (§2.4).
         case .membersNotTrusted: return .failure(.init(kind: .localState, message: "e2ee-v2-members-not-trusted"))
         case .failure(let failure): return .failure(failure)
+        }
+    }
+
+    // MARK: Pour les appels
+
+    /// Membres d'une conversation v2 gardée et leurs appareils certifiés, pour
+    /// un appel (§10) : ceux de la chaîne vérifiée, jamais la liste du
+    /// serveur. Le verrou d'appels est lu par l'appelant. `synchronizing` :
+    /// la conversation est relue d'abord (époque ou membres plus récents).
+    struct CallMembers: Sendable {
+        let devices: E2EEV2CertifiedDeviceSet
+        let members: Set<String>
+        let excludesWeb: Bool
+        let ownUserId: String
+        let ownerNamespace: String
+    }
+
+    func callMembers(conversationId: String, synchronizing: Bool) async -> CallMembers? {
+        guard let parts = current() else { return nil }
+        guard case .v2(let isGroup, let members, _) = parts.messaging.storedMembership(conversationId: conversationId) else {
+            return nil
+        }
+        let devices: E2EEV2CertifiedDeviceSet
+        do {
+            if synchronizing {
+                await parts.directory.invalidate(accounts(conversationId: conversationId, participantIds: members, parts: parts))
+                _ = try await withDevices(conversationId: conversationId, participantIds: members, parts: parts, staleUserIds: {
+                    if case .failure(let failure) = $0 { return Self.stale(failure) }
+                    return nil
+                }) { devices in
+                    await parts.messaging.refresh(
+                        conversationId: conversationId, isGroup: isGroup, devices: devices,
+                        expectedOwnerScopeId: parts.session.ownerScopeId
+                    )
+                }
+            }
+            // Relus après une synchronisation : les membres ont pu changer.
+            guard case .v2(_, let current, let excludesWeb) = parts.messaging.storedMembership(conversationId: conversationId)
+            else { return nil }
+            devices = try await parts.directory.devices(for: accounts(conversationId: conversationId, participantIds: current, parts: parts))
+            return CallMembers(
+                devices: devices, members: Set(current), excludesWeb: excludesWeb,
+                ownUserId: String(parts.session.ownerScopeId.dropFirst("user:".count)),
+                ownerNamespace: parts.session.ownerNamespace
+            )
+        } catch {
+            return nil
         }
     }
 

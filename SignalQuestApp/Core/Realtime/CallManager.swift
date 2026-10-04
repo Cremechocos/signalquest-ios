@@ -219,7 +219,7 @@ enum CallDiscretionPolicy {
 enum IncomingCallE2EEExpectation: Equatable {
     case unresolved
     case legacy
-    case required(E2EEV2CallSessionDescriptor)
+    case required(E2EEV2SignedCallDescriptor)
     case invalid
 
     /// Le serveur peut rendre le chiffrement obligatoire, jamais le retirer :
@@ -264,15 +264,17 @@ enum IncomingCallE2EEContract {
     /// `unresolved` and are authenticated through `/pending` before answer.
     static func parse(_ payload: [AnyHashable: Any]) -> IncomingCallE2EEExpectation {
         let marker = payload["e2eeRequired"] as? Bool
-        guard let rawDescriptor = payload["e2ee"] else {
+        guard let rawDescriptor = payload["e2eeV2"], !(rawDescriptor is NSNull) else {
             if marker == true { return .invalid }
             return marker == false ? .legacy : .unresolved
         }
-        guard marker == true,
+        // VoIP : `e2eeV2` en objet (E.4), lu strictement ; sa vérification
+        // (appareil, époque, nonce) suit le report à CallKit.
+        guard marker != false,
               JSONSerialization.isValidJSONObject(rawDescriptor),
               let data = try? JSONSerialization.data(withJSONObject: rawDescriptor),
               let value = try? JSONDecoder().decode(JSONValue.self, from: data),
-              let descriptor = E2EEV2CallBridge.parseDescriptor(value) else {
+              let descriptor = E2EEV2SignedCallDescriptor.parse(value) else {
             return .invalid
         }
         return .required(descriptor)
@@ -308,7 +310,9 @@ final class CallManager: NSObject, ObservableObject {
         /// `nil` means a PushKit wake-up has not yet been reconciled with the
         /// authenticated `/pending` contract. Such a call cannot be answered.
         var requiresE2EE: Bool? = nil
-        var e2eeDescriptor: E2EEV2CallSessionDescriptor? = nil
+        /// Descripteur signé d'un appel chiffré (D.11) : celui que cet appareil
+        /// a signé, ou le premier reçu, vérifié avant de répondre.
+        var e2eeDescriptor: E2EEV2SignedCallDescriptor? = nil
     }
 
     enum CallError: LocalizedError {
@@ -351,6 +355,9 @@ final class CallManager: NSObject, ObservableObject {
 
     private let callsService: CallsServicing
     private let api: APIClient
+    /// Appels chiffrés v2 (§10) ; nil : aucun appel chiffré ne part ni n'aboutit.
+    private let callRuntime: E2EEV2CallRuntime?
+    private let pushRegistrar: E2EEV2CallPushRegistrar?
     private let terminationRetryStore: CallTerminationRetryStore
     private let provider: CXProvider
     private let callController = CXCallController()
@@ -364,10 +371,13 @@ final class CallManager: NSObject, ObservableObject {
     init(
         callsService: CallsServicing,
         api: APIClient,
+        callRuntime: E2EEV2CallRuntime? = nil,
         terminationRetryStore: CallTerminationRetryStore = CallTerminationRetryStore()
     ) {
         self.callsService = callsService
         self.api = api
+        self.callRuntime = callRuntime
+        pushRegistrar = callRuntime == nil ? nil : E2EEV2CallPushRegistrar(api: api)
         self.terminationRetryStore = terminationRetryStore
         let config = CXProviderConfiguration()
         config.supportsVideo = true
@@ -401,6 +411,12 @@ final class CallManager: NSObject, ObservableObject {
     }
 
     // MARK: Outgoing
+
+    /// Un appel chiffré peut partir d'ici : verrou d'appels ouvert, conversation
+    /// v2 et clé de son époque courante vérifiée (§10.0).
+    func canStartEncryptedCall(conversationId: String) -> Bool {
+        callRuntime?.canStart(conversationId: conversationId) ?? false
+    }
 
     func startOutgoingCall(
         conversationId: String,
@@ -604,7 +620,7 @@ final class CallManager: NSObject, ObservableObject {
         hasVideo: Bool,
         serverStatus: String? = nil,
         requiresE2EE: Bool? = nil,
-        e2eeDescriptor: E2EEV2CallSessionDescriptor? = nil,
+        e2eeDescriptor: E2EEV2SignedCallDescriptor? = nil,
         completion: (() -> Void)?
     ) {
         let conversation = knownConversation(conversationId)
@@ -735,6 +751,7 @@ final class CallManager: NSObject, ObservableObject {
                 } else if let callId {
                     self?.startIncomingReconciliation(callId: callId)
                     completionBox.value?()
+                    self?.verifyRinging(callId: callId)
                 } else {
                     completionBox.value?()
                 }
@@ -769,7 +786,11 @@ final class CallManager: NSObject, ObservableObject {
                     activeCall?.requiresE2EE = IncomingCallE2EEExpectation.merged(
                         known: active.requiresE2EE, server: call.e2eeRequired
                     )
-                    activeCall?.e2eeDescriptor = call.e2ee
+                    // Le premier descripteur reçu reste : un autre est refusé à la réponse.
+                    if active.e2eeDescriptor == nil, let descriptor = call.e2eeV2 {
+                        activeCall?.e2eeDescriptor = descriptor
+                        verifyRinging(callId: call.id)
+                    }
                     return
                 }
                 // `/pending` ne renvoie qu'un appel (le plus récent). Si un second
@@ -807,7 +828,7 @@ final class CallManager: NSObject, ObservableObject {
             hasVideo: call.mode == "video",
             serverStatus: call.status,
             requiresE2EE: call.e2eeRequired,
-            e2eeDescriptor: call.e2ee,
+            e2eeDescriptor: call.e2eeV2,
             completion: nil
         )
     }
@@ -824,23 +845,19 @@ final class CallManager: NSObject, ObservableObject {
         }
         let e2eeSession: E2EEV2LiveKitSession?
         if session.e2eeRequired {
-            guard let descriptor = session.e2ee,
-                  let conversationId = activeCall?.conversationId else {
+            // Le descripteur de la réponse est celui vérifié ou signé ici, à l'octet.
+            guard let descriptor = session.e2eeV2, descriptor == activeCall?.e2eeDescriptor,
+                  descriptor.descriptor.conversationId == activeCall?.conversationId,
+                  let callRuntime else {
                 throw CallError.untrustedE2EESession
             }
-            switch E2EEV2CallBridge.resolveRuntimeSession(
-                conversationId: conversationId,
-                callId: session.id,
-                liveKitURL: url,
-                descriptor: descriptor
-            ) {
-            case .ready(let material):
-                e2eeSession = try material.consume { epochKey, context in
-                    try E2EEV2LiveKitSession.make(epochKey: epochKey, context: context)
-                }
-            case .blocked(.deviceLocked):
+            do {
+                e2eeSession = try await callRuntime.liveKitSession(for: descriptor, liveKitURL: url)
+            } catch E2EEV2CallRuntime.SessionFailure.deviceLocked {
                 throw CallError.deviceLocked
-            case .blocked:
+            } catch E2EEV2CallRuntime.SessionFailure.runtimeClosed {
+                throw CallError.e2eeUnavailable
+            } catch {
                 throw CallError.untrustedE2EESession
             }
         } else {
@@ -864,13 +881,59 @@ final class CallManager: NSObject, ObservableObject {
         guard liveKit.state == .connected else { throw CallError.connectionEnded }
     }
 
-    private func outgoingE2EEContext(for call: ActiveCall) throws -> E2EEV2CallEpochContext? {
+    /// Descripteur signé ici pour un appel sortant chiffré (§10.1).
+    private func outgoingDescriptor(for call: ActiveCall) throws -> E2EEV2SignedCallDescriptor? {
         guard call.requiresE2EE == true else { return nil }
-        guard let conversationId = call.conversationId else { throw CallError.e2eeUnavailable }
-        switch E2EEV2CallBridge.prepareRuntimeRequest(conversationId: conversationId) {
-        case .prepared(let context): return context
+        guard let conversationId = call.conversationId, let callRuntime else { throw CallError.e2eeUnavailable }
+        switch callRuntime.prepareOutgoing(conversationId: conversationId) {
+        case .prepared(let descriptor): return descriptor
         case .runtimeClosed, .localEpochUnavailable: throw CallError.e2eeUnavailable
         case .deviceLocked: throw CallError.deviceLocked
+        }
+    }
+
+    /// Initiation d'un appel chiffré : une époque remplacée entre-temps ou un
+    /// identifiant déjà pris font signer un nouveau descripteur, une fois.
+    private func initiate(_ call: ActiveCall, conversationId: String) async throws -> CallSession {
+        let mode = call.hasVideo ? "video" : "audio"
+        var descriptor = try outgoingDescriptor(for: call)
+        activeCall?.e2eeDescriptor = descriptor
+        do {
+            return try await callsService.initiate(conversationId: conversationId, mode: mode, e2ee: descriptor)
+        } catch CallsServiceError.refused(let code)
+            where descriptor != nil && ["E2EE_EPOCH_STALE", "CALL_ID_TAKEN", "CALL_NONCE_TAKEN"].contains(code) {
+            if code == "E2EE_EPOCH_STALE" { await callRuntime?.synchronize(conversationId: conversationId) }
+            guard let current = activeCall, current.id == call.id, !current.isEnding else { throw CallError.connectionEnded }
+            descriptor = try outgoingDescriptor(for: current)
+            activeCall?.e2eeDescriptor = descriptor
+            return try await callsService.initiate(conversationId: conversationId, mode: mode, e2ee: descriptor)
+        }
+    }
+
+    /// Sonnerie d'un appel chiffré : son descripteur est vérifié (§10.1) dès
+    /// qu'il est connu. Refusé, l'appel ne sonne plus et le serveur l'apprend.
+    private func verifyRinging(callId: String) {
+        guard let call = activeCall, call.callId == callId, !call.isOutgoing,
+              let descriptor = call.e2eeDescriptor, let conversationId = call.conversationId,
+              let callRuntime else { return }
+        Task { [weak self] in
+            let verification = await callRuntime.verify(descriptor, conversationId: conversationId, callId: callId, ringing: true)
+            guard let self, let current = self.activeCall, current.callId == callId,
+                  current.e2eeDescriptor == descriptor, !current.isAnswered, !current.isEnding else { return }
+            switch verification {
+            case .verified:
+                return
+            case .unavailable:
+                // Appareils ou conversation illisibles pour l'instant : la
+                // réponse revérifie, et refuse si rien n'a changé.
+                return
+            case .refused(let failure):
+                self.logger.error("encrypted call descriptor refused: \(String(describing: failure), privacy: .public)")
+                self.activeCall?.isEnding = true
+                self.reportCallEnded(current.id, reason: .failed)
+                await self.notifyBackendCallTerminated(current)
+                await self.tearDown()
+            }
         }
     }
 
@@ -887,35 +950,38 @@ final class CallManager: NSObject, ObservableObject {
         reconciled.requiresE2EE = IncomingCallE2EEExpectation.merged(
             known: reconciled.requiresE2EE, server: serverCall.e2eeRequired
         )
-        reconciled.e2eeDescriptor = serverCall.e2ee
+        // Jamais un autre descripteur que celui déjà reçu pour cet appel.
+        if let known = reconciled.e2eeDescriptor, let served = serverCall.e2eeV2, known != served {
+            throw CallError.untrustedE2EESession
+        }
+        reconciled.e2eeDescriptor = reconciled.e2eeDescriptor ?? serverCall.e2eeV2
         activeCall = reconciled
         return reconciled
     }
 
-    private func answerE2EEContext(for call: ActiveCall) throws -> E2EEV2CallEpochContext? {
+    /// Avant de répondre à un appel chiffré, son descripteur est revérifié
+    /// (§10.1) : appareil appelant, époque, nonce. Vrai pour un appel chiffré.
+    private func verifiedForAnswer(_ call: ActiveCall, callId: String) async throws -> Bool {
         guard call.requiresE2EE == true else {
             guard call.requiresE2EE == false, call.e2eeDescriptor == nil else {
                 throw CallError.untrustedE2EESession
             }
-            return nil
+            return false
         }
-        guard let conversationId = call.conversationId,
-              let descriptor = call.e2eeDescriptor else {
+        guard let conversationId = call.conversationId, let descriptor = call.e2eeDescriptor else {
             throw CallError.untrustedE2EESession
         }
-        switch E2EEV2CallBridge.prepareRuntimeAnswerRequest(
-            conversationId: conversationId,
-            descriptor: descriptor
-        ) {
-        case .prepared(let context): return context
-        case .runtimeClosed, .localEpochUnavailable: throw CallError.e2eeUnavailable
-        case .deviceLocked: throw CallError.deviceLocked
+        guard let callRuntime else { throw CallError.e2eeUnavailable }
+        switch await callRuntime.verify(descriptor, conversationId: conversationId, callId: callId, ringing: false) {
+        case .verified: return true
+        case .unavailable: throw CallError.e2eeUnavailable
+        case .refused: throw CallError.untrustedE2EESession
         }
     }
 
     private func answerOnce(_ call: ActiveCall, callId: String) async throws -> CallSession {
-        let context = try answerE2EEContext(for: call)
-        return try await callsService.answer(callId: callId, e2ee: context)
+        let encrypted = try await verifiedForAnswer(call, callId: callId)
+        return try await callsService.answer(callId: callId, e2ee: encrypted)
     }
 
     /// Verrouillé : la clé de l'époque (aperçu qui n'est pas complet) ou la clé
@@ -1070,7 +1136,7 @@ final class CallManager: NSObject, ObservableObject {
               advance.ownerNamespace == LocalAccountScope.storageNamespace,
               E2EEV2CallEpochPolicy.endsCall(
                   conversationId: call.conversationId,
-                  callEpochNumber: call.e2eeDescriptor?.epochNumber,
+                  callEpochNumber: call.e2eeDescriptor?.descriptor.epochNumber,
                   requiresE2EE: call.requiresE2EE == true,
                   advance: advance
               ) else { return }
@@ -1197,6 +1263,8 @@ final class CallManager: NSObject, ObservableObject {
             voipTokenNeedsSync = true
             logger.error("VoIP token registration failed: \(error.localizedDescription, privacy: .public)")
         }
+        // Appareil v2 : jetons liés à l'appareil, et session liée à lui (E.1).
+        await pushRegistrar?.register(voipToken: token)
     }
 
     /// Ré-enregistre le dernier token VoIP UNIQUEMENT s'il reste à synchroniser
@@ -1213,7 +1281,12 @@ final class CallManager: NSObject, ObservableObject {
     /// compte). No-op au tout premier login tant que le token n'a pas été livré
     /// (le `didUpdate` initial fera alors le POST).
     func registerVoIPTokenForSession() async {
-        guard let token = lastVoipToken else { return }
+        guard let token = lastVoipToken else {
+            // Sans jeton VoIP encore livré, la session se lie quand même à
+            // l'appareil v2 avec le jeton APNs (E.1, v0.4.19).
+            await pushRegistrar?.register(voipToken: nil)
+            return
+        }
         await registerVoIPToken(token)
     }
 
@@ -1279,15 +1352,10 @@ extension CallManager: CXProviderDelegate {
                 action.fail(); return
             }
             do {
-                let context = try self.outgoingE2EEContext(for: call)
-                let session = try await self.callsService.initiate(
-                    conversationId: conversationId,
-                    mode: call.hasVideo ? "video" : "audio",
-                    e2ee: context
-                )
+                let session = try await self.initiate(call, conversationId: conversationId)
                 self.activeCall?.callId = session.id
                 self.activeCall?.requiresE2EE = session.e2eeRequired
-                self.activeCall?.e2eeDescriptor = session.e2ee
+                self.activeCall?.e2eeDescriptor = session.e2eeV2
                 self.provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: nil)
                 try await self.connectLiveKit(for: session, video: call.hasVideo)
                 self.provider.reportOutgoingCall(with: action.callUUID, connectedAt: nil)
@@ -1454,7 +1522,7 @@ extension CallManager: PKPushRegistryDelegate {
                 return
             }
             let requirement: Bool?
-            let descriptor: E2EEV2CallSessionDescriptor?
+            let descriptor: E2EEV2SignedCallDescriptor?
             switch e2eeExpectation {
             case .unresolved:
                 requirement = nil

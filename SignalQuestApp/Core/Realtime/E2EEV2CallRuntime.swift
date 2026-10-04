@@ -1,0 +1,328 @@
+import CryptoKit
+import Foundation
+
+/// Appel chiffré v2 (§10, E.4) au-dessus de la messagerie v2 : le descripteur
+/// que l'appelant signe, les vérifications de l'appelé, et la session LiveKit
+/// qui en découle (clé de trame v2, preuves de jonction). Les appareils et
+/// l'époque viennent de la chaîne vérifiée gardée ici, jamais du serveur.
+/// Fermé tant que le verrou d'appels l'est (`E2EEV2CallRuntimeGate`).
+final class E2EEV2CallRuntime: @unchecked Sendable {
+    enum Preparation: Equatable, Sendable {
+        case prepared(E2EEV2SignedCallDescriptor)
+        case runtimeClosed
+        case localEpochUnavailable
+        case deviceLocked
+    }
+
+    enum Verification: Equatable, Sendable {
+        case verified(E2EEV2CallDescriptor)
+        case refused(E2EEV2CallDescriptorCheck.Failure)
+        /// Verrou fermé, ou conversation et appareils illisibles ici.
+        case unavailable
+    }
+
+    enum SessionFailure: Error, Equatable {
+        case runtimeClosed
+        case localEpochUnavailable
+        case deviceLocked
+        case untrusted
+    }
+
+    /// Membres et appareils certifiés d'une conversation v2 gardée ; `true` :
+    /// la relire d'abord.
+    private let members: @Sendable (String, Bool) async -> E2EEV2MessagingRuntime.CallMembers?
+    private let identityStore: E2EEV2DeviceIdentityStore
+    private let keyStore: E2EEV2EpochKeyStore
+    private let stateStore: E2EEV2ConversationStateStore
+    private let nonces: E2EEV2CallNonceLedger
+    private let contextStore: () -> E2EEV2NotificationContextStore?
+    private let now: @Sendable () -> Date
+    private let controlPlaneOpen: @Sendable () -> Bool
+    private let mediaOpen: @Sendable (URL) -> Bool
+
+    convenience init(messaging: E2EEV2MessagingRuntime) {
+        self.init(members: { await messaging.callMembers(conversationId: $0, synchronizing: $1) })
+    }
+
+    init(
+        members: @escaping @Sendable (String, Bool) async -> E2EEV2MessagingRuntime.CallMembers?,
+        identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
+        keyStore: E2EEV2EpochKeyStore = E2EEV2EpochKeyStore(),
+        stateStore: E2EEV2ConversationStateStore = E2EEV2ConversationStateStore(),
+        nonces: E2EEV2CallNonceLedger = .shared,
+        contextStore: @escaping () -> E2EEV2NotificationContextStore? = { .configured() },
+        now: @escaping @Sendable () -> Date = Date.init,
+        controlPlaneOpen: @escaping @Sendable () -> Bool = { E2EEV2CallRuntimeGate.allowsControlPlane() },
+        mediaOpen: @escaping @Sendable (URL) -> Bool = { E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: $0) }
+    ) {
+        self.members = members
+        self.identityStore = identityStore
+        self.keyStore = keyStore
+        self.stateStore = stateStore
+        self.nonces = nonces
+        self.contextStore = contextStore
+        self.now = now
+        self.controlPlaneOpen = controlPlaneOpen
+        self.mediaOpen = mediaOpen
+    }
+
+    private var nowMs: Int64 { Int64(now().timeIntervalSince1970 * 1_000) }
+
+    // MARK: Appelant
+
+    /// Ce que l'écran peut proposer sans réseau : verrou ouvert, conversation
+    /// v2 ici, époque courante vérifiée et sa clé. L'intersection « appels »
+    /// est contrôlée par le serveur à l'initiation (`E2EE_CAPABILITY_MISSING`).
+    func canStart(conversationId: String) -> Bool {
+        guard controlPlaneOpen(), let session = LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              (try? stateStore.isV2(conversationId: conversationId, ownerNamespace: session.ownerNamespace)) == true,
+              var epoch = try? E2EEV2VerifiedEpochKeys.current(
+                  conversationId: conversationId, ownerNamespace: session.ownerNamespace,
+                  keyStore: keyStore, stateStore: stateStore
+              ) else { return false }
+        epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count)
+        return true
+    }
+
+    /// Descripteur signé par cet appareil (§10.1), sur l'époque courante
+    /// vérifiée : `callId` et `callNonce` tirés ici, jamais par le serveur.
+    func prepareOutgoing(conversationId: String) -> Preparation {
+        guard controlPlaneOpen() else { return .runtimeClosed }
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return .localEpochUnavailable }
+        let namespace = session.ownerNamespace
+        var epoch: E2EEV2StoredEpochKey
+        do {
+            guard (try stateStore.isV2(conversationId: conversationId, ownerNamespace: namespace)),
+                  let current = try E2EEV2VerifiedEpochKeys.current(
+                      conversationId: conversationId, ownerNamespace: namespace, keyStore: keyStore, stateStore: stateStore
+                  ) else { return .localEpochUnavailable }
+            epoch = current
+        } catch where E2EEV2DeviceIdentityStore.isLocked(error) {
+            return .deviceLocked
+        } catch {
+            return .localEpochUnavailable
+        }
+        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
+        do {
+            let deviceId = try identityStore.signingDeviceId(ownerNamespace: namespace)
+            let descriptor = try E2EEV2CallDescriptorFactory.make(
+                conversationId: conversationId,
+                callId: try E2EEV2CallDescriptorFactory.newCallId(),
+                callerDeviceId: deviceId,
+                epochId: epoch.epochId,
+                epochNumber: epoch.epochNumber,
+                keyCommitmentB64: epoch.keyCommitmentB64,
+                callNonceB64: try E2EEV2CallDescriptorFactory.newCallNonceB64(),
+                createdAtMs: nowMs,
+                sign: { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: namespace) }
+            )
+            // Son propre nonce est réservé : un rejeu de ce descripteur vers cet
+            // appareil ne vaut que pour cet appel.
+            _ = nonces.claim(descriptor.descriptor.callNonceB64, callId: descriptor.descriptor.callId, nowMs: nowMs)
+            return .prepared(descriptor)
+        } catch where E2EEV2DeviceIdentityStore.isLocked(error) {
+            return .deviceLocked
+        } catch {
+            return .localEpochUnavailable
+        }
+    }
+
+    /// `E2EE_EPOCH_STALE` à l'initiation : la conversation est relue avant un
+    /// nouveau descripteur (nouveau `callNonce`).
+    func synchronize(conversationId: String) async {
+        _ = await members(conversationId, true)
+    }
+
+    // MARK: Appelé
+
+    /// Vérifications de l'appelé (§10.1) : appareil appelant certifié d'un
+    /// membre avec « appels vérifiés », signature, 60 secondes pour une
+    /// sonnerie, époque la plus récente connue ici, nonce jamais vu pour un
+    /// autre appel. Une époque plus récente que la sienne, ou un appareil
+    /// inconnu, font relire la conversation une fois.
+    func verify(
+        _ candidate: E2EEV2SignedCallDescriptor,
+        conversationId: String,
+        callId: String,
+        ringing: Bool
+    ) async -> Verification {
+        guard controlPlaneOpen() else { return .unavailable }
+        var lastFailure: E2EEV2CallDescriptorCheck.Failure?
+        for synchronizing in [false, true] {
+            guard let members = await self.members(conversationId, synchronizing) else { return .unavailable }
+            let current = try? stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: members.ownerNamespace)
+            let checkedAt = nowMs
+            let result = E2EEV2CallDescriptorCheck.verify(
+                candidate,
+                conversationId: conversationId,
+                callId: callId,
+                callerSigningKey: { deviceId in Self.callSigningKey(deviceId: deviceId, in: members, nowMs: checkedAt) },
+                // Une époque gardée sans identifiant ni engagement n'est la « plus récente » de rien.
+                latestEpoch: current.flatMap { epoch in
+                    guard let epochId = epoch.epochId, let commitment = epoch.keyCommitmentB64 else { return nil }
+                    return .init(epochId: epochId, epochNumber: epoch.epochNumber, keyCommitmentB64: commitment)
+                },
+                nonces: nonces,
+                nowMs: checkedAt,
+                ringing: ringing
+            )
+            switch result {
+            case .success(let descriptor):
+                return .verified(descriptor)
+            case .failure(.notLatestEpoch) where !synchronizing
+                && candidate.descriptor.epochNumber > (current?.epochNumber ?? 0):
+                lastFailure = .notLatestEpoch
+            case .failure(.untrustedCaller) where !synchronizing:
+                lastFailure = .untrustedCaller
+            case .failure(let failure):
+                return .refused(failure)
+            }
+        }
+        return .refused(lastFailure ?? .untrustedCaller)
+    }
+
+    // MARK: Média
+
+    /// Session LiveKit d'un appel vérifié : clé de trame v2 tirée de l'époque
+    /// que le descripteur désigne (§10.2), preuves de jonction signées par cet
+    /// appareil et vérifiées contre les appareils certifiés des membres (§10.4).
+    func liveKitSession(
+        for candidate: E2EEV2SignedCallDescriptor,
+        liveKitURL: URL
+    ) async throws -> E2EEV2LiveKitSession {
+        guard mediaOpen(liveKitURL) else { throw SessionFailure.runtimeClosed }
+        let descriptor = candidate.descriptor
+        guard let members = await self.members(descriptor.conversationId, false) else {
+            throw SessionFailure.localEpochUnavailable
+        }
+        let namespace = members.ownerNamespace
+        var locked = false
+        guard var epoch = E2EEV2CallBridge.callEpoch(
+            conversationId: descriptor.conversationId, epochNumber: descriptor.epochNumber, ownerNamespace: namespace,
+            keyStore: keyStore, stateStore: stateStore, contextStore: contextStore(), locked: &locked
+        ) else { throw locked ? SessionFailure.deviceLocked : SessionFailure.localEpochUnavailable }
+        defer { epoch.epochKey.resetBytes(in: 0..<epoch.epochKey.count) }
+        guard epoch.epochId == descriptor.epochId, epoch.keyCommitmentB64 == descriptor.keyCommitmentB64 else {
+            throw SessionFailure.untrusted
+        }
+        let deviceId: String
+        do {
+            deviceId = try identityStore.signingDeviceId(ownerNamespace: namespace)
+        } catch where E2EEV2DeviceIdentityStore.isLocked(error) {
+            throw SessionFailure.deviceLocked
+        }
+        let devices = members.devices, memberIds = members.members, joinedAtMs = nowMs
+        let join = E2EEV2CallJoinConfiguration(
+            context: .init(conversationId: descriptor.conversationId, callId: descriptor.callId, callNonceB64: descriptor.callNonceB64),
+            userId: members.ownUserId,
+            deviceId: deviceId,
+            sign: { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: namespace) },
+            deviceSigningKey: { userId, deviceId in
+                guard memberIds.contains(userId), let device = devices.device(userId: userId, deviceId: deviceId),
+                      device.supports("calls", nowMs: joinedAtMs) else { return nil }
+                return device.signingKey
+            }
+        )
+        do {
+            return try E2EEV2LiveKitSession.make(epochKey: epoch.epochKey, descriptor: descriptor, join: join)
+        } catch {
+            throw SessionFailure.untrusted
+        }
+    }
+
+    /// Clé de l'appareil appelant : certifié, d'un membre, doté de « appels
+    /// vérifiés » (§10.0), et pas un navigateur exclu de la conversation.
+    static func callSigningKey(
+        deviceId: String,
+        in members: E2EEV2MessagingRuntime.CallMembers,
+        nowMs: Int64
+    ) -> P256.Signing.PublicKey? {
+        guard let device = members.devices.device(deviceId: deviceId), members.members.contains(device.userId),
+              device.supports("calls", nowMs: nowMs),
+              !(members.excludesWeb && device.platform == "web") else { return nil }
+        return device.signingKey
+    }
+}
+
+/// Jetons push d'un appareil v2 (E.1, v0.4.19) : la sonnerie d'un appel
+/// chiffré ne vise qu'eux. La requête, signée, lie aussi la session de
+/// connexion à cet appareil, sans quoi `pending` ne montre aucun appel
+/// chiffré. Le corps remplace l'ensemble : iOS ne lie que ses jetons APNs,
+/// jamais FCM, pour ne pas sonner deux fois.
+enum E2EEV2CallPushTokens {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var storedAPNs: String?
+
+    /// Jeton APNs de l'app, en hexadécimal, remis par `AppDelegate`.
+    static var apnsToken: String? {
+        get { lock.withLock { storedAPNs } }
+        set { lock.withLock { storedAPNs = newValue } }
+    }
+
+    static func hex(_ token: Data) -> String {
+        token.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Environnement APNs du build : développement en Debug, production pour
+    /// TestFlight et l'App Store.
+    static var environment: String {
+        #if DEBUG
+        return "sandbox"
+        #else
+        return "production"
+        #endif
+    }
+
+    /// `{apnsVoipToken?, apnsToken?, environment}` ; nil sans aucun jeton
+    /// valide (hexadécimal, 32 à 512 caractères).
+    static func body(voipToken: String?, apnsToken: String?, environment: String = environment) -> Data? {
+        func valid(_ token: String?) -> String? {
+            guard let token, (32...512).contains(token.count),
+                  token.allSatisfy({ $0.isHexDigit && ($0.isNumber || $0.isLowercase) }) else { return nil }
+            return token
+        }
+        var object: [String: E2EEV2JSON] = ["environment": .string(environment)]
+        if let voip = valid(voipToken) { object["apnsVoipToken"] = .string(voip) }
+        if let apns = valid(apnsToken) { object["apnsToken"] = .string(apns) }
+        guard object.count > 1 else { return nil }
+        return E2EEV2CanonicalJSON.encode(.object(object))
+    }
+}
+
+/// Publie, à chaque connexion et à chaque nouveau jeton, ce qu'il faut à un
+/// appareil iOS pour sonner : son document de capacités (« appels »), puis
+/// ses jetons APNs. Rien tant que le verrou d'appels est fermé.
+final class E2EEV2CallPushRegistrar: @unchecked Sendable {
+    private let api: APIClient
+    private let identityStore: E2EEV2DeviceIdentityStore
+    private let open: @Sendable () -> Bool
+
+    init(
+        api: APIClient,
+        identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
+        open: @escaping @Sendable () -> Bool = { E2EEV2CallRuntimeGate.allowsControlPlane() }
+    ) {
+        self.api = api
+        self.identityStore = identityStore
+        self.open = open
+    }
+
+    @discardableResult
+    func register(voipToken: String?) async -> Bool {
+        guard open(), let session = LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              let body = E2EEV2CallPushTokens.body(voipToken: voipToken, apnsToken: E2EEV2CallPushTokens.apnsToken),
+              let deviceId = try? identityStore.signingDeviceId(ownerNamespace: session.ownerNamespace) else { return false }
+        // « Appels vérifiés » publié d'abord : l'intersection du serveur le lit
+        // pour choisir les appareils qui sonnent.
+        _ = await E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: identityStore).publishCapabilitiesIfNeeded()
+        guard session.isCurrent else { return false }
+        let result = await E2EEV2APITransport(api: api, identityStore: identityStore).bound(to: session).putJSON(
+            path: "/api/e2ee/v2/devices/\(deviceId)/push-tokens",
+            body: body,
+            expectedOwnerScopeId: session.ownerScopeId,
+            capabilitySet: .calls
+        )
+        if case .success = result { return true }
+        return false
+    }
+}

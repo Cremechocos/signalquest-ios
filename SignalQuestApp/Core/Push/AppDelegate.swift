@@ -120,6 +120,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Jeton APNs gardé pour la sonnerie des appels chiffrés (E.1, push-tokens).
+        E2EEV2CallPushTokens.apnsToken = E2EEV2CallPushTokens.hex(deviceToken)
         // On transmet le token APNs à FCM, qui en dérive le token de registration
         // FCM (le seul que le backend sait utiliser via firebase-admin). Le token
         // FCM remonte ensuite via `messaging(_:didReceiveRegistrationToken:)`.

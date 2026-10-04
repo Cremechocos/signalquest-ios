@@ -1185,6 +1185,22 @@
         }
       }
     },
+    "L’appel a déjà été pris sur un autre appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The call was already answered on another device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’appel a déjà été pris sur un autre appareil."
+          }
+        }
+      }
+    },
     "La clé de ton compte a changé sur cet appareil. Compare les nouveaux chiffres." : {
       "localizations" : {
         "en" : {
@@ -2237,6 +2253,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un membre a un nouveau numéro de sécurité. Rien ne lui est envoyé tant que tu ne l’as pas vu."
+          }
+        }
+      }
+    },
+    "Un membre doit mettre à jour SignalQuest pour les appels chiffrés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member needs to update SignalQuest for encrypted calls."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un membre doit mettre à jour SignalQuest pour les appels chiffrés."
           }
         }
       }

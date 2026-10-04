@@ -14,16 +14,22 @@ struct CallSession: Decodable, Identifiable, Equatable {
     let isPending: Bool?
     let displayName: String?
     let isGroup: Bool
-    /// `true` only when the backend returned the strict v2 call descriptor.
-    /// A required marker without that descriptor is rejected while decoding.
-    let e2eeRequired: Bool
-    let e2ee: E2EEV2CallSessionDescriptor?
+    /// Descripteur signé d'un appel chiffré (D.11, E.4), relayé tel quel par
+    /// le serveur ; lu strictement, un descripteur mal formé fait échouer le
+    /// décodage. Sa vérification (appareil, époque, nonce) revient à l'appelé.
+    let e2eeV2: E2EEV2SignedCallDescriptor?
+    /// Identité LiveKit annoncée (`<userId>.<deviceId>`), informative : aucune
+    /// vérification ne s'y fie (E.4).
+    let livekitIdentity: String?
+
+    /// Un appel chiffré est celui qui porte un descripteur v2.
+    var e2eeRequired: Bool { e2eeV2 != nil }
 
     enum CodingKeys: String, CodingKey {
         case id, callId, mode, type, callType, conversationId, createdAt, startedAt, endedAt, participants
         case otherParticipants, caller, callerName, conversation, conversationTitle, isGroup
         case liveKitToken, token, liveKitUrl, wsUrl, liveKitRoom, roomName, status, pending
-        case e2eeRequired, e2ee
+        case e2eeRequired, e2eeV2, livekitIdentity
     }
 
     init(
@@ -40,8 +46,8 @@ struct CallSession: Decodable, Identifiable, Equatable {
         isPending: Bool? = nil,
         displayName: String? = nil,
         isGroup: Bool = false,
-        e2eeRequired: Bool = false,
-        e2ee: E2EEV2CallSessionDescriptor? = nil
+        e2eeV2: E2EEV2SignedCallDescriptor? = nil,
+        livekitIdentity: String? = nil
     ) {
         self.id = id
         self.mode = mode
@@ -56,8 +62,8 @@ struct CallSession: Decodable, Identifiable, Equatable {
         self.isPending = isPending
         self.displayName = displayName
         self.isGroup = isGroup
-        self.e2eeRequired = e2eeRequired
-        self.e2ee = e2ee
+        self.e2eeV2 = e2eeV2
+        self.livekitIdentity = livekitIdentity
     }
 
     init(from decoder: Decoder) throws {
@@ -104,37 +110,26 @@ struct CallSession: Decodable, Identifiable, Equatable {
             ?? conversation?.isGroup
             ?? false
 
-        let requiredMarker = try c.decodeIfPresent(Bool.self, forKey: .e2eeRequired)
-        let descriptorValue = try c.decodeIfPresent(JSONValue.self, forKey: .e2ee)
-        let descriptor: E2EEV2CallSessionDescriptor?
-        if let descriptorValue {
-            guard let parsed = E2EEV2CallBridge.parseDescriptor(descriptorValue) else {
+        // `e2eeV2` absent ou nul : appel non chiffré. Présent : lu strictement.
+        let descriptorValue = try c.decodeIfPresent(JSONValue.self, forKey: .e2eeV2)
+        if let descriptorValue, descriptorValue != .null {
+            guard let parsed = E2EEV2SignedCallDescriptor.parse(descriptorValue) else {
                 throw DecodingError.dataCorruptedError(
-                    forKey: .e2ee,
-                    in: c,
-                    debugDescription: "Invalid E2EE v2 call descriptor"
+                    forKey: .e2eeV2, in: c, debugDescription: "Invalid E2EE v2 call descriptor"
                 )
             }
-            descriptor = parsed
+            e2eeV2 = parsed
         } else {
-            descriptor = nil
+            e2eeV2 = nil
         }
-        if requiredMarker == true && descriptor == nil {
+        // Ancien marqueur : un appel annoncé chiffré sans descripteur n'est jamais
+        // pris pour un appel en clair.
+        if try c.decodeIfPresent(Bool.self, forKey: .e2eeRequired) == true, e2eeV2 == nil {
             throw DecodingError.dataCorruptedError(
-                forKey: .e2ee,
-                in: c,
-                debugDescription: "E2EE v2 call descriptor is required"
+                forKey: .e2eeRequired, in: c, debugDescription: "E2EE v2 call descriptor is required"
             )
         }
-        if requiredMarker == false && descriptor != nil {
-            throw DecodingError.dataCorruptedError(
-                forKey: .e2eeRequired,
-                in: c,
-                debugDescription: "Unexpected E2EE v2 call descriptor"
-            )
-        }
-        e2eeRequired = requiredMarker ?? (descriptor != nil)
-        e2ee = descriptor
+        livekitIdentity = try? c.decodeIfPresent(String.self, forKey: .livekitIdentity)
     }
 }
 
@@ -181,6 +176,9 @@ struct CallInitiateRequest: Codable {
 enum CallsServiceError: LocalizedError, Equatable {
     case e2eeUnavailable(String)
     case invalidE2EEResponse
+    /// Refus du serveur à un appel chiffré, avec son code (E.0) :
+    /// `E2EE_EPOCH_STALE`, `CALL_ID_TAKEN`, `CALL_PARTICIPANT_ALREADY_ANSWERED`…
+    case refused(code: String)
 
     var errorDescription: String? {
         switch self {
@@ -191,54 +189,53 @@ enum CallsServiceError: LocalizedError, Equatable {
             return String(localized: "L’appel chiffré de bout en bout n’est pas disponible sur cet appareil.")
         case .invalidE2EEResponse:
             return String(localized: "La vérification du chiffrement de l’appel a échoué.")
+        case .refused("CALL_PARTICIPANT_ALREADY_ANSWERED"), .refused("E2EE_CALL_DEVICE_NOT_ELIGIBLE"):
+            return String(localized: "L’appel a déjà été pris sur un autre appareil.")
+        case .refused("E2EE_CAPABILITY_MISSING"):
+            return String(localized: "Un membre doit mettre à jour SignalQuest pour les appels chiffrés.")
+        case .refused:
+            return String(localized: "L’appel chiffré de bout en bout n’est pas disponible sur cet appareil.")
         }
     }
 }
 
-/// Exact JSON bytes signed by the E2EE v2 device identity. The same bytes are
-/// sent once, without transparent retry, and the response must bind the exact
-/// local epoch before LiveKit receives any key material.
+/// Corps et réponses d'un appel chiffré (E.4), envoyés en requête signée par
+/// l'appareil, une seule fois et sans reprise transparente.
 enum CallE2EEV2Wire {
-    static func initiateBody(
-        conversationId: String,
-        type: String,
-        context: E2EEV2CallEpochContext
-    ) throws -> Data {
-        try JSONSerialization.data(
-            withJSONObject: [
-                "conversationId": conversationId,
-                "type": type,
-                "e2ee": context.jsonObject,
-            ],
-            options: [.sortedKeys]
-        )
+    /// `{conversationId, type, callId, e2eeV2}`, exactement.
+    static func initiateBody(conversationId: String, type: String, descriptor: E2EEV2SignedCallDescriptor) -> Data {
+        E2EEV2CanonicalJSON.encode(.object([
+            "conversationId": .string(conversationId),
+            "type": .string(type),
+            "callId": .string(descriptor.descriptor.callId),
+            "e2eeV2": .object([
+                "descriptor": .string(descriptor.signed.canonical),
+                "signatureB64": .string(descriptor.signed.signatureB64),
+                "callerDeviceId": .string(descriptor.callerDeviceId),
+            ]),
+        ]))
     }
 
-    static func answerBody(callId: String, context: E2EEV2CallEpochContext) throws -> Data {
-        try JSONSerialization.data(
-            withJSONObject: [
-                "callId": callId,
-                "e2ee": context.jsonObject,
-            ],
-            options: [.sortedKeys]
-        )
+    /// `{callId}`, rien de plus.
+    static func answerBody(callId: String) -> Data {
+        E2EEV2CanonicalJSON.encode(.object(["callId": .string(callId)]))
     }
 
-    static func decodeBoundSession(
-        _ data: Data,
-        expectedContext: E2EEV2CallEpochContext,
-        expectedCallId: String? = nil
-    ) throws -> CallSession {
+    /// La réponse d'initiation porte l'appel demandé et, à l'octet, le
+    /// descripteur signé ici.
+    static func decodeInitiated(_ data: Data, sent: E2EEV2SignedCallDescriptor) throws -> CallSession {
         let session = try JSONDecoder.signalQuest.decode(CallSession.self, from: data)
-        guard expectedCallId.map({ $0 == session.id }) ?? true,
-              let descriptor = session.e2ee,
-              session.e2eeRequired,
-              descriptor.version == expectedContext.version,
-              descriptor.provider == expectedContext.provider,
-              descriptor.epochId == expectedContext.epochId,
-              descriptor.epochNumber == expectedContext.epochNumber,
-              descriptor.keyCommitmentB64 == expectedContext.keyCommitmentB64,
-              descriptor.keyId == expectedContext.epochId else {
+        guard session.id == sent.descriptor.callId, session.e2eeV2 == sent else {
+            throw CallsServiceError.invalidE2EEResponse
+        }
+        return session
+    }
+
+    /// La réponse à `answer` porte un descripteur pour cet appel ; l'appelé le
+    /// compare à celui qu'il a vérifié avant de rejoindre.
+    static func decodeAnswered(_ data: Data, callId: String) throws -> CallSession {
+        let session = try JSONDecoder.signalQuest.decode(CallSession.self, from: data)
+        guard session.id == callId, session.e2eeV2?.descriptor.callId == callId else {
             throw CallsServiceError.invalidE2EEResponse
         }
         return session
@@ -278,11 +275,12 @@ protocol CallsServicing: Sendable {
     func initiate(
         conversationId: String,
         mode: String,
-        e2ee: E2EEV2CallEpochContext?
+        e2ee: E2EEV2SignedCallDescriptor?
     ) async throws -> CallSession
+    /// `e2ee` : appel chiffré, réponse signée par l'appareil (E.4).
     func answer(
         callId: String,
-        e2ee: E2EEV2CallEpochContext?
+        e2ee: Bool
     ) async throws -> CallSession
     func reject(callId: String) async throws
     func end(callId: String) async throws
@@ -305,7 +303,7 @@ extension CallsServicing {
     }
 
     func answer(callId: String) async throws -> CallSession {
-        try await answer(callId: callId, e2ee: nil)
+        try await answer(callId: callId, e2ee: false)
     }
 
     func history(page: Int, limit: Int) async throws -> [CallSession] { try await history() }
@@ -331,40 +329,31 @@ final class CallsService: CallsServicing {
     func initiate(
         conversationId: String,
         mode: String,
-        e2ee: E2EEV2CallEpochContext?
+        e2ee: E2EEV2SignedCallDescriptor?
     ) async throws -> CallSession {
         let type = mode.uppercased() == "VIDEO" || mode.lowercased() == "video" ? "VIDEO" : "AUDIO"
         if let e2ee {
-            let body = try CallE2EEV2Wire.initiateBody(
-                conversationId: conversationId,
-                type: type,
-                context: e2ee
-            )
+            let body = CallE2EEV2Wire.initiateBody(conversationId: conversationId, type: type, descriptor: e2ee)
             let data = try await executeE2EECall(path: "/api/calls/initiate", body: body)
-            return try CallE2EEV2Wire.decodeBoundSession(data, expectedContext: e2ee)
+            return try CallE2EEV2Wire.decodeInitiated(data, sent: e2ee)
         }
         let session: CallSession = try await api.requestJSON(
             "/api/calls/initiate",
             body: CallInitiateRequest(conversationId: conversationId, type: type)
         )
-        guard !session.e2eeRequired, session.e2ee == nil else {
+        guard !session.e2eeRequired else {
             throw CallsServiceError.invalidE2EEResponse
         }
         return session
     }
 
-    func answer(callId: String, e2ee: E2EEV2CallEpochContext?) async throws -> CallSession {
-        if let e2ee {
-            let body = try CallE2EEV2Wire.answerBody(callId: callId, context: e2ee)
-            let data = try await executeE2EECall(path: "/api/calls/answer", body: body)
-            return try CallE2EEV2Wire.decodeBoundSession(
-                data,
-                expectedContext: e2ee,
-                expectedCallId: callId
-            )
+    func answer(callId: String, e2ee: Bool) async throws -> CallSession {
+        if e2ee {
+            let data = try await executeE2EECall(path: "/api/calls/answer", body: CallE2EEV2Wire.answerBody(callId: callId))
+            return try CallE2EEV2Wire.decodeAnswered(data, callId: callId)
         }
         let session: CallSession = try await api.requestJSON("/api/calls/answer", body: ["callId": callId])
-        guard !session.e2eeRequired, session.e2ee == nil else {
+        guard !session.e2eeRequired else {
             throw CallsServiceError.invalidE2EEResponse
         }
         return session
@@ -380,6 +369,8 @@ final class CallsService: CallsServicing {
         ) {
         case .success(let value, _, _):
             return value
+        case .failure(let failure) where failure.statusCode != nil && failure.code != nil:
+            throw CallsServiceError.refused(code: failure.code ?? "")
         case .failure(let failure):
             throw CallsServiceError.e2eeUnavailable(failure.message)
         }

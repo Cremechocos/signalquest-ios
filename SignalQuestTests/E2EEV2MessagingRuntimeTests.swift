@@ -119,9 +119,9 @@ extension E2EEV2MessagingRuntimeTests {
         let group = try fixture.seedGroup(with: [bruno], devices: devices)
         let parts = try XCTUnwrap(open.current())
         XCTAssertEqual(parts.messaging.storedMembership(conversationId: direct.conversationId),
-                       .v2(isGroup: false, members: [fixture.user, bruno].sorted()))
+                       .v2(isGroup: false, members: [fixture.user, bruno].sorted(), excludesWeb: false))
         XCTAssertEqual(parts.messaging.storedMembership(conversationId: group.conversationId),
-                       .v2(isGroup: true, members: [fixture.user, bruno].sorted()))
+                       .v2(isGroup: true, members: [fixture.user, bruno].sorted(), excludesWeb: false))
         XCTAssertEqual(parts.messaging.storedMembership(conversationId: "conversation_v1_only_000001"), .notV2)
     }
 }
