@@ -95,13 +95,19 @@ final class E2EEV2LocalMessagingQATests: XCTestCase {
             throw XCTSkip("Essai de messagerie v2 local non demandé")
         }
         let previousUserId = LocalAccountScope.currentUserId
-        let run = "msg" + String(UUID().uuidString.prefix(8))
+        // `…_RUN` fixe : les trousseaux sont gardés d'un passage à l'autre et
+        // les identités déjà créées resservent ; sinon tout est effacé à la fin.
+        let keptRun = environment("SQ_E2EE_V2_MSG_QA_RUN")
+        let run = keptRun ?? ("msg" + String(UUID().uuidString.prefix(8)))
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(run, isDirectory: true)
+            .appendingPathComponent("v2", isDirectory: true)
         var people: [Account] = []
         for email in emails { people.append(try await login(email: email, password: password, base: base, run: run)) }
         defer {
-            for person in people { try? person.vault.removeAll() }
-            try? FileManager.default.removeItem(at: root)
+            if keptRun == nil {
+                for person in people { try? person.vault.removeAll() }
+                try? FileManager.default.removeItem(at: root)
+            }
             LocalAccountScope.deactivate()
             if let previousUserId { LocalAccountScope.activate(userId: previousUserId) }
         }
@@ -112,6 +118,10 @@ final class E2EEV2LocalMessagingQATests: XCTestCase {
             let session = try become(person, base: base, root: root)
             guard case .registered = await session.enrollment.registerPendingDevice(label: "QA v2 \(person.email)") else {
                 return XCTFail("Enrôlement de \(person.email)")
+            }
+            // Identité gardée d'un passage précédent : elle resert.
+            if keptRun != nil, (try? E2EEV2AccountIdentityStore(tokenStore: person.vault).load(ownerNamespace: LocalAccountScope.storageNamespace)) != nil {
+                continue
             }
             guard case .success = await session.lifecycle.bootstrapInitialDevice(.password(password)) else {
                 return XCTFail("Bootstrap de \(person.email)")
@@ -167,9 +177,16 @@ final class E2EEV2LocalMessagingQATests: XCTestCase {
         let view3 = await session.runtime.thread(conversationId: conversationId, isGroup: true, participants: participants)
         XCTAssertEqual(texts(view3),
                        ["Bonjour à tous", "Salut Alice", "Carla est partie"])
+        let parts = try XCTUnwrap(session.runtime.current())
+        XCTAssertEqual(try parts.stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: parts.session.ownerNamespace)?
+            .epochNumber, 2, "Le départ a fait tourner l'époque")
+        // Un membre parti n'a plus accès : le serveur ne lui sert plus la conversation.
         session = try become(carla, base: base, root: root)
-        let carlaThread = await session.runtime.thread(conversationId: conversationId, isGroup: true, participants: participants)
-        let carlaView = texts(carlaThread)
-        XCTAssertFalse(carlaView.contains("Carla est partie"), "Un membre parti ne lit plus rien de neuf")
+        switch await session.runtime.thread(conversationId: conversationId, isGroup: true, participants: participants) {
+        case .failure(let failure):
+            XCTAssertEqual(failure.code, "E2EE_CONVERSATION_NOT_FOUND")
+        case .thread(let thread):
+            XCTAssertFalse(thread.messages.compactMap(\.content).contains("Carla est partie"), "Un membre parti ne lit plus rien de neuf")
+        }
     }
 }

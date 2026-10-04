@@ -181,6 +181,25 @@ final class E2EEV2MessageStoreV2Tests: XCTestCase {
         XCTAssertEqual(group.displayed, original)
     }
 
+    /// Relecture Android du 04/10 : l'expiration vue s'écrit aussitôt, et la
+    /// suppression d'un message efface aussi ses éditions équivoques.
+    func testAnExpiryIsWrittenWhenSeenAndADeletionErasesEquivocalEdits() throws {
+        let store = makeStore()
+        let ephemeral = try message(1, from: bruno, .text("Éphémère"), expiresAtMs: nowMs + 60_000)
+        try store.apply([ephemeral], equivocal: [], cursor: 1, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        _ = try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs + 61_000)
+        XCTAssertNil(try store.stored(ephemeral.messageRef, conversationId: conversationId, ownerScopeId: owner)?.text,
+                     "Effacé du disque dès qu'on l'a vu expiré")
+
+        let original = try message(2, from: bruno, .text("Salut"))
+        let twin = try message(3, from: bruno, .edit(targetRef: original.messageRef, text: "Secret"), sentAtMs: nowMs + 10)
+        let deletion = try message(4, from: bruno, .delete(targetRef: original.messageRef), sentAtMs: nowMs + 20)
+        try store.apply([original, twin, deletion], equivocal: [twin.messageRef], cursor: 4, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        let kept = try store.stored(twin.messageRef, conversationId: conversationId, ownerScopeId: owner)
+        XCTAssertNil(kept?.text, "Rien ne reste d'une édition équivoque d'un message supprimé")
+        XCTAssertNil(kept?.payloadB64)
+    }
+
     func testPurgeAndTamperingLeaveNothingReadable() throws {
         let keys = InMemoryTokenStore()
         let store = makeStore(keys: keys)

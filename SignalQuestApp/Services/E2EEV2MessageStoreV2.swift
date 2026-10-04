@@ -50,7 +50,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         let equivocalRefs: Set<String>
     }
 
-    private struct ConversationFile: Codable {
+    private struct ConversationFile: Codable, Equatable {
         var version = 1
         var cursor: Int64 = 0
         var messages: [String: Stored] = [:]
@@ -84,7 +84,11 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
     func snapshot(conversationId: String, ownerScopeId: String, nowMs: Int64) throws -> Snapshot {
         Self.lock.lock()
         defer { Self.lock.unlock() }
-        let file = Self.expiring(try read(conversationId: conversationId, ownerScopeId: ownerScopeId), nowMs: nowMs)
+        let stored = try read(conversationId: conversationId, ownerScopeId: ownerScopeId)
+        let file = Self.expiring(stored, nowMs: nowMs)
+        // Un éphémère expiré quitte le disque dès qu'on le voit expiré, pas à la
+        // page suivante (relecture Android du 04/10).
+        if file != stored { try write(file, conversationId: conversationId, ownerScopeId: ownerScopeId) }
         let visible = file.messages.values
             .filter { $0.kind == "TEXT" && !file.equivocal.contains($0.messageRef) && ($0.expiresAtMs.map { $0 > nowMs } ?? true) }
             .sorted { $0.sequence < $1.sequence }
@@ -175,8 +179,11 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         let actions = related
             .filter { $0.senderUserId == target.senderUserId && !equivocal.contains($0.messageRef) }
             .sorted { ($0.sentAtMs, $0.sequence) < ($1.sentAtMs, $1.sequence) }
+        // Message supprimé : toutes ses éditions par son auteur partent, même
+        // équivoques (§11) ; il ne reste rien de leur charge.
+        let ownEdits = related.filter { $0.senderUserId == target.senderUserId && $0.kind == "EDIT" }
         guard !target.deleted else {
-            erase(actions.filter { $0.kind == "EDIT" }, in: &messages)
+            erase(ownEdits, in: &messages)
             return
         }
         target.text = originalText(of: target)
@@ -187,7 +194,7 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
                 target.payloadB64 = nil
                 target.fkB64 = nil
                 target.deleted = true
-                erase(actions.filter { $0.kind == "EDIT" }, in: &messages)
+                erase(ownEdits, in: &messages)
                 break
             }
             if action.kind == "EDIT" {

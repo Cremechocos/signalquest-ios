@@ -157,18 +157,27 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
             // destinataire, un message ne se lira jamais : il est dépassé.
             var stop = false
             for (message, result) in zip(page.messages, results) {
+                // Seul un émetteur inconnu de l'annuaire (appareil révoqué) peut
+                // être dépassé après quelques relèves ; une clé verrouillée, le
+                // stockage ou l'état bloquent toujours le curseur : le message se
+                // relira (relecture Android du 04/10).
                 var reread = false
+                var bounded = false
                 switch result {
-                case .retryLater: reread = true
+                case .retryLater(let reason):
+                    reread = true
+                    bounded = reason == "e2ee-sender-not-certified"
                 case .needsEpoch: reread = synced != .waitingForEpoch
                 case .unsupported(let ref, _): unsupported.append(ref)
                 default: break
                 }
-                if reread, let count = try? messageStore.noteReread(
-                    sequence: message.sequence, conversationId: conversationId, ownerScopeId: expectedOwnerScopeId
-                ), count <= Self.maxRereads {
-                    stop = true
-                    break
+                if reread {
+                    guard bounded, let count = try? messageStore.noteReread(
+                        sequence: message.sequence, conversationId: conversationId, ownerScopeId: expectedOwnerScopeId
+                    ), count > Self.maxRereads else {
+                        stop = true
+                        break
+                    }
                 }
                 cursor = message.sequence
             }
