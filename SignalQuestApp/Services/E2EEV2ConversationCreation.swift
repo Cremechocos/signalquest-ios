@@ -280,11 +280,11 @@ enum E2EEV2ConversationMigration {
     ) -> Decision {
         guard isV2 == false else { return .alreadyV2 }
         guard conversation.e2eeEnabled == true else { return .notEncrypted }
-        let waiting = conversation.participants.map(\.userId).filter { user in
+        let waiting = conversation.migrationMemberIds.filter { user in
             !(devices.devicesByUser[user] ?? []).contains { !$0.isSidelined(nowMs: nowMs) }
         }
         guard waiting.isEmpty else { return .membersWaiting(waiting.sorted()) }
-        let members = Set(conversation.participants.map(\.userId))
+        let members = Set(conversation.migrationMemberIds)
         return E2EEV2ConversationCreation.readsV2(devices, members: members, excludesWeb: false, nowMs: nowMs)
             ? .migrate : .capabilityWaiting
     }
@@ -305,7 +305,7 @@ enum E2EEV2ConversationMigration {
         sign: (Data) throws -> Data,
         wrap: (_ context: E2EEV2EpochContext, _ recipientIdentityKeyB64: String) throws -> E2EEV2SignedEpochEnvelope
     ) throws -> E2EEV2ConversationCreation {
-        let members = conversation.participants.map(\.userId)
+        let members = conversation.migrationMemberIds
         guard members.contains(ownUserId) else { throw E2EEV2ConversationCreation.Failure.invalidMembers }
         return try E2EEV2ConversationCreation.make(
             conversationId: conversation.id, ownUserId: ownUserId, device: device,

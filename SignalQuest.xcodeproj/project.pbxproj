@@ -45,6 +45,7 @@
 		09FFE9CEF1D1C7137C00E934 /* MarketRegistryLoadingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068132547A0F68C33228E66B /* MarketRegistryLoadingTests.swift */; };
 		0A25EC5F92ED512E7A81C4DF /* SpeedtestLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6243FADB2D8B644F4E836E /* SpeedtestLiveActivity.swift */; };
 		0A7916FE1A3236A3599113ED /* ComposerPollTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD162FB28B7CB0A7E2FE891E /* ComposerPollTests.swift */; };
+		0AC62546B7B83A5FDF92CDD0 /* E2EEV2LocalCallQATests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0102946B056FB8D87A711B /* E2EEV2LocalCallQATests.swift */; };
 		0B638C1A0778E2B060E4807A /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78913AE6513A3E22DD8F8B87 /* AppConfig.swift */; };
 		0C230D7F9F22B0A70623CD38 /* AppStorageObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD462DE2B52FAA985077A2F /* AppStorageObservationTests.swift */; };
 		0C5C061E773EAA66585D6C63 /* E2EEV2ConversationStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF15169FFA7B3EAE60467F71 /* E2EEV2ConversationStateTests.swift */; };
@@ -885,6 +886,7 @@
 		09CB65B2D1C9FAFB41970E34 /* MetricKitReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitReporter.swift; sourceTree = "<group>"; };
 		0A6F8CBC682F830C6285FAB7 /* AndroidDataPresence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AndroidDataPresence.swift; sourceTree = "<group>"; };
 		0AE35D85E1465DC7E47D01A5 /* Audit2TourQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Audit2TourQATests.swift; sourceTree = "<group>"; };
+		0B0102946B056FB8D87A711B /* E2EEV2LocalCallQATests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = E2EEV2LocalCallQATests.swift; sourceTree = "<group>"; };
 		0B591ECD579111D93DAD5251 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 		0B9B5640F38ED77C1C34D499 /* CoverageRenderPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageRenderPolicyTests.swift; sourceTree = "<group>"; };
 		0BBEF6D66A51142E104DBD6B /* SignalQuestUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SignalQuestUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2737,6 +2739,7 @@
 				2A567F31189154F64431EE0F /* E2EEV2EpochRotationV2Tests.swift */,
 				7C129F6AA51DA75F6A60A791 /* E2EEV2IdentityVerificationTests.swift */,
 				AE462EB9FB52BB5A8D4AB872 /* E2EEV2JalonAVectorTests.swift */,
+				0B0102946B056FB8D87A711B /* E2EEV2LocalCallQATests.swift */,
 				C7865C02BAEC89AD59C8CFD4 /* E2EEV2LocalMessagingQATests.swift */,
 				EC57340D93CE2F4DA3574894 /* E2EEV2LockedCallEpochTests.swift */,
 				0EB7210CDA44B8EA73F6A869 /* E2EEV2MembershipEventsTests.swift */,
@@ -3963,6 +3966,7 @@
 				E43A40D999EFDF7895848F3D /* E2EEV2EpochRotationV2Tests.swift in Sources */,
 				2249B0FFD84B669F701D887D /* E2EEV2IdentityVerificationTests.swift in Sources */,
 				01CA0252CB25A0F8AFCDB2E6 /* E2EEV2JalonAVectorTests.swift in Sources */,
+				0AC62546B7B83A5FDF92CDD0 /* E2EEV2LocalCallQATests.swift in Sources */,
 				8A33A7C9EE63142ADDB477DA /* E2EEV2LocalMessagingQATests.swift in Sources */,
 				47C71CEBC1B6AFC97D4BD42A /* E2EEV2LockedCallEpochTests.swift in Sources */,
 				242EE2F3613CCD68522186C5 /* E2EEV2MembershipEventsTests.swift in Sources */,

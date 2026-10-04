@@ -149,7 +149,16 @@ final class E2EEV2CallRuntime: @unchecked Sendable {
         guard controlPlaneOpen() else { return .unavailable }
         var lastFailure: E2EEV2CallDescriptorCheck.Failure?
         for synchronizing in [false, true] {
-            guard let members = await self.members(conversationId, synchronizing) else { return .unavailable }
+            guard let members = await self.members(conversationId, synchronizing) else {
+                // Conversation pas encore lue ici : elle l'est au second tour.
+                if !synchronizing { continue }
+                return .unavailable
+            }
+            // Son propre descripteur renvoyé à cet appareil ne le fait jamais sonner.
+            if let own = try? identityStore.signingDeviceId(ownerNamespace: members.ownerNamespace),
+               own == candidate.callerDeviceId {
+                return .refused(.untrustedCaller)
+            }
             let current = try? stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: members.ownerNamespace)
             let checkedAt = nowMs
             let result = E2EEV2CallDescriptorCheck.verify(
@@ -211,16 +220,15 @@ final class E2EEV2CallRuntime: @unchecked Sendable {
         } catch where E2EEV2DeviceIdentityStore.isLocked(error) {
             throw SessionFailure.deviceLocked
         }
-        let devices = members.devices, memberIds = members.members, joinedAtMs = nowMs
+        let devices = members.devices, joinedAtMs = nowMs
         let join = E2EEV2CallJoinConfiguration(
             context: .init(conversationId: descriptor.conversationId, callId: descriptor.callId, callNonceB64: descriptor.callNonceB64),
             userId: members.ownUserId,
             deviceId: deviceId,
             sign: { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: namespace) },
             deviceSigningKey: { userId, deviceId in
-                guard memberIds.contains(userId), let device = devices.device(userId: userId, deviceId: deviceId),
-                      device.supports("calls", nowMs: joinedAtMs) else { return nil }
-                return device.signingKey
+                guard devices.device(userId: userId, deviceId: deviceId) != nil else { return nil }
+                return Self.callSigningKey(deviceId: deviceId, in: members, nowMs: joinedAtMs)
             }
         )
         do {
@@ -253,10 +261,19 @@ enum E2EEV2CallPushTokens {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var storedAPNs: String?
 
+    /// Un nouveau jeton APNs : l'enregistrement repart.
+    static let didChange = Notification.Name("SignalQuest.E2EEV2.CallPushTokensDidChange.v1")
+
     /// Jeton APNs de l'app, en hexadécimal, remis par `AppDelegate`.
     static var apnsToken: String? {
         get { lock.withLock { storedAPNs } }
-        set { lock.withLock { storedAPNs = newValue } }
+        set {
+            let changed = lock.withLock { () -> Bool in
+                defer { storedAPNs = newValue }
+                return storedAPNs != newValue
+            }
+            if changed { NotificationCenter.default.post(name: didChange, object: nil) }
+        }
     }
 
     static func hex(_ token: Data) -> String {
@@ -291,32 +308,75 @@ enum E2EEV2CallPushTokens {
 
 /// Publie, à chaque connexion et à chaque nouveau jeton, ce qu'il faut à un
 /// appareil iOS pour sonner : son document de capacités (« appels »), puis
-/// ses jetons APNs. Rien tant que le verrou d'appels est fermé.
+/// ses jetons APNs. Un seul envoi à la fois, toujours avec le dernier état
+/// connu des deux jetons, puisque chaque envoi remplace l'ensemble. Rien tant
+/// que le verrou d'appels est fermé, sinon retirer « appels » s'il avait été
+/// annoncé.
 final class E2EEV2CallPushRegistrar: @unchecked Sendable {
     private let api: APIClient
     private let identityStore: E2EEV2DeviceIdentityStore
+    private let capabilities: E2EEV2CapabilitiesPublicationStore
     private let open: @Sendable () -> Bool
+    private let lock = NSLock()
+    private var latestVoipToken: String?
+    private var chain: Task<Bool, Never>?
 
     init(
         api: APIClient,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
+        capabilities: E2EEV2CapabilitiesPublicationStore = E2EEV2CapabilitiesPublicationStore(),
         open: @escaping @Sendable () -> Bool = { E2EEV2CallRuntimeGate.allowsControlPlane() }
     ) {
         self.api = api
         self.identityStore = identityStore
+        self.capabilities = capabilities
         self.open = open
     }
 
+    /// `voipToken` nil : le dernier jeton VoIP connu est gardé.
     @discardableResult
     func register(voipToken: String?) async -> Bool {
-        guard open(), let session = LocalAccountScope.sessionSnapshot(), session.isCurrent,
-              let body = E2EEV2CallPushTokens.body(voipToken: voipToken, apnsToken: E2EEV2CallPushTokens.apnsToken),
-              let deviceId = try? identityStore.signingDeviceId(ownerNamespace: session.ownerNamespace) else { return false }
+        let task: Task<Bool, Never> = lock.withLock {
+            if let voipToken { latestVoipToken = voipToken }
+            let previous = chain
+            let next = Task { [weak self] () -> Bool in
+                _ = await previous?.value
+                return await self?.send() ?? false
+            }
+            chain = next
+            return next
+        }
+        return await task.value
+    }
+
+    private func send() async -> Bool {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return false }
+        let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: identityStore)
+        guard open() else {
+            // Verrou refermé après une annonce : « appels » est retiré.
+            if let stored = try? capabilities.load(ownerNamespace: session.ownerNamespace),
+               let document = try? E2EEV2CapabilitiesDocument.parse(document: stored.document),
+               document.features.contains("calls") {
+                _ = await lifecycle.publishCapabilitiesIfNeeded()
+            }
+            return false
+        }
+        guard let deviceId = try? identityStore.signingDeviceId(ownerNamespace: session.ownerNamespace) else { return false }
         // « Appels vérifiés » publié d'abord : l'intersection du serveur le lit
         // pour choisir les appareils qui sonnent.
-        _ = await E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: identityStore).publishCapabilitiesIfNeeded()
+        _ = await lifecycle.publishCapabilitiesIfNeeded()
         guard session.isCurrent else { return false }
-        let result = await E2EEV2APITransport(api: api, identityStore: identityStore).bound(to: session).putJSON(
+        let transport = E2EEV2APITransport(api: api, identityStore: identityStore).bound(to: session)
+        let voip = lock.withLock { latestVoipToken }
+        guard let body = E2EEV2CallPushTokens.body(voipToken: voip, apnsToken: E2EEV2CallPushTokens.apnsToken) else {
+            // Aucun jeton encore : une requête signée lie quand même la session
+            // à l'appareil, pour que `pending` montre les appels chiffrés.
+            if case .success = await transport.getJSON(
+                path: "/api/e2ee/v2/devices", expectedOwnerScopeId: session.ownerScopeId, capabilitySet: .deviceLifecycle
+            ) { return true }
+            return false
+        }
+        let result = await transport.putJSON(
             path: "/api/e2ee/v2/devices/\(deviceId)/push-tokens",
             body: body,
             expectedOwnerScopeId: session.ownerScopeId,

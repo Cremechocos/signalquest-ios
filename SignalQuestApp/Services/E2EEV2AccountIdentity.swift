@@ -511,7 +511,17 @@ final class E2EEV2CapabilitiesPublicationStore: @unchecked Sendable {
     /// vérifiés » seulement quand le verrou d'appels est ouvert (§10.0), les
     /// médias chiffrés au jalon B.
     static let kinds = ["DELETE", "EDIT", "TEXT"]
-    static var features: [String] { E2EEV2CallRuntimeGate.allowsControlPlane() ? ["calls"] : [] }
+    static var features: [String] {
+        #if DEBUG
+        if announcesCallsForLocalQA { return ["calls"] }
+        #endif
+        return E2EEV2CallRuntimeGate.allowsControlPlane() ? ["calls"] : []
+    }
+    #if DEBUG
+    /// Essai d'appel local (tests, pile en boucle locale) : « appels » annoncé
+    /// sans ouvrir le verrou global. N'existe pas en Release.
+    nonisolated(unsafe) static var announcesCallsForLocalQA = false
+    #endif
     static let republishAfterMs: Int64 = 30 * 86_400_000
 
     static func key(ownerNamespace: String) -> String { "capabilities-v1:\(ownerNamespace)" }

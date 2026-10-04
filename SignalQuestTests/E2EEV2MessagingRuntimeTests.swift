@@ -125,3 +125,22 @@ extension E2EEV2MessagingRuntimeTests {
         XCTAssertEqual(parts.messaging.storedMembership(conversationId: "conversation_v1_only_000001"), .notV2)
     }
 }
+
+extension E2EEV2MessagingRuntimeTests {
+    /// §14.2 (v0.4.20) : la genèse d'un tête-à-tête compte l'autre participant
+    /// même s'il a archivé, que les routes v1 de lecture cachent.
+    func testAnArchivedDirectPeerStaysAMemberOfTheMigrationGenesis() throws {
+        let data = Data(#"""
+        {"id": "conversation_direct_0000000001", "isGroup": false, "e2eeEnabled": true,
+         "participants": [{"userId": "user_me_01J7ABCD23456789", "user": {"id": "user_me_01J7ABCD23456789", "email": "me@example.test"}}],
+         "directPeerUserId": "user_peer_01J7ABCD2345678"}
+        """#.utf8)
+        let conversation = try JSONDecoder.signalQuest.decode(MessageConversation.self, from: data)
+        XCTAssertEqual(conversation.migrationMemberIds, ["user_me_01J7ABCD23456789", "user_peer_01J7ABCD2345678"])
+        let group = Data(#"""
+        {"id": "conversation_group_00000000001", "isGroup": true, "participants": [], "directPeerUserId": "user_peer_01J7ABCD2345678"}
+        """#.utf8)
+        XCTAssertEqual(try JSONDecoder.signalQuest.decode(MessageConversation.self, from: group).migrationMemberIds, [],
+                       "Un groupe garde la règle « non archivé »")
+    }
+}

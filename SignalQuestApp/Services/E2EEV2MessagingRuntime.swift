@@ -313,7 +313,17 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
 
     func callMembers(conversationId: String, synchronizing: Bool) async -> CallMembers? {
         guard let parts = current() else { return nil }
-        guard case .v2(let isGroup, let members, _) = parts.messaging.storedMembership(conversationId: conversationId) else {
+        let stored = parts.messaging.storedMembership(conversationId: conversationId)
+        let isGroup: Bool, members: [String]
+        switch stored {
+        case .v2(let group, let ids, _):
+            (isGroup, members) = (group, ids)
+        case .notV2 where synchronizing:
+            // Appel d'une conversation v2 jamais ouverte ici : ses membres v1
+            // servent à lire leurs appareils, puis la chaîne vérifiée fait foi.
+            guard let conversation = await conversationDetail(conversationId) else { return nil }
+            (isGroup, members) = (conversation.isGroup, conversation.migrationMemberIds)
+        case .notV2, .unreadable:
             return nil
         }
         let devices: E2EEV2CertifiedDeviceSet
@@ -342,6 +352,15 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         } catch {
             return nil
         }
+    }
+
+    private func conversationDetail(_ conversationId: String) async -> MessageConversation? {
+        // Identifiant venu d'une notification : jamais hors du format opaque dans un chemin.
+        guard E2EEV2Canonical.isOpaque(conversationId) else { return nil }
+        struct Response: Decodable { let conversation: MessageConversation }
+        return try? await api.request(
+            APIEndpoint(path: "/api/messages/conversations/\(conversationId)"), as: Response.self
+        ).conversation
     }
 
     // MARK: Pour l'écran
@@ -396,7 +415,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         let namespace = parts.session.ownerNamespace
         let isV2 = try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)
         if isV2 == true { return true }
-        let participantIds = conversation.participants.map(\.userId)
+        let participantIds = conversation.migrationMemberIds
         guard let result = try? await withDevices(
             conversationId: conversation.id, participantIds: participantIds, parts: parts,
             staleUserIds: { (result: E2EEV2ConversationCreationResult?) -> [String]? in

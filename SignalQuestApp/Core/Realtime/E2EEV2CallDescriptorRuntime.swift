@@ -195,6 +195,8 @@ final class E2EEV2CallNonceLedger: @unchecked Sendable {
         defer { lock.unlock() }
         guard let stored = loadLocked(nowMs: nowMs) else { return false }
         var current = stored.filter { nowMs - $0.value.seenAtMs < Self.retentionMs }
+        // Un appel terminé ne se rejoint plus, même sous un autre nonce.
+        if current.values.contains(where: { $0.callId == callId && $0.terminated == true }) { return false }
         if let known = current[nonceB64] { return known.callId == callId && known.terminated != true }
         current[nonceB64] = Record(callId: callId, seenAtMs: nowMs)
         if current.count > Self.maxEntries {
@@ -213,8 +215,18 @@ final class E2EEV2CallNonceLedger: @unchecked Sendable {
         defer { lock.unlock() }
         guard var current = loadLocked(nowMs: nowMs) else { return }
         var changed = false
-        for (nonce, record) in current where record.callId == callId && record.terminated != true {
-            current[nonce]?.terminated = true
+        var known = false
+        for (nonce, record) in current where record.callId == callId {
+            known = true
+            if record.terminated != true {
+                current[nonce]?.terminated = true
+                changed = true
+            }
+        }
+        // Appel terminé avant que son nonce soit vu ici : gardé par son
+        // identifiant (une clé qui ne peut pas être un nonce base64).
+        if !known {
+            current["call:" + callId] = Record(callId: callId, seenAtMs: nowMs, terminated: true)
             changed = true
         }
         guard changed else { return }

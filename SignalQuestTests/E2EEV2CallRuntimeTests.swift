@@ -177,4 +177,24 @@ final class E2EEV2CallRuntimeTests: XCTestCase {
         XCTAssertFalse(E2EEV2CapabilitiesPublicationStore.features.contains("calls"),
                        "« Appels vérifiés » n'est annoncé que verrou d'appels ouvert")
     }
+
+    /// Un appel terminé avant que son nonce soit vu ici ne se rejoint plus,
+    /// sous aucun nonce ; son propre descripteur ne fait pas sonner l'appareil.
+    func testATerminatedCallAndOwnDescriptorsNeverRing() async throws {
+        let ledger = E2EEV2CallNonceLedger(fileURL: nil)
+        ledger.markTerminated(callId: "call_ended_00000000000001", nowMs: 1_000)
+        XCTAssertFalse(ledger.claim(Data(repeating: 1, count: 32).base64EncodedString(), callId: "call_ended_00000000000001", nowMs: 2_000))
+        XCTAssertTrue(ledger.claim(Data(repeating: 2, count: 32).base64EncodedString(), callId: "call_other_00000000000001", nowMs: 2_000))
+
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let callee = runtime(fixture, devices: devices)
+        guard case .prepared(let own) = callee.prepareOutgoing(conversationId: seeded.conversationId) else {
+            return XCTFail("Descripteur attendu")
+        }
+        let echoed = await callee.verify(own, conversationId: seeded.conversationId, callId: own.descriptor.callId, ringing: true)
+        XCTAssertEqual(echoed, .refused(.untrustedCaller))
+    }
 }

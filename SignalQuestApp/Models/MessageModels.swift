@@ -19,6 +19,18 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
     let pinnedAt: Date?
     let participants: [ConversationParticipant]
     let lastMessage: MessageItem?
+    /// L'autre participant d'un tête-à-tête, archivé ou non (clé additive du
+    /// serveur, A3c) ; `participants` cache un participant qui a archivé.
+    var directPeerUserId: String? = nil
+
+    /// Membres v1 d'une genèse de migration (§14.2, v0.4.20) : dans un
+    /// tête-à-tête, les deux participants même archivés ; dans un groupe, les
+    /// participants non archivés.
+    var migrationMemberIds: [String] {
+        var ids = participants.map(\.userId)
+        if !isGroup, let directPeerUserId, !ids.contains(directPeerUserId) { ids.append(directPeerUserId) }
+        return ids
+    }
 
     var displayTitle: String {
         displayTitle(excluding: nil)
@@ -53,6 +65,7 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, isGroup, e2eeEnabled, groupPhotoUrl, createdAt, updatedAt, lastMessageAt, lastReadAt, pinnedAt, participants, lastMessage
+        case directPeerUserId
     }
 
     init(
@@ -97,6 +110,7 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         pinnedAt = try c.decodeIfPresent(Date.self, forKey: .pinnedAt)
         participants = c.decodeLossyArray([ConversationParticipant].self, forKey: .participants)
         lastMessage = try c.decodeIfPresent(MessageItem.self, forKey: .lastMessage)
+        directPeerUserId = try? c.decodeIfPresent(String.self, forKey: .directPeerUserId)
     }
 }
 

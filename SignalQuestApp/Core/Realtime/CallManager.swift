@@ -313,6 +313,9 @@ final class CallManager: NSObject, ObservableObject {
         /// Descripteur signé d'un appel chiffré (D.11) : celui que cet appareil
         /// a signé, ou le premier reçu, vérifié avant de répondre.
         var e2eeDescriptor: E2EEV2SignedCallDescriptor? = nil
+        /// Descripteur vérifié pendant sa fenêtre de sonnerie de 60 secondes
+        /// (§10.1). Sans elle, la réponse revérifie avec cette fenêtre.
+        var ringingVerified = false
     }
 
     enum CallError: LocalizedError {
@@ -365,6 +368,7 @@ final class CallManager: NSObject, ObservableObject {
     private var incomingReconciliationTask: Task<Void, Never>?
     private var recentlyTerminatedCallIDs: [String: Date] = [:]
     private var epochObserver: NSObjectProtocol?
+    private var pushTokenObserver: NSObjectProtocol?
     private let deviceID = InstallationIdentity().deviceID()
     private let logger = Logger(subsystem: "fr.signalquest.ios", category: "CallKit")
 
@@ -391,6 +395,15 @@ final class CallManager: NSObject, ObservableObject {
         // room fermée, ou réseau tombé), LiveKit le signale → on clôt l'appel.
         liveKit.onRemoteDisconnect = { [weak self] in self?.handleRemoteDisconnect() }
         liveKit.onE2EETrustLost = { [weak self] reason in self?.handleE2EETrustLost(reason) }
+        // Un nouveau jeton APNs fait repartir l'enregistrement des jetons v2.
+        pushTokenObserver = NotificationCenter.default.addObserver(
+            forName: E2EEV2CallPushTokens.didChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let registrar = self?.pushRegistrar else { return }
+                Task { await registrar.register(voipToken: nil) }
+            }
+        }
         epochObserver = NotificationCenter.default.addObserver(
             forName: E2EEV2EpochEvents.didAdvance, object: nil, queue: .main
         ) { [weak self] note in
@@ -426,6 +439,11 @@ final class CallManager: NSObject, ObservableObject {
         isEncryptedConversation: Bool = false
     ) {
         guard activeCall == nil else { return }
+        // §10.0 : une conversation que cet appareil sait v2 n'appelle que
+        // chiffré, quoi que dise le serveur ou l'écran qui relance l'appel.
+        let requiresE2EE = requiresE2EE || (LocalAccountScope.currentUserId != nil && IncomingCallE2EEExpectation.knownV2(
+            conversationId: conversationId, ownerNamespace: LocalAccountScope.storageNamespace
+        ))
         updateDiscretion(isEncryptedConversation || CallDiscretionPolicy.isDiscreet(
             requiresE2EE: requiresE2EE,
             conversation: knownConversation(conversationId)
@@ -919,7 +937,9 @@ final class CallManager: NSObject, ObservableObject {
         Task { [weak self] in
             let verification = await callRuntime.verify(descriptor, conversationId: conversationId, callId: callId, ringing: true)
             guard let self, let current = self.activeCall, current.callId == callId,
-                  current.e2eeDescriptor == descriptor, !current.isAnswered, !current.isEnding else { return }
+                  current.e2eeDescriptor == descriptor, !current.isEnding else { return }
+            if case .verified = verification { self.activeCall?.ringingVerified = true }
+            guard !current.isAnswered else { return }
             switch verification {
             case .verified:
                 return
@@ -972,8 +992,14 @@ final class CallManager: NSObject, ObservableObject {
             throw CallError.untrustedE2EESession
         }
         guard let callRuntime else { throw CallError.e2eeUnavailable }
-        switch await callRuntime.verify(descriptor, conversationId: conversationId, callId: callId, ringing: false) {
-        case .verified: return true
+        // La fenêtre de 12 heures ne vaut qu'après une sonnerie vérifiée dans
+        // ses 60 secondes : jamais pour un descripteur qui ne l'a pas été.
+        switch await callRuntime.verify(
+            descriptor, conversationId: conversationId, callId: callId, ringing: !call.ringingVerified
+        ) {
+        case .verified:
+            if activeCall?.callId == callId { activeCall?.ringingVerified = true }
+            return true
         case .unavailable: throw CallError.e2eeUnavailable
         case .refused: throw CallError.untrustedE2EESession
         }
