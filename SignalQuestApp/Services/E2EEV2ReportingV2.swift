@@ -11,7 +11,13 @@ enum E2EEV2ModerationKey {
         let publicKeyX963B64: String
     }
 
-    static let pinned: Pinned? = nil
+    /// Paire générée par l'administrateur le 04/10/2026 à 21:51, clé privée
+    /// chiffrée hors serveur. Empreinte SHA-256 du point X9.63 :
+    /// f08c38f6ae878f297ca1f93a710a6d3dd0dfccf2bc5d2dc9b53582f5f21b8f9a.
+    static let pinned: Pinned? = Pinned(
+        keyId: "sq_moderation_key_2026_10",
+        publicKeyX963B64: "BMxFlM/W4lDpPlVKD+/ZcOSZNHqmwXatyDjDOS0I1sbNP5bGopp4ecux/lk4AuhXpq3Gpt27Jd1m2tHYZsCaKUM="
+    )
 }
 
 enum E2EEV2ReportResultV2: Equatable, Sendable {

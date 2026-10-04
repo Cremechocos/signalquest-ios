@@ -16,7 +16,13 @@ final class E2EEV2ReportSenderV2Tests: XCTestCase {
         let sender = E2EEV2ReportSenderV2(api: fixture.api, identityStore: fixture.identity, moderationKey: nil, expectedSession: fixture.session)
         let result = await sender.report([try message(1)], reason: "SPAM", conversationId: conversationId, expectedOwnerScopeId: fixture.session.ownerScopeId)
         XCTAssertEqual(result, .unavailable)
-        XCTAssertNil(E2EEV2ModerationKey.pinned, "Aucune clé épinglée avant l'outil hors ligne (SRV-A6)")
+        // Clé épinglée le 04/10 : point P-256 valide, empreinte attendue.
+        let pinned = try XCTUnwrap(E2EEV2ModerationKey.pinned)
+        XCTAssertEqual(pinned.keyId, "sq_moderation_key_2026_10")
+        let point = try XCTUnwrap(Data(base64Encoded: pinned.publicKeyX963B64))
+        XCTAssertNoThrow(try P256.KeyAgreement.PublicKey(x963Representation: point))
+        XCTAssertEqual(SHA256.hash(data: point).map { String(format: "%02x", $0) }.joined(),
+                       "f08c38f6ae878f297ca1f93a710a6d3dd0dfccf2bc5d2dc9b53582f5f21b8f9a")
     }
 
     func testOnlyTheModerationKeyOpensTheSealedPart() async throws {
