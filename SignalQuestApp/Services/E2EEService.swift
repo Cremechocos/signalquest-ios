@@ -2437,7 +2437,8 @@ final class E2EEV2DeviceEnrollmentCoordinator: @unchecked Sendable {
                 path: "/api/e2ee/v2/devices",
                 body: body,
                 expectedOwnerScopeId: ownerScopeId,
-                capabilitySet: .preview
+                // Le serveur exige l'identité d'appareil v2 pour enrôler (essai local du 04/10).
+                capabilitySet: .deviceLifecycle
             )
             switch result {
             case .failure(let failure):

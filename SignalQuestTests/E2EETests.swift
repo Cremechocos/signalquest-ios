@@ -5213,6 +5213,10 @@ private enum E2EEV2LocalQAPhase: String {
     case resume
     case inventory
     case cleanup
+    /// Lot A1 : l'appareil approuvé reçoit l'UIK déposée pour lui (entrée : approvalId).
+    case receiveTrust = "receive-trust"
+    /// Lot A1 : la liste signée du compte, vérifiée contre l'UIK de ce client.
+    case accountTrust = "account-trust"
 }
 
 private enum E2EEV2LocalQAError: Error, CustomStringConvertible, Equatable {
@@ -5408,11 +5412,17 @@ extension E2EETests {
             do { try backlog.request(owner, conversations: ids) }
             catch { queueFailure.value = String(describing: error) }
         }
+        // Lot A1 : UIK et épinglages dans le coffre de ce client, jamais partagés
+        // entre les appareils simulés d'un même compte.
+        let accounts = E2EEV2AccountIdentityStore(tokenStore: vault)
+        let pins = E2EEV2TrustPinStore(tokenStore: vault)
         let lifecycle = E2EEV2DeviceLifecycleCoordinator(
             api: api,
             identityStore: identity,
             epochKeyStore: epochs,
             mediaOutboxStore: outbox,
+            accountIdentityStore: accounts,
+            trustPins: pins,
             rotationCommitted: committed
         )
         let recovery = E2EEV2RecoveryCoordinatorV2(
@@ -5520,6 +5530,30 @@ extension E2EETests {
                            "rotationRequired": value.rotationRequired,
                            "affectedConversationIds": value.affectedConversationIds]
             }
+        case .receiveTrust:
+            let approvalId = try localQARequired("SQ_E2EE_V2_LOCAL_QA_INPUT")
+            switch await lifecycle.receiveApprovedTrust(approvalId: approvalId) {
+            case .failed(let failure): throw localQAOperation("receive-trust", failure)
+            case .success(let status):
+                let namespace = LocalAccountScope.storageNamespace
+                let uik = try accounts.load(ownerNamespace: namespace)
+                payload = ["status": status.rawValue,
+                           "uikB64": uik?.publicKey.x963Representation.base64EncodedString() ?? NSNull(),
+                           "uikVerified": try accounts.isVerified(ownerNamespace: namespace)]
+            }
+        case .accountTrust:
+            let namespace = LocalAccountScope.storageNamespace
+            let uik = try accounts.load(ownerNamespace: namespace)
+            let publicKey = uik?.publicKey
+            let transport = E2EEV2APITransport(api: api, identityStore: identity)
+            let trust = try await E2EEV2TrustDirectory(
+                ownerNamespace: namespace, pins: pins, ownUserId: config.userId, ownAccountKey: { publicKey },
+                fetch: E2EEV2TrustDirectory.identityFetch(transport: transport, ownerScopeId: session.ownerScopeId)
+            ).ownAccountTrust()
+            payload = ["listVersion": trust.outcome.pin.listVersion,
+                       "uikB64": trust.outcome.pin.uikX963B64,
+                       "devices": trust.outcome.devices.map { ["deviceId": $0.deviceId, "keyVersion": $0.keyVersion,
+                                                                "platform": $0.platform] }]
         case .prepareReset:
             switch lifecycle.prepareIdentityReset(label: localQAEnvironment("SQ_E2EE_V2_LOCAL_QA_LABEL") ?? "SQ QA iOS reset") {
             case .failed(let failure): throw localQAOperation("prepare-reset", failure)
