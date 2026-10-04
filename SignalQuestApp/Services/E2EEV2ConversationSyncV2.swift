@@ -204,6 +204,8 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
                 genesisLength: genesis.membershipChangeNumber, verifiedCount: all.count, signingKey: signingKey
             )
         }
+        // Époques dont la clé vient d'être gardée : accusées en fin de relève (E.2).
+        var kept: [Int] = []
         let open = { (epoch: E2EEV2EpochContractV2.Current) -> E2EEV2ConversationSyncResult? in
             let previous = try? self.stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
             switch E2EEV2EpochVerifierV2.open(
@@ -223,12 +225,14 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
                 return .failure(self.localError("invalid-e2ee-current-epoch"))
             case .opened(var epochKey, let manifest, let state):
                 defer { epochKey.resetBytes(in: 0..<epochKey.count) }
-                return E2EEV2EpochVerifierV2.keep(
+                guard E2EEV2EpochVerifierV2.keep(
                     epochKey: epochKey, accepted: epoch.accepted, conversationId: conversationId,
                     commitment: manifest.keyCommitmentB64, membership: state, recipients: epoch.recipients,
                     createdAtMs: manifest.createdAtMs, acceptedAtMs: Int64(self.now().timeIntervalSince1970 * 1_000),
                     session: session, keyStore: self.keyStore, stateStore: self.stateStore
-                ) ? nil : .failure(self.localError("e2ee-received-epoch-storage-failed"))
+                ) else { return .failure(self.localError("e2ee-received-epoch-storage-failed")) }
+                kept.append(manifest.epochNumber)
+                return nil
             }
         }
         // Époques sautées, dans l'ordre. Celle dont l'appareil n'est pas
@@ -251,7 +255,16 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
             }
         }
         guard session.isCurrent else { return .failure(localError("e2ee-session-changed")) }
-        return open(served) ?? .received(epochNumber: served.accepted.epochNumber)
+        let result = open(served) ?? .received(epochNumber: served.accepted.epochNumber)
+        // Accusé une fois la clé gardée : le serveur passe l'enveloppe en ligne
+        // témoin (§2.6). Sans effet sur le résultat : un accusé perdu se refait.
+        for number in kept where session.isCurrent {
+            _ = await bound.postJSON(
+                path: "\(base)/epochs/\(number)/ack", body: Data(),
+                expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
+            )
+        }
+        return result
     }
 
     private func localError(_ message: String) -> E2EEV2TransportFailure {

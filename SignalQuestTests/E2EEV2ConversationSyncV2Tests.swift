@@ -200,6 +200,10 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
         XCTAssertEqual(caughtUp, .received(epochNumber: 3))
         let namespace = fixture.session.ownerNamespace
         XCTAssertTrue(paths.all.contains { $0.0.url?.path.hasSuffix("/epochs/2") == true }, "L'époque sautée est demandée")
+        // E.2 : chaque clé gardée est accusée, signée, corps vide.
+        let acks = paths.all.filter { $0.0.url?.path.hasSuffix("/ack") == true }
+        XCTAssertEqual(acks.compactMap { $0.0.url?.path.components(separatedBy: "/").dropLast().last }, ["2", "3"])
+        XCTAssertTrue(acks.allSatisfy { $0.0.httpMethod == "POST" && $0.0.value(forHTTPHeaderField: E2EEV2SignedRequest.headerSignature) != nil })
         XCTAssertEqual(try fixture.keys.loadEpoch(conversationId: conversationId, epochNumber: 2, ownerNamespace: namespace)?.epochKey, keyTwo,
                        "Ses messages en vol se liront")
         XCTAssertEqual(try fixture.states.acceptedEpochs(conversationId: conversationId, ownerNamespace: namespace).map(\.epochNumber), [1, 2, 3])

@@ -459,11 +459,19 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
             return .failure(localError("invalid-e2ee-current-epoch"))
         case .opened(var epochKey, let manifest, let state):
             defer { epochKey.resetBytes(in: 0..<epochKey.count) }
-            return keep(
+            guard keep(
                 epochKey: epochKey, accepted: served.accepted, conversationId: conversationId,
                 commitment: manifest.keyCommitmentB64, membership: state, recipients: served.recipients,
                 createdAtMs: manifest.createdAtMs, session: session
-            ) ? .adopted(epochNumber: manifest.epochNumber) : .failure(localError("e2ee-adopted-epoch-storage-failed"))
+            ) else { return .failure(localError("e2ee-adopted-epoch-storage-failed")) }
+            // Accusé une fois la clé gardée (E.2) ; un accusé perdu se refait.
+            if session.isCurrent {
+                _ = await transport.postJSON(
+                    path: "/api/e2ee/v2/conversations/\(conversationId)/epochs/\(manifest.epochNumber)/ack", body: Data(),
+                    expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
+                )
+            }
+            return .adopted(epochNumber: manifest.epochNumber)
         }
     }
 
