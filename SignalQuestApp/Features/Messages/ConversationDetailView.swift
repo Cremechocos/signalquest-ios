@@ -1909,6 +1909,15 @@ struct ConversationDetailView: View {
     /// la conversation part chiffrée pour la seule modération, comme sur le
     /// web ; la feuille le dit avant l'envoi.
     private func report(_ message: MessageItem, reason: ReportReason, comment: String?) async throws {
+        if usesV2 {
+            // §11 : rapport scellé pour la seule clé de modération, sans clé de conversation.
+            try await services.e2eeV2Messaging.report(refs: [message.id], reason: reason, conversationId: conversation.id)
+            inAppNotifications.show(SQInAppNotificationItem(
+                body: String(localized: "Signalement envoyé. Merci, l’équipe de modération va l’examiner."),
+                variant: .success
+            ))
+            return
+        }
         var wrappedKey: String?
         if isE2EE {
             guard let e2ee else { throw E2EEError.locked }
@@ -2588,6 +2597,15 @@ struct ConversationDetailView: View {
     }
 
     private func delete(message: MessageItem, forEveryone: Bool) async {
+        if usesV2 {
+            // v2 : « pour tous » est une suppression signée (§5) ; « pour moi » reste local.
+            if forEveryone {
+                _ = await sendV2(.delete(targetRef: message.id), replyToId: nil, ttlSeconds: 0, clientRequestId: UUID().uuidString)
+            } else {
+                messages.removeAll { $0.id == message.id }
+            }
+            return
+        }
         do {
             try await service.deleteMessage(messageId: message.id, forEveryone: forEveryone)
             if forEveryone {
@@ -2601,7 +2619,8 @@ struct ConversationDetailView: View {
     }
 
     private func markRead() async {
-        guard let last = messages.last else { return }
+        // L'état de lecture d'une conversation v2 arrive avec le lot serveur A7.
+        guard !usesV2, let last = messages.last else { return }
         try? await service.markRead(conversationId: conversation.id, lastMessageId: last.id)
         // Le badge restait allumé jusqu'au prochain rafraîchissement (SOC-23).
         await services.refreshInboxBadge(force: true)

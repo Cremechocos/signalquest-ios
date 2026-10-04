@@ -100,9 +100,14 @@ final class MessagesViewModel: ObservableObject {
     }
 
     /// Quitte la conversation (swipe) et la retire de la liste localement.
-    func leave(_ conversation: MessageConversation) async {
+    func leave(_ conversation: MessageConversation, v2: E2EEV2MessagingRuntime? = nil) async {
         do {
-            try await service.leaveConversation(id: conversation.id)
+            // Conversation v2 : le départ passe par la chaîne signée (D.4).
+            if let v2, v2.writesEnabled, EncryptedConversationSurfaces.isV2(conversation) {
+                try await v2.apply(.leave, to: conversation)
+            } else {
+                try await service.leaveConversation(id: conversation.id)
+            }
             conversations.removeAll { $0.id == conversation.id }
         } catch {
             errorMessage = error.userFacingMessage
@@ -281,7 +286,7 @@ struct MessagesView: View {
         ) { conversation in
             Button("Quitter", role: .destructive) {
                 pendingLeave = nil
-                Task { await model.leave(conversation); await services.refreshInboxBadge(force: true) }
+                Task { await model.leave(conversation, v2: services.e2eeV2Messaging); await services.refreshInboxBadge(force: true) }
             }
             Button("Annuler", role: .cancel) { pendingLeave = nil }
         } message: { _ in
@@ -567,6 +572,7 @@ private struct NewConversationSheet: View {
     let service: MessagesServicing
     let onCreated: () async -> Void
 
+    @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var searchTask: Task<Void, Never>?
@@ -697,6 +703,27 @@ private struct NewConversationSheet: View {
         defer { isBusy = false }
         do {
             let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let isGroup = selected.count > 1
+            // Chiffrée et verrous ouverts : naît en v2 si tous les membres le
+            // lisent ; sinon en v1, tant que le serveur l'accepte (v0.4.17).
+            if e2ee, services.e2eeV2Messaging.writesEnabled {
+                switch await services.e2eeV2Messaging.create(
+                    participantIds: selected.map(\.id), isGroup: isGroup,
+                    title: isGroup && !normalizedTitle.isEmpty ? normalizedTitle : nil, excludesWeb: false
+                ) {
+                case .created:
+                    Haptics.success()
+                    await onCreated()
+                    dismiss()
+                    return
+                case .failure(let failure) where failure.message == "e2ee-v2-capability-missing":
+                    break
+                case .failure(let failure):
+                    throw E2EEV2MessagingError(failure.kind == .retryable
+                        ? String(localized: "Connexion instable. Réessaie.")
+                        : String(localized: "La conversation chiffrée n’a pas pu être créée."))
+                }
+            }
             _ = try await service.createConversation(
                 participantIds: selected.map(\.id),
                 title: normalizedTitle.isEmpty ? nil : normalizedTitle,

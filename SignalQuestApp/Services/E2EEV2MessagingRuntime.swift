@@ -1,5 +1,12 @@
 import Foundation
 
+/// Erreur lisible d'une action v2 depuis un écran.
+struct E2EEV2MessagingError: LocalizedError, Equatable {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
+}
+
 /// Recette strictement locale de la messagerie v2, comme celle des appels :
 /// Debug, argument explicite, environnement hors production, API en boucle
 /// locale. Elle ne change pas les verrous globaux ; en Release, la branche
@@ -37,6 +44,8 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         let creator: E2EEV2ConversationCreator
         let directory: E2EEV2DeviceDirectoryCache
         let stateStore: E2EEV2ConversationStateStore
+        let messageStore: E2EEV2MessageStoreV2
+        let reporter: E2EEV2ReportSenderV2
     }
 
     private let api: APIClient
@@ -106,7 +115,9 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
                     api: api, identityStore: identityStore, keyStore: keyStore, stateStore: stateStore, expectedSession: session
                 ),
                 directory: directory,
-                stateStore: stateStore
+                stateStore: stateStore,
+                messageStore: stores.0,
+                reporter: E2EEV2ReportSenderV2(api: api, identityStore: identityStore, expectedSession: session)
             )
             parts = built
             return built
@@ -305,6 +316,37 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         ) else { return false }
         if case .created = result { return true }
         return false
+    }
+
+    /// Signalement en deux parties (§11, D.10) de messages gardés par cet
+    /// appareil : jamais la clé de la conversation.
+    func report(refs: [String], reason: ReportReason, conversationId: String) async throws {
+        guard writesEnabled else { throw E2EEV2MessagingError(String(localized: "Le signalement chiffré n’est pas encore disponible.")) }
+        guard let parts = current() else { throw E2EEV2MessagingError(String(localized: "Reconnecte-toi puis réessaie.")) }
+        try await E2EEV2MessageReport.send(
+            refs: refs, reason: reason, conversationId: conversationId, ownerScopeId: parts.session.ownerScopeId,
+            store: parts.messageStore, sender: parts.reporter
+        )
+    }
+
+    /// Un changement d'appartenance depuis l'écran : lève une erreur lisible
+    /// si le changement n'est pas appliqué.
+    func apply(_ membership: E2EEV2MembershipWriterV2.Change, to conversation: MessageConversation) async throws {
+        let result = await change(
+            membership, conversationId: conversation.id, isGroup: conversation.isGroup,
+            participantIds: conversation.participants.map(\.userId)
+        )
+        switch result {
+        case .applied: return
+        case .notAllowed:
+            throw E2EEV2MessagingError(String(localized: "Seul un administrateur peut faire ce changement."))
+        case .needsSync:
+            throw E2EEV2MessagingError(String(localized: "La conversation a changé entre-temps. Réessaie."))
+        case .failure(let failure):
+            throw E2EEV2MessagingError(failure.kind == .retryable
+                ? String(localized: "Connexion instable. Réessaie.")
+                : String(localized: "Ce changement n’a pas pu être fait dans la conversation chiffrée."))
+        }
     }
 
     // MARK: Erreurs

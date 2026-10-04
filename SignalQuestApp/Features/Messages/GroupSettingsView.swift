@@ -15,6 +15,12 @@ struct GroupSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var services: AppServices
+
+    /// Conversation v2 : les membres changent par la chaîne signée (D.4).
+    private var usesV2: Bool {
+        EncryptedConversationSurfaces.isV2(conversation) && services.e2eeV2Messaging.writesEnabled
+    }
 
     @State private var title: String
     @State private var participants: [ConversationParticipant]
@@ -253,7 +259,11 @@ struct GroupSettingsView: View {
 
     private func add(_ user: MessageSearchUser) async {
         await run {
-            try await service.updateConversation(id: conversation.id, title: nil, addUserIds: [user.id], removeUserIds: [])
+            if usesV2 {
+                try await services.e2eeV2Messaging.apply(.add(userId: user.id), to: conversation)
+            } else {
+                try await service.updateConversation(id: conversation.id, title: nil, addUserIds: [user.id], removeUserIds: [])
+            }
             participants.append(
                 ConversationParticipant(
                     userId: user.id,
@@ -264,8 +274,8 @@ struct GroupSettingsView: View {
                     presence: nil
                 )
             )
-            // Nouveau membre d'un groupe chiffré : il lui faut la clé wrappée.
-            if conversation.e2eeEnabled == true, let e2ee {
+            // Nouveau membre d'un groupe chiffré v1 : il lui faut la clé wrappée.
+            if !usesV2, conversation.e2eeEnabled == true, let e2ee {
                 await e2ee.shareConversationKeyIfNeeded(conversationId: conversation.id)
             }
         }
@@ -273,14 +283,24 @@ struct GroupSettingsView: View {
 
     private func remove(_ participant: ConversationParticipant) async {
         await run {
-            try await service.updateConversation(id: conversation.id, title: nil, addUserIds: [], removeUserIds: [participant.userId])
+            if usesV2 {
+                try await services.e2eeV2Messaging.apply(.remove(userId: participant.userId), to: conversation)
+            } else {
+                try await service.updateConversation(id: conversation.id, title: nil, addUserIds: [], removeUserIds: [participant.userId])
+            }
             participants.removeAll { $0.userId == participant.userId }
         }
     }
 
     private func changeRole(_ participant: ConversationParticipant, to role: String) async {
         await run {
-            try await service.changeRole(conversationId: conversation.id, userId: participant.userId, role: role)
+            if usesV2 {
+                try await services.e2eeV2Messaging.apply(
+                    role == "admin" ? .promote(userId: participant.userId) : .demote(userId: participant.userId), to: conversation
+                )
+            } else {
+                try await service.changeRole(conversationId: conversation.id, userId: participant.userId, role: role)
+            }
             if let index = participants.firstIndex(where: { $0.userId == participant.userId }) {
                 participants[index] = ConversationParticipant(
                     userId: participant.userId,
@@ -357,7 +377,11 @@ struct GroupSettingsView: View {
 
     private func leave() async {
         await run {
-            try await service.leaveConversation(id: conversation.id)
+            if usesV2 {
+                try await services.e2eeV2Messaging.apply(.leave, to: conversation)
+            } else {
+                try await service.leaveConversation(id: conversation.id)
+            }
             dismiss()
             onLeft()
         }
