@@ -146,8 +146,10 @@ final class FeedContextTests: XCTestCase {
         XCTAssertEqual(model.pendingCount, 0)
     }
 
+    /// Jusqu'à 5 s : une seconde ne suffisait pas sous la charge des portes
+    /// (simulateur partagé), le test passant pourtant seul.
     private func eventually(_ condition: () -> Bool) async {
-        for _ in 0..<100 {
+        for _ in 0..<500 {
             if condition() { return }
             try? await Task.sleep(for: .milliseconds(10))
         }
