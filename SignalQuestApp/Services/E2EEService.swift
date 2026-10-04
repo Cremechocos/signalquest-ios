@@ -2207,6 +2207,7 @@ final class E2EEV2APITransport: @unchecked Sendable {
         }
         let bounded = data.prefix(Self.maxErrorResponseBytes)
         let decoded = try? JSONDecoder().decode(BackendErrorResponse.self, from: Data(bounded))
+        E2EEDeviceRevocationSignal.postIfRevoked(status: response.statusCode, details: decoded?.details)
         return .failure(
             E2EEV2TransportFailure(
                 kind: E2EEV2TransportFailurePolicy.classify(
@@ -4213,6 +4214,8 @@ struct E2EEV2WrappedRecoveryPrivateKey: Codable, Equatable, Sendable {
     let nonceB64: String
     let wrappedPrivateJwkB64: String
     let aadB64: String
+    /// Bundle v3, clé du compte seulement : l'UIK en X9.63 (§2.8, v0.4.21).
+    var publicKeyB64: String? = nil
 }
 
 private struct E2EEV2RecoveryV2KDFParameters: Codable, Equatable, Sendable {
@@ -4220,6 +4223,8 @@ private struct E2EEV2RecoveryV2KDFParameters: Codable, Equatable, Sendable {
     let outputBytes: Int
     let identityInfo: String
     let signingInfo: String
+    /// Bundle v3 seulement.
+    var accountInfo: String? = nil
 }
 
 struct E2EEV2RecoveryBundleV2: Codable, Equatable, Sendable {
@@ -4231,38 +4236,50 @@ struct E2EEV2RecoveryBundleV2: Codable, Equatable, Sendable {
     let recoveryPublicSigningKeyB64: String
     let identityPrivateKey: E2EEV2WrappedRecoveryPrivateKey
     let signingPrivateKey: E2EEV2WrappedRecoveryPrivateKey
+    /// Bundle v3 (§2.8, v0.4.21) : l'UIK enveloppée sous la clé de
+    /// récupération, qui permet à un appareil récupéré de se certifier.
+    let accountPrivateKey: E2EEV2WrappedRecoveryPrivateKey?
 
     init(
         recoveryPublicIdentityKeyB64: String,
         recoveryPublicSigningKeyB64: String,
         identityPrivateKey: E2EEV2WrappedRecoveryPrivateKey,
-        signingPrivateKey: E2EEV2WrappedRecoveryPrivateKey
+        signingPrivateKey: E2EEV2WrappedRecoveryPrivateKey,
+        accountPrivateKey: E2EEV2WrappedRecoveryPrivateKey? = nil
     ) {
-        version = 2
+        version = accountPrivateKey == nil ? 2 : 3
         kdfAlgorithm = E2EEV2RecoveryV2Crypto.kdfAlgorithm
         kdfParameters = .init(
             hash: "SHA-256",
             outputBytes: 32,
             identityInfo: E2EEV2RecoveryV2Crypto.identityInfo,
-            signingInfo: E2EEV2RecoveryV2Crypto.signingInfo
+            signingInfo: E2EEV2RecoveryV2Crypto.signingInfo,
+            accountInfo: accountPrivateKey == nil ? nil : E2EEV2RecoveryV2Crypto.accountInfo
         )
         wrapAlgorithm = E2EEV2RecoveryV2Crypto.wrapAlgorithm
         self.recoveryPublicIdentityKeyB64 = recoveryPublicIdentityKeyB64
         self.recoveryPublicSigningKeyB64 = recoveryPublicSigningKeyB64
         self.identityPrivateKey = identityPrivateKey
         self.signingPrivateKey = signingPrivateKey
+        self.accountPrivateKey = accountPrivateKey
     }
 
     fileprivate var validSuite: Bool {
-        version == 2
-            && kdfAlgorithm == E2EEV2RecoveryV2Crypto.kdfAlgorithm
-            && kdfParameters == .init(
-                hash: "SHA-256",
-                outputBytes: 32,
-                identityInfo: E2EEV2RecoveryV2Crypto.identityInfo,
-                signingInfo: E2EEV2RecoveryV2Crypto.signingInfo
-            )
-            && wrapAlgorithm == E2EEV2RecoveryV2Crypto.wrapAlgorithm
+        let v3 = version == 3
+        guard version == 2 || v3,
+              kdfAlgorithm == E2EEV2RecoveryV2Crypto.kdfAlgorithm,
+              kdfParameters == .init(
+                  hash: "SHA-256",
+                  outputBytes: 32,
+                  identityInfo: E2EEV2RecoveryV2Crypto.identityInfo,
+                  signingInfo: E2EEV2RecoveryV2Crypto.signingInfo,
+                  accountInfo: v3 ? E2EEV2RecoveryV2Crypto.accountInfo : nil
+              ),
+              wrapAlgorithm == E2EEV2RecoveryV2Crypto.wrapAlgorithm,
+              identityPrivateKey.publicKeyB64 == nil, signingPrivateKey.publicKeyB64 == nil else { return false }
+        // Une v2 n'a pas de neuvième clé ; une v3 l'a, avec l'UIK.
+        guard let account = accountPrivateKey else { return !v3 }
+        return v3 && account.publicKeyB64 != nil
     }
 }
 
@@ -4299,12 +4316,20 @@ enum E2EEV2RecoveryV2Crypto {
     static let wrapAlgorithm = "AES_256_GCM"
     static let identityInfo = "signalquest-e2ee-v2-recovery-identity-v2"
     static let signingInfo = "signalquest-e2ee-v2-recovery-signing-v2"
+    static let accountInfo = "signalquest-e2ee-v2-recovery-account-v3"
 
-    private enum Role: String {
+    enum Role: String {
         case identity = "IDENTITY"
         case signing = "SIGNING"
+        case account = "ACCOUNT"
 
-        var info: String { self == .identity ? identityInfo : signingInfo }
+        var info: String {
+            switch self {
+            case .identity: return identityInfo
+            case .signing: return signingInfo
+            case .account: return accountInfo
+            }
+        }
     }
 
     private struct PortableJWK {
@@ -4313,7 +4338,12 @@ enum E2EEV2RecoveryV2Crypto {
         let y: Data
     }
 
-    static func generateMaterial(ownerBinding: String) throws -> E2EEV2RecoveryMaterialV2 {
+    /// `accountKey` : l'UIK du compte, enveloppée en v3 (§2.8, v0.4.21) ; sans
+    /// elle, un bundle v2 qui ne sert qu'à restaurer l'historique.
+    static func generateMaterial(
+        ownerBinding: String,
+        accountKey: P256.Signing.PrivateKey? = nil
+    ) throws -> E2EEV2RecoveryMaterialV2 {
         let recoveryKey = try randomBytes(count: 32)
         let identity = P256.KeyAgreement.PrivateKey()
         let signing = P256.Signing.PrivateKey()
@@ -4332,7 +4362,11 @@ enum E2EEV2RecoveryV2Crypto {
                 ownerBinding: ownerBinding,
                 role: .signing
             )
-            guard identityWrapped.nonceB64 != signingWrapped.nonceB64 else {
+            let accountWrapped = try accountKey.map {
+                try wrapAccountKey($0, recoveryKey: recoveryKey, ownerBinding: ownerBinding)
+            }
+            let nonces = [identityWrapped.nonceB64, signingWrapped.nonceB64] + (accountWrapped.map { [$0.nonceB64] } ?? [])
+            guard Set(nonces).count == nonces.count else {
                 throw E2EEV2RecoveryV2Error.invalidBundle
             }
             return E2EEV2RecoveryMaterialV2(
@@ -4340,7 +4374,8 @@ enum E2EEV2RecoveryV2Crypto {
                     recoveryPublicIdentityKeyB64: identity.publicKey.x963Representation.base64EncodedString(),
                     recoveryPublicSigningKeyB64: signing.publicKey.x963Representation.base64EncodedString(),
                     identityPrivateKey: identityWrapped,
-                    signingPrivateKey: signingWrapped
+                    signingPrivateKey: signingWrapped,
+                    accountPrivateKey: accountWrapped
                 ),
                 recoveryKey: recoveryKey
             )
@@ -4349,6 +4384,52 @@ enum E2EEV2RecoveryV2Crypto {
             clear.resetBytes(in: 0..<clear.count)
             throw error
         }
+    }
+
+    /// L'UIK du compte, rôle `ACCOUNT` (v0.4.21). `salt` et `nonce` fixés
+    /// seulement pour le vecteur.
+    static func wrapAccountKey(
+        _ key: P256.Signing.PrivateKey,
+        recoveryKey: Data,
+        ownerBinding: String,
+        salt: Data? = nil,
+        nonce: Data? = nil
+    ) throws -> E2EEV2WrappedRecoveryPrivateKey {
+        var wrapped = try wrap(
+            privateRaw: key.rawRepresentation, publicX963: key.publicKey.x963Representation,
+            recoveryKey: recoveryKey, ownerBinding: ownerBinding, role: .account, salt: salt, nonce: nonce
+        )
+        wrapped.publicKeyB64 = key.publicKey.x963Representation.base64EncodedString()
+        return wrapped
+    }
+
+    /// Bundle v3 : déballe l'UIK, puis vérifie que son scalaire redonne les
+    /// `x`/`y` du JWK et que ce sont ceux de `publicKeyB64` (§2.8). Reste à
+    /// la comparer à l'UIK servie par le paquet de confiance du compte.
+    static func unwrapAccountPrivateKey(
+        bundle: E2EEV2RecoveryBundleV2,
+        recoveryKey: Data,
+        ownerBinding: String
+    ) throws -> P256.Signing.PrivateKey {
+        guard bundle.version == 3, let wrapped = bundle.accountPrivateKey, let publicKeyB64 = wrapped.publicKeyB64 else {
+            throw E2EEV2RecoveryV2Error.invalidBundle
+        }
+        let jwk = try unwrap(
+            wrapped: wrapped, expectedPublicB64: publicKeyB64, recoveryKey: recoveryKey,
+            ownerBinding: ownerBinding, role: .account
+        )
+        let privateKey = try P256.Signing.PrivateKey(rawRepresentation: jwk.d)
+        guard privateKey.publicKey.x963Representation.base64EncodedString() == publicKeyB64 else {
+            throw E2EEV2RecoveryV2Error.keyMismatch
+        }
+        return privateKey
+    }
+
+    /// §2.8 : la chaîne que l'UIK signe pour le bundle.
+    static func bundleSignatureCanonical(userId: String, bundle: E2EEV2RecoveryBundleV2) -> Data {
+        Data([
+            "SQ-E2EE-V2-RECOVERY-BUNDLE", "1", userId, bundleHash(bundle), bundle.recoveryPublicIdentityKeyB64,
+        ].joined(separator: "\n").utf8)
     }
 
     static func unwrapSigningPrivateKey(
@@ -4424,20 +4505,24 @@ enum E2EEV2RecoveryV2Crypto {
             .joined()
     }
 
-    private static func wrap(
+    /// Interne pour les vecteurs (cas négatifs) ; ailleurs, `generateMaterial`.
+    static func wrap(
         privateRaw: Data,
         publicX963: Data,
         recoveryKey: Data,
         ownerBinding: String,
-        role: Role
+        role: Role,
+        salt fixedSalt: Data? = nil,
+        nonce fixedNonce: Data? = nil
     ) throws -> E2EEV2WrappedRecoveryPrivateKey {
         guard privateRaw.count == 32, publicX963.count == 65, publicX963.first == 4 else {
             throw E2EEV2RecoveryV2Error.invalidBundle
         }
         var clear = Data(portableJWKJSON(privateRaw: privateRaw, publicX963: publicX963).utf8)
         defer { clear.resetBytes(in: 0..<clear.count) }
-        let salt = try randomBytes(count: 32)
-        let nonce = try randomBytes(count: 12)
+        let salt = try fixedSalt ?? randomBytes(count: 32)
+        let nonce = try fixedNonce ?? randomBytes(count: 12)
+        guard salt.count == 32, nonce.count == 12 else { throw E2EEV2RecoveryV2Error.invalidBundle }
         let additionalData = try aad(ownerBinding: ownerBinding, role: role)
         let sealed = try AES.GCM.seal(
             clear,
@@ -4550,8 +4635,23 @@ enum E2EEV2RecoveryV2Contract {
         return try encoder.encode(bundle)
     }
 
+    /// `PUT /recovery-bundle` (E.1) : les clés du bundle plus `signatureB64`,
+    /// la signature de l'UIK sur sa forme hachée (§2.8).
+    static func uploadData(_ bundle: E2EEV2RecoveryBundleV2, signatureB64: String) throws -> Data {
+        guard var object = try JSONSerialization.jsonObject(with: bundleData(bundle)) as? [String: Any] else {
+            throw E2EEV2RecoveryV2Error.invalidBundle
+        }
+        object["signatureB64"] = signatureB64
+        return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+
+    /// Forme hachée (`bundleHash`) : ordre de clés fixe, non trié ; en v3,
+    /// `accountInfo` après `signingInfo` et `accountPrivateKey` en dernier.
     static func canonicalBundleJSON(_ bundle: E2EEV2RecoveryBundleV2) -> String {
-        "{\"version\":2,\"kdfAlgorithm\":\"\(E2EEV2RecoveryV2Crypto.kdfAlgorithm)\",\"kdfParameters\":{\"hash\":\"SHA-256\",\"outputBytes\":32,\"identityInfo\":\"\(E2EEV2RecoveryV2Crypto.identityInfo)\",\"signingInfo\":\"\(E2EEV2RecoveryV2Crypto.signingInfo)\"},\"wrapAlgorithm\":\"\(E2EEV2RecoveryV2Crypto.wrapAlgorithm)\",\"recoveryPublicIdentityKeyB64\":\"\(bundle.recoveryPublicIdentityKeyB64)\",\"recoveryPublicSigningKeyB64\":\"\(bundle.recoveryPublicSigningKeyB64)\",\"identityPrivateKey\":\(wrappedJSON(bundle.identityPrivateKey)),\"signingPrivateKey\":\(wrappedJSON(bundle.signingPrivateKey))}"
+        let v3 = bundle.version == 3
+        let accountInfo = v3 ? ",\"accountInfo\":\"\(E2EEV2RecoveryV2Crypto.accountInfo)\"" : ""
+        let accountKey = v3 ? (bundle.accountPrivateKey.map { ",\"accountPrivateKey\":\(wrappedJSON($0))" } ?? "") : ""
+        return "{\"version\":\(v3 ? 3 : 2),\"kdfAlgorithm\":\"\(E2EEV2RecoveryV2Crypto.kdfAlgorithm)\",\"kdfParameters\":{\"hash\":\"SHA-256\",\"outputBytes\":32,\"identityInfo\":\"\(E2EEV2RecoveryV2Crypto.identityInfo)\",\"signingInfo\":\"\(E2EEV2RecoveryV2Crypto.signingInfo)\"\(accountInfo)},\"wrapAlgorithm\":\"\(E2EEV2RecoveryV2Crypto.wrapAlgorithm)\",\"recoveryPublicIdentityKeyB64\":\"\(bundle.recoveryPublicIdentityKeyB64)\",\"recoveryPublicSigningKeyB64\":\"\(bundle.recoveryPublicSigningKeyB64)\",\"identityPrivateKey\":\(wrappedJSON(bundle.identityPrivateKey)),\"signingPrivateKey\":\(wrappedJSON(bundle.signingPrivateKey))\(accountKey)}"
     }
 
     static func parseChallenge(
@@ -4564,7 +4664,7 @@ enum E2EEV2RecoveryV2Contract {
               Set(root.keys) == Set(["challenge", "bundle"]),
               let challenge = root["challenge"] as? [String: Any],
               Set(challenge.keys) == Set([
-                "challengeId", "pendingDeviceId", "bundleHash", "challengeB64Url", "expiresAt",
+                "challengeId", "pendingDeviceId", "bundleHash", "challengeB64Url", "expiresAt", "expiresAtMs",
               ]),
               let bundleObject = root["bundle"] as? [String: Any],
               let challengeId = challenge["challengeId"] as? String,
@@ -4578,8 +4678,13 @@ enum E2EEV2RecoveryV2Contract {
               Data(base64URLEncoded: challengeB64URL)?.count == 32,
               let expiresAt = challenge["expiresAt"] as? String,
               let expiresDate = parseTimestamp(expiresAt) else { return nil }
-        let expiresAtMs = Int64(expiresDate.timeIntervalSince1970 * 1_000)
-        guard expiresAtMs > nowMs else { return nil }
+        // `expiresAtMs`, en chaîne (D.0), est ce que signe la preuve ; il doit
+        // désigner le même instant que `expiresAt`.
+        guard let rawMs = challenge["expiresAtMs"] as? String,
+              rawMs.range(of: #"^(0|[1-9][0-9]{0,15})\z"#, options: .regularExpression) != nil,
+              let expiresAtMs = Int64(rawMs),
+              abs(expiresAtMs - Int64(expiresDate.timeIntervalSince1970 * 1_000)) < 1_000,
+              expiresAtMs > nowMs else { return nil }
         guard let bundle = parsePublicBundle(bundleObject, expectedOwnerBinding: expectedOwnerBinding),
               E2EEV2RecoveryV2Crypto.bundleHash(bundle) == bundleHash else { return nil }
         return .init(
@@ -4592,14 +4697,19 @@ enum E2EEV2RecoveryV2Contract {
         )
     }
 
+    /// `{challengeB64Url, recoverySignatureB64, certificate, deviceList}` :
+    /// l'appareil récupéré se certifie avec l'UIK déballée (§2.3, §2.8).
     static func completionData(
         challenge: E2EEV2RecoveryChallengeV2,
-        recoverySignatureB64: String
+        recoverySignatureB64: String,
+        trust: E2EEV2RecoveryTrust.Artifacts
     ) throws -> Data {
         try JSONSerialization.data(withJSONObject: [
             "challengeB64Url": challenge.challengeB64URL,
             "recoverySignatureB64": recoverySignatureB64,
-        ], options: [.sortedKeys])
+            "certificate": ["certificate": trust.certificate.canonical, "signatureB64": trust.certificate.signatureB64],
+            "deviceList": ["list": trust.deviceList.canonical, "signatureB64": trust.deviceList.signatureB64, "devices": trust.deviceEntries],
+        ] as [String: Any], options: [.sortedKeys])
     }
 
     static func parseBundleReceipt(_ data: Data) -> Bool {
@@ -4658,11 +4768,17 @@ enum E2EEV2RecoveryV2Contract {
     }
 
     static func validate(_ bundle: E2EEV2RecoveryBundleV2, ownerBinding: String) -> Bool {
+        let nonces = [bundle.identityPrivateKey.nonceB64, bundle.signingPrivateKey.nonceB64]
+            + (bundle.accountPrivateKey.map { [$0.nonceB64] } ?? [])
         guard bundle.validSuite,
               bundle.recoveryPublicIdentityKeyB64 != bundle.recoveryPublicSigningKeyB64,
               validP256(bundle.recoveryPublicIdentityKeyB64),
               validP256(bundle.recoveryPublicSigningKeyB64),
-              bundle.identityPrivateKey.nonceB64 != bundle.signingPrivateKey.nonceB64 else { return false }
+              Set(nonces).count == nonces.count else { return false }
+        if let account = bundle.accountPrivateKey {
+            guard let publicKey = account.publicKeyB64, validP256(publicKey),
+                  validWrapped(account, ownerBinding: ownerBinding, role: "ACCOUNT") else { return false }
+        }
         return validWrapped(bundle.identityPrivateKey, ownerBinding: ownerBinding, role: "IDENTITY")
             && validWrapped(bundle.signingPrivateKey, ownerBinding: ownerBinding, role: "SIGNING")
     }
@@ -4671,11 +4787,17 @@ enum E2EEV2RecoveryV2Contract {
         _ bundleObject: [String: Any],
         expectedOwnerBinding: String
     ) -> E2EEV2RecoveryBundleV2? {
-        guard Set(bundleObject.keys) == Set([
+        var base: Set<String> = [
             "version", "kdfAlgorithm", "kdfParameters", "wrapAlgorithm",
             "recoveryPublicIdentityKeyB64", "recoveryPublicSigningKeyB64",
             "identityPrivateKey", "signingPrivateKey", "createdAt", "rotatedAt", "revokedAt",
-        ]),
+        ]
+        // A2 : le bundle servi porte la signature de l'UIK (§2.8).
+        if bundleObject["signatureB64"] != nil { base.insert("signatureB64") }
+        let v3 = bundleObject["version"] as? Int == 3
+        let accountKeys = (bundleObject["accountPrivateKey"] as? [String: Any]).map { Set($0.keys) }
+        guard Set(bundleObject.keys) == (v3 ? base.union(["accountPrivateKey"]) : base),
+              !v3 || accountKeys == ["saltB64", "nonceB64", "wrappedPrivateJwkB64", "aadB64", "publicKeyB64"],
         bundleObject["revokedAt"] is NSNull,
         validISO(bundleObject["createdAt"]),
         bundleObject["rotatedAt"] is NSNull || validISO(bundleObject["rotatedAt"]) else {
@@ -4685,6 +4807,7 @@ enum E2EEV2RecoveryV2Contract {
         payload.removeValue(forKey: "createdAt")
         payload.removeValue(forKey: "rotatedAt")
         payload.removeValue(forKey: "revokedAt")
+        payload.removeValue(forKey: "signatureB64")
         guard let payloadData = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
               let bundle = try? JSONDecoder().decode(E2EEV2RecoveryBundleV2.self, from: payloadData),
               validate(bundle, ownerBinding: expectedOwnerBinding) else { return nil }
@@ -4723,7 +4846,8 @@ enum E2EEV2RecoveryV2Contract {
     }
 
     private static func wrappedJSON(_ value: E2EEV2WrappedRecoveryPrivateKey) -> String {
-        "{\"saltB64\":\"\(value.saltB64)\",\"nonceB64\":\"\(value.nonceB64)\",\"wrappedPrivateJwkB64\":\"\(value.wrappedPrivateJwkB64)\",\"aadB64\":\"\(value.aadB64)\"}"
+        let publicKey = value.publicKeyB64.map { ",\"publicKeyB64\":\"\($0)\"" } ?? ""
+        return "{\"saltB64\":\"\(value.saltB64)\",\"nonceB64\":\"\(value.nonceB64)\",\"wrappedPrivateJwkB64\":\"\(value.wrappedPrivateJwkB64)\",\"aadB64\":\"\(value.aadB64)\"\(publicKey)}"
     }
 }
 
@@ -4747,17 +4871,23 @@ enum E2EEV2RecoveryBundleLoadResultV2: Sendable {
 final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
     private let transport: E2EEV2APITransport
     private let identityStore: E2EEV2DeviceIdentityStore
+    private let accountIdentityStore: E2EEV2AccountIdentityStore
+    private let trustPins: E2EEV2TrustPinStore
     private let rotationCommitted: @Sendable (LocalAccountSession, [String], Bool) -> Void
 
     init(
         api: APIClient,
         identityStore: E2EEV2DeviceIdentityStore = E2EEV2DeviceIdentityStore(),
+        accountIdentityStore: E2EEV2AccountIdentityStore = E2EEV2AccountIdentityStore(),
+        trustPins: E2EEV2TrustPinStore = E2EEV2TrustPinStore(),
         rotationCommitted: @escaping @Sendable (LocalAccountSession, [String], Bool) -> Void = {
             E2EEV2RotationEvents.recordCommitted(session: $0, conversations: $1, notify: $2)
         }
     ) {
         transport = E2EEV2APITransport(api: api, identityStore: identityStore)
         self.identityStore = identityStore
+        self.accountIdentityStore = accountIdentityStore
+        self.trustPins = trustPins
         self.rotationCommitted = rotationCommitted
     }
 
@@ -4766,9 +4896,20 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
         guard let session = LocalAccountScope.sessionSnapshot() else { return localBundleFailure("authenticated-account-required") }
         let transport = self.transport.bound(to: session)
         let ownerScope = LocalAccountScope.currentOwnerScopeId
+        // Bundle v3 (§2.8) : l'UIK y est enveloppée, et elle signe le bundle.
+        guard let uik = try? accountIdentityStore.load(ownerNamespace: session.ownerNamespace) else {
+            return localBundleFailure("e2ee-account-key-unavailable")
+        }
         var material: E2EEV2RecoveryMaterialV2
+        let signatureB64: String
         do {
-            material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: ownerScope)
+            material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: ownerScope, accountKey: uik)
+            signatureB64 = try E2EEV2LowS.sign(
+                E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(
+                    userId: String(ownerScope.dropFirst("user:".count)), bundle: material.bundle
+                ),
+                with: uik
+            ).base64EncodedString()
         } catch {
             return localBundleFailure("e2ee-recovery-generation-failed")
         }
@@ -4776,7 +4917,7 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
         do {
             result = await transport.putJSON(
                 path: "/api/e2ee/v2/recovery-bundle",
-                body: try E2EEV2RecoveryV2Contract.bundleData(material.bundle),
+                body: try E2EEV2RecoveryV2Contract.uploadData(material.bundle, signatureB64: signatureB64),
                 expectedOwnerScopeId: ownerScope,
                 capabilitySet: .deviceLifecycle
             )
@@ -4851,7 +4992,10 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
             ) else { return localFailure("invalid-e2ee-recovery-challenge") }
             challenge = parsed
         }
+        // Seul un bundle v3 porte l'UIK qui permet de se certifier (§2.8).
+        guard challenge.bundle.version == 3 else { return localFailure("e2ee-recovery-bundle-version-unsupported") }
         let signature: String
+        let uik: P256.Signing.PrivateKey
         do {
             let privateKey = try E2EEV2RecoveryV2Crypto.unwrapSigningPrivateKey(
                 bundle: challenge.bundle,
@@ -4862,14 +5006,38 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
                 privateSigningKey: privateKey,
                 challenge: challenge
             )
+            uik = try E2EEV2RecoveryV2Crypto.unwrapAccountPrivateKey(
+                bundle: challenge.bundle, recoveryKey: recoveryKey, ownerBinding: ownerScope
+            )
         } catch {
             return localFailure("e2ee-recovery-key-mismatch")
+        }
+        // L'UIK déballée doit être celle que sert le paquet de confiance du
+        // compte, dont la liste courante porte la suivante.
+        let userId = String(ownerScope.dropFirst("user:".count))
+        let trust: E2EEV2RecoveryTrust.Artifacts
+        do {
+            let publicKey = uik.publicKey
+            let account = try await E2EEV2TrustDirectory(
+                ownerNamespace: session.ownerNamespace, pins: trustPins, ownUserId: userId,
+                ownAccountKey: { publicKey },
+                fetch: E2EEV2TrustDirectory.identityFetch(transport: transport, ownerScopeId: ownerScope)
+            ).ownAccountTrust()
+            trust = try E2EEV2RecoveryTrust.make(
+                userId: userId, currentList: account.deviceList, currentEntries: account.deviceEntries,
+                device: device, uik: uik, nowMs: Int64(Date().timeIntervalSince1970 * 1_000)
+            )
+        } catch let failure as E2EEV2TransportFailure {
+            return .failed(failure)
+        } catch {
+            return localFailure("e2ee-account-trust-refused")
         }
         let completionBody: Data
         do {
             completionBody = try E2EEV2RecoveryV2Contract.completionData(
                 challenge: challenge,
-                recoverySignatureB64: signature
+                recoverySignatureB64: signature,
+                trust: trust
             )
         } catch {
             return localFailure("e2ee-recovery-serialization-failed")
@@ -4887,6 +5055,14 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
                 data,
                 expectedDeviceId: device.deviceId
             ) else { return localFailure("invalid-e2ee-recovery-completion") }
+            // L'UIK prouvée par la clé de récupération est celle du compte :
+            // gardée ici, et tenue pour vérifiée.
+            do {
+                try accountIdentityStore.install(uik, ownerNamespace: session.ownerNamespace)
+                try accountIdentityStore.markVerified(ownerNamespace: session.ownerNamespace)
+            } catch {
+                return localFailure("e2ee-account-key-storage-failed")
+            }
             rotationCommitted(session, parsed.affectedConversationIds, true)
             return .success(parsed)
         }
@@ -5806,8 +5982,9 @@ enum E2EEV2RecoveryEpochContract {
         var deliveries: [E2EEV2RecoveryEpochDelivery] = []
         var seen = Set<String>()
         for raw in rawItems {
-            guard JSONSerialization.isValidJSONObject(raw),
-                  let itemData = try? JSONSerialization.data(withJSONObject: raw),
+            guard let normalized = withIntegerEpochNumber(raw),
+                  JSONSerialization.isValidJSONObject(normalized),
+                  let itemData = try? JSONSerialization.data(withJSONObject: normalized),
                   let delivery = E2EEV2RecoveryEpochParser.parseAndVerify(
                     itemData,
                     expectedRecipientUserId: expectedRecipientUserId,
@@ -5849,9 +6026,12 @@ enum E2EEV2RecoveryEpochContract {
                   ),
                   let conversationId = item["conversationId"] as? String,
                   E2EEV2RecoveryEpochParser.validOpaqueId(conversationId),
-                  let epoch = item["epoch"] as? [String: Any],
-                  let sender = item["senderDevice"] as? [String: Any],
-                  let deviceEnvelope = item["deviceEnvelope"] as? [String: Any],
+                  let epoch = (withIntegerEpochNumber(["epoch": item["epoch"] as Any]) as? [String: Any])?["epoch"] as? [String: Any],
+                  let sender = item["senderDevice"] as? [String: Any] else { return nil }
+            // Époque dont cet appareil n'a pas l'enveloppe : il ne peut pas la
+            // recopier, un autre appareil du compte le fera.
+            if item["deviceEnvelope"] is NSNull { continue }
+            guard let deviceEnvelope = item["deviceEnvelope"] as? [String: Any],
                   let deliveryData = try? JSONSerialization.data(withJSONObject: [
                     "protocolVersion": 2,
                     "conversationId": conversationId,
@@ -5877,8 +6057,11 @@ enum E2EEV2RecoveryEpochContract {
                 guard let recipient = rawRecipient as? [String: Any],
                       exactKeys(
                         recipient,
-                        ["recipientUserId", "recoveryBundleHash", "recoveryPublicIdentityKeyB64"]
+                        ["recipientUserId", "recoveryBundleHash", "recoveryPublicIdentityKeyB64", "signatureB64"]
                       ),
+                      // Signature de l'UIK sur ce bundle (§2.8) : seul le bundle que
+                      // cet appareil connaît est enveloppé (`ownRecipients`).
+                      (recipient["signatureB64"] as? String).flatMap({ Data(base64Encoded: $0) }) != nil,
                       let recipientUserId = recipient["recipientUserId"] as? String,
                       E2EEV2RecoveryEpochParser.validOpaqueId(recipientUserId),
                       recipientIds.insert(recipientUserId).inserted,
@@ -5911,6 +6094,16 @@ enum E2EEV2RecoveryEpochContract {
             ))
         }
         return .init(items: items, nextCursor: nextCursor)
+    }
+
+    /// `epoch.epochNumber` en chaîne (D.0) ramené à l'entier qu'attendent les
+    /// lecteurs stricts ; nil pour toute autre forme.
+    private static func withIntegerEpochNumber(_ raw: Any) -> Any? {
+        guard var item = raw as? [String: Any], var epoch = item["epoch"] as? [String: Any] else { return raw }
+        guard let number = integer(epoch["epochNumber"]) else { return nil }
+        epoch["epochNumber"] = number
+        item["epoch"] = epoch
+        return item
     }
 
     /// §2.8 : un appareil n'enveloppe une clé d'époque que vers la clé de
@@ -6022,6 +6215,11 @@ enum E2EEV2RecoveryEpochContract {
     }
 
     private static func integer(_ value: Any?) -> Int? {
+        // D.0 : entiers en chaînes décimales canoniques ; un nombre JSON reste lu.
+        if let string = value as? String {
+            guard string.range(of: #"^(0|[1-9][0-9]{0,15})\z"#, options: .regularExpression) != nil else { return nil }
+            return Int(string)
+        }
         guard let number = value as? NSNumber,
               CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
         let double = number.doubleValue
@@ -6254,7 +6452,7 @@ final class E2EEV2RecoveryEpochCoordinator: @unchecked Sendable {
                         )
                     }
                     let uploadPath = "/api/e2ee/v2/conversations/\(item.deviceDelivery.conversationId)"
-                        + "/epochs/\(item.deviceDelivery.epochId)/recovery-envelopes"
+                        + "/epochs/\(item.deviceDelivery.epochNumber)/recovery-envelopes"
                     let receiptResponse = await transport.postJSON(
                         path: uploadPath,
                         body: try E2EEV2RecoveryEpochContract.uploadData(envelopes),

@@ -416,6 +416,32 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         let isV2 = try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)
         if isV2 == true { return true }
         let participantIds = conversation.migrationMemberIds
+        // Règle commune iOS et Android : une conversation peut déjà être v2,
+        // créée par un autre membre. Elle est d'abord découverte (chaîne et
+        // époque vérifiées puis gardées) ; la genèse n'est tentée que si le
+        // serveur répond qu'elle est encore v1.
+        guard isV2 == false else { return false }
+        let discovered = try? await withDevices(
+            conversationId: conversation.id, participantIds: participantIds, parts: parts,
+            staleUserIds: { (result: E2EEV2RefreshResultV2) -> [String]? in
+                if case .failure(let failure) = result { return Self.stale(failure) }
+                return nil
+            }, { devices in
+                await parts.messaging.refresh(
+                    conversationId: conversation.id, isGroup: conversation.isGroup, devices: devices,
+                    expectedOwnerScopeId: parts.session.ownerScopeId
+                )
+            }
+        )
+        switch discovered {
+        case .refreshed?:
+            return (try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)) == true
+        case .failure(let failure)? where failure.code == "E2EE_CONVERSATION_NOT_V2":
+            break
+        default:
+            // Rien de sûr sur son état : jamais de genèse sur un doute.
+            return false
+        }
         guard let result = try? await withDevices(
             conversationId: conversation.id, participantIds: participantIds, parts: parts,
             staleUserIds: { (result: E2EEV2ConversationCreationResult?) -> [String]? in

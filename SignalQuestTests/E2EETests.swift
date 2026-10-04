@@ -1202,6 +1202,7 @@ final class E2EETests: XCTestCase {
                 "expiresAt": ISO8601DateFormatter().string(
                     from: Date(timeIntervalSince1970: Double(fixture.challenge.expiresAtMs) / 1_000)
                 ),
+                "expiresAtMs": String(fixture.challenge.expiresAtMs),
             ],
             "bundle": bundle,
         ], options: [.sortedKeys])
@@ -1535,6 +1536,7 @@ final class E2EETests: XCTestCase {
                     "recipientUserId": fixture.recipientUserId,
                     "recoveryBundleHash": fixture.recoveryBundleHash,
                     "recoveryPublicIdentityKeyB64": fixture.recoveryPublicIdentityKeyB64,
+                    "signatureB64": Data(repeating: 1, count: 70).base64EncodedString(),
                 ]],
                 "missingParticipantUserIds": ["user_missing_recipient_01"],
             ]],
@@ -4783,13 +4785,18 @@ extension E2EETests {
         let onCommitted: @Sendable (LocalAccountSession, [String], Bool) -> Void = { session, ids, notify in
             events.value.append((session, ids, notify))
         }
+        let accounts = E2EEV2AccountIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
         let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: fixture.api, identityStore: fixture.identity,
             epochKeyStore: fixture.keys, mediaOutboxStore: fixture.outbox,
-            accountIdentityStore: E2EEV2AccountIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true }),
+            accountIdentityStore: accounts,
             trustPins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()),
             capabilities: E2EEV2CapabilitiesPublicationStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true }),
             rotationCommitted: onCommitted)
-        let recovery = E2EEV2RecoveryCoordinatorV2(api: fixture.api, identityStore: fixture.identity, rotationCommitted: onCommitted)
+        // La récupération elle-même (appareil neuf, bundle v3) est éprouvée de
+        // bout en bout contre la pile de test ; ici, la publication du bundle.
+        let recovery = E2EEV2RecoveryCoordinatorV2(
+            api: fixture.api, identityStore: fixture.identity, accountIdentityStore: accounts, rotationCommitted: onCommitted
+        )
         // Lot A1 : le compte tel que le bootstrap l'a déposé, servi à `…/identity`.
         let account = LockedBox<[String: Any]>([:])
         var material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: fixture.context.ownerScopeId)
@@ -4865,7 +4872,6 @@ extension E2EETests {
         )
         guard case .success = await lifecycle.approve(detail, comparedQR: qr) else { return XCTFail("Approval receipt was lost") }
         guard case .success = await lifecycle.revoke(deviceId: target, reason: "USER_REQUEST") else { return XCTFail("Revocation receipt was lost") }
-        guard case .success = await recovery.recover(recoveryKey: material.recoveryKey) else { return XCTFail("Recovery receipt was lost") }
         switch await recovery.createAndUploadBundle() {
         case .success(var created): created.zeroize()
         case .failed: return XCTFail("Bundle receipt was lost")
@@ -4875,12 +4881,12 @@ extension E2EETests {
             return XCTFail("Reset receipt was lost")
         }
         let delivered = events.value
-        XCTAssertEqual(delivered.count, 7)
-        XCTAssertEqual(delivered.map { $0.1 }, [[], [id], [id], [id], [], [id], [id]])
-        XCTAssertEqual(delivered.map { $0.2 }, [true, true, true, true, true, false, true])
-        XCTAssertEqual(delivered[5].0, beforeReset)
-        XCTAssertEqual(delivered[6].0, LocalAccountScope.sessionSnapshot())
-        XCTAssertNotEqual(delivered[6].0.sessionId, beforeReset.sessionId)
+        XCTAssertEqual(delivered.count, 6)
+        XCTAssertEqual(delivered.map { $0.1 }, [[], [id], [id], [], [id], [id]])
+        XCTAssertEqual(delivered.map { $0.2 }, [true, true, true, true, false, true])
+        XCTAssertEqual(delivered[4].0, beforeReset)
+        XCTAssertEqual(delivered[5].0, LocalAccountScope.sessionSnapshot())
+        XCTAssertNotEqual(delivered[5].0.sessionId, beforeReset.sessionId)
         XCTAssertEqual(try fixture.identity.load(ownerNamespace: fixture.context.ownerNamespace)?.deviceId, replacement.deviceId)
     }
 

@@ -1,0 +1,337 @@
+{
+  "bundle" : {
+    "accountPrivateKey" : {
+      "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=",
+      "nonceB64" : "RERERERERERERERE",
+      "publicKeyB64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+      "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+      "wrappedPrivateJwkB64" : "Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV"
+    },
+    "identityPrivateKey" : {
+      "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+      "nonceB64" : "ISEhISEhISEhISEh",
+      "saltB64" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+      "wrappedPrivateJwkB64" : "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V"
+    },
+    "kdfAlgorithm" : "HKDF_SHA256",
+    "kdfParameters" : {
+      "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
+      "hash" : "SHA-256",
+      "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
+      "outputBytes" : 32,
+      "signingInfo" : "signalquest-e2ee-v2-recovery-signing-v2"
+    },
+    "recoveryPublicIdentityKeyB64" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+    "recoveryPublicSigningKeyB64" : "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+    "signingPrivateKey" : {
+      "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+      "nonceB64" : "IiIiIiIiIiIiIiIi",
+      "saltB64" : "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+      "wrappedPrivateJwkB64" : "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l"
+    },
+    "version" : 3,
+    "wrapAlgorithm" : "AES_256_GCM"
+  },
+  "bundleHash" : "7cb90cd3dc404f56d485fbc66687de2ab87b5dbaff157284ef8ab6d1a9bef438",
+  "bundleSignatureDerB64" : "MEUCIQDWtnc1nTZxLZbFZ21MF/3DdMcV/h+VQInVuFfqFZvh1QIgNmcCmETqItmgUYW2tv2Hd5DuhYIg24DSwLz/71D+8LI=",
+  "bundleSignatureUtf8" : "SQ-E2EE-V2-RECOVERY-BUNDLE\n1\ninterop-fixture\n7cb90cd3dc404f56d485fbc66687de2ab87b5dbaff157284ef8ab6d1a9bef438\nBFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+  "canonicalUtf8" : "{\"version\":3,\"kdfAlgorithm\":\"HKDF_SHA256\",\"kdfParameters\":{\"hash\":\"SHA-256\",\"outputBytes\":32,\"identityInfo\":\"signalquest-e2ee-v2-recovery-identity-v2\",\"signingInfo\":\"signalquest-e2ee-v2-recovery-signing-v2\",\"accountInfo\":\"signalquest-e2ee-v2-recovery-account-v3\"},\"wrapAlgorithm\":\"AES_256_GCM\",\"recoveryPublicIdentityKeyB64\":\"BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=\",\"recoveryPublicSigningKeyB64\":\"BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=\",\"identityPrivateKey\":{\"saltB64\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"nonceB64\":\"ISEhISEhISEhISEh\",\"wrappedPrivateJwkB64\":\"BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V\",\"aadB64\":\"U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ\"},\"signingPrivateKey\":{\"saltB64\":\"EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=\",\"nonceB64\":\"IiIiIiIiIiIiIiIi\",\"wrappedPrivateJwkB64\":\"RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l\",\"aadB64\":\"U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=\"},\"accountPrivateKey\":{\"saltB64\":\"MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=\",\"nonceB64\":\"RERERERERERERERE\",\"wrappedPrivateJwkB64\":\"Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV\",\"aadB64\":\"U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=\",\"publicKeyB64\":\"BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=\"}}",
+  "fixtureVersion" : 1,
+  "negative" : [
+    {
+      "bundle" : {
+        "accountPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+          "nonceB64" : "RERERERERERERERE",
+          "publicKeyB64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+          "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+          "wrappedPrivateJwkB64" : "Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV"
+        },
+        "identityPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+          "nonceB64" : "ISEhISEhISEhISEh",
+          "saltB64" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "wrappedPrivateJwkB64" : "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V"
+        },
+        "kdfAlgorithm" : "HKDF_SHA256",
+        "kdfParameters" : {
+          "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
+          "hash" : "SHA-256",
+          "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
+          "outputBytes" : 32,
+          "signingInfo" : "signalquest-e2ee-v2-recovery-signing-v2"
+        },
+        "recoveryPublicIdentityKeyB64" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+        "recoveryPublicSigningKeyB64" : "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+        "signingPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+          "nonceB64" : "IiIiIiIiIiIiIiIi",
+          "saltB64" : "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+          "wrappedPrivateJwkB64" : "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l"
+        },
+        "version" : 3,
+        "wrapAlgorithm" : "AES_256_GCM"
+      },
+      "name" : "aad-role-identity"
+    },
+    {
+      "bundle" : {
+        "accountPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+          "nonceB64" : "RERERERERERERERE",
+          "publicKeyB64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+          "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+          "wrappedPrivateJwkB64" : "Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV"
+        },
+        "identityPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+          "nonceB64" : "ISEhISEhISEhISEh",
+          "saltB64" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "wrappedPrivateJwkB64" : "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V"
+        },
+        "kdfAlgorithm" : "HKDF_SHA256",
+        "kdfParameters" : {
+          "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
+          "hash" : "SHA-256",
+          "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
+          "outputBytes" : 32,
+          "signingInfo" : "signalquest-e2ee-v2-recovery-signing-v2"
+        },
+        "recoveryPublicIdentityKeyB64" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+        "recoveryPublicSigningKeyB64" : "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+        "signingPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+          "nonceB64" : "IiIiIiIiIiIiIiIi",
+          "saltB64" : "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+          "wrappedPrivateJwkB64" : "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l"
+        },
+        "version" : 3,
+        "wrapAlgorithm" : "AES_256_GCM"
+      },
+      "name" : "aad-role-signing"
+    },
+    {
+      "bundle" : {
+        "accountPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6b3RoZXItZml4dHVyZQpBQ0NPVU5U",
+          "nonceB64" : "RERERERERERERERE",
+          "publicKeyB64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+          "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+          "wrappedPrivateJwkB64" : "Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV"
+        },
+        "identityPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+          "nonceB64" : "ISEhISEhISEhISEh",
+          "saltB64" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "wrappedPrivateJwkB64" : "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V"
+        },
+        "kdfAlgorithm" : "HKDF_SHA256",
+        "kdfParameters" : {
+          "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
+          "hash" : "SHA-256",
+          "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
+          "outputBytes" : 32,
+          "signingInfo" : "signalquest-e2ee-v2-recovery-signing-v2"
+        },
+        "recoveryPublicIdentityKeyB64" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+        "recoveryPublicSigningKeyB64" : "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+        "signingPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+          "nonceB64" : "IiIiIiIiIiIiIiIi",
+          "saltB64" : "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+          "wrappedPrivateJwkB64" : "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l"
+        },
+        "version" : 3,
+        "wrapAlgorithm" : "AES_256_GCM"
+      },
+      "name" : "aad-other-account"
+    },
+    {
+      "name" : "served-uik-differs",
+      "servedUikPublicX963B64" : "BFFzAtAorOW/3DeHEOCqPS084/UV7CbpwfjqeblGfeBubSyUhn7xRVCYWWYqE94/o4TgpsAvggYcd+Kpm5JSXXI="
+    },
+    {
+      "bundle" : {
+        "accountPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=",
+          "nonceB64" : "RERERERERERERERE",
+          "publicKeyB64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+          "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+          "wrappedPrivateJwkB64" : "Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV"
+        },
+        "identityPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+          "nonceB64" : "ISEhISEhISEhISEh",
+          "saltB64" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "wrappedPrivateJwkB64" : "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V"
+        },
+        "kdfAlgorithm" : "HKDF_SHA256",
+        "kdfParameters" : {
+          "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
+          "hash" : "SHA-256",
+          "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
+          "outputBytes" : 32,
+          "signingInfo" : "signalquest-e2ee-v2-recovery-signing-v2"
+        },
+        "recoveryPublicIdentityKeyB64" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+        "recoveryPublicSigningKeyB64" : "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+        "signingPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+          "nonceB64" : "IiIiIiIiIiIiIiIi",
+          "saltB64" : "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+          "wrappedPrivateJwkB64" : "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l"
+        },
+        "version" : 2,
+        "wrapAlgorithm" : "AES_256_GCM"
+      },
+      "name" : "version-2-with-ninth-key"
+    },
+    {
+      "bundle" : {
+        "identityPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+          "nonceB64" : "ISEhISEhISEhISEh",
+          "saltB64" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "wrappedPrivateJwkB64" : "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V"
+        },
+        "kdfAlgorithm" : "HKDF_SHA256",
+        "kdfParameters" : {
+          "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
+          "hash" : "SHA-256",
+          "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
+          "outputBytes" : 32,
+          "signingInfo" : "signalquest-e2ee-v2-recovery-signing-v2"
+        },
+        "recoveryPublicIdentityKeyB64" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+        "recoveryPublicSigningKeyB64" : "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+        "signingPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+          "nonceB64" : "IiIiIiIiIiIiIiIi",
+          "saltB64" : "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+          "wrappedPrivateJwkB64" : "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l"
+        },
+        "version" : 3,
+        "wrapAlgorithm" : "AES_256_GCM"
+      },
+      "name" : "version-3-without-account-key"
+    },
+    {
+      "bundle" : {
+        "accountPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=",
+          "nonceB64" : "RUVFRUVFRUVFRUVF",
+          "publicKeyB64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+          "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+          "wrappedPrivateJwkB64" : "AjNP61gS7pesjKfAoIaXri1t4pCP5uA3oClGgW+2+H4dKyDVTuwBO457KV8kLXPCWb6tVPAxDpRh2VsMfc5PYSpl/5ncqsnjI74j7Ec6rr3zcNuXx7GnKz2+uzbMo3/QvrjKH2JQX2UAGKlrKSVJJiQleAIGZCO/DRIs8w0uMxyKkIqbQLhNSgey0rhfGZ35UMg0RnPN6vXzFIgI5SfybbxpnIq2qz8YoznqH1HRrgRT9MVVnmGtFOVDsS2slnyd"
+        },
+        "identityPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+          "nonceB64" : "ISEhISEhISEhISEh",
+          "saltB64" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "wrappedPrivateJwkB64" : "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V"
+        },
+        "kdfAlgorithm" : "HKDF_SHA256",
+        "kdfParameters" : {
+          "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
+          "hash" : "SHA-256",
+          "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
+          "outputBytes" : 32,
+          "signingInfo" : "signalquest-e2ee-v2-recovery-signing-v2"
+        },
+        "recoveryPublicIdentityKeyB64" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+        "recoveryPublicSigningKeyB64" : "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+        "signingPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+          "nonceB64" : "IiIiIiIiIiIiIiIi",
+          "saltB64" : "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+          "wrappedPrivateJwkB64" : "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l"
+        },
+        "version" : 3,
+        "wrapAlgorithm" : "AES_256_GCM"
+      },
+      "name" : "scalar-out-of-range"
+    },
+    {
+      "bundleHash" : "62b6a8d3cb05f8047c5e8fc2fed76e6bde505188bfc5260138a2a7ae5257bdb3",
+      "name" : "hash-without-account-key"
+    },
+    {
+      "bundle" : {
+        "accountPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=",
+          "nonceB64" : "ISEhISEhISEhISEh",
+          "publicKeyB64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+          "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+          "wrappedPrivateJwkB64" : "Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV"
+        },
+        "identityPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+          "nonceB64" : "ISEhISEhISEhISEh",
+          "saltB64" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "wrappedPrivateJwkB64" : "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V"
+        },
+        "kdfAlgorithm" : "HKDF_SHA256",
+        "kdfParameters" : {
+          "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
+          "hash" : "SHA-256",
+          "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
+          "outputBytes" : 32,
+          "signingInfo" : "signalquest-e2ee-v2-recovery-signing-v2"
+        },
+        "recoveryPublicIdentityKeyB64" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+        "recoveryPublicSigningKeyB64" : "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+        "signingPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+          "nonceB64" : "IiIiIiIiIiIiIiIi",
+          "saltB64" : "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+          "wrappedPrivateJwkB64" : "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l"
+        },
+        "version" : 3,
+        "wrapAlgorithm" : "AES_256_GCM"
+      },
+      "name" : "equal-nonces"
+    },
+    {
+      "bundle" : {
+        "accountPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=",
+          "nonceB64" : "RERERERERERERERE",
+          "publicKeyB64" : "BFFzAtAorOW/3DeHEOCqPS084/UV7CbpwfjqeblGfeBubSyUhn7xRVCYWWYqE94/o4TgpsAvggYcd+Kpm5JSXXI=",
+          "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+          "wrappedPrivateJwkB64" : "Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV"
+        },
+        "identityPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ",
+          "nonceB64" : "ISEhISEhISEhISEh",
+          "saltB64" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "wrappedPrivateJwkB64" : "BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V"
+        },
+        "kdfAlgorithm" : "HKDF_SHA256",
+        "kdfParameters" : {
+          "accountInfo" : "signalquest-e2ee-v2-recovery-account-v3",
+          "hash" : "SHA-256",
+          "identityInfo" : "signalquest-e2ee-v2-recovery-identity-v2",
+          "outputBytes" : 32,
+          "signingInfo" : "signalquest-e2ee-v2-recovery-signing-v2"
+        },
+        "recoveryPublicIdentityKeyB64" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+        "recoveryPublicSigningKeyB64" : "BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=",
+        "signingPrivateKey" : {
+          "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=",
+          "nonceB64" : "IiIiIiIiIiIiIiIi",
+          "saltB64" : "EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=",
+          "wrappedPrivateJwkB64" : "RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l"
+        },
+        "version" : 3,
+        "wrapAlgorithm" : "AES_256_GCM"
+      },
+      "name" : "public-key-not-the-wrapped-uik"
+    }
+  ],
+  "ownerNamespace" : "user:interop-fixture",
+  "recoveryKeyB64" : "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "servedUikPublicX963B64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+  "uikPrivateRawB64" : "FBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM=",
+  "uikPublicX963B64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
+  "userId" : "interop-fixture"
+}

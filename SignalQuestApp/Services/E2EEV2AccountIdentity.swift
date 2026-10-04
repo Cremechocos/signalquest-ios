@@ -381,6 +381,59 @@ enum E2EEV2DeviceApprovalTrust {
 
 /// §2.2, D.3 et E.1 : la liste suivante, sans l'appareil révoqué, signée par
 /// l'UIK. Le serveur ne l'accepte que si elle suit la courante.
+/// Récupération (§2.8, v0.4.21) : l'appareil en attente, qui vient de
+/// déballer l'UIK du bundle v3, signe lui-même son certificat et la liste
+/// suivante. Rien n'est signé si la liste courante n'est pas celle de cette UIK.
+enum E2EEV2RecoveryTrust {
+    struct Artifacts: Equatable, Sendable {
+        let certificate: E2EEV2SignedString
+        let deviceList: E2EEV2SignedString
+        let deviceEntries: [String]
+    }
+
+    static func make(
+        userId: String,
+        currentList: E2EEV2SignedString,
+        currentEntries: [String],
+        device: E2EEV2DeviceDescriptor,
+        uik: P256.Signing.PrivateKey,
+        nowMs: Int64
+    ) throws -> Artifacts {
+        guard let current = try? E2EEV2DeviceList.verifyWithoutChain(currentList, entries: currentEntries, uik: uik.publicKey),
+              current.userId == userId else {
+            throw E2EEV2DeviceApprovalTrust.Failure.foreignList
+        }
+        let listed = Set(currentEntries.compactMap { $0.components(separatedBy: "\n").first })
+        guard !listed.contains(device.deviceId) else { throw E2EEV2DeviceApprovalTrust.Failure.alreadyListed }
+        guard device.keyVersion == 1,
+              let identityKey = Data(base64Encoded: device.publicIdentityKeyB64),
+              let signingKey = Data(base64Encoded: device.publicSigningKeyB64) else {
+            throw E2EEV2DeviceApprovalTrust.Failure.invalidDevice
+        }
+        let certificate = E2EEV2DeviceCertificate(
+            userId: userId, deviceId: device.deviceId, keyVersion: device.keyVersion,
+            identityKeyB64: device.publicIdentityKeyB64, signingKeyB64: device.publicSigningKeyB64,
+            platform: device.platform, createdAtMs: nowMs
+        )
+        guard (try? E2EEV2DeviceCertificate.parse(certificate.canonical)) == certificate else {
+            throw E2EEV2DeviceApprovalTrust.Failure.invalidDevice
+        }
+        let entries = currentEntries + [E2EEV2DeviceList.entry(
+            deviceId: device.deviceId, keyVersion: device.keyVersion, platform: device.platform,
+            fingerprint: E2EEV2Canonical.deviceFingerprint(identityKeyX963: identityKey, signingKeyX963: signingKey)
+        )]
+        let next = E2EEV2DeviceList.make(
+            userId: userId, version: current.version + 1, previousCanonical: currentList.canonical,
+            entries: entries, issuedAtMs: nowMs
+        )
+        return Artifacts(
+            certificate: try E2EEV2SignedString.sign(certificate.canonical, with: uik),
+            deviceList: try E2EEV2SignedString.sign(next.canonical, with: uik),
+            deviceEntries: entries
+        )
+    }
+}
+
 enum E2EEV2DeviceRevocationTrust {
     struct Artifacts: Equatable, Sendable {
         let deviceList: E2EEV2SignedString

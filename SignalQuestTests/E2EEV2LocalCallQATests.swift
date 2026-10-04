@@ -53,7 +53,9 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         let config = AppConfig(environment: .test, appBaseURL: base, apiBaseURL: base, debugLogsEnabled: false)
         let api = APIClient(config: config, credentials: credentials, session: APIClient.makeSession())
         let vault = account.vault
-        let identity = E2EEV2DeviceIdentityStore(tokenStore: vault, identityChanged: { _ in })
+        // Deux comptes dans un même processus : chaque coffre signe pour son
+        // compte même quand l'autre est le compte courant (preuves de jonction).
+        let identity = E2EEV2DeviceIdentityStore(tokenStore: vault, allowsOwner: { _ in true }, identityChanged: { _ in })
         let keys = E2EEV2EpochKeyStore(tokenStore: vault)
         let states = E2EEV2ConversationStateStore(tokenStore: vault)
         let accounts = E2EEV2AccountIdentityStore(tokenStore: vault)
@@ -126,7 +128,7 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         XCTAssertEqual(initiated.e2eeV2, descriptor)
         let callId = initiated.id
         let callerURL = try XCTUnwrap(initiated.liveKitUrl)
-        _ = try await session.calls.liveKitSession(for: descriptor, liveKitURL: callerURL)
+        let callerMedia = try await session.calls.liveKitSession(for: descriptor, liveKitURL: callerURL)
 
         // 3. L'appelé lie sa session, voit l'appel sans nom servi, le vérifie et répond.
         session = try become(callee, base: base, root: root)
@@ -139,8 +141,12 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         let answered = try await session.service.answer(callId: callId, e2ee: true)
         XCTAssertEqual(answered.e2eeV2, descriptor)
         let calleeURL = try XCTUnwrap(answered.liveKitUrl)
-        _ = try await session.calls.liveKitSession(for: descriptor, liveKitURL: calleeURL)
+        let calleeMedia = try await session.calls.liveKitSession(for: descriptor, liveKitURL: calleeURL)
         XCTAssertNotNil(answered.liveKitToken)
+
+        // 3 bis. Média réel : les deux appareils rejoignent le LiveKit local avec
+        // leurs jetons, se prouvent l'un à l'autre, puis échangent une donnée chiffrée.
+        try await Self.exchange(caller: (initiated, callerMedia), callee: (answered, calleeMedia))
 
         // 4. Une seconde réponse ne gagne pas.
         do {
@@ -154,5 +160,48 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         try await session.service.end(callId: callId)
         session = try become(caller, base: base, root: root)
         try await session.service.end(callId: callId)
+    }
+
+    @MainActor
+    private static func exchange(
+        caller: (call: CallSession, media: E2EEV2LiveKitSession),
+        callee: (call: CallSession, media: E2EEV2LiveKitSession)
+    ) async throws {
+        var received: [(sender: String?, topic: String)] = []
+        var losses: [E2EEV2CallTrustLoss] = []
+        let callerClient = LiveKitClient(), calleeClient = LiveKitClient()
+        calleeClient.onDataReceived = { sender, _, topic in received.append((sender, topic)) }
+        callerClient.onE2EETrustLost = { losses.append($0) }
+        calleeClient.onE2EETrustLost = { losses.append($0) }
+        defer {
+            Task { @MainActor in
+                await callerClient.disconnect()
+                await calleeClient.disconnect()
+            }
+        }
+        for (client, side) in [(callerClient, caller), (calleeClient, callee)] {
+            await client.connect(
+                url: try XCTUnwrap(side.call.liveKitUrl), token: try XCTUnwrap(side.call.liveKitToken),
+                room: try XCTUnwrap(side.call.liveKitRoom), video: false, managesAudioSession: false,
+                e2eeSession: side.media, mediaSetupMode: .localQADataOnly
+            )
+            XCTAssertEqual(client.state, .connected)
+        }
+        try await waitUntil("preuves de jonction échangées") { callerClient.isE2EEVerified && calleeClient.isE2EEVerified }
+        try await callerClient.publishData(Data("bonjour chiffré".utf8), topic: "sq.qa.call")
+        try await waitUntil("donnée reçue de l'appelant prouvé") { received.contains { $0.topic == "sq.qa.call" } }
+        XCTAssertEqual(received.first { $0.topic == "sq.qa.call" }?.sender, caller.call.livekitIdentity,
+                       "Identité LiveKit <userId>.<deviceId>")
+        XCTAssertFalse(received.contains { $0.topic == E2EEV2CallJoinProof.topic }, "Une preuve n'atteint jamais l'app")
+        XCTAssertEqual(losses, [])
+    }
+
+    @MainActor
+    private static func waitUntil(_ label: String, timeout: TimeInterval = 15, _ condition: () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() {
+            guard Date() < deadline else { return XCTFail("Délai dépassé : \(label)") }
+            try await Task.sleep(for: .milliseconds(100))
+        }
     }
 }

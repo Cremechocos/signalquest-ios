@@ -369,10 +369,12 @@ final class E2EEV2CallPushRegistrar: @unchecked Sendable {
         let transport = E2EEV2APITransport(api: api, identityStore: identityStore).bound(to: session)
         let voip = lock.withLock { latestVoipToken }
         guard let body = E2EEV2CallPushTokens.body(voipToken: voip, apnsToken: E2EEV2CallPushTokens.apnsToken) else {
-            // Aucun jeton encore : une requête signée lie quand même la session
-            // à l'appareil, pour que `pending` montre les appels chiffrés.
+            // Aucun jeton encore : une lecture signée qui consomme sa preuve lie
+            // quand même la session à l'appareil (E.1), pour que `pending` montre
+            // les appels chiffrés.
             if case .success = await transport.getJSON(
-                path: "/api/e2ee/v2/devices", expectedOwnerScopeId: session.ownerScopeId, capabilitySet: .deviceLifecycle
+                path: "/api/e2ee/v2/epoch-rotation-requirements", expectedOwnerScopeId: session.ownerScopeId,
+                capabilitySet: .message
             ) { return true }
             return false
         }
