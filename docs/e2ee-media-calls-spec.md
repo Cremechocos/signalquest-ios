@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.19**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.20**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,12 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.20 (04/10/2026), proposition : règles du lot serveur A3c. Raisons
+>   de `E2EE_MEMBERSHIP_INVALID` ; le créateur d'une époque en est
+>   destinataire ; tout changement d'appartenance rejoué à l'octet rend son
+>   reçu ; membres v1 d'une genèse (`directPeerUserId` pour un tête-à-tête) ;
+>   réponses d'unicité ; session révoquée avec son appareil. Aucun vecteur
+>   ne change.
 > - v0.4.19 (04/10/2026), proposition : décisions du serveur après la
 >   relecture iOS des routes d'appel. Une requête signée valide d'un
 >   appareil approuvé lie sa session à cet appareil (E.1) ; `push-tokens`
@@ -629,6 +635,9 @@ Format de l'enveloppe : annexe A.3. Vecteur : `epoch-envelope-v1.json`.
   pas sa propre liste, puisque le client décide (§1.2). Une époque vise au
   plus 500 appareils, ce qui tient avec son manifeste dans la limite de
   512 Kio par requête.
+- L'appareil créateur figure toujours parmi les destinataires de l'époque
+  qu'il crée (création, genèse, rotation) ; sinon `422
+  E2EE_EPOCH_RECIPIENT_INVALID`, `CREATOR_NOT_RECIPIENT` (v0.4.20).
 - L'époque est **acceptée** par comparaison-échange sur le numéro courant.
   Le client envoie `previousEpochNumber`. Si une autre époque a été acceptée
   entre-temps, le serveur répond `409 E2EE_EPOCH_STALE` avec l'époque
@@ -1394,7 +1403,13 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
      UTF-8). Dans un groupe, il signe ensuite un `ROLE_ADMIN` pour chaque
      propriétaire ou administrateur v1 : « propriétaire » disparaît en v2.
    - Le serveur refuse une genèse qui ne reproduit pas exactement les membres
-     et les administrateurs v1.
+     et les administrateurs v1. **Membres v1** (v0.4.20) : dans un
+     tête-à-tête, les deux participants, archivés ou non ; les routes v1 de
+     lecture cachent un participant archivé, et le client prend l'autre
+     participant dans `directPeerUserId` (`GET
+     /api/messages/conversations/{id}`, `null` pour un groupe). Dans un
+     groupe, les participants non archivés : la v1 ne distingue pas un
+     départ d'un archivage personnel.
    - Un client ne peut pas vérifier les administrateurs v1 : la genèse de
      migration hérite de la confiance v1. L'app l'affiche en message système
      vérifié : « X a migré la conversation ; administrateurs : … ».
@@ -2404,7 +2419,12 @@ version publiée qui ouvre les verrous.
     la donne ;
   - `E2EE_MEMBERSHIP_STALE` (409) : `changeNumber` n'est pas le suivant, ou
     une époque repose sur un état d'appartenance qui n'est plus le dernier
-    (§3.5) ; la réponse donne l'état courant ;
+    (§3.5) ; la réponse donne l'état courant, `details`
+    `{changeNumber, changeDigest}` (v0.4.20). Une course sur l'unicité d'une
+    époque ou d'une enveloppe rend `E2EE_EPOCH_STALE` avec
+    `details.currentEpoch` à `null` ; sur un message,
+    `E2EE_MESSAGE_CONFLICT` ; une preuve rejouée sur `POST …/messages`,
+    `E2EE_REQUEST_REPLAYED` (v0.4.20) ;
   - `E2EE_CAPABILITY_MISSING` (409) : la conversation ne peut pas recevoir ce
     contenu (§12). `details.missing` est un tableau trié pris parmi
     `envelopeVersion`, `payloadVersion`, les fonctions de D.5 et
@@ -2490,11 +2510,17 @@ version publiée qui ouvre les verrous.
       `E2EE_MEMBERSHIP_REQUEST_INVALID` (400) : requête mal formée ;
     - `E2EE_GENESIS_MISMATCH` (422) : genèse qui ne reproduit pas exactement
       les membres attendus ;
-    - `E2EE_MEMBERSHIP_INVALID` (422) : changement contraire à D.4, avec
-      `details.reason` ;
+    - `E2EE_MEMBERSHIP_INVALID` (422) : changement contraire à D.4, genèse
+      comprise, avec `details.reason` parmi `TARGET_NOT_ADMIN` (`ROLE_MEMBER`
+      visant un non-administrateur), `AUTHOR_NOT_ADMIN`, `LEAVE_NOT_SELF`,
+      `REMOVE_SELF`, `MALFORMED`, `CONVERSATION_MISMATCH`,
+      `AUTHOR_NOT_SIGNER` et `SIGNATURE_INVALID` (v0.4.20) ;
     - `E2EE_EPOCH_MANIFEST_INVALID`, `E2EE_EPOCH_ENVELOPE_INVALID` et
       `E2EE_EPOCH_RECIPIENT_INVALID` (422) : manifeste, enveloppe ou
-      destinataire qui ne se vérifient pas ;
+      destinataire qui ne se vérifient pas. Pour un destinataire,
+      `details.reason` vaut `CREATOR_NOT_RECIPIENT` (l'appareil créateur
+      n'est pas destinataire) ou `NOT_MEMBER` (appareil d'un non-membre)
+      (v0.4.20) ;
     - `E2EE_CONVERSATION_ALREADY_V2` (409) : genèse d'une conversation déjà
       v2 ;
     - `E2EE_GENESIS_NOT_ELIGIBLE` (409) : genèse refusée, avec
@@ -2590,6 +2616,10 @@ version publiée qui ouvre les verrous.
   `apnsToken`, jamais `fcmToken`, pour ne pas sonner deux fois. La sonnerie d'un appel chiffré ne cible
   que ces jetons ; l'enregistrement actuel par installation reste pour le
   reste.
+- **Session révoquée avec son appareil** (v0.4.20) : `401 UNAUTHORIZED`
+  avec `details.reason` à `E2EE_DEVICE_REVOKED`, y compris sur
+  `POST /api/auth/refresh`. Le client efface le coffre v2 de cet appareil et
+  se déconnecte. Chaque requête signée valide met à jour `lastSeenAt`.
 - **Liaison de la session à l'appareil** (v0.4.19) : toute requête signée
   valide d'un appareil approuvé lie sa session de connexion à cet appareil,
   si elle n'est liée à aucun ; une session liée à un autre appareil reçoit
@@ -2696,7 +2726,9 @@ version publiée qui ouvre les verrous.
   chaîne gardée, vérifie localement les règles de D.4, garde le changement
   signé avant l'envoi et le renvoie tel quel jusqu'à sa réponse : jamais deux
   signatures pour un même numéro. Sur `409 E2EE_MEMBERSHIP_STALE`, il relit
-  la suite de la chaîne, puis recompose. Un `LEAVE` rejoué après un reçu
+  la suite de la chaîne, puis recompose. Tout changement rejoué à l'octet
+  (chaîne et signature) par l'appareil qui l'a signé rend `200
+  {changeNumber}` (v0.4.20). Un `LEAVE` rejoué après un reçu
   perdu rend le même reçu, ou `404 E2EE_CONVERSATION_NOT_FOUND` (serveur
   antérieur), l'appelant n'étant plus membre : dans les deux cas le départ
   est tenu pour fait, le client ajoute son changement signé à sa chaîne et
