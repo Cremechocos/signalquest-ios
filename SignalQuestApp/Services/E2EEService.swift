@@ -5074,6 +5074,28 @@ enum E2EEV2RecoveryV2Contract {
         return listVersion(bundle["deviceListVersion"])
     }
 
+    /// Bundle actif servi (v3), seulement s'il porte déjà une signature de
+    /// cette UIK sur sa version de liste : sinon un serveur ferait re-signer
+    /// une clé de récupération qu'il détient (§2.8).
+    static func activeBundleSignedBy(
+        _ data: Data,
+        uik: P256.Signing.PublicKey,
+        ownerScopeId: String
+    ) -> (bundle: E2EEV2RecoveryBundleV2, listVersion: Int)? {
+        guard let bundle = parseActiveBundle(data, expectedOwnerBinding: ownerScopeId), bundle.version == 3,
+              let served = activeBundleListVersion(data),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let object = root["bundle"] as? [String: Any],
+              let signature = object["signatureB64"] as? String, !signature.isEmpty,
+              E2EEV2SignedString(
+                  canonical: String(decoding: E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(
+                      userId: String(ownerScopeId.dropFirst("user:".count)), bundle: bundle, deviceListVersion: served
+                  ), as: UTF8.self),
+                  signatureB64: signature
+              ).verify(with: uik) else { return nil }
+        return (bundle, served)
+    }
+
     /// `{challengeB64Url, recoverySignatureB64, certificate, deviceList}` :
     /// l'appareil récupéré se certifie avec l'UIK déballée (§2.3, §2.8).
     static func completionData(
@@ -5335,11 +5357,14 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
         let transport = self.transport.bound(to: session)
         guard case .success(let data, _, _) = await transport.getJSON(
             path: "/api/e2ee/v2/recovery-bundle", expectedOwnerScopeId: session.ownerScopeId, capabilitySet: .deviceLifecycle
-        ), let bundle = E2EEV2RecoveryV2Contract.parseActiveBundle(data, expectedOwnerBinding: session.ownerScopeId),
-           bundle.version == 3,
+        ),
+           // Seul un bundle déjà signé par l'UIK d'ici est re-signé (§2.8).
+           let active = E2EEV2RecoveryV2Contract.activeBundleSignedBy(
+               data, uik: uik.publicKey, ownerScopeId: session.ownerScopeId
+           ),
            let current = try? await currentListVersion(uik: uik, session: session, transport: transport),
-           (E2EEV2RecoveryV2Contract.activeBundleListVersion(data) ?? 0) < current else { return }
-        _ = await upload(bundle, uik: uik, session: session, transport: transport)
+           active.listVersion < current else { return }
+        _ = await upload(active.bundle, uik: uik, session: session, transport: transport)
     }
 
     func createAndUploadBundle() async -> E2EEV2RecoveryBundleCreationResultV2 {

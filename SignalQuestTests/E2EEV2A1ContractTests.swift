@@ -1,3 +1,4 @@
+import CryptoKit
 import Security
 import XCTest
 @testable import SignalQuest
@@ -119,6 +120,40 @@ final class E2EEV2A1ContractTests: XCTestCase {
         XCTAssertTrue(E2EEV2SignedTarget.isEncodedPath("/api/e2ee/v2/users/user_0123456789abcdef/identity"))
         XCTAssertFalse(E2EEV2SignedTarget.isEncodedPath("/api/e2ee/v2/users/a b/identity"))
         XCTAssertFalse(E2EEV2SignedTarget.isEncodedPath("/api//identity"))
+    }
+
+    /// §2.8 : après une approbation ou une révocation, seul un bundle actif
+    /// déjà signé par l'UIK d'ici est re-signé. Un bundle servi avec la clé
+    /// publique de notre UIK mais une autre signature, ou sans signature, ne
+    /// l'est jamais : le serveur ferait sinon certifier sa propre clé.
+    func testOnlyABundleAlreadySignedByOurAccountKeyIsResigned() throws {
+        let owner = "user:a1-resign"
+        let uik = P256.Signing.PrivateKey()
+        let material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: owner, accountKey: uik)
+        func served(signedBy key: P256.Signing.PrivateKey?, version: Int = 3) throws -> Data {
+            let signature = try key.map {
+                try E2EEV2LowS.sign(E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(
+                    userId: "a1-resign", bundle: material.bundle, deviceListVersion: version
+                ), with: $0).base64EncodedString()
+            } ?? ""
+            var object = try XCTUnwrap(try JSONSerialization.jsonObject(with: E2EEV2RecoveryV2Contract.uploadData(
+                material.bundle, signatureB64: signature, deviceListVersion: version
+            )) as? [String: Any])
+            object["createdAt"] = "2026-10-05T20:00:00.000Z"
+            object["rotatedAt"] = NSNull()
+            object["revokedAt"] = NSNull()
+            return try JSONSerialization.data(withJSONObject: ["bundle": object, "state": "AVAILABLE"])
+        }
+        let ours = try XCTUnwrap(E2EEV2RecoveryV2Contract.activeBundleSignedBy(
+            try served(signedBy: uik), uik: uik.publicKey, ownerScopeId: owner
+        ))
+        XCTAssertEqual(ours.listVersion, 3)
+        XCTAssertNil(E2EEV2RecoveryV2Contract.activeBundleSignedBy(
+            try served(signedBy: P256.Signing.PrivateKey()), uik: uik.publicKey, ownerScopeId: owner
+        ), "Signé par une autre clé : jamais re-signé")
+        XCTAssertNil(E2EEV2RecoveryV2Contract.activeBundleSignedBy(
+            try served(signedBy: nil), uik: uik.publicKey, ownerScopeId: owner
+        ), "Sans signature : jamais re-signé")
     }
 
     /// Une requête signée automatique (rotation, lecture) ne crée jamais
