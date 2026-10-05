@@ -366,6 +366,41 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         try? FileManager.default.removeItem(at: qrURL)
     }
 
+    /// Prépare un appel à plusieurs plateformes : l'appareil iOS de QA crée un
+    /// groupe v2 avec les comptes donnés (leurs appareils certifiés, toutes
+    /// plateformes comprises, reçoivent l'époque 1) et écrit son identifiant
+    /// dans `…_GROUP_FILE`.
+    func testAGroupForACrossPlatformCallIsCreatedOnIOS() async throws {
+        guard let rawBase = environment("SQ_E2EE_V2_GROUP_QA_BASE_URL"), let base = URL(string: rawBase),
+              ["127.0.0.1", "localhost", "::1"].contains(base.host ?? ""),
+              let ownerEmail = environment("SQ_E2EE_V2_GROUP_QA_OWNER_EMAIL"),
+              let memberEmails = environment("SQ_E2EE_V2_GROUP_QA_MEMBER_EMAILS")?.split(separator: ",").map(String.init),
+              let password = environment("SQ_E2EE_V2_GROUP_QA_PASSWORD"),
+              let run = environment("SQ_E2EE_V2_GROUP_QA_RUN"),
+              let groupFile = environment("SQ_E2EE_V2_GROUP_QA_FILE") else {
+            throw XCTSkip("Groupe d'appel croisé local non demandé")
+        }
+        let previousUserId = LocalAccountScope.currentUserId
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(run, isDirectory: true)
+            .appendingPathComponent("v2", isDirectory: true)
+        defer {
+            LocalAccountScope.deactivate()
+            if let previousUserId { LocalAccountScope.activate(userId: previousUserId) }
+        }
+        var memberIds: [String] = []
+        for email in memberEmails { memberIds.append(try await login(email: email, password: password, base: base, run: run).userId) }
+        let owner = try await login(email: ownerEmail, password: password, base: base, run: run)
+        let session = try become(owner, base: base, root: root)
+        let created = await session.messaging.create(participantIds: memberIds, isGroup: true, title: "QA appel à trois", excludesWeb: false)
+        guard case .created(let conversationId, let pending) = created else { return XCTFail("Création v2 : \(created)") }
+        XCTAssertEqual(pending, [], "Chaque membre a un appareil certifié")
+        let url = URL(fileURLWithPath: groupFile)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: ["conversationId": conversationId, "ownerUserId": owner.userId, "memberUserIds": memberIds])
+            .write(to: url, options: .atomic)
+        print("[QA groupe] \(conversationId) membres=\(memberIds.count + 1)")
+    }
+
     @MainActor
     private static func crossExchange(call: CallSession, media: E2EEV2LiveKitSession, calleeUserId: String, wait: TimeInterval) async throws {
         var received: [(sender: String?, text: String)] = []
@@ -394,8 +429,12 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         // Réussite : un paquet de l'identité prouvée de l'appelé, ou son appareil
         // prouvé et sa piste audio chiffrée reçue (un SDK qui ne remplit pas
         // l'émetteur d'un paquet chiffré rend ses autres paquets inattribuables).
+        // Appel à plusieurs : autant de pistes distantes que de pairs attendus.
+        let peers = Int(ProcessInfo.processInfo.environment["SQ_E2EE_V2_CROSS_CALL_PEERS"]
+            ?? ProcessInfo.processInfo.environment["TEST_RUNNER_SQ_E2EE_V2_CROSS_CALL_PEERS"] ?? "") ?? 1
         func done() -> Bool {
-            !received.isEmpty || (client.isE2EEVerified && !(client.remoteAudios.isEmpty && client.remoteVideos.isEmpty))
+            if peers > 1 { return client.isE2EEVerified && client.remoteAudios.count >= peers }
+            return !received.isEmpty || (client.isE2EEVerified && !(client.remoteAudios.isEmpty && client.remoteVideos.isEmpty))
         }
         while !done(), Date() < deadline {
             if Date().timeIntervalSince(lastReport) >= 5 {
