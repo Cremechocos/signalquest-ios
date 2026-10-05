@@ -394,7 +394,9 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         // Réussite : un paquet de l'identité prouvée de l'appelé, ou son appareil
         // prouvé et sa piste audio chiffrée reçue (un SDK qui ne remplit pas
         // l'émetteur d'un paquet chiffré rend ses autres paquets inattribuables).
-        func done() -> Bool { !received.isEmpty || (client.isE2EEVerified && !client.remoteAudios.isEmpty) }
+        func done() -> Bool {
+            !received.isEmpty || (client.isE2EEVerified && !(client.remoteAudios.isEmpty && client.remoteVideos.isEmpty))
+        }
         while !done(), Date() < deadline {
             if Date().timeIntervalSince(lastReport) >= 5 {
                 lastReport = Date()
@@ -411,7 +413,7 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         XCTAssertTrue(client.isE2EEVerified)
         // Laisse passer quelques secondes de média pour compter les échecs.
         try await Task.sleep(for: .seconds(5))
-        print("[QA appel croisé] fin : paquets=\(received.count) pistesAudio=\(client.remoteAudios.count) échecsDéchiffrement=\(client.e2eeDataDecryptionFailureCount)")
+        print("[QA appel croisé] fin : paquets=\(received.count) pistesAudio=\(client.remoteAudios.count) pistesVidéo=\(client.remoteVideos.count) échecsDéchiffrement=\(client.e2eeDataDecryptionFailureCount)")
         XCTAssertEqual(client.e2eeDataDecryptionFailureCount, 0)
         // Plusieurs envois, le temps que l'appelé confirme de son côté.
         // L'autre plateforme peut mettre fin à l'appel dès son propre critère
