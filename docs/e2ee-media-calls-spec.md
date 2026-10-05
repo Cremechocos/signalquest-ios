@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.22**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.23**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,11 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.23 (05/10/2026), proposition, revue avec le serveur pour ses lots
+>   A6 et A7 : l'exemple du JSON transporté d'un signalement est écrit en
+>   JSON canonique (D.10) ; le vecteur `report-v1` ajoute `Ks`,
+>   `senderUserId`, `serverTimeMs` et `keyId` pour recalculer `serverTag`
+>   (D.9). Aucune valeur existante ne change.
 > - v0.4.22 (05/10/2026), proposition : plancher de version de liste pour
 >   la récupération (§2.8). Le texte que l'UIK signe pour le bundle passe en
 >   version 2 et porte la version de la liste courante ; l'appareil qui
@@ -2328,7 +2333,9 @@ Mêmes routes et même type de contenu que la v1 (A.4), avec
 ### D.9 `serverTag`
 
 Format au §11. Le vecteur `franking-v1` donne `fk`, la charge, `frankTag`,
-`Ks`, les champs et `serverTag`.
+`Ks`, les champs et `serverTag`. Le vecteur `report-v1` donne aussi `Ks`,
+`senderUserId`, `serverTimeMs` et `keyId`, pour recalculer le `serverTag` de
+chaque élément de la partie en clair (v0.4.23).
 
 ### D.10 Signalement (`report-v1`)
 
@@ -2348,8 +2355,8 @@ Format au §11. Le vecteur `franking-v1` donne `fk`, la charge, `frankTag`,
     `0x0002` (AES-256-GCM) ;
   - `info` = `"SQ-E2EE-V2-REPORT\n1\n" ‖ b64url(SHA-256(partie en clair))` ;
   - AAD vide, un seul `Seal`.
-- **JSON transporté** :
-  `{"clear": "<JSON canonique>", "encB64": "…", "sealedB64": "…", "moderationKeyId": "…"}`.
+- **JSON transporté**, lui-même en JSON canonique (§15) :
+  `{"clear":"<JSON canonique>","encB64":"…","moderationKeyId":"…","sealedB64":"…"}`.
   Il tient en 512 Kio, comme tout corps JSON : la charge, déjà en base64
   dans la partie scellée, y est encodée une seconde fois. Au-delà, le client
   réduit la sélection plutôt que d'échouer à l'envoi.

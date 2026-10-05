@@ -456,6 +456,14 @@ final class E2EEV2JalonAVectorTests: XCTestCase {
         XCTAssertEqual(resealed.sealed.base64EncodedString(), try str(v, "sealedB64"))
         XCTAssertEqual(String(decoding: E2EEV2Report.sealedJSON(items: items), as: UTF8.self), try str(v, "sealedPlaintextUtf8"))
         let parsed = try E2EEV2Report.parseClear(clear)
+        for clearItem in parsed.items {
+            let recomputed = E2EEV2Franking.serverTag(
+                ks: try b64(v, "ksB64"), frankTagB64: clearItem.frankTagB64, conversationId: parsed.conversationId,
+                envelopeId: clearItem.envelopeId, senderUserId: try str(v, "senderUserId"),
+                senderDeviceId: try str(v, "senderDeviceId"), serverTimeMs: try int64(v, "serverTimeMs"), keyId: try str(v, "keyId")
+            )
+            XCTAssertEqual(recomputed.base64EncodedString(), clearItem.serverTagB64, "serverTag recalculé avec Ks")
+        }
         for (item, clearItem) in zip(items, parsed.items) {
             XCTAssertTrue(E2EEV2Report.verifyFrankTag(
                 item: item, clearItem: clearItem, conversationId: parsed.conversationId,
@@ -1223,8 +1231,9 @@ private extension E2EEV2JalonAVectorTests {
         let fk = Data((0..<32).map { UInt8(0xA0 + $0) })
         let payload = Data(#"{"body":{"text":"Message signalé"},"counter":"1","kind":"TEXT","mentions":[],"replyToRef":null,"schema":"signalquest.e2ee-content","sentAtMs":"1790000000000","version":"2"}"#.utf8)
         let frank = E2EEV2Franking.frankTag(fk: fk, conversationId: conversationId, senderDeviceId: deviceB1, clientRequestId: "message_01J7ABCD23456789", payload: payload)
+        let ks = Data((0..<32).map { UInt8(0xC0 + $0) })
         let serverTag = E2EEV2Franking.serverTag(
-            ks: Data((0..<32).map { UInt8(0xC0 + $0) }), frankTagB64: frank.base64EncodedString(), conversationId: conversationId,
+            ks: ks, frankTagB64: frank.base64EncodedString(), conversationId: conversationId,
             envelopeId: "envelope_01J7ABCD23456789", senderUserId: userB, senderDeviceId: deviceB1, serverTimeMs: createdAtMs, keyId: "server_tag_key_01J7ABCD"
         )
         let clear = E2EEV2Report.clearJSON(
@@ -1244,6 +1253,9 @@ private extension E2EEV2JalonAVectorTests {
             ("hpkeSuite", .s("0x0010/0x0001/0x0002")),
             ("ephemeralIkmB64", .s(ikm.base64EncodedString())),
             ("senderDeviceId", .s(deviceB1)), ("clientRequestId", .s("message_01J7ABCD23456789")),
+            // De quoi recalculer chaque `serverTag` de la partie en clair (D.9).
+            ("ksB64", .s(ks.base64EncodedString())), ("senderUserId", .s(userB)),
+            ("serverTimeMs", .s(String(createdAtMs))), ("keyId", .s("server_tag_key_01J7ABCD")),
             ("clearUtf8", .s(clear)),
             ("infoB64", .s(E2EEV2Report.info(clearJSON: clear).base64EncodedString())),
             ("sealedPlaintextUtf8", .s(String(decoding: E2EEV2Report.sealedJSON(items: items), as: UTF8.self))),
