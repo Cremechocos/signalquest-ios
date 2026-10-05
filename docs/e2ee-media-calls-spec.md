@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.32**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.33**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,10 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.33 (05/10/2026), proposition : réseau partagé pendant un appel,
+>   volontaire et coupé par défaut (décision produit), paquet `radio_data`
+>   attribué par l'émetteur de la SFU ou par l'identité qu'il nomme si elle
+>   est prouvée (D.11). Aucun vecteur ne change.
 > - v0.4.32 (05/10/2026), proposition, apprise de la recette croisée iOS
 >   et web : à la découverte d'une conversation, les époques antérieures
 >   dont l'appareil est destinataire s'ouvrent aussi (§3.4). Aucun vecteur
@@ -2497,7 +2501,8 @@ chaque élément de la partie en clair (v0.4.23).
   la connexion pour cette attribution, son délai de 10 secondes partant plus
   tard. Tout
   autre paquet de données sans émetteur résolu est écarté. Aucune fonction
-  ne dépend donc du canal de données entre plateformes, hors des preuves.
+  ne dépend donc du canal de données entre plateformes, hors des preuves et
+  du réseau partagé ci-dessous, qui n'est que de l'affichage.
   Deux garde-fous :
   - l'appartenance d'une piste à une identité vient toujours de LiveKit
     (identité du jeton, posée par le serveur), jamais d'un paquet de
@@ -2505,6 +2510,30 @@ chaque élément de la partie en clair (v0.4.23).
   - aucun autre paquet à portée de sécurité (annonce de clé, fin d'appel…)
     ne dépend de l'émetteur donné par le SDK : s'il en faut un, il porte
     son identité signée, comme la preuve.
+- **Réseau partagé pendant un appel** (v0.4.33, décision produit du
+  05/10/2026, 20:13) :
+  - **Partage volontaire, coupé par défaut.** Chacun active « Partager mon
+    réseau » dans la fenêtre d'appel. Tant que c'est actif, et seulement
+    alors, l'appareil envoie toutes les 2 s un paquet chiffré de sujet
+    `radio_data`. Il s'arrête dès que le partage est coupé ou que l'appel
+    finit.
+  - **Contenu** : JSON canonique `{"v": "1", "livekitIdentity":
+    "<userId>.<deviceId>", "technology": "…"}`, plus des champs facultatifs.
+    `operator` est commun aux plateformes. Les champs radio (`rsrp`, `pci`,
+    `enb`/`gnb`, `lteBands`/`nrBands`, `qualityLevel`) n'existent que là où
+    la plateforme les donne : un iPhone n'envoie que `technology` et
+    `operator`. Un champ absent est masqué à l'affichage. Paquet de 2 Kio au
+    plus, sinon il est écarté.
+  - **Attribution.** L'émetteur donné par le SDK (identité de la SFU) est
+    préféré quand il est résolu. Alors `livekitIdentity` doit le désigner,
+    sinon le paquet est écarté. Faute d'émetteur résolu, le paquet est
+    attribué à `livekitIdentity`, seulement si ce participant est prouvé
+    dans l'appel (preuve de jonction vérifiée). Sinon, il est écarté.
+  - **Portée.** C'est de l'affichage, jamais de la sécurité. Un autre membre
+    prouvé de l'appel peut se faire passer pour un autre sur cette carte,
+    sans rien obtenir d'autre. Aucune décision (clé, fin d'appel, piste) ne
+    dépend de ce paquet. La carte n'apparaît chez l'autre que pendant le
+    partage, et disparaît 6 s après le dernier paquet.
 - **Rejeu d'une preuve** (v0.4.25) : une preuve est un jeton signé
   qu'un serveur pourrait rejouer après le départ de son auteur. Chaque
   appareil garde, pour chaque identité, la dernière heure de jonction
