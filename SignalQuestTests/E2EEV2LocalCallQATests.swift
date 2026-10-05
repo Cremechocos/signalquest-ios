@@ -25,6 +25,10 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         let calls: E2EEV2CallRuntime
         let service: CallsService
         let lifecycle: E2EEV2DeviceLifecycleCoordinator
+        /// Lie la session à l'appareil par une requête signée qui consomme sa
+        /// preuve, comme l'app au démarrage : sans cela, un appel chiffré ne
+        /// sonne pas dans `pending`.
+        let bind: @Sendable () async -> Bool
     }
 
     private func environment(_ name: String) -> String? {
@@ -76,6 +80,10 @@ final class E2EEV2LocalCallQATests: XCTestCase {
             nonces: E2EEV2CallNonceLedger(fileURL: nil), contextStore: { nil },
             controlPlaneOpen: { true }, mediaOpen: { url in ["127.0.0.1", "localhost"].contains(url.host ?? "") }
         )
+        let requirements = E2EEV2RotationRequirementsClient(
+            api: api, identityStore: identity, expectedSession: try XCTUnwrap(LocalAccountScope.sessionSnapshot())
+        )
+        let ownerScopeId = "user:\(account.userId)"
         return Session(
             messaging: messaging, calls: calls,
             service: CallsService(api: api, e2eeTransport: E2EEV2APITransport(api: api, identityStore: identity)),
@@ -83,7 +91,11 @@ final class E2EEV2LocalCallQATests: XCTestCase {
                 api: api, identityStore: identity, epochKeyStore: keys, conversationStateStore: states,
                 accountIdentityStore: accounts, trustPins: pins,
                 capabilities: E2EEV2CapabilitiesPublicationStore(tokenStore: vault), rotationCommitted: { _, _, _ in }
-            )
+            ),
+            bind: {
+                if case .success = await requirements.pending(expectedOwnerScopeId: ownerScopeId) { return true }
+                return false
+            }
         )
     }
 
@@ -264,6 +276,8 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         guard case .success = await session.lifecycle.publishCapabilitiesIfNeeded() else {
             return XCTFail("Capacités de l'appelé")
         }
+        let bound = await session.bind()
+        XCTAssertTrue(bound, "Session liée à l'appareil")
         // Prêt : l'autre plateforme peut appeler.
         let inboundURL = URL(fileURLWithPath: inbound)
         let ready = inboundURL.deletingLastPathComponent().appendingPathComponent("ios-ready.json")
@@ -299,6 +313,54 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         defer { Task { try? await session.service.end(callId: callId) } }
         try await Self.crossExchange(call: answered, media: media, calleeUserId: callerUserId, wait: 60)
         try await session.service.end(callId: callId)
+    }
+
+    /// Approbation croisée (§2.7, A1) : l'appareil iOS de QA d'un compte, qui
+    /// détient sa clé de compte, approuve l'appareil d'une autre plateforme
+    /// (un navigateur, par exemple) à partir du contenu de son QR v3, écrit
+    /// dans `…_QR_FILE` faute de caméra. Mêmes vérifications que l'écran
+    /// « Appareils » : QR comparé au détail servi, empreinte et plateforme.
+    func testACertifiedDeviceApprovesAnotherPlatformFromItsQRContent() async throws {
+        guard let rawBase = environment("SQ_E2EE_V2_APPROVE_QA_BASE_URL"), let base = URL(string: rawBase),
+              ["127.0.0.1", "localhost", "::1"].contains(base.host ?? ""),
+              let email = environment("SQ_E2EE_V2_APPROVE_QA_EMAIL"),
+              let password = environment("SQ_E2EE_V2_APPROVE_QA_PASSWORD"),
+              let run = environment("SQ_E2EE_V2_APPROVE_QA_RUN"),
+              let qrFile = environment("SQ_E2EE_V2_APPROVE_QA_QR_FILE") else {
+            throw XCTSkip("Approbation croisée locale non demandée")
+        }
+        let wait = TimeInterval(environment("SQ_E2EE_V2_APPROVE_QA_WAIT_SECONDS").flatMap(Int.init) ?? 600)
+        let previousUserId = LocalAccountScope.currentUserId
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(run, isDirectory: true)
+            .appendingPathComponent("v2", isDirectory: true)
+        defer {
+            LocalAccountScope.deactivate()
+            if let previousUserId { LocalAccountScope.activate(userId: previousUserId) }
+        }
+        let account = try await login(email: email, password: password, base: base, run: run)
+        let session = try become(account, base: base, root: root)
+
+        // Le QR de l'appareil à approuver, écrit d'un bloc par l'autre plateforme.
+        let qrURL = URL(fileURLWithPath: qrFile)
+        let deadline = Date().addingTimeInterval(wait)
+        var content: String?
+        while content == nil, Date() < deadline {
+            content = (try? String(contentsOf: qrURL, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if content?.hasPrefix("SQE2EE2|") != true { content = nil; try await Task.sleep(for: .seconds(1)) }
+        }
+        let input = try XCTUnwrap(content, "Contenu du QR")
+        let qr = try XCTUnwrap(E2EEV2DeviceApprovalContract.parseQRPayload(input), "QR v3 valide et non expiré")
+        let detail: E2EEV2ApprovalDetail
+        switch await session.lifecycle.loadQRApproval(input) {
+        case .success(let value): detail = value
+        case .failed(let failure): return XCTFail("Demande d'approbation : \(failure.code ?? "") \(failure.message)")
+        }
+        print("[QA approbation] plateforme=\(qr.platform) appareil=\(qr.pendingDeviceId)")
+        switch await session.lifecycle.approve(detail, comparedQR: qr) {
+        case .success: break
+        case .failed(let failure): return XCTFail("Approbation : \(failure.code ?? "") \(failure.message)")
+        }
+        try? FileManager.default.removeItem(at: qrURL)
     }
 
     @MainActor
@@ -349,8 +411,10 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         print("[QA appel croisé] fin : paquets=\(received.count) pistesAudio=\(client.remoteAudios.count) échecsDéchiffrement=\(client.e2eeDataDecryptionFailureCount)")
         XCTAssertEqual(client.e2eeDataDecryptionFailureCount, 0)
         // Plusieurs envois, le temps que l'appelé confirme de son côté.
-        for _ in 0..<5 {
-            try await client.publishData(Data("bonjour depuis iOS".utf8), topic: "sq.qa.cross")
+        // L'autre plateforme peut mettre fin à l'appel dès son propre critère
+        // rempli : un envoi dans une salle fermée n'est pas un échec de l'essai.
+        for _ in 0..<5 where client.state == .connected {
+            do { try await client.publishData(Data("bonjour depuis iOS".utf8), topic: "sq.qa.cross") } catch { break }
             try await Task.sleep(for: .seconds(2))
         }
         XCTAssertEqual(losses, [])
