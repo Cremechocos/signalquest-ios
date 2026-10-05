@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.33**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.34**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,10 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.34 (05/10/2026), proposition : lien universel dans le QR
+>   d'approbation, charge dans le fragment (D.13) ; clés d'époque restaurées
+>   provisoires jusqu'à l'engagement du manifeste signé (§2.8). Aucun vecteur
+>   ne change.
 > - v0.4.33 (05/10/2026), proposition : réseau partagé pendant un appel,
 >   volontaire et coupé par défaut (décision produit), paquet `radio_data`
 >   attribué par l'émetteur de la SFU ou par l'identité qu'il nomme si elle
@@ -698,6 +702,17 @@ conversations chiffrées **sur demande seulement**.
     E2EE_RECOVERY_ACCOUNT_KEY_MISMATCH`). Un bundle v2 ne sert plus qu'à
     restaurer l'historique : un défi ou une complétion avec lui répond `409
     E2EE_RECOVERY_BUNDLE_VERSION_UNSUPPORTED`.
+- **Clés d'époque restaurées** (v0.4.34, relecture d'Android) : la signature
+  d'une enveloppe de récupération ne rattache pas son émetteur à un appareil
+  certifié, puisque n'importe qui peut chiffrer vers la clé publique de
+  récupération. Une clé restaurée est donc PROVISOIRE :
+  - elle ne sert qu'une fois que le manifeste signé de son époque, vérifié
+    par la chaîne d'appartenance comme à la synchro, porte son engagement
+    (`keyCommitmentB64`) ;
+  - si l'engagement diffère, elle est effacée ;
+  - elle ne bloque jamais la clé vérifiée au même numéro, qui la remplace.
+  Un serveur qui injecte de fausses clés n'ajoute ainsi que des clés
+  provisoires, vite écartées.
   - Le client déballe l'UIK et vérifie, dans l'ordre, que le scalaire redonne
     `x`/`y` du JWK, qu'ils sont ceux de `publicKeyB64`, puis que c'est l'UIK
     servie par `…/identity` ; sinon il refuse sans rien signer. Le « 2 » de
@@ -2596,6 +2611,16 @@ chaque élément de la partie en clair (v0.4.23).
   - `<platform>` suit D.2. Elle ne peut contenir ni `|` ni retour à la ligne.
   - L'approbateur compare `<empreinte>` à celle du descripteur en attente, et
     `<platform>` à la plateforme qu'il déclare.
+  - **Lien universel** (v0.4.34) : le QR peut porter
+    `https://signalquest.fr/e2ee/approve#<charge>`, où `<charge>` est la
+    chaîne v3 ci-dessus en base64url sans bourrage. La charge est dans le
+    FRAGMENT, que le navigateur n'envoie jamais au serveur : elle n'apparaît
+    dans aucun journal. L'appareil photo du système ouvre alors l'app sur
+    l'écran d'approbation, avec la même comparaison d'empreinte et de
+    plateforme qu'un scan dans l'app, et jamais d'approbation sans geste. Le
+    chemin figure dans l'`apple-app-site-association` et les `assetlinks`.
+    Sans l'app, une page de repli dit « Ouvre ce QR avec l'app SignalQuest »
+    et ne lit jamais le fragment. La chaîne v3 nue reste acceptée.
 - **Code SAS v3** (approbation par notification), en mise en gage puis
   révélation, pour que le serveur ne puisse pas chercher un code qui coïncide :
   1. l'appareil en attente tire `nP` (32 octets aléatoires) et publie, avec sa
