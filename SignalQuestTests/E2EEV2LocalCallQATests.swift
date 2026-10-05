@@ -162,6 +162,107 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         try await session.service.end(callId: callId)
     }
 
+    /// Appel croisé iOS ↔ Android (plan 3, X-1) : iOS crée un groupe v2 avec
+    /// le compte appelé, initie un appel chiffré et écrit la passation
+    /// (`…_HANDOFF`) ; l'appareil Android de l'appelé le vérifie, répond et
+    /// rejoint. Chacun prouve sa jonction, puis échange un paquet chiffré sur
+    /// `sq.qa.cross` ; iOS n'accepte que celui de l'identité prouvée de l'appelé.
+    func testACrossPlatformEncryptedCallIsAnsweredAndProvenByAnotherPlatform() async throws {
+        guard let rawBase = environment("SQ_E2EE_V2_CROSS_CALL_BASE_URL"), let base = URL(string: rawBase),
+              ["127.0.0.1", "localhost", "::1"].contains(base.host ?? ""),
+              let callerEmail = environment("SQ_E2EE_V2_CROSS_CALL_CALLER_EMAIL"),
+              let calleeEmail = environment("SQ_E2EE_V2_CROSS_CALL_CALLEE_EMAIL"),
+              let password = environment("SQ_E2EE_V2_CROSS_CALL_PASSWORD"),
+              let run = environment("SQ_E2EE_V2_CROSS_CALL_RUN"),
+              let handoff = environment("SQ_E2EE_V2_CROSS_CALL_HANDOFF") else {
+            throw XCTSkip("Appel croisé local non demandé")
+        }
+        let wait = TimeInterval(environment("SQ_E2EE_V2_CROSS_CALL_WAIT_SECONDS").flatMap(Int.init) ?? 300)
+        let previousUserId = LocalAccountScope.currentUserId
+        E2EEV2CapabilitiesPublicationStore.announcesCallsForLocalQA = true
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(run, isDirectory: true)
+            .appendingPathComponent("v2", isDirectory: true)
+        defer {
+            E2EEV2CapabilitiesPublicationStore.announcesCallsForLocalQA = false
+            LocalAccountScope.deactivate()
+            if let previousUserId { LocalAccountScope.activate(userId: previousUserId) }
+        }
+        let caller = try await login(email: callerEmail, password: password, base: base, run: run)
+        // Seulement pour l'identifiant de l'appelé : aucun appareil n'est créé pour lui ici.
+        let calleeUserId = try await login(email: calleeEmail, password: password, base: base, run: run).userId
+
+        let session = try become(caller, base: base, root: root)
+        guard case .success = await session.lifecycle.publishCapabilitiesIfNeeded() else {
+            return XCTFail("Capacités de l'appelant")
+        }
+        let created = await session.messaging.create(participantIds: [calleeUserId], isGroup: true, title: "QA appel croisé", excludesWeb: false)
+        guard case .created(let conversationId, _) = created else { return XCTFail("Création v2 : \(created)") }
+        XCTAssertTrue(session.calls.canStart(conversationId: conversationId),
+                      "Tous les appareils certifiés de l'appelé doivent annoncer « appels »")
+        guard case .prepared(let descriptor) = session.calls.prepareOutgoing(conversationId: conversationId) else {
+            return XCTFail("Descripteur de l'appelant")
+        }
+        let initiated = try await session.service.initiate(conversationId: conversationId, mode: "audio", e2ee: descriptor)
+        let media = try await session.calls.liveKitSession(for: descriptor, liveKitURL: try XCTUnwrap(initiated.liveKitUrl))
+        defer { Task { try? await session.service.end(callId: initiated.id) } }
+
+        let handoffURL = URL(fileURLWithPath: handoff)
+        try FileManager.default.createDirectory(at: handoffURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: [
+            "conversationId": conversationId, "callId": initiated.id, "callerUserId": caller.userId,
+            "callerDeviceId": descriptor.descriptor.callerDeviceId, "livekitIdentity": initiated.livekitIdentity ?? "",
+            "calleeUserId": calleeUserId, "createdAtMs": descriptor.descriptor.createdAtMs,
+        ], options: [.sortedKeys]).write(to: handoffURL, options: .atomic)
+
+        if environment("SQ_E2EE_V2_CROSS_CALL_MEDIA") == "0" {
+            // Étape sans média : le banc de l'autre plateforme vérifie le descripteur,
+            // répond signé, puis écrit son reçu à côté de la passation.
+            let answer = handoffURL.deletingLastPathComponent().appendingPathComponent("answer.json")
+            let deadline = Date().addingTimeInterval(wait)
+            var receipt: [String: Any]?
+            while receipt == nil, Date() < deadline {
+                try await Task.sleep(for: .seconds(1))
+                receipt = (try? Data(contentsOf: answer)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                if receipt?["callId"] as? String != initiated.id { receipt = nil }
+            }
+            let received = try XCTUnwrap(receipt, "Reçu de l'appelé")
+            XCTAssertEqual(received["descriptorVerified"] as? Bool, true, "Descripteur vérifié par l'appelé")
+            XCTAssertEqual(received["answered"] as? Bool, true, "Réponse signée acceptée par le serveur : \(received)")
+        } else {
+            try await Self.crossExchange(call: initiated, media: media, calleeUserId: calleeUserId, wait: wait)
+        }
+        try await session.service.end(callId: initiated.id)
+    }
+
+    @MainActor
+    private static func crossExchange(call: CallSession, media: E2EEV2LiveKitSession, calleeUserId: String, wait: TimeInterval) async throws {
+        var received: [(sender: String?, text: String)] = []
+        var losses: [E2EEV2CallTrustLoss] = []
+        let client = LiveKitClient()
+        client.onDataReceived = { sender, data, topic in
+            if topic == "sq.qa.cross" { received.append((sender, String(decoding: data, as: UTF8.self))) }
+        }
+        client.onE2EETrustLost = { losses.append($0) }
+        defer { Task { @MainActor in await client.disconnect() } }
+        await client.connect(
+            url: try XCTUnwrap(call.liveKitUrl), token: try XCTUnwrap(call.liveKitToken),
+            room: try XCTUnwrap(call.liveKitRoom), video: false, managesAudioSession: false,
+            e2eeSession: media, mediaSetupMode: .localQADataOnly
+        )
+        XCTAssertEqual(client.state, .connected)
+        // Le paquet de l'appelé n'arrive qu'une fois sa jonction prouvée.
+        try await waitUntil("paquet chiffré de l'appelé", timeout: wait) { !received.isEmpty }
+        let sender = try XCTUnwrap(received.first?.sender)
+        XCTAssertTrue(sender.hasPrefix(calleeUserId + "."), "Identité LiveKit prouvée de l'appelé : \(sender)")
+        XCTAssertTrue(client.isE2EEVerified)
+        // Plusieurs envois, le temps que l'appelé confirme de son côté.
+        for _ in 0..<5 {
+            try await client.publishData(Data("bonjour depuis iOS".utf8), topic: "sq.qa.cross")
+            try await Task.sleep(for: .seconds(2))
+        }
+        XCTAssertEqual(losses, [])
+    }
+
     @MainActor
     private static func exchange(
         caller: (call: CallSession, media: E2EEV2LiveKitSession),
