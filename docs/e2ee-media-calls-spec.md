@@ -2703,9 +2703,12 @@ version publiée qui ouvre les verrous.
     membres, sans successeur (D.4, v0.4.30) ;
   - `E2EE_DIRECT_CONVERSATION_EXISTS` (409), `details: {conversationId,
     protocolVersion}` : création v2 d'un second tête-à-tête entre les mêmes
-    deux comptes (participants exacts, comme la route v1). Le client ouvre
-    l'existant ; encore v1, il le migre à l'ouverture (§14.2). Le serveur
-    vérifie et crée sous un même verrou (v0.4.31) ;
+    deux comptes (participants exacts, comme la route v1). `protocolVersion`
+    est une chaîne (`"1"` ou `"2"`, D.0) ; la v2 l'emporte si les deux
+    existent. Le 409 désarchive la conversation pour l'appelant. Le client
+    ouvre l'existant ; encore v1, il le migre à l'ouverture (§14.2). Le
+    serveur vérifie et crée sous un même verrou, pris avant la lecture du
+    reçu idempotent (v0.4.31) ;
   - `E2EE_UPDATE_REQUIRED` (409) avec `details.reason` à `MEMBER_WITHOUT_V2` :
     `ADD` d'un compte sans identité v2 dans une conversation v2, ou création
     v2 avec un tel membre (D.4, v0.4.31). Le client ne garde pas le
