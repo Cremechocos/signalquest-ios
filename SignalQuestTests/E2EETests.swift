@@ -1537,6 +1537,7 @@ final class E2EETests: XCTestCase {
                     "recoveryBundleHash": fixture.recoveryBundleHash,
                     "recoveryPublicIdentityKeyB64": fixture.recoveryPublicIdentityKeyB64,
                     "signatureB64": Data(repeating: 1, count: 70).base64EncodedString(),
+                    "deviceListVersion": "3",
                 ]],
                 "missingParticipantUserIds": ["user_missing_recipient_01"],
             ]],

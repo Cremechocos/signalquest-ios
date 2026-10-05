@@ -33,9 +33,10 @@
     "wrapAlgorithm" : "AES_256_GCM"
   },
   "bundleHash" : "7cb90cd3dc404f56d485fbc66687de2ab87b5dbaff157284ef8ab6d1a9bef438",
-  "bundleSignatureDerB64" : "MEUCIQDQnP9ufxPdoyFDYMvH+jK/m987dWslba8qvOuDkk4YQgIgaejRIbiBx8YjxNaumacR/SpMRmTPlwwprv8YTgWHiao=",
-  "bundleSignatureUtf8" : "SQ-E2EE-V2-RECOVERY-BUNDLE\n1\ninterop-fixture\n7cb90cd3dc404f56d485fbc66687de2ab87b5dbaff157284ef8ab6d1a9bef438\nBFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+  "bundleSignatureDerB64" : "MEUCIQCv9bJ/5lYxq2E4eiMeyRijAIQXn9D0IynMu7WkopkWsgIgWJoLw4y2sMckiiZtCaLmY3nnakX9RSZlLG0EMCa+RVU=",
+  "bundleSignatureUtf8" : "SQ-E2EE-V2-RECOVERY-BUNDLE\n2\ninterop-fixture\n7cb90cd3dc404f56d485fbc66687de2ab87b5dbaff157284ef8ab6d1a9bef438\nBFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=\n3",
   "canonicalUtf8" : "{\"version\":3,\"kdfAlgorithm\":\"HKDF_SHA256\",\"kdfParameters\":{\"hash\":\"SHA-256\",\"outputBytes\":32,\"identityInfo\":\"signalquest-e2ee-v2-recovery-identity-v2\",\"signingInfo\":\"signalquest-e2ee-v2-recovery-signing-v2\",\"accountInfo\":\"signalquest-e2ee-v2-recovery-account-v3\"},\"wrapAlgorithm\":\"AES_256_GCM\",\"recoveryPublicIdentityKeyB64\":\"BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=\",\"recoveryPublicSigningKeyB64\":\"BB8UAUa/sbJR+E9N2+DUzc/Xev2YSpUg41eUAh+DErue7JlaCLH6dwTfPcwLUKlmUmP7dxH5X5+KRJxQluR8iSs=\",\"identityPrivateKey\":{\"saltB64\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"nonceB64\":\"ISEhISEhISEhISEh\",\"wrappedPrivateJwkB64\":\"BTcZRW7GMgtMg5Uwdnf1F8e4GfyxQc1ZJdL2eVbc5XVFBwWV4FkpoUxhNH4Ywcrcldri5f50lWDGJOk9vcQ9p7zzZvnaZsD4Uuo4hJpA6arz8+M5n6H/mcYuk+yfh166sJdETi6ympUGnhJ/VhEizefN+liMuIl2aoknDCeRHXHVtJjbFerZgYXgTSzrl2xzwTQfWAHx/2RRX5it1hjGyHaYLhvKPvieSqOMd4Uo3oLkiVepsvMmPiDYo0ke7/2V\",\"aadB64\":\"U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCklERU5USVRZ\"},\"signingPrivateKey\":{\"saltB64\":\"EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI=\",\"nonceB64\":\"IiIiIiIiIiIiIiIi\",\"wrappedPrivateJwkB64\":\"RlbuvF+3fCyD9sax9++iajf7PxSR6HQjAISzqScVeeKfZVkoL2omqg6SLJlFAGO37G8eiH4mvfC2NIgp1zwwrRz/A5GCnozVLFpCDI7YwPV0ggHMICiyKS337gYHDP2+VFVwIFpsSIMlQtqV4TYNHpG5UTxdArmgvzGApHpLL2CUATJj7yBJ2cwK1uKyoqj52EtTeZ6fhv0vcdIt1kUU/umcrutCQEKnHK7GYA24xT0xtprggiJhNMdJCDVk3K6l\",\"aadB64\":\"U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlClNJR05JTkc=\"},\"accountPrivateKey\":{\"saltB64\":\"MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=\",\"nonceB64\":\"RERERERERERERERE\",\"wrappedPrivateJwkB64\":\"Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV\",\"aadB64\":\"U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=\",\"publicKeyB64\":\"BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=\"}}",
+  "deviceListVersion" : "3",
   "fixtureVersion" : 1,
   "negative" : [
     {
@@ -155,7 +156,7 @@
     {
       "expect" : "served",
       "name" : "served-uik-differs",
-      "servedUikPublicX963B64" : "BGfuYMu6EaOk9P5AeS0Vjr0rVbqOsYwwjL+XOXGn5Zc7FvlFqhZZYEfETM9ye21iotbyCENHvp/7PI7C85547oA="
+      "servedUikPublicX963B64" : "BCnd0yX9re5Msk1VxV7/02Irv4COqdXZc5ntij4fHiRdQBlioEXWv2DbqnKqgCYUzCgPsbJP+YMI0we5uwUP/Do="
     },
     {
       "bundle" : {
@@ -311,7 +312,7 @@
         "accountPrivateKey" : {
           "aadB64" : "U1EtRTJFRS1WMi1SRUNPVkVSWQoyCnVzZXI6aW50ZXJvcC1maXh0dXJlCkFDQ09VTlQ=",
           "nonceB64" : "RERERERERERERERE",
-          "publicKeyB64" : "BGfuYMu6EaOk9P5AeS0Vjr0rVbqOsYwwjL+XOXGn5Zc7FvlFqhZZYEfETM9ye21iotbyCENHvp/7PI7C85547oA=",
+          "publicKeyB64" : "BCnd0yX9re5Msk1VxV7/02Irv4COqdXZc5ntij4fHiRdQBlioEXWv2DbqnKqgCYUzCgPsbJP+YMI0we5uwUP/Do=",
           "saltB64" : "MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
           "wrappedPrivateJwkB64" : "Z7TMo4iovCRixkj4+UMDmCExVYzkdONYElJ405x5ibl2aCbqZVgIazvFyRFbKfHPSAc/yjXlZjTprlsVoNwPucm4CdaC8HedJdM0ABSVKs3zEdo2y2rDR+M3TAW2aQH2TW2EmlybVf46++M3iiwlQjj8KLh7GaGbbtvps09CNCDBYkWSG02NqKpV4zhfiUYUQGIGOtD6pXnWFO7Z96WjUibJvt1Y+y9ZFiNJ2Vn1tCieFdPjrYcpfImjFNXedlCV"
         },
@@ -340,13 +341,24 @@
         "version" : 3,
         "wrapAlgorithm" : "AES_256_GCM"
       },
-      "bundleHash" : "e5638e10273eeffefc4d81f7e5372d503cfd983d7c7ea55734f48e50bbb14a4c",
+      "bundleHash" : "6c358c50a1154e67fd6044c07df83dc085c87d8c685b94b915c9461ee420591e",
       "expect" : "unwrap",
       "name" : "public-key-not-the-wrapped-uik"
+    },
+    {
+      "bundleSignatureDerB64" : "MEUCIQCfuzpBJn0gq2IOlSWqaP7aL042pna3SDUDvAgUvYeQYAIgN0ja9jxY6Ku3S1sz5G+LzjnhIqtSjz8HORTgfArzIlY=",
+      "expect" : "signature",
+      "name" : "signature-over-another-list-version"
+    },
+    {
+      "expect" : "rollback",
+      "name" : "served-list-older-than-floor",
+      "servedDeviceListVersion" : "2"
     }
   ],
   "ownerNamespace" : "user:interop-fixture",
   "recoveryKeyB64" : "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "servedDeviceListVersion" : "3",
   "servedUikPublicX963B64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",
   "uikPrivateRawB64" : "FBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM=",
   "uikPublicX963B64" : "BB72ZA2S2eO7ItNGvaYeBisWFePiFYqL1+99MwE3II4ViphWIT1xh4y9KzCvyPmwEyTJ6DnOOknis5CR88AJ/uQ=",

@@ -51,8 +51,13 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
         let canonical = E2EEV2RecoveryV2Contract.canonicalBundleJSON(v3)
         let hash = E2EEV2RecoveryV2Crypto.bundleHash(v3)
         XCTAssertEqual(hash, Self.serverBundleHash, "Même condensat que le banc du serveur")
-        let signedText = E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(userId: userId, bundle: v3)
+        // Plancher (v0.4.22) : la version de liste que signe le bundle.
+        let listVersion = 3
+        let signedText = E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(userId: userId, bundle: v3, deviceListVersion: listVersion)
         let signature = try E2EEV2LowS.sign(signedText, with: uik)
+        let otherVersionSignature = try E2EEV2LowS.sign(
+            E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(userId: userId, bundle: v3, deviceListVersion: listVersion - 1), with: uik
+        )
 
         // Cas négatifs.
         let other = P256.Signing.PrivateKey().publicKey.x963Representation.base64EncodedString()
@@ -101,6 +106,9 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
             try negative("hash-without-account-key", "hash", extra: ["bundleHash": E2EEV2RecoveryV2Crypto.bundleHash(v2)]),
             try negative("equal-nonces", "shape", bundle: try withAccount { $0["nonceB64"] = v2.identityPrivateKey.nonceB64 }),
             try negative("public-key-not-the-wrapped-uik", "unwrap", bundle: try withAccount { $0["publicKeyB64"] = other }),
+            try negative("signature-over-another-list-version", "signature",
+                         extra: ["bundleSignatureDerB64": otherVersionSignature.base64EncodedString()]),
+            try negative("served-list-older-than-floor", "rollback", extra: ["servedDeviceListVersion": String(listVersion - 1)]),
         ]
         let vector: [String: Any] = [
             "fixtureVersion": 1,
@@ -113,6 +121,8 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
             "bundle": try object(v3),
             "canonicalUtf8": canonical,
             "bundleHash": hash,
+            "deviceListVersion": String(listVersion),
+            "servedDeviceListVersion": String(listVersion),
             "bundleSignatureUtf8": String(decoding: signedText, as: UTF8.self),
             "bundleSignatureDerB64": signature.base64EncodedString(),
             "negative": negatives,
@@ -123,7 +133,7 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
 
     // MARK: Lecture
 
-    private enum Stage: String { case shape, hash, unwrap, served }
+    private enum Stage: String { case shape, hash, unwrap, signature, rollback, served }
     private struct Refused: Error { let stage: Stage }
 
     /// Ce que fait un appareil en récupération, dans l'ordre : lecture stricte
@@ -134,7 +144,11 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
         expectedHash: String,
         servedUIK: String,
         recoveryKey: Data,
-        ownerBinding: String
+        ownerBinding: String,
+        userId: String,
+        floor: Int,
+        signatureB64: String,
+        servedListVersion: Int
     ) throws -> P256.Signing.PrivateKey {
         var served = bundleObject
         served["createdAt"] = "2026-10-05T00:00:00.000Z"
@@ -151,6 +165,14 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
         } catch {
             throw Refused(stage: .unwrap)
         }
+        // Le plancher signé par l'UIK déballée, puis la liste servie au-dessus.
+        guard E2EEV2SignedString(
+            canonical: String(decoding: E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(
+                userId: userId, bundle: candidate, deviceListVersion: floor
+            ), as: UTF8.self),
+            signatureB64: signatureB64
+        ).verify(with: uik.publicKey) else { throw Refused(stage: .signature) }
+        guard servedListVersion >= floor else { throw Refused(stage: .rollback) }
         guard uik.publicKey.x963Representation.base64EncodedString() == servedUIK else { throw Refused(stage: .served) }
         return uik
     }
@@ -163,14 +185,21 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
         let expectedHash = try XCTUnwrap(v["bundleHash"] as? String)
         let served = try XCTUnwrap(v["servedUikPublicX963B64"] as? String)
         let parsed = try bundle(bundleObject)
+        let userId = try XCTUnwrap(v["userId"] as? String)
+        let floor = try XCTUnwrap(Int(try XCTUnwrap(v["deviceListVersion"] as? String)))
+        let servedList = try XCTUnwrap(Int(try XCTUnwrap(v["servedDeviceListVersion"] as? String)))
+        let signatureB64 = try XCTUnwrap(v["bundleSignatureDerB64"] as? String)
         XCTAssertEqual(parsed.version, 3)
         XCTAssertEqual(E2EEV2RecoveryV2Contract.canonicalBundleJSON(parsed), v["canonicalUtf8"] as? String, "Forme hachée à l'octet")
         XCTAssertEqual(expectedHash, Self.serverBundleHash)
-        let uik = try recover(bundleObject, expectedHash: expectedHash, servedUIK: served, recoveryKey: recoveryKey, ownerBinding: ownerBinding)
+        let uik = try recover(
+            bundleObject, expectedHash: expectedHash, servedUIK: served, recoveryKey: recoveryKey, ownerBinding: ownerBinding,
+            userId: userId, floor: floor, signatureB64: signatureB64, servedListVersion: servedList
+        )
         XCTAssertEqual(uik.rawRepresentation.base64EncodedString(), v["uikPrivateRawB64"] as? String)
         let signature = try XCTUnwrap(Data(base64Encoded: try XCTUnwrap(v["bundleSignatureDerB64"] as? String)))
         XCTAssertEqual(
-            E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(userId: try XCTUnwrap(v["userId"] as? String), bundle: parsed),
+            E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(userId: userId, bundle: parsed, deviceListVersion: floor),
             Data(try XCTUnwrap(v["bundleSignatureUtf8"] as? String).utf8)
         )
         XCTAssertTrue(E2EEV2SignedString(
@@ -178,14 +207,16 @@ final class E2EEV2RecoveryBundleV3VectorTests: XCTestCase {
         ).verify(with: uik.publicKey))
 
         let negatives = try XCTUnwrap(v["negative"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(negatives.count, 10)
+        XCTAssertGreaterThanOrEqual(negatives.count, 12)
         for negative in negatives {
             let name = negative["name"] as? String ?? "?"
             XCTAssertThrowsError(try recover(
                 negative["bundle"] as? [String: Any] ?? bundleObject,
                 expectedHash: negative["bundleHash"] as? String ?? expectedHash,
                 servedUIK: negative["servedUikPublicX963B64"] as? String ?? served,
-                recoveryKey: recoveryKey, ownerBinding: ownerBinding
+                recoveryKey: recoveryKey, ownerBinding: ownerBinding, userId: userId, floor: floor,
+                signatureB64: negative["bundleSignatureDerB64"] as? String ?? signatureB64,
+                servedListVersion: (negative["servedDeviceListVersion"] as? String).flatMap { Int($0) } ?? servedList
             ), name) { error in
                 XCTAssertEqual((error as? Refused)?.stage.rawValue, negative["expect"] as? String, "Refusé pour la règle visée : \\(name)")
             }

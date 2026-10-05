@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.21**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.22**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,13 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.22 (05/10/2026), proposition : plancher de version de liste pour
+>   la récupération (§2.8). Le texte que l'UIK signe pour le bundle passe en
+>   version 2 et porte la version de la liste courante ; l'appareil qui
+>   récupère vérifie cette signature avec l'UIK déballée et refuse toute
+>   liste servie plus ancienne. Les appareils détenteurs de l'UIK re-signent
+>   le bundle après chaque changement de liste. Vecteur
+>   `recovery-bundle-v3` mis à jour (texte v2, deux cas négatifs de plus).
 > - v0.4.21 (05/10/2026), proposition : lot serveur A2 (réinitialisation
 >   d'identité, récupération). Bundle de récupération v3, qui enveloppe
 >   l'UIK sous la clé de récupération : un appareil récupéré signe lui-même
@@ -609,7 +616,15 @@ conversations chiffrées **sur demande seulement**.
   récupération d'un autre membre fournie par le serveur.
 - Le serveur ne choisit pas non plus la clé de son propre compte : le bundle
   porte une signature de l'UIK sur
-  `SQ-E2EE-V2-RECOVERY-BUNDLE\n1\n<userId>\n<bundleHash>\n<recoveryPublicIdentityKeyB64>`.
+  `SQ-E2EE-V2-RECOVERY-BUNDLE\n2\n<userId>\n<bundleHash>\n<recoveryPublicIdentityKeyB64>\n<deviceListVersion>`
+  (texte v2, v0.4.22), `deviceListVersion` étant la version de la liste
+  signée courante du compte, en décimal sans zéro de tête. Le `PUT` porte
+  `deviceListVersion` en chaîne ; le serveur exige la version courante
+  (`409 E2EE_RECOVERY_BUNDLE_LIST_STALE`, `details.currentDeviceListVersion`)
+  et refuse un texte v1. Le bundle servi (`GET`, défi) porte `signatureB64`
+  et `deviceListVersion`. Un `PUT` du même bundle avec une nouvelle
+  signature remplace signature et version (200) ; `unchanged` ne vaut que
+  pour un renvoi identique à l'octet.
   Un appareil qui n'a pas créé le bundle vérifie cette signature avant
   d'envelopper. En attendant ce format, seul l'appareil qui a créé le bundle
   sauvegarde l'historique. Le serveur garde le bundle tel quel et vérifie
@@ -656,12 +671,15 @@ conversations chiffrées **sur demande seulement**.
   - Un appareil qui reçoit un bundle v2 garde le comportement d'avant :
     restauration de l'historique s'il est déjà approuvé, jamais de
     signature d'appareil.
-  - Limite connue (v0.4.21) : un appareil qui récupère n'a encore aucun pin.
-    Un serveur pourrait donc lui servir une liste signée plus ancienne qui
-    contient encore un appareil révoqué depuis ; l'appareil récupéré la
-    prolongerait. Les appareils déjà épinglés refusent ce recul. Piste
-    proposée : lier au texte signé du bundle la version de liste du moment,
-    et refuser toute liste servie plus ancienne.
+  - **Plancher de liste** (v0.4.22) : l'appareil qui récupère vérifie, avec
+    l'UIK qu'il vient de déballer, la signature du bundle sur le texte v2 et
+    le `deviceListVersion` servi, puis refuse toute liste servie de version
+    inférieure. Les appareils qui détiennent l'UIK DEVRAIENT re-signer le
+    bundle (même bundle, nouvelle signature) après chaque approbation ou
+    révocation. Limite résiduelle : entre le plancher signé et une
+    révocation postérieure non encore re-signée, un serveur malveillant peut
+    encore servir une liste intermédiaire ; les appareils déjà épinglés
+    refusent ce recul.
   - Une réinitialisation d'identité révoque le bundle et efface ses
     enveloppes : l'historique n'est plus récupérable après elle, ce que la
     demande fait acquitter.

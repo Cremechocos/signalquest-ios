@@ -40,7 +40,11 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         let identityStore = E2EEV2DeviceIdentityStore()
         self.identityStore = identityStore
         enrollment = E2EEV2DeviceEnrollmentCoordinator(api: api, identityStore: identityStore)
-        lifecycle = E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: identityStore)
+        let recovery = E2EEV2RecoveryCoordinatorV2(api: api, identityStore: identityStore)
+        lifecycle = E2EEV2DeviceLifecycleCoordinator(
+            api: api, identityStore: identityStore,
+            deviceListChanged: { await recovery.resignActiveBundleIfStale() }
+        )
     }
 
     var hasLocalIdentity: Bool { currentDeviceId != nil }

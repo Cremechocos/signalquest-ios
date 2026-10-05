@@ -3328,6 +3328,9 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
     private let appBuild: String
     private let nowMs: @Sendable () -> Int64
     private let rotationCommitted: @Sendable (LocalAccountSession, [String], Bool) -> Void
+    /// Après une approbation ou une révocation réussie : le bundle de
+    /// récupération est re-signé à la nouvelle liste (§2.8, v0.4.22).
+    private let deviceListChanged: (@Sendable () async -> Void)?
 
     init(
         api: APIClient,
@@ -3342,9 +3345,11 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         nowMs: @escaping @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) },
         rotationCommitted: @escaping @Sendable (LocalAccountSession, [String], Bool) -> Void = {
             E2EEV2RotationEvents.recordCommitted(session: $0, conversations: $1, notify: $2)
-        }
+        },
+        deviceListChanged: (@Sendable () async -> Void)? = nil
     ) {
         transport = E2EEV2APITransport(api: api, identityStore: identityStore)
+        self.deviceListChanged = deviceListChanged
         self.identityStore = identityStore
         self.epochKeyStore = epochKeyStore
         self.conversationStateStore = conversationStateStore
@@ -3752,7 +3757,10 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                     parser: E2EEV2DeviceApprovalContract.parseCompletion,
                     invalidMessage: "invalid-e2ee-approval-completion"
                 )
-                if case .success(let value) = result { rotationCommitted(session, value.affectedConversationIds, true) }
+                if case .success(let value) = result {
+                    rotationCommitted(session, value.affectedConversationIds, true)
+                    await deviceListChanged?()
+                }
                 return result
             }
             return localFailure("e2ee-device-list-stale")
@@ -3866,7 +3874,10 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                     parser: E2EEV2DeviceApprovalContract.parseRevocation,
                     invalidMessage: "invalid-e2ee-revocation-response"
                 )
-                if case .success(let value) = result { rotationCommitted(session, value.affectedConversationIds, true) }
+                if case .success(let value) = result {
+                    rotationCommitted(session, value.affectedConversationIds, true)
+                    await deviceListChanged?()
+                }
                 return result
             }
             return localFailure("e2ee-device-list-stale")
@@ -4299,6 +4310,10 @@ struct E2EEV2RecoveryChallengeV2: Equatable, Sendable {
     let challengeB64URL: String
     let expiresAtMs: Int64
     let bundle: E2EEV2RecoveryBundleV2
+    /// Signature de l'UIK sur le texte v2 du bundle, et la version de liste
+    /// qu'elle couvre : le plancher de la récupération (§2.8, v0.4.22).
+    var signatureB64: String? = nil
+    var deviceListVersion: Int? = nil
 }
 
 struct E2EEV2RecoveryCompletionV2: Equatable, Sendable {
@@ -4428,9 +4443,12 @@ enum E2EEV2RecoveryV2Crypto {
     }
 
     /// §2.8 : la chaîne que l'UIK signe pour le bundle.
-    static func bundleSignatureCanonical(userId: String, bundle: E2EEV2RecoveryBundleV2) -> Data {
+    /// Texte v2 (v0.4.22) : la version de liste courante à la signature, le
+    /// plancher sous lequel une récupération refuse toute liste servie.
+    static func bundleSignatureCanonical(userId: String, bundle: E2EEV2RecoveryBundleV2, deviceListVersion: Int) -> Data {
         Data([
-            "SQ-E2EE-V2-RECOVERY-BUNDLE", "1", userId, bundleHash(bundle), bundle.recoveryPublicIdentityKeyB64,
+            "SQ-E2EE-V2-RECOVERY-BUNDLE", "2", userId, bundleHash(bundle), bundle.recoveryPublicIdentityKeyB64,
+            String(deviceListVersion),
         ].joined(separator: "\n").utf8)
     }
 
@@ -4641,11 +4659,12 @@ enum E2EEV2RecoveryV2Contract {
 
     /// `PUT /recovery-bundle` (E.1) : les clés du bundle plus `signatureB64`,
     /// la signature de l'UIK sur sa forme hachée (§2.8).
-    static func uploadData(_ bundle: E2EEV2RecoveryBundleV2, signatureB64: String) throws -> Data {
+    static func uploadData(_ bundle: E2EEV2RecoveryBundleV2, signatureB64: String, deviceListVersion: Int) throws -> Data {
         guard var object = try JSONSerialization.jsonObject(with: bundleData(bundle)) as? [String: Any] else {
             throw E2EEV2RecoveryV2Error.invalidBundle
         }
         object["signatureB64"] = signatureB64
+        object["deviceListVersion"] = String(deviceListVersion)
         return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
 
@@ -4697,8 +4716,24 @@ enum E2EEV2RecoveryV2Contract {
             bundleHash: bundleHash,
             challengeB64URL: challengeB64URL,
             expiresAtMs: expiresAtMs,
-            bundle: bundle
+            bundle: bundle,
+            signatureB64: (bundleObject["signatureB64"] as? String).flatMap { Data(base64Encoded: $0) == nil ? nil : $0 },
+            deviceListVersion: listVersion(bundleObject["deviceListVersion"])
         )
+    }
+
+    /// `deviceListVersion` servi avec le bundle (D.0, chaîne canonique).
+    static func listVersion(_ value: Any?) -> Int? {
+        guard let raw = value as? String,
+              raw.range(of: #"^[1-9][0-9]{0,9}\z"#, options: .regularExpression) != nil else { return nil }
+        return Int(raw)
+    }
+
+    /// Version de liste que couvre la signature du bundle actif servi.
+    static func activeBundleListVersion(_ data: Data) -> Int? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let bundle = root["bundle"] as? [String: Any] else { return nil }
+        return listVersion(bundle["deviceListVersion"])
     }
 
     /// `{challengeB64Url, recoverySignatureB64, certificate, deviceList}` :
@@ -4798,6 +4833,7 @@ enum E2EEV2RecoveryV2Contract {
         ]
         // A2 : le bundle servi porte la signature de l'UIK (§2.8).
         if bundleObject["signatureB64"] != nil { base.insert("signatureB64") }
+        if bundleObject["deviceListVersion"] != nil { base.insert("deviceListVersion") }
         // Version : un entier JSON, jamais 3.0 ; chaque objet avec exactement ses clés.
         guard let versionNumber = bundleObject["version"] as? NSNumber,
               !CFNumberIsFloatType(versionNumber), CFGetTypeID(versionNumber) != CFBooleanGetTypeID() else { return nil }
@@ -4819,6 +4855,7 @@ enum E2EEV2RecoveryV2Contract {
         payload.removeValue(forKey: "rotatedAt")
         payload.removeValue(forKey: "revokedAt")
         payload.removeValue(forKey: "signatureB64")
+        payload.removeValue(forKey: "deviceListVersion")
         guard let payloadData = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
               let bundle = try? JSONDecoder().decode(E2EEV2RecoveryBundleV2.self, from: payloadData),
               validate(bundle, ownerBinding: expectedOwnerBinding) else { return nil }
@@ -4902,6 +4939,71 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
         self.rotationCommitted = rotationCommitted
     }
 
+    /// La version de la liste signée courante du compte, vérifiée contre l'UIK
+    /// détenue ici : celle que le texte v2 du bundle signe (§2.8, v0.4.22).
+    private func currentListVersion(
+        uik: P256.Signing.PrivateKey,
+        session: LocalAccountSession,
+        transport: E2EEV2APITransport
+    ) async throws -> Int {
+        let publicKey = uik.publicKey
+        return try await E2EEV2TrustDirectory(
+            ownerNamespace: session.ownerNamespace, pins: trustPins,
+            ownUserId: String(session.ownerScopeId.dropFirst("user:".count)), ownAccountKey: { publicKey },
+            fetch: E2EEV2TrustDirectory.identityFetch(transport: transport, ownerScopeId: session.ownerScopeId)
+        ).ownAccountTrust().outcome.pin.listVersion
+    }
+
+    /// Signe le bundle à la version de liste courante et l'envoie ; une liste
+    /// changée entre-temps (`E2EE_RECOVERY_BUNDLE_LIST_STALE`) est relue une fois.
+    private func upload(
+        _ bundle: E2EEV2RecoveryBundleV2,
+        uik: P256.Signing.PrivateKey,
+        session: LocalAccountSession,
+        transport: E2EEV2APITransport
+    ) async -> E2EEV2TransportResult<Data> {
+        let userId = String(session.ownerScopeId.dropFirst("user:".count))
+        var last = E2EEV2TransportResult<Data>.failure(.init(kind: .localState, message: "e2ee-recovery-upload-not-attempted"))
+        for _ in 0..<2 {
+            do {
+                let version = try await currentListVersion(uik: uik, session: session, transport: transport)
+                let signature = try E2EEV2LowS.sign(
+                    E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(userId: userId, bundle: bundle, deviceListVersion: version),
+                    with: uik
+                ).base64EncodedString()
+                last = await transport.putJSON(
+                    path: "/api/e2ee/v2/recovery-bundle",
+                    body: try E2EEV2RecoveryV2Contract.uploadData(bundle, signatureB64: signature, deviceListVersion: version),
+                    expectedOwnerScopeId: session.ownerScopeId,
+                    capabilitySet: .deviceLifecycle
+                )
+            } catch let failure as E2EEV2TransportFailure {
+                return .failure(failure)
+            } catch {
+                return .failure(.init(kind: .localState, message: "e2ee-recovery-signature-failed"))
+            }
+            if case .failure(let failure) = last, failure.code == "E2EE_RECOVERY_BUNDLE_LIST_STALE" { continue }
+            return last
+        }
+        return last
+    }
+
+    /// Après une approbation ou une révocation, le bundle actif est re-signé à
+    /// la nouvelle version de liste : son plancher suit les révocations (§2.8,
+    /// DEVRAIT, v0.4.22). Sans UIK ici ou sans bundle, rien.
+    func resignActiveBundleIfStale() async {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              let uik = try? accountIdentityStore.load(ownerNamespace: session.ownerNamespace) else { return }
+        let transport = self.transport.bound(to: session)
+        guard case .success(let data, _, _) = await transport.getJSON(
+            path: "/api/e2ee/v2/recovery-bundle", expectedOwnerScopeId: session.ownerScopeId, capabilitySet: .deviceLifecycle
+        ), let bundle = E2EEV2RecoveryV2Contract.parseActiveBundle(data, expectedOwnerBinding: session.ownerScopeId),
+           bundle.version == 3,
+           let current = try? await currentListVersion(uik: uik, session: session, transport: transport),
+           (E2EEV2RecoveryV2Contract.activeBundleListVersion(data) ?? 0) < current else { return }
+        _ = await upload(bundle, uik: uik, session: session, transport: transport)
+    }
+
     func createAndUploadBundle() async -> E2EEV2RecoveryBundleCreationResultV2 {
         guard LocalAccountScope.currentUserId != nil else { return localBundleFailure("authenticated-account-required") }
         guard let session = LocalAccountScope.sessionSnapshot() else { return localBundleFailure("authenticated-account-required") }
@@ -4912,30 +5014,12 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
             return localBundleFailure("e2ee-account-key-unavailable")
         }
         var material: E2EEV2RecoveryMaterialV2
-        let signatureB64: String
         do {
             material = try E2EEV2RecoveryV2Crypto.generateMaterial(ownerBinding: ownerScope, accountKey: uik)
-            signatureB64 = try E2EEV2LowS.sign(
-                E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(
-                    userId: String(ownerScope.dropFirst("user:".count)), bundle: material.bundle
-                ),
-                with: uik
-            ).base64EncodedString()
         } catch {
             return localBundleFailure("e2ee-recovery-generation-failed")
         }
-        let result: E2EEV2TransportResult<Data>
-        do {
-            result = await transport.putJSON(
-                path: "/api/e2ee/v2/recovery-bundle",
-                body: try E2EEV2RecoveryV2Contract.uploadData(material.bundle, signatureB64: signatureB64),
-                expectedOwnerScopeId: ownerScope,
-                capabilitySet: .deviceLifecycle
-            )
-        } catch {
-            material.zeroize()
-            return localBundleFailure("e2ee-recovery-serialization-failed")
-        }
+        let result = await upload(material.bundle, uik: uik, session: session, transport: transport)
         switch result {
         case .failure(let failure):
             material.zeroize()
@@ -5023,6 +5107,18 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
         } catch {
             return localFailure("e2ee-recovery-key-mismatch")
         }
+        // Le plancher : la signature du bundle par l'UIK déballée, sur le texte
+        // v2 et la version de liste servie (§2.8, v0.4.22). Sans elle, un
+        // serveur pourrait servir un plancher plus bas.
+        guard let bundleSignature = challenge.signatureB64, let floor = challenge.deviceListVersion,
+              E2EEV2SignedString(
+                  canonical: String(decoding: E2EEV2RecoveryV2Crypto.bundleSignatureCanonical(
+                      userId: String(ownerScope.dropFirst("user:".count)), bundle: challenge.bundle, deviceListVersion: floor
+                  ), as: UTF8.self),
+                  signatureB64: bundleSignature
+              ).verify(with: uik.publicKey) else {
+            return localFailure("e2ee-recovery-bundle-signature-invalid")
+        }
         // Jamais rien de signé si ce coffre garde déjà une autre UIK : sinon le
         // serveur certifierait un appareil qui ne pourrait plus la garder.
         do {
@@ -5044,6 +5140,8 @@ final class E2EEV2RecoveryCoordinatorV2: @unchecked Sendable {
                 ownAccountKey: { publicKey },
                 fetch: E2EEV2TrustDirectory.identityFetch(transport: transport, ownerScopeId: ownerScope)
             ).ownAccountTrust()
+            // Une liste plus ancienne que celle que le bundle signe : recul servi.
+            guard account.outcome.pin.listVersion >= floor else { return localFailure("e2ee-recovery-device-list-rollback") }
             trust = try E2EEV2RecoveryTrust.make(
                 userId: userId, currentList: account.deviceList, currentEntries: account.deviceEntries,
                 device: device, uik: uik, nowMs: Int64(Date().timeIntervalSince1970 * 1_000)
@@ -6078,8 +6176,9 @@ enum E2EEV2RecoveryEpochContract {
                 guard let recipient = rawRecipient as? [String: Any],
                       exactKeys(
                         recipient,
-                        ["recipientUserId", "recoveryBundleHash", "recoveryPublicIdentityKeyB64", "signatureB64"]
+                        ["recipientUserId", "recoveryBundleHash", "recoveryPublicIdentityKeyB64", "signatureB64", "deviceListVersion"]
                       ),
+                      E2EEV2RecoveryV2Contract.listVersion(recipient["deviceListVersion"]) != nil,
                       // Signature de l'UIK sur ce bundle (§2.8) : seul le bundle que
                       // cet appareil connaît est enveloppé (`ownRecipients`).
                       (recipient["signatureB64"] as? String).flatMap({ Data(base64Encoded: $0) }) != nil,
