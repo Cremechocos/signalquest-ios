@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.34**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.35**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,10 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.35 (05/10/2026), proposition, arrêtée avec le serveur : signatures
+>   passées d'un appareil révoqué depuis, vérifiées par ses certificats
+>   (nouvelle route `…/devices/{deviceId}/certificates`, §2.8). Aucun vecteur
+>   ne change.
 > - v0.4.34 (05/10/2026), proposition : lien universel dans le QR
 >   d'approbation, charge dans le fragment (D.13) ; clés d'époque restaurées
 >   provisoires jusqu'à l'engagement du manifeste signé (§2.8). Aucun vecteur
@@ -713,6 +717,31 @@ conversations chiffrées **sur demande seulement**.
   - elle ne bloque jamais la clé vérifiée au même numéro, qui la remplace.
   Un serveur qui injecte de fausses clés n'ajoute ainsi que des clés
   provisoires, vite écartées.
+- **Signatures passées d'un appareil révoqué depuis** (v0.4.35) : un manifeste
+  d'ancienne époque, un changement d'appartenance ou un message signé par un
+  appareil qui n'est plus dans la liste courante se vérifie avec son
+  certificat de l'époque :
+  - `GET /api/e2ee/v2/users/{userId}/devices/{deviceId}/certificates` →
+    `{"certificates": [{"identityGeneration": "<g>", "keyVersion": "<k>",
+    "cert": "<chaîne D.2>", "signatureB64": "…"}], "revokedIn":
+    {"identityGeneration": "<g>", "version": "<n>"} | null}`, entiers en
+    chaînes, certificats triés par (génération, version de clé). Lecture par
+    session, réservée au compte lui-même ou à un membre actuel d'une
+    conversation v2 dont la chaîne contient un `ADD` visant ce compte, genèse
+    comprise. Tout autre refus répond `404 E2EE_DEVICE_NOT_FOUND`, et une
+    requête mal formée `400 E2EE_DEVICE_CERTIFICATES_REQUEST_INVALID`. Un
+    compte supprimé répond 410 à qui y aurait eu accès, même s'il a quitté le
+    groupe avant, ce qui reste cohérent avec la règle « a contenu ». Porte
+    d'activation et 426 comme `identity` ; `Cache-Control: private,
+    no-store` ;
+  - le client prend le certificat dont la clé de signature correspond, et ne
+    l'accepte que signé par l'UIK épinglée du compte. La révocation
+    ultérieure n'annule pas le passé, mais un objet dont la date signée
+    (`createdAtMs`) suit la révocation est refusé. La révocation se lit dans
+    la liste signée `revokedIn`, vérifiée par E.1 ;
+  - UIK changée depuis (autre génération d'identité) ou compte supprimé
+    (`410 E2EE_ACCOUNT_DELETED`) : échec fermé. La clé restaurée reste
+    provisoire, sans erreur visible.
   - Le client déballe l'UIK et vérifie, dans l'ordre, que le scalaire redonne
     `x`/`y` du JWK, qu'ils sont ceux de `publicKeyB64`, puis que c'est l'UIK
     servie par `…/identity` ; sinon il refuse sans rien signer. Le « 2 » de
