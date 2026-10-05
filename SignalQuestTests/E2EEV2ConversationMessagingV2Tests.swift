@@ -304,6 +304,7 @@ private final class FakeV2Server: @unchecked Sendable {
     func appendChange(_ change: E2EEV2SignedString) { lock.withLock { chain.append(change) } }
 
     func handle(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {
+        if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
         lock.lock(); defer { lock.unlock() }
         let path = request.url?.path ?? ""
         let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []

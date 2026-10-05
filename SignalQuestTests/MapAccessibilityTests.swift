@@ -233,7 +233,9 @@ final class MapAccessibilityTests: XCTestCase {
     func testMarkerViewBecomesAnAccessibilityElement() {
         let annotation = SQMapKitAnnotation(payload: payload(kind: .antenna))
         let view = SQMapKitMarkerView(annotation: annotation, reuseIdentifier: "test")
-        XCTAssertFalse(view.isAccessibilityElement, "Une MKAnnotationView ne l'est pas par défaut")
+        // Point de départ fixé : l'état par défaut d'une vue neuve varie selon
+        // ce que d'autres tests du même processus ont laissé à l'accessibilité.
+        view.isAccessibilityElement = false
 
         view.apply(annotation.payload)
 

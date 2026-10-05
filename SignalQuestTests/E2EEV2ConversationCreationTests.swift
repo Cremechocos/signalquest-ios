@@ -144,6 +144,7 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
 
         // Reçu inexact (nombre d'enveloppes) : rien n'est gardé non plus.
         MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
             let body = try E2EEV2AccountFixture.body(request)
             return E2EEV2AccountFixture.response(request, try E2EEV2AccountFixture.receipt(for: body, recipientCount: 99))
         }
@@ -161,7 +162,9 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
 
         // Reçu exact : la clé de l'époque 1 et l'état « v2 » sont gardés.
         let captured = LockedRequests()
+        let acks = AckLog()
         MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request, acks: acks) { return ack }
             let body = try E2EEV2AccountFixture.body(request)
             captured.append(request, body: body)
             let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []
@@ -180,6 +183,8 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertEqual(stored.epochNumber, 1)
         XCTAssertEqual(stored.epochId, "epoch_" + conversationId)
         XCTAssertTrue(try fixture.states.isV2(conversationId: conversationId, ownerNamespace: fixture.session.ownerNamespace))
+        XCTAssertEqual(acks.paths, ["/api/e2ee/v2/conversations/\(conversationId)/epochs/1/ack"],
+                       "Le créateur accuse sa première époque, une fois la clé gardée (v0.4.26)")
     }
 
     /// Point 5 du relevé Android (04/10) : un reçu perdu ne laisse jamais de
@@ -204,6 +209,7 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         ) else { return XCTFail("503 attendu") }
         let raw = LockedRequests()
         MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
             let body = try E2EEV2AccountFixture.body(request)
             raw.append(request, body: body)
             let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []
@@ -284,6 +290,7 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         )
         let captured = LockedRequests()
         MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
             let body = try E2EEV2AccountFixture.body(request)
             captured.append(request, body: body)
             let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []
@@ -324,6 +331,7 @@ final class E2EEV2ConversationCreationTests: XCTestCase {
         XCTAssertNotNil(try fixture.states.pendingGenesis(conversationId: direct.id, ownerNamespace: namespace))
 
         MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
             let body = try E2EEV2AccountFixture.body(request)
             bodies.append(request, body: body)
             let envelopes = (body["epoch"] as? [String: Any])?["envelopes"] as? [[String: Any]] ?? []

@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.25**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.26**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,9 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.26 (05/10/2026), proposition, soulevée par la relecture du web :
+>   le créateur d'une époque l'accuse comme tout destinataire, une fois la
+>   clé gardée (E.2).
 > - v0.4.25 (05/10/2026), proposition, convenue avec Android : une preuve
 >   de jonction rejouée après le départ de son auteur ne prouve pas un
 >   retour, et l'heure de jonction reste plausible (D.11).
@@ -2920,6 +2923,12 @@ version publiée qui ouvre les verrous.
   l'appareil en ligne témoin (§2.6). Réponse : `{epochNumber, acknowledgedAt}`,
   `acknowledgedAt` en RFC 3339. Idempotent ; l'enveloppe revient ensuite
   `null` (v0.4.16). L'appareil n'accuse réception qu'une fois la clé gardée.
+  Le créateur d'une époque, qui en est destinataire (v0.4.20), l'accuse
+  aussi, après le reçu de création ou de rotation et une fois la clé gardée
+  (v0.4.26). Le serveur ne l'accuse jamais à sa place : il ne sait pas quand
+  la clé est gardée. Un accusé perdu se rejoue : tant que `epochs/current` sert
+  l'enveloppe de l'appareil pour une époque dont la clé est déjà gardée,
+  l'appareil renvoie l'accusé, à chaque relève.
 - **`POST /api/e2ee/v2/conversations/{id}/membership`**. Corps :
   `{change, signatureB64}`, en comparaison-échange sur `changeNumber`.
   Réponse proposée par iOS : `{changeNumber}`, en chaîne ; le même changement

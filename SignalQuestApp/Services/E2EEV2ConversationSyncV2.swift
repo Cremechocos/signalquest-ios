@@ -195,6 +195,16 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
             return .failure(localError("e2ee-sync-state-unavailable"))
         }
         if let knownEpoch, served.accepted.epochNumber <= knownEpoch.epochNumber {
+            // Accusé perdu, du créateur comme d'un destinataire : le serveur sert
+            // encore notre enveloppe d'une époque dont la clé est gardée. L'accusé,
+            // idempotent, se rejoue à chaque relève jusqu'à `envelope: null` (E.2, v0.4.26).
+            if served.envelope != nil, served.accepted.epochNumber == knownEpoch.epochNumber,
+               served.accepted.epochId == knownEpoch.epochId, session.isCurrent {
+                _ = await bound.postJSON(
+                    path: "\(base)/epochs/\(knownEpoch.epochNumber)/ack", body: Data(),
+                    expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
+                )
+            }
             return .upToDate(epochNumber: knownEpoch.epochNumber)
         }
         let membershipAt = { (number: Int) -> E2EEV2MembershipState? in

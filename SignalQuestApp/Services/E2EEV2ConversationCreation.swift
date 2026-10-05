@@ -628,6 +628,14 @@ final class E2EEV2ConversationCreator: @unchecked Sendable {
         } catch {
             return .failure(localError("e2ee-created-epoch-storage-failed"))
         }
+        // Le créateur accuse sa première époque une fois la clé gardée (§2.6,
+        // v0.4.26), comme tout destinataire.
+        if context.session.isCurrent {
+            _ = await transport.bound(to: context.session).postJSON(
+                path: "/api/e2ee/v2/conversations/\(prepared.conversationId)/epochs/1/ack", body: Data(),
+                expectedOwnerScopeId: context.expectedOwnerScopeId, capabilitySet: .message
+            )
+        }
         return .created(conversationId: prepared.conversationId, pendingUserIds: prepared.pendingUserIds)
     }
 

@@ -420,11 +420,21 @@ final class E2EEV2EpochRotatorV2: @unchecked Sendable {
                   ) else {
                 return .failure(localError("invalid-e2ee-epoch-receipt"))
             }
-            return keep(
+            guard keep(
                 epochKey: epochKey, accepted: accepted, conversationId: conversationId,
                 commitment: proposal.keyCommitmentB64, membership: membership, recipients: proposal.recipients,
                 createdAtMs: proposal.createdAtMs, session: session
-            ) ? .rotated(epochNumber: epochNumber) : .failure(localError("e2ee-rotated-epoch-storage-failed"))
+            ) else { return .failure(localError("e2ee-rotated-epoch-storage-failed")) }
+            // Le créateur, destinataire de son époque, l'accuse comme les autres
+            // une fois la clé gardée (§2.6, v0.4.26) ; un accusé perdu ne change rien
+            // au résultat.
+            if session.isCurrent {
+                _ = await bound.postJSON(
+                    path: "/api/e2ee/v2/conversations/\(conversationId)/epochs/\(epochNumber)/ack", body: Data(),
+                    expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
+                )
+            }
+            return .rotated(epochNumber: epochNumber)
         }
     }
 

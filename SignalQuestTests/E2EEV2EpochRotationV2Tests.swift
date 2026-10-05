@@ -113,6 +113,7 @@ final class E2EEV2EpochRotationV2Tests: XCTestCase {
         let devices = fixture.deviceSet(adding: [phone.device, tablet.device])
         let captured = LockedRequests()
         MockURLProtocol.requestHandler = { request in
+            if let ack = E2EEV2AccountFixture.ackResponse(request) { return ack }
             let body = try E2EEV2AccountFixture.body(request)
             captured.append(request, body: body)
             let envelopes = body["envelopes"] as? [[String: Any]] ?? []

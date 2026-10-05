@@ -180,6 +180,15 @@ final class E2EEV2AccountFixture: @unchecked Sendable {
         }
     }
 
+    /// Accusé d'une époque (E.2) : `{epochNumber, acknowledgedAt}`. Le créateur
+    /// accuse aussi la sienne (v0.4.26) ; `acks` note les chemins accusés.
+    static func ackResponse(_ request: URLRequest, acks: AckLog? = nil) -> (HTTPURLResponse, Data)? {
+        guard request.httpMethod == "POST", let path = request.url?.path, path.hasSuffix("/ack"),
+              let number = path.split(separator: "/").dropLast().last else { return nil }
+        acks?.append(path)
+        return response(request, Data(#"{"epochNumber":"\#(number)","acknowledgedAt":"2026-10-05T12:00:00.000Z"}"#.utf8))
+    }
+
     static func response(_ request: URLRequest, _ data: Data, status: Int = 200) -> (HTTPURLResponse, Data) {
         (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!, data)
     }
@@ -320,4 +329,12 @@ extension E2EEV2AccountFixture {
         }
         return data
     }
+}
+
+/// Chemins des accusés d'époque reçus par un faux serveur.
+final class AckLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [String] = []
+    func append(_ path: String) { lock.withLock { stored.append(path) } }
+    var paths: [String] { lock.withLock { stored } }
 }
