@@ -174,9 +174,10 @@ final class E2EEV2MembershipWriterV2: @unchecked Sendable {
             }
             return .applied(changeNumber: head.changeNumber + 1)
         // Refus définitif d'un changement que le serveur ne prendra jamais (le
-        // dernier admin qui part sans successeur) : il n'est pas gardé, sinon il
-        // repartirait à la place du changement suivant.
-        case .failure(let error) where error.statusCode == 409 && error.code == "E2EE_LAST_ADMIN_MUST_PROMOTE":
+        // dernier admin qui part sans successeur, un membre sans v2) : il n'est
+        // pas gardé, sinon il repartirait à la place du changement suivant.
+        case .failure(let error) where error.statusCode == 409
+            && ["E2EE_LAST_ADMIN_MUST_PROMOTE", "E2EE_UPDATE_REQUIRED"].contains(error.code ?? ""):
             try? stateStore.clearPendingMembership(conversationId: conversationId, ownerNamespace: ownerNamespace)
             return .failure(error)
         case .failure(let error):

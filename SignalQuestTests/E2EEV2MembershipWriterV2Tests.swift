@@ -145,6 +145,11 @@ extension E2EEV2MembershipWriterV2Tests {
     /// Le dernier admin qui part sans successeur : refus définitif, le départ
     /// n'est pas gardé et ne repart pas à la place du changement suivant.
     func testALeaveRefusedForTheLastAdminIsNotKept() async throws {
+        try await refusedChangeIsNotKept(code: "E2EE_LAST_ADMIN_MUST_PROMOTE")
+        try await refusedChangeIsNotKept(code: "E2EE_UPDATE_REQUIRED")
+    }
+
+    private func refusedChangeIsNotKept(code: String) async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
         let seeded = try fixture.seedConversation(with: bruno, devices: fixture.deviceSet(adding: [phone.device]))
@@ -153,7 +158,7 @@ extension E2EEV2MembershipWriterV2Tests {
         MockURLProtocol.requestHandler = { request in
             if bodies.append(request.url?.path ?? "", E2EEV2AccountFixture.rawBody(request)) == 1 {
                 return E2EEV2AccountFixture.response(
-                    request, Data(#"{"error":"x","code":"E2EE_LAST_ADMIN_MUST_PROMOTE"}"#.utf8), status: 409
+                    request, Data(#"{"error":"x","code":"\#(code)"}"#.utf8), status: 409
                 )
             }
             let number = String(seeded.membership.changeNumber + 1)
@@ -163,7 +168,7 @@ extension E2EEV2MembershipWriterV2Tests {
         let owner = fixture.session.ownerScopeId
         guard case .failure(let refused) = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
         else { return XCTFail("Départ refusé attendu") }
-        XCTAssertEqual(refused.code, "E2EE_LAST_ADMIN_MUST_PROMOTE")
+        XCTAssertEqual(refused.code, code)
         XCTAssertNil(try fixture.states.pendingMembership(conversationId: seeded.conversationId, ownerNamespace: namespace))
 
         let next = await writer.submit(.excludeBrowsers(true), conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)

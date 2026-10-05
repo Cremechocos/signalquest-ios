@@ -204,8 +204,11 @@
 >   vecteur ne change.
 > - v0.4.31 (05/10/2026), proposition, arrêtée avec le serveur : période
 >   mixte, création v1 chiffrée permise seulement si un participant n'a pas
->   de v2, jamais en repli pour un pair déjà épinglé (§14.4). Aucun vecteur
->   ne change.
+>   de v2, jamais en repli pour un pair déjà épinglé (§14.4) ; genèse,
+>   création v2 et `ADD` refusés pour un membre sans v2 ; le dernier
+>   administrateur ne peut pas non plus se rétrograder sans successeur ; un
+>   seul tête-à-tête par paire de comptes (`E2EE_DIRECT_CONVERSATION_EXISTS`) ;
+>   `version-policy` lisible par le web. Aucun vecteur ne change.
 > - v0.4.30 (05/10/2026), proposition, arrêtée avec le serveur : un compte
 >   supprimé dans une conversation v2 (410 `E2EE_ACCOUNT_DELETED`) devient un
 >   membre sans appareil, qu'un administrateur peut retirer ; ré-ajout sans
@@ -1722,6 +1725,8 @@ protocole, états des cryptors d'appel.
     `e2ee_message_envelope_v2`, `e2ee_history_migration_v2` (la récupération
     en dépend) et `e2ee_verified_calls_v2`. `e2ee_encrypted_media_v2` relève
     du jalon B.
+  - `platform` accepte `ios`, `android` et `web` (v0.4.31), avec la même
+    liste de capacités ; pas de version minimale pour le web.
   - Messages : ouverts avec l'identité et l'enveloppe. Appels : avec, en plus,
     `e2ee_verified_calls_v2`, et des médias en `wss` seulement.
   - La lecture reste ouverte si la liste recule : une conversation v2 ne
@@ -2270,8 +2275,9 @@ certificat et la liste, sans `uikWrap` (§2.7).
     l'ouverture ; elle remplace une succession par le membre le plus ancien,
     abandonnée faute de preuve vérifiable) :
     - le dernier administrateur d'un groupe qui garde d'autres membres nomme
-      un successeur par un `ROLE_ADMIN` qu'il signe, avant son `LEAVE`. Le
-      serveur refuse ce `LEAVE` sans successeur :
+      un successeur par un `ROLE_ADMIN` qu'il signe, avant son `LEAVE` ou sa
+      propre rétrogradation (`ROLE_MEMBER` sur lui-même). Le serveur refuse
+      l'un et l'autre sans successeur :
       `409 E2EE_LAST_ADMIN_MUST_PROMOTE`. Le client ne garde pas ce
       changement refusé et invite à nommer un admin ;
     - à la suppression de son compte, son appareil promeut d'abord le membre
@@ -2692,8 +2698,18 @@ version publiée qui ouvre les verrous.
     autre que celui auquel la session est liée (E.1, v0.4.19) ;
   - `E2EE_ACCOUNT_DELETED` (410) : compte supprimé, lu par un membre d'une
     conversation v2 qui le contient (D.4, v0.4.30) ;
-  - `E2EE_LAST_ADMIN_MUST_PROMOTE` (409) : `LEAVE` du dernier administrateur
-    d'un groupe qui garde d'autres membres, sans successeur (D.4, v0.4.30) ;
+  - `E2EE_LAST_ADMIN_MUST_PROMOTE` (409) : `LEAVE` ou `ROLE_MEMBER` sur
+    soi-même du dernier administrateur d'un groupe qui garde d'autres
+    membres, sans successeur (D.4, v0.4.30) ;
+  - `E2EE_DIRECT_CONVERSATION_EXISTS` (409), `details: {conversationId,
+    protocolVersion}` : création v2 d'un second tête-à-tête entre les mêmes
+    deux comptes (participants exacts, comme la route v1). Le client ouvre
+    l'existant ; encore v1, il le migre à l'ouverture (§14.2). Le serveur
+    vérifie et crée sous un même verrou (v0.4.31) ;
+  - `E2EE_UPDATE_REQUIRED` (409) avec `details.reason` à `MEMBER_WITHOUT_V2` :
+    `ADD` d'un compte sans identité v2 dans une conversation v2, ou création
+    v2 avec un tel membre (D.4, v0.4.31). Le client ne garde pas le
+    changement refusé ;
   - `E2EE_DEVICE_ID_INVALID` (400) : identifiant d'appareil mal formé dans
     le chemin (v0.4.19) ;
   - réinitialisation et récupération (E.1, v0.4.21) :
@@ -2772,8 +2788,10 @@ version publiée qui ouvre les verrous.
     - `E2EE_CONVERSATION_ALREADY_V2` (409) : genèse d'une conversation déjà
       v2 ;
     - `E2EE_GENESIS_NOT_ELIGIBLE` (409) : genèse refusée, avec
-      `details.reason` à `NOT_ENCRYPTED` (conversation v1 non chiffrée) ou
-      `HAS_EPOCH` (conversation v1 qui a déjà une époque, §14.2) ;
+      `details.reason` à `NOT_ENCRYPTED` (conversation v1 non chiffrée),
+      `HAS_EPOCH` (conversation v1 qui a déjà une époque, §14.2) ou
+      `MEMBER_WITHOUT_V2`, avec `details.userIds` (un membre sans identité v2
+      la perdrait, v0.4.31). Le client ne garde pas la genèse refusée ;
     - `E2EE_CONVERSATION_NOT_V2` (409) : route d'époque ou d'appartenance
       appelée sur une conversation v1 ;
     - `E2EE_EPOCH_NOT_FOUND` et `E2EE_EPOCH_ENVELOPE_NOT_FOUND` (404) ;

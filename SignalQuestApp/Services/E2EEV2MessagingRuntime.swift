@@ -529,7 +529,8 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
             throw E2EEV2MessagingError(String(localized: "La conversation a changé entre-temps. Réessaie."))
         case .failure(let failure) where failure.code == "E2EE_LAST_ADMIN_MUST_PROMOTE":
             throw E2EEV2MessagingError(String(localized: "Nomme un autre admin avant de quitter le groupe."))
-        case .failure(let failure) where failure.message == "e2ee-v2-capability-missing":
+        case .failure(let failure) where failure.message == "e2ee-v2-capability-missing"
+            || failure.code == "E2EE_UPDATE_REQUIRED":
             throw E2EEV2MessagingError(String(localized: "Ce membre doit mettre à jour SignalQuest pour rejoindre ce groupe chiffré."))
         case .failure(let failure):
             throw E2EEV2MessagingError(failure.kind == .retryable

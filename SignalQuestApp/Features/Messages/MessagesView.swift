@@ -401,9 +401,22 @@ struct MessagesView: View {
             }
         }
         .sheet(isPresented: $showNewConversation) {
-            NewConversationSheet(service: service) {
-                await model.refreshAfterCreate()
-            }
+            NewConversationSheet(
+                service: service,
+                onCreated: { await model.refreshAfterCreate() },
+                existingDirect: { peerId in
+                    model.conversations.first { conversation in
+                        !conversation.isGroup && (conversation.directPeerUserId == peerId
+                            || conversation.participants.contains { $0.userId == peerId })
+                    }?.id
+                },
+                onOpenExisting: { id in
+                    Task {
+                        if !model.conversations.contains(where: { $0.id == id }) { await model.load() }
+                        routedConversationId = id
+                    }
+                }
+            )
         }
         .sheet(isPresented: $showE2EEUnlock, onDismiss: openNewConversationIfRequested) {
             if let e2ee = e2ee, case .authenticated(let user) = session.state {
@@ -674,6 +687,10 @@ struct MessagesView: View {
 private struct NewConversationSheet: View {
     let service: MessagesServicing
     let onCreated: () async -> Void
+    /// Un tête-à-tête avec cette personne existe déjà : on l'ouvre au lieu
+    /// d'en créer un second (v1 comme v2).
+    var existingDirect: (String) -> String? = { _ in nil }
+    var onOpenExisting: (String) -> Void = { _ in }
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
@@ -807,6 +824,11 @@ private struct NewConversationSheet: View {
         do {
             let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
             let isGroup = selected.count > 1
+            if !isGroup, let peer = selected.first, let existing = existingDirect(peer.id) {
+                dismiss()
+                onOpenExisting(existing)
+                return
+            }
             // Chiffrée et verrous ouverts : naît en v2 si tous les membres le
             // lisent ; sinon en v1, tant que le serveur l'accepte (v0.4.17).
             // Un appareil pas encore activé en v2 crée en v1 ; une porte serveur
@@ -826,6 +848,15 @@ private struct NewConversationSheet: View {
                 case .failure(let failure) where failure.message == "e2ee-v2-capability-missing"
                     || failure.kind == .activationBlocked:
                     break
+                // Créé entre-temps ailleurs (autre appareil, autre plateforme) : on l'ouvre.
+                case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":
+                    if case .string(let existing)? = failure.details?["conversationId"] {
+                        await onCreated()
+                        dismiss()
+                        onOpenExisting(existing)
+                        return
+                    }
+                    throw E2EEV2MessagingError(String(localized: "La conversation chiffrée n’a pas pu être créée."))
                 case .failure(let failure):
                     throw E2EEV2MessagingError(failure.kind == .retryable
                         ? String(localized: "Connexion instable. Réessaie.")

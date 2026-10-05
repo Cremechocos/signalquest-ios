@@ -292,7 +292,10 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         // Un compte sans identité v2 (`E2EE_IDENTITY_NOT_FOUND`) ne lirait rien
         // du groupe et en suspendrait les envois (§2.4) : il n'y entre pas tant
         // qu'il n'a pas mis à jour SignalQuest.
-        if case .add(let userId) = change, devices.refusals[userId] == .notFound {
+        // Même règle pour un compte dont aucun appareil ne lit le texte v2 : les
+        // envois du groupe s'arrêteraient en `capabilityMissing` (§12).
+        if case .add(let userId) = change, devices.refusals[userId] == .notFound
+            || !Self.readsTextV2(devices.devicesByUser[userId] ?? [], userId: userId) {
             return .failure(.init(kind: .permanent, message: "e2ee-v2-capability-missing"))
         }
         let mirrorGeneration = notificationMirror?.invalidate(conversationId)
@@ -398,6 +401,13 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
 
     /// Tête de la chaîne gardée, déjà vérifiée, et messages acceptés sous
     /// l'époque courante (§3.3).
+    private static func readsTextV2(_ devices: [E2EEV2CertifiedDevice], userId: String) -> Bool {
+        guard let common = E2EEV2CertifiedDeviceSet(devicesByUser: [userId: devices], refusals: [:])
+            .capabilityIntersection(nowMs: Int64(Date().timeIntervalSince1970 * 1_000), excludesWeb: false)
+        else { return false }
+        return common.envelopeVersions.contains("2") && common.payloadVersions.contains("2") && common.kinds.contains("TEXT")
+    }
+
     private func membershipContext(conversationId: String, isGroup: Bool) throws -> MembershipContext {
         guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(),
               let genesis = try stateStore.genesis(conversationId: conversationId, ownerNamespace: session.ownerNamespace)
