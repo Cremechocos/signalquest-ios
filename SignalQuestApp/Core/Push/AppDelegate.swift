@@ -34,6 +34,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // sur l'accueil au lieu de la conversation ou du post visé (TRX-02).
         // Indépendant de Firebase : les notifications locales et APNs en dépendent aussi.
         UNUserNotificationCenter.current().delegate = AppServicesHolder.services.push
+        // PushKit dès le lancement : quand iOS réveille l'app fermée pour une
+        // push VoIP, aucune fenêtre n'est affichée et le `.task` de la scène ne
+        // tourne pas. Sans registre ici, l'appel n'est jamais rapporté à
+        // CallKit, iOS tue l'app puis cesse de lui livrer les VoIP.
+        AppServicesHolder.services.callManager.registerForVoIPPushes()
         // Tâches d'arrière-plan : iOS exige leur enregistrement avant la fin du lancement.
         PendingQueueBackgroundTasks.register()
         SpeedtestLiveActivityController.endLeftoversFromPreviousLaunch()
