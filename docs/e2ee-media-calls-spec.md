@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.31**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.32**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,10 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.32 (05/10/2026), proposition, apprise de la recette croisée iOS
+>   et web : à la découverte d'une conversation, les époques antérieures
+>   dont l'appareil est destinataire s'ouvrent aussi (§3.4). Aucun vecteur
+>   ne change.
 > - v0.4.31 (05/10/2026), proposition, arrêtée avec le serveur : période
 >   mixte, création v1 chiffrée permise seulement si un participant n'a pas
 >   de v2, jamais en repli pour un pair déjà épinglé (§14.4) ; genèse,
@@ -804,6 +808,14 @@ Un client rejette un message :
 
 Les 24 heures se comptent à l'horloge de l'appareil, depuis l'acceptation
 locale de l'époque suivante ou du changement d'appartenance.
+
+**Découverte d'une conversation** (v0.4.32, vu à la recette croisée iOS et
+web du 05/10) : un appareil qui découvre une conversation (aucune époque
+connue) ouvre aussi les époques antérieures dont il est destinataire (`GET
+…/epochs/{n}`, au plus 32 avant la courante), puis la courante. Sinon, un
+groupe renouvelé avant sa première relève garderait ses premiers messages
+illisibles pour lui. Une époque dont il n'est pas destinataire répond 404 et
+se saute. La fenêtre de 24 heures part de cette acceptation locale.
 
 ### 3.5 Manifeste d'époque
 

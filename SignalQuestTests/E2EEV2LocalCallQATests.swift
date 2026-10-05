@@ -21,6 +21,7 @@ final class E2EEV2LocalCallQATests: XCTestCase {
     }
 
     private struct Session {
+        let api: APIClient
         let messaging: E2EEV2MessagingRuntime
         let calls: E2EEV2CallRuntime
         let service: CallsService
@@ -85,7 +86,7 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         )
         let ownerScopeId = "user:\(account.userId)"
         return Session(
-            messaging: messaging, calls: calls,
+            api: api, messaging: messaging, calls: calls,
             service: CallsService(api: api, e2eeTransport: E2EEV2APITransport(api: api, identityStore: identity)),
             lifecycle: E2EEV2DeviceLifecycleCoordinator(
                 api: api, identityStore: identity, epochKeyStore: keys, conversationStateStore: states,
@@ -407,6 +408,96 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         try JSONSerialization.data(withJSONObject: ["conversationId": conversationId, "ownerUserId": owner.userId, "memberUserIds": memberIds])
             .write(to: url, options: .atomic)
         print("[QA groupe] \(conversationId) membres=\(memberIds.count + 1)")
+    }
+
+    /// Recette croisée iOS + web (lot 6 du web) : une conversation v2 créée ou
+    /// changée sur le web est lue ici, puis reçoit une réponse ; un groupe créé
+    /// ici reçoit un message ; une conversation chiffrée v1 migre ici en v2.
+    /// Chaque étape écrit son bilan dans `…_FILE` pour l'autre plateforme.
+    /// `…_ACTION` : `read` (défaut), `create-group` ou `migrate`.
+    func testAConversationAcrossTheWebIsReadAnsweredCreatedOrMigrated() async throws {
+        guard let rawBase = environment("SQ_E2EE_V2_WEB_QA_BASE_URL"), let base = URL(string: rawBase),
+              ["127.0.0.1", "localhost", "::1"].contains(base.host ?? ""),
+              let email = environment("SQ_E2EE_V2_WEB_QA_EMAIL"),
+              let password = environment("SQ_E2EE_V2_WEB_QA_PASSWORD"),
+              let run = environment("SQ_E2EE_V2_WEB_QA_RUN"),
+              let file = environment("SQ_E2EE_V2_WEB_QA_FILE") else {
+            throw XCTSkip("Recette croisée avec le web non demandée")
+        }
+        let action = environment("SQ_E2EE_V2_WEB_QA_ACTION") ?? "read"
+        let previousUserId = LocalAccountScope.currentUserId
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(run, isDirectory: true)
+            .appendingPathComponent("v2", isDirectory: true)
+        defer {
+            LocalAccountScope.deactivate()
+            if let previousUserId { LocalAccountScope.activate(userId: previousUserId) }
+        }
+        var memberIds: [String] = []
+        for other in (environment("SQ_E2EE_V2_WEB_QA_MEMBER_EMAILS") ?? "").split(separator: ",").map(String.init) {
+            memberIds.append(try await login(email: other, password: password, base: base, run: run).userId)
+        }
+        let account = try await login(email: email, password: password, base: base, run: run)
+        let session = try become(account, base: base, root: root)
+        struct Detail: Decodable { let conversation: MessageConversation }
+        func detail(_ id: String) async throws -> MessageConversation {
+            try await session.api.request(APIEndpoint(path: "/api/messages/conversations/\(id)"), as: Detail.self).conversation
+        }
+        var report: [String: Any] = ["action": action, "userId": account.userId]
+
+        var conversationId = environment("SQ_E2EE_V2_WEB_QA_CONVERSATION") ?? ""
+        switch action {
+        case "create-group":
+            let created = await session.messaging.create(
+                participantIds: memberIds, isGroup: true, title: "QA iOS vers web", excludesWeb: false
+            )
+            guard case .created(let id, let pending) = created else { return XCTFail("Création v2 : \(created)") }
+            XCTAssertEqual(pending, [], "Chaque membre a un appareil certifié")
+            conversationId = id
+        case "migrate":
+            let conversation = try await detail(conversationId)
+            XCTAssertEqual(conversation.e2eeEnabled, true, "Conversation chiffrée v1 attendue")
+            let migrated = await session.messaging.migrateIfReady(conversation)
+            report["migrated"] = migrated
+            XCTAssertTrue(migrated, "Migration v1 → v2 à l'ouverture (§14.2)")
+        default:
+            break
+        }
+        let conversation = try await detail(conversationId)
+        let participantIds = conversation.participants.map(\.userId)
+        guard case .thread(let before) = await session.messaging.thread(
+            conversationId: conversationId, isGroup: conversation.isGroup, participants: conversation.participants
+        ) else { return XCTFail("Lecture v2 impossible") }
+        let readTexts = before.messages.compactMap(\.content)
+        print("[QA web] \(action) \(conversationId) : \(before.messages.count) messages lus, avis=\(before.notices.count)")
+        for text in readTexts { print("[QA web] lu : \(text)") }
+
+        let reply = environment("SQ_E2EE_V2_WEB_QA_REPLY") ?? "Réponse d'iOS (\(action))"
+        let clientRequestId = "msg_ios_web_qa_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(20).lowercased())"
+        let sent = await session.messaging.send(
+            .init(body: .text(reply), replyToRef: nil, mentions: [], ttlSeconds: 0),
+            clientRequestId: clientRequestId, conversationId: conversationId, isGroup: conversation.isGroup,
+            participantIds: participantIds
+        )
+        switch sent {
+        case .sent, .alreadyAccepted: break
+        default: XCTFail("Envoi v2 : \(sent)")
+        }
+        guard case .thread(let after) = await session.messaging.thread(
+            conversationId: conversationId, isGroup: conversation.isGroup, participants: conversation.participants
+        ) else { return XCTFail("Relecture v2 impossible") }
+        XCTAssertTrue(after.messages.contains { $0.content == reply }, "La réponse est relue en clair ici")
+
+        report["conversationId"] = conversationId
+        report["isGroup"] = conversation.isGroup
+        report["memberUserIds"] = participantIds
+        report["readCount"] = before.messages.count
+        report["readTexts"] = readTexts
+        report["reply"] = reply
+        report["notices"] = before.notices.count
+        report["at"] = ISO8601DateFormatter().string(from: Date())
+        let url = URL(fileURLWithPath: file)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic)
     }
 
     @MainActor

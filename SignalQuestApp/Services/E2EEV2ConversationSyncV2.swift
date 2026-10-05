@@ -266,9 +266,14 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
             }
         }
         // Époques sautées, dans l'ordre. Celle dont l'appareil n'est pas
-        // destinataire ne se lit pas : ses messages non plus.
-        if let knownEpoch, served.accepted.epochNumber - knownEpoch.epochNumber <= Self.maxSkippedEpochs {
-            for number in (knownEpoch.epochNumber + 1)..<served.accepted.epochNumber {
+        // destinataire ne se lit pas : ses messages non plus. À la découverte
+        // d'une conversation (aucune époque connue ici), les époques antérieures
+        // dont il est destinataire s'ouvrent aussi : un groupe renouvelé avant la
+        // première relève garde ses premiers messages lisibles (§3.4).
+        let firstMissing = knownEpoch.map { $0.epochNumber + 1 }
+            ?? max(1, served.accepted.epochNumber - Self.maxSkippedEpochs)
+        if served.accepted.epochNumber - firstMissing <= Self.maxSkippedEpochs {
+            for number in firstMissing..<max(firstMissing, served.accepted.epochNumber) {
                 switch await bound.getJSON(
                     path: "\(base)/epochs/\(number)", expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
                 ) {

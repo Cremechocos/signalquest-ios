@@ -196,6 +196,33 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
 
     // MARK: Outils
 
+    /// Découverte d'une conversation déjà renouvelée avant la première relève
+    /// (recette croisée avec le web, 05/10) : les époques antérieures dont
+    /// l'appareil est destinataire s'ouvrent aussi, sinon leurs premiers
+    /// messages resteraient illisibles (§3.4, v0.4.32).
+    func testDiscoveryOpensTheEarlierEpochsOfThisDevice() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
+        let devices = fixture.deviceSet(adding: [creator.device])
+        let served = try serve(fixture, creator: creator, devices: devices)
+        let keyTwo = Data(repeating: 0x22, count: 32), keyThree = Data(repeating: 0x33, count: 32)
+        let two = try epoch(2, key: keyTwo, fixture, creator: creator, devices: devices, chain: served.chain)
+        let three = try epoch(3, key: keyThree, fixture, creator: creator, devices: devices, chain: served.chain)
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/epochs/1") { return E2EEV2AccountFixture.response(request, served.current) }
+            if path.hasSuffix("/epochs/2") { return E2EEV2AccountFixture.response(request, two) }
+            if path.hasSuffix("/epochs/current") { return E2EEV2AccountFixture.response(request, three) }
+            return try Self.server(served)(request)
+        }
+        let discovered = await sync(fixture, devices: devices)
+        XCTAssertEqual(discovered, .received(epochNumber: 3))
+        let namespace = fixture.session.ownerNamespace
+        XCTAssertEqual(try fixture.states.acceptedEpochs(conversationId: conversationId, ownerNamespace: namespace).map(\.epochNumber), [1, 2, 3])
+        XCTAssertEqual(try fixture.keys.loadEpoch(conversationId: conversationId, epochNumber: 1, ownerNamespace: namespace)?.epochKey,
+                       served.epochKey, "Le premier message reste lisible")
+    }
+
     func testSkippedEpochsAreReadOneByOne() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
