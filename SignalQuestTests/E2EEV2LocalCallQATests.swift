@@ -207,8 +207,16 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         guard case .success = await session.lifecycle.publishCapabilitiesIfNeeded() else {
             return XCTFail("Capacités de l'appelant")
         }
-        let created = await session.messaging.create(participantIds: [calleeUserId], isGroup: true, title: "QA appel croisé", excludesWeb: false)
-        guard case .created(let conversationId, _) = created else { return XCTFail("Création v2 : \(created)") }
+        // Une conversation v2 existante (`…_CONVERSATION`), synchronisée, ou un groupe neuf.
+        let conversationId: String
+        if let existing = environment("SQ_E2EE_V2_CROSS_CALL_CONVERSATION"), !existing.isEmpty {
+            conversationId = existing
+            _ = await session.messaging.callMembers(conversationId: existing, synchronizing: true)
+        } else {
+            let created = await session.messaging.create(participantIds: [calleeUserId], isGroup: true, title: "QA appel croisé", excludesWeb: false)
+            guard case .created(let newId, _) = created else { return XCTFail("Création v2 : \(created)") }
+            conversationId = newId
+        }
         XCTAssertTrue(session.calls.canStart(conversationId: conversationId),
                       "Tous les appareils certifiés de l'appelé doivent annoncer « appels »")
         guard case .prepared(let descriptor) = session.calls.prepareOutgoing(conversationId: conversationId) else {
