@@ -110,6 +110,29 @@ final class E2EEV2ConversationMessagingV2Tests: XCTestCase {
         XCTAssertTrue(server.sentEnvelopes.isEmpty, "Rien d'envoyé tant que son numéro n'est pas accepté")
     }
 
+    /// Un compte sans identité v2 n'entre pas dans un groupe v2 : rien n'est
+    /// signé ni envoyé, le groupe n'est jamais suspendu à son sujet.
+    func testAnAccountWithoutV2IsNotAddedToAV2Group() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let seeded = try fixture.seedConversation(with: bruno, devices: fixture.deviceSet(adding: [phone.device]))
+        let server = try FakeV2Server(fixture, seeded: seeded, pageSize: 100)
+        MockURLProtocol.requestHandler = server.handle
+        let messaging = try makeMessaging(fixture)
+        let newcomer = "user_david_01J7ABCD23456789"
+        let devices = E2EEV2CertifiedDeviceSet(
+            devicesByUser: fixture.deviceSet(adding: [phone.device]).devicesByUser, refusals: [newcomer: .notFound]
+        )
+        let result = await messaging.change(
+            .add(userId: newcomer), conversationId: seeded.conversationId, isGroup: true, devices: devices,
+            expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        guard case .failure(let failure) = result else { return XCTFail("Ajout refusé attendu, reçu \(result)") }
+        XCTAssertEqual(failure.message, "e2ee-v2-capability-missing")
+        XCTAssertNil(try fixture.states.pendingMembership(conversationId: seeded.conversationId, ownerNamespace: fixture.session.ownerNamespace))
+        XCTAssertEqual(server.epochPosts, 0)
+    }
+
     func testExcludingBrowsersRotatesAtOnce() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")

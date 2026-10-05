@@ -141,6 +141,35 @@ extension E2EEV2MembershipWriterV2Tests {
         let chain = try fixture.states.membershipChain(conversationId: seeded.conversationId, ownerNamespace: namespace)
         XCTAssertTrue(try XCTUnwrap(chain.last).canonical.contains("\nLEAVE\n"))
     }
+
+    /// Le dernier admin qui part sans successeur : refus définitif, le départ
+    /// n'est pas gardé et ne repart pas à la place du changement suivant.
+    func testALeaveRefusedForTheLastAdminIsNotKept() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let seeded = try fixture.seedConversation(with: bruno, devices: fixture.deviceSet(adding: [phone.device]))
+        let namespace = fixture.session.ownerNamespace
+        let bodies = MembershipBodies()
+        MockURLProtocol.requestHandler = { request in
+            if bodies.append(request.url?.path ?? "", E2EEV2AccountFixture.rawBody(request)) == 1 {
+                return E2EEV2AccountFixture.response(
+                    request, Data(#"{"error":"x","code":"E2EE_LAST_ADMIN_MUST_PROMOTE"}"#.utf8), status: 409
+                )
+            }
+            let number = String(seeded.membership.changeNumber + 1)
+            return E2EEV2AccountFixture.response(request, E2EEV2CanonicalJSON.encode(.object(["changeNumber": .string(number)])))
+        }
+        let writer = E2EEV2MembershipWriterV2(api: fixture.api, identityStore: fixture.identity, stateStore: fixture.states, expectedSession: fixture.session)
+        let owner = fixture.session.ownerScopeId
+        guard case .failure(let refused) = await writer.submit(.leave, conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
+        else { return XCTFail("Départ refusé attendu") }
+        XCTAssertEqual(refused.code, "E2EE_LAST_ADMIN_MUST_PROMOTE")
+        XCTAssertNil(try fixture.states.pendingMembership(conversationId: seeded.conversationId, ownerNamespace: namespace))
+
+        let next = await writer.submit(.excludeBrowsers(true), conversationId: seeded.conversationId, isGroup: false, expectedOwnerScopeId: owner)
+        XCTAssertEqual(next, .applied(changeNumber: seeded.membership.changeNumber + 1))
+        XCTAssertTrue(String(decoding: try XCTUnwrap(bodies.all.last).1, as: UTF8.self).contains("EXCLUDE_WEB_ON"))
+    }
 }
 
 private extension Array {

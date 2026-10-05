@@ -849,6 +849,22 @@
         }
       }
     },
+    "Ce membre doit mettre à jour SignalQuest pour rejoindre ce groupe chiffré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This member needs to update SignalQuest to join this encrypted group."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce membre doit mettre à jour SignalQuest pour rejoindre ce groupe chiffré."
+          }
+        }
+      }
+    },
     "Ce message chiffré n’a pas pu être envoyé." : {
       "localizations" : {
         "en" : {
@@ -2676,6 +2692,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Primaire"
+          }
+        }
+      }
+    },
+    "Nomme un autre admin avant de quitter le groupe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make someone else an admin before leaving the group."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nomme un autre admin avant de quitter le groupe."
           }
         }
       }

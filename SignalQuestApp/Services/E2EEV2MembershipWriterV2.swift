@@ -173,6 +173,12 @@ final class E2EEV2MembershipWriterV2: @unchecked Sendable {
                 return .failure(localError("e2ee-membership-storage-failed"))
             }
             return .applied(changeNumber: head.changeNumber + 1)
+        // Refus définitif d'un changement que le serveur ne prendra jamais (le
+        // dernier admin qui part sans successeur) : il n'est pas gardé, sinon il
+        // repartirait à la place du changement suivant.
+        case .failure(let error) where error.statusCode == 409 && error.code == "E2EE_LAST_ADMIN_MUST_PROMOTE":
+            try? stateStore.clearPendingMembership(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            return .failure(error)
         case .failure(let error):
             return .failure(error)
         case .success(let data, _, _):

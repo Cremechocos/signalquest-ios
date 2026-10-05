@@ -13,6 +13,7 @@ actor E2EEV2DeviceDirectoryCache {
         let devices: [E2EEV2CertifiedDevice]?
         let refusal: E2EEV2IdentityVerification.Failure?
         let listVersion: Int?
+        var deleted = false
         let readAt: Date
     }
 
@@ -74,13 +75,14 @@ actor E2EEV2DeviceDirectoryCache {
             where before.all == generation && seen == (generations[user] ?? 0) {
                 entries[user] = Entry(
                     devices: read.devicesByUser[user], refusal: read.refusals[user],
-                    listVersion: read.listVersions[user], readAt: readAt
+                    listVersion: read.listVersions[user], deleted: read.deleted.contains(user), readAt: readAt
                 )
             }
         }
         var devices: [String: [E2EEV2CertifiedDevice]] = [:]
         var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
         var versions: [String: Int] = [:]
+        var deleted: Set<String> = []
         for user in wanted {
             // Ce qui vient d'être lu sert à cet appel même si une invalidation
             // l'empêche d'entrer dans le cache : il est plus récent que lui.
@@ -90,13 +92,17 @@ actor E2EEV2DeviceDirectoryCache {
             if let refusalRead { refusals[user] = refusalRead }
             if let devicesRead { devices[user] = devicesRead }
             if let versionRead { versions[user] = versionRead }
+            let isDeleted = stale.contains(user)
+                ? fresh?.deleted.contains(user) == true
+                : entries[user]?.deleted == true
+            if isDeleted { deleted.insert(user) }
         }
         let owners = devices.values.flatMap { $0 }.reduce(into: [String: Int]()) { $0[$1.deviceId, default: 0] += 1 }
         let ambiguous = Set(owners.filter { $0.value > 1 }.keys)
         if !ambiguous.isEmpty {
             devices = devices.mapValues { $0.filter { !ambiguous.contains($0.deviceId) } }
         }
-        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals, listVersions: versions)
+        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals, listVersions: versions, deleted: deleted)
     }
 
     /// Comptes à relire au prochain appel ; tous si `nil`.

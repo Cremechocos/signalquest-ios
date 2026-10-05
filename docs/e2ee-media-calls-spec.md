@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.30**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.31**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,11 +202,16 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.31 (05/10/2026), proposition, arrêtée avec le serveur : période
+>   mixte, création v1 chiffrée permise seulement si un participant n'a pas
+>   de v2, jamais en repli pour un pair déjà épinglé (§14.4). Aucun vecteur
+>   ne change.
 > - v0.4.30 (05/10/2026), proposition, arrêtée avec le serveur : un compte
->   supprimé dans une conversation v2 (410 `E2EE_ACCOUNT_DELETED`), retiré
->   par un administrateur ; succession du dernier administrateur par le
->   membre le plus ancien (décision produit) ; ré-ajout sans l'historique
->   antérieur (D.4). Aucun vecteur ne change.
+>   supprimé dans une conversation v2 (410 `E2EE_ACCOUNT_DELETED`) devient un
+>   membre sans appareil, qu'un administrateur peut retirer ; ré-ajout sans
+>   l'historique antérieur (D.4). Le dernier administrateur nomme un
+>   successeur avant de partir (décision produit, après l'ouverture ;
+>   `409 E2EE_LAST_ADMIN_MUST_PROMOTE`). Aucun vecteur ne change.
 > - v0.4.29 (05/10/2026), proposition : signal d'ouverture des verrous à
 >   l'exécution, par les capacités publiées dans `/api/app/version-policy`
 >   (§17), arrêté avec le serveur. Aucun vecteur ne change.
@@ -1531,6 +1536,19 @@ minimale qui accompagne la bêta du jalon A (décision du 30/09).
    authenticité.
 4. Quand la v2 est activée, le serveur cesse toute génération de clé v1.
    Décision du 30/09 : au jalon A, donc avant la prochaine bêta TestFlight.
+   - **Période mixte** (v0.4.31) : tant que des comptes n'ont pas de v2 (une
+     plateforme qui ouvre plus tard), une conversation chiffrée v1 peut
+     encore naître, et recevoir un nouveau membre. Condition : au moins un
+     participant, créateur compris, répond `404 E2EE_IDENTITY_NOT_FOUND`. Si
+     tous ont la v2, le serveur répond `409 E2EE_UPDATE_REQUIRED` et ne
+     génère aucune clé v1.
+   - Pas de déclassement nouveau : un serveur qui ment sur ce 404 pouvait
+     déjà faire naître du v1 (§14.2), affiché « ancien chiffrement, clé
+     connue du serveur ».
+   - Le garde-fou est chez le client. Un pair déjà épinglé en v2 qui répond
+     404 est un refus (identité retirée, §2.4) : jamais de repli en v1, la
+     création attend.
+   - Un groupe v2 ne reçoit jamais de compte sans v2 (D.4).
 5. Une app sans v2 face à une conversation v2 ne reçoit pas les messages v2.
    Décision du 30/09 : elle affiche « Cette conversation utilise un
    chiffrement plus récent : mets à jour SignalQuest ».
@@ -2245,23 +2263,24 @@ certificat et la liste, sans `uikWrap` (§2.7).
     comme « compte supprimé ».
   - Ce n'est pas un risque : déclarer un compte supprimé ne fait que retirer
     un destinataire, sans donner accès à quoi que ce soit.
-  - Le premier appareil d'un administrateur qui reçoit ce 410 signe un
-    `REMOVE` qui vise ce membre. Une course entre deux administrateurs se
-    règle par le 409 de comparaison-échange : le perdant relit la chaîne.
-  - **Succession** (décision produit du 05/10/2026) : quand aucun
-    administrateur de l'état courant n'a plus de compte, le membre le plus
-    ancien encore vivant signe un `ROLE_ADMIN` qui le vise lui-même.
-    - « Plus ancien » : son arrivée courante porte le plus petit
-      `changeNumber`. L'arrivée courante est le `ADD` qui l'a fait entrer pour
-      la dernière fois (son `ADD` de genèse pour un membre d'origine) : un
-      membre retiré puis ré-ajouté compte à partir de son retour.
-    - Sans aucun administrateur (le dernier est parti par `LEAVE`), la
-      condition est remplie de même : la succession s'applique.
-    - C'est la seule exception à la règle des administrateurs.
-    - Un vérificateur l'accepte si chaque administrateur de l'état précédent
-      répond 410 et qu'aucun membre plus ancien ne répond autrement que 410.
-    - Le serveur applique la même règle à l'écriture.
-    - Ensuite, le nouvel administrateur retire les comptes supprimés.
+  - Un administrateur peut le retirer par un `REMOVE` ordinaire. Aucun
+    client ne le fait de lui-même : un 410 n'est ni signé ni gardé, ce n'est
+    pas une preuve.
+  - **Successeur avant de partir** (décision produit du 05/10/2026, après
+    l'ouverture ; elle remplace une succession par le membre le plus ancien,
+    abandonnée faute de preuve vérifiable) :
+    - le dernier administrateur d'un groupe qui garde d'autres membres nomme
+      un successeur par un `ROLE_ADMIN` qu'il signe, avant son `LEAVE`. Le
+      serveur refuse ce `LEAVE` sans successeur :
+      `409 E2EE_LAST_ADMIN_MUST_PROMOTE`. Le client ne garde pas ce
+      changement refusé et invite à nommer un admin ;
+    - à la suppression de son compte, son appareil promeut d'abord le membre
+      le plus ancien, puis appelle la suppression ; le serveur ne bloque
+      jamais une suppression de compte ;
+    - si rien n'a pu se faire, le groupe est figé : plus de changement de
+      membres ni de rôle, mais messages, départs et appels continuent ;
+    - tout reste signé et vérifiable : aucune règle ne dépend de l'état des
+      comptes.
   - Un membre retiré puis ré-ajouté ne reçoit ni les messages ni les
     enveloppes de récupération des époques antérieures à son retour. Il ne
     pourrait pas les lire de toute façon : il n'a que l'époque de son retour.
@@ -2673,6 +2692,8 @@ version publiée qui ouvre les verrous.
     autre que celui auquel la session est liée (E.1, v0.4.19) ;
   - `E2EE_ACCOUNT_DELETED` (410) : compte supprimé, lu par un membre d'une
     conversation v2 qui le contient (D.4, v0.4.30) ;
+  - `E2EE_LAST_ADMIN_MUST_PROMOTE` (409) : `LEAVE` du dernier administrateur
+    d'un groupe qui garde d'autres membres, sans successeur (D.4, v0.4.30) ;
   - `E2EE_DEVICE_ID_INVALID` (400) : identifiant d'appareil mal formé dans
     le chemin (v0.4.19) ;
   - réinitialisation et récupération (E.1, v0.4.21) :

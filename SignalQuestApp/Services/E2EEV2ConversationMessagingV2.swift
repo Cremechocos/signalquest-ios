@@ -289,6 +289,12 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         devices: E2EEV2CertifiedDeviceSet,
         expectedOwnerScopeId: String
     ) async -> E2EEV2MembershipWriteResultV2 {
+        // Un compte sans identité v2 (`E2EE_IDENTITY_NOT_FOUND`) ne lirait rien
+        // du groupe et en suspendrait les envois (§2.4) : il n'y entre pas tant
+        // qu'il n'a pas mis à jour SignalQuest.
+        if case .add(let userId) = change, devices.refusals[userId] == .notFound {
+            return .failure(.init(kind: .permanent, message: "e2ee-v2-capability-missing"))
+        }
         let mirrorGeneration = notificationMirror?.invalidate(conversationId)
         var result = await writer.submit(change, conversationId: conversationId, isGroup: isGroup, expectedOwnerScopeId: expectedOwnerScopeId)
         if result == .needsSync {

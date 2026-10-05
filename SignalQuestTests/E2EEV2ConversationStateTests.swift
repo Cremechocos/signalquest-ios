@@ -83,6 +83,21 @@ final class E2EEV2ConversationStateTests: XCTestCase {
         )
     }
 
+    /// 410 `E2EE_ACCOUNT_DELETED` : un membre sans appareil, ni refusé ni à relire.
+    func testADeletedAccountIsAMemberWithoutDevices() async throws {
+        let directory = E2EEV2TrustDirectory(
+            ownerNamespace: "ns-deleted-account", pins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()),
+            fetch: { _, _ in throw E2EEV2TrustDirectory.AccountDeleted() }
+        )
+        let set = try await directory.certifiedDevices(for: [bruno])
+        XCTAssertEqual(set.devicesByUser[bruno], [])
+        XCTAssertEqual(set.deleted, [bruno])
+        XCTAssertTrue(set.refusals.isEmpty)
+        XCTAssertEqual(set.untrustedMembers([bruno]), [])
+        XCTAssertEqual(set.unread([bruno]), [])
+        XCTAssertNil(set.listVersions[bruno])
+    }
+
     /// Un membre non administrateur qui a migré un groupe ne peut pas, plus
     /// tard, se nommer administrateur : la genèse s'arrête au n° de l'époque 1.
     func testMigrationAuthorCannotLaterGrantHimselfAdmin() throws {

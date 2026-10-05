@@ -14,6 +14,9 @@ struct E2EEV2CertifiedDeviceSet: Equatable, Sendable {
     /// avec une époque (`memberListVersions`, E.2) : le serveur refuse une
     /// époque bâtie sur une liste qui n'est plus la courante.
     var listVersions: [String: Int] = [:]
+    /// Comptes supprimés (410 `E2EE_ACCOUNT_DELETED`, D.4 v0.4.30) : membres
+    /// sans appareil, ni refusés ni à relire ; un administrateur les retire.
+    var deleted: Set<String> = []
 
     /// Membres qui n'ont pas été lus du tout, ni crus ni refusés : appris par
     /// une synchronisation après la lecture. Ils sont à lire avant toute
@@ -139,6 +142,9 @@ actor E2EEV2TrustDirectory {
     /// `E2EE_IDENTITY_NOT_FOUND`, levé par `fetch` : refus de ce seul membre.
     struct IdentityNotFound: Error, Equatable {}
 
+    /// `410 E2EE_ACCOUNT_DELETED`, levé par `fetch` : compte supprimé (D.4).
+    struct AccountDeleted: Error, Equatable {}
+
     /// E.1 en production : lecture par session (sans signature), la version
     /// épinglée en `sinceVersion`.
     static func identityFetch(
@@ -158,6 +164,8 @@ actor E2EEV2TrustDirectory {
                 return value
             case .failure(let failure) where failure.statusCode == 404 && failure.code == "E2EE_IDENTITY_NOT_FOUND":
                 throw IdentityNotFound()
+            case .failure(let failure) where failure.statusCode == 410 && failure.code == "E2EE_ACCOUNT_DELETED":
+                throw AccountDeleted()
             case .failure(let failure):
                 throw failure
             }
@@ -196,11 +204,17 @@ actor E2EEV2TrustDirectory {
         var devices: [String: [E2EEV2CertifiedDevice]] = [:]
         var refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
         var versions: [String: Int] = [:]
+        var deleted: Set<String> = []
         for userId in Set(userIds).sorted() {
             let expected = userId == ownUserId ? ownAccountKey() : nil
             let read: Read
             do {
                 read = try await self.read(userId: userId, expectedUIK: expected)
+            } catch is AccountDeleted where userId != ownUserId {
+                // Ne fait que retirer un destinataire : sans appareil, sans refus.
+                devices[userId] = []
+                deleted.insert(userId)
+                continue
             } catch is IdentityNotFound {
                 // Un pin illisible compte comme un pin : jamais de retour en v1 sur un doute.
                 let pinned: Bool
@@ -223,7 +237,7 @@ actor E2EEV2TrustDirectory {
         if !ambiguous.isEmpty {
             devices = devices.mapValues { $0.filter { !ambiguous.contains($0.deviceId) } }
         }
-        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals, listVersions: versions)
+        return E2EEV2CertifiedDeviceSet(devicesByUser: devices, refusals: refusals, listVersions: versions, deleted: deleted)
     }
 
     /// Son propre compte, vérifié : la liste courante sur laquelle signer la
