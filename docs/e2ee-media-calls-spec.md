@@ -2524,6 +2524,23 @@ chaque élément de la partie en clair (v0.4.23).
     la plateforme les donne : un iPhone n'envoie que `technology` et
     `operator`. Un champ absent est masqué à l'affichage. Paquet de 2 Kio au
     plus, sinon il est écarté.
+  - **Valeurs** (v0.4.33) :
+    - les nombres sont des chaînes décimales signées (D.0), par exemple
+      `"rsrp": "-95"` ; les bandes sont des tableaux de chaînes
+      (`"lteBands": ["3", "20"]`). Un récepteur peut accepter aussi un nombre,
+      puisque ce n'est que de l'affichage, mais un émetteur envoie toujours des
+      chaînes ;
+    - `technology` : `5G SA`, `5G NSA`, `4G LTE`, `3G` ou `2G`. Absente si
+      elle est inconnue. Le récepteur affiche le texte tel quel. C'est la
+      génération réelle du réseau, lue dans le système, jamais déduite du
+      débit : un navigateur, qui n'expose qu'une classe de débit, ne l'envoie
+      pas ;
+    - `operator` : le nom commercial du réseau qui porte la connexion, tel que
+      l'appareil le connaît. Sur Android, c'est le réseau observé ; sur
+      iPhone, l'opérateur résolu par l'app, puisque iOS ne donne plus celui
+      de la SIM. 64 caractères au plus, sans MCC ni MNC ;
+    - `qualityLevel` : `EXCELLENT`, `GOOD`, `FAIR`, `POOR` ou `NO_SIGNAL`,
+      seulement là où la plateforme mesure le signal (pas sur iPhone).
   - **Attribution.** L'émetteur donné par le SDK (identité de la SFU) est
     préféré quand il est résolu. Alors `livekitIdentity` doit le désigner,
     sinon le paquet est écarté. Faute d'émetteur résolu, le paquet est
