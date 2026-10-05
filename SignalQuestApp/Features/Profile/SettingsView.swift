@@ -851,7 +851,12 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
     @Published var acknowledgesDeviceRevocation = false
     @Published var acknowledgesRecoveryReplacement = false
     @Published private(set) var resetCompleted = false
+    /// Demande faite ici, en attente de la bascule à son échéance (72 heures).
+    @Published private(set) var pendingReset: E2EEV2IdentityResetStatus?
+    /// Demande faite depuis un autre appareil du compte, que celui-ci peut refuser.
+    @Published private(set) var resetToReview: E2EEV2PendingIdentityResetReview?
     @Published private(set) var resetNeedsRecovery = false
+    private var recoveryRequestedAfterSwitch = false
     @Published var acknowledgedNoRecovery = false
 
     private let identityStore: E2EEV2DeviceIdentityStore
@@ -881,6 +886,8 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
         activationEnabled = false
         errorMessage = nil
         defer { isLoading = false }
+        // D'abord la demande faite ici : sa bascule change l'appareil local.
+        let completed = await followPendingReset()
         let localDeviceId: String?
         do {
             localDeviceId = try identityStore.load()?.deviceId
@@ -902,6 +909,15 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
             currentDeviceStatus = inventory.devices.first {
                 $0.descriptor.deviceId == localDeviceId
             }?.status
+            resetToReview = activationEnabled && currentDeviceStatus == .approved
+                ? await lifecycle.pendingIdentityResetToReview() : nil
+            if completed { await createRecoveryAfterSwitch() }
+            if !completed, !resetNeedsRecovery, Self.needsRecoveryAfterReset {
+                // Bascule faite lors d'un lancement précédent, clé jamais créée.
+                flow = .reset
+                resetCompleted = true
+                resetNeedsRecovery = true
+            }
         case .failed(let failure):
             currentDeviceStatus = nil
             identityGeneration = nil
@@ -911,7 +927,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
 
     func changeFlow(_ next: E2EEV2RecoveryFlow) {
         guard !isBusy, mayLeaveSecret else { return }
-        if flow == .reset, next != .reset, !resetCompleted {
+        if flow == .reset, next != .reset, !resetCompleted, pendingReset == nil {
             _ = lifecycle.discardIdentityResetCandidate()
         }
         wipeRecoveryKey()
@@ -972,7 +988,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
     }
 
     func requestResetEmail() async {
-        guard activationEnabled, !isBusy, allResetAcknowledged,
+        guard activationEnabled, !isBusy, allResetAcknowledged, pendingReset == nil,
               let generation = identityGeneration else { return }
         isBusy = true
         errorMessage = nil
@@ -1005,22 +1021,113 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
             expectedGeneration: generation,
             reauthentication: .email(challengeId: challenge.challengeId, code: resetCode)
         ) {
-        case .success:
-            resetCompleted = true
+        case .success(let status):
             resetChallenge = nil
             resetCode = ""
-            resetNeedsRecovery = true
-            confirmationMessage = "Identité réinitialisée. Création immédiate d’une nouvelle clé de récupération."
-            await load()
-            await createRecoveryMaterial()
+            if status.state == .pending {
+                pendingReset = status
+                confirmationMessage = String(localized: "Demande enregistrée. Ton identité sera remplacée à l’échéance, sauf si l’un de tes appareils s’y oppose.")
+            } else if apply(status) {
+                // Une demande antérieure vient de basculer : l'appareil local a changé.
+                await load()
+                await createRecoveryAfterSwitch()
+            }
         case .failed(let failure):
+            errorMessage = Self.message(
+                for: failure,
+                fallback: "La réinitialisation a échoué ; l’identité actuelle reste inchangée."
+            )
+        }
+    }
+
+    func checkPendingReset() async {
+        guard !isBusy, pendingReset != nil else { return }
+        isBusy = true
+        errorMessage = nil
+        confirmationMessage = nil
+        defer { isBusy = false }
+        if await followPendingReset() {
+            await load()
+            await createRecoveryAfterSwitch()
+        }
+    }
+
+    /// Refuse, depuis cet appareil, la réinitialisation demandée ailleurs.
+    func objectToReset() async {
+        guard activationEnabled, !isBusy, let review = resetToReview else { return }
+        isBusy = true
+        errorMessage = nil
+        confirmationMessage = nil
+        defer { isBusy = false }
+        switch await lifecycle.objectIdentityReset(review) {
+        case .success:
+            resetToReview = nil
+            confirmationMessage = String(localized: "Réinitialisation refusée. Ton identité actuelle est conservée.")
+        case .failed(let failure):
+            // L'issue déjà acquise (`details.status`) : une opposition dont la
+            // réponse s'est perdue a réussi ; une bascule qui a gagné la course
+            // révoque l'appareil qui s'oppose (403).
+            let outcome: String? = if case .string(let value)? = failure.details?["status"] { value } else { nil }
+            if failure.code == "E2EE_IDENTITY_RESET_NOT_PENDING", outcome == "objected" {
+                resetToReview = nil
+                confirmationMessage = String(localized: "Réinitialisation refusée. Ton identité actuelle est conservée.")
+            } else if failure.code == "E2EE_IDENTITY_RESET_NOT_PENDING", outcome == "aborted" {
+                resetToReview = nil
+                confirmationMessage = String(localized: "La réinitialisation a été annulée, car l’état du compte a changé entre-temps.")
+            } else if failure.code == "E2EE_IDENTITY_RESET_NOT_PENDING" || failure.code == "E2EE_DEVICE_REVOKED"
+                        || failure.message == "e2ee-identity-reset-due" {
+                resetToReview = nil
+                errorMessage = String(localized: "Trop tard : l’échéance de cette réinitialisation est passée.")
+            } else {
+                errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible de refuser cette réinitialisation."))
+            }
+        }
+    }
+
+    /// Suit la demande faite ici. `true` : la bascule vient d'avoir lieu, la
+    /// nouvelle clé de récupération reste à créer.
+    private func followPendingReset() async -> Bool {
+        switch await lifecycle.refreshIdentityReset() {
+        case nil:
+            pendingReset = nil
+            return false
+        case .success(let status)?:
+            return apply(status)
+        case .failed(let failure)?:
             errorMessage = Self.message(
                 for: failure,
                 fallback: failure.message == "e2ee-identity-reset-local-activation-pending"
                     ? String(localized: "Identité réinitialisée côté compte. La configuration locale reste en attente.")
-                    : "La réinitialisation a échoué ; l’identité actuelle reste inchangée."
+                    : String(localized: "Impossible de vérifier la réinitialisation en attente.")
             )
+            return false
         }
+    }
+
+    /// Montre l'état d'une demande faite ici. `true` : la bascule a eu lieu.
+    private func apply(_ status: E2EEV2IdentityResetStatus) -> Bool {
+            switch status.state {
+            case .pending:
+                pendingReset = status
+                flow = .reset
+                return false
+            case .completed:
+                pendingReset = nil
+                flow = .reset
+                resetCompleted = true
+                resetNeedsRecovery = true
+                Self.needsRecoveryAfterReset = true
+                confirmationMessage = String(localized: "Identité réinitialisée. Création immédiate d’une nouvelle clé de récupération.")
+                return true
+            case .objected:
+                pendingReset = nil
+                errorMessage = String(localized: "La réinitialisation a été refusée depuis un autre de tes appareils. L’identité actuelle reste inchangée.")
+                return false
+            case .aborted:
+                pendingReset = nil
+                errorMessage = String(localized: "La réinitialisation a été annulée, car l’état du compte a changé entre-temps.")
+                return false
+            }
     }
 
     func retryRecoveryAfterReset() async {
@@ -1032,12 +1139,34 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
     }
 
     func wipeTransientSecrets() {
+        if resetNeedsRecovery, acknowledgedNoRecovery { Self.needsRecoveryAfterReset = false }
         wipeRecoveryKey()
         recoveryInput = ""
         resetCode = ""
-        if flow == .reset, !resetCompleted {
+        if flow == .reset, !resetCompleted, pendingReset == nil {
             _ = lifecycle.discardIdentityResetCandidate()
         }
+    }
+
+    /// Une seule clé par bascule, même si deux lectures la constatent.
+    private func createRecoveryAfterSwitch() async {
+        guard !recoveryRequestedAfterSwitch else { return }
+        recoveryRequestedAfterSwitch = true
+        await createRecoveryMaterial()
+    }
+
+    /// Après une bascule, la clé de récupération reste due d'un lancement à
+    /// l'autre, jusqu'à sa création ou au renoncement explicite.
+    private static var needsRecoveryAfterReset: Bool {
+        get { UserDefaults.standard.bool(forKey: needsRecoveryKey) }
+        set {
+            if newValue { UserDefaults.standard.set(true, forKey: needsRecoveryKey) }
+            else { UserDefaults.standard.removeObject(forKey: needsRecoveryKey) }
+        }
+    }
+
+    private static var needsRecoveryKey: String {
+        "SignalQuest.E2EE.resetNeedsRecovery.v1:" + LocalAccountScope.storageNamespace
     }
 
     private func createRecoveryMaterial() async {
@@ -1058,6 +1187,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
         recoveryKeyAcknowledged = false
         acknowledgedNoRecovery = false
         resetNeedsRecovery = false
+        Self.needsRecoveryAfterReset = false
 
         switch await recoveryEpochs.backfillAll(ownBundle: ownBundle) {
         case .success(let summary):
@@ -1113,7 +1243,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
     }
 }
 
-private struct E2EEV2RecoveryResetView: View {
+struct E2EEV2RecoveryResetView: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: E2EEV2RecoveryResetViewModel
     @State private var revealRecoveryInput = false
@@ -1125,6 +1255,7 @@ private struct E2EEV2RecoveryResetView: View {
     var body: some View {
         List {
             statusSection
+            resetReviewSection
             E2EEV2RotationStatusSection(runtime: services.epochRotations)
 
             switch model.flow {
@@ -1175,6 +1306,31 @@ private struct E2EEV2RecoveryResetView: View {
         // La clé de récupération peut être affichée en clair. Masquer aussi
         // cette vue dans l'aperçu système, même si le verrou local est désactivé.
         .background(AppSensitiveContentMarker())
+    }
+
+    @ViewBuilder
+    private var resetReviewSection: some View {
+        if let review = model.resetToReview {
+            Section {
+                Label("Réinitialisation demandée", systemImage: "exclamationmark.shield.fill")
+                    .font(SQType.heading)
+                    .foregroundStyle(SQColor.warning)
+                Text("Un appareil a demandé à remplacer l’identité de chiffrement de ton compte. Sans refus, ce remplacement aura lieu le \(Self.resetDate(review.document.effectiveAtMs)) et tous tes appareils actuels seront révoqués. Si ce n’est pas toi, refuse-la.")
+                Button(role: .destructive) {
+                    Task { await model.objectToReset() }
+                } label: {
+                    Label("Refuser cette réinitialisation", systemImage: "hand.raised.fill")
+                        .frame(minHeight: 48)
+                }
+                .disabled(!model.activationEnabled || model.isBusy)
+            } header: {
+                Text("Sécurité du compte")
+            }
+        }
+    }
+
+    private static func resetDate(_ milliseconds: Int64) -> String {
+        Date(timeIntervalSince1970: Double(milliseconds) / 1_000).formatted(date: .long, time: .shortened)
     }
 
     private var statusSection: some View {
@@ -1303,7 +1459,19 @@ private struct E2EEV2RecoveryResetView: View {
             Text("Tous les appareils actuels seront révoqués. L’historique non récupéré sera définitivement perdu.")
                 .foregroundStyle(SQColor.danger)
 
-            if !model.resetCompleted && model.resetChallenge == nil {
+            if let pending = model.pendingReset {
+                Label("Réinitialisation en attente", systemImage: "hourglass")
+                    .font(SQType.heading)
+                Text("Ton identité sera remplacée le \(Self.resetDate(pending.effectiveAtMs)). D’ici là, chacun de tes appareils actuels peut s’y opposer.")
+                    .foregroundStyle(SQColor.labelSecondary)
+                Button {
+                    Task { await model.checkPendingReset() }
+                } label: {
+                    Label("Vérifier l’état", systemImage: "arrow.clockwise")
+                        .frame(minHeight: 48)
+                }
+                .disabled(model.isBusy)
+            } else if !model.resetCompleted && model.resetChallenge == nil {
                 resetAcknowledgement(
                     "Je comprends que l’historique non récupéré pourra être perdu définitivement.",
                     isOn: $model.acknowledgesHistoryLoss

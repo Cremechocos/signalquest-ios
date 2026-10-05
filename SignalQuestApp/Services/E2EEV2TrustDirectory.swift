@@ -113,6 +113,10 @@ final class E2EEV2TrustPinStore: @unchecked Sendable {
         try tokenStore.set(value, for: key(userId: userId, ownerNamespace: ownerNamespace), accessibility: .afterFirstUnlock)
     }
 
+    func remove(userId: String, ownerNamespace: String) throws {
+        try tokenStore.remove(key(userId: userId, ownerNamespace: ownerNamespace))
+    }
+
     static func prefix(ownerNamespace: String) -> String {
         "\(keyPrefix):\(ownerNamespace):"
     }
@@ -230,6 +234,8 @@ actor E2EEV2TrustDirectory {
         let outcome: E2EEV2IdentityVerification.Outcome
         let deviceList: E2EEV2SignedString
         let deviceEntries: [String]
+        /// Réinitialisation en attente servie, à vérifier avant d'en parler.
+        var pendingIdentityReset: E2EEV2IdentityBundle.PendingReset? = nil
     }
 
     func ownAccountTrust() async throws -> AccountTrust {
@@ -237,7 +243,10 @@ actor E2EEV2TrustDirectory {
         let read = try await read(userId: ownUserId, expectedUIK: ownAccountKey())
         switch read.result {
         case .success(let outcome):
-            return AccountTrust(outcome: outcome, deviceList: read.bundle.deviceList, deviceEntries: read.bundle.deviceEntries)
+            return AccountTrust(
+                outcome: outcome, deviceList: read.bundle.deviceList, deviceEntries: read.bundle.deviceEntries,
+                pendingIdentityReset: read.bundle.pendingIdentityReset
+            )
         case .failure(let failure):
             throw failure
         }

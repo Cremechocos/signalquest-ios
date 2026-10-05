@@ -538,13 +538,21 @@ final class E2EETests: XCTestCase {
     func testV2IdentityResetContractBindsGenerationDeviceAndIrreversibleAcknowledgements() throws {
         let store = E2EEV2DeviceIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
         let candidate = try store.prepareResetCandidate(ownerNamespace: "account-reset-contract")
+        let userId = "user_reset_contract_0001"
+        let newUik = P256.Signing.PrivateKey(), oldUik = P256.Signing.PrivateKey()
+        let requestedAtMs: Int64 = 1_790_000_000_000
+        let trust = try E2EEV2IdentityResetTrust.make(
+            userId: userId, device: candidate, newUik: newUik,
+            previousUikX963: oldUik.publicKey.x963Representation, requestedAtMs: requestedAtMs
+        )
         let request = try E2EEV2DeviceApprovalContract.identityResetData(
             expectedGeneration: 3,
             replacementDevice: candidate,
             reauthentication: .email(
                 challengeId: "challenge_0000000000000001",
                 code: "123456"
-            )
+            ),
+            trust: trust
         )
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: request) as? [String: Any])
         let acknowledgements = try XCTUnwrap(object["acknowledgements"] as? [String: Bool])
@@ -561,38 +569,62 @@ final class E2EETests: XCTestCase {
         ])
         XCTAssertTrue(acknowledgements.values.allSatisfy { $0 })
 
-        let response = try JSONSerialization.data(withJSONObject: [
-            "replacementDevice": [
-                "deviceId": candidate.deviceId,
-                "status": "approved",
-                "approvedByDeviceId": NSNull(),
-            ],
-            "identity": [
-                "generation": 4,
-                "establishmentMethod": "identity_reset",
-                "establishedAt": "2026-08-24T12:00:00.000Z",
-                "lastResetAt": "2026-08-24T12:00:00.000Z",
-            ],
-            "alreadyReset": false,
-            "historicalContentRecoverable": false,
-            "recoveryBundleRequired": true,
-            "pushRegistrationRequired": true,
-            "rotationRequired": true,
-            "affectedConversationIds": ["conversation_0000000000000001"],
-        ])
-        XCTAssertEqual(
-            E2EEV2DeviceApprovalContract.parseIdentityReset(
-                response,
-                expectedGeneration: 3,
-                expectedReplacementDeviceId: candidate.deviceId
-            )?.generation,
-            4
+        // D.14 : le document, le certificat et la liste v1, signés par la nouvelle UIK.
+        let reset = try XCTUnwrap(object["reset"] as? [String: String])
+        XCTAssertEqual(Set(reset.keys), ["reset", "signatureB64"])
+        let document = try E2EEV2IdentityReset.verify(.init(canonical: reset["reset"]!, signatureB64: reset["signatureB64"]!))
+        XCTAssertEqual(document.userId, userId)
+        XCTAssertEqual(document.newUikB64, newUik.publicKey.x963Representation.base64EncodedString())
+        XCTAssertEqual(document.previousUikFingerprint,
+                       E2EEV2Canonical.sha256B64URL(oldUik.publicKey.x963Representation))
+        XCTAssertEqual(document.effectiveAtMs, requestedAtMs + 259_200_000)
+        let certificate = try XCTUnwrap(object["certificate"] as? [String: String])
+        let parsedCertificate = try E2EEV2DeviceCertificate.verify(
+            .init(canonical: certificate["certificate"]!, signatureB64: certificate["signatureB64"]!), uik: newUik.publicKey
         )
-        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityReset(
-            response,
-            expectedGeneration: 2,
-            expectedReplacementDeviceId: candidate.deviceId
+        XCTAssertEqual(parsedCertificate.deviceId, candidate.deviceId)
+        let list = try XCTUnwrap(object["deviceList"] as? [String: Any])
+        XCTAssertEqual(Set(list.keys), ["list", "signatureB64", "devices"])
+        XCTAssertEqual((list["devices"] as? [String])?.count, 1)
+        XCTAssertTrue(E2EEV2SignedString(canonical: list["list"] as! String, signatureB64: list["signatureB64"] as! String)
+            .verify(with: newUik.publicKey))
+        XCTAssertThrowsError(try E2EEV2IdentityReset.verify(.init(
+            canonical: trust.reset.canonical.replacingOccurrences(of: document.previousUikFingerprint, with: "not-a-digest"),
+            signatureB64: trust.reset.signatureB64
+        )), "La ligne d'empreinte est un condensat ou « - »")
+
+        func view(_ status: String, overrides: [String: Any] = [:]) throws -> Data {
+            var value: [String: Any] = [
+                "resetId": "reset_contract_00000001", "status": status, "replacementDeviceId": candidate.deviceId,
+                "reset": ["reset": trust.reset.canonical, "signatureB64": trust.reset.signatureB64],
+                "effectiveAtMs": String(requestedAtMs + 259_200_000), "objection": NSNull(),
+                "objectingDeviceId": NSNull(), "resolvedAt": status == "pending" ? NSNull() : "2026-10-08T12:00:00.000Z",
+                "abortReason": NSNull(),
+            ]
+            value.merge(overrides) { _, new in new }
+            return try JSONSerialization.data(withJSONObject: value)
+        }
+        let pending = try XCTUnwrap(E2EEV2DeviceApprovalContract.parseIdentityResetView(
+            try view("pending"), expectedReplacementDeviceId: candidate.deviceId
         ))
+        XCTAssertEqual(pending.state, .pending)
+        XCTAssertEqual(pending.effectiveAtMs, document.effectiveAtMs)
+        XCTAssertEqual(E2EEV2DeviceApprovalContract.parseIdentityResetView(try view("completed"))?.state, .completed)
+        // Refus : autre appareil, échéance différente, statut inconnu, clé en trop, entier non textuel.
+        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(
+            try view("pending"), expectedReplacementDeviceId: "device_other_0000000001"
+        ))
+        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(
+            try view("pending", overrides: ["effectiveAtMs": String(requestedAtMs)])
+        ))
+        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(try view("switched")))
+        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(try view("pending", overrides: ["extra": true])))
+        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(
+            try view("pending", overrides: ["effectiveAtMs": requestedAtMs + 259_200_000])
+        ))
+        XCTAssertNil(E2EEV2DeviceApprovalContract.parseIdentityResetView(
+            try view("objected"), expectedReplacementDeviceId: candidate.deviceId
+        ), "Une opposition nomme l'appareil qui s'oppose")
     }
 
     func testV2DeviceInventoryRequiresIdentityBoundToListedDevice() throws {
@@ -4787,12 +4819,14 @@ extension E2EETests {
             events.value.append((session, ids, notify))
         }
         let accounts = E2EEV2AccountIdentityStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
+        // Horloge du coordinateur : avancée au-delà de l'échéance pour la bascule.
+        let clock = LockedBox<Int64>(Int64(Date().timeIntervalSince1970 * 1_000))
         let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: fixture.api, identityStore: fixture.identity,
             epochKeyStore: fixture.keys, mediaOutboxStore: fixture.outbox,
             accountIdentityStore: accounts,
             trustPins: E2EEV2TrustPinStore(tokenStore: InMemoryTokenStore()),
             capabilities: E2EEV2CapabilitiesPublicationStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true }),
-            rotationCommitted: onCommitted)
+            nowMs: { clock.value }, rotationCommitted: onCommitted)
         // La récupération elle-même (appareil neuf, bundle v3) est éprouvée de
         // bout en bout contre la pile de test ; ici, la publication du bundle.
         let recovery = E2EEV2RecoveryCoordinatorV2(
@@ -4810,6 +4844,7 @@ extension E2EETests {
         let bundleData = try JSONSerialization.data(withJSONObject: bundleObject)
         let replacement = try fixture.identity.prepareResetCandidate(ownerNamespace: fixture.context.ownerNamespace, label: "Synthetic reset")
         let expiry = ISO8601DateFormatter().string(from: Date().addingTimeInterval(300))
+        let resetDocument = LockedBox<[String: String]>([:])
         MockURLProtocol.requestHandler = { request in
             // Independent valid server receipts exercise each real client success branch.
             let path = request.url!.path
@@ -4845,10 +4880,16 @@ extension E2EETests {
             } else if path.hasSuffix("/recovery-bundle") {
                 value = ["stored": true, "unchanged": false, "createdAt": date, "rotatedAt": NSNull()]
             } else if path.hasSuffix("/identity/reset") {
-                value = ["replacementDevice": ["deviceId": replacement.deviceId, "status": "approved", "approvedByDeviceId": NSNull()],
-                    "identity": ["generation": 2, "establishmentMethod": "identity_reset", "establishedAt": date, "lastResetAt": date],
-                    "alreadyReset": false, "historicalContentRecoverable": false, "recoveryBundleRequired": true,
-                    "pushRegistrationRequired": true, "rotationRequired": true, "affectedConversationIds": [id]]
+                // Lot A2 : la demande reste en attente ; la lecture suivante la rend basculée.
+                let reset = try XCTUnwrap(try E2EEV2AccountFixture.body(request)["reset"] as? [String: String])
+                resetDocument.value = reset
+                value = Self.resetView(reset, status: "pending", replacementDeviceId: replacement.deviceId)
+            } else if path.hasSuffix("/identity/reset/reset_rotation_000000001"), request.httpMethod == "GET" {
+                value = Self.resetView(resetDocument.value, status: "completed", replacementDeviceId: replacement.deviceId)
+                // Basculé : le compte porte désormais la nouvelle UIK.
+                account.value["accountIdentityKeyB64"] = try E2EEV2IdentityReset.verify(.init(
+                    canonical: resetDocument.value["reset"] ?? "", signatureB64: resetDocument.value["signatureB64"] ?? ""
+                )).newUikB64
             } else {
                 XCTFail("A device action must enqueue, not synchronously call the rotation API: \(path)")
                 value = [:]
@@ -4878,17 +4919,165 @@ extension E2EETests {
         case .failed: return XCTFail("Bundle receipt was lost")
         }
         let beforeReset = LocalAccountScope.sessionSnapshot()!
-        guard case .success = await lifecycle.resetIdentity(expectedGeneration: 1, reauthentication: .password("synthetic")) else {
+        guard case .success(let requested) = await lifecycle.resetIdentity(expectedGeneration: 1, reauthentication: .password("synthetic")),
+              requested.state == .pending else {
             return XCTFail("Reset receipt was lost")
         }
+        XCTAssertEqual(events.value.count, 4, "Rien ne bascule à la demande")
+        XCTAssertEqual(try fixture.identity.load(ownerNamespace: fixture.context.ownerNamespace)?.deviceId, fixture.descriptor.deviceId)
+        guard case .failed? = await lifecycle.refreshIdentityReset() else {
+            return XCTFail("Une bascule annoncée avant l'échéance n'est jamais crue")
+        }
+        XCTAssertEqual(try fixture.identity.load(ownerNamespace: fixture.context.ownerNamespace)?.deviceId, fixture.descriptor.deviceId)
+        clock.value += E2EEV2IdentityReset.delayMs
+        guard case .success(let switched)? = await lifecycle.refreshIdentityReset(), switched.state == .completed else {
+            return XCTFail("Reset switch was lost")
+        }
+        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: fixture.context.ownerNamespace))
+        XCTAssertEqual(try accounts.load(ownerNamespace: fixture.context.ownerNamespace)?.publicKey.x963Representation.base64EncodedString(),
+                       try E2EEV2IdentityReset.verify(try XCTUnwrap(switched.reset)).newUikB64, "La nouvelle UIK remplace l'ancienne")
         let delivered = events.value
         XCTAssertEqual(delivered.count, 6)
-        XCTAssertEqual(delivered.map { $0.1 }, [[], [id], [id], [], [id], [id]])
+        XCTAssertEqual(delivered.map { $0.1 }, [[], [id], [id], [], [], []])
         XCTAssertEqual(delivered.map { $0.2 }, [true, true, true, true, false, true])
         XCTAssertEqual(delivered[4].0, beforeReset)
         XCTAssertEqual(delivered[5].0, LocalAccountScope.sessionSnapshot())
         XCTAssertNotEqual(delivered[5].0.sessionId, beforeReset.sessionId)
         XCTAssertEqual(try fixture.identity.load(ownerNamespace: fixture.context.ownerNamespace)?.deviceId, replacement.deviceId)
+    }
+
+    /// Lot A2 : une demande envoyée garde sa nouvelle UIK et son appareil de
+    /// remplacement ; la purge du coffre l'efface ; la bascule locale se rejoue.
+    func testV2PendingIdentityResetKeepsItsKeysUntilClosedAndIsPurgedWithTheVault() throws {
+        let fixture = try RotationFixture(); defer { fixture.close() }
+        let namespace = fixture.context.ownerNamespace
+        let accounts = E2EEV2AccountIdentityStore(tokenStore: fixture.vault)
+        let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: fixture.api, identityStore: fixture.identity,
+            accountIdentityStore: accounts, trustPins: E2EEV2TrustPinStore(tokenStore: fixture.vault))
+        guard case .success(let candidate) = lifecycle.prepareIdentityReset(label: "Synthetic reset") else {
+            return XCTFail("Appareil de remplacement")
+        }
+        let first = try accounts.pendingReset(ownerNamespace: namespace, nowMs: 1_000)
+        let again = try accounts.pendingReset(ownerNamespace: namespace, nowMs: 9_000_000)
+        XCTAssertEqual(first, again, "Une reprise rend la même UIK et la même heure")
+        XCTAssertFalse(lifecycle.discardIdentityResetCandidate(), "Jamais jeté tant qu'une demande peut le nommer")
+        XCTAssertEqual(try fixture.identity.loadResetCandidate(ownerNamespace: namespace)?.deviceId, candidate.deviceId)
+
+        // Bascule locale : la nouvelle UIK s'installe, vérifiée ; rejouée, rien ne change.
+        try accounts.completePendingReset(ownerNamespace: namespace)
+        try accounts.completePendingReset(ownerNamespace: namespace)
+        XCTAssertEqual(try accounts.load(ownerNamespace: namespace)?.rawRepresentation, first.uik?.rawRepresentation)
+        XCTAssertTrue(try accounts.isVerified(ownerNamespace: namespace))
+        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: namespace))
+        XCTAssertTrue(lifecycle.discardIdentityResetCandidate())
+
+        // La purge du coffre efface une demande en cours.
+        _ = try accounts.pendingReset(ownerNamespace: namespace, nowMs: 2_000)
+        try E2EEV2VaultBoundary.purge(store: fixture.vault, ownerScopeId: fixture.context.ownerScopeId)
+        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: namespace))
+    }
+
+    private static func resetView(_ reset: [String: String], status: String, replacementDeviceId: String,
+                                  resetId: String = "reset_rotation_000000001") -> [String: Any] {
+        let effective = (try? E2EEV2IdentityReset.verify(.init(canonical: reset["reset"] ?? "", signatureB64: reset["signatureB64"] ?? "")))?
+            .effectiveAtMs ?? 0
+        return ["resetId": resetId, "status": status, "replacementDeviceId": replacementDeviceId,
+                "reset": reset, "effectiveAtMs": String(effective), "objection": NSNull(),
+                "objectingDeviceId": status == "objected" ? "device_objecting_0000001" : NSNull(),
+                "resolvedAt": status == "pending" ? NSNull() : "2026-10-08T12:00:00.000Z", "abortReason": NSNull()]
+    }
+
+    /// Lot A2, reprise : un 409 garde la nouvelle UIK et l'appareil de
+    /// remplacement ; un reçu perdu se retrouve dans le paquet de confiance ;
+    /// une issue close n'est oubliée qu'après une lecture réussie du compte ;
+    /// une tentative jamais enregistrée est oubliée passé le délai du serveur.
+    func testV2IdentityResetResumeKeepsTheNewKeyAndOnlyForgetsOnProof() async throws {
+        let fixture = try RotationFixture(); defer { fixture.close() }
+        let namespace = fixture.context.ownerNamespace
+        let accounts = E2EEV2AccountIdentityStore(tokenStore: fixture.vault)
+        let oldUik = try accounts.create(ownerNamespace: namespace)
+        let clock = LockedBox<Int64>(Int64(Date().timeIntervalSince1970 * 1_000))
+        let lifecycle = E2EEV2DeviceLifecycleCoordinator(api: fixture.api, identityStore: fixture.identity,
+            accountIdentityStore: accounts, trustPins: E2EEV2TrustPinStore(tokenStore: fixture.vault), nowMs: { clock.value })
+        guard case .success(let candidate) = lifecycle.prepareIdentityReset(label: "Synthetic reset") else {
+            return XCTFail("Appareil de remplacement")
+        }
+        let posted = LockedBox<[String: String]>([:]), mode = LockedBox("none")
+        let resetId = "reset_resume_000000001"
+        MockURLProtocol.requestHandler = { request in
+            let path = request.url!.path
+            if path.hasSuffix("/identity/reset"), request.httpMethod == "POST" {
+                posted.value = try XCTUnwrap(try E2EEV2AccountFixture.body(request)["reset"] as? [String: String])
+                let refusal = #"{"error":"pending","code":"E2EE_IDENTITY_RESET_PENDING"}"#
+                return RotationFixture.response(request, Data(refusal.utf8), status: 409)
+            }
+            if path.hasSuffix("/identity/reset/\(resetId)") {
+                let status = mode.value.hasPrefix("objected") ? "objected" : "pending"
+                return RotationFixture.response(request, try JSONSerialization.data(withJSONObject:
+                    Self.resetView(posted.value, status: status, replacementDeviceId: candidate.deviceId, resetId: resetId)))
+            }
+            if path.hasSuffix("/identity") {
+                if mode.value == "objected-unreadable" {
+                    return RotationFixture.response(request, Data(#"{"error":"down"}"#.utf8), status: 503)
+                }
+                let served: Any = mode.value == "served"
+                    ? ["resetId": resetId, "reset": posted.value["reset"] ?? "", "signatureB64": posted.value["signatureB64"] ?? ""]
+                    : NSNull()
+                return RotationFixture.response(request, try JSONSerialization.data(withJSONObject: [
+                    "accountIdentityKeyB64": oldUik.publicKey.x963Representation.base64EncodedString(),
+                    "deviceList": ["list": "SQ-E2EE-V2-DEVICE-LIST", "signatureB64": "AA==", "devices": [String]()],
+                    "certificates": [Any](), "capabilities": [Any](), "pendingIdentityReset": served,
+                ]))
+            }
+            XCTFail("Requête inattendue : \(path)")
+            return RotationFixture.response(request, Data("{}".utf8), status: 500)
+        }
+
+        // 1. Un 409 « déjà en attente » : rien n'est jeté.
+        guard case .failed(let refused) = await lifecycle.resetIdentity(expectedGeneration: 1, reauthentication: .password("synthetic")) else {
+            return XCTFail("Le 409 doit remonter")
+        }
+        XCTAssertEqual(refused.code, "E2EE_IDENTITY_RESET_PENDING")
+        let kept = try XCTUnwrap(try accounts.loadPendingReset(ownerNamespace: namespace), "La nouvelle UIK reste")
+        XCTAssertNil(kept.resetId)
+        XCTAssertEqual(kept.replacementDeviceId, candidate.deviceId, "Appareil lié avant l'envoi")
+        XCTAssertFalse(lifecycle.discardIdentityResetCandidate())
+
+        // 2. Rien de servi, dans le délai : la demande reste.
+        let early = await lifecycle.refreshIdentityReset()
+        XCTAssertNil(early)
+        XCTAssertNotNil(try accounts.loadPendingReset(ownerNamespace: namespace))
+
+        // 3. Reçu retrouvé dans le paquet de confiance.
+        mode.value = "served"
+        guard case .success(let followed)? = await lifecycle.refreshIdentityReset() else { return XCTFail("Reçu retrouvé") }
+        XCTAssertEqual(followed.state, .pending)
+        XCTAssertEqual(try accounts.loadPendingReset(ownerNamespace: namespace)?.resetId, resetId)
+
+        // 4. Opposition annoncée mais compte illisible : rien n'est oublié.
+        mode.value = "objected-unreadable"
+        guard case .failed? = await lifecycle.refreshIdentityReset() else { return XCTFail("Sans preuve, pas d'oubli") }
+        XCTAssertNotNil(try accounts.loadPendingReset(ownerNamespace: namespace))
+        XCTAssertNotNil(try fixture.identity.loadResetCandidate(ownerNamespace: namespace))
+
+        // 5. Opposition, compte lisible sous l'ancienne UIK : la demande est oubliée.
+        mode.value = "objected"
+        guard case .success(let objected)? = await lifecycle.refreshIdentityReset() else { return XCTFail("Opposition lue") }
+        XCTAssertEqual(objected.state, .objected)
+        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: namespace))
+        XCTAssertNil(try fixture.identity.loadResetCandidate(ownerNamespace: namespace))
+        XCTAssertEqual(try accounts.load(ownerNamespace: namespace)?.rawRepresentation, oldUik.rawRepresentation)
+
+        // 6. Une tentative jamais enregistrée est oubliée passé le délai du serveur.
+        guard case .success = lifecycle.prepareIdentityReset(label: "Synthetic reset") else { return XCTFail("Appareil") }
+        mode.value = "none"
+        _ = await lifecycle.resetIdentity(expectedGeneration: 1, reauthentication: .password("synthetic"))
+        XCTAssertNotNil(try accounts.loadPendingReset(ownerNamespace: namespace))
+        clock.value += 20 * 60 * 1_000
+        let late = await lifecycle.refreshIdentityReset()
+        XCTAssertNil(late)
+        XCTAssertNil(try accounts.loadPendingReset(ownerNamespace: namespace))
+        XCTAssertTrue(lifecycle.discardIdentityResetCandidate())
     }
 
     func testV2BoundAccountDeletionDiscardsLateCookieAndCannotAdoptARelogin() async throws {
@@ -5328,10 +5517,10 @@ extension E2EETests {
             switch await lifecycle.resetIdentity(expectedGeneration: generation, reauthentication: .password(password)) {
             case .failed(let failure): throw localQAOperation("reset", failure)
             case .success(let value):
-                payload = ["replacementDeviceId": value.replacementDeviceId,
-                           "generation": value.generation,
-                           "rotationRequired": value.rotationRequired,
-                           "affectedConversationIds": value.affectedConversationIds,
+                payload = ["resetId": value.resetId ?? "",
+                           "state": value.state.rawValue,
+                           "replacementDeviceId": value.replacementDeviceId,
+                           "effectiveAtMs": String(value.effectiveAtMs),
                            "localSessionRenewed": before != LocalAccountScope.sessionSnapshot()]
             }
         case .resume:

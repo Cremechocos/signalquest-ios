@@ -76,6 +76,14 @@ final class OnboardingRoutingTests: XCTestCase {
         XCTAssertEqual(router.openE2EEDeviceApprovalId, "approval-synthetic")
     }
 
+    func testIdentityResetPushOpensTheProfileReview() async {
+        let router = AppRouter()
+        router.handle(type: "e2ee_v2_identity_reset", conversationId: nil, postId: nil)
+        XCTAssertFalse(router.routeFromOnboarding(to: .map))
+        XCTAssertEqual(router.selectedTab, .profile)
+        XCTAssertTrue(router.openE2EEIdentityReset)
+    }
+
     func testMapContentAndDriveTestIntentsCannotBeOverwritten() async {
         let map = AppRouter()
         map.route(toSite: "site-synthetic")

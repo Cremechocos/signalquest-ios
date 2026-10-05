@@ -1094,6 +1094,7 @@ struct E2EEV2IdentityReset: Equatable, Sendable {
               E2EEV2Canonical.isX963PublicKey(f[3]),
               let keyData = Data(base64Encoded: f[3]),
               let newUik = try? P256.Signing.PublicKey(x963Representation: keyData),
+              f[4] == "-" || E2EEV2ApprovalV2.isDigest(f[4]),
               E2EEV2Canonical.isDecimal(f[5]), let requested = Int64(f[5]), requested < Int64(1) << 53,
               E2EEV2Canonical.isDecimal(f[6]), let effective = Int64(f[6]),
               effective == requested + delayMs else {

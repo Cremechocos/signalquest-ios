@@ -388,7 +388,7 @@ enum PushRecipientPolicy {
                 "zone_new_antenna", "zone_antenna_upgrade", "coverage_session_auto_closed",
                 "antenna_report_reply", "photo_comment", "photo_like", "photo_mention",
                 "photo_reply", "test_push", "new_bug", "e2ee_v2_device_approval",
-                "e2ee_v2_envelope"
+                "e2ee_v2_envelope", "e2ee_v2_identity_reset"
             ].contains(type)
     }
 

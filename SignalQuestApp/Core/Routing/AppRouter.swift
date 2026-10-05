@@ -67,6 +67,9 @@ final class AppRouter: ObservableObject {
     /// Demande E2EE v2 validée issue d'une notification. L'identifiant opaque est
     /// consommé par ProfileView, puis revérifié côté serveur avant toute approbation.
     @Published var openE2EEDeviceApprovalId: String?
+    /// Lot A2 : une réinitialisation d'identité demandée sur le compte, à
+    /// vérifier (et refuser) depuis cet appareil.
+    @Published var openE2EEIdentityReset = false
     /// Box Sentinelle à ouvrir (tap sur une notification de coupure). Consommé
     /// par ProfileView : Sentinelle vit sous l'onglet Profil, dans les réglages.
     /// Sans identifiant, l'écran s'ouvre quand même — sur son accueil.
@@ -108,7 +111,7 @@ final class AppRouter: ObservableObject {
         openConversationId != nil || openMessagesInbox || openPostId != nil
             || openUserProfileId != nil || openSiteId != nil || openCommunityOutage != nil
             || openCommunityOutageId != nil || openAntennaReportId != nil
-            || openE2EEDeviceApprovalId != nil || openSentinelleTargetId != nil
+            || openE2EEDeviceApprovalId != nil || openE2EEIdentityReset || openSentinelleTargetId != nil
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
             || pendingMapFocus != nil || pendingDriveTest || pendingSpeedtestStart
     }
@@ -223,6 +226,9 @@ final class AppRouter: ObservableObject {
             route(toSentinelle: targetId)
         case "e2ee_v2_device_approval":
             route(toE2EEDeviceApproval: e2eeDeviceApprovalId)
+        case "e2ee_v2_identity_reset":
+            selectedTab = .profile
+            openE2EEIdentityReset = true
         default:
             if reportId != nil {
                 route(toAntennaReport: reportId)

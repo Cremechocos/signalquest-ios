@@ -1,6 +1,246 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Demande enregistrée. Ton identité sera remplacée à l’échéance, sauf si l’un de tes appareils s’y oppose." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request saved. Your identity will be replaced when the waiting period ends, unless one of your devices objects."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande enregistrée. Ton identité sera remplacée à l’échéance, sauf si l’un de tes appareils s’y oppose."
+          }
+        }
+      }
+    },
+    "Réinitialisation refusée. Ton identité actuelle est conservée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset refused. Your current identity is kept."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinitialisation refusée. Ton identité actuelle est conservée."
+          }
+        }
+      }
+    },
+    "Impossible de refuser cette réinitialisation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t refuse this reset."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de refuser cette réinitialisation."
+          }
+        }
+      }
+    },
+    "Impossible de vérifier la réinitialisation en attente." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t check the pending reset."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de vérifier la réinitialisation en attente."
+          }
+        }
+      }
+    },
+    "Identité réinitialisée. Création immédiate d’une nouvelle clé de récupération." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identity reset. A new recovery key is being created now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identité réinitialisée. Création immédiate d’une nouvelle clé de récupération."
+          }
+        }
+      }
+    },
+    "La réinitialisation a été refusée depuis un autre de tes appareils. L’identité actuelle reste inchangée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The reset was refused from another of your devices. Your current identity is unchanged."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La réinitialisation a été refusée depuis un autre de tes appareils. L’identité actuelle reste inchangée."
+          }
+        }
+      }
+    },
+    "La réinitialisation a été annulée, car l’état du compte a changé entre-temps." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The reset was cancelled because the account changed in the meantime."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La réinitialisation a été annulée, car l’état du compte a changé entre-temps."
+          }
+        }
+      }
+    },
+    "Réinitialisation en attente" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset pending"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinitialisation en attente"
+          }
+        }
+      }
+    },
+    "Ton identité sera remplacée le %@. D’ici là, chacun de tes appareils actuels peut s’y opposer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your identity will be replaced on %@. Until then, any of your current devices can object."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton identité sera remplacée le %@. D’ici là, chacun de tes appareils actuels peut s’y opposer."
+          }
+        }
+      }
+    },
+    "Trop tard : l’échéance de cette réinitialisation est passée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too late: this reset’s deadline has passed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop tard : l’échéance de cette réinitialisation est passée."
+          }
+        }
+      }
+    },
+    "Vérifier l’état" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check status"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérifier l’état"
+          }
+        }
+      }
+    },
+    "Réinitialisation demandée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset requested"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réinitialisation demandée"
+          }
+        }
+      }
+    },
+    "Un appareil a demandé à remplacer l’identité de chiffrement de ton compte. Sans refus, ce remplacement aura lieu le %@ et tous tes appareils actuels seront révoqués. Si ce n’est pas toi, refuse-la." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A device asked to replace your account’s encryption identity. Unless refused, this will happen on %@ and all your current devices will be revoked. If this wasn’t you, refuse it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un appareil a demandé à remplacer l’identité de chiffrement de ton compte. Sans refus, ce remplacement aura lieu le %@ et tous tes appareils actuels seront révoqués. Si ce n’est pas toi, refuse-la."
+          }
+        }
+      }
+    },
+    "Refuser cette réinitialisation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuse this reset"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuser cette réinitialisation"
+          }
+        }
+      }
+    },
+    "Sécurité du compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account security"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sécurité du compte"
+          }
+        }
+      }
+    },
     "« %@ »" : {
       "localizations" : {
         "en" : {

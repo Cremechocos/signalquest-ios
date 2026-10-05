@@ -801,6 +801,7 @@ enum E2EEV2VaultBoundary {
                     E2EEV2AccountIdentityStore.verifiedKey(ownerNamespace: namespace),
                     E2EEV2AccountIdentityStore.pendingBootstrapKey(ownerNamespace: namespace),
                     E2EEV2AccountIdentityStore.pendingApprovalKey(ownerNamespace: namespace),
+                    E2EEV2AccountIdentityStore.pendingResetKey(ownerNamespace: namespace),
                     E2EEV2CapabilitiesPublicationStore.key(ownerNamespace: namespace)] {
             attempt { try store.remove(key) }
         }
@@ -2627,17 +2628,28 @@ struct E2EEV2IdentityResetEmailChallenge: Equatable, Sendable {
     let replacementDeviceId: String
 }
 
-struct E2EEV2IdentityResetOutcome: Equatable, Sendable {
+/// Lot A2 (D.14) : une réinitialisation demandée par un autre appareil du
+/// compte, vérifiée (signature de la nouvelle UIK, compte, échéance à venir).
+struct E2EEV2PendingIdentityResetReview: Equatable, Sendable {
+    let resetId: String
+    let document: E2EEV2IdentityReset
+}
+
+/// Lot A2 (§2.4, D.14) : l'état d'une réinitialisation, tel que servi par
+/// `POST /identity/reset`, `GET …/{resetId}` et l'opposition. Rien ne bascule
+/// à la demande : le serveur bascule à l'échéance, sauf opposition.
+struct E2EEV2IdentityResetStatus: Equatable, Sendable {
+    enum State: String, Sendable { case pending, completed, objected, aborted }
+
+    /// `nil` avec `reset` : reçu perdu, bascule constatée dans le paquet de
+    /// confiance du compte, vérifié sous la nouvelle UIK détenue ici.
+    let resetId: String?
+    let state: State
     let replacementDeviceId: String
-    let generation: Int
-    let establishedAt: String
-    let lastResetAt: String
-    let alreadyReset: Bool
-    let historicalContentRecoverable: Bool
-    let recoveryBundleRequired: Bool
-    let pushRegistrationRequired: Bool
-    let rotationRequired: Bool
-    let affectedConversationIds: [String]
+    let reset: E2EEV2SignedString?
+    let effectiveAtMs: Int64
+    let objectingDeviceId: String?
+    let abortReason: String?
 }
 
 enum E2EEV2DeviceApprovalContract {
@@ -2755,7 +2767,8 @@ enum E2EEV2DeviceApprovalContract {
     static func identityResetData(
         expectedGeneration: Int,
         replacementDevice: E2EEV2DeviceDescriptor,
-        reauthentication: E2EEV2BootstrapReauthentication
+        reauthentication: E2EEV2BootstrapReauthentication,
+        trust: E2EEV2IdentityResetTrust.Artifacts
     ) throws -> Data {
         guard (1..<Int(Int32.max)).contains(expectedGeneration) else {
             throw E2EEV2DeviceIdentityError.invalidRecord
@@ -2772,7 +2785,21 @@ enum E2EEV2DeviceApprovalContract {
                     "recoveryWillBeReplaced": true,
                 ],
                 "reauthentication": try reauthenticationObject(reauthentication),
+                "reset": ["reset": trust.reset.canonical, "signatureB64": trust.reset.signatureB64],
+                "certificate": ["certificate": trust.certificate.canonical, "signatureB64": trust.certificate.signatureB64],
+                "deviceList": [
+                    "list": trust.deviceList.canonical, "signatureB64": trust.deviceList.signatureB64,
+                    "devices": trust.deviceEntries,
+                ],
             ],
+            options: [.sortedKeys]
+        )
+    }
+
+    /// Corps exact de `POST /identity/reset/{resetId}/objection`.
+    static func identityResetObjectionData(_ objection: E2EEV2SignedString) throws -> Data {
+        try JSONSerialization.data(
+            withJSONObject: ["objection": objection.canonical, "signatureB64": objection.signatureB64],
             options: [.sortedKeys]
         )
     }
@@ -3124,45 +3151,42 @@ enum E2EEV2DeviceApprovalContract {
         )
     }
 
-    static func parseIdentityReset(
+    /// La vue d'une réinitialisation, clés exactes (E.1). `expectedReplacementDeviceId`
+    /// et `expectedResetId` : ce que cet appareil a demandé ou vise, quand il le sait.
+    static func parseIdentityResetView(
         _ data: Data,
-        expectedGeneration: Int,
-        expectedReplacementDeviceId: String
-    ) -> E2EEV2IdentityResetOutcome? {
-        guard expectedGeneration >= 1,
-              validOpaqueId(expectedReplacementDeviceId),
-              let root = dictionary(data),
-              let device = root["replacementDevice"] as? [String: Any],
-              device["deviceId"] as? String == expectedReplacementDeviceId,
-              (device["status"] as? String)?.lowercased() == E2EEV2RemoteDeviceStatus.approved.rawValue,
-              device["approvedByDeviceId"] is NSNull,
-              let identity = root["identity"] as? [String: Any],
-              identity["generation"] as? Int == expectedGeneration + 1,
-              identity["establishmentMethod"] as? String == "identity_reset",
-              let establishedAt = identity["establishedAt"] as? String,
-              parseISO8601(establishedAt) != nil,
-              let lastResetAt = identity["lastResetAt"] as? String,
-              parseISO8601(lastResetAt) != nil,
-              let alreadyReset = root["alreadyReset"] as? Bool,
-              root["historicalContentRecoverable"] as? Bool == false,
-              root["recoveryBundleRequired"] as? Bool == true,
-              root["pushRegistrationRequired"] as? Bool == true,
-              let rotationRequired = root["rotationRequired"] as? Bool,
-              let affected = root["affectedConversationIds"] as? [String],
-              affected.allSatisfy(validOpaqueId),
-              Set(affected).count == affected.count,
-              rotationRequired == !affected.isEmpty else { return nil }
+        expectedReplacementDeviceId: String? = nil,
+        expectedResetId: String? = nil
+    ) -> E2EEV2IdentityResetStatus? {
+        let keys: Set<String> = [
+            "resetId", "status", "replacementDeviceId", "reset", "effectiveAtMs", "objection",
+            "objectingDeviceId", "resolvedAt", "abortReason",
+        ]
+        guard let root = dictionary(data), Set(root.keys) == keys,
+              let resetId = root["resetId"] as? String, validOpaqueId(resetId),
+              expectedResetId.map({ $0 == resetId }) ?? true,
+              let state = (root["status"] as? String).flatMap(E2EEV2IdentityResetStatus.State.init(rawValue:)),
+              let replacementDeviceId = root["replacementDeviceId"] as? String, validOpaqueId(replacementDeviceId),
+              expectedReplacementDeviceId.map({ $0 == replacementDeviceId }) ?? true,
+              let reset = root["reset"] as? [String: Any], Set(reset.keys) == ["reset", "signatureB64"],
+              let resetText = reset["reset"] as? String, let resetSignature = reset["signatureB64"] as? String,
+              let effectiveText = root["effectiveAtMs"] as? String, E2EEV2Canonical.isDecimal(effectiveText),
+              let effectiveAtMs = Int64(effectiveText),
+              root["objection"] is NSNull || (root["objection"] as? [String: Any]).map({ Set($0.keys) == ["objection", "signatureB64"] }) == true,
+              root["objectingDeviceId"] is NSNull || (root["objectingDeviceId"] as? String).map(validOpaqueId) == true,
+              root["resolvedAt"] is NSNull || (root["resolvedAt"] as? String).flatMap(parseISO8601) != nil,
+              root["abortReason"] is NSNull || root["abortReason"] is String,
+              (state == .pending) == (root["resolvedAt"] is NSNull),
+              (state == .objected) == !(root["objectingDeviceId"] is NSNull) else { return nil }
+        let signed = E2EEV2SignedString(canonical: resetText, signatureB64: resetSignature)
+        // Le document doit se vérifier, et son échéance être celle servie.
+        guard let document = try? E2EEV2IdentityReset.verify(signed), document.effectiveAtMs == effectiveAtMs else {
+            return nil
+        }
         return .init(
-            replacementDeviceId: expectedReplacementDeviceId,
-            generation: expectedGeneration + 1,
-            establishedAt: establishedAt,
-            lastResetAt: lastResetAt,
-            alreadyReset: alreadyReset,
-            historicalContentRecoverable: false,
-            recoveryBundleRequired: true,
-            pushRegistrationRequired: true,
-            rotationRequired: rotationRequired,
-            affectedConversationIds: affected
+            resetId: resetId, state: state, replacementDeviceId: replacementDeviceId, reset: signed,
+            effectiveAtMs: effectiveAtMs, objectingDeviceId: root["objectingDeviceId"] as? String,
+            abortReason: root["abortReason"] as? String
         )
     }
 
@@ -3331,6 +3355,8 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
     /// Après une approbation ou une révocation réussie : le bundle de
     /// récupération est re-signé à la nouvelle liste (§2.8, v0.4.22).
     private let deviceListChanged: (@Sendable () async -> Void)?
+    private let resetRefreshLock = NSLock()
+    private var resetRefresh: Task<E2EEV2DeviceLifecycleResult<E2EEV2IdentityResetStatus>?, Never>?
 
     init(
         api: APIClient,
@@ -3403,6 +3429,11 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
     func discardIdentityResetCandidate() -> Bool {
         guard let owner = ownerScope() else { return false }
         do {
+            // Une demande envoyée (ou peut-être envoyée) nomme cet appareil : il
+            // ne se jette qu'avec elle, quand elle est close.
+            guard try accountIdentityStore.loadPendingReset(
+                ownerNamespace: LocalAccountScope.storageNamespace(for: owner)
+            ) == nil else { return false }
             try identityStore.discardResetCandidate(
                 ownerNamespace: LocalAccountScope.storageNamespace(for: owner)
             )
@@ -3446,11 +3477,18 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         }
     }
 
+    /// Lot A2 (§2.4, D.14) : demande la réinitialisation. L'appareil de
+    /// remplacement signe la requête ; la nouvelle UIK signe le document, son
+    /// certificat et la liste v1. Rien ne bascule ici : la demande attend
+    /// 72 heures, suivie par `refreshIdentityReset`. Une reprise renvoie
+    /// toujours d'abord les mêmes textes, que le serveur rend comme un rejeu :
+    /// la nouvelle UIK n'est jamais jetée tant qu'une demande peut la nommer.
     func resetIdentity(
         expectedGeneration: Int,
         reauthentication: E2EEV2BootstrapReauthentication
-    ) async -> E2EEV2DeviceLifecycleResult<E2EEV2IdentityResetOutcome> {
-        guard let owner = ownerScope(), let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == owner else {
+    ) async -> E2EEV2DeviceLifecycleResult<E2EEV2IdentityResetStatus> {
+        guard let owner = ownerScope(), let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == owner,
+              let userId = Self.userId(owner) else {
             return localFailure("authenticated-account-required")
         }
         let transport = self.transport.bound(to: session)
@@ -3459,31 +3497,218 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
             guard let candidate = try identityStore.loadResetCandidate(ownerNamespace: namespace) else {
                 return localFailure("e2ee-reset-candidate-unavailable")
             }
-            let body = try E2EEV2DeviceApprovalContract.identityResetData(
-                expectedGeneration: expectedGeneration,
-                replacementDevice: candidate,
-                reauthentication: reauthentication
-            )
-            let response = await transport.postJSONWithResetCandidate(
-                path: "/api/e2ee/v2/identity/reset",
-                body: body,
-                expectedOwnerScopeId: owner,
-                capabilitySet: .deviceLifecycle
-            )
-            switch response {
-            case .failure(let failure):
-                return .failed(failure)
-            case .success(let data, _, _):
-                guard let parsed = E2EEV2DeviceApprovalContract.parseIdentityReset(
-                    data,
+            var pending = try accountIdentityStore.pendingReset(ownerNamespace: namespace, nowMs: nowMs())
+            if pending.resetId != nil {
+                return await refreshIdentityReset() ?? localFailure("e2ee-identity-reset-unavailable")
+            }
+            // L'appareil de remplacement est lié à la demande avant tout envoi.
+            func bindCandidate() throws -> Bool {
+                if let named = pending.replacementDeviceId { return named == candidate.deviceId }
+                pending.replacementDeviceId = candidate.deviceId
+                try accountIdentityStore.savePendingReset(pending, ownerNamespace: namespace)
+                return true
+            }
+            guard try bindCandidate() else { return localFailure("e2ee-reset-candidate-unavailable") }
+            let previousUik = await previousAccountKey(owner: owner, userId: userId, transport: transport)
+            for attempt in 0..<2 {
+                guard let newUik = pending.uik else { return localFailure("e2ee-reset-candidate-unavailable") }
+                let trust = try E2EEV2IdentityResetTrust.make(
+                    userId: userId, device: candidate, newUik: newUik,
+                    previousUikX963: previousUik, requestedAtMs: pending.requestedAtMs
+                )
+                let body = try E2EEV2DeviceApprovalContract.identityResetData(
                     expectedGeneration: expectedGeneration,
-                    expectedReplacementDeviceId: candidate.deviceId
-                ) else {
+                    replacementDevice: candidate,
+                    reauthentication: reauthentication,
+                    trust: trust
+                )
+                switch await transport.postJSONWithResetCandidate(
+                    path: "/api/e2ee/v2/identity/reset",
+                    body: body,
+                    expectedOwnerScopeId: owner,
+                    capabilitySet: .deviceLifecycle
+                ) {
+                case .failure(let failure):
+                    // 422 : le serveur n'a rien en attente et refuse de créer à partir
+                    // de ce document (trop ancien) ; un nouveau, une seule fois.
+                    if attempt == 0, failure.code == "E2EE_IDENTITY_RESET_INVALID",
+                       abs(nowMs() - pending.requestedAtMs) > Self.resetRetryWindowMs {
+                        try accountIdentityStore.discardPendingReset(ownerNamespace: namespace)
+                        pending = try accountIdentityStore.pendingReset(ownerNamespace: namespace, nowMs: nowMs())
+                        guard try bindCandidate() else { return localFailure("e2ee-reset-candidate-unavailable") }
+                        continue
+                    }
+                    return .failed(failure)
+                case .success(let data, _, _):
+                    guard let status = E2EEV2DeviceApprovalContract.parseIdentityResetView(
+                        data, expectedReplacementDeviceId: candidate.deviceId
+                    ), status.state == .pending, status.reset?.canonical == trust.reset.canonical else {
+                        return localFailure("invalid-e2ee-identity-reset-response")
+                    }
+                    // Le reçu tient au compte, pas à la session : il est gardé même
+                    // si la session a changé pendant la requête.
+                    guard ownerScope() == owner else { return localFailure("e2ee-session-changed") }
+                    pending.resetId = status.resetId
+                    pending.effectiveAtMs = status.effectiveAtMs
+                    pending.replacementDeviceId = candidate.deviceId
+                    try accountIdentityStore.savePendingReset(pending, ownerNamespace: namespace)
+                    return .success(status)
+                }
+            }
+            return localFailure("e2ee-identity-reset-unavailable")
+        } catch {
+            return localFailure("e2ee-identity-reset-unavailable")
+        }
+    }
+
+    /// Lot A2 : l'état de la réinitialisation demandée ici, `nil` s'il n'y en a
+    /// pas. À la bascule (`completed`), l'appareil de remplacement et la nouvelle
+    /// UIK deviennent ceux de ce téléphone ; après une opposition ou un abandon,
+    /// la demande et son appareil de remplacement sont oubliés. Deux appels
+    /// simultanés partagent la même lecture.
+    func refreshIdentityReset() async -> E2EEV2DeviceLifecycleResult<E2EEV2IdentityResetStatus>? {
+        let task: Task<E2EEV2DeviceLifecycleResult<E2EEV2IdentityResetStatus>?, Never> = resetRefreshLock.withLock {
+            if let running = resetRefresh { return running }
+            let started = Task { await self.performIdentityResetRefresh() }
+            resetRefresh = started
+            return started
+        }
+        let result = await task.value
+        resetRefreshLock.withLock { if resetRefresh == task { resetRefresh = nil } }
+        return result
+    }
+
+    private func performIdentityResetRefresh() async -> E2EEV2DeviceLifecycleResult<E2EEV2IdentityResetStatus>? {
+        guard let owner = ownerScope(), let session = LocalAccountScope.sessionSnapshot(), session.ownerScopeId == owner,
+              let userId = Self.userId(owner) else { return nil }
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        let transport = self.transport.bound(to: session)
+        var pending: E2EEV2AccountIdentityStore.PendingReset
+        do {
+            guard let stored = try accountIdentityStore.loadPendingReset(ownerNamespace: namespace) else { return nil }
+            pending = stored
+        } catch {
+            return localFailure("e2ee-identity-reset-unavailable")
+        }
+        guard let newUik = pending.uik else { return localFailure("e2ee-identity-reset-unavailable") }
+        let newUikB64 = newUik.publicKey.x963Representation.base64EncodedString()
+        if pending.resetId == nil {
+            // Reçu perdu : le paquet de confiance du compte nomme la demande en
+            // attente ; son document, signé par la nouvelle UIK détenue ici seule,
+            // prouve qu'elle est la sienne.
+            guard let data = try? await E2EEV2TrustDirectory.identityFetch(transport: transport, ownerScopeId: owner)(userId, nil),
+                  let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let bundle = E2EEV2IdentityBundle.parse(root, userId: userId) else {
+                return localFailure("e2ee-identity-reset-unavailable")
+            }
+            if bundle.uikX963B64 == newUikB64 {
+                // Bascule faite pendant que le reçu manquait : le paquet, vérifié sous
+                // la nouvelle UIK, doit certifier l'appareil de remplacement.
+                guard case .success(let outcome) = E2EEV2IdentityVerification.verify(
+                          bundle, pinned: nil, expectedUIK: newUik.publicKey
+                      ),
+                      let replacementId = pending.replacementDeviceId,
+                      outcome.devices.contains(where: { $0.deviceId == replacementId }) else {
                     return localFailure("invalid-e2ee-identity-reset-response")
                 }
-                guard session.isCurrent else { return localFailure("e2ee-session-changed") }
-                // Le reçu précède les mutations locales ; garder la reprise même si Keychain échoue ensuite.
-                rotationCommitted(session, parsed.affectedConversationIds, false)
+                let observed = E2EEV2IdentityResetStatus(
+                    resetId: nil, state: .completed, replacementDeviceId: replacementId, reset: nil,
+                    effectiveAtMs: pending.requestedAtMs + E2EEV2IdentityReset.delayMs,
+                    objectingDeviceId: nil, abortReason: nil
+                )
+                return completeIdentityReset(observed, session: session, owner: owner, userId: userId, namespace: namespace)
+            }
+            guard let served = bundle.pendingIdentityReset,
+                  let document = try? E2EEV2IdentityReset.verify(served.reset),
+                  document.userId == userId, document.newUikB64 == newUikB64,
+                  document.requestedAtMs == pending.requestedAtMs else {
+                // Rien en attente pour cette UIK : passé le délai où le serveur pouvait
+                // encore créer la demande à partir de ces textes, elle est oubliée.
+                if abs(nowMs() - pending.requestedAtMs) > Self.resetClockSkewMs + Self.resetRetryWindowMs {
+                    forgetIdentityReset(namespace: namespace, resetId: nil)
+                }
+                return nil
+            }
+            pending.resetId = served.resetId
+            pending.effectiveAtMs = document.effectiveAtMs
+            guard ownerScope() == owner else { return localFailure("e2ee-session-changed") }
+            do { try accountIdentityStore.savePendingReset(pending, ownerNamespace: namespace) } catch {
+                return localFailure("e2ee-identity-reset-unavailable")
+            }
+        }
+        guard let resetId = pending.resetId else { return nil }
+        let response = await transport.getSessionJSON(
+            path: "/api/e2ee/v2/identity/reset/\(resetId)",
+            expectedOwnerScopeId: owner,
+            capabilitySet: .deviceLifecycle
+        )
+        let status: E2EEV2IdentityResetStatus
+        switch response {
+        case .failure(let failure) where failure.statusCode == 404 && failure.code == "E2EE_IDENTITY_RESET_NOT_FOUND":
+            guard let served = await servedAccountKey(owner: owner, userId: userId, transport: transport),
+                  served != newUikB64 else {
+                return localFailure("invalid-e2ee-identity-reset-response")
+            }
+            forgetIdentityReset(namespace: namespace, resetId: resetId)
+            return .failed(failure)
+        case .failure(let failure):
+            return .failed(failure)
+        case .success(let data, _, _):
+            guard let parsed = E2EEV2DeviceApprovalContract.parseIdentityResetView(data, expectedResetId: resetId),
+                  let signed = parsed.reset, let document = try? E2EEV2IdentityReset.verify(signed),
+                  document.userId == userId,
+                  document.requestedAtMs == pending.requestedAtMs,
+                  document.newUikB64 == newUikB64,
+                  pending.replacementDeviceId.map({ $0 == parsed.replacementDeviceId }) ?? true else {
+                return localFailure("invalid-e2ee-identity-reset-response")
+            }
+            status = parsed
+        }
+        switch status.state {
+        case .pending:
+            return .success(status)
+        case .objected, .aborted:
+            // Jamais oublier une UIK que le compte porte déjà, ni sur une lecture manquée.
+            guard let served = await servedAccountKey(owner: owner, userId: userId, transport: transport),
+                  served != newUikB64 else {
+                return localFailure("invalid-e2ee-identity-reset-response")
+            }
+            forgetIdentityReset(namespace: namespace, resetId: resetId)
+            return .success(status)
+        case .completed:
+            // Pas avant l'échéance (à l'écart d'horloge près), et seulement si le
+            // compte porte bien la nouvelle UIK.
+            guard nowMs() >= status.effectiveAtMs - Self.resetClockSkewMs,
+                  await servedAccountKey(owner: owner, userId: userId, transport: transport) == newUikB64 else {
+                return localFailure("invalid-e2ee-identity-reset-response")
+            }
+            return completeIdentityReset(status, session: session, owner: owner, userId: userId, namespace: namespace)
+        }
+    }
+
+    /// La bascule côté appareil. Rejouable : chaque étape relit l'état laissé
+    /// par une reprise interrompue.
+    private func completeIdentityReset(
+        _ status: E2EEV2IdentityResetStatus,
+        session: LocalAccountSession,
+        owner: String,
+        userId: String,
+        namespace: String
+    ) -> E2EEV2DeviceLifecycleResult<E2EEV2IdentityResetStatus> {
+        guard session.isCurrent else { return localFailure("e2ee-session-changed") }
+        do {
+            // Relu après l'attente réseau : un autre appel a pu finir la bascule.
+            guard let pending = try accountIdentityStore.loadPendingReset(ownerNamespace: namespace) else {
+                return .success(status)
+            }
+            guard pending.resetId == status.resetId else { return localFailure("e2ee-identity-reset-unavailable") }
+            let replacementId = pending.replacementDeviceId ?? status.replacementDeviceId
+            let candidate = try identityStore.loadResetCandidate(ownerNamespace: namespace)
+            let current = try identityStore.load(ownerNamespace: namespace)
+            if candidate?.deviceId == replacementId {
+                // Le serveur demande une rotation de chaque conversation chiffrée :
+                // la reprise relit la liste à jour (`epoch-rotation-requirements`).
+                rotationCommitted(session, [], false)
                 guard let mediaOutboxStore else {
                     return localFailure("e2ee-identity-reset-local-activation-pending")
                 }
@@ -3494,17 +3719,113 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
                 try conversationStateStore.removeCurrentEpochs(ownerNamespace: namespace)
                 let renewed = try identityStore.activateResetCandidate(
                     ownerNamespace: namespace,
-                    expectedDeviceId: parsed.replacementDeviceId,
+                    expectedDeviceId: replacementId,
                     expectedSession: session
                 )
                 if let renewed, renewed.ownerScopeId == owner {
-                    rotationCommitted(renewed, parsed.affectedConversationIds, true)
+                    rotationCommitted(renewed, [], true)
                 }
-                return .success(parsed)
+            } else if current?.deviceId != replacementId {
+                return localFailure("e2ee-identity-reset-local-activation-pending")
             }
+            // L'ancien pin nomme l'UIK remplacée ; retiré avant que la nouvelle ne
+            // soit installée, il est refait à la prochaine lecture, contre elle.
+            try trustPins.remove(userId: userId, ownerNamespace: namespace)
+            try accountIdentityStore.completePendingReset(ownerNamespace: namespace)
+            return .success(status)
         } catch {
             return localFailure("e2ee-identity-reset-local-activation-pending")
         }
+    }
+
+    /// Lot A2 (D.14) : la réinitialisation en attente sur ce compte, si un autre
+    /// appareil l'a demandée et qu'elle se vérifie. `nil` : rien à signaler.
+    func pendingIdentityResetToReview() async -> E2EEV2PendingIdentityResetReview? {
+        guard let owner = ownerScope(), let userId = Self.userId(owner) else { return nil }
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        let uik = try? accountIdentityStore.load(ownerNamespace: namespace)
+        guard let trust = try? await accountTrust(owner: owner, transport: transport, uik: uik),
+              let served = trust.pendingIdentityReset,
+              let document = try? E2EEV2IdentityReset.verify(served.reset),
+              document.userId == userId, nowMs() < document.effectiveAtMs,
+              // Elle doit remplacer l'UIK vérifiée de ce compte, sinon le serveur l'abandonnera.
+              let current = Data(base64Encoded: trust.outcome.pin.uikX963B64),
+              document.previousUikFingerprint == E2EEV2IdentityReset.previousFingerprint(of: current) else { return nil }
+        // La sienne se suit par `refreshIdentityReset`, jamais comme une alerte.
+        if let own = try? accountIdentityStore.loadPendingReset(ownerNamespace: namespace),
+           own.uik?.publicKey.x963Representation.base64EncodedString() == document.newUikB64 {
+            return nil
+        }
+        return .init(resetId: served.resetId, document: document)
+    }
+
+    /// Lot A2 (D.14) : un appareil certifié de l'identité actuelle s'oppose,
+    /// avant l'échéance. Le serveur annule la demande et révoque l'appareil
+    /// de remplacement encore en attente.
+    func objectIdentityReset(
+        _ review: E2EEV2PendingIdentityResetReview
+    ) async -> E2EEV2DeviceLifecycleResult<E2EEV2IdentityResetStatus> {
+        guard let owner = ownerScope(), let userId = Self.userId(owner), review.document.userId == userId else {
+            return localFailure("authenticated-account-required")
+        }
+        let objectedAtMs = nowMs()
+        guard objectedAtMs < review.document.effectiveAtMs else { return localFailure("e2ee-identity-reset-due") }
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        do {
+            guard let descriptor = try identityStore.load(ownerNamespace: namespace) else {
+                return localFailure("e2ee-device-identity-unavailable")
+            }
+            let canonical = E2EEV2IdentityReset.objectionCanonical(
+                userId: userId, newUikB64: review.document.newUikB64,
+                objectingDeviceId: descriptor.deviceId, objectedAtMs: objectedAtMs
+            )
+            let signed = try identityStore.signWithDeviceId(canonicalRequest: Data(canonical.utf8), ownerNamespace: namespace)
+            guard signed.deviceId == descriptor.deviceId else { return localFailure("e2ee-device-identity-unavailable") }
+            let body = try E2EEV2DeviceApprovalContract.identityResetObjectionData(
+                E2EEV2SignedString(canonical: canonical, signatureB64: signed.signature.base64EncodedString())
+            )
+            return map(
+                await transport.postJSON(
+                    path: "/api/e2ee/v2/identity/reset/\(review.resetId)/objection",
+                    body: body,
+                    expectedOwnerScopeId: owner,
+                    capabilitySet: .deviceLifecycle
+                ),
+                parser: { data in
+                    E2EEV2DeviceApprovalContract.parseIdentityResetView(data, expectedResetId: review.resetId)
+                        .flatMap { $0.state == .objected && $0.objectingDeviceId == descriptor.deviceId ? $0 : nil }
+                },
+                invalidMessage: "invalid-e2ee-identity-reset-response"
+            )
+        } catch {
+            return localFailure("e2ee-device-identity-unavailable")
+        }
+    }
+
+    /// Cinq minutes : sous l'écart de 10 minutes que le serveur tolère.
+    private static let resetRetryWindowMs: Int64 = 5 * 60 * 1_000
+    private static let resetClockSkewMs: Int64 = 10 * 60 * 1_000
+
+    /// Oublie une demande close, seulement si c'est encore celle-là.
+    private func forgetIdentityReset(namespace: String, resetId: String?) {
+        guard let stored = try? accountIdentityStore.loadPendingReset(ownerNamespace: namespace),
+              stored.resetId == resetId else { return }
+        try? accountIdentityStore.discardPendingReset(ownerNamespace: namespace)
+        try? identityStore.discardResetCandidate(ownerNamespace: namespace)
+    }
+
+    /// L'UIK que la réinitialisation remplace : celle détenue ici, sinon celle
+    /// épinglée, sinon celle servie. Le serveur refuse un document qui ne nomme
+    /// pas l'UIK enregistrée ; `nil` vaut « compte sans UIK ».
+    private func previousAccountKey(owner: String, userId: String, transport: E2EEV2APITransport) async -> Data? {
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        if let held = try? accountIdentityStore.load(ownerNamespace: namespace) {
+            return held.publicKey.x963Representation
+        }
+        if let pinned = try? trustPins.pin(userId: userId, ownerNamespace: namespace) {
+            return Data(base64Encoded: pinned.uikX963B64)
+        }
+        return await servedAccountKey(owner: owner, userId: userId, transport: transport).flatMap { Data(base64Encoded: $0) }
     }
 
     func requestApproval(_ method: E2EEV2ApprovalMethod) async -> E2EEV2DeviceLifecycleResult<E2EEV2Approval> {

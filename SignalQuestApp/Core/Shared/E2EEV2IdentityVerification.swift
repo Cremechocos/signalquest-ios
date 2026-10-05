@@ -22,6 +22,9 @@ struct E2EEV2IdentityBundle: Equatable, Sendable {
     let certificates: [E2EEV2SignedString]
     let capabilities: [E2EEV2SignedCapabilities]
     let hasPendingIdentityReset: Bool
+    /// La réinitialisation en attente servie (E.1, lot A2) : `{resetId,
+    /// reset, signatureB64}`. Rien n'en est cru avant `E2EEV2IdentityReset.verify`.
+    var pendingIdentityReset: PendingReset? = nil
     /// Listes N+1 à M−1 depuis la version épinglée N (E.1), dans l'ordre.
     var deviceListChain: [E2EEV2SignedString] = []
     /// Page suivante de la chaîne, quand il en reste.
@@ -56,6 +59,14 @@ struct E2EEV2IdentityBundle: Equatable, Sendable {
         }
         let reset = object["pendingIdentityReset"]
         guard reset is NSNull || reset is [String: Any] else { return nil }
+        var pending: PendingReset?
+        if let item = reset as? [String: Any] {
+            guard Set(item.keys) == ["resetId", "reset", "signatureB64"],
+                  let resetId = item["resetId"] as? String, E2EEV2Canonical.isOpaque(resetId),
+                  let text = item["reset"] as? String,
+                  let signature = item["signatureB64"] as? String else { return nil }
+            pending = PendingReset(resetId: resetId, reset: E2EEV2SignedString(canonical: text, signatureB64: signature))
+        }
         // Chaîne des listes (E.1) : absente, elle est vide ; la vérification
         // refuse alors tout saut de version.
         var chain: [E2EEV2SignedString] = []
@@ -81,9 +92,17 @@ struct E2EEV2IdentityBundle: Equatable, Sendable {
             certificates: signedCertificates,
             capabilities: signedCapabilities,
             hasPendingIdentityReset: reset is [String: Any],
+            pendingIdentityReset: pending,
             deviceListChain: chain,
             nextSinceVersion: next
         )
+    }
+}
+
+extension E2EEV2IdentityBundle {
+    struct PendingReset: Equatable, Sendable {
+        let resetId: String
+        let reset: E2EEV2SignedString
     }
 }
 

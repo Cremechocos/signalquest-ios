@@ -176,6 +176,17 @@ final class E2EEV2IdentityVerificationTests: XCTestCase {
         let decoded = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(E2EEV2IdentityBundle.parse(decoded, userId: userId), bundle, "Clé inconnue de premier niveau ignorée")
 
+        // Lot A2 : la réinitialisation en attente, clés exactes, gardée pour vérification.
+        let reset = ["resetId": "reset_served_000000001", "reset": "SQ-E2EE-V2-IDENTITY-RESET", "signatureB64": "AA=="]
+        var withReset = decoded
+        withReset["pendingIdentityReset"] = reset
+        let served = try XCTUnwrap(E2EEV2IdentityBundle.parse(withReset, userId: userId))
+        XCTAssertTrue(served.hasPendingIdentityReset)
+        XCTAssertEqual(served.pendingIdentityReset?.resetId, "reset_served_000000001")
+        XCTAssertEqual(served.pendingIdentityReset?.reset.canonical, "SQ-E2EE-V2-IDENTITY-RESET")
+        withReset["pendingIdentityReset"] = reset.merging(["extra": "x"]) { $1 }
+        XCTAssertNil(E2EEV2IdentityBundle.parse(withReset, userId: userId), "Réinitialisation servie : clés exactes")
+
         object["deviceList"] = ["list": bundle.deviceList.canonical, "signatureB64": bundle.deviceList.signatureB64,
                                 "devices": bundle.deviceEntries, "extra": true]
         XCTAssertNil(E2EEV2IdentityBundle.parse(object, userId: userId), "Objet signé : clés exactes")

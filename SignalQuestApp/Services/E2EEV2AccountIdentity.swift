@@ -21,6 +21,21 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
     static func pendingBootstrapKey(ownerNamespace: String) -> String { "uik-bootstrap-v1:\(ownerNamespace)" }
     /// Demande d'approbation par QR de cet appareil, tant que l'UIK n'est pas reçue.
     static func pendingApprovalKey(ownerNamespace: String) -> String { "uik-approval-v1:\(ownerNamespace)" }
+    /// Réinitialisation demandée ici (lot A2) : la nouvelle UIK, l'heure du
+    /// document signé et, une fois reçus, son identifiant et son échéance.
+    static func pendingResetKey(ownerNamespace: String) -> String { "uik-reset-v1:\(ownerNamespace)" }
+
+    struct PendingReset: Codable, Equatable, Sendable {
+        let uikRawB64: String
+        let requestedAtMs: Int64
+        var resetId: String?
+        var effectiveAtMs: Int64?
+        var replacementDeviceId: String?
+
+        var uik: P256.Signing.PrivateKey? {
+            Data(base64Encoded: uikRawB64).flatMap { try? P256.Signing.PrivateKey(rawRepresentation: $0) }
+        }
+    }
     /// Deux bootstraps simultanés ne créent qu'une UIK et une heure.
     private static let bootstrapLock = NSLock()
 
@@ -41,6 +56,49 @@ final class E2EEV2AccountIdentityStore: @unchecked Sendable {
             throw Failure.invalidRecord
         }
         return key
+    }
+
+    /// La réinitialisation en attente, créée au premier appel : une reprise
+    /// renvoie la même UIK et la même heure, donc les mêmes textes signés.
+    func pendingReset(ownerNamespace: String, nowMs: Int64) throws -> PendingReset {
+        try Self.bootstrapLock.withLock {
+            if let existing = try loadPendingReset(ownerNamespace: ownerNamespace) { return existing }
+            let created = PendingReset(
+                uikRawB64: P256.Signing.PrivateKey().rawRepresentation.base64EncodedString(), requestedAtMs: nowMs
+            )
+            try savePendingReset(created, ownerNamespace: ownerNamespace)
+            return created
+        }
+    }
+
+    func loadPendingReset(ownerNamespace: String) throws -> PendingReset? {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        guard let raw = try tokenStore.string(for: Self.pendingResetKey(ownerNamespace: ownerNamespace)) else { return nil }
+        guard let value = try? JSONDecoder().decode(PendingReset.self, from: Data(raw.utf8)), value.uik != nil else {
+            throw Failure.invalidRecord
+        }
+        return value
+    }
+
+    func savePendingReset(_ value: PendingReset, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        let raw = String(decoding: try JSONEncoder().encode(value), as: UTF8.self)
+        try tokenStore.set(raw, for: Self.pendingResetKey(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
+    }
+
+    func discardPendingReset(ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        try tokenStore.remove(Self.pendingResetKey(ownerNamespace: ownerNamespace))
+    }
+
+    /// Bascule faite par le serveur : la nouvelle UIK remplace l'ancienne,
+    /// vérifiée puisqu'elle a été créée ici. Rejouable.
+    func completePendingReset(ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        guard let pending = try loadPendingReset(ownerNamespace: ownerNamespace) else { return }
+        try tokenStore.set(pending.uikRawB64, for: Self.key(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
+        try tokenStore.set("1", for: Self.verifiedKey(ownerNamespace: ownerNamespace), accessibility: .whenUnlocked)
+        try tokenStore.remove(Self.pendingResetKey(ownerNamespace: ownerNamespace))
     }
 
     /// Premier appareil du compte : une nouvelle UIK, jamais par-dessus une autre.
@@ -379,8 +437,58 @@ enum E2EEV2DeviceApprovalTrust {
     }
 }
 
-/// §2.2, D.3 et E.1 : la liste suivante, sans l'appareil révoqué, signée par
-/// l'UIK. Le serveur ne l'accepte que si elle suit la courante.
+/// Réinitialisation d'identité (lot A2, D.14) : le document signé par la
+/// nouvelle UIK, le certificat de l'appareil de remplacement et la liste v1
+/// qui ne nomme que lui, tous signés par cette nouvelle UIK.
+enum E2EEV2IdentityResetTrust {
+    struct Artifacts: Equatable, Sendable {
+        let reset: E2EEV2SignedString
+        let certificate: E2EEV2SignedString
+        let deviceList: E2EEV2SignedString
+        let deviceEntries: [String]
+    }
+
+    static func make(
+        userId: String,
+        device: E2EEV2DeviceDescriptor,
+        newUik: P256.Signing.PrivateKey,
+        previousUikX963: Data?,
+        requestedAtMs: Int64
+    ) throws -> Artifacts {
+        guard device.platform != "web",
+              let identityKey = Data(base64Encoded: device.publicIdentityKeyB64),
+              let signingKey = Data(base64Encoded: device.publicSigningKeyB64) else {
+            throw E2EEV2TrustFormatError.invalidKey
+        }
+        let reset = E2EEV2IdentityReset(
+            userId: userId, newUikB64: newUik.publicKey.x963Representation.base64EncodedString(),
+            previousUikFingerprint: E2EEV2IdentityReset.previousFingerprint(of: previousUikX963), requestedAtMs: requestedAtMs
+        )
+        let certificate = E2EEV2DeviceCertificate(
+            userId: userId, deviceId: device.deviceId, keyVersion: device.keyVersion,
+            identityKeyB64: device.publicIdentityKeyB64, signingKeyB64: device.publicSigningKeyB64,
+            platform: device.platform, createdAtMs: requestedAtMs
+        )
+        guard (try? E2EEV2DeviceCertificate.parse(certificate.canonical)) == certificate else {
+            throw E2EEV2TrustFormatError.invalidField
+        }
+        let entry = E2EEV2DeviceList.entry(
+            deviceId: device.deviceId, keyVersion: device.keyVersion, platform: device.platform,
+            fingerprint: E2EEV2Canonical.deviceFingerprint(identityKeyX963: identityKey, signingKeyX963: signingKey)
+        )
+        let list = E2EEV2DeviceList.make(userId: userId, version: 1, previousCanonical: nil, entries: [entry], issuedAtMs: requestedAtMs)
+        let signedReset = try E2EEV2SignedString.sign(reset.canonical, with: newUik)
+        // Relu comme le serveur le lira : jamais un document qu'il refuserait.
+        _ = try E2EEV2IdentityReset.verify(signedReset)
+        return Artifacts(
+            reset: signedReset,
+            certificate: try E2EEV2SignedString.sign(certificate.canonical, with: newUik),
+            deviceList: try E2EEV2SignedString.sign(list.canonical, with: newUik),
+            deviceEntries: [entry]
+        )
+    }
+}
+
 /// Récupération (§2.8, v0.4.21) : l'appareil en attente, qui vient de
 /// déballer l'UIK du bundle v3, signe lui-même son certificat et la liste
 /// suivante. Rien n'est signé si la liste courante n'est pas celle de cette UIK.
@@ -434,6 +542,8 @@ enum E2EEV2RecoveryTrust {
     }
 }
 
+/// §2.2, D.3 et E.1 : la liste suivante, sans l'appareil révoqué, signée par
+/// l'UIK. Le serveur ne l'accepte que si elle suit la courante.
 enum E2EEV2DeviceRevocationTrust {
     struct Artifacts: Equatable, Sendable {
         let deviceList: E2EEV2SignedString
