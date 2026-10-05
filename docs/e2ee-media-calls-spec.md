@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.26**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.27**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,9 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.27 (05/10/2026), proposition, apprise du premier appel croisé
+>   web → iOS : piège de livekit-client sur le type de chiffrement d'un
+>   paquet de données (D.11). Aucun vecteur ne change.
 > - v0.4.26 (05/10/2026), proposition, soulevée par la relecture du web :
 >   le créateur d'une époque l'accuse comme tout destinataire, une fois la
 >   clé gardée (E.2).
@@ -2413,6 +2416,11 @@ chaque élément de la partie en clair (v0.4.23).
   l'horloge locale. On ne compare jamais l'heure de jonction d'un pair à
   l'heure de départ vue localement : deux horloges différentes refuseraient
   un vrai retour.
+- **livekit-client (web)** (v0.4.27) : jusqu'à la 2.22.3 au moins, un
+  paquet de données chiffré part avec `EncryptedPacket.encryptionType` à
+  `NONE`. Les autres SDK, et le client web lui-même, le lisent comme un
+  paquet en clair et l'appel prend fin. Le client web pose `GCM` sur chaque
+  paquet chiffré qu'il envoie, et met fin à l'appel s'il ne peut pas le faire.
 - **LiveKit Android** : le gestionnaire de chiffrement est désactivé par
   défaut (`enableE2EE(true)` obligatoire), et les états du chiffreur émis
   avant l'état connecté de la salle sont perdus : publier les pistes
