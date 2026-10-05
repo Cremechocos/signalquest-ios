@@ -274,6 +274,12 @@ struct AppRootView: View {
                 guard let reason = note.userInfo?["reason"] as? String,
                       reason == "identity" || reason == "credentials" else { return }
                 services.epochRotations.resume()
+                // Appareil tout juste approuvé (ou identité changée) : ses jetons
+                // d'appel v2 partent aussitôt, sinon le premier appel chiffré ne
+                // sonne pas app fermée tant que l'app n'a pas été relancée.
+                if reason == "identity", case .authenticated = session.state {
+                    Task { await services.callManager.registerVoIPTokenForSession() }
+                }
             }
             .onChangeCompat(of: scenePhase) { _, phase in
                 if phase != .active { onboardingEntry.releaseGuestScene(onboardingScene.id) }
