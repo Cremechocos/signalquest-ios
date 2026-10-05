@@ -1,0 +1,25 @@
+{
+  "fixtureVersion": "1",
+  "sdkReference": {
+    "swift": "client-sdk-swift 2.17.0",
+    "android": "livekit-android 2.27.0",
+    "web": "livekit-client 2.18.4"
+  },
+  "sourceVector": "call-frame-key-v2",
+  "frameKeyB64": "ryVIIS5swqua1/mAzfYRxAMSihYu75I9qC/TNOTAttU=",
+  "passphrase": "ryVIIS5swqua1/mAzfYRxAMSihYu75I9qC/TNOTAttU=",
+  "installedKeyUtf8B64": "cnlWSUlTNXN3cXVhMS9tQXpmWVJ4QU1TaWhZdTc1STlxQy9UTk9UQXR0VT0=",
+  "keyIndex": "0",
+  "settings": {
+    "sharedKey": true,
+    "keyDerivationAlgorithm": "PBKDF2",
+    "ratchetSaltUtf8": "LKFrameEncryptionKey",
+    "ratchetWindowSize": "0",
+    "keyRingSize": "16",
+    "failureTolerance": "10",
+    "uncryptedMagicBytesUtf8": "LK-ROCKS",
+    "discardFrameWhenCryptorNotReady": true,
+    "encryptionType": "gcm"
+  },
+  "derivationEvidence": "La dérivation PBKDF2 interne au SDK (itérations, taille de la clé AES) n'est pas exportable en Swift ; elle est établie par les appels croisés chiffrés du 05/10/2026 entre iOS, Android et le web (audio et vidéo déchiffrés sans échec dans les trois sens). Chaque changement de version d'un SDK refait ces appels."
+}

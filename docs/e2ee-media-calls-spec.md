@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.27**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.28**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,9 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.28 (05/10/2026), proposition : le vecteur `livekit-shared-key-v1`
+>   fige la phrase de passe et les réglages LiveKit ; la dérivation interne
+>   des SDK est établie par les appels croisés (§10.3).
 > - v0.4.27 (05/10/2026), proposition, apprise du premier appel croisé
 >   web → iOS : piège de livekit-client sur le type de chiffrement d'un
 >   paquet de données (D.11). Aucun vecteur ne change.
@@ -1141,9 +1144,12 @@ version qui expose `discardFrameWhenCryptorNotReady` et
   caractères de la clé de trame. Android : `setSharedKey(String)`. Web : une
   chaîne et non un `ArrayBuffer`, sans quoi la dérivation change.
 - `keyDerivationAlgorithm = PBKDF2` et `ratchetSalt = "LKFrameEncryptionKey"`,
-  explicites. Le nombre d'itérations et la taille effective de la clé AES
-  sont établis par le vecteur `livekit-shared-key-v1`. Swift et Android le
-  produisent (export de la clé), le web le vérifie par l'appel croisé.
+  explicites. Le vecteur `livekit-shared-key-v1` fige la phrase de passe
+  installée à l'index 0 et tous ces réglages ; chaque SDK les relit. La
+  dérivation PBKDF2 interne (itérations, taille effective de la clé AES)
+  n'est pas exportable par tous les SDK : elle est établie par les appels
+  croisés chiffrés entre les trois plateformes (05/10/2026), refaits à chaque
+  changement de version d'un SDK.
 - `ratchetWindowSize = 0`, `keyRingSize = 16`, `encryptionType = gcm`,
   `discardFrameWhenCryptorNotReady = true`, et `failureTolerance` à une même
   valeur explicite partout : 10, proposée par iOS dans le ticket COM-1
