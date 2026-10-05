@@ -7270,6 +7270,22 @@
         }
       }
     },
+    "Active le chiffrement de bout en bout sur cet appareil pour écrire et appeler en privé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on end-to-end encryption on this device to message and call privately."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active le chiffrement de bout en bout sur cet appareil pour écrire et appeler en privé."
+          }
+        }
+      }
+    },
     "Active un code pour ton appareil dans les Réglages iOS, puis reviens dans SignalQuest pour déverrouiller. Le contenu reste masqué." : {
       "localizations" : {
         "en" : {
@@ -7394,6 +7410,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activer l’image dans l’image"
+          }
+        }
+      }
+    },
+    "Activer sur cet appareil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on for this device"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer sur cet appareil"
           }
         }
       }
@@ -14416,6 +14448,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet appareil n’a pas encore d’identité locale E2EE v2."
+          }
+        }
+      }
+    },
+    "Cet appareil n’est pas encore enregistré pour le chiffrement de bout en bout." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device isn’t registered for end-to-end encryption yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’est pas encore enregistré pour le chiffrement de bout en bout."
           }
         }
       }
@@ -26399,6 +26447,22 @@
         }
       }
     },
+    "La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération plus bas, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The account key didn’t reach this device. Enter your recovery key below, or have this device revoked from another one and approve it again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération plus bas, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau."
+          }
+        }
+      }
+    },
     "La clé privée qui ouvre tes conversations chiffrées. Elle est protégée par un mot de passe distinct de celui de ton compte : s’il est perdu, les anciens messages chiffrés ne peuvent plus être lus." : {
       "localizations" : {
         "en" : {
@@ -32107,6 +32171,22 @@
         }
       }
     },
+    "Messages et appels chiffrés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted messages and calls"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages et appels chiffrés"
+          }
+        }
+      }
+    },
     "Messages indisponibles" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -33371,6 +33451,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "N"
+          }
+        }
+      }
+    },
+    "Navigateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Browser"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navigateur"
           }
         }
       }

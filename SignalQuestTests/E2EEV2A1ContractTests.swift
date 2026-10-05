@@ -121,6 +121,24 @@ final class E2EEV2A1ContractTests: XCTestCase {
         XCTAssertFalse(E2EEV2SignedTarget.isEncodedPath("/api//identity"))
     }
 
+    /// Une requête signée automatique (rotation, lecture) ne crée jamais
+    /// l'identité d'appareil : seul l'enregistrement demandé la crée.
+    func testASignedRequestNeverCreatesTheDeviceIdentity() throws {
+        let store = E2EEV2DeviceIdentityStore(
+            tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true },
+            identityChanged: { _ in XCTFail("Aucune identité ne doit naître d'une signature") }
+        )
+        XCTAssertThrowsError(try store.signWithDeviceId(canonicalRequest: Data("GET\n/".utf8), ownerNamespace: "user:a1-sign"))
+        XCTAssertNil(try store.load(ownerNamespace: "user:a1-sign"))
+        // Le chemin du transport, qui signe chaque requête v2, non plus.
+        XCTAssertThrowsError(try E2EEV2SignedRequest.signBodyHash(
+            method: "GET", path: "/api/e2ee/v2/epoch-rotation-requirements",
+            bodySHA256Base64URL: "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+            ownerNamespace: "user:a1-sign", identityStore: store
+        ))
+        XCTAssertNil(try store.load(ownerNamespace: "user:a1-sign"))
+    }
+
     /// E.1 : lecture par session, sans signature ; lire un membre ne crée
     /// jamais d'identité d'appareil, et un 404 devient le refus de ce membre.
     func testAnIdentityIsReadBySessionWithoutCreatingADevice() async throws {

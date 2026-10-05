@@ -262,6 +262,14 @@ struct AppRootView: View {
                       let id = note.userInfo?["session"] as? String else { return }
                 services.epochRotations.resume(expected: .init(ownerScopeId: owner, sessionId: id))
             }
+            // Porte E2EE v2 levée (ou refermée) pendant que l'app tourne.
+            .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
+                services.epochRotations.resume()
+                // Jetons d'appel liés à l'appareil v2 dès l'ouverture des appels.
+                if case .authenticated = session.state {
+                    Task { await services.callManager.registerVoIPTokenForSession() }
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: E2EEV2NotificationContextEvents.refresh).receive(on: RunLoop.main)) { note in
                 guard let reason = note.userInfo?["reason"] as? String,
                       reason == "identity" || reason == "credentials" else { return }
@@ -289,6 +297,7 @@ struct AppRootView: View {
                         }
                     }
                     services.enterForeground()
+                    Task { await services.versionPolicy.refreshIfStale() }
                 case .background:
                     // On ne coupe QUE si plus aucune fenêtre n'est visible.
                     // `scenePhase` est par scène, mais `appLock` et `services`

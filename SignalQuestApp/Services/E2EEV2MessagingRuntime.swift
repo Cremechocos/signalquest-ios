@@ -98,6 +98,21 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     var writesEnabled: Bool { ignoresGates || E2EEV2RuntimeWriteGate.enabled }
     var readsEnabled: Bool { ignoresGates || E2EEV2RuntimeReadGate.enabled }
 
+    /// Cet appareil n'est pas encore entré en v2 : pas d'identité d'appareil,
+    /// ou pas de clé de compte, qui n'arrive qu'avec l'approbation (ou un
+    /// premier appareil confirmé). Vrai seulement quand on le sait : un
+    /// trousseau verrouillé ou illisible n'en dit rien.
+    func lacksV2Readiness(_ session: LocalAccountSession) -> Bool {
+        let namespace = session.ownerNamespace
+        do {
+            return try identityStore.load(ownerNamespace: namespace) == nil
+                || accountIdentityStore.load(ownerNamespace: namespace) == nil
+                || accountIdentityStore.hasPendingBootstrap(ownerNamespace: namespace)
+        } catch {
+            return false
+        }
+    }
+
     /// Les briques de la session courante, rebâties si elle a changé.
     func current() -> Parts? {
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return nil }
@@ -411,7 +426,8 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
     /// la règle commune : tous les membres certifiés et lisant le v2. Vrai si
     /// la conversation est v2 après l'appel.
     func migrateIfReady(_ conversation: MessageConversation) async -> Bool {
-        guard writesEnabled, conversation.e2eeEnabled == true, let parts = current() else { return false }
+        guard writesEnabled, conversation.e2eeEnabled == true, let parts = current(),
+              !lacksV2Readiness(parts.session) else { return false }
         let namespace = parts.session.ownerNamespace
         let isV2 = try? parts.stateStore.isV2(conversationId: conversation.id, ownerNamespace: namespace)
         if isV2 == true { return true }

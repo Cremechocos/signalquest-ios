@@ -1118,8 +1118,10 @@ final class E2EEV2DeviceIdentityStore: @unchecked Sendable {
 
     /// Requête signée, appareil verrouillé compris (spec §2.6, v0.4.13) :
     /// l'identifiant et la signature viennent de la même clé, lue une fois.
+    /// N'en crée jamais : seul l'enregistrement de l'appareil, demandé par
+    /// l'utilisateur, crée l'identité.
     func signWithDeviceId(canonicalRequest: Data, ownerNamespace: String) throws -> (deviceId: String, signature: Data) {
-        let signing = try signingKey(ownerNamespace: ownerNamespace, createsIdentity: true)
+        let signing = try signingKey(ownerNamespace: ownerNamespace, createsIdentity: false)
         return (signing.deviceId, try signing.key.sign(canonicalRequest))
     }
 
@@ -2292,41 +2294,44 @@ final class E2EEV2APITransport: @unchecked Sendable {
     }
 }
 
-/// L'écriture publique reste fermée tant que les critères de sortie du jalon A
-/// (spec §17 : vecteurs, tests croisés, tests d'attaque, relectures
-/// indépendantes) et les capacités serveur correspondantes ne sont pas réunis.
+/// L'écriture s'ouvre quand le serveur publie les capacités du jalon A : les
+/// critères de sortie (spec §17 : vecteurs, tests croisés, tests d'attaque,
+/// relectures indépendantes) sont réunis et sa porte est levée.
 enum E2EEV2RuntimeWriteGate {
-    static let enabled = false
+    static var enabled: Bool { E2EEV2ServerGate.messagingOpen }
 }
 
-/// Exception de recette strictement locale pour les appels uniquement. Elle ne
-/// change pas `E2EEV2RuntimeWriteGate` et ne peut donc ouvrir ni messages, ni
-/// médias, ni migration E2EE. En Release, le compilateur conserve toujours la
-/// branche fermée, quels que soient les arguments ou URLs fournis.
+/// Appels chiffrés : ouverts quand le serveur publie la capacité des appels
+/// vérifiés, médias en `wss` seulement. En Debug, la recette strictement
+/// locale les ouvre aussi, sans rien ouvrir d'autre.
 enum E2EEV2CallRuntimeGate {
     static func allowsControlPlane(
         config: AppConfig = .current,
-        qaArgumentEnabled: Bool = AppEnvironment.runsE2EEV2CallQA
+        qaArgumentEnabled: Bool = AppEnvironment.runsE2EEV2CallQA,
+        serverOpen: Bool = E2EEV2ServerGate.callsOpen
     ) -> Bool {
         #if DEBUG
-        guard qaArgumentEnabled, config.environment != .production else { return false }
-        return isStrictLoopbackEndpoint(config.apiBaseURL, schemes: ["http", "https"])
-        #else
-        return false
+        if qaArgumentEnabled {
+            guard config.environment != .production else { return false }
+            return isStrictLoopbackEndpoint(config.apiBaseURL, schemes: ["http", "https"])
+        }
         #endif
+        return serverOpen
     }
 
     static func allowsMedia(
         liveKitURL: URL,
         config: AppConfig = .current,
-        qaArgumentEnabled: Bool = AppEnvironment.runsE2EEV2CallQA
+        qaArgumentEnabled: Bool = AppEnvironment.runsE2EEV2CallQA,
+        serverOpen: Bool = E2EEV2ServerGate.callsOpen
     ) -> Bool {
         #if DEBUG
-        return allowsControlPlane(config: config, qaArgumentEnabled: qaArgumentEnabled)
-            && isStrictLoopbackEndpoint(liveKitURL, schemes: ["ws", "wss"])
-        #else
-        return false
+        if qaArgumentEnabled {
+            return allowsControlPlane(config: config, qaArgumentEnabled: true)
+                && isStrictLoopbackEndpoint(liveKitURL, schemes: ["ws", "wss"])
+        }
         #endif
+        return serverOpen && liveKitURL.scheme?.lowercased() == "wss"
     }
 
     private static func isStrictLoopbackEndpoint(_ url: URL, schemes: Set<String>) -> Bool {
@@ -3736,6 +3741,18 @@ final class E2EEV2DeviceLifecycleCoordinator: @unchecked Sendable {
         } catch {
             return localFailure("e2ee-identity-reset-local-activation-pending")
         }
+    }
+
+    /// Lot A4 : plateforme de chaque appareil d'après son certificat, dans la
+    /// liste signée du compte vérifiée ici, et non d'après ce que le serveur en
+    /// déclare. `nil` : liste illisible ou refusée, l'écran s'en tient au registre.
+    func certifiedPlatforms() async -> [String: String]? {
+        // Seulement contre la clé de compte détenue ici : un simple affichage
+        // n'épingle jamais une clé servie au premier contact.
+        guard let owner = ownerScope(),
+              let uik = try? accountIdentityStore.load(ownerNamespace: LocalAccountScope.storageNamespace(for: owner)),
+              let trust = try? await accountTrust(owner: owner, transport: transport, uik: uik) else { return nil }
+        return Dictionary(trust.outcome.devices.map { ($0.deviceId, $0.platform) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Lot A2 (D.14) : la réinitialisation en attente sur ce compte, si un autre
@@ -7229,6 +7246,9 @@ final class E2EEV2EpochRotationRuntime: ObservableObject {
                 let existing = try await drain.snapshot(session: current, backlog: backlog)
                 guard current.isCurrent, self.session == current else { return }
                 if !messaging.writesEnabled && !existing.hasWork { self.task = nil; return }
+                // Sans identité d'appareil ici, rien à renouveler : aucune requête
+                // signée, qui ne doit jamais en créer une en passant.
+                if messaging.lacksV2Readiness(current) { self.task = nil; return }
                 self.state = existing
                 self.state.phase = messaging.writesEnabled ? .running : .waitingAuthorization
                 try await drain.request(session: current, backlog: backlog, resetRetry: manualRetry)

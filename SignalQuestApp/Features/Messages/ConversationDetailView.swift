@@ -55,6 +55,8 @@ struct ConversationDetailView: View {
     @State private var conversationIsV2 = false
     /// Avis du fil v2 (§2.4, §4.2, §4.3, §3.2), posés en tête.
     @State private var v2Notices: [E2EEV2ThreadPresentation.Notice] = []
+    @State private var v2LoadInFlight = false
+    @State private var v2LoadAgain = false
     /// Membre dont le numéro de sécurité est ouvert depuis un avis du fil (§2.4).
     @State private var safetyNumberPeer: SafetyNumberPeer?
     @State private var showEncryptionInfo = false
@@ -566,6 +568,12 @@ struct ConversationDetailView: View {
                 await loadV2()
                 guard !Task.isCancelled else { return }
                 await markRead()
+                // Relève en direct (événements du serveur, relevé périodique) et
+                // présence à l'écran, comme en v1 : le serveur ne pousse rien à
+                // l'appareil qui regarde la conversation (A7).
+                guard !Task.isCancelled, isOnScreen else { return }
+                startSync()
+                startActivePing()
                 return
             }
             // SwiftUI annule cette tâche quand on quitte l'écran, mais les appels
@@ -589,6 +597,13 @@ struct ConversationDetailView: View {
             startSync()
             startActivePing()
         }
+        .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.e2eeV2EnvelopeReceived)) { _ in
+            guard usesV2, isOnScreen else { return }
+            Task {
+                await loadV2()
+                await markRead()
+            }
+        }
         .onDisappear {
             isOnScreen = false
             router.isDockHidden = false
@@ -604,7 +619,7 @@ struct ConversationDetailView: View {
                 guard isOnScreen else { return }
                 startSync()
                 startActivePing()
-                Task { await refreshDelta() }
+                Task { if usesV2 { await loadV2() } else { await refreshDelta() } }
             } else {
                 stopSync()
                 stopActivePing(sendLeave: true)
@@ -1890,6 +1905,19 @@ struct ConversationDetailView: View {
     /// Relève v2 : chaîne, époques, liste vérifiée, puis le fil présenté. Les
     /// bulles locales en cours d'envoi restent jusqu'à leur accusé.
     private func loadV2() async {
+        // Push, flux, relevé et retour au premier plan se recouvrent : une
+        // seule relève à la fois, refaite une fois si une autre a été demandée,
+        // pour qu'un résultat plus ancien n'écrase jamais un plus récent.
+        guard !v2LoadInFlight else { v2LoadAgain = true; return }
+        v2LoadInFlight = true
+        defer { v2LoadInFlight = false }
+        repeat {
+            v2LoadAgain = false
+            await loadV2Once()
+        } while v2LoadAgain && !Task.isCancelled
+    }
+
+    private func loadV2Once() async {
         switch await services.e2eeV2Messaging.thread(
             conversationId: conversation.id, isGroup: conversation.isGroup, participants: conversation.participants
         ) {
@@ -2060,7 +2088,8 @@ struct ConversationDetailView: View {
                 case .viewingEvent:
                     await refreshViewers()
                 case .stateEvent:
-                    await refreshLatestPageState()
+                    // Une conversation v2 ne se relit jamais par la page v1.
+                    if usesV2 { await loadV2() } else { await refreshLatestPageState() }
                 case .serverEvent, .polling:
                     if usesV2 { await loadV2() } else { await refreshDelta() }
                 }

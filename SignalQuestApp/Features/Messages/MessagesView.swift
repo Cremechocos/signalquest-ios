@@ -150,6 +150,9 @@ struct MessagesView: View {
     @State private var pendingLeave: MessageConversation?
     /// Brouillons par conversation, lus sur l'appareil (plan 3, vague 1).
     @State private var drafts: [String: String] = [:]
+    /// Porte E2EE v2 ouverte côté serveur, mais cet appareil n'y est pas encore entré.
+    @State private var needsV2Activation = false
+    @State private var showV2Activation = false
 
     /// Insets des rangées : gap vertical de 14 pt entre cartes (2 × 7),
     /// marge d'écran 20 pt.
@@ -163,10 +166,62 @@ struct MessagesView: View {
         _model = StateObject(wrappedValue: MessagesViewModel(service: service))
     }
 
+    private func refreshV2Activation() {
+        guard services.e2eeV2Messaging.writesEnabled, let current = LocalAccountScope.sessionSnapshot() else {
+            needsV2Activation = false
+            return
+        }
+        let snoozedUntil = UserDefaults.standard.double(forKey: Self.activationSnoozeKey(current))
+        needsV2Activation = services.e2eeV2Messaging.lacksV2Readiness(current)
+            && Date().timeIntervalSince1970 >= snoozedUntil
+    }
+
+    /// « Plus tard » : la carte revient au bout d'une semaine ; l'activation
+    /// reste à portée dans Réglages › Appareils.
+    private func snoozeV2Activation() {
+        guard let current = LocalAccountScope.sessionSnapshot() else { return }
+        UserDefaults.standard.set(Date().addingTimeInterval(7 * 24 * 3600).timeIntervalSince1970,
+                                  forKey: Self.activationSnoozeKey(current))
+        needsV2Activation = false
+    }
+
+    private static func activationSnoozeKey(_ session: LocalAccountSession) -> String {
+        "sq.e2ee.v2.activation-snoozed.\(session.ownerNamespace)"
+    }
+
+    /// Activation guidée : l'enregistrement de l'appareil et l'approbation
+    /// demandent un geste (code e-mail du premier appareil, ou un appareil déjà
+    /// approuvé), jamais faits en silence.
+    private var v2ActivationCard: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Label("Messages et appels chiffrés", systemImage: "lock.shield")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+                .accessibilityAddTraits(.isHeader)
+            Text("Active le chiffrement de bout en bout sur cet appareil pour écrire et appeler en privé.")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            GradientButton(String(localized: "Activer sur cet appareil"), style: .primary, allowsMultiline: true) {
+                showV2Activation = true
+            }
+            .accessibilityIdentifier("e2ee-v2-activation-open")
+            GradientButton(String(localized: "Plus tard"), style: .ghost, allowsMultiline: true) {
+                snoozeV2Activation()
+            }
+            .accessibilityIdentifier("e2ee-v2-activation-later")
+        }
+        .padding(.vertical, SQSpace.md)
+        .accessibilityElement(children: .contain)
+    }
+
     var body: some View {
         List {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 header
+                if needsV2Activation {
+                    v2ActivationCard
+                }
                 if E2EEV2RuntimeReadGate.enabled {
                     E2EEV2NotificationPreviewNotice()
                 }
@@ -281,6 +336,13 @@ struct MessagesView: View {
             await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
             await openRoutedConversationIfNeeded()
         }
+        // Message v2 reçu app ouverte : la liste (non-lus, ordre) se met à jour.
+        .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.e2eeV2EnvelopeReceived)) { _ in
+            Task {
+                await model.load()
+                await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
+            }
+        }
         // Au retour d'une conversation : la liste restait figée jusqu'au
         // tirer-pour-rafraîchir (SOC-23). Le premier affichage passe par `.task`.
         .onAppear {
@@ -322,6 +384,21 @@ struct MessagesView: View {
         }
         .onChangeCompat(of: router.openNewConversation) { _, requested in
             if requested { openNewConversationIfRequested() }
+        }
+        .task(id: PushOwnerScope.current) { refreshV2Activation() }
+        .onAppear { refreshV2Activation() }
+        .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
+            refreshV2Activation()
+        }
+        .sheet(isPresented: $showV2Activation, onDismiss: refreshV2Activation) {
+            NavigationStack {
+                E2EEV2TrustedDevicesView(api: services.api)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Fermer") { showV2Activation = false }
+                        }
+                    }
+            }
         }
         .sheet(isPresented: $showNewConversation) {
             NewConversationSheet(service: service) {
@@ -732,7 +809,11 @@ private struct NewConversationSheet: View {
             let isGroup = selected.count > 1
             // Chiffrée et verrous ouverts : naît en v2 si tous les membres le
             // lisent ; sinon en v1, tant que le serveur l'accepte (v0.4.17).
-            if e2ee, services.e2eeV2Messaging.writesEnabled {
+            // Un appareil pas encore activé en v2 crée en v1 ; une porte serveur
+            // refermée aussi, rien n'ayant été créé.
+            if e2ee, services.e2eeV2Messaging.writesEnabled,
+               let session = LocalAccountScope.sessionSnapshot(),
+               !services.e2eeV2Messaging.lacksV2Readiness(session) {
                 switch await services.e2eeV2Messaging.create(
                     participantIds: selected.map(\.id), isGroup: isGroup,
                     title: isGroup && !normalizedTitle.isEmpty ? normalizedTitle : nil, excludesWeb: false
@@ -742,7 +823,8 @@ private struct NewConversationSheet: View {
                     await onCreated()
                     dismiss()
                     return
-                case .failure(let failure) where failure.message == "e2ee-v2-capability-missing":
+                case .failure(let failure) where failure.message == "e2ee-v2-capability-missing"
+                    || failure.kind == .activationBlocked:
                     break
                 case .failure(let failure):
                     throw E2EEV2MessagingError(failure.kind == .retryable

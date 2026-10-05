@@ -151,15 +151,16 @@ final class E2EEV2DeviceLockedSigningTests: XCTestCase {
         XCTAssertEqual(try store.signWithDeviceId(canonicalRequest: message, ownerNamespace: namespace).deviceId, candidate.deviceId)
     }
 
-    /// Deux premières requêtes signées simultanées : une seule identité.
+    /// Deux enregistrements simultanés (seul chemin qui crée l'identité) :
+    /// une seule identité.
     func testConcurrentFirstUsesCreateASingleIdentity() {
         let tokens = LockableTokenStore()
         let store = makeStore(tokens)
         let deviceIds = OSAllocatedUnfairLock(initialState: Set<String>())
-        let message = message, namespace = namespace
+        let namespace = namespace
         DispatchQueue.concurrentPerform(iterations: 8) { _ in
-            guard let signed = try? store.signWithDeviceId(canonicalRequest: message, ownerNamespace: namespace) else { return }
-            deviceIds.withLock { _ = $0.insert(signed.deviceId) }
+            guard let created = try? store.loadOrCreate(ownerNamespace: namespace) else { return }
+            deviceIds.withLock { _ = $0.insert(created.deviceId) }
         }
         let created = deviceIds.withLock { $0 }
         XCTAssertEqual(created.count, 1)

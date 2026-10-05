@@ -812,6 +812,10 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
     // Toucher une notification faisait planter l'app, en particulier app fermée.
     // Le traitement reste asynchrone ; seul l'accusé de fin repasse par le fil
     // principal (`MainQueueCompletion`).
+    /// Un message v2 est arrivé pendant que l'app est ouverte (notification
+    /// opaque, sans conversation) : de quoi relever la conversation affichée.
+    static let e2eeV2EnvelopeReceived = Notification.Name("SignalQuest.E2EEV2EnvelopeReceived")
+
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
@@ -826,6 +830,11 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
            Self.e2eeDeviceApprovalID(info) == nil {
             center.removeDeliveredNotifications(withIdentifiers: [notification.request.identifier])
             return completionHandler([])
+        }
+        // Message v2 reçu app ouverte : la notification ne nomme pas la
+        // conversation (§2.6) ; l'écran ouvert sur une conversation v2 se relève.
+        if Self.string(info, "type")?.lowercased() == "e2ee_v2_envelope" {
+            NotificationCenter.default.post(name: Self.e2eeV2EnvelopeReceived, object: nil)
         }
         // La conversation est déjà à l'écran : ni bannière ni son pour elle,
         // la synchro l'affiche déjà (SOC-24).

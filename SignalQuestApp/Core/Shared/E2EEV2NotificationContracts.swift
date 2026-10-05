@@ -1281,8 +1281,84 @@ enum E2EEV2ContentContract {
     }
 }
 
+/// Porte E2EE v2 du serveur, lue dans `/api/app/version-policy` : il ne
+/// publie les capacités ouvertes qu'une fois sa porte levée. Une app installée
+/// avant reste dormante ; aucune requête v2 ne part pour la découvrir. Gardée
+/// dans l'App Group : l'extension de notification lit le même état.
+enum E2EEV2ServerGate {
+    static let messagingCapabilities: Set<String> = [
+        E2EEV2ProtocolWire.deviceIdentityCapability, E2EEV2ProtocolWire.messageEnvelopeCapability,
+    ]
+    static let callCapabilities = messagingCapabilities.union(["e2ee_verified_calls_v2"])
+
+    /// Posté quand la porte s'ouvre ou se referme : l'app relance ce qui en dépend.
+    static let didChange = Notification.Name("SignalQuest.E2EEV2ServerGate.didChange")
+
+    #if DEBUG
+    /// Tests unitaires : l'app hôte ne lit ni n'écrit l'état partagé.
+    nonisolated(unsafe) static var overrideForTesting: Set<String>?
+    private static let isUnitTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    #endif
+
+    static var messagingOpen: Bool { messagingCapabilities.isSubset(of: published) }
+    static var callsOpen: Bool { callCapabilities.isSubset(of: published) }
+    /// Une fois la lecture ouverte, les conversations déjà v2 restent lisibles
+    /// même si le serveur referme sa porte : elles ne repassent jamais en v1.
+    static var readsOpen: Bool {
+        if messagingOpen { return true }
+        guard let store = Store.current else { return false }
+        return store.defaults.bool(forKey: store.readsOpenedKey)
+    }
+
+    /// Liste publiée par le serveur `host`, telle quelle ; remplacée à chaque
+    /// lecture. Vrai si l'ouverture des messages ou des appels a changé.
+    @discardableResult
+    static func record(serverCapabilities: Set<String>, host: String?) -> Bool {
+        guard let store = Store.current, let host, host.lowercased() == store.host else { return false }
+        let before = (messagingOpen, callsOpen)
+        store.defaults.set(serverCapabilities.sorted(), forKey: store.publishedKey)
+        if messagingCapabilities.isSubset(of: serverCapabilities) { store.defaults.set(true, forKey: store.readsOpenedKey) }
+        return before != (messagingOpen, callsOpen)
+    }
+
+    private static var published: Set<String> {
+        #if DEBUG
+        if let overrideForTesting { return overrideForTesting }
+        #endif
+        guard let store = Store.current else { return [] }
+        return Set(store.defaults.stringArray(forKey: store.publishedKey) ?? [])
+    }
+
+    /// État rangé par hôte d'API, dans l'App Group que l'app et l'extension
+    /// partagent : une build Debug branchée sur un banc local n'ouvre jamais
+    /// la porte d'une build pointée vers la production.
+    private struct Store: @unchecked Sendable {
+        let defaults: UserDefaults
+        let host: String
+        var publishedKey: String { "sq.e2ee.v2.server-capabilities.\(host)" }
+        var readsOpenedKey: String { "sq.e2ee.v2.reads-opened.\(host)" }
+
+        static let shared: Store? = {
+            let info = Bundle.main
+            guard let group = info.object(forInfoDictionaryKey: "SQ_APP_GROUP") as? String,
+                  !group.isEmpty, !group.contains("$("),
+                  let base = info.object(forInfoDictionaryKey: "SQ_API_BASE_URL") as? String,
+                  let host = URL(string: base.replacingOccurrences(of: "$()", with: ""))?.host?.lowercased(),
+                  let defaults = UserDefaults(suiteName: group) else { return nil }
+            return Store(defaults: defaults, host: host)
+        }()
+
+        static var current: Store? {
+            #if DEBUG
+            if overrideForTesting != nil || isUnitTestHost { return nil }
+            #endif
+            return shared
+        }
+    }
+}
+
 enum E2EEV2RuntimeReadGate {
-    static let enabled = false
+    static var enabled: Bool { E2EEV2ServerGate.readsOpen }
 }
 
 struct E2EEV2IncomingMessageInput: Sendable {

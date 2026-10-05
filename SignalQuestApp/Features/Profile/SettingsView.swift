@@ -16,10 +16,17 @@ struct ExportedDataFile: Identifiable {
 @MainActor
 final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     @Published private(set) var devices: [E2EEV2RemoteDevice] = []
+    /// Plateforme lue dans le certificat de chaque appareil (liste signée).
+    @Published private(set) var certifiedPlatforms: [String: String] = [:]
     @Published private(set) var currentDeviceId: String?
     /// Descripteur local : le QR d'approbation en montre la plateforme et l'empreinte.
     @Published private(set) var localDescriptor: E2EEV2DeviceDescriptor?
     @Published private(set) var activationEnabled = false
+    /// Inventaire lu : un appareil local absent n'est alors pas encore enregistré.
+    @Published private(set) var inventoryLoaded = false
+    /// Approuvé côté serveur, mais la clé du compte n'est jamais arrivée ici
+    /// (dépôt expiré ou déjà consommé) : seule la clé de récupération la rend.
+    @Published private(set) var accountKeyMissing = false
     @Published private(set) var identityGeneration: Int?
     @Published private(set) var isLoading = false
     @Published private(set) var isActing = false
@@ -49,6 +56,12 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
 
     var hasLocalIdentity: Bool { currentDeviceId != nil }
 
+    /// À préparer : sans identité locale, ou avec une identité que le serveur
+    /// n'a jamais reçue (enregistrement interrompu).
+    var needsPreparation: Bool {
+        !hasLocalIdentity || (inventoryLoaded && currentDevice == nil)
+    }
+
     var currentDeviceCanRevoke: Bool {
         devices.contains {
             $0.descriptor.deviceId == currentDeviceId && $0.status == .approved
@@ -61,9 +74,16 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
 
     var identityEstablished: Bool { identityGeneration != nil }
 
+    /// Le certificat fait foi ; sans lui (appareil en attente, liste illisible),
+    /// la plateforme déclarée au registre.
+    func platform(of device: E2EEV2RemoteDevice) -> String {
+        certifiedPlatforms[device.descriptor.deviceId] ?? device.descriptor.platform
+    }
+
     func load() async {
         isLoading = true
         activationEnabled = false
+        inventoryLoaded = false
         errorMessage = nil
         defer { isLoading = false }
         do {
@@ -89,6 +109,10 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         switch await lifecycle.listDeviceInventory() {
         case .success(let inventory):
             devices = inventory.devices
+            inventoryLoaded = true
+            accountKeyMissing = currentDevice?.status == .approved
+                && (try? E2EEV2AccountIdentityStore().load(ownerNamespace: LocalAccountScope.storageNamespace)) == nil
+            certifiedPlatforms = await lifecycle.certifiedPlatforms() ?? [:]
             activationEnabled = inventory.activationEnabled
             identityGeneration = inventory.identity?.generation
             if inventory.activationEnabled, currentDeviceCanRevoke {
@@ -299,6 +323,11 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         for failure: E2EEV2TransportFailure,
         fallback: String
     ) -> String {
+        // Session déjà liée à un autre appareil (E.1, v0.4.19) : une nouvelle
+        // connexion la délie, jamais un nouvel essai.
+        if failure.code == "E2EE_DEVICE_SESSION_MISMATCH" {
+            return String(localized: "La session a changé. Reconnecte-toi avant de gérer les appareils.")
+        }
         switch failure.kind {
         case .authentication:
             return String(localized: "La session a changé. Reconnecte-toi avant de gérer les appareils.")
@@ -331,8 +360,11 @@ struct E2EEV2TrustedDevicesView: View {
     var body: some View {
         List {
             Section {
-                if !model.hasLocalIdentity && !model.isLoading {
-                    Label("Cet appareil n’a pas encore d’identité locale E2EE v2.", systemImage: "iphone.gen3.badge.play")
+                if model.needsPreparation && !model.isLoading {
+                    Label(model.hasLocalIdentity
+                          ? String(localized: "Cet appareil n’est pas encore enregistré pour le chiffrement de bout en bout.")
+                          : String(localized: "Cet appareil n’a pas encore d’identité locale E2EE v2."),
+                          systemImage: "iphone.gen3.badge.play")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
                     Button {
@@ -364,6 +396,14 @@ struct E2EEV2TrustedDevicesView: View {
             }
 
             E2EEV2RotationStatusSection(runtime: services.epochRotations)
+
+            if model.accountKeyMissing {
+                Section {
+                    Label("La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération plus bas, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau.", systemImage: "key.slash")
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
 
             if let currentDevice = model.currentDevice,
                currentDevice.status == .pending,
@@ -577,8 +617,9 @@ struct E2EEV2TrustedDevicesView: View {
     @ViewBuilder
     private func deviceRow(_ device: E2EEV2RemoteDevice) -> some View {
         let isCurrent = device.descriptor.deviceId == model.currentDeviceId
+        let platform = model.platform(of: device)
         HStack(alignment: .top, spacing: SQSpace.md) {
-            Image(systemName: platformIcon(device.descriptor.platform))
+            Image(systemName: platformIcon(platform))
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(SQColor.brandRed)
                 .frame(width: 40, height: 40)
@@ -586,8 +627,16 @@ struct E2EEV2TrustedDevicesView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Text(device.descriptor.label ?? platformName(device.descriptor.platform))
+                    Text(device.descriptor.label ?? platformName(platform))
                         .font(SQType.heading)
+                    // Un navigateur nommé se distingue encore d'un téléphone.
+                    if platform == "web", device.descriptor.label != nil {
+                        Text("Navigateur")
+                            .font(SQFont.body(12, .bold, relativeTo: .caption2))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(SQColor.accentSoft, in: Capsule())
+                    }
                     if isCurrent {
                         Text("Cet appareil")
                             .font(SQFont.body(12, .bold, relativeTo: .caption2))
@@ -616,7 +665,7 @@ struct E2EEV2TrustedDevicesView: View {
                     Image(systemName: "trash")
                         .frame(width: 44, height: 44)
                 }
-                .accessibilityLabel("Révoquer \(device.descriptor.label ?? platformName(device.descriptor.platform))")
+                .accessibilityLabel("Révoquer \(device.descriptor.label ?? platformName(platform))")
                 .disabled(model.isActing)
             }
         }

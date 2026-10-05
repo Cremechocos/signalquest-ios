@@ -203,6 +203,42 @@ final class CallReliabilityTests: XCTestCase {
         XCTAssertEqual(CallLifecyclePolicy.outgoingCallMode(conversationE2EE: true, conversationV2: true, verifiedV2: true), .endToEnd)
     }
 
+    #if DEBUG
+    /// Les verrous de Release s'ouvrent avec les capacités que le serveur
+    /// publie dans `/api/app/version-policy`, et seulement avec elles.
+    func testServerPublishedCapabilitiesOpenTheReleaseGates() throws {
+        defer { E2EEV2ServerGate.overrideForTesting = nil }
+        let production = AppConfig(
+            environment: .production,
+            appBaseURL: try XCTUnwrap(URL(string: "https://signalquest.fr")),
+            apiBaseURL: try XCTUnwrap(URL(string: "https://api.signalquest.fr")),
+            debugLogsEnabled: false
+        )
+        let secureMedia = try XCTUnwrap(URL(string: "wss://livekit.signalquest.fr"))
+        let clearMedia = try XCTUnwrap(URL(string: "ws://livekit.signalquest.fr"))
+
+        E2EEV2ServerGate.overrideForTesting = ["e2ee_v2_contract_preview"]
+        XCTAssertFalse(E2EEV2RuntimeWriteGate.enabled)
+        XCTAssertFalse(E2EEV2RuntimeReadGate.enabled)
+        XCTAssertFalse(E2EEV2CallRuntimeGate.allowsControlPlane(config: production, qaArgumentEnabled: false))
+        XCTAssertFalse(E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: secureMedia, config: production, qaArgumentEnabled: false))
+
+        E2EEV2ServerGate.overrideForTesting = ["e2ee_v2_contract_preview", "e2ee_device_identity_v2", "e2ee_message_envelope_v2"]
+        XCTAssertTrue(E2EEV2RuntimeWriteGate.enabled)
+        XCTAssertTrue(E2EEV2RuntimeReadGate.enabled)
+        XCTAssertFalse(E2EEV2CallRuntimeGate.allowsControlPlane(config: production, qaArgumentEnabled: false))
+
+        E2EEV2ServerGate.overrideForTesting = [
+            "e2ee_device_identity_v2", "e2ee_message_envelope_v2", "e2ee_verified_calls_v2",
+        ]
+        XCTAssertTrue(E2EEV2CallRuntimeGate.allowsControlPlane(config: production, qaArgumentEnabled: false))
+        XCTAssertTrue(E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: secureMedia, config: production, qaArgumentEnabled: false))
+        XCTAssertFalse(E2EEV2CallRuntimeGate.allowsMedia(liveKitURL: clearMedia, config: production, qaArgumentEnabled: false))
+        // La recette locale ne vise jamais la production, porte ouverte ou non.
+        XCTAssertFalse(E2EEV2CallRuntimeGate.allowsControlPlane(config: production, qaArgumentEnabled: true))
+    }
+    #endif
+
     func testE2EECallQAGateRequiresExplicitDebugFlagAndStrictLoopbackEndpoints() throws {
         let local = AppConfig(
             environment: .test,

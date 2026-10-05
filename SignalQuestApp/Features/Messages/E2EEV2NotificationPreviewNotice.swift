@@ -29,8 +29,20 @@ struct E2EEV2NotificationPreviewNotice: View {
     private func reload() {
         ownerScopeId = PushOwnerScope.current
         selected = E2EEV2NotificationPrivacyStore.get(ownerScopeId: ownerScopeId)
+        // Seulement une fois cet appareil entré en v2 : avant, aucun aperçu chiffré.
         needsNotice = E2EEV2RuntimeReadGate.enabled && ownerScopeId != nil && selected != .hidden &&
+            Self.deviceIsInV2 &&
             !E2EEV2NotificationPrivacyStore.isNoticeAcknowledged(ownerScopeId: ownerScopeId)
+    }
+
+    /// Identité d'appareil et clé de compte (reçue à l'approbation) présentes ici.
+    private static var deviceIsInV2: Bool {
+        guard let session = LocalAccountScope.sessionSnapshot() else { return false }
+        let namespace = session.ownerNamespace
+        let account = E2EEV2AccountIdentityStore()
+        return (try? E2EEV2DeviceIdentityStore().load(ownerNamespace: namespace)) != nil
+            && (try? account.load(ownerNamespace: namespace)) != nil
+            && (try? account.hasPendingBootstrap(ownerNamespace: namespace)) == false
     }
 
     private func choose(_ privacy: E2EEV2NotificationPrivacy) {

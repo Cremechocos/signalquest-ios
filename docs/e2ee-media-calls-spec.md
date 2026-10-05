@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.28**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.30**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,14 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.30 (05/10/2026), proposition, arrêtée avec le serveur : un compte
+>   supprimé dans une conversation v2 (410 `E2EE_ACCOUNT_DELETED`), retiré
+>   par un administrateur ; succession du dernier administrateur par le
+>   membre le plus ancien (décision produit) ; ré-ajout sans l'historique
+>   antérieur (D.4). Aucun vecteur ne change.
+> - v0.4.29 (05/10/2026), proposition : signal d'ouverture des verrous à
+>   l'exécution, par les capacités publiées dans `/api/app/version-policy`
+>   (§17), arrêté avec le serveur. Aucun vecteur ne change.
 > - v0.4.28 (05/10/2026), proposition : le vecteur `livekit-shared-key-v1`
 >   fige la phrase de passe et les réglages LiveKit ; la dérivation interne
 >   des SDK est établie par les appels croisés (§10.3).
@@ -1688,6 +1696,24 @@ protocole, états des cryptors d'appel.
   les critères de sortie du jalon A (§16) sont remplis. Ce sont les vecteurs,
   les tests croisés, les tests d'attaque et les relectures indépendantes. Il
   n'y a pas de revue externe.
+  - **Signal d'ouverture à l'exécution (v0.4.29).** Une app publiée avant
+    l'ouverture du serveur reste dormante, puis s'ouvre seule. Le signal est
+    `serverCapabilities` de `GET /api/app/version-policy` (public). Le serveur
+    n'y publie les capacités du jalon A qu'une fois sa porte levée, avec la
+    même décision que ses routes : `e2ee_device_identity_v2`,
+    `e2ee_message_envelope_v2`, `e2ee_history_migration_v2` (la récupération
+    en dépend) et `e2ee_verified_calls_v2`. `e2ee_encrypted_media_v2` relève
+    du jalon B.
+  - Messages : ouverts avec l'identité et l'enveloppe. Appels : avec, en plus,
+    `e2ee_verified_calls_v2`, et des médias en `wss` seulement.
+  - La lecture reste ouverte si la liste recule : une conversation v2 ne
+    repasse jamais en v1. L'état est rangé par hôte d'API.
+  - Porte fermée, l'app n'envoie aucune requête v2 et ne crée aucune identité.
+    Une requête signée n'en crée jamais : seul l'enregistrement demandé par
+    l'utilisateur en crée une.
+  - Un appareil sans identité, ou sans clé de compte (pas encore approuvé),
+    n'entre pas en v2 : il crée ses conversations en v1, ne migre ni ne
+    renouvelle rien, et l'app lui propose l'activation.
 - **Tests croisés** sur deux comptes et trois plateformes : chaque type de
   contenu, dans les deux sens, en ligne et hors ligne, avec ajout, révocation et
   réinitialisation d'appareil.
@@ -2208,6 +2234,37 @@ certificat et la liste, sans `uikWrap` (§2.7).
   - `LEAVE` est fait par la personne elle-même ;
   - l'auteur est membre à l'état précédent, et l'on part par `LEAVE`, jamais
     en se visant par `REMOVE`.
+- **Compte supprimé** (v0.4.30) :
+  - `GET /api/e2ee/v2/users/{id}/identity` répond `410 E2EE_ACCOUNT_DELETED`
+    pour un compte qui n'existe plus. Le serveur ne donne cette réponse qu'à
+    un membre actuel d'une conversation v2 dont la liste signée courante
+    contient ce compte. Dans tous les autres cas, c'est le 404 habituel.
+  - Le client tient ce membre pour un membre sans appareil. Il ne figure ni
+    dans les époques ni dans `memberListVersions`. Il ne bloque ni l'envoi ni
+    la rotation, et ce n'est pas un refus au sens du §2.4. L'app l'affiche
+    comme « compte supprimé ».
+  - Ce n'est pas un risque : déclarer un compte supprimé ne fait que retirer
+    un destinataire, sans donner accès à quoi que ce soit.
+  - Le premier appareil d'un administrateur qui reçoit ce 410 signe un
+    `REMOVE` qui vise ce membre. Une course entre deux administrateurs se
+    règle par le 409 de comparaison-échange : le perdant relit la chaîne.
+  - **Succession** (décision produit du 05/10/2026) : quand aucun
+    administrateur de l'état courant n'a plus de compte, le membre le plus
+    ancien encore vivant signe un `ROLE_ADMIN` qui le vise lui-même.
+    - « Plus ancien » : son arrivée courante porte le plus petit
+      `changeNumber`. L'arrivée courante est le `ADD` qui l'a fait entrer pour
+      la dernière fois (son `ADD` de genèse pour un membre d'origine) : un
+      membre retiré puis ré-ajouté compte à partir de son retour.
+    - Sans aucun administrateur (le dernier est parti par `LEAVE`), la
+      condition est remplie de même : la succession s'applique.
+    - C'est la seule exception à la règle des administrateurs.
+    - Un vérificateur l'accepte si chaque administrateur de l'état précédent
+      répond 410 et qu'aucun membre plus ancien ne répond autrement que 410.
+    - Le serveur applique la même règle à l'écriture.
+    - Ensuite, le nouvel administrateur retire les comptes supprimés.
+  - Un membre retiré puis ré-ajouté ne reçoit ni les messages ni les
+    enveloppes de récupération des époques antérieures à son retour. Il ne
+    pourrait pas les lire de toute façon : il n'a que l'époque de son retour.
 - JSON : `{"change": "<chaîne>", "signatureB64": "…"}`.
 - Le serveur garde les changements en ajout seul, en comparaison-échange sur
   `changeNumber`.
@@ -2614,6 +2671,8 @@ version publiée qui ouvre les verrous.
   - `CALL_NONCE_TAKEN` (409) : `callNonce` déjà enregistré (§10.1) ;
   - `E2EE_DEVICE_SESSION_MISMATCH` (409) : requête signée par un appareil
     autre que celui auquel la session est liée (E.1, v0.4.19) ;
+  - `E2EE_ACCOUNT_DELETED` (410) : compte supprimé, lu par un membre d'une
+    conversation v2 qui le contient (D.4, v0.4.30) ;
   - `E2EE_DEVICE_ID_INVALID` (400) : identifiant d'appareil mal formé dans
     le chemin (v0.4.19) ;
   - réinitialisation et récupération (E.1, v0.4.21) :

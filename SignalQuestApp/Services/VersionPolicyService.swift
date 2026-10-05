@@ -216,8 +216,20 @@ final class VersionPolicyService: ObservableObject {
         self.currentBuild = Self.parseBuildNumber(bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String)
     }
 
+    private var lastRefresh: Date?
+
+    /// Au retour au premier plan : une app restée des jours en mémoire voit
+    /// quand même une version minimale relevée ou la porte E2EE v2 levée.
+    func refreshIfStale(minimumInterval: TimeInterval = 15 * 60) async {
+        if let lastRefresh, Date().timeIntervalSince(lastRefresh) < minimumInterval { return }
+        await refresh()
+    }
+
     /// Best-effort : ne lève jamais, ne bloque jamais sur erreur.
     func refresh() async {
+        // Marquée dès le départ : le retour au premier plan pendant la lecture
+        // du lancement n'en relance pas une seconde.
+        lastRefresh = Date()
         guard let currentBuild else {
             logger.error("CFBundleVersion non analysable : politique de version ignorée.")
             return
@@ -241,6 +253,9 @@ final class VersionPolicyService: ObservableObject {
                     legacyWriteDeadline: policy.legacyWriteDeadline
                 )
             )
+            if E2EEV2ServerGate.record(serverCapabilities: policy.serverCapabilities, host: api.config.apiBaseURL.host) {
+                NotificationCenter.default.post(name: E2EEV2ServerGate.didChange, object: nil)
+            }
             state = Self.evaluate(policy: policy, currentBuild: currentBuild)
         } catch {
             guard !error.isCancellation else { return }
