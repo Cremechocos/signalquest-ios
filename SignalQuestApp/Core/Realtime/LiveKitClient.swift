@@ -137,6 +137,11 @@ final class LiveKitClient: ObservableObject {
     /// Le SDK a déjà déchiffré `data` avant cet appel ; les paquets non-GCM sont
     /// refusés lorsque la session exige E2EE v2.
     var onDataReceived: (@MainActor (_ senderIdentity: String?, _ data: Data, _ topic: String) -> Void)?
+#if DEBUG
+    /// Essais locaux seulement : trace des paquets reçus et des preuves envoyées
+    /// (sujet, chiffrement, verdict), sans identité ni contenu.
+    nonisolated(unsafe) static var qaDataTrace: (@Sendable (String) -> Void)?
+#endif
     /// Appel prouvé : nom d'un utilisateur prouvé, lu sur l'appareil. Le nom
     /// du jeton, choisi par le serveur, n'y sert jamais (§10.4).
     var participantName: (@MainActor (_ userId: String) -> String?)?
@@ -412,12 +417,24 @@ final class LiveKitClient: ObservableObject {
                         self?.isE2EEVerified = false
                     }
                 },
-                onDataReceived: { [weak self] senderIdentity, data, topic, encryptionType in
-                    switch E2EEV2CallDataPolicy.verdict(
+                onDataReceived: { [weak self] resolvedSender, data, topic, encryptionType in
+                    // D.11 : preuve sans émetteur résolu, attribuée à l'identité
+                    // qu'elle nomme et vérifiée sous le même verrou.
+                    var unattributed: (identity: String, outcome: E2EEV2CallJoinVerifier.Outcome)?
+                    if let joinVerifier = e2eeSession?.joinVerifier,
+                       E2EEV2CallDataPolicy.attributesByProof(resolvedSender: resolvedSender, topic: topic, encryptionType: encryptionType) {
+                        unattributed = joinVerifier.receiveUnattributed(data)
+                    }
+                    let senderIdentity = resolvedSender ?? unattributed?.identity
+                    let verdict = E2EEV2CallDataPolicy.verdict(
                         requiresE2EE: e2eeSession != nil,
                         senderIdentity: senderIdentity,
                         encryptionType: encryptionType
-                    ) {
+                    )
+#if DEBUG
+                    LiveKitClient.qaDataTrace?("reçu sujet=\(topic) chiffrement=\(encryptionType) émetteur=\(resolvedSender != nil ? "résolu" : senderIdentity != nil ? "nommé par la preuve" : "inconnu") verdict=\(verdict) octets=\(data.count)")
+#endif
+                    switch verdict {
                     case .endCall:
                         e2eeSession?.verification.failGlobally()
                         Task { @MainActor in
@@ -436,7 +453,10 @@ final class LiveKitClient: ObservableObject {
                         // participant non prouvé n'atteint l'app.
                         guard let senderIdentity else { return }
                         if topic == E2EEV2CallJoinProof.topic {
-                            let outcome = joinVerifier.receive(data, from: senderIdentity)
+                            let outcome = unattributed?.outcome ?? joinVerifier.receive(data, from: senderIdentity)
+#if DEBUG
+                            LiveKitClient.qaDataTrace?("preuve reçue issue=\(outcome)")
+#endif
                             guard outcome != .rejected else {
                                 e2eeSession?.verification.failGlobally()
                                 Task { @MainActor in
@@ -485,6 +505,11 @@ final class LiveKitClient: ObservableObject {
             )
             e2eeSession?.neutralizeServerInjectedFrames()
             await enforceRemoteTracks(in: liveRoom)
+            // Présents avant nous : leurs preuves s'attribuent dès maintenant (D.11),
+            // pendant la mise en place des médias locaux ; leur délai part plus loin.
+            for participant in liveRoom.remoteParticipants.values {
+                if let identity = participant.identity?.stringValue { e2eeSession?.joinVerifier?.announce(identity) }
+            }
             if didE2EEFailDuringConnect {
                 await liveRoom.disconnect()
                 state = .failed("La vérification du chiffrement média a échoué.")
@@ -889,6 +914,9 @@ final class LiveKitClient: ObservableObject {
               let joinVerifier = session.joinVerifier else { return }
         guard room.e2eeManager?.dataChannelEncryptionType == .gcm,
               let identity = room.localParticipant.identity?.stringValue else {
+#if DEBUG
+            Self.qaDataTrace?("preuve non envoyée : canal de données non chiffré")
+#endif
             logger.error("Join proof not sent: data channel not encrypted")
             session.verification.failGlobally()
             handleE2EETrustLoss(.joinProof)
@@ -906,7 +934,13 @@ final class LiveKitClient: ObservableObject {
             )
             session.verification.markJoinProven(identity)
             isE2EEVerified = session.verification.isVerified
+#if DEBUG
+            Self.qaDataTrace?("preuve envoyée vers=\(destination == nil ? "tous" : "un participant")")
+#endif
         } catch {
+#if DEBUG
+            Self.qaDataTrace?("preuve non envoyée : \(error)")
+#endif
             logger.error("Join proof not sent: \(String(describing: error), privacy: .public)")
             guard state == .connected else { return }
             session.verification.failGlobally()
@@ -1463,6 +1497,13 @@ enum E2EEV2CallDataPolicy {
     /// Un paquet en clair dans un appel chiffré y met fin. Un paquet chiffré
     /// peut arriver avant que le serveur annonce son émetteur (jusqu'à environ
     /// 3 secondes après sa jonction) : il est ignoré, sans couper l'appel.
+    /// D.11 : seule une preuve de jonction chiffrée, dont le SDK n'a pas résolu
+    /// l'émetteur, s'attribue à l'identité qu'elle nomme. Un émetteur résolu
+    /// prime toujours.
+    static func attributesByProof(resolvedSender: String?, topic: String, encryptionType: EncryptionType) -> Bool {
+        resolvedSender == nil && topic == E2EEV2CallJoinProof.topic && encryptionType == .gcm
+    }
+
     static func verdict(
         requiresE2EE: Bool,
         senderIdentity: String?,

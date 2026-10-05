@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.23**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.24**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -201,6 +201,10 @@
 >   de l'appareil est utilisable dès le premier déverrouillage après le
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
+>   vecteur ne change.
+> - v0.4.24 (05/10/2026), proposition, apprise du premier appel croisé
+>   iOS ↔ Android : attribution d'une preuve de jonction dont le SDK n'a pas
+>   résolu l'émetteur, et deux règles de LiveKit Android (D.11). Aucun
 >   vecteur ne change.
 > - v0.4.23 (05/10/2026), proposition, revue avec le serveur pour ses lots
 >   A6 et A7 : l'exemple du JSON transporté d'un signalement est écrit en
@@ -2372,6 +2376,30 @@ chaque élément de la partie en clair (v0.4.23).
   `sq.e2ee.join`. Son contenu est le JSON canonique
   `{"proof": "<chaîne du §10.4>", "signatureB64": "…"}`. Dans la chaîne,
   `<livekitIdentity>` vaut exactement `<userId>.<deviceId>`.
+- **Émetteur d'un paquet de données chiffré** (v0.4.24) : selon le SDK, il
+  est lu dans le paquet intérieur, que les SDK des autres plateformes ne
+  remplissent pas toujours (constaté entre LiveKit Swift 2.17 et Android
+  2.27). Une preuve de jonction dont l'émetteur n'est pas résolu est
+  attribuée à la `<livekitIdentity>` qu'elle nomme, seulement si ce
+  participant est annoncé dans la salle ; elle est ensuite vérifiée en
+  entier. Sa signature atteste que l'appareil nommé l'a écrite pour cet
+  appel, pas que ce paquet vient de sa connexion : un rejeu ne prouve que son
+  véritable auteur. Un participant déjà présent à l'arrivée est annoncé dès
+  la connexion pour cette attribution, son délai de 10 secondes partant plus
+  tard. Tout
+  autre paquet de données sans émetteur résolu est écarté. Aucune fonction
+  ne dépend donc du canal de données entre plateformes, hors des preuves.
+  Deux garde-fous :
+  - l'appartenance d'une piste à une identité vient toujours de LiveKit
+    (identité du jeton, posée par le serveur), jamais d'un paquet de
+    données : la preuve valide une identité, elle n'attribue pas de piste ;
+  - aucun autre paquet à portée de sécurité (annonce de clé, fin d'appel…)
+    ne dépend de l'émetteur donné par le SDK : s'il en faut un, il porte
+    son identité signée, comme la preuve.
+- **LiveKit Android** : le gestionnaire de chiffrement est désactivé par
+  défaut (`enableE2EE(true)` obligatoire), et les états du chiffreur émis
+  avant l'état connecté de la salle sont perdus : publier les pistes
+  locales une fois la salle connectée.
 
 ### D.12 Numéro de sécurité (`safety-number-v1`)
 

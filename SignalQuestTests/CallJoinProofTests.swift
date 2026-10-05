@@ -1,6 +1,9 @@
 import CryptoKit
 import XCTest
 @testable import SignalQuest
+#if canImport(LiveKit)
+import LiveKit
+#endif
 
 /// IOS-CALL-3 (plan 3, jalon A) : preuve de jonction d'un appel chiffré
 /// (spec §10.4, vecteur `call-join-proof-v1`).
@@ -23,6 +26,63 @@ final class CallJoinProofTests: XCTestCase {
         XCTAssertEqual(verifier.provenUserId(identity), userId, "L'utilisateur vient de la preuve signée")
         XCTAssertEqual(verifier.receive(vector.message, from: identity), .confirmed, "Une preuve renvoyée ne change rien")
     }
+
+    /// Émetteur non résolu par le SDK (paquet chiffré d'un autre SDK, D.11) :
+    /// la preuve n'est attribuée à l'identité qu'elle nomme que si ce
+    /// participant est dans la salle, puis vérifiée en entier.
+    func testUnresolvedSenderIsTheNamedIdentityOnlyWhenPresent() throws {
+        let vector = try loadVector()
+        let verifier = makeVerifier(keys: [owner(deviceId): vector.publicKey])
+        XCTAssertNil(verifier.receiveUnattributed(vector.message), "Participant absent : rien n'est conclu")
+        verifier.expect("user_mallory_01J7ABCD23456.device_mallory_01J7ABCD", at: Date())
+        XCTAssertNil(verifier.receiveUnattributed(vector.message), "Un autre participant ne suffit pas")
+
+        // Présent sans délai (déjà là à notre arrivée) : l'attribution vaut déjà.
+        verifier.announce(identity)
+        XCTAssertTrue(verifier.overdue(at: Date().addingTimeInterval(60)).allSatisfy { $0 != identity }, "Annoncer ne lance pas le délai")
+        let first = try XCTUnwrap(verifier.receiveUnattributed(vector.message))
+        XCTAssertEqual(first.identity, identity)
+        XCTAssertEqual(first.outcome, .proven)
+        XCTAssertEqual(verifier.receiveUnattributed(vector.message)?.outcome, .confirmed)
+        XCTAssertNil(verifier.receiveUnattributed(Data("{}".utf8)))
+
+        verifier.remove(identity)
+        XCTAssertNil(verifier.receiveUnattributed(vector.message), "Parti de la salle")
+    }
+
+    func testUnresolvedProofOfAnotherCallOrDeviceEndsTheCall() throws {
+        let vector = try loadVector()
+        let otherNonce = Data(repeating: 7, count: 32).base64EncodedString()
+        let otherCall = makeVerifier(
+            context: .init(conversationId: conversationId, callId: callId, callNonceB64: otherNonce),
+            keys: [owner(deviceId): vector.publicKey]
+        )
+        otherCall.announce(identity)
+        XCTAssertEqual(otherCall.receiveUnattributed(vector.message)?.outcome, .rejected)
+        let uncertified = makeVerifier(keys: [:])
+        uncertified.announce(identity)
+        XCTAssertEqual(uncertified.receiveUnattributed(vector.message)?.outcome, .rejected)
+    }
+
+#if canImport(LiveKit)
+    /// Seule une preuve chiffrée sans émetteur résolu passe par l'attribution ;
+    /// un émetteur résolu prime toujours.
+    func testOnlyAnEncryptedProofWithoutResolvedSenderIsAttributedByItsContent() {
+        let topic = E2EEV2CallJoinProof.topic
+        XCTAssertTrue(E2EEV2CallDataPolicy.attributesByProof(resolvedSender: nil, topic: topic, encryptionType: .gcm))
+        XCTAssertFalse(E2EEV2CallDataPolicy.attributesByProof(resolvedSender: identity, topic: topic, encryptionType: .gcm))
+        XCTAssertFalse(E2EEV2CallDataPolicy.attributesByProof(resolvedSender: nil, topic: "sq.qa.cross", encryptionType: .gcm))
+        XCTAssertFalse(E2EEV2CallDataPolicy.attributesByProof(resolvedSender: nil, topic: topic, encryptionType: .none))
+        XCTAssertEqual(
+            E2EEV2CallDataPolicy.verdict(requiresE2EE: true, senderIdentity: nil, encryptionType: .gcm), .ignore,
+            "Un autre sujet sans émetteur reste écarté"
+        )
+        XCTAssertEqual(
+            E2EEV2CallDataPolicy.verdict(requiresE2EE: true, senderIdentity: nil, encryptionType: .none), .endCall,
+            "Un paquet en clair met fin à l'appel, sans repli"
+        )
+    }
+#endif
 
     func testVectorNegativeCasesEndTheCall() throws {
         let vector = try loadVector()

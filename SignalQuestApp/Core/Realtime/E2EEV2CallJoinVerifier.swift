@@ -46,6 +46,8 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
     private let lock = NSLock()
     private var arrivals: [String: Date] = [:]
     private var devices: [String: Device] = [:]
+    /// Participants dans la salle (annoncés ou attendus), pour l'attribution D.11.
+    private var present: Set<String> = []
     /// Première arrivée de chaque identité pendant l'appel : partir puis revenir
     /// ne relance pas le délai de 10 secondes.
     private var firstArrivals: [String: Date] = [:]
@@ -83,10 +85,38 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
     func expect(_ identity: String, at now: Date) {
         lock.lock()
         defer { lock.unlock() }
+        present.insert(identity)
         guard devices[identity] == nil, arrivals[identity] == nil else { return }
         let first = firstArrivals[identity] ?? now
         firstArrivals[identity] = first
         arrivals[identity] = first
+    }
+
+    /// Un participant est dans la salle, sans que son délai commence : de quoi
+    /// lui attribuer une preuve dont le SDK n'a pas résolu l'émetteur.
+    func announce(_ identity: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        present.insert(identity)
+    }
+
+    /// Preuve dont le SDK n'a pas résolu l'émetteur : le SDK Swift lit
+    /// l'émetteur d'un paquet chiffré dans le paquet intérieur, que d'autres
+    /// SDK ne remplissent pas (D.11). Elle est attribuée à l'identité qu'elle
+    /// nomme, seulement si ce participant est dans la salle, puis vérifiée en
+    /// entier, sous le même verrou. La signature atteste que l'appareil nommé
+    /// a écrit cette preuve pour cet appel, pas que ce paquet vient de sa
+    /// connexion : un rejeu ne prouve que son véritable auteur. `nil` : rien
+    /// n'est conclu, le paquet est ignoré.
+    func receiveUnattributed(_ message: Data) -> (identity: String, outcome: Outcome)? {
+        guard let signed = try? E2EEV2CallJoinProof.readMessage(message),
+              let identity = (try? E2EEV2CallJoinProof.parse(signed.canonical))?.livekitIdentity else { return nil }
+        let device = verifiedDevice(signed, from: identity)
+        lock.lock()
+        defer { lock.unlock() }
+        guard present.contains(identity) || arrivals[identity] != nil || devices[identity] != nil else { return nil }
+        guard let device else { return (identity, .rejected) }
+        return (identity, record(device, for: identity))
     }
 
     func remove(_ identity: String) {
@@ -94,14 +124,23 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
         defer { lock.unlock() }
         arrivals[identity] = nil
         devices[identity] = nil
+        present.remove(identity)
     }
 
     /// Vérifie un message du sujet `sq.e2ee.join`, déjà déchiffré par le SDK.
     /// `senderIdentity` est l'identité LiveKit de l'émetteur du paquet.
     func receive(_ message: Data, from senderIdentity: String) -> Outcome {
-        let context = configuration.context
         guard let signed = try? E2EEV2CallJoinProof.readMessage(message),
-              let proof = try? E2EEV2CallJoinProof.parse(signed.canonical),
+              let device = verifiedDevice(signed, from: senderIdentity) else { return .rejected }
+        lock.lock()
+        defer { lock.unlock() }
+        return record(device, for: senderIdentity)
+    }
+
+    /// L'appareil certifié qui a signé cette preuve pour cet appel, sous cette identité.
+    private func verifiedDevice(_ signed: E2EEV2SignedString, from senderIdentity: String) -> Device? {
+        let context = configuration.context
+        guard let proof = try? E2EEV2CallJoinProof.parse(signed.canonical),
               proof.conversationId == context.conversationId,
               proof.callId == context.callId,
               proof.callNonceB64 == context.callNonceB64,
@@ -110,11 +149,13 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
               proof.deviceId != configuration.deviceId,
               let signingKey = configuration.deviceSigningKey(proof.userId, proof.deviceId),
               signed.verify(with: signingKey) else {
-            return .rejected
+            return nil
         }
-        let device = Device(userId: proof.userId, deviceId: proof.deviceId)
-        lock.lock()
-        defer { lock.unlock() }
+        return Device(userId: proof.userId, deviceId: proof.deviceId)
+    }
+
+    /// À appeler sous le verrou.
+    private func record(_ device: Device, for senderIdentity: String) -> Outcome {
         if let known = devices[senderIdentity] {
             // L'identité porte l'appareil : elle n'en change jamais.
             return known == device ? .confirmed : .rejected
@@ -152,6 +193,7 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
         defer { lock.unlock() }
         arrivals.removeAll()
         devices.removeAll()
+        present.removeAll()
         firstArrivals.removeAll()
     }
 }

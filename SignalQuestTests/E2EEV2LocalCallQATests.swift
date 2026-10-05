@@ -234,6 +234,73 @@ final class E2EEV2LocalCallQATests: XCTestCase {
         try await session.service.end(callId: initiated.id)
     }
 
+    /// Sens inverse (plan 3, X-1) : l'autre plateforme appelle. Elle écrit sa
+    /// passation (`…_INBOUND`, avec `callId` et `conversationId`) ; iOS voit
+    /// l'appel dans `pending`, synchronise la conversation v2, vérifie le
+    /// descripteur à la sonnerie, répond signé et rejoint avec sa preuve.
+    func testAnEncryptedCallFromAnotherPlatformIsVerifiedAnsweredAndJoined() async throws {
+        guard let rawBase = environment("SQ_E2EE_V2_CROSS_CALL_BASE_URL"), let base = URL(string: rawBase),
+              ["127.0.0.1", "localhost", "::1"].contains(base.host ?? ""),
+              let calleeEmail = environment("SQ_E2EE_V2_CROSS_CALL_CALLEE_EMAIL"),
+              let callerEmail = environment("SQ_E2EE_V2_CROSS_CALL_CALLER_EMAIL"),
+              let password = environment("SQ_E2EE_V2_CROSS_CALL_PASSWORD"),
+              let run = environment("SQ_E2EE_V2_CROSS_CALL_RUN"),
+              let inbound = environment("SQ_E2EE_V2_CROSS_CALL_INBOUND") else {
+            throw XCTSkip("Appel croisé entrant local non demandé")
+        }
+        let wait = TimeInterval(environment("SQ_E2EE_V2_CROSS_CALL_WAIT_SECONDS").flatMap(Int.init) ?? 300)
+        let previousUserId = LocalAccountScope.currentUserId
+        E2EEV2CapabilitiesPublicationStore.announcesCallsForLocalQA = true
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(run, isDirectory: true)
+            .appendingPathComponent("v2", isDirectory: true)
+        defer {
+            E2EEV2CapabilitiesPublicationStore.announcesCallsForLocalQA = false
+            LocalAccountScope.deactivate()
+            if let previousUserId { LocalAccountScope.activate(userId: previousUserId) }
+        }
+        let callee = try await login(email: calleeEmail, password: password, base: base, run: run)
+        let callerUserId = try await login(email: callerEmail, password: password, base: base, run: run).userId
+        let session = try become(callee, base: base, root: root)
+        guard case .success = await session.lifecycle.publishCapabilitiesIfNeeded() else {
+            return XCTFail("Capacités de l'appelé")
+        }
+        // Prêt : l'autre plateforme peut appeler.
+        let inboundURL = URL(fileURLWithPath: inbound)
+        let ready = inboundURL.deletingLastPathComponent().appendingPathComponent("ios-ready.json")
+        try FileManager.default.createDirectory(at: ready.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: ["calleeUserId": callee.userId, "readyAtMs": Int64(Date().timeIntervalSince1970 * 1_000)])
+            .write(to: ready, options: .atomic)
+
+        // L'appel annoncé, puis sa sonnerie dans `pending`.
+        let deadline = Date().addingTimeInterval(wait)
+        var handoff: [String: Any]?
+        while handoff == nil, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(500))
+            handoff = (try? Data(contentsOf: inboundURL)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            if let at = handoff?["createdAtMs"] as? Int64 ?? (handoff?["createdAtMs"] as? NSNumber)?.int64Value,
+               Double(at) / 1_000 < Date().timeIntervalSince1970 - 120 { handoff = nil }
+        }
+        let announced = try XCTUnwrap(handoff, "Passation de l'appelant")
+        let callId = try XCTUnwrap(announced["callId"] as? String)
+        let conversationId = try XCTUnwrap(announced["conversationId"] as? String)
+        _ = await session.messaging.callMembers(conversationId: conversationId, synchronizing: true)
+        var ringing: CallSession?
+        for _ in 0..<20 where ringing == nil {
+            ringing = try await session.service.pending().first { $0.id == callId }
+            if ringing == nil { try await Task.sleep(for: .milliseconds(500)) }
+        }
+        let call = try XCTUnwrap(ringing, "L'appel chiffré sonne chez iOS")
+        let descriptor = try XCTUnwrap(call.e2eeV2, "Appel v2")
+        let verification = await session.calls.verify(descriptor, conversationId: conversationId, callId: callId, ringing: true)
+        XCTAssertEqual(verification, .verified(descriptor.descriptor), "Descripteur de \(callerUserId) vérifié")
+        guard case .verified = verification else { return }
+        let answered = try await session.service.answer(callId: callId, e2ee: true)
+        let media = try await session.calls.liveKitSession(for: descriptor, liveKitURL: try XCTUnwrap(answered.liveKitUrl))
+        defer { Task { try? await session.service.end(callId: callId) } }
+        try await Self.crossExchange(call: answered, media: media, calleeUserId: callerUserId, wait: 60)
+        try await session.service.end(callId: callId)
+    }
+
     @MainActor
     private static func crossExchange(call: CallSession, media: E2EEV2LiveKitSession, calleeUserId: String, wait: TimeInterval) async throws {
         var received: [(sender: String?, text: String)] = []
@@ -243,18 +310,44 @@ final class E2EEV2LocalCallQATests: XCTestCase {
             if topic == "sq.qa.cross" { received.append((sender, String(decoding: data, as: UTF8.self))) }
         }
         client.onE2EETrustLost = { losses.append($0) }
-        defer { Task { @MainActor in await client.disconnect() } }
+        let start = Date()
+        LiveKitClient.qaDataTrace = { print(String(format: "[QA appel croisé] +%.2f s ", Date().timeIntervalSince(start)) + $0) }
+        defer {
+            LiveKitClient.qaDataTrace = nil
+            Task { @MainActor in await client.disconnect() }
+        }
         await client.connect(
             url: try XCTUnwrap(call.liveKitUrl), token: try XCTUnwrap(call.liveKitToken),
             room: try XCTUnwrap(call.liveKitRoom), video: false, managesAudioSession: false,
             e2eeSession: media, mediaSetupMode: .localQADataOnly
         )
         XCTAssertEqual(client.state, .connected)
-        // Le paquet de l'appelé n'arrive qu'une fois sa jonction prouvée.
-        try await waitUntil("paquet chiffré de l'appelé", timeout: wait) { !received.isEmpty }
-        let sender = try XCTUnwrap(received.first?.sender)
-        XCTAssertTrue(sender.hasPrefix(calleeUserId + "."), "Identité LiveKit prouvée de l'appelé : \(sender)")
+        // Le paquet de l'appelé n'arrive qu'une fois sa jonction prouvée. Un état
+        // toutes les 5 s, pour situer un blocage avec l'autre plateforme.
+        let deadline = Date().addingTimeInterval(wait)
+        var lastReport = Date.distantPast
+        // Réussite : un paquet de l'identité prouvée de l'appelé, ou son appareil
+        // prouvé et sa piste audio chiffrée reçue (un SDK qui ne remplit pas
+        // l'émetteur d'un paquet chiffré rend ses autres paquets inattribuables).
+        func done() -> Bool { !received.isEmpty || (client.isE2EEVerified && !client.remoteAudios.isEmpty) }
+        while !done(), Date() < deadline {
+            if Date().timeIntervalSince(lastReport) >= 5 {
+                lastReport = Date()
+                print("[QA appel croisé] état=\(client.state) arrivé=\(client.remoteJoinedAt.map { "\($0)" } ?? "non")"
+                      + " vérifié=\(client.isE2EEVerified) échecsDéchiffrement=\(client.e2eeDataDecryptionFailureCount)"
+                      + " pistesAudio=\(client.remoteAudios.count) pertes=\(losses)")
+            }
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        guard done() else { return XCTFail("Délai dépassé : ni paquet ni piste prouvée de l'appelé") }
+        if let sender = received.first?.sender {
+            XCTAssertTrue(sender.hasPrefix(calleeUserId + "."), "Identité LiveKit prouvée de l'appelé : \(sender)")
+        }
         XCTAssertTrue(client.isE2EEVerified)
+        // Laisse passer quelques secondes de média pour compter les échecs.
+        try await Task.sleep(for: .seconds(5))
+        print("[QA appel croisé] fin : paquets=\(received.count) pistesAudio=\(client.remoteAudios.count) échecsDéchiffrement=\(client.e2eeDataDecryptionFailureCount)")
+        XCTAssertEqual(client.e2eeDataDecryptionFailureCount, 0)
         // Plusieurs envois, le temps que l'appelé confirme de son côté.
         for _ in 0..<5 {
             try await client.publishData(Data("bonjour depuis iOS".utf8), topic: "sq.qa.cross")
