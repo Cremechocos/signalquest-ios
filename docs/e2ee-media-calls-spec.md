@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.24**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.25**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,9 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.25 (05/10/2026), proposition, convenue avec Android : une preuve
+>   de jonction rejouée après le départ de son auteur ne prouve pas un
+>   retour, et l'heure de jonction reste plausible (D.11).
 > - v0.4.24 (05/10/2026), proposition, apprise du premier appel croisé
 >   iOS ↔ Android : attribution d'une preuve de jonction dont le SDK n'a pas
 >   résolu l'émetteur, et deux règles de LiveKit Android (D.11). Aucun
@@ -2396,6 +2399,17 @@ chaque élément de la partie en clair (v0.4.23).
   - aucun autre paquet à portée de sécurité (annonce de clé, fin d'appel…)
     ne dépend de l'émetteur donné par le SDK : s'il en faut un, il porte
     son identité signée, comme la preuve.
+- **Rejeu d'une preuve** (v0.4.25) : une preuve est un jeton signé
+  qu'un serveur pourrait rejouer après le départ de son auteur. Chaque
+  appareil garde, pour chaque identité, la dernière heure de jonction
+  prouvée, même après son départ. Un retour n'est prouvé que par une heure
+  de jonction strictement plus récente, selon l'horloge de cet appareil :
+  une preuve d'avant le départ, identique à l'octet ou non, est refusée.
+  L'heure de jonction reste plausible : au plus 10 minutes avant
+  `createdAtMs` du descripteur, au plus 10 minutes dans le futur de
+  l'horloge locale. On ne compare jamais l'heure de jonction d'un pair à
+  l'heure de départ vue localement : deux horloges différentes refuseraient
+  un vrai retour.
 - **LiveKit Android** : le gestionnaire de chiffrement est désactivé par
   défaut (`enableE2EE(true)` obligatoire), et les états du chiffreur émis
   avant l'état connecté de la salle sont perdus : publier les pistes

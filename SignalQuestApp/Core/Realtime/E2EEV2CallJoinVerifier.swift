@@ -6,6 +6,8 @@ struct E2EEV2CallJoinContext: Equatable, Sendable {
     let conversationId: String
     let callId: String
     let callNonceB64: String
+    /// Heure du descripteur : une jonction ne la précède pas (v0.4.25).
+    var createdAtMs: Int64? = nil
 }
 
 /// Ce qu'il faut à un appel chiffré pour prouver ses participants : l'appel,
@@ -19,6 +21,7 @@ struct E2EEV2CallJoinConfiguration: Sendable {
     /// Clé de signature d'un appareil certifié d'un membre de la conversation,
     /// doté de la capacité « appels vérifiés » ; nil pour tout autre appareil.
     let deviceSigningKey: @Sendable (_ userId: String, _ deviceId: String) -> P256.Signing.PublicKey?
+    var nowMs: @Sendable () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1_000) }
 }
 
 /// Preuves de jonction d'un appel chiffré (spec §10.4). Chaque participant
@@ -42,12 +45,25 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
         let deviceId: String
     }
 
+    /// Une preuve vérifiée : l'appareil et l'heure de jonction qu'il a signée.
+    private struct Verified {
+        let device: Device
+        let joinedAtMs: Int64
+    }
+
+    /// Écart d'horloge toléré entre appareils pour l'heure de jonction (v0.4.25).
+    static let joinClockSkewMs: Int64 = 10 * 60 * 1_000
+
     private let configuration: E2EEV2CallJoinConfiguration
     private let lock = NSLock()
     private var arrivals: [String: Date] = [:]
     private var devices: [String: Device] = [:]
     /// Participants dans la salle (annoncés ou attendus), pour l'attribution D.11.
     private var present: Set<String> = []
+    /// Dernière heure de jonction prouvée de chaque identité, gardée après son
+    /// départ : un retour signe une heure plus récente, selon sa propre
+    /// horloge ; une preuve d'avant le départ, rejouée, est refusée (v0.4.25).
+    private var lastJoinedAtMs: [String: Int64] = [:]
     /// Première arrivée de chaque identité pendant l'appel : partir puis revenir
     /// ne relance pas le délai de 10 secondes.
     private var firstArrivals: [String: Date] = [:]
@@ -111,12 +127,12 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
     func receiveUnattributed(_ message: Data) -> (identity: String, outcome: Outcome)? {
         guard let signed = try? E2EEV2CallJoinProof.readMessage(message),
               let identity = (try? E2EEV2CallJoinProof.parse(signed.canonical))?.livekitIdentity else { return nil }
-        let device = verifiedDevice(signed, from: identity)
+        let verified = verifiedDevice(signed, from: identity)
         lock.lock()
         defer { lock.unlock() }
         guard present.contains(identity) || arrivals[identity] != nil || devices[identity] != nil else { return nil }
-        guard let device else { return (identity, .rejected) }
-        return (identity, record(device, for: identity))
+        guard let verified else { return (identity, .rejected) }
+        return (identity, record(verified, for: identity))
     }
 
     func remove(_ identity: String) {
@@ -131,14 +147,14 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
     /// `senderIdentity` est l'identité LiveKit de l'émetteur du paquet.
     func receive(_ message: Data, from senderIdentity: String) -> Outcome {
         guard let signed = try? E2EEV2CallJoinProof.readMessage(message),
-              let device = verifiedDevice(signed, from: senderIdentity) else { return .rejected }
+              let verified = verifiedDevice(signed, from: senderIdentity) else { return .rejected }
         lock.lock()
         defer { lock.unlock() }
-        return record(device, for: senderIdentity)
+        return record(verified, for: senderIdentity)
     }
 
     /// L'appareil certifié qui a signé cette preuve pour cet appel, sous cette identité.
-    private func verifiedDevice(_ signed: E2EEV2SignedString, from senderIdentity: String) -> Device? {
+    private func verifiedDevice(_ signed: E2EEV2SignedString, from senderIdentity: String) -> Verified? {
         let context = configuration.context
         guard let proof = try? E2EEV2CallJoinProof.parse(signed.canonical),
               proof.conversationId == context.conversationId,
@@ -148,18 +164,26 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
               // L'appareil local ne rejoint qu'une fois, sous sa propre identité.
               proof.deviceId != configuration.deviceId,
               let signingKey = configuration.deviceSigningKey(proof.userId, proof.deviceId),
-              signed.verify(with: signingKey) else {
+              signed.verify(with: signingKey),
+              // Heure de jonction plausible : pas avant le descripteur, pas dans
+              // le futur, à l'écart d'horloge près (v0.4.25).
+              proof.joinedAtMs >= (context.createdAtMs ?? 0) - Self.joinClockSkewMs,
+              proof.joinedAtMs <= configuration.nowMs() + Self.joinClockSkewMs else {
             return nil
         }
-        return Device(userId: proof.userId, deviceId: proof.deviceId)
+        return Verified(device: Device(userId: proof.userId, deviceId: proof.deviceId), joinedAtMs: proof.joinedAtMs)
     }
 
     /// À appeler sous le verrou.
-    private func record(_ device: Device, for senderIdentity: String) -> Outcome {
+    private func record(_ verified: Verified, for senderIdentity: String) -> Outcome {
+        let device = verified.device
         if let known = devices[senderIdentity] {
             // L'identité porte l'appareil : elle n'en change jamais.
             return known == device ? .confirmed : .rejected
         }
+        // Après un départ, seule une jonction plus récente prouve un retour.
+        if let previous = lastJoinedAtMs[senderIdentity], verified.joinedAtMs <= previous { return .rejected }
+        lastJoinedAtMs[senderIdentity] = verified.joinedAtMs
         devices[senderIdentity] = device
         arrivals[senderIdentity] = nil
         return .proven
@@ -194,6 +218,7 @@ final class E2EEV2CallJoinVerifier: @unchecked Sendable {
         arrivals.removeAll()
         devices.removeAll()
         present.removeAll()
+        lastJoinedAtMs.removeAll()
         firstArrivals.removeAll()
     }
 }

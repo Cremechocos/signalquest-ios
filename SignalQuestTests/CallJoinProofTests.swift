@@ -50,6 +50,35 @@ final class CallJoinProofTests: XCTestCase {
         XCTAssertNil(verifier.receiveUnattributed(vector.message), "Parti de la salle")
     }
 
+    /// v0.4.25 : une preuve d'avant un départ, rejouée, ne prouve pas un
+    /// retour ; l'heure de jonction reste plausible face au descripteur et à
+    /// l'horloge locale.
+    func testReplayAfterDepartureAndImplausibleJoinTimesAreRefused() throws {
+        let vector = try loadVector()
+        let keys = [owner(deviceId): vector.publicKey]
+        let joinedAt = try XCTUnwrap(E2EEV2CallJoinProof.parse(E2EEV2CallJoinProof.readMessage(vector.message).canonical)).joinedAtMs
+        let verifier = makeVerifier(keys: keys)
+        verifier.expect(identity, at: Date())
+        XCTAssertEqual(verifier.receive(vector.message, from: identity), .proven)
+        verifier.remove(identity)
+        verifier.expect(identity, at: Date())
+        XCTAssertEqual(verifier.receive(vector.message, from: identity), .rejected, "Même preuve après un départ : rejeu")
+
+        let skew = E2EEV2CallJoinVerifier.joinClockSkewMs
+        let beforeDescriptor = makeVerifier(
+            context: .init(conversationId: conversationId, callId: callId, callNonceB64: callNonceB64, createdAtMs: joinedAt + skew + 1),
+            keys: keys
+        )
+        XCTAssertEqual(beforeDescriptor.receive(vector.message, from: identity), .rejected, "Jonction avant le descripteur")
+        let future = makeVerifier(keys: keys, nowMs: joinedAt - skew - 1)
+        XCTAssertEqual(future.receive(vector.message, from: identity), .rejected, "Jonction dans le futur")
+        let plausible = makeVerifier(
+            context: .init(conversationId: conversationId, callId: callId, callNonceB64: callNonceB64, createdAtMs: joinedAt - 5_000),
+            keys: keys, nowMs: joinedAt + 1_000
+        )
+        XCTAssertEqual(plausible.receive(vector.message, from: identity), .proven)
+    }
+
     func testUnresolvedProofOfAnotherCallOrDeviceEndsTheCall() throws {
         let vector = try loadVector()
         let otherNonce = Data(repeating: 7, count: 32).base64EncodedString()
@@ -274,7 +303,8 @@ final class CallJoinProofTests: XCTestCase {
         localUserId: String = "user_alice_01J7ABCD23456789",
         localDeviceId: String = "device_alice_ios_01J7ABCD2345",
         signingKey: P256.Signing.PrivateKey? = nil,
-        keys: [String: P256.Signing.PublicKey]
+        keys: [String: P256.Signing.PublicKey],
+        nowMs: Int64? = nil
     ) -> E2EEV2CallJoinVerifier {
         let signingKeyRaw = signingKey?.rawRepresentation
         let publicKeys = keys.mapValues(\.x963Representation)
@@ -289,7 +319,8 @@ final class CallJoinProofTests: XCTestCase {
             deviceSigningKey: { user, device in
                 guard let raw = publicKeys["\(user)/\(device)"] else { return nil }
                 return try? P256.Signing.PublicKey(x963Representation: raw)
-            }
+            },
+            nowMs: { nowMs ?? Int64(Date().timeIntervalSince1970 * 1_000) }
         ))
     }
 }

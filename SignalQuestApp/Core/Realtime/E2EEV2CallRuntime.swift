@@ -222,7 +222,10 @@ final class E2EEV2CallRuntime: @unchecked Sendable {
         }
         let devices = members.devices, joinedAtMs = nowMs
         let join = E2EEV2CallJoinConfiguration(
-            context: .init(conversationId: descriptor.conversationId, callId: descriptor.callId, callNonceB64: descriptor.callNonceB64),
+            context: .init(
+                conversationId: descriptor.conversationId, callId: descriptor.callId,
+                callNonceB64: descriptor.callNonceB64, createdAtMs: descriptor.createdAtMs
+            ),
             userId: members.ownUserId,
             deviceId: deviceId,
             sign: { [identityStore] in try identityStore.sign(canonicalRequest: $0, ownerNamespace: namespace) },
