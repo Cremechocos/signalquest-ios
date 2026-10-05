@@ -40,6 +40,27 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
         XCTAssertEqual(again, .upToDate(epochNumber: 1), "Rien de neuf : la chaîne gardée suffit")
     }
 
+    /// Un groupe dont le créateur n'a pas encore été lu par l'annuaire (parti
+    /// du groupe, par exemple) : la relève le nomme pour relecture
+    /// (`E2EE_DEVICE_LIST_STALE`), puis réussit une fois ses appareils lus.
+    func testAnUnreadCreatorIsNamedForRereadInsteadOfFailingVerification() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
+        let devices = fixture.deviceSet(adding: [creator.device])
+        MockURLProtocol.requestHandler = Self.server(try serve(fixture, creator: creator, devices: devices))
+
+        let withoutCreator = fixture.deviceSet(adding: [])
+        guard case .failure(let failure) = await sync(fixture, devices: withoutCreator) else {
+            return XCTFail("Créateur inconnu : rien ne peut se vérifier")
+        }
+        XCTAssertEqual(failure.code, "E2EE_DEVICE_LIST_STALE")
+        XCTAssertTrue(failure.staleUserIds.contains(alice), "Le créateur est nommé pour relecture")
+        XCTAssertEqual(try fixture.states.membershipChain(conversationId: conversationId, ownerNamespace: fixture.session.ownerNamespace), [])
+
+        let result = await sync(fixture, devices: devices)
+        XCTAssertEqual(result, .received(epochNumber: 1), "Relu, le créateur vérifie la genèse")
+    }
+
     func testAGenesisSignedByAnUnknownKeyKeepsNothing() async throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")

@@ -107,6 +107,26 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
             }
         }
         let all = known + fresh
+        // Auteurs et cibles des changements nouveaux (toute la chaîne, créateur
+        // compris, à la découverte) que l'annuaire n'a pas encore lus, par exemple
+        // partis du groupe : nommés pour relecture, comme le serveur le ferait,
+        // plutôt qu'un échec de vérification. La chaîne gardée, déjà vérifiée,
+        // n'exige pas de relire ses anciens auteurs.
+        var unread = Set<String>()
+        for change in fresh {
+            guard let fields = E2EEV2Canonical.split(change.canonical, tag: E2EEV2MembershipChange.tag, version: "1", fieldCount: 10)
+            else { continue }
+            for userId in [fields[5], fields[6]] where E2EEV2Canonical.isOpaque(userId)
+                && devices.devicesByUser[userId] == nil && devices.refusals[userId] == nil {
+                unread.insert(userId)
+            }
+        }
+        if !unread.isEmpty {
+            return .failure(E2EEV2TransportFailure(
+                kind: .localState, code: "E2EE_DEVICE_LIST_STALE", message: "e2ee-membership-authors-unread",
+                details: ["userIds": .array(unread.sorted().map { .string($0) })]
+            ))
+        }
 
         // 2. La genèse : vérifiée une fois sur le manifeste de l'époque 1, puis
         //    revérifiée à chaque passage (longueur, condensat, auteur). Rien
