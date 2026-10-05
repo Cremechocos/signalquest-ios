@@ -161,6 +161,22 @@
         }
       }
     },
+    "Tu as déjà épinglé le nombre maximal de conversations. Désépingles-en une pour en épingler une autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’ve already pinned the maximum number of conversations. Unpin one to pin another."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as déjà épinglé le nombre maximal de conversations. Désépingles-en une pour en épingler une autre."
+          }
+        }
+      }
+    },
     "Vérifier l’état" : {
       "localizations" : {
         "en" : {

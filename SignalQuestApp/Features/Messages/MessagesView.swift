@@ -7,6 +7,14 @@ final class MessagesViewModel: ObservableObject {
     @Published var errorMessage: String?
     /// Aperçus déchiffrés du dernier message, par id de conversation.
     @Published var decryptedPreviews: [String: String] = [:]
+    /// Limite d'épinglage du compte (P2-46), quand le serveur la sert.
+    @Published var pinLimit: Int?
+
+    /// « Épingler » ne se propose plus une fois la limite atteinte.
+    var canPinMore: Bool {
+        guard let pinLimit else { return true }
+        return conversations.filter { $0.pinnedAt != nil }.count < pinLimit
+    }
 
     private let service: MessagesServicing
 
@@ -26,7 +34,9 @@ final class MessagesViewModel: ObservableObject {
             try? await Task.sleep(for: .seconds(4))
         }
         do {
-            conversations = try await service.conversations().inDisplayOrder()
+            let list = try await service.conversationList()
+            conversations = list.conversations.inDisplayOrder()
+            pinLimit = list.pinLimit
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }
@@ -91,7 +101,11 @@ final class MessagesViewModel: ObservableObject {
             _ = try await service.setConversationPinned(pinned, conversationId: conversation.id)
         } catch {
             update(conversation.id) { $0.with(pinnedAt: previous) }
-            if !error.isCancellation { errorMessage = error.userFacingMessage }
+            if case APIError.http(_, "CONVERSATION_PIN_LIMIT", _, _, _) = error {
+                errorMessage = String(localized: "Tu as déjà épinglé le nombre maximal de conversations. Désépingles-en une pour en épingler une autre.")
+            } else if !error.isCancellation {
+                errorMessage = error.userFacingMessage
+            }
         }
     }
 
@@ -547,13 +561,17 @@ struct MessagesView: View {
         .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }
 
+    @ViewBuilder
     private func pinButton(_ conversation: MessageConversation) -> some View {
         let pinned = conversation.pinnedAt != nil
-        return Button {
-            Haptics.light()
-            Task { await model.setPinned(!pinned, conversation) }
-        } label: {
-            Label(pinned ? "Désépingler" : "Épingler", systemImage: pinned ? "pin.slash" : "pin")
+        // Limite d'épinglage atteinte (P2-46) : seul « Désépingler » reste.
+        if pinned || model.canPinMore {
+            Button {
+                Haptics.light()
+                Task { await model.setPinned(!pinned, conversation) }
+            } label: {
+                Label(pinned ? "Désépingler" : "Épingler", systemImage: pinned ? "pin.slash" : "pin")
+            }
         }
     }
 

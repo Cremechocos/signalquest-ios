@@ -81,6 +81,18 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertEqual(try decode(#"{"lastMessage":null,"unreadCount":7}"#).e2eeV2?.unreadCount, 0)
     }
 
+    /// P2-46 : `pinLimit` est lu de façon tolérante, en nombre ou en chaîne, et
+    /// son absence ou une forme inattendue ne fait pas échouer la liste.
+    func testPinLimitIsReadLeniently() throws {
+        func decode(_ extra: String) throws -> ConversationsResponse {
+            try JSONDecoder.signalQuest.decode(ConversationsResponse.self, from: Data(#"{"conversations":[]\#(extra)}"#.utf8))
+        }
+        XCTAssertEqual(try decode(#","pinLimit":5"#).pinLimit, 5)
+        XCTAssertEqual(try decode(#","pinLimit":"5""#).pinLimit, 5)
+        XCTAssertNil(try decode("").pinLimit)
+        XCTAssertNil(try decode(#","pinLimit":{"x":1}"#).pinLimit)
+    }
+
     func testCopiesKeepEverythingElse() {
         let original = conversation("c", lastMessageAt: Date(), lastReadAt: Date(), senderId: "other")
         let pinned = original.with(pinnedAt: Date())

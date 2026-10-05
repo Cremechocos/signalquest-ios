@@ -3,6 +3,8 @@ import Foundation
 
 protocol MessagesServicing: Sendable {
     func conversations() async throws -> [MessageConversation]
+    /// La liste avec la limite d'épinglage (P2-46).
+    func conversationList() async throws -> ConversationList
     func conversation(id: String) async throws -> MessageConversation
     func createConversation(participantIds: [String], title: String?, e2ee: Bool) async throws -> CreateConversationResponse
     func searchUsers(query: String) async throws -> [MessageSearchUser]
@@ -232,12 +234,16 @@ final class MessagesService: MessagesServicing {
     }
 
     func conversations() async throws -> [MessageConversation] {
+        try await conversationList().conversations
+    }
+
+    func conversationList() async throws -> ConversationList {
         let session = LocalAccountScope.sessionSnapshot()
-        let conversations = try await api.request(
+        let response = try await api.request(
             APIEndpoint(path: "/api/messages/conversations"), as: ConversationsResponse.self
-        ).conversations
-        rememberForCalls(conversations, session: session)
-        return conversations
+        )
+        rememberForCalls(response.conversations, session: session)
+        return ConversationList(conversations: response.conversations, pinLimit: response.pinLimit)
     }
 
     func conversation(id: String) async throws -> MessageConversation {

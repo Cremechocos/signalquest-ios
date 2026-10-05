@@ -4,6 +4,26 @@ struct ConversationsResponse: Decodable {
     let conversations: [MessageConversation]
     let hasMore: Bool?
     let nextCursor: String?
+    /// Nombre maximal de conversations épinglées par compte (P2-46, clé
+    /// additive) ; lue de façon tolérante, `nil` si le serveur ne la sert pas.
+    let pinLimit: Int?
+
+    private enum CodingKeys: String, CodingKey { case conversations, hasMore, nextCursor, pinLimit }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        conversations = try c.decode([MessageConversation].self, forKey: .conversations)
+        hasMore = try? c.decodeIfPresent(Bool.self, forKey: .hasMore)
+        nextCursor = try? c.decodeIfPresent(String.self, forKey: .nextCursor)
+        pinLimit = (try? c.decodeIfPresent(Int.self, forKey: .pinLimit))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .pinLimit)).flatMap { $0.flatMap(Int.init) }
+    }
+}
+
+/// La liste des conversations et la limite d'épinglage servie avec elle.
+struct ConversationList: Sendable {
+    let conversations: [MessageConversation]
+    let pinLimit: Int?
 }
 
 struct MessageConversation: Decodable, Identifiable, Equatable {
