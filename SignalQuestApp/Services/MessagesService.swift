@@ -64,6 +64,9 @@ protocol MessagesServicing: Sendable {
     ) async throws -> MessageItem
     func retryPendingAttachments() async
     func markRead(conversationId: String, lastMessageId: String) async throws
+    /// Lit jusqu'au message le plus récent, v1 et v2 (lot serveur A7) : une
+    /// conversation v2 n'a pas d'identifiant de message v1 à donner.
+    func markReadToLatest(conversationId: String) async throws
     /// Remet la conversation en non lu pour soi (plan 3, vague 2).
     func markUnread(conversationId: String) async throws
     /// Épingle ou désépingle la conversation pour soi ; renvoie la date d'épinglage.
@@ -943,6 +946,15 @@ final class MessagesService: MessagesServicing {
             "/api/messages/conversations/\(conversationId)/read-state",
             method: .patch,
             body: ["lastMessageId": lastMessageId]
+        )
+    }
+
+    func markReadToLatest(conversationId: String) async throws {
+        if AppEnvironment.usesDemoData { return }
+        let _: SuccessResponse = try await api.requestJSON(
+            "/api/messages/conversations/\(conversationId)/read-state",
+            method: .patch,
+            body: ["state": "read"]
         )
     }
 

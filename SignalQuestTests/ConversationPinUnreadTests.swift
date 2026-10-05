@@ -55,6 +55,32 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertFalse(conversation("c", lastMessageAt: nil).canMarkUnread(currentUserId: "me"))
     }
 
+    /// Lot serveur A7 : `e2eeV2` lu de façon tolérante ; le non-lu d'une
+    /// conversation v2 vient de son dernier message v2 ; les copies le gardent.
+    func testV2ListStateDrivesUnreadAndSurvivesCopies() throws {
+        func decode(_ e2eeV2: String) throws -> MessageConversation {
+            let json = #"{"id":"conversation_v2","isGroup":false,"participants":[],"lastReadAt":"2026-10-05T08:00:00.000Z","directPeerUserId":"peer","e2eeV2":"# + e2eeV2 + "}"
+            return try JSONDecoder.signalQuest.decode(MessageConversation.self, from: Data(json.utf8))
+        }
+        // 1790000000000 ms = 2026-09-21, avant la lecture ; 1791190800000 = 2026-10-05 09:00 UTC, après.
+        let unread = try decode(#"{"lastMessage":{"envelopeId":"envelope_1","sequence":"4","senderUserId":"other","senderDeviceId":"device_1","serverTimeMs":"1791190800000"},"unreadCount":"2"}"#)
+        XCTAssertEqual(unread.e2eeV2?.unreadCount, 2)
+        XCTAssertTrue(unread.isUnread(currentUserId: "me"))
+        XCTAssertFalse(unread.isUnread(currentUserId: "other"), "Son propre message v2 ne compte pas")
+        XCTAssertFalse(unread.with(lastReadAt: Date(timeIntervalSince1970: 1_791_190_900)).isUnread(currentUserId: "me"))
+        let read = try decode(#"{"lastMessage":{"envelopeId":"envelope_1","sequence":"4","senderUserId":"other","senderDeviceId":"device_1","serverTimeMs":"1790000000000"},"unreadCount":"0"}"#)
+        XCTAssertFalse(read.isUnread(currentUserId: "me"))
+
+        let pinned = unread.with(pinnedAt: Date())
+        XCTAssertEqual(pinned.e2eeV2, unread.e2eeV2)
+        XCTAssertEqual(pinned.directPeerUserId, "peer")
+
+        // Formes inattendues : la liste se lit quand même, sans état v2 utile.
+        XCTAssertNil(try decode("null").e2eeV2)
+        XCTAssertNil(try decode(#""surprise""#).e2eeV2?.lastMessage)
+        XCTAssertEqual(try decode(#"{"lastMessage":null,"unreadCount":7}"#).e2eeV2?.unreadCount, 0)
+    }
+
     func testCopiesKeepEverythingElse() {
         let original = conversation("c", lastMessageAt: Date(), lastReadAt: Date(), senderId: "other")
         let pinned = original.with(pinnedAt: Date())

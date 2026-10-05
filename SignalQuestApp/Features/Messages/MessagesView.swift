@@ -417,6 +417,8 @@ struct MessagesView: View {
     /// Les replis passent par `String(localized:)` : rendus en `Text(String)`,
     /// ils restaient en français dans l'app anglaise.
     private func lastMessagePreview(_ conversation: MessageConversation) -> String {
+        // Message v2 : le serveur n'en sert qu'un aperçu vide (lot A7).
+        if conversation.e2eeV2?.lastMessage != nil { return String(localized: "Message chiffré") }
         guard let last = conversation.lastMessage else {
             return conversation.e2eeEnabled == true
                 ? String(localized: "Conversation chiffrée")

@@ -2688,9 +2688,13 @@ struct ConversationDetailView: View {
     }
 
     private func markRead() async {
-        // L'état de lecture d'une conversation v2 arrive avec le lot serveur A7.
-        guard !usesV2, let last = messages.last else { return }
-        try? await service.markRead(conversationId: conversation.id, lastMessageId: last.id)
+        if usesV2 {
+            // Lot serveur A7 : lecture jusqu'au dernier message, v1 et v2.
+            try? await service.markReadToLatest(conversationId: conversation.id)
+        } else {
+            guard let last = messages.last else { return }
+            try? await service.markRead(conversationId: conversation.id, lastMessageId: last.id)
+        }
         // Le badge restait allumé jusqu'au prochain rafraîchissement (SOC-23).
         await services.refreshInboxBadge(force: true)
     }

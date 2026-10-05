@@ -22,6 +22,9 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
     /// L'autre participant d'un tête-à-tête, archivé ou non (clé additive du
     /// serveur, A3c) ; `participants` cache un participant qui a archivé.
     var directPeerUserId: String? = nil
+    /// État v2 de la liste (lot serveur A7) : `null` en v1. Le dernier message
+    /// v2 et le nombre de non-lus, sans contenu ; lu de façon tolérante.
+    var e2eeV2: E2EEV2ConversationListState? = nil
 
     /// Membres v1 d'une genèse de migration (§14.2, v0.4.20) : dans un
     /// tête-à-tête, les deux participants même archivés ; dans un groupe, les
@@ -65,7 +68,7 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, isGroup, e2eeEnabled, groupPhotoUrl, createdAt, updatedAt, lastMessageAt, lastReadAt, pinnedAt, participants, lastMessage
-        case directPeerUserId
+        case directPeerUserId, e2eeV2
     }
 
     init(
@@ -80,7 +83,9 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         lastReadAt: Date?,
         pinnedAt: Date?,
         participants: [ConversationParticipant],
-        lastMessage: MessageItem?
+        lastMessage: MessageItem?,
+        directPeerUserId: String? = nil,
+        e2eeV2: E2EEV2ConversationListState? = nil
     ) {
         self.id = id
         self.title = title
@@ -94,6 +99,8 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         self.pinnedAt = pinnedAt
         self.participants = participants
         self.lastMessage = lastMessage
+        self.directPeerUserId = directPeerUserId
+        self.e2eeV2 = e2eeV2
     }
 
     init(from decoder: Decoder) throws {
@@ -111,6 +118,7 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         participants = c.decodeLossyArray([ConversationParticipant].self, forKey: .participants)
         lastMessage = try c.decodeIfPresent(MessageItem.self, forKey: .lastMessage)
         directPeerUserId = try? c.decodeIfPresent(String.self, forKey: .directPeerUserId)
+        e2eeV2 = try? c.decodeIfPresent(E2EEV2ConversationListState.self, forKey: .e2eeV2)
     }
 }
 
@@ -432,6 +440,12 @@ extension MessageConversation {
     /// Règle unique de non-lu, pour la liste ET le badge : son propre dernier
     /// message ne compte pas (SOC-23).
     func isUnread(currentUserId: String?) -> Bool {
+        // Conversation v2 : le dernier message v2, à l'heure du serveur.
+        if let last = e2eeV2?.lastMessage {
+            guard last.senderUserId != currentUserId, let at = last.serverTime else { return false }
+            if let read = lastReadAt { return at > read }
+            return true
+        }
         guard let last = lastMessage, last.senderId != currentUserId,
               let lastAt = lastMessageAt else { return false }
         if let read = lastReadAt { return lastAt > read }
@@ -466,8 +480,46 @@ extension MessageConversation {
         MessageConversation(
             id: id, title: title, isGroup: isGroup, e2eeEnabled: e2eeEnabled, groupPhotoUrl: groupPhotoUrl,
             createdAt: createdAt, updatedAt: updatedAt, lastMessageAt: lastMessageAt,
-            lastReadAt: lastReadAt, pinnedAt: pinnedAt, participants: participants, lastMessage: lastMessage
+            lastReadAt: lastReadAt, pinnedAt: pinnedAt, participants: participants, lastMessage: lastMessage,
+            directPeerUserId: directPeerUserId, e2eeV2: e2eeV2
         )
+    }
+}
+
+/// Lot serveur A7 : `{lastMessage: {envelopeId, sequence, senderUserId,
+/// senderDeviceId, serverTimeMs} | null, unreadCount}`, entiers en chaînes.
+/// Une forme inattendue se lit comme « rien », sans faire échouer la liste.
+struct E2EEV2ConversationListState: Decodable, Equatable, Sendable {
+    struct LastMessage: Equatable, Sendable {
+        let envelopeId: String
+        let senderUserId: String
+        let serverTime: Date?
+    }
+
+    let lastMessage: LastMessage?
+    let unreadCount: Int
+
+    init(lastMessage: LastMessage?, unreadCount: Int) {
+        self.lastMessage = lastMessage
+        self.unreadCount = unreadCount
+    }
+
+    private enum Keys: String, CodingKey { case lastMessage, unreadCount, envelopeId, senderUserId, serverTimeMs }
+
+    init(from decoder: Decoder) throws {
+        let root = try? decoder.container(keyedBy: Keys.self)
+        let last = try? root?.nestedContainer(keyedBy: Keys.self, forKey: .lastMessage)
+        if let last, let envelopeId = try? last.decode(String.self, forKey: .envelopeId),
+           let sender = try? last.decode(String.self, forKey: .senderUserId) {
+            let ms = (try? last.decode(String.self, forKey: .serverTimeMs)).flatMap { Int64($0) }
+            lastMessage = LastMessage(
+                envelopeId: envelopeId, senderUserId: sender,
+                serverTime: ms.map { Date(timeIntervalSince1970: Double($0) / 1_000) }
+            )
+        } else {
+            lastMessage = nil
+        }
+        unreadCount = (try? root?.decode(String.self, forKey: .unreadCount)).flatMap { Int($0) } ?? 0
     }
 }
 
