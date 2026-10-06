@@ -151,6 +151,14 @@ final class LiveKitClient: ObservableObject {
     /// When false, the audio session lifecycle is owned by CallKit and we must
     /// not activate/deactivate it ourselves.
     private var managesAudioSession = true
+    /// CallKit a activé la session audio partagée. Tant qu'il ne l'a pas fait,
+    /// le moteur audio de LiveKit reste éteint : démarré sur une session
+    /// inactive (décroché depuis l'écran verrouillé, app réveillée en arrière-plan),
+    /// il ne capte ni ne joue rien, des deux côtés de l'appel.
+    private var callKitAudioActive = false
+    /// Le micro n'a pas pu démarrer à la jonction (autorisation pas encore
+    /// demandée, app réveillée en arrière-plan) : il est relancé au premier plan.
+    private var microphoneStartFailed = false
     /// Observateur des interruptions audio (appel entrant, Siri, alarme…).
     private var interruptionObserver: NSObjectProtocol?
     private var routeChangeObserver: NSObjectProtocol?
@@ -216,8 +224,23 @@ final class LiveKitClient: ObservableObject {
         try? session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetoothHFP])
         #if canImport(LiveKit)
         AudioManager.shared.audioSession.isAutomaticConfigurationEnabled = false
+        applyCallKitEngineAvailability()
         #endif
     }
+
+    #if canImport(LiveKit)
+    /// SDK LiveKit, parcours CallKit : moteur audio disponible seulement une
+    /// fois la session activée par CallKit ; les demandes faites avant (micro,
+    /// lecture) sont honorées à l'activation.
+    private func applyCallKitEngineAvailability() {
+        guard !managesAudioSession, !allowsLocalQADataBootstrap else { return }
+        do {
+            try AudioManager.shared.setEngineAvailability(callKitAudioActive ? .default : .none)
+        } catch {
+            logger.error("Audio engine availability not applied: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+    #endif
 
     func connect(
         url: URL,
@@ -294,6 +317,7 @@ final class LiveKitClient: ObservableObject {
                 } else {
                     #if canImport(LiveKit)
                     AudioManager.shared.audioSession.isAutomaticConfigurationEnabled = false
+                    applyCallKitEngineAvailability()
                     #endif
                 }
                 applySpeakerOutput()
@@ -549,6 +573,7 @@ final class LiveKitClient: ObservableObject {
                         await standardMedia.toggleCamera()
                     }
                 }
+                microphoneStartFailed = !didE2EEFailDuringConnect && !standardMedia.isMicrophoneEnabled
                 media = standardMedia
             #if DEBUG
             case .localQADataOnly:
@@ -667,6 +692,7 @@ final class LiveKitClient: ObservableObject {
         await room?.disconnect()
         room = nil
         localMedia = nil
+        microphoneStartFailed = false
         roomObserver = nil
         activeE2eeSession?.verification.reset()
         activeE2eeSession?.joinVerifier?.reset()
@@ -697,6 +723,8 @@ final class LiveKitClient: ObservableObject {
         AudioManager.shared.isSpeakerOutputPreferred = false
         if !managesAudioSession {
             AudioManager.shared.audioSession.isAutomaticConfigurationEnabled = true
+            // Hors appel, le moteur redevient disponible pour le prochain usage.
+            try? AudioManager.shared.setEngineAvailability(.default)
         }
 #endif
     }
@@ -1076,17 +1104,34 @@ final class LiveKitClient: ObservableObject {
     /// place to add AudioManager coordination after on-device validation.
     func audioSessionDidActivate(_ audioSession: AVAudioSession) {
         logger.info("CallKit audio session activated")
+        callKitAudioActive = true
         #if canImport(LiveKit)
         LKRTCAudioSession.sharedInstance().audioSessionDidActivate(audioSession)
+        applyCallKitEngineAvailability()
         #endif
         applySpeakerOutput()
     }
 
     func audioSessionDidDeactivate(_ audioSession: AVAudioSession) {
         logger.info("CallKit audio session deactivated")
+        callKitAudioActive = false
         #if canImport(LiveKit)
         LKRTCAudioSession.sharedInstance().audioSessionDidDeactivate(audioSession)
+        if state == .connecting || state == .connected { applyCallKitEngineAvailability() }
         #endif
+    }
+
+    /// Retour au premier plan pendant l'appel : le micro qui n'avait pas pu
+    /// démarrer est relancé (l'autorisation peut alors être demandée). Un micro
+    /// coupé par l'utilisateur ne l'est jamais.
+    func retryMicrophoneIfNeeded() {
+        guard microphoneStartFailed, state == .connected else { return }
+        microphoneStartFailed = false
+#if canImport(LiveKit)
+        guard let localMedia, !localMedia.isMicrophoneEnabled else { return }
+#endif
+        logger.info("Retrying the microphone in the foreground")
+        toggleMic()
     }
 
     func toggleMic() {

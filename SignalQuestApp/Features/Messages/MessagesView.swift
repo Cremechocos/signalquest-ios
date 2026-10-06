@@ -424,6 +424,9 @@ struct MessagesView: View {
             if requested { openNewConversationIfRequested() }
         }
         .task(id: PushOwnerScope.current) { refreshV2Activation() }
+        // Les appels se décrochent souvent écran verrouillé, où iOS ne peut pas
+        // demander l'accès au micro : la demande est faite ici, une fois.
+        .task { await CallManager.requestMicrophoneAccessIfUndetermined() }
         .onAppear { refreshV2Activation() }
         .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
             refreshV2Activation()

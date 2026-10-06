@@ -2,6 +2,7 @@ import Foundation
 import CallKit
 import PushKit
 import AVFAudio
+import UIKit
 import CryptoKit
 import UserNotifications
 import Intents
@@ -551,6 +552,30 @@ final class CallManager: NSObject, ObservableObject {
                 ))
             }
         }
+    }
+
+    // MARK: Micro
+
+    /// Un appel décroché écran verrouillé ne peut pas afficher la demande
+    /// d'accès au micro : elle est faite à l'avance, au premier plan, une seule
+    /// fois (iOS ne la montre plus ensuite).
+    static func requestMicrophoneAccessIfUndetermined() async {
+        guard UIApplication.shared.applicationState == .active, !AppEnvironment.usesDemoData else { return }
+        let undetermined: Bool
+        if #available(iOS 17.0, *) {
+            undetermined = AVAudioApplication.shared.recordPermission == .undetermined
+        } else {
+            undetermined = AVAudioSession.sharedInstance().recordPermission == .undetermined
+        }
+        guard undetermined else { return }
+        _ = await VoiceNoteRecorder.requestPermission()
+    }
+
+    /// Retour au premier plan pendant un appel : relance du micro s'il n'avait
+    /// pas pu démarrer.
+    func sceneDidBecomeActive() {
+        guard activeCall != nil else { return }
+        liveKit.retryMicrophoneIfNeeded()
     }
 
     // MARK: Réseau partagé (D.11)

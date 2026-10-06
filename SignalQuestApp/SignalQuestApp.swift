@@ -310,6 +310,7 @@ struct AppRootView: View {
                         }
                     }
                     services.enterForeground()
+                    services.callManager.sceneDidBecomeActive()
                     Task { await services.versionPolicy.refreshIfStale() }
                     // Capacités v2 restées sans réponse (500, réseau) : republiées ici,
                     // sans requête quand le document publié est à jour.
