@@ -62,7 +62,8 @@ final class TerrainService: TerrainServicing {
             let response: ElevationResponse = try await self.api.requestJSON(
                 "/api/rf/terrain",
                 method: .post,
-                body: body
+                body: body,
+                authenticated: false
             )
             return response.results.map(\.elevation)
         }
@@ -73,7 +74,8 @@ final class TerrainService: TerrainServicing {
             let response: ClutterResponse = try await self.api.requestJSON(
                 "/api/rf/clutter",
                 method: .post,
-                body: body
+                body: body,
+                authenticated: false
             )
             // Un point sans bâtiment renvoie un compte nul : c'est « dégagé », pas
             // « inconnu ». Le distinguer évite de traiter une rase campagne comme
