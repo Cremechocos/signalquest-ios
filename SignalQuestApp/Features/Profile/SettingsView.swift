@@ -293,14 +293,18 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     /// la clé du compte déposée pour lui (lot A1).
     func waitForApproval() async {
         guard let approvalId = generatedApproval?.id else { return }
+        // 3 s entre deux relevés ; après un 429, au moins les 15 s que le
+        // serveur annonce, puis le double, jusqu'à une minute.
+        var delaySeconds: UInt64 = 3
         while !Task.isCancelled, generatedApproval?.id == approvalId {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            try? await Task.sleep(nanoseconds: delaySeconds * 1_000_000_000)
             guard !Task.isCancelled, generatedApproval?.id == approvalId else { return }
             let result = await lifecycle.receiveApprovedTrust(approvalId: approvalId)
             // Un QR plus récent ou la sortie de l'écran : ce résultat ne s'applique plus.
             guard !Task.isCancelled, generatedApproval?.id == approvalId else { return }
             switch result {
             case .success(.pending):
+                delaySeconds = 3
                 continue
             case .success(.approved):
                 resetApproval()
@@ -312,6 +316,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
                 approvalErrorMessage = String(localized: "La demande a expiré ou a été refusée. Affiche un nouveau QR.")
                 return
             case .failed(let failure) where failure.kind == .retryable:
+                delaySeconds = failure.statusCode == 429 ? min(max(delaySeconds * 2, 15), 60) : 3
                 continue
             case .failed:
                 generatedApproval = nil
@@ -2596,8 +2601,12 @@ private struct DeleteAccountSheet: View {
     @ObservedObject var model: SettingsViewModel
     let onDeleted: () async -> Void
 
+    @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    /// Groupes chiffrés dont ce compte est le seul admin (D.4) : leur membre le
+    /// plus ancien est nommé admin juste avant la suppression.
+    @State private var soleAdminGroups: [MessageConversation] = []
     @State private var password = ""
     @State private var emailCode = ""
     @State private var emailChallenge: AccountDeletionEmailChallenge?
@@ -2625,6 +2634,15 @@ private struct DeleteAccountSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     } else if let preview = model.deletionPreview {
                         deletionInventory(preview)
+                        if !soleAdminGroups.isEmpty {
+                            Label(
+                                String(localized: "Tu es le seul admin de \(soleAdminGroups.count) groupe(s) chiffré(s) : leur membre le plus ancien sera nommé admin."),
+                                systemImage: "person.badge.shield.checkmark"
+                            )
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
                         reauthentication(preview)
                     } else {
                         Text("Impossible de charger le détail de la suppression. Aucun compte ne sera supprimé tant que cette vérification échoue.")
@@ -2662,6 +2680,7 @@ private struct DeleteAccountSheet: View {
             }
         }
         .task { await loadPreview() }
+        .task { await loadSoleAdminGroups() }
         .presentationDetents([.medium, .large])
         .interactiveDismissDisabled(isBusy)
     }
@@ -2840,8 +2859,21 @@ private struct DeleteAccountSheet: View {
         emailChallenge = await model.requestAccountDeletionEmailCode()
     }
 
+    private func loadSoleAdminGroups() async {
+        let v2 = services.e2eeV2Messaging
+        guard v2.writesEnabled, let conversations = try? await services.messages.conversations() else { return }
+        soleAdminGroups = conversations.filter { conversation in
+            guard conversation.isGroup, case .mustName = v2.successorNeed(conversationId: conversation.id) else { return false }
+            return true
+        }
+    }
+
     private func delete(using proof: AccountDeletionProof) async {
         isBusy = true
+        // D.4 : le successeur d'abord, signé par cet appareil ; jamais bloquant.
+        if !soleAdminGroups.isEmpty {
+            _ = await services.e2eeV2Messaging.promoteSuccessorsBeforeDeletion(soleAdminGroups)
+        }
         let succeeded = await model.deleteAccount(using: proof)
         if succeeded {
             Haptics.success()

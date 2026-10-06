@@ -403,7 +403,6 @@ final class MapSnapshotService: MapSnapshotServicing {
                         path: "/api/android/map/tiles/speedtests/\(tile.z)/\(tile.x)/\(tile.y)",
                         query: query,
                         headers: ["Cache-Control": "no-cache"],
-                        authenticated: false,
                         responseDeadline: .seconds(30)
                     ), expectedSessionID: owner.sessionID
                 )
@@ -468,9 +467,9 @@ final class MapSnapshotService: MapSnapshotServicing {
                     query.append(URLQueryItem(name: "limit", value: String(CoverageRenderPolicy.pointCapPerTile)))
                 }
                 return APIEndpoint(
+                    // Cookie de session quand il existe : limite de débit par compte.
                     path: "/api/android/map/tiles/coverage/\(tile.z)/\(tile.x)/\(tile.y)",
-                    query: query,
-                    authenticated: false
+                    query: query
                 )
             },
             validate: { try CoverageRenderPolicy.validate($0, selectedBands: bands) }

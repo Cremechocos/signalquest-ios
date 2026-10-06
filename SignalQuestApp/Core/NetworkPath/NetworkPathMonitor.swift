@@ -531,8 +531,9 @@ final class NetworkOperatorService: NetworkOperatorServicing {
     func resolve(viaVpn: Bool) async -> DetectedOperator? {
         let endpoint = APIEndpoint(
             path: "/api/speedtest/operator",
-            query: [URLQueryItem(name: "vpn", value: viaVpn ? "1" : "0")],
-            authenticated: false
+            // Cookie de session quand il existe : le serveur compte alors par
+            // compte, pas par IP (partagée par le CGNAT de l'opérateur).
+            query: [URLQueryItem(name: "vpn", value: viaVpn ? "1" : "0")]
         )
         return try? await api.request(endpoint, as: DetectedOperator.self)
     }

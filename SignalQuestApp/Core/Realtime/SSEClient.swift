@@ -39,6 +39,13 @@ final class SSEClient: Sendable {
         return configuration
     }
 
+    /// Attente avant de se reconnecter : le `Retry-After` d'un refus (429,
+    /// 503) prime sur le backoff quand il est plus long, borné à 5 minutes.
+    static func reconnectDelay(backoff: Double, after error: Error?) -> Double {
+        guard let error, case APIError.http(_, _, _, _, let retryAfter?) = error else { return backoff }
+        return max(backoff, min(Double(max(0, retryAfter)), 300))
+    }
+
     /// Flux des noms d'événements SSE pour une conversation. Se reconnecte
     /// automatiquement (backoff 1,5 s → 30 s). Se termine quand la Task qui le
     /// consomme est annulée.
@@ -46,7 +53,9 @@ final class SSEClient: Sendable {
         AsyncStream { continuation in
             let task = Task { [api, session, logger] in
                 var backoff: Double = 1.5
+                var lastError: Error?
                 while !Task.isCancelled {
+                    lastError = nil
                     do {
                         var request = try api.makeURLRequest(APIEndpoint(path: path))
                         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -65,7 +74,8 @@ final class SSEClient: Sendable {
                             throw APIError.http(status: 401, code: nil, message: "SSE non autorisé", requestId: nil, retryAfter: nil)
                         }
                         guard (200..<300).contains(http.statusCode) else {
-                            throw APIError.http(status: http.statusCode, code: nil, message: "SSE refusé", requestId: nil, retryAfter: nil)
+                            throw APIError.http(status: http.statusCode, code: nil, message: "SSE refusé", requestId: nil,
+                                                retryAfter: http.value(forHTTPHeaderField: "Retry-After").flatMap(Int.init))
                         }
 
                         backoff = 1.5
@@ -87,10 +97,11 @@ final class SSEClient: Sendable {
                             logger.debug("SSE refusé (\(status, privacy: .public)) — arrêt de la reconnexion")
                             break
                         }
+                        lastError = error
                         logger.debug("SSE interrompu: \(error.localizedDescription, privacy: .public)")
                     }
                     if Task.isCancelled { break }
-                    try? await Task.sleep(for: .seconds(backoff))
+                    try? await Task.sleep(for: .seconds(Self.reconnectDelay(backoff: backoff, after: lastError)))
                     backoff = min(backoff * 2, 30)
                 }
                 continuation.finish()
@@ -119,7 +130,9 @@ final class SSEClient: Sendable {
         AsyncStream(bufferingPolicy: bufferingPolicy) { continuation in
             let task = Task { [api, session, logger] in
                 var backoff: Double = 1.5
+                var lastError: Error?
                 while !Task.isCancelled {
+                    lastError = nil
                     do {
                         var request = try api.makeURLRequest(APIEndpoint(path: path, query: query))
                         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -132,7 +145,8 @@ final class SSEClient: Sendable {
                             throw APIError.http(status: 401, code: nil, message: "SSE non autorisé", requestId: nil, retryAfter: nil)
                         }
                         guard (200..<300).contains(http.statusCode) else {
-                            throw APIError.http(status: http.statusCode, code: nil, message: "SSE refusé", requestId: nil, retryAfter: nil)
+                            throw APIError.http(status: http.statusCode, code: nil, message: "SSE refusé", requestId: nil,
+                                                retryAfter: http.value(forHTTPHeaderField: "Retry-After").flatMap(Int.init))
                         }
 
                         backoff = 1.5
@@ -156,10 +170,11 @@ final class SSEClient: Sendable {
                             logger.debug("SSE data refusé (\(status, privacy: .public)) — arrêt de la reconnexion")
                             break
                         }
+                        lastError = error
                         logger.debug("SSE data interrompu: \(error.localizedDescription, privacy: .public)")
                     }
                     if Task.isCancelled { break }
-                    try? await Task.sleep(for: .seconds(backoff))
+                    try? await Task.sleep(for: .seconds(Self.reconnectDelay(backoff: backoff, after: lastError)))
                     backoff = min(backoff * 2, 30)
                 }
                 continuation.finish()

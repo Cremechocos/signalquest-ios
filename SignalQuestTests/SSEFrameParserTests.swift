@@ -35,4 +35,18 @@ final class SSEFrameParserTests: XCTestCase {
             XCTAssertThrowsError(try input.utf8.forEach { _ = try parser.append($0) })
         }
     }
+
+    /// Limites de débit (#401) : un refus qui annonce `Retry-After` n'est pas
+    /// rejoué avant ce délai, borné à 5 minutes ; sinon le backoff habituel.
+    func testReconnectWaitsForRetryAfter() {
+        func refused(_ seconds: Int?) -> Error {
+            APIError.http(status: 429, code: nil, message: "", requestId: nil, retryAfter: seconds)
+        }
+        XCTAssertEqual(SSEClient.reconnectDelay(backoff: 1.5, after: nil), 1.5)
+        XCTAssertEqual(SSEClient.reconnectDelay(backoff: 1.5, after: refused(nil)), 1.5)
+        XCTAssertEqual(SSEClient.reconnectDelay(backoff: 1.5, after: refused(15)), 15)
+        XCTAssertEqual(SSEClient.reconnectDelay(backoff: 30, after: refused(15)), 30)
+        XCTAssertEqual(SSEClient.reconnectDelay(backoff: 1.5, after: refused(86_400)), 300)
+        XCTAssertEqual(SSEClient.reconnectDelay(backoff: 1.5, after: URLError(.timedOut)), 1.5)
+    }
 }
