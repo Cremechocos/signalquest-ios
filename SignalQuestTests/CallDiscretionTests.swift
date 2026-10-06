@@ -109,6 +109,38 @@ final class CallDiscretionTests: XCTestCase {
         XCTAssertNil(CallRecentsHandle.callBack(from: NSUserActivity(activityType: "INStartCallIntent")))
     }
 
+    /// D.11 (v0.4.33) : paquet `radio_data` d'un iPhone, à l'octet.
+    func testRadioPacketIsCanonicalAndReadLeniently() throws {
+        let packet = CallRadioPacket(livekitIdentity: "u.d", technology: CallRadioPacket.technology(.fourG), operatorName: "Orange")
+        XCTAssertEqual(String(decoding: try XCTUnwrap(packet.encoded()), as: UTF8.self),
+                       #"{"livekitIdentity":"u.d","operator":"Orange","technology":"4G LTE","v":"1"}"#)
+        XCTAssertEqual(CallRadioPacket.technology(.fiveGNSA), "5G NSA")
+        let long = CallRadioPacket(livekitIdentity: "u.d", technology: nil, operatorName: String(repeating: "x", count: 80))
+        XCTAssertTrue(String(decoding: try XCTUnwrap(long.encoded()), as: UTF8.self).contains(String(repeating: "x", count: 64) + "\""))
+        XCTAssertNil(CallRadioPacket(livekitIdentity: String(repeating: "i", count: 3_000)).encoded(), "Plus de 2 Kio : écarté")
+
+        let android = Data(#"{"enb":"123456","livekitIdentity":"a.b","lteBands":["3",20],"pci":7,"qualityLevel":"GOOD","rsrp":"-95","technology":"4G LTE","unknown":"x","v":"1"}"#.utf8)
+        let read = try XCTUnwrap(CallRadioPacket.parse(android))
+        XCTAssertEqual(read.livekitIdentity, "a.b")
+        XCTAssertEqual(read.rsrp, "-95")
+        XCTAssertEqual(read.pci, "7", "Un nombre est lu comme une chaîne")
+        XCTAssertEqual(read.lteBands, ["3", "20"])
+        XCTAssertEqual(read.qualityLevel, "GOOD")
+        XCTAssertNil(CallRadioPacket.parse(Data(#"{"livekitIdentity":"a.b","technology":"4G"}"#.utf8)), "Sans version")
+        XCTAssertNil(CallRadioPacket.parse(Data(#"{"livekitIdentity":"a.b","v":1}"#.utf8)), "Version numérique")
+        XCTAssertNil(CallRadioPacket.parse(Data(#"{"v":"1"}"#.utf8)), "Sans identité")
+        XCTAssertNil(CallRadioPacket.parse(Data(#"{"livekitIdentity":"a.b","qualityLevel":"SUPER","v":"1"}"#.utf8))?.qualityLevel)
+        XCTAssertTrue(try XCTUnwrap(CallRadioPacket.parse(Data(#"{"livekitIdentity":"a.b","v":"1"}"#.utf8))).isEmpty)
+    }
+
+    func testRadioPacketAttribution() {
+        let packet = CallRadioPacket(livekitIdentity: "a.b")
+        XCTAssertEqual(CallRadioPacket.attribute(packet, resolvedSender: "a.b", isProven: { _ in false }), "a.b")
+        XCTAssertNil(CallRadioPacket.attribute(packet, resolvedSender: "c.d", isProven: { _ in true }), "L'émetteur résolu prime")
+        XCTAssertEqual(CallRadioPacket.attribute(packet, resolvedSender: nil, isProven: { $0 == "a.b" }), "a.b")
+        XCTAssertNil(CallRadioPacket.attribute(packet, resolvedSender: nil, isProven: { _ in false }), "Non prouvé : écarté")
+    }
+
     func testOnlyTheRingNotificationOfThatCallIsCleared() {
         XCTAssertTrue(CallManager.isRingNotification(["type": "call_incoming", "callId": "call_1"], callId: "call_1"))
         XCTAssertFalse(CallManager.isRingNotification(["type": "call_incoming", "callId": "call_2"], callId: "call_1"))

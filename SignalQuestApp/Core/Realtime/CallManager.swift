@@ -401,8 +401,22 @@ final class CallManager: NSObject, ObservableObject {
     @Published private(set) var activeCall: ActiveCall?
     @Published var showCallScreen = false
     @Published private(set) var endNotice: EndNotice?
+    /// « Partager mon réseau » (D.11) : volontaire, coupé par défaut, arrêté
+    /// avec l'appel.
+    @Published private(set) var isSharingNetwork = false
+    /// Réseaux partagés par les autres participants, par identité LiveKit.
+    @Published private(set) var peerNetworks: [String: PeerNetwork] = [:]
+
+    struct PeerNetwork: Equatable {
+        let packet: CallRadioPacket
+        let receivedAt: Date
+    }
 
     let liveKit = LiveKitClient()
+    /// Lecture de la technologie et de l'opérateur, posée par `AppServices`.
+    var networkSources: (path: NetworkPathMonitor, operator: NetworkOperatorServicing)?
+    private var networkSharingTask: Task<Void, Never>?
+    private var peerNetworkExpiryTask: Task<Void, Never>?
 
     private let callsService: CallsServicing
     private let api: APIClient
@@ -443,6 +457,9 @@ final class CallManager: NSObject, ObservableObject {
         // room fermée, ou réseau tombé), LiveKit le signale → on clôt l'appel.
         liveKit.onRemoteDisconnect = { [weak self] in self?.handleRemoteDisconnect() }
         liveKit.onE2EETrustLost = { [weak self] reason in self?.handleE2EETrustLost(reason) }
+        liveKit.onDataReceived = { [weak self] sender, data, topic in
+            if topic == CallRadioPacket.topic { self?.receiveNetwork(from: sender, data: data) }
+        }
         // Un nouveau jeton APNs fait repartir l'enregistrement des jetons v2.
         pushTokenObserver = NotificationCenter.default.addObserver(
             forName: E2EEV2CallPushTokens.didChange, object: nil, queue: .main
@@ -523,6 +540,75 @@ final class CallManager: NSObject, ObservableObject {
                 await self.tearDown(notice: self.failureNotice(
                     message: String(localized: "L’appel n’a pas pu démarrer. Réessaie dans un instant.")
                 ))
+            }
+        }
+    }
+
+    // MARK: Réseau partagé (D.11)
+
+    func toggleNetworkSharing() {
+        isSharingNetwork ? stopNetworkSharing() : startNetworkSharing()
+    }
+
+    /// Toutes les 2 s, tant que l'appel dure : la technologie et l'opérateur,
+    /// sur un chemin cellulaire seulement (en Wi-Fi, l'adresse IP désignerait la
+    /// box, pas un réseau mobile).
+    private func startNetworkSharing() {
+        guard activeCall != nil, let sources = networkSources else { return }
+        isSharingNetwork = true
+        networkSharingTask?.cancel()
+        networkSharingTask = Task { [weak self] in
+            var operatorName: String?
+            var resolvedOnCellular = false
+            while !Task.isCancelled {
+                guard let self, self.activeCall != nil else { break }
+                sources.path.refreshNow()
+                let status = sources.path.status
+                if status.connection == .cellular, let technology = status.cellularTechnology,
+                   let identity = self.liveKit.localIdentity {
+                    if !resolvedOnCellular {
+                        operatorName = status.operatorName
+                        if operatorName == nil {
+                            let detected = await sources.operator.resolve(viaVpn: VPNDetector.isActive())
+                            operatorName = detected?.shortLabel ?? detected?.label
+                        }
+                        resolvedOnCellular = true
+                    }
+                    let packet = CallRadioPacket(
+                        livekitIdentity: identity,
+                        technology: CallRadioPacket.technology(technology),
+                        operatorName: operatorName
+                    )
+                    if let data = packet.encoded() {
+                        try? await self.liveKit.publishData(data, topic: CallRadioPacket.topic)
+                    }
+                } else {
+                    resolvedOnCellular = false
+                }
+                try? await Task.sleep(for: CallRadioPacket.interval)
+            }
+        }
+    }
+
+    func stopNetworkSharing() {
+        networkSharingTask?.cancel()
+        networkSharingTask = nil
+        isSharingNetwork = false
+    }
+
+    private func receiveNetwork(from sender: String?, data: Data) {
+        guard activeCall != nil, let packet = CallRadioPacket.parse(data),
+              let identity = CallRadioPacket.attribute(packet, resolvedSender: sender, isProven: { _ in false }),
+              identity != liveKit.localIdentity else { return }
+        peerNetworks[identity] = PeerNetwork(packet: packet, receivedAt: Date())
+        guard peerNetworkExpiryTask == nil else { return }
+        peerNetworkExpiryTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                let now = Date()
+                self.peerNetworks = self.peerNetworks.filter { now.timeIntervalSince($0.value.receivedAt) < CallRadioPacket.expiry }
+                if self.peerNetworks.isEmpty { self.peerNetworkExpiryTask = nil; return }
             }
         }
     }
@@ -1124,6 +1210,10 @@ final class CallManager: NSObject, ObservableObject {
     private func tearDown(notice: EndNotice? = nil) async {
         incomingReconciliationTask?.cancel()
         incomingReconciliationTask = nil
+        stopNetworkSharing()
+        peerNetworkExpiryTask?.cancel()
+        peerNetworkExpiryTask = nil
+        peerNetworks = [:]
         if let callId = activeCall?.callId { markRecentlyTerminated(callId) }
         await liveKit.disconnect()
         activeCall = nil

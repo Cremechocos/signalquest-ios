@@ -47,6 +47,14 @@ struct CallScreen: View {
                     .foregroundStyle(SQColor.danger)
                     .multilineTextAlignment(.center)
             }
+            ForEach(callManager.peerNetworks.keys.sorted(), id: \.self) { identity in
+                if let network = callManager.peerNetworks[identity], !network.packet.isEmpty {
+                    PeerNetworkCard(
+                        name: callManager.peerNetworks.count == 1 ? callManager.activeCall?.handle : nil,
+                        packet: network.packet
+                    )
+                }
+            }
             controls
             encryptionNote
         }
@@ -367,8 +375,23 @@ struct CallScreen: View {
                 .accessibilityLabel("Raccrocher")
             }
 
-            if callManager.activeCall?.hasVideo == true {
-                HStack(spacing: SQSpace.xl) {
+            HStack(spacing: SQSpace.xl) {
+                // D.11 : volontaire, coupé par défaut ; seulement une fois l'appel
+                // connecté (et vérifié, s'il est chiffré).
+                let canShare = liveKit.state == .connected && (callManager.activeCall?.requiresE2EE != true || liveKit.isE2EEVerified)
+                controlButton(
+                    systemImage: "antenna.radiowaves.left.and.right",
+                    tint: callManager.isSharingNetwork ? SQColor.success : SQColor.label
+                ) {
+                    callManager.toggleNetworkSharing()
+                }
+                .disabled(!canShare && !callManager.isSharingNetwork)
+                .opacity(canShare || callManager.isSharingNetwork ? 1 : 0.4)
+                .accessibilityLabel(callManager.isSharingNetwork ? "Arrêter de partager mon réseau" : "Partager mon réseau")
+                .accessibilityValue(callManager.isSharingNetwork ? "Partagé" : "Non partagé")
+                .accessibilityIdentifier("call.shareNetwork")
+
+                if callManager.activeCall?.hasVideo == true {
                     controlButton(systemImage: "arrow.triangle.2.circlepath.camera", tint: SQColor.label) {
                         liveKit.switchCamera()
                     }
@@ -403,6 +426,63 @@ struct CallScreen: View {
                 .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
+    }
+}
+
+/// Réseau qu'un autre participant partage (D.11) : seulement les champs reçus.
+struct PeerNetworkCard: View {
+    let name: String?
+    let packet: CallRadioPacket
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text(name.map { String(localized: "Réseau de \($0), en direct") } ?? String(localized: "Réseau d’un participant, en direct"))
+                .font(SQType.caption.weight(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+            ForEach(lines, id: \.label) { line in
+                HStack(spacing: SQSpace.sm) {
+                    Text(line.label)
+                        .foregroundStyle(SQColor.labelSecondary)
+                    Spacer(minLength: SQSpace.sm)
+                    Text(verbatim: line.value)
+                        .foregroundStyle(SQColor.label)
+                        .monospacedDigit()
+                }
+                .font(SQType.caption)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .accessibilityIdentifier("call.peerNetwork")
+    }
+
+    private struct Line { let label: String; let value: String }
+
+    private var lines: [Line] {
+        var lines: [Line] = []
+        if let operatorName = packet.operatorName { lines.append(Line(label: String(localized: "Opérateur"), value: operatorName)) }
+        let bands = packet.nrBands.map { "n\($0)" } + packet.lteBands.map { "B\($0)" }
+        let technology = ([packet.technology].compactMap { $0 } + bands).joined(separator: " · ")
+        if !technology.isEmpty { lines.append(Line(label: String(localized: "Techno"), value: technology)) }
+        if let rsrp = packet.rsrp { lines.append(Line(label: "RSRP", value: "\(rsrp.replacingOccurrences(of: "-", with: "−")) dBm")) }
+        if let quality = packet.qualityLevel.flatMap(Self.qualityLabel) { lines.append(Line(label: String(localized: "Qualité"), value: quality)) }
+        let node = [packet.gnb.map { "gNB \($0)" } ?? packet.enb.map { "eNB \($0)" }, packet.pci.map { "PCI \($0)" }]
+            .compactMap { $0 }.joined(separator: " · ")
+        if !node.isEmpty { lines.append(Line(label: String(localized: "Cellule"), value: node)) }
+        return lines
+    }
+
+    private static func qualityLabel(_ level: String) -> String? {
+        switch level {
+        case "EXCELLENT": return String(localized: "Excellent")
+        case "GOOD": return String(localized: "Bon")
+        case "FAIR": return String(localized: "Moyen")
+        case "POOR": return String(localized: "Faible")
+        case "NO_SIGNAL": return String(localized: "Aucun signal")
+        default: return nil
+        }
     }
 }
 

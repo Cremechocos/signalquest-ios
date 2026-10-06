@@ -425,7 +425,14 @@ final class LiveKitClient: ObservableObject {
                        E2EEV2CallDataPolicy.attributesByProof(resolvedSender: resolvedSender, topic: topic, encryptionType: encryptionType) {
                         unattributed = joinVerifier.receiveUnattributed(data)
                     }
-                    let senderIdentity = resolvedSender ?? unattributed?.identity
+                    // D.11 : un paquet `radio_data` chiffré sans émetteur résolu va à
+                    // l'identité qu'il nomme, seulement si elle a prouvé sa jonction.
+                    var radioIdentity: String?
+                    if resolvedSender == nil, unattributed == nil, topic == CallRadioPacket.topic, encryptionType == .gcm,
+                       let joinVerifier = e2eeSession?.joinVerifier, let packet = CallRadioPacket.parse(data) {
+                        radioIdentity = CallRadioPacket.attribute(packet, resolvedSender: nil, isProven: joinVerifier.isProven)
+                    }
+                    let senderIdentity = resolvedSender ?? unattributed?.identity ?? radioIdentity
                     let verdict = E2EEV2CallDataPolicy.verdict(
                         requiresE2EE: e2eeSession != nil,
                         senderIdentity: senderIdentity,
@@ -1138,6 +1145,15 @@ final class LiveKitClient: ObservableObject {
 #endif
     }
 
+    /// Identité LiveKit de cet appareil dans l'appel en cours.
+    var localIdentity: String? {
+#if canImport(LiveKit)
+        room?.localParticipant.identity?.stringValue
+#else
+        nil
+#endif
+    }
+
     func publishData(_ data: Data, topic: String, reliable: Bool = true) async throws {
         guard !data.isEmpty, data.count <= 15_000,
               !topic.isEmpty, topic.count <= 160 else {
@@ -1480,6 +1496,97 @@ private final class RoomConnectionObserver: NSObject, RoomDelegate, @unchecked S
         onDataReceived(participant?.identity?.stringValue, data, topic, encryptionType)
     }
     func room(_ room: Room, participant: Participant, trackPublication: TrackPublication, didUpdateIsMuted isMuted: Bool) { onMediaChanged() }
+}
+
+/// Réseau partagé pendant un appel (D.11, v0.4.33) : paquet `radio_data`,
+/// volontaire et coupé par défaut, en JSON canonique aux valeurs en chaînes.
+/// Un iPhone n'envoie que la technologie et l'opérateur ; il affiche tout ce
+/// qu'un autre appareil envoie, champs absents masqués. Affichage seulement :
+/// aucune décision de sécurité n'en dépend.
+struct CallRadioPacket: Equatable, Sendable {
+    static let topic = "radio_data"
+    static let version = "1"
+    static let maxBytes = 2_048
+    static let interval: Duration = .seconds(2)
+    /// Une carte sans nouveau paquet depuis 6 s est retirée.
+    static let expiry: TimeInterval = 6
+    static let qualityLevels: Set<String> = ["EXCELLENT", "GOOD", "FAIR", "POOR", "NO_SIGNAL"]
+
+    let livekitIdentity: String
+    var technology: String?
+    var operatorName: String?
+    var rsrp: String?
+    var pci: String?
+    var enb: String?
+    var gnb: String?
+    var lteBands: [String] = []
+    var nrBands: [String] = []
+    var qualityLevel: String?
+
+    /// Libellé de la spec : `4G LTE`, et non le `4G` affiché ailleurs dans l'app.
+    static func technology(_ technology: CellularRadioTechnology) -> String {
+        technology == .fourG ? "4G LTE" : technology.rawValue
+    }
+
+    func encoded() -> Data? {
+        var object: [String: E2EEV2JSON] = ["v": .string(Self.version), "livekitIdentity": .string(livekitIdentity)]
+        if let technology { object["technology"] = .string(technology) }
+        if let operatorName, !operatorName.isEmpty { object["operator"] = .string(String(operatorName.prefix(64))) }
+        let data = E2EEV2CanonicalJSON.encode(.object(object))
+        return data.count <= Self.maxBytes ? data : nil
+    }
+
+    /// Lecture tolérante d'un paquet reçu : version « 1 », identité bornée ;
+    /// les nombres sont acceptés en chaîne ou en entier, les clés inconnues
+    /// ignorées. Toute autre forme est écartée.
+    static func parse(_ data: Data) -> CallRadioPacket? {
+        guard data.count <= maxBytes,
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["v"] as? String == version,
+              let identity = object["livekitIdentity"] as? String, !identity.isEmpty, identity.count <= 256 else { return nil }
+        func text(_ key: String, max: Int) -> String? {
+            guard let value = object[key] as? String else { return nil }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty || trimmed.count > max ? nil : trimmed
+        }
+        func integer(_ key: String) -> String? {
+            if let value = object[key] as? String, value.range(of: #"^-?[0-9]{1,12}$"#, options: .regularExpression) != nil { return value }
+            if let value = object[key] as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(),
+               value.doubleValue == value.doubleValue.rounded(), abs(value.doubleValue) < 1e12 { return String(value.int64Value) }
+            return nil
+        }
+        func bands(_ key: String) -> [String] {
+            guard let values = object[key] as? [Any], values.count <= 16 else { return [] }
+            return values.compactMap { value in
+                if let text = value as? String, text.range(of: #"^[0-9]{1,4}$"#, options: .regularExpression) != nil { return text }
+                if let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(), number.intValue >= 0 { return String(number.intValue) }
+                return nil
+            }
+        }
+        let quality = text("qualityLevel", max: 16)
+        return CallRadioPacket(
+            livekitIdentity: identity,
+            technology: text("technology", max: 32),
+            operatorName: text("operator", max: 64),
+            rsrp: integer("rsrp"), pci: integer("pci"), enb: integer("enb"), gnb: integer("gnb"),
+            lteBands: bands("lteBands"), nrBands: bands("nrBands"),
+            qualityLevel: quality.flatMap { qualityLevels.contains($0) ? $0 : nil }
+        )
+    }
+
+    /// D.11 : l'émetteur résolu par le SDK prime, et le paquet doit le nommer ;
+    /// sans émetteur résolu, seul un participant à la preuve de jonction
+    /// vérifiée peut être nommé.
+    static func attribute(_ packet: CallRadioPacket, resolvedSender: String?, isProven: (String) -> Bool) -> String? {
+        if let resolvedSender { return packet.livekitIdentity == resolvedSender ? resolvedSender : nil }
+        return isProven(packet.livekitIdentity) ? packet.livekitIdentity : nil
+    }
+
+    /// Rien à montrer : pas de carte.
+    var isEmpty: Bool {
+        technology == nil && operatorName == nil && rsrp == nil && pci == nil && enb == nil && gnb == nil
+            && lteBands.isEmpty && nrBands.isEmpty && qualityLevel == nil
+    }
 }
 
 enum E2EEV2CallDataPolicy {
