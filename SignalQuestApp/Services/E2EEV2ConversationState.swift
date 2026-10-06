@@ -510,11 +510,22 @@ enum E2EEV2VerifiedEpochKeys {
         if try stateStore.isV2(conversationId: conversationId, ownerNamespace: ownerNamespace) {
             guard let current = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
             else { return nil }
-            return try keyStore.loadEpoch(
+            return pinned(try keyStore.loadEpoch(
                 conversationId: conversationId, epochNumber: current.epochNumber, ownerNamespace: ownerNamespace
-            )
+            ), to: current)
         }
         return try keyStore.load(conversationId: conversationId, ownerNamespace: ownerNamespace)
+    }
+
+    /// La clé rangée ne sert que si elle tient l'engagement épinglé à l'époque
+    /// vérifiée : une clé d'une autre source au même numéro n'est jamais utilisée.
+    private static func pinned(
+        _ stored: E2EEV2StoredEpochKey?,
+        to current: E2EEV2ConversationStateStore.CurrentEpoch
+    ) -> E2EEV2StoredEpochKey? {
+        guard let stored else { return nil }
+        if let commitment = current.keyCommitmentB64, stored.keyCommitmentB64 != commitment { return nil }
+        return stored
     }
 
     /// Une époque désignée (réponse à un appel) : pour une conversation v2,
@@ -529,6 +540,10 @@ enum E2EEV2VerifiedEpochKeys {
         if try stateStore.isV2(conversationId: conversationId, ownerNamespace: ownerNamespace) {
             guard let current = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace),
                   current.epochNumber == epochNumber else { return nil }
+            return pinned(
+                try keyStore.loadEpoch(conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace),
+                to: current
+            )
         }
         return try keyStore.loadEpoch(conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace)
     }

@@ -7,8 +7,18 @@ final class SessionDetailViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var identifyingId: String?
     @Published var identifyResult: String?
+    /// Pages suivantes en cours : le tracé se complète sous les yeux.
+    @Published var isLoadingMorePoints = false
+    /// Change à chaque lot de points reçu : la carte ne se redessine que là.
+    @Published var renderVersion = UUID()
+    /// Tous les points sont là : revenir sur l'écran ne recharge rien.
+    private var hasAllPoints = false
 
     let session: CoverageSession
+    /// Première page petite pour un affichage rapide, les suivantes plus grosses.
+    nonisolated static let firstPageLimit = 2_000
+    nonisolated static let nextPageLimit = 5_000
+    nonisolated static let antennaRefreshPageLimit = 100
 
     init(session: CoverageSession) { self.session = session }
 
@@ -34,11 +44,18 @@ final class SessionDetailViewModel: ObservableObject {
     }
 
     /// Répartition des points par génération et état (inconnu ≠ sans réseau).
+    /// Celle du serveur couvre toute la session, même avant la dernière page.
     var generationBreakdown: [GenerationShare] {
-        guard let points = detail?.points, !points.isEmpty else { return [] }
         var counts: [String: Int] = [:]
-        for p in points { counts[Self.generationKey(p.tech), default: 0] += 1 }
-        let total = points.count
+        if let shares = detail?.technologyBreakdown, !shares.isEmpty {
+            for share in shares where share.points > 0 {
+                counts[Self.generationKey(share.technology), default: 0] += share.points
+            }
+        } else {
+            for p in detail?.points ?? [] { counts[Self.generationKey(p.tech), default: 0] += 1 }
+        }
+        let total = counts.values.reduce(0, +)
+        guard total > 0 else { return [] }
         return ["5G", "4G", "3G", "2G", "Inconnu", "Aucun"].compactMap { gen -> GenerationShare? in
             guard let c = counts[gen], c > 0 else { return nil }
             return GenerationShare(generation: gen, count: c, pct: Double(c) / Double(total) * 100)
@@ -60,15 +77,107 @@ final class SessionDetailViewModel: ObservableObject {
         return (sts.count, mean(downs), downs.max(), mean(ups), mean(pings))
     }
 
+    /// Part des points déjà chargés, tant que des pages restent à venir.
+    var pointsProgress: Double? {
+        guard isLoadingMorePoints, let detail, let expected = detail.expectedPointRows, expected > 0 else { return nil }
+        return min(Double(detail.points.count) / Double(expected), 1)
+    }
+
     func load(service: SessionsServicing) async {
+        guard !(hasAllPoints && detail != nil) else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        let first: CoverageSessionDetail
         do {
-            detail = try await service.sessionDetail(id: session.id)
+            first = try await service.sessionDetail(id: session.id, pageLimit: Self.firstPageLimit)
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }
+            return
         }
+        detail = first
+        renderVersion = UUID()
+        guard let cursor = first.page?.nextCursor else {
+            hasAllPoints = true
+            return
+        }
+        isLoading = false
+        await loadRemainingPoints(after: cursor, service: service)
+    }
+
+    /// Pages suivantes, ajoutées dans l'ordre. Un point déjà reçu n'est jamais
+    /// doublé. Un curseur refusé (session modifiée entre deux pages) relance une
+    /// seule fois depuis la première page.
+    private func loadRemainingPoints(after firstCursor: String, service: SessionsServicing, restarted: Bool = false) async {
+        isLoadingMorePoints = true
+        defer { isLoadingMorePoints = false }
+        var seen = Set((detail?.points ?? []).map(\.id))
+        var seenCursors: Set<String> = []
+        var cursor: String? = firstCursor
+        // Un curseur déjà servi arrêterait jamais la boucle.
+        while let current = cursor, seenCursors.insert(current).inserted, !Task.isCancelled {
+            do {
+                let page = try await service.sessionPoints(id: session.id, after: current, limit: Self.nextPageLimit)
+                let fresh = page.points.filter { seen.insert($0.id).inserted }
+                if !fresh.isEmpty {
+                    detail?.points.append(contentsOf: fresh)
+                    renderVersion = UUID()
+                }
+                cursor = page.page?.nextCursor
+                if cursor == nil { hasAllPoints = true }
+            } catch let error as APIError {
+                if case .http(400, "INVALID_CURSOR", _, _, _) = error, !restarted {
+                    await reloadFirstPage(service: service)
+                } else if !error.isCancellation {
+                    errorMessage = error.userFacingMessage
+                }
+                return
+            } catch {
+                if !error.isCancellation { errorMessage = error.userFacingMessage }
+                return
+            }
+        }
+    }
+
+    /// Après une identification, seul l'état des antennes change : on relit la
+    /// plus petite première page au lieu de tout recharger.
+    func refreshServingAntennas(service: SessionsServicing) async {
+        guard let fresh = try? await service.sessionDetail(id: session.id, pageLimit: Self.antennaRefreshPageLimit) else { return }
+        if fresh.page == nil {
+            // Serveur sans pagination : la réponse est complète.
+            detail = fresh
+        } else {
+            detail?.servingAntennas = fresh.servingAntennas
+        }
+        renderVersion = UUID()
+    }
+
+    private func reloadFirstPage(service: SessionsServicing) async {
+        let first: CoverageSessionDetail
+        do {
+            first = try await service.sessionDetail(id: session.id, pageLimit: Self.firstPageLimit)
+        } catch {
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
+            return
+        }
+        detail = first
+        renderVersion = UUID()
+        if let cursor = first.page?.nextCursor {
+            await loadRemainingPoints(after: cursor, service: service, restarted: true)
+        } else {
+            hasAllPoints = true
+        }
+    }
+
+    /// Point de la session qui porte le nœud de l'antenne (eNB ou gNB), et sa
+    /// cellule ou son PCI quand l'antenne les donne. Jamais un point d'un autre nœud.
+    nonisolated static func sample(for antenna: ServingAntenna, in points: [CoverageSessionPoint]) -> CoverageSessionPoint? {
+        let sameNode = points.filter { p in
+            (antenna.enb != nil && p.enb == antenna.enb) || (antenna.gnb != nil && p.gnb == antenna.gnb)
+        }
+        return sameNode.first { p in
+            (antenna.cellId == nil || p.cellId == antenna.cellId) && (antenna.pci == nil || p.pci == antenna.pci)
+        } ?? sameNode.first
     }
 
     /// Identifie une antenne non confirmée : croise les identifiants radio d'un
@@ -77,10 +186,10 @@ final class SessionDetailViewModel: ObservableObject {
         identifyingId = antenna.id
         identifyResult = nil
         defer { identifyingId = nil }
-        // Point porteur des mêmes identifiants que l'antenne, sinon premier point radio.
-        let sample = detail?.points.first { p in
-            (antenna.enb != nil && p.enb == antenna.enb) || (antenna.gnb != nil && p.gnb == antenna.gnb)
-        } ?? detail?.points.first { $0.enb != nil || $0.gnb != nil || $0.pci != nil }
+        // Seul un point porteur des identifiants de CETTE antenne fait preuve :
+        // le premier point radio venu peut appartenir à une autre cellule, voire
+        // à un autre réseau.
+        let sample = Self.sample(for: antenna, in: detail?.points ?? [])
         let coord = await location.currentLocation(timeoutSeconds: 5)?.coordinate ?? antenna.coordinate
         guard let siteId = antenna.siteId, !siteId.isEmpty else {
             identifyResult = "Site inconnu : rien à identifier."
@@ -92,19 +201,27 @@ final class SessionDetailViewModel: ObservableObject {
         // de réseau servant. Les anciennes sessions sans PLMN restent lisibles,
         // mais leur identification doit passer par le journal ou un choix manuel.
         guard let plmn = sample?.servingPlmn else {
+            if sample == nil {
+                identifyResult = isLoadingMorePoints
+                    ? String(localized: "Points encore en chargement : réessaie dans un instant.")
+                    : String(localized: "Aucune mesure de ce nœud dans la session : identifie-le depuis les logs radio.")
+                Haptics.error()
+                return
+            }
             identifyResult = "PLMN servant absent dans cette session : identifie ce nœud depuis les logs radio ou choisis explicitement son réseau."
             Haptics.error()
             return
         }
-        let isNr = (sample?.gnb ?? antenna.gnb) != nil
+        let isNr = (antenna.gnb ?? sample?.gnb) != nil
         do {
             let result = try await service.identify(
                 IdentifyDirectRequest(
                     siteId: siteId,
-                    enb: sample?.enb ?? antenna.enb,
-                    gnb: sample?.gnb ?? antenna.gnb,
-                    pci: (sample?.pci ?? antenna.pci).flatMap(Int.init),
-                    cellId: sample?.cellId ?? antenna.cellId,
+                    // Les identifiants de l'antenne priment, le point ne fait que compléter.
+                    enb: antenna.enb ?? sample?.enb,
+                    gnb: antenna.gnb ?? sample?.gnb,
+                    pci: (antenna.pci ?? sample?.pci).flatMap(Int.init),
+                    cellId: antenna.cellId ?? sample?.cellId,
                     tech: isNr ? "5G" : "4G",
                     operatorName: sample?.operatorKey,
                     operatorKey: sample?.operatorKey,
@@ -194,7 +311,7 @@ struct SessionDetailView: View {
                     await model.identify(antenna, service: services.identify, location: services.location)
                     pendingIdentify = nil
                     // SESS-DETAIL-BUG-01 : rafraîchir la liste pour repasser l'antenne identifiée en vert.
-                    await model.load(service: services.sessions)
+                    await model.refreshServingAntennas(service: services.sessions)
                 }
             }
             Button("Annuler", role: .cancel) { pendingIdentify = nil }
@@ -269,10 +386,15 @@ struct SessionDetailView: View {
                                     antennas: detail.servingAntennas,
                                     speedtests: detail.speedtests,
                                     drawPath: model.session.isDriveTest,
-                                    coloring: model.session.isIosCoverage ? .generation : .rsrp)
+                                    coloring: model.session.isIosCoverage ? .generation : .rsrp,
+                                    renderID: model.renderVersion,
+                                    keepsUserViewport: true)
                     .frame(height: 300)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
                     .sqShadowCard()
+                if model.isLoadingMorePoints {
+                    pointsProgressRow
+                }
                 if !detail.points.isEmpty {
                     // Couverture iOS = génération seule (pas de RSRP) → légende génération.
                     if model.session.isIosCoverage {
@@ -289,6 +411,29 @@ struct SessionDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, SQSpace.lg)
         }
+    }
+
+    private var pointsProgressRow: some View {
+        let percent = model.pointsProgress.map { $0.formatted(.percent.precision(.fractionLength(0))) }
+        return VStack(alignment: .leading, spacing: SQSpace.xs) {
+            HStack(spacing: SQSpace.sm) {
+                Text("Chargement des points…")
+                Spacer(minLength: 0)
+                if let percent {
+                    Text(percent).monospacedDigit()
+                } else {
+                    ProgressView().controlSize(.small).tint(SQColor.brandRed)
+                }
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            if let progress = model.pointsProgress {
+                ProgressView(value: progress).tint(SQColor.brandRed)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Chargement des points…"))
+        .accessibilityValue(Text(percent ?? ""))
     }
 
     /// Légende RSRP — couleurs dérivées de `SessionRSRPColor` (celles des points

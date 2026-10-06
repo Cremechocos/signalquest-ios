@@ -16,6 +16,9 @@ struct SessionTraceMapView: UIViewRepresentable {
     /// Fourni par « Mes mesures » : évite de reconstruire 30 000 points quand
     /// seul un état d'interface change. Les autres appelants gardent leur rendu.
     var renderID: UUID? = nil
+    /// Chargement progressif : la carte se cadre tant que l'utilisateur ne l'a
+    /// pas déplacée, puis garde sa vue quand de nouveaux points arrivent.
+    var keepsUserViewport: Bool = false
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -69,14 +72,26 @@ struct SessionTraceMapView: UIViewRepresentable {
         for st in locatedSpeedtests {
             rect = rect.union(MKMapRect(origin: MKMapPoint(st.coordinate), size: MKMapSize(width: 1, height: 1)))
         }
-        if !rect.isNull {
+        if !rect.isNull, !(keepsUserViewport && context.coordinator.userMovedMap) {
             map.setVisibleMapRect(rect, edgePadding: UIEdgeInsets(top: 44, left: 44, bottom: 44, right: 44), animated: false)
+            context.coordinator.didFit = true
         }
     }
 
     @MainActor
     final class Coordinator: NSObject, MKMapViewDelegate {
         private var lastSignature: SessionTraceRenderSignature?
+        private(set) var userMovedMap = false
+        /// Un geste avant le premier cadrage ne doit pas figer la vue du monde entier.
+        var didFit = false
+
+        func mapView(_ mapView: MKMapView, regionWillChangeAnimated animated: Bool) {
+            // Seul un geste de l'utilisateur fige le cadrage, pas nos propres recadrages.
+            let gestures = mapView.subviews.first?.gestureRecognizers ?? []
+            if didFit, gestures.contains(where: { $0.state == .began || $0.state == .changed || $0.state == .ended }) {
+                userMovedMap = true
+            }
+        }
 
         func shouldRender(_ signature: SessionTraceRenderSignature?) -> Bool {
             guard let signature else {

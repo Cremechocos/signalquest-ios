@@ -2877,6 +2877,31 @@ enum E2EEV2DeviceApprovalContract {
         return qr.payload
     }
 
+    /// Lien universel du QR (D.13, v0.4.34) : `https://<hôte SignalQuest>/e2ee/approve#<charge>`,
+    /// la charge étant la chaîne v3 en base64url sans bourrage. Rend la chaîne
+    /// v3 ; une chaîne v3 nue est rendue telle quelle. Rien d'autre n'est lu.
+    static func rawQRPayload(fromScanned scanned: String, appHosts: Set<String> = E2EEV2DeviceApprovalContract.appHosts) -> String? {
+        let trimmed = scanned.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("SQE2EE2|") { return trimmed }
+        guard let components = URLComponents(string: trimmed), components.scheme == "https",
+              let host = components.host?.lowercased(), appHosts.contains(host),
+              components.path == "/e2ee/approve", components.query == nil,
+              let fragment = components.fragment, !fragment.isEmpty, fragment.count <= 2_048,
+              fragment.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }) else { return nil }
+        var base64 = fragment.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while base64.count % 4 != 0 { base64 += "=" }
+        guard let data = Data(base64Encoded: base64), let raw = String(data: data, encoding: .utf8),
+              raw.hasPrefix("SQE2EE2|") else { return nil }
+        return raw
+    }
+
+    /// Hôtes qui portent le lien universel : la production et l'hôte web de ce build.
+    static var appHosts: Set<String> {
+        var hosts: Set<String> = ["signalquest.fr", "www.signalquest.fr"]
+        if let host = AppConfig.current.appBaseURL.host?.lowercased() { hosts.insert(host) }
+        return hosts
+    }
+
     /// Lecture stricte du QR v3 ; une autre version est refusée, jamais devinée.
     static func parseQRPayload(
         _ raw: String,
@@ -5838,6 +5863,15 @@ enum E2EEV2EpochKeyStoreError: Error, Equatable {
 /// Keychain cache scoped by account and conversation. The current pointer only
 /// advances, while authenticated historical epochs remain addressable for
 /// history decryption. A same-number substitution is always rejected.
+/// Provenance d'une clé d'époque rangée. Une clé restaurée depuis la
+/// sauvegarde de récupération (§2.8) ne remplace jamais une clé reçue par la
+/// synchro vérifiée ; une clé vérifiée, elle, remplace toujours une clé
+/// restaurée au même numéro.
+enum E2EEV2EpochKeyOrigin: String, Sendable {
+    case verified
+    case restored
+}
+
 final class E2EEV2EpochKeyStore: @unchecked Sendable {
     private struct Record: Codable {
         let version: Int
@@ -5847,6 +5881,8 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
         let keyCommitmentB64: String
         let epochKeyB64: String
         let storedAtMs: Int64
+        /// Absent des enregistrements antérieurs et des clés vérifiées.
+        var origin: String? = nil
     }
 
     private struct Index: Codable {
@@ -5897,7 +5933,8 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
         recordInput: E2EEV2EpochKeyRecordInput,
         epochKey: Data,
         ownerNamespace: String,
-        expectedSession: LocalAccountSession? = nil
+        expectedSession: LocalAccountSession? = nil,
+        origin: E2EEV2EpochKeyOrigin = .verified
     ) throws -> Bool {
         guard allowsOwner(ownerNamespace) else { throw E2EEV2DeviceIdentityError.unauthenticated }
         guard expectedSession == nil || (expectedSession?.isCurrent == true && expectedSession?.ownerNamespace == ownerNamespace) else {
@@ -5935,6 +5972,7 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
             conversationId: recordInput.conversationId
         )
         let current: E2EEV2StoredEpochKey?
+        var replacesCurrent = false
         if let raw = try tokenStore.string(for: currentKey) {
             guard let parsed = parse(raw), parsed.conversationId == recordInput.conversationId else {
                 return false
@@ -5942,7 +5980,8 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
             current = parsed
             if parsed.epochNumber == recordInput.epochNumber,
                !matches(parsed, recordInput: recordInput, epochKey: epochKey) {
-                return false
+                guard origin == .verified, isRestored(raw) else { return false }
+                replacesCurrent = true
             }
         } else {
             current = nil
@@ -5954,9 +5993,13 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
             epochNumber: recordInput.epochNumber
         )
         if let raw = try tokenStore.string(for: historicalKey) {
-            guard let historical = parse(raw),
-                  historical.conversationId == recordInput.conversationId,
-                  matches(historical, recordInput: recordInput, epochKey: epochKey) else {
+            guard let historical = parse(raw), historical.conversationId == recordInput.conversationId else {
+                return false
+            }
+            if matches(historical, recordInput: recordInput, epochKey: epochKey) {
+                // Déjà rangée : une restauration ne rétrograde jamais une clé vérifiée.
+                if origin == .restored { return true }
+            } else if origin == .restored || !isRestored(raw) {
                 return false
             }
         }
@@ -5984,12 +6027,18 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
             epochNumber: recordInput.epochNumber,
             keyCommitmentB64: recordInput.keyCommitmentB64,
             epochKeyB64: epochKey.base64EncodedString(),
-            storedAtMs: Int64(Date().timeIntervalSince1970 * 1_000)
+            storedAtMs: Int64(Date().timeIntervalSince1970 * 1_000),
+            origin: origin == .restored ? origin.rawValue : nil
         )
         let encoded = try JSONEncoder().encode(record)
         guard let value = String(data: encoded, encoding: .utf8) else { return false }
         try publish(value, key: historicalKey, expectedSession: expectedSession)
-        if current == nil || recordInput.epochNumber > current!.epochNumber {
+        if replacesCurrent {
+            try publish(value, key: currentKey, expectedSession: expectedSession)
+        } else if origin == .restored {
+            // Une clé restaurée ne devient jamais l'époque courante : elle sert à
+            // relire l'historique, pas à envoyer ni à appeler (§2.8).
+        } else if current == nil || recordInput.epochNumber > current!.epochNumber {
             try publish(value, key: currentKey, expectedSession: expectedSession)
             advanced = true
         }
@@ -6124,6 +6173,12 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
             keyCommitmentB64: record.keyCommitmentB64,
             epochKey: epochKey
         )
+    }
+
+    private func isRestored(_ raw: String) -> Bool {
+        guard let data = raw.data(using: .utf8),
+              let record = try? JSONDecoder().decode(Record.self, from: data) else { return false }
+        return record.origin == E2EEV2EpochKeyOrigin.restored.rawValue
     }
 
     private func storageKey(ownerNamespace: String, conversationId: String) -> String {
@@ -6819,13 +6874,25 @@ final class E2EEV2RecoveryEpochCoordinator: @unchecked Sendable {
                 }
                 defer { epochKey.resetBytes(in: 0..<epochKey.count) }
                 do {
-                    guard accountIsCurrent(account),
-                          try keyStore.put(
-                            recordInput: delivery.metadata.keyRecord,
-                            epochKey: epochKey,
+                    guard accountIsCurrent(account) else { return authenticationFailure() }
+                    // Une clé déjà reçue par la synchro vérifiée garde sa place :
+                    // la sauvegarde ne la remplace pas et ne bloque pas le reste.
+                    if try !keyStore.put(
+                        recordInput: delivery.metadata.keyRecord,
+                        epochKey: epochKey,
+                        ownerNamespace: account.ownerNamespace,
+                        origin: .restored
+                    ) {
+                        guard try keyStore.loadEpoch(
+                            conversationId: delivery.metadata.conversationId,
+                            epochNumber: delivery.metadata.epochNumber,
                             ownerNamespace: account.ownerNamespace
-                          ),
-                          let stored = try keyStore.loadEpoch(
+                        ) != nil else {
+                            return localFailure("e2ee-recovery-epoch-storage-or-verification-failed")
+                        }
+                        continue
+                    }
+                    guard let stored = try keyStore.loadEpoch(
                             conversationId: delivery.metadata.conversationId,
                             epochNumber: delivery.metadata.epochNumber,
                             ownerNamespace: account.ownerNamespace

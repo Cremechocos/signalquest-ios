@@ -1633,6 +1633,22 @@
         }
       }
     },
+    "Le chiffrement de bout en bout est activé sur cet appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End-to-end encryption is on for this device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement de bout en bout est activé sur cet appareil."
+          }
+        }
+      }
+    },
     "Le chiffrement de ce compte doit être réinitialisé avant d’approuver un appareil." : {
       "localizations" : {
         "en" : {
@@ -7302,6 +7318,22 @@
         }
       }
     },
+    "Active le chiffrement de bout en bout" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on end-to-end encryption"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active le chiffrement de bout en bout"
+          }
+        }
+      }
+    },
     "Active le chiffrement de bout en bout sur cet appareil pour écrire et appeler en privé." : {
       "localizations" : {
         "en" : {
@@ -7442,6 +7474,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activer l’image dans l’image"
+          }
+        }
+      }
+    },
+    "Activer maintenant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on now"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer maintenant"
           }
         }
       }
@@ -7928,6 +7976,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher la transcription"
+          }
+        }
+      }
+    },
+    "Afficher le QR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show the QR"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le QR"
           }
         }
       }
@@ -14500,6 +14564,73 @@
         }
       }
     },
+    "Cet appareil a été révoqué depuis un autre de tes appareils : il ne peut plus être approuvé tel quel." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device was revoked from another of your devices: it can’t be approved again as is."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil a été révoqué depuis un autre de tes appareils : il ne peut plus être approuvé tel quel."
+          }
+        }
+      }
+    },
+    "Étape %lld sur 3 : %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step %lld of 3: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étape %lld sur 3 : %@"
+          }
+        }
+      }
+    },
+    "N’approuve que si cet appareil est devant toi et que tu viens d’afficher ce QR toi-même." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only approve if this device is in front of you and you just displayed this QR code yourself."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "N’approuve que si cet appareil est devant toi et que tu viens d’afficher ce QR toi-même."
+          }
+        }
+      }
+    },
+    "Cet appareil se prépare" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device gets ready"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil se prépare"
+          }
+        }
+      }
+    },
     "Cette action est définitive." : {
       "localizations" : {
         "en" : {
@@ -15061,6 +15192,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chaque test peut consommer plusieurs centaines de Mo en 4G ou en 5G, et une rafale en enchaîne %lld."
+          }
+        }
+      }
+    },
+    "Chargement des points…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading points…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement des points…"
           }
         }
       }
@@ -16412,6 +16560,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code reçu"
+          }
+        }
+      }
+    },
+    "Code reçu par e-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code received by email"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code reçu par e-mail"
           }
         }
       }
@@ -18901,6 +19065,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Créée le"
+          }
+        }
+      }
+    },
+    "C’est le premier appareil chiffré de ton compte : un code à usage unique, envoyé par e-mail, le confirme. Aucune clé privée ne quitte cet appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is your account’s first encrypted device: a one-time code sent by email confirms it. No private key ever leaves this device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est le premier appareil chiffré de ton compte : un code à usage unique, envoyé par e-mail, le confirme. Aucune clé privée ne quitte cet appareil."
+          }
+        }
+      }
+    },
+    "C’est prêt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All set"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est prêt"
           }
         }
       }
@@ -22032,6 +22228,22 @@
         }
       }
     },
+    "En attente de l’approbation…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for approval…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de l’approbation…"
+          }
+        }
+      }
+    },
     "En attente de mesure" : {
       "localizations" : {
         "en" : {
@@ -23369,6 +23581,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Faisceau hertzien"
+          }
+        }
+      }
+    },
+    "Fait" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fait"
           }
         }
       }
@@ -26491,6 +26719,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération plus bas, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau."
+          }
+        }
+      }
+    },
+    "La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The account key didn’t reach this device. Enter your recovery key, or have this device revoked from another one and approve it again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau."
           }
         }
       }
@@ -36137,6 +36381,23 @@
         }
       }
     },
+    "Sans nouvelles : refermée automatiquement" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No news: closed automatically"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans nouvelles : refermée automatiquement"
+          }
+        }
+      }
+    },
     "Panne close par la modération" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -38301,6 +38562,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Points affichés"
+          }
+        }
+      }
+    },
+    "Points encore en chargement : réessaie dans un instant." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points are still loading: try again in a moment."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points encore en chargement : réessaie dans un instant."
+          }
+        }
+      }
+    },
+    "Aucune mesure de ce nœud dans la session : identifie-le depuis les logs radio." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No measurement of this node in the session: identify it from the radio logs."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune mesure de ce nœud dans la session : identifie-le depuis les logs radio."
           }
         }
       }
@@ -41056,6 +41351,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Recentrer sur ma position"
+          }
+        }
+      }
+    },
+    "Recevoir le code par e-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get the code by email"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recevoir le code par e-mail"
           }
         }
       }
@@ -49316,6 +49627,22 @@
         }
       }
     },
+    "Tes messages et tes appels ne seront lisibles que sur tes appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your messages and calls will only be readable on your devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes messages et tes appels ne seront lisibles que sur tes appareils."
+          }
+        }
+      }
+    },
     "Tes messages sont chiffrés sur ton téléphone et déchiffrés sur celui de tes correspondants : nos serveurs ne stockent que du texte illisible. Deux limites pour l’instant : seul le texte est chiffré, et la clé de chaque conversation est créée par nos serveurs à son ouverture, puis remise chiffrée à chaque membre." : {
       "localizations" : {
         "en" : {
@@ -49707,6 +50034,22 @@
         }
       }
     },
+    "Ton autre appareil l’approuve" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your other device approves it"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton autre appareil l’approuve"
+          }
+        }
+      }
+    },
     "Ton bilan de la semaine est déjà en story." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -49720,6 +50063,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton bilan de la semaine est déjà en story."
+          }
+        }
+      }
+    },
+    "Ton compte est déjà chiffré sur un autre appareil. Sur celui-ci, ouvre Profil › Réglages › Compte et sécurité › Appareils, puis « Scanner le code », et vise ce QR." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account is already encrypted on another device. On that device, open Profile › Settings › Account and security › Devices, then “Scan the code”, and point it at this QR."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton compte est déjà chiffré sur un autre appareil. Sur celui-ci, ouvre Profil › Réglages › Compte et sécurité › Appareils, puis « Scanner le code », et vise ce QR."
           }
         }
       }
@@ -52512,6 +52871,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utiliser"
+          }
+        }
+      }
+    },
+    "Utiliser ma clé de récupération" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use my recovery key"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser ma clé de récupération"
           }
         }
       }

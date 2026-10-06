@@ -463,6 +463,8 @@ struct CommunityOutageDetailSheet: View {
             return String(localized: "Réseau mesuré comme revenu")
         case .resolvedAdmin:
             return String(localized: "Panne close par la modération")
+        case .resolvedExpired:
+            return String(localized: "Sans nouvelles : refermée automatiquement")
         case .rejected:
             return String(localized: "Panne écartée")
         }

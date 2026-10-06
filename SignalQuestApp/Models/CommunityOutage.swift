@@ -173,6 +173,8 @@ enum OutageTimelineKind: String, Decodable, Equatable {
     case resolvedOperator = "resolved_operator"
     case resolvedMeasured = "resolved_measured"
     case resolvedAdmin = "resolved_admin"
+    /// Panne en veille restée sans aucune voix pendant 7 jours, refermée par le serveur.
+    case resolvedExpired = "resolved_expired"
     case rejected
 }
 

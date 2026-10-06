@@ -599,21 +599,40 @@ struct SessionsPagination: Decodable {
 /// `{id,ok,result}` à plat.
 struct CoverageSessionDetail: Decodable {
     let session: CoverageSession
-    let points: [CoverageSessionPoint]
+    /// Première page seulement quand `page` porte un curseur : les suivantes
+    /// s'y ajoutent au fil du chargement progressif.
+    var points: [CoverageSessionPoint]
     let speedtests: [SessionSpeedtest]
-    let servingAntennas: [ServingAntenna]
+    /// Relue seule après une identification, sans recharger les points.
+    var servingAntennas: [ServingAntenna]
+    /// Absente d'une réponse complète (serveur sans pagination).
+    let page: SessionPointsPage?
+    /// Répartition calculée par le serveur sur TOUS les points visibles.
+    let technologyBreakdown: [SessionTechnologyShare]
+    /// Lignes de points visibles attendues, pour la progression (nil si inconnu).
+    let expectedPointRows: Int?
 
-    enum CodingKeys: String, CodingKey { case session, points, servingAntennas, antennas }
-    enum SessionInnerKeys: String, CodingKey { case points, speedtests }
+    enum CodingKeys: String, CodingKey { case session, points, servingAntennas, antennas, page }
+    enum SessionInnerKeys: String, CodingKey {
+        case points, speedtests, technologyBreakdown, rawTotalPoints, excludedPoints
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        page = try? c.decodeIfPresent(SessionPointsPage.self, forKey: .page)
+        var breakdown: [SessionTechnologyShare] = []
+        var expected: Int?
         if let nested = try? c.decodeIfPresent(CoverageSession.self, forKey: .session) {
             session = nested
             // Les points ET les speedtests sont imbriqués sous `session`.
             if let inner = try? c.nestedContainer(keyedBy: SessionInnerKeys.self, forKey: .session) {
                 points = inner.decodeLossyArray([CoverageSessionPoint].self, forKey: .points)
                 speedtests = inner.decodeLossyArray([SessionSpeedtest].self, forKey: .speedtests)
+                breakdown = inner.decodeLossyArray([SessionTechnologyShare].self, forKey: .technologyBreakdown)
+                if let raw = (try? inner.decodeIfPresent(Int.self, forKey: .rawTotalPoints)) ?? nil {
+                    let excluded = (try? inner.decodeIfPresent(Int.self, forKey: .excludedPoints)) ?? nil
+                    expected = max(raw - (excluded ?? 0), 0)
+                }
             } else {
                 points = []
                 speedtests = []
@@ -624,8 +643,45 @@ struct CoverageSessionDetail: Decodable {
             points = c.decodeLossyArray([CoverageSessionPoint].self, forKey: .points)
             speedtests = []
         }
+        technologyBreakdown = breakdown
+        expectedPointRows = expected
         let wrappers = c.decodeLossyArray([ServingAntennaWrapper].self, forKey: .servingAntennas)
         let fallback = wrappers.isEmpty ? c.decodeLossyArray([ServingAntennaWrapper].self, forKey: .antennas) : wrappers
         servingAntennas = fallback.compactMap(ServingAntenna.init(wrapper:))
     }
+}
+
+/// Page de points d'une session (`fields=detail&limit=`, `after=` ensuite).
+struct SessionPointsPage: Decodable, Equatable {
+    let returned: Int?
+    let nextCursor: String?
+}
+
+/// Page suivante : `{ session: { id, points }, page }`, sans résumé ni antennes.
+struct SessionPointsPageResponse: Decodable {
+    let points: [CoverageSessionPoint]
+    let page: SessionPointsPage?
+
+    enum CodingKeys: String, CodingKey { case session, page }
+    enum SessionInnerKeys: String, CodingKey { case points }
+
+    init(points: [CoverageSessionPoint], page: SessionPointsPage?) {
+        self.points = points
+        self.page = page
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let inner = try c.nestedContainer(keyedBy: SessionInnerKeys.self, forKey: .session)
+        points = inner.decodeLossyArray([CoverageSessionPoint].self, forKey: .points)
+        page = try? c.decodeIfPresent(SessionPointsPage.self, forKey: .page)
+    }
+}
+
+/// Une ligne de `technologyBreakdown` : une mesure 5G NSA compte pour son ancre
+/// 4G et pour sa cellule 5G, d'où `logicalPoints` à part.
+struct SessionTechnologyShare: Decodable, Equatable {
+    let technology: String?
+    let points: Int
+    let logicalPoints: Int
 }

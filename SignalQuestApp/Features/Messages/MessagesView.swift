@@ -171,22 +171,15 @@ struct MessagesView: View {
             needsV2Activation = false
             return
         }
-        let snoozedUntil = UserDefaults.standard.double(forKey: Self.activationSnoozeKey(current))
         needsV2Activation = services.e2eeV2Messaging.lacksV2Readiness(current)
-            && Date().timeIntervalSince1970 >= snoozedUntil
+            && !E2EEV2ActivationPrompt.isSnoozed(current)
     }
 
     /// « Plus tard » : la carte revient au bout d'une semaine ; l'activation
     /// reste à portée dans Réglages › Appareils.
     private func snoozeV2Activation() {
-        guard let current = LocalAccountScope.sessionSnapshot() else { return }
-        UserDefaults.standard.set(Date().addingTimeInterval(7 * 24 * 3600).timeIntervalSince1970,
-                                  forKey: Self.activationSnoozeKey(current))
+        E2EEV2ActivationPrompt.snooze()
         needsV2Activation = false
-    }
-
-    private static func activationSnoozeKey(_ session: LocalAccountSession) -> String {
-        "sq.e2ee.v2.activation-snoozed.\(session.ownerNamespace)"
     }
 
     /// Activation guidée : l'enregistrement de l'appareil et l'approbation

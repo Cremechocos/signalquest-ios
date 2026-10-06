@@ -413,6 +413,11 @@ protocol SessionsServicing: Sendable {
     /// session (~5,5 Mo pièce, contre quatre champs utiles).
     func sessions(offset: Int, limit: Int, mapPoints: Bool) async throws -> SessionsListResponse
     func sessionDetail(id: String) async throws -> CoverageSessionDetail
+    /// Chargement progressif : première page (résumé, antennes, `limit` points),
+    /// puis les pages suivantes par curseur. Un serveur sans pagination renvoie
+    /// tout d'un bloc, sans `page`.
+    func sessionDetail(id: String, pageLimit: Int) async throws -> CoverageSessionDetail
+    func sessionPoints(id: String, after cursor: String, limit: Int) async throws -> SessionPointsPageResponse
     // L'enregistrement de couverture est retiré d'iOS : les anciennes files
     // restent sur l'appareil, en lecture seule (`LocalCoverageArchiveReader`).
     // Ses méthodes d'écriture, qui ne faisaient plus que refuser, n'avaient
@@ -424,6 +429,14 @@ protocol SessionsServicing: Sendable {
 extension SessionsServicing {
     func sessions(offset: Int = 0, limit: Int = 30) async throws -> SessionsListResponse {
         try await sessions(offset: offset, limit: limit, mapPoints: false)
+    }
+
+    func sessionDetail(id: String, pageLimit: Int) async throws -> CoverageSessionDetail {
+        try await sessionDetail(id: id)
+    }
+
+    func sessionPoints(id: String, after cursor: String, limit: Int) async throws -> SessionPointsPageResponse {
+        SessionPointsPageResponse(points: [], page: nil)
     }
 }
 
@@ -462,6 +475,36 @@ final class SessionsService: SessionsServicing, @unchecked Sendable {
                 ]
             ),
             as: CoverageSessionDetail.self
+        )
+    }
+
+    func sessionDetail(id: String, pageLimit: Int) async throws -> CoverageSessionDetail {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/coverage/sessions",
+                query: [
+                    URLQueryItem(name: "sessionId", value: id),
+                    URLQueryItem(name: "fields", value: "detail"),
+                    URLQueryItem(name: "limit", value: String(pageLimit)),
+                    URLQueryItem(name: "withAntennas", value: "1")
+                ]
+            ),
+            as: CoverageSessionDetail.self
+        )
+    }
+
+    func sessionPoints(id: String, after cursor: String, limit: Int) async throws -> SessionPointsPageResponse {
+        try await api.request(
+            APIEndpoint(
+                path: "/api/coverage/sessions",
+                query: [
+                    URLQueryItem(name: "sessionId", value: id),
+                    URLQueryItem(name: "fields", value: "detail"),
+                    URLQueryItem(name: "limit", value: String(limit)),
+                    URLQueryItem(name: "after", value: cursor)
+                ]
+            ),
+            as: SessionPointsPageResponse.self
         )
     }
 

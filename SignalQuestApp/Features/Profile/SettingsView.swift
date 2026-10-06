@@ -218,7 +218,9 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     }
 
     func resolveApproval(_ rawInput: String) async {
-        let input = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Le QR peut porter le lien universel (v0.4.34) : on en lit la chaîne v3.
+        let input = E2EEV2DeviceApprovalContract.rawQRPayload(fromScanned: rawInput)
+            ?? rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !isActing, !input.isEmpty, currentDeviceCanRevoke else { return }
         isActing = true
         approvalErrorMessage = nil
@@ -341,6 +343,254 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     }
 }
 
+/// Quand proposer l'activation du chiffrement de bout en bout sur cet appareil
+/// (1.0 (164), décision du 05/10) : porte serveur ouverte, appareil pas encore
+/// entré en v2, et pas de « Plus tard » en cours. Le plein écran au lancement
+/// et la carte de Messages partagent ce « Plus tard ».
+enum E2EEV2ActivationPrompt {
+    static let snoozeSeconds: TimeInterval = 7 * 24 * 3600
+
+    @MainActor
+    static func shouldPrompt(messaging: E2EEV2MessagingRuntime) -> Bool {
+        guard messaging.writesEnabled, let session = LocalAccountScope.sessionSnapshot() else { return false }
+        return messaging.lacksV2Readiness(session) && !isSnoozed(session)
+    }
+
+    static func isSnoozed(_ session: LocalAccountSession) -> Bool {
+        Date().timeIntervalSince1970 < UserDefaults.standard.double(forKey: key(session))
+    }
+
+    static func snooze() {
+        guard let session = LocalAccountScope.sessionSnapshot() else { return }
+        UserDefaults.standard.set(Date().addingTimeInterval(snoozeSeconds).timeIntervalSince1970, forKey: key(session))
+    }
+
+    private static func key(_ session: LocalAccountSession) -> String {
+        "sq.e2ee.v2.activation-snoozed.\(session.ownerNamespace)"
+    }
+}
+
+/// Activation guidée au lancement (1.0 (164), décision du 05/10) : les étapes
+/// de l'écran Appareils, sur place et dans l'ordre, sans passer par Réglages.
+/// ① cet appareil se prépare ; ② code e-mail pour le premier appareil du
+/// compte, ou QR à faire scanner par un appareil déjà approuvé ; ③ c'est prêt.
+struct E2EEV2ActivationScreen: View {
+    @StateObject private var model: E2EEV2TrustedDevicesViewModel
+    @State private var code = ""
+    @State private var showsRecovery = false
+    private let api: APIClient
+    let onFinish: () -> Void
+    let onLater: () -> Void
+
+    init(api: APIClient, onFinish: @escaping () -> Void, onLater: @escaping () -> Void) {
+        _model = StateObject(wrappedValue: E2EEV2TrustedDevicesViewModel(api: api))
+        self.api = api
+        self.onFinish = onFinish
+        self.onLater = onLater
+    }
+
+    private enum Step: Int { case prepare = 1, confirm, ready }
+
+    private var step: Step {
+        if model.needsPreparation { return .prepare }
+        if model.currentDevice?.status == .approved && !model.accountKeyMissing { return .ready }
+        return .confirm
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.largeTitle.weight(.semibold))
+                        .foregroundStyle(SQColor.brandRed)
+                        .accessibilityHidden(true)
+                    Text("Active le chiffrement de bout en bout")
+                        .font(SQType.display)
+                        .foregroundStyle(SQColor.label)
+                        .accessibilityAddTraits(.isHeader)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Tes messages et tes appels ne seront lisibles que sur tes appareils.")
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: SQSpace.md) {
+                        stepRow(1, String(localized: "Cet appareil se prépare"), done: step.rawValue > 1)
+                        stepRow(2, model.identityEstablished
+                                ? String(localized: "Ton autre appareil l’approuve")
+                                : String(localized: "Code reçu par e-mail"), done: step.rawValue > 2)
+                        stepRow(3, String(localized: "C’est prêt"), done: step == .ready)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(SQSpace.lg)
+                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                    content
+
+                    if let message = model.approvalErrorMessage ?? model.errorMessage {
+                        Label(message, systemImage: "exclamationmark.triangle.fill")
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.dangerInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, SQSpace.xl)
+                .padding(.vertical, SQSpace.lg)
+            }
+            .background(SQColor.bg.ignoresSafeArea())
+            .toolbar {
+                if step != .ready {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Plus tard") { onLater() }
+                            .accessibilityIdentifier("e2ee-v2-activation-later")
+                    }
+                }
+            }
+            .navigationDestination(isPresented: $showsRecovery) { E2EEV2RecoveryResetView(api: api) }
+        }
+        .task { await model.load() }
+        .task(id: model.generatedApproval?.id) { await model.waitForApproval() }
+        // Compte déjà actif ailleurs : le QR s'affiche de lui-même.
+        .task(id: autoQRKey) {
+            if step == .confirm, model.identityEstablished, model.generatedApproval == nil, !model.isActing,
+               !model.accountKeyMissing, model.currentDevice?.status == .pending {
+                await model.requestApproval(.qr)
+            }
+        }
+        .interactiveDismissDisabled()
+    }
+
+    private var autoQRKey: String {
+        // `isActing` en fait partie : la préparation recharge l'inventaire
+        // pendant qu'elle agit, et la tâche doit repartir une fois libre.
+        "\(step.rawValue)-\(model.identityEstablished)-\(model.currentDevice?.status.rawValue ?? "-")-\(model.isActing)"
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch step {
+        case .prepare:
+            GradientButton(String(localized: "Activer maintenant"), systemImage: "lock.badge.plus", isBusy: model.isActing, style: .primary) {
+                Task { await model.prepareCurrentDevice() }
+            }
+            .disabled(model.isActing || model.isLoading)
+            .accessibilityIdentifier("e2ee-v2-activation-start")
+        case .confirm where model.currentDevice == nil:
+            // Inventaire pas encore lu, ou en échec : sans lui, impossible de
+            // savoir si ce compte a déjà un appareil chiffré.
+            if model.isLoading {
+                ProgressView()
+                    .tint(SQColor.brandRed)
+                    .frame(maxWidth: .infinity)
+            } else {
+                GradientButton(String(localized: "Réessayer"), systemImage: "arrow.clockwise", style: .primary) {
+                    Task { await model.load() }
+                }
+            }
+        case .confirm where model.currentDevice?.status == .revoked:
+            Text("Cet appareil a été révoqué depuis un autre de tes appareils : il ne peut plus être approuvé tel quel.")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        case .confirm where model.accountKeyMissing:
+            Text("La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau.")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            GradientButton(String(localized: "Utiliser ma clé de récupération"), systemImage: "key.viewfinder", style: .primary) {
+                showsRecovery = true
+            }
+        case .confirm where !model.identityEstablished:
+            if let challenge = model.bootstrapChallenge {
+                Text("Code envoyé à \(challenge.maskedEmail)")
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.labelSecondary)
+                TextField("Code reçu", text: $code)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .font(.system(.title2, design: .monospaced, weight: .semibold))
+                    .padding(SQSpace.md)
+                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .onChangeCompat(of: code) { _, value in code = String(value.filter(\.isNumber).prefix(6)) }
+                    .accessibilityIdentifier("e2ee-v2-activation-code")
+                GradientButton(String(localized: "Valider"), systemImage: "checkmark.shield.fill", isBusy: model.isActing, style: .primary) {
+                    Task { await model.completeBootstrap(code: code) }
+                }
+                .disabled(model.isActing || code.count != 6)
+            } else {
+                Text("C’est le premier appareil chiffré de ton compte : un code à usage unique, envoyé par e-mail, le confirme. Aucune clé privée ne quitte cet appareil.")
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                GradientButton(String(localized: "Recevoir le code par e-mail"), systemImage: "envelope.fill", isBusy: model.isActing, style: .primary) {
+                    Task { await model.requestBootstrapEmail() }
+                }
+                .disabled(model.isActing)
+            }
+        case .confirm:
+            Text("Ton compte est déjà chiffré sur un autre appareil. Sur celui-ci, ouvre Profil › Réglages › Compte et sécurité › Appareils, puis « Scanner le code », et vise ce QR.")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let approval = model.generatedApproval, let device = model.localDescriptor,
+               let payload = try? E2EEV2DeviceApprovalContract.encodeQRPayload(approval, device: device),
+               let image = E2EEV2ActivationScreen.qrImage(payload) {
+                Image(uiImage: image)
+                    .interpolation(.none)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 260)
+                    .padding(SQSpace.md)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel("QR temporaire d’approbation SignalQuest")
+                Label("En attente de l’approbation…", systemImage: "hourglass")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            } else {
+                GradientButton(String(localized: "Afficher le QR"), systemImage: "qrcode", isBusy: model.isActing, style: .primary) {
+                    Task { await model.requestApproval(.qr) }
+                }
+                .disabled(model.isActing)
+            }
+        case .ready:
+            Text("Le chiffrement de bout en bout est activé sur cet appareil.")
+                .font(SQType.body)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            GradientButton(String(localized: "Continuer"), systemImage: "checkmark", style: .primary) { onFinish() }
+                .accessibilityIdentifier("e2ee-v2-activation-done")
+        }
+    }
+
+    private func stepRow(_ number: Int, _ title: String, done: Bool) -> some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: done ? "checkmark.circle.fill" : "\(number).circle")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(done ? SQColor.success : SQColor.labelSecondary)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
+        }
+        .frame(minHeight: 44)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Étape \(number) sur 3 : \(title)"))
+        .accessibilityValue(done ? String(localized: "Fait") : "")
+    }
+
+    static func qrImage(_ value: String) -> UIImage? {
+        let context = CIContext()
+        let filter = CIFilter.qrCodeGenerator()
+        filter.setValue(Data(value.utf8), forKey: "inputMessage")
+        filter.setValue("H", forKey: "inputCorrectionLevel")
+        guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)),
+              let image = context.createCGImage(output, from: output.extent) else { return nil }
+        return UIImage(cgImage: image)
+    }
+}
+
 struct E2EEV2TrustedDevicesView: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: E2EEV2TrustedDevicesViewModel
@@ -350,8 +600,12 @@ struct E2EEV2TrustedDevicesView: View {
     @State private var showsApprovalScanner = false
     private let api: APIClient
     private let initialApprovalId: String?
+    /// QR ouvert par le lien universel (appareil photo du système) : chargé
+    /// pour comparaison, jamais approuvé sans geste.
+    private let initialApprovalQR: String?
 
-    init(api: APIClient, initialApprovalId: String? = nil) {
+    init(api: APIClient, initialApprovalId: String? = nil, initialApprovalQR: String? = nil) {
+        self.initialApprovalQR = initialApprovalQR
         _model = StateObject(wrappedValue: E2EEV2TrustedDevicesViewModel(api: api))
         self.api = api
         self.initialApprovalId = initialApprovalId
@@ -478,6 +732,14 @@ struct E2EEV2TrustedDevicesView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                     if let detail = model.approvalDetail {
                         approvalPreview(detail)
+                        if initialApprovalQR != nil {
+                            // Ouvert par un lien : n'importe qui peut en envoyer un.
+                            Label("N’approuve que si cet appareil est devant toi et que tu viens d’afficher ce QR toi-même.",
+                                  systemImage: "exclamationmark.triangle.fill")
+                                .font(SQType.body)
+                                .foregroundStyle(SQColor.dangerInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         Button {
                             Task { await model.approveResolvedDevice() }
                         } label: {
@@ -589,6 +851,11 @@ struct E2EEV2TrustedDevicesView: View {
                model.currentDeviceCanRevoke {
                 initialApprovalConsumed = true
                 await model.loadPushApproval(initialApprovalId)
+            }
+            if !initialApprovalConsumed, let initialApprovalQR, model.currentDeviceCanRevoke {
+                initialApprovalConsumed = true
+                approvalInput = initialApprovalQR
+                await model.resolveApproval(initialApprovalQR)
             }
         }
         .alert("Révoquer cet appareil ?", isPresented: Binding(
@@ -781,13 +1048,7 @@ struct E2EEV2TrustedDevicesView: View {
     }
 
     private func qrCode(for value: String) -> UIImage? {
-        let context = CIContext()
-        let filter = CIFilter.qrCodeGenerator()
-        filter.setValue(Data(value.utf8), forKey: "inputMessage")
-        filter.setValue("H", forKey: "inputCorrectionLevel")
-        guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)),
-              let image = context.createCGImage(output, from: output.extent) else { return nil }
-        return UIImage(cgImage: image)
+        E2EEV2ActivationScreen.qrImage(value)
     }
 
     private func formattedExpiry(_ value: String) -> String {

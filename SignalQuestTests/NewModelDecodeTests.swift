@@ -275,12 +275,13 @@ final class NewModelDecodeTests: XCTestCase {
         [
             {"id": "e1", "at": "2026-08-11T09:12:00.000Z", "kind": "reported", "isSelf": true, "services": ["data", "voice"]},
             {"id": "e2", "at": "2026-08-11T09:20:00.000Z", "kind": "points_awarded", "isSelf": false},
-            {"id": "e3", "at": "2026-08-11T09:40:00.000Z", "kind": "state_confirmed", "isSelf": false}
+            {"id": "e3", "at": "2026-08-11T09:40:00.000Z", "kind": "state_confirmed", "isSelf": false},
+            {"id": "e4", "at": "2026-08-18T09:40:00.000Z", "kind": "resolved_expired", "isSelf": false}
         ]
         """
         let outage = try JSONDecoder.signalQuest.decode(CommunityOutage.self, from: outageJSON(timeline: timeline))
         let entries = try XCTUnwrap(outage.timeline)
-        XCTAssertEqual(entries.map(\.kind), [.reported, .stateConfirmed])
+        XCTAssertEqual(entries.map(\.kind), [.reported, .stateConfirmed, .resolvedExpired])
         XCTAssertTrue(entries[0].isSelf)
         XCTAssertEqual(entries[0].services, ["data", "voice"])
         // Clé absente et non tableau vide : le contrat la retire quand l'événement ne porte sur

@@ -170,6 +170,13 @@ enum AppEnvironment {
         false
         #endif
     }
+    static var showsActivationQA: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        hasArgument("--qa-e2ee-activation")
+        #else
+        false
+        #endif
+    }
     static var showsAccountKeyQA: Bool {
         #if DEBUG && targetEnvironment(simulator)
         hasArgument("--qa-account-key") || hasArgument("--qa-account-key-verified")

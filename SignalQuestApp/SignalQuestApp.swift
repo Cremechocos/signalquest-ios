@@ -289,7 +289,9 @@ struct AppRootView: View {
                     services.routing.activate(windowRouter)
                     UNUserNotificationCenter.current().setBadgeCountCompat(0)
                     // Verrouillage / déconnexion par inactivité au retour au 1er plan.
+                    var locksOut = false
                     if case .authenticated = session.state, appLock.willEnterForeground() {
+                        locksOut = true
                         Task { await session.logout() }
                     }
                     // CALL-INCOMING-03 / CALL-VOIP-04 : ré-enregistrer le token VoIP
@@ -304,6 +306,17 @@ struct AppRootView: View {
                     }
                     services.enterForeground()
                     Task { await services.versionPolicy.refreshIfStale() }
+                    // Capacités v2 restées sans réponse (500, réseau) : republiées ici,
+                    // sans requête quand le document publié est à jour.
+                    if case .authenticated = session.state, !locksOut, services.e2eeV2Messaging.writesEnabled,
+                       let account = LocalAccountScope.sessionSnapshot(),
+                       !services.e2eeV2Messaging.lacksV2Readiness(account) {
+                        let api = services.api
+                        Task {
+                            _ = await E2EEV2DeviceLifecycleCoordinator(api: api, identityStore: E2EEV2DeviceIdentityStore())
+                                .publishCapabilitiesIfNeeded()
+                        }
+                    }
                 case .background:
                     // On ne coupe QUE si plus aucune fenêtre n'est visible.
                     // `scenePhase` est par scène, mais `appLock` et `services`
@@ -396,6 +409,8 @@ struct RootView: View {
     @State private var guestLease: OnboardingGuestLease?
     @State private var guestEntryInFlight = false
     @State private var mainApplicationAppeared = false
+    /// Activation guidée du chiffrement au lancement (1.0 (164)).
+    @State private var showsV2Activation = false
     @EnvironmentObject private var onboardingEntry: OnboardingEntryState
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -404,6 +419,14 @@ struct RootView: View {
     @EnvironmentObject private var appLock: AppLockController
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var versionPolicy: VersionPolicyService
+
+    /// Seulement pour un compte connecté, jamais pendant un appel, et tant que
+    /// cet appareil n'est pas entré en v2 sans « Plus tard » en cours.
+    private func refreshV2ActivationPrompt() {
+        guard isAuthenticated, !callManager.showCallScreen, callManager.activeCall == nil, !showsV2Activation,
+              !AppEnvironment.usesDemoData else { return }
+        if E2EEV2ActivationPrompt.shouldPrompt(messaging: services.e2eeV2Messaging) { showsV2Activation = true }
+    }
 
     var body: some View {
         Group {
@@ -419,6 +442,8 @@ struct RootView: View {
                 E2EEV2MessageReportQAScreen()
             } else if AppEnvironment.showsBrowserExclusionQA {
                 E2EEV2BrowserExclusionQAScreen()
+            } else if AppEnvironment.showsActivationQA {
+                E2EEV2ActivationScreen(api: services.api, onFinish: {}, onLater: {})
             } else if AppEnvironment.showsAccountKeyQA {
                 E2EEV2AccountKeyQAScreen()
             } else if AppEnvironment.showsApprovalScannerQA {
@@ -435,8 +460,37 @@ struct RootView: View {
                     .onAppear {
                         mainApplicationAppeared = true
                         acknowledgeGuestPresentation()
+                        refreshV2ActivationPrompt()
                     }
                     .onDisappear { mainApplicationAppeared = false }
+                    .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
+                        refreshV2ActivationPrompt()
+                    }
+                    .onChangeCompat(of: scenePhase) { _, phase in
+                        if phase == .active { refreshV2ActivationPrompt() }
+                    }
+                    .onChangeCompat(of: callManager.showCallScreen) { _, shown in
+                        if !shown { refreshV2ActivationPrompt() }
+                    }
+                    // Calque plutôt que `fullScreenCover` : l'écran d'appel, présenté
+                    // plus haut, doit pouvoir passer devant. Deux présentations
+                    // modales concurrentes, et l'appel entrant restait invisible.
+                    .accessibilityHidden(showsV2Activation)
+                    .overlay {
+                        if showsV2Activation {
+                            E2EEV2ActivationScreen(
+                                api: services.api,
+                                onFinish: { showsV2Activation = false },
+                                onLater: {
+                                    E2EEV2ActivationPrompt.snooze()
+                                    showsV2Activation = false
+                                }
+                            )
+                            .accessibilityAddTraits(.isModal)
+                            .transition(.move(edge: .bottom))
+                        }
+                    }
+                    .sqAnimation(SQMotion.smooth, value: showsV2Activation)
             } else {
                 switch session.state {
                 case .checking:
@@ -969,14 +1023,20 @@ struct MainTabView: View {
 
     /// Deep-link de l'environnement (widgets, raccourcis) → onglet correspondant.
     private func handleDeepLink(_ url: URL) {
-        // Lien universel https : seul le partage Sentinelle est revendiqué côté
-        // app pour l'instant. Le chemin est vérifié ici ET dans
+        // Liens universels https : partage Sentinelle, QR d'approbation d'un
+        // appareil et Messages. Le chemin est vérifié ici ET dans
         // .well-known/apple-app-site-association — iOS n'ouvre l'app que si les
         // deux concordent.
         if url.scheme == "https" {
             let parts = url.path.split(separator: "/").map(String.init)
             if parts.count >= 3, parts[0] == "sentinelle", parts[1] == "p" {
                 router.route(toSentinelleShare: parts[2])
+            } else if parts == ["e2ee", "approve"],
+                      let payload = E2EEV2DeviceApprovalContract.rawQRPayload(fromScanned: url.absoluteString) {
+                // QR d'approbation scanné avec l'appareil photo (v0.4.34).
+                router.route(toE2EEApprovalQR: payload)
+            } else if parts == ["messages"] {
+                router.route(toConversation: nil)
             }
             return
         }

@@ -739,6 +739,30 @@ final class E2EETests: XCTestCase {
         ), "Un QR ne montre que l'appareil de sa demande")
     }
 
+    func testV2DeviceApprovalUniversalLinkCarriesTheV3PayloadInItsFragmentOnly() throws {
+        let raw = "SQE2EE2|3|appr_01J7ABCD|ios|AbC-_09"
+        let fragment = Data(raw.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let hosts: Set<String> = ["signalquest.fr"]
+        func read(_ text: String) -> String? {
+            E2EEV2DeviceApprovalContract.rawQRPayload(fromScanned: text, appHosts: hosts)
+        }
+
+        XCTAssertEqual(read("https://signalquest.fr/e2ee/approve#\(fragment)"), raw)
+        XCTAssertEqual(read("  https://SignalQuest.fr/e2ee/approve#\(fragment)\n"), raw)
+        XCTAssertEqual(read(raw), raw, "La chaîne v3 nue reste lue telle quelle")
+        XCTAssertNil(read("http://signalquest.fr/e2ee/approve#\(fragment)"), "https seulement")
+        XCTAssertNil(read("https://evil.example/e2ee/approve#\(fragment)"), "Hôte de l'app seulement")
+        XCTAssertNil(read("https://signalquest.fr/e2ee/approve/x#\(fragment)"))
+        XCTAssertNil(read("https://signalquest.fr/e2ee/approve?p=\(fragment)"), "Jamais dans la requête")
+        XCTAssertNil(read("https://signalquest.fr/e2ee/approve?x=1#\(fragment)"))
+        XCTAssertNil(read("https://signalquest.fr/e2ee/approve#\(fragment)="), "base64url sans bourrage")
+        let other = Data("SQE2EE1|x".utf8).base64EncodedString().replacingOccurrences(of: "=", with: "")
+        XCTAssertNil(read("https://signalquest.fr/e2ee/approve#\(other)"), "Autre charge refusée")
+        XCTAssertNil(read("https://signalquest.fr/e2ee/approve#"))
+    }
+
     func testV2DeviceApprovalProximityCodeRejectsAmbiguousCharacters() throws {
         let fixture = try deviceApprovalFixture()
         XCTAssertEqual(
@@ -1949,6 +1973,47 @@ final class E2EETests: XCTestCase {
         XCTAssertFalse(
             try store.put(delivery: substitution, epochKey: replacementKey, ownerNamespace: "account-a")
         )
+    }
+
+    func testV2RestoredEpochKeyNeverDisplacesAVerifiedKeyAndAVerifiedKeyReplacesIt() throws {
+        let store = E2EEV2EpochKeyStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
+        let conversationId = "conv_restored_0000000001"
+        func record(_ key: Data, epochId: String, number: Int = 3) throws -> E2EEV2EpochKeyRecordInput {
+            .init(conversationId: conversationId, epochId: epochId, epochNumber: number,
+                  keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(key))
+        }
+        let restoredKey = Data(repeating: 1, count: 32)
+        let verifiedKey = Data(repeating: 2, count: 32)
+
+        // Restaurée d'abord, puis la synchro vérifiée apporte une autre clé au même
+        // numéro (autre epochId, non authentifié par la sauvegarde) : elle gagne.
+        XCTAssertTrue(try store.put(recordInput: record(restoredKey, epochId: "epoch_restored_000001"),
+                                    epochKey: restoredKey, ownerNamespace: "a", origin: .restored))
+        XCTAssertNil(try store.load(conversationId: conversationId, ownerNamespace: "a"),
+                     "Une clé restaurée ne devient jamais l'époque courante")
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a")?.epochKey, restoredKey)
+        XCTAssertTrue(try store.put(recordInput: record(verifiedKey, epochId: "epoch_verified_000001"),
+                                    epochKey: verifiedKey, ownerNamespace: "a"))
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a")?.epochKey, verifiedKey)
+        XCTAssertEqual(try store.load(conversationId: conversationId, ownerNamespace: "a")?.epochKey, verifiedKey,
+                       "Le pointeur courant suit la clé vérifiée")
+
+        // Une clé restaurée ne remplace jamais la clé vérifiée, ni ne la rétrograde.
+        XCTAssertFalse(try store.put(recordInput: record(restoredKey, epochId: "epoch_restored_000001"),
+                                     epochKey: restoredKey, ownerNamespace: "a", origin: .restored))
+        XCTAssertTrue(try store.put(recordInput: record(verifiedKey, epochId: "epoch_verified_000001"),
+                                    epochKey: verifiedKey, ownerNamespace: "a", origin: .restored))
+        let other = Data(repeating: 4, count: 32)
+        XCTAssertFalse(try store.put(recordInput: record(other, epochId: "epoch_other_00000001"),
+                                     epochKey: other, ownerNamespace: "a"),
+                       "Une clé vérifiée ne se remplace pas, même après une restauration identique")
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a")?.epochKey, verifiedKey)
+
+        // Une clé restaurée reste lisible pour l'historique tant que rien ne la remplace.
+        XCTAssertTrue(try store.put(recordInput: record(restoredKey, epochId: "epoch_restored_000002", number: 2),
+                                    epochKey: restoredKey, ownerNamespace: "a", origin: .restored))
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 2, ownerNamespace: "a")?.epochKey, restoredKey)
+        XCTAssertEqual(try store.load(conversationId: conversationId, ownerNamespace: "a")?.epochNumber, 3)
     }
 
     func testV2EpochKeyStoreResetPurgeIsStrictlyAccountScoped() throws {

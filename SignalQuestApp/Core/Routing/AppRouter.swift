@@ -67,6 +67,8 @@ final class AppRouter: ObservableObject {
     /// Demande E2EE v2 validée issue d'une notification. L'identifiant opaque est
     /// consommé par ProfileView, puis revérifié côté serveur avant toute approbation.
     @Published var openE2EEDeviceApprovalId: String?
+    /// Chaîne v3 d'un QR d'approbation ouvert par son lien universel (v0.4.34).
+    @Published var openE2EEApprovalQR: String?
     /// Lot A2 : une réinitialisation d'identité demandée sur le compte, à
     /// vérifier (et refuser) depuis cet appareil.
     @Published var openE2EEIdentityReset = false
@@ -111,7 +113,8 @@ final class AppRouter: ObservableObject {
         openConversationId != nil || openMessagesInbox || openPostId != nil
             || openUserProfileId != nil || openSiteId != nil || openCommunityOutage != nil
             || openCommunityOutageId != nil || openAntennaReportId != nil
-            || openE2EEDeviceApprovalId != nil || openE2EEIdentityReset || openSentinelleTargetId != nil
+            || openE2EEDeviceApprovalId != nil || openE2EEApprovalQR != nil || openE2EEIdentityReset
+            || openSentinelleTargetId != nil
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
             || pendingMapFocus != nil || pendingDriveTest || pendingSpeedtestStart
     }
@@ -340,5 +343,10 @@ final class AppRouter: ObservableObject {
         guard let id, !id.isEmpty else { return }
         selectedTab = .profile
         openE2EEDeviceApprovalId = id
+    }
+
+    func route(toE2EEApprovalQR payload: String) {
+        selectedTab = .profile
+        openE2EEApprovalQR = payload
     }
 }

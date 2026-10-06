@@ -19,6 +19,11 @@ struct E2EEDeviceApprovalDeepLink: Identifiable {
     let id: String
 }
 
+/// QR d'approbation ouvert par le lien universel ; `id` est la chaîne v3.
+struct E2EEApprovalQRDeepLink: Identifiable {
+    let id: String
+}
+
 /// Profil « Crème & Terre cuite » : en-tête centré (avatar 88 + ombre accent),
 /// carte stats 4 cellules, carte progression (niveau/points), menu en carte
 /// unique rayon 22 et déconnexion en capsule danger. Header custom scrollable
@@ -46,6 +51,7 @@ struct ProfileView: View {
     @State private var deepLinkShare: SentinelleDeepLink?
     /// Nouvel appareil à examiner après un tap sur une notification E2EE v2.
     @State private var deepLinkE2EEApproval: E2EEDeviceApprovalDeepLink?
+    @State private var deepLinkE2EEApprovalQR: E2EEApprovalQRDeepLink?
     @State private var showE2EEIdentityReset = false
     /// Écran Notifications ouvert depuis les Réglages d'iOS (TRX-21).
     @State private var showNotificationSettings = false
@@ -146,6 +152,11 @@ struct ProfileView: View {
                 E2EEV2TrustedDevicesView(api: services.api, initialApprovalId: link.id)
             }
         }
+        .sheet(item: $deepLinkE2EEApprovalQR) { link in
+            NavigationStack {
+                E2EEV2TrustedDevicesView(api: services.api, initialApprovalQR: link.id)
+            }
+        }
         .sheet(isPresented: $showE2EEIdentityReset) {
             NavigationStack {
                 E2EEV2RecoveryResetView(api: services.api)
@@ -171,6 +182,7 @@ struct ProfileView: View {
             consumeSentinelleDeepLink()
             consumeShareDeepLink()
             consumeE2EEApprovalDeepLink()
+            consumeE2EEApprovalQRDeepLink()
             consumeE2EEIdentityResetDeepLink()
             consumeNotificationSettingsDeepLink()
         }
@@ -180,6 +192,7 @@ struct ProfileView: View {
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
         .onChangeCompat(of: router.openSentinelle) { _, _ in consumeSentinelleDeepLink() }
         .onChangeCompat(of: router.openE2EEDeviceApprovalId) { _, _ in consumeE2EEApprovalDeepLink() }
+        .onChangeCompat(of: router.openE2EEApprovalQR) { _, _ in consumeE2EEApprovalQRDeepLink() }
         .task { await loadStats() }
         // À chaque retour sur le Profil : une mission réclamée ou une photo
         // validée entre-temps doit quitter « À faire ».
@@ -228,6 +241,13 @@ struct ProfileView: View {
         // Même règle que l'entrée des Réglages (E2E-03).
         guard E2EEV2RuntimeWriteGate.enabled else { return }
         deepLinkE2EEApproval = E2EEDeviceApprovalDeepLink(id: id)
+    }
+
+    private func consumeE2EEApprovalQRDeepLink() {
+        guard let payload = router.openE2EEApprovalQR else { return }
+        router.openE2EEApprovalQR = nil
+        guard E2EEV2RuntimeWriteGate.enabled else { return }
+        deepLinkE2EEApprovalQR = E2EEApprovalQRDeepLink(id: payload)
     }
 
     private func consumeE2EEIdentityResetDeepLink() {
