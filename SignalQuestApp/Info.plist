@@ -92,6 +92,12 @@
 	<string>SignalQuest peut importer une photo choisie pour contribuer aux sites antennes.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>INStartCallIntent</string>
+		<string>INStartAudioCallIntent</string>
+		<string>INStartVideoCallIntent</string>
+	</array>
 	<key>SQ_API_BASE_URL</key>
 	<string>$(SQ_API_BASE_URL)</string>
 	<key>SQ_APP_BASE_URL</key>

@@ -4,6 +4,7 @@ import PushKit
 import AVFAudio
 import CryptoKit
 import UserNotifications
+import Intents
 import os
 
 enum CallTerminationAction: String, Codable, Equatable {
@@ -219,6 +220,47 @@ enum CallDiscretionPolicy {
     static func configuration(_ base: CXProviderConfiguration, discreet: Bool) -> CXProviderConfiguration {
         base.includesCallsInRecents = includesCallsInRecents(discreet: discreet)
         return base
+    }
+}
+
+/// Identifiant d'appel vu par CallKit, et donc par les Récents de Téléphone :
+/// la conversation, jamais un nom. Le nom affiché passe par `localizedCallerName`.
+/// Toucher l'entrée dans Récents rouvre la conversation et relance l'appel.
+enum CallRecentsHandle {
+    static let prefix = "sq-conversation:"
+
+    static func value(conversationId: String?) -> String? {
+        guard let conversationId, !conversationId.isEmpty else { return nil }
+        return prefix + conversationId
+    }
+
+    static func conversationId(fromHandleValue value: String?) -> String? {
+        guard let value, value.hasPrefix(prefix) else { return nil }
+        let id = String(value.dropFirst(prefix.count))
+        // Même forme que les identifiants opaques du serveur.
+        guard id.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}\z"#, options: .regularExpression) != nil else { return nil }
+        return id
+    }
+
+    /// Appui dans Récents : `INStartCallIntent` (iOS 13+), ou ses formes audio/vidéo.
+    static func callBack(from activity: NSUserActivity) -> (conversationId: String, video: Bool)? {
+        let intent = activity.interaction?.intent
+        let contact: INPerson?
+        let video: Bool
+        if let call = intent as? INStartCallIntent {
+            contact = call.contacts?.first
+            video = call.callCapability == .videoCall
+        } else if let call = intent as? INStartVideoCallIntent {
+            contact = call.contacts?.first
+            video = true
+        } else if let call = intent as? INStartAudioCallIntent {
+            contact = call.contacts?.first
+            video = false
+        } else {
+            return nil
+        }
+        guard let id = conversationId(fromHandleValue: contact?.personHandle?.value) else { return nil }
+        return (id, video)
     }
 }
 
@@ -468,7 +510,10 @@ final class CallManager: NSObject, ObservableObject {
             requiresE2EE: requiresE2EE
         )
         showCallScreen = true
-        let action = CXStartCallAction(call: uuid, handle: CXHandle(type: .generic, value: displayName))
+        let action = CXStartCallAction(
+            call: uuid,
+            handle: CXHandle(type: .generic, value: CallRecentsHandle.value(conversationId: conversationId) ?? displayName)
+        )
         action.isVideo = hasVideo
         callController.request(CXTransaction(action: action)) { [weak self] error in
             guard let error else { return }
@@ -686,7 +731,7 @@ final class CallManager: NSObject, ObservableObject {
             conversation: conversation
         ))
         let update = CXCallUpdate()
-        update.remoteHandle = CXHandle(type: .generic, value: handle)
+        update.remoteHandle = CXHandle(type: .generic, value: CallRecentsHandle.value(conversationId: conversationId) ?? handle)
         update.localizedCallerName = handle
         update.hasVideo = hasVideo
         let completionBox = UnsafeMainActorBox(value: completion)
@@ -1408,6 +1453,12 @@ extension CallManager: CXProviderDelegate {
             guard let call = self.activeCall, call.id == action.callUUID, let conversationId = call.conversationId else {
                 action.fail(); return
             }
+            // Le nom, pas l'identifiant de conversation, dans l'appel et dans Récents.
+            let named = CXCallUpdate()
+            named.remoteHandle = action.handle
+            named.localizedCallerName = call.handle
+            named.hasVideo = call.hasVideo
+            self.provider.reportCall(with: action.callUUID, updated: named)
             do {
                 let session = try await self.initiate(call, conversationId: conversationId)
                 self.activeCall?.callId = session.id

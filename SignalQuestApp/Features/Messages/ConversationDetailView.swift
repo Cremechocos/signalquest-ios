@@ -555,6 +555,13 @@ struct ConversationDetailView: View {
             router.isDockHidden = true
             isOnScreen = true
         }
+        // Rappel depuis les Récents de Téléphone : mêmes contrôles qu'un appui
+        // sur le bouton d'appel.
+        .task(id: router.pendingCall) {
+            guard let pending = router.pendingCall, pending.conversationId == conversation.id else { return }
+            router.pendingCall = nil
+            startCall(mode: pending.video ? "video" : "audio")
+        }
         .task {
             conversationIsV2 = EncryptedConversationSurfaces.isV2(conversation)
             // §14.2 : une conversation chiffrée v1 passe en v2 à son ouverture,

@@ -67,6 +67,13 @@ final class AppRouter: ObservableObject {
     /// Demande E2EE v2 validée issue d'une notification. L'identifiant opaque est
     /// consommé par ProfileView, puis revérifié côté serveur avant toute approbation.
     @Published var openE2EEDeviceApprovalId: String?
+    /// Rappel demandé depuis les Récents de Téléphone : la conversation le lance
+    /// elle-même, avec ses propres contrôles (chiffrement, participants).
+    struct PendingCall: Equatable {
+        let conversationId: String
+        let video: Bool
+    }
+    @Published var pendingCall: PendingCall?
     /// Chaîne v3 d'un QR d'approbation ouvert par son lien universel (v0.4.34).
     @Published var openE2EEApprovalQR: String?
     /// Lot A2 : une réinitialisation d'identité demandée sur le compte, à
@@ -283,6 +290,11 @@ final class AppRouter: ObservableObject {
         selectedTab = .community
         openMessagesInbox = true
         if let id { openConversationId = id }
+    }
+
+    func route(toCallBack conversationId: String, video: Bool) {
+        route(toConversation: conversationId)
+        pendingCall = PendingCall(conversationId: conversationId, video: video)
     }
 
     func route(toPost id: String?) {

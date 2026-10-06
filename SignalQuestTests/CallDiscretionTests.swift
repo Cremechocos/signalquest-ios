@@ -96,6 +96,19 @@ final class CallDiscretionTests: XCTestCase {
         XCTAssertTrue(CallDiscretionPolicy.configuration(configuration, discreet: false).includesCallsInRecents)
     }
 
+    func testRecentsHandleCarriesTheConversationAndCallsBackThroughIt() {
+        XCTAssertEqual(CallRecentsHandle.value(conversationId: "conv_01J7"), "sq-conversation:conv_01J7")
+        XCTAssertNil(CallRecentsHandle.value(conversationId: nil))
+        XCTAssertNil(CallRecentsHandle.value(conversationId: ""))
+        XCTAssertEqual(CallRecentsHandle.conversationId(fromHandleValue: "sq-conversation:conv_01J7"), "conv_01J7")
+        XCTAssertNil(CallRecentsHandle.conversationId(fromHandleValue: "Camille"), "Ancien appel nommé : rien à rappeler")
+        XCTAssertNil(CallRecentsHandle.conversationId(fromHandleValue: "sq-conversation:../x"))
+        XCTAssertNil(CallRecentsHandle.conversationId(fromHandleValue: "sq-conversation:"))
+
+        // `NSUserActivity.interaction` ne se pose pas en test : sans elle, rien.
+        XCTAssertNil(CallRecentsHandle.callBack(from: NSUserActivity(activityType: "INStartCallIntent")))
+    }
+
     func testOnlyTheRingNotificationOfThatCallIsCleared() {
         XCTAssertTrue(CallManager.isRingNotification(["type": "call_incoming", "callId": "call_1"], callId: "call_1"))
         XCTAssertFalse(CallManager.isRingNotification(["type": "call_incoming", "callId": "call_2"], callId: "call_1"))

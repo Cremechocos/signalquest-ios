@@ -834,6 +834,15 @@ struct MainTabView: View {
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { handleDeepLink(url) }
         }
+        // Appui sur un appel SignalQuest dans les Récents de Téléphone.
+        .onContinueUserActivity("INStartCallIntent") { handleCallBack($0) }
+        .onContinueUserActivity("INStartAudioCallIntent") { handleCallBack($0) }
+        .onContinueUserActivity("INStartVideoCallIntent") { handleCallBack($0) }
+    }
+
+    private func handleCallBack(_ activity: NSUserActivity) {
+        guard let request = CallRecentsHandle.callBack(from: activity) else { return }
+        router.route(toCallBack: request.conversationId, video: request.video)
     }
 
     /// iOS 26+ : tab bar système Liquid Glass native — vrai verre, glissement
