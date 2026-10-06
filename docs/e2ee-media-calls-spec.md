@@ -1389,8 +1389,9 @@ version qui expose `discardFrameWhenCryptorNotReady` et
   conversation ; à défaut, elle affiche « Appel SignalQuest ».
 - iOS : `includesCallsInRecents = true` pour tous les appels, chiffrés
   compris (décision produit du 06/10, v0.4.36). L'historique d'appels d'iOS,
-  synchronisé par iCloud, porte alors le nom local de la conversation, l'heure
-  et la durée de l'appel ; jamais son contenu.
+  synchronisé par iCloud, porte alors le nom local de la conversation,
+  l'identifiant opaque de la conversation (pour rappeler depuis Récents),
+  l'heure et la durée de l'appel ; jamais son contenu.
 - Android : `ConnectionService` autogéré, exclu du journal d'appels
   (`EXTRA_LOG_SELF_MANAGED_CALLS = false`, API 34 et plus).
 - Opus à débit constant.

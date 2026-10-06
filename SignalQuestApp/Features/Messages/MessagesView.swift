@@ -386,7 +386,11 @@ struct MessagesView: View {
                 pendingLeave = nil
                 if conversation.isGroup,
                    case .mustName(let candidates) = services.e2eeV2Messaging.successorNeed(conversationId: conversation.id) {
-                    successorRequest = SuccessorRequest(conversation: conversation, candidates: candidates)
+                    let request = SuccessorRequest(conversation: conversation, candidates: candidates)
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 400_000_000)
+                        successorRequest = request
+                    }
                 } else {
                     Task { await model.leave(conversation, v2: services.e2eeV2Messaging); await services.refreshInboxBadge(force: true) }
                 }
@@ -395,6 +399,8 @@ struct MessagesView: View {
         } message: { _ in
             Text("Elle disparaîtra de ta liste et tu ne recevras plus ses messages.")
         }
+        // Après la boîte de dialogue, jamais depuis elle : iOS 16 refuse une
+        // feuille présentée pendant qu'elle se ferme.
         .sheet(item: $successorRequest) { request in
             SuccessorPickerSheet(
                 candidates: request.candidates.compactMap { id in request.conversation.participants.first { $0.userId == id } }
@@ -494,6 +500,9 @@ struct MessagesView: View {
         }
         if model.conversations.contains(where: { $0.id == id }) {
             routedConversationId = id
+        } else if router.pendingCall?.conversationId == id {
+            // Conversation introuvable : le rappel demandé ne part jamais plus tard.
+            router.pendingCall = nil
         }
     }
 

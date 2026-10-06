@@ -560,6 +560,7 @@ struct ConversationDetailView: View {
         .task(id: router.pendingCall) {
             guard let pending = router.pendingCall, pending.conversationId == conversation.id else { return }
             router.pendingCall = nil
+            guard pending.isFresh, SQFeatures.callsEnabled else { return }
             startCall(mode: pending.video ? "video" : "audio")
         }
         .task {
@@ -2854,7 +2855,8 @@ struct ConversationDetailView: View {
             mode: mode,
             displayName: conversationTitle,
             requiresE2EE: endToEnd,
-            isEncryptedConversation: isE2EE
+            isEncryptedConversation: isE2EE,
+            isGroup: conversation.isGroup
         )
     }
 

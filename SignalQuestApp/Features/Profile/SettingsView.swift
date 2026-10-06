@@ -293,8 +293,8 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
     /// la clé du compte déposée pour lui (lot A1).
     func waitForApproval() async {
         guard let approvalId = generatedApproval?.id else { return }
-        // 3 s entre deux relevés ; après un 429, au moins les 15 s que le
-        // serveur annonce, puis le double, jusqu'à une minute.
+        // 3 s entre deux relevés ; après un 429, 15 s (la valeur que le
+        // serveur annonce aujourd'hui), puis le double, jusqu'à une minute.
         var delaySeconds: UInt64 = 3
         while !Task.isCancelled, generatedApproval?.id == approvalId {
             try? await Task.sleep(nanoseconds: delaySeconds * 1_000_000_000)

@@ -208,6 +208,8 @@ struct GroupSettingsView: View {
 
                 Section {
                     Button(role: .destructive) {
+                        // Relu au moment du départ : membres et admins ont pu changer.
+                        refreshChainRoles()
                         if case .mustName = successorNeed {
                             showsSuccessorPicker = true
                         } else {
@@ -341,6 +343,7 @@ struct GroupSettingsView: View {
                 try await service.updateConversation(id: conversation.id, title: nil, addUserIds: [], removeUserIds: [participant.userId])
             }
             participants.removeAll { $0.userId == participant.userId }
+            refreshChainRoles()
         }
     }
 
@@ -453,6 +456,7 @@ struct GroupSettingsView: View {
             Haptics.success()
         } catch {
             errorMessage = error.userFacingMessage
+            refreshChainRoles()
             Haptics.error()
         }
     }
@@ -470,6 +474,12 @@ struct SuccessorPickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                if candidates.isEmpty {
+                    Text("Aucun autre membre n’est disponible. Ferme cet écran et réessaie.")
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .listRowBackground(SQColor.surface)
+                }
                 Section {
                     ForEach(candidates) { participant in
                         Button {

@@ -1145,6 +1145,18 @@ final class LiveKitClient: ObservableObject {
 #endif
     }
 
+    /// Nom d'un participant distant, s'il en a un vrai (pas « Participant »).
+    func remoteDisplayName(identity: String) -> String? {
+#if canImport(LiveKit)
+        guard let participant = room?.remoteParticipants.values.first(where: { $0.identity?.stringValue == identity })
+        else { return nil }
+        let name = displayName(of: participant)
+        return name == "Participant" || name.isEmpty ? nil : name
+#else
+        nil
+#endif
+    }
+
     /// Identité LiveKit de cet appareil dans l'appel en cours.
     var localIdentity: String? {
 #if canImport(LiveKit)

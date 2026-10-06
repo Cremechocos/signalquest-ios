@@ -9684,7 +9684,8 @@ final class E2EEV2LiveShareTransportClient: @unchecked Sendable {
                     return try epochStore.loadEpoch(
                         conversationId: conversationId,
                         epochNumber: epochNumber,
-                        ownerNamespace: LocalAccountScope.storageNamespace(for: input.ownerScopeId)
+                        ownerNamespace: LocalAccountScope.storageNamespace(for: input.ownerScopeId),
+                        includeRestored: false
                     )
                 },
                 unwrapEpoch: { [identityStore = self.identityStore] delivery in

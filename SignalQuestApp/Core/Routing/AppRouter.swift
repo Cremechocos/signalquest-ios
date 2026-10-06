@@ -72,6 +72,11 @@ final class AppRouter: ObservableObject {
     struct PendingCall: Equatable {
         let conversationId: String
         let video: Bool
+        var requestedAt = Date()
+
+        /// Un rappel ne part que dans la minute du geste : jamais plus tard,
+        /// à l'ouverture suivante de la conversation.
+        var isFresh: Bool { Date().timeIntervalSince(requestedAt) < 60 }
     }
     @Published var pendingCall: PendingCall?
     /// Chaîne v3 d'un QR d'approbation ouvert par son lien universel (v0.4.34).

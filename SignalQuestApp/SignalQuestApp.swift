@@ -190,6 +190,11 @@ struct AppRootView: View {
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                 if let url = activity.webpageURL { receiveAccountOrPostURL(url) }
             }
+            // Appui sur un appel SignalQuest dans les Récents de Téléphone. À la
+            // racine : au démarrage à froid, l'onglet principal n'existe pas encore.
+            .onContinueUserActivity("INStartCallIntent") { receiveCallBack($0) }
+            .onContinueUserActivity("INStartAudioCallIntent") { receiveCallBack($0) }
+            .onContinueUserActivity("INStartVideoCallIntent") { receiveCallBack($0) }
             .task {
                 // `networkPath.start()` et `session.bootstrap()` ont migré dans
                 // `bootstrapIfNeeded` : la scène CarPlay a besoin des deux, et
@@ -352,6 +357,11 @@ struct AppRootView: View {
         guard !mustDismissPasswordReset, !appLock.isLocked, scenePhase == .active else { return false }
         if case .checking = session.state { return false }
         return true
+    }
+
+    private func receiveCallBack(_ activity: NSUserActivity) {
+        guard let request = CallRecentsHandle.callBack(from: activity) else { return }
+        windowRouter.route(toCallBack: request.conversationId, video: request.video)
     }
 
     private func receiveAccountOrPostURL(_ url: URL) {
@@ -834,15 +844,6 @@ struct MainTabView: View {
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { handleDeepLink(url) }
         }
-        // Appui sur un appel SignalQuest dans les Récents de Téléphone.
-        .onContinueUserActivity("INStartCallIntent") { handleCallBack($0) }
-        .onContinueUserActivity("INStartAudioCallIntent") { handleCallBack($0) }
-        .onContinueUserActivity("INStartVideoCallIntent") { handleCallBack($0) }
-    }
-
-    private func handleCallBack(_ activity: NSUserActivity) {
-        guard let request = CallRecentsHandle.callBack(from: activity) else { return }
-        router.route(toCallBack: request.conversationId, video: request.video)
     }
 
     /// iOS 26+ : tab bar système Liquid Glass native — vrai verre, glissement

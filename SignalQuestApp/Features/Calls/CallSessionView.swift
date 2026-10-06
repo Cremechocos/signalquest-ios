@@ -47,12 +47,10 @@ struct CallScreen: View {
                     .foregroundStyle(SQColor.danger)
                     .multilineTextAlignment(.center)
             }
-            ForEach(callManager.peerNetworks.keys.sorted(), id: \.self) { identity in
+            // Deux cartes au plus : les contrôles d'appel restent toujours à l'écran.
+            ForEach(Array(callManager.peerNetworks.keys.sorted().prefix(2)), id: \.self) { identity in
                 if let network = callManager.peerNetworks[identity], !network.packet.isEmpty {
-                    PeerNetworkCard(
-                        name: callManager.peerNetworks.count == 1 ? callManager.activeCall?.handle : nil,
-                        packet: network.packet
-                    )
+                    PeerNetworkCard(name: callManager.peerNetworkName(for: identity), packet: network.packet)
                 }
             }
             controls

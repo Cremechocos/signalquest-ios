@@ -364,6 +364,9 @@ final class CallManager: NSObject, ObservableObject {
         /// Descripteur vérifié pendant sa fenêtre de sonnerie de 60 secondes
         /// (§10.1). Sans elle, la réponse revérifie avec cette fenêtre.
         var ringingVerified = false
+        /// Connu pour un appel lancé depuis une conversation : `handle` n'est le
+        /// nom d'une personne qu'en tête-à-tête.
+        var isGroup: Bool? = nil
     }
 
     enum CallError: LocalizedError {
@@ -398,7 +401,11 @@ final class CallManager: NSObject, ObservableObject {
         let requiresE2EE: Bool
     }
 
-    @Published private(set) var activeCall: ActiveCall?
+    @Published private(set) var activeCall: ActiveCall? {
+        // Le réseau partagé appartient à un appel : tout autre appel, ou plus
+        // d'appel du tout, le coupe et efface les cartes reçues (D.11).
+        didSet { if oldValue?.id != activeCall?.id { resetNetworkSharing() } }
+    }
     @Published var showCallScreen = false
     @Published private(set) var endNotice: EndNotice?
     /// « Partager mon réseau » (D.11) : volontaire, coupé par défaut, arrêté
@@ -501,7 +508,8 @@ final class CallManager: NSObject, ObservableObject {
         mode: String,
         displayName: String,
         requiresE2EE: Bool = false,
-        isEncryptedConversation: Bool = false
+        isEncryptedConversation: Bool = false,
+        isGroup: Bool? = nil
     ) {
         guard activeCall == nil else { return }
         // §10.0 : une conversation que cet appareil sait v2 n'appelle que
@@ -524,7 +532,8 @@ final class CallManager: NSObject, ObservableObject {
             handle: displayName,
             hasVideo: hasVideo,
             isOutgoing: true,
-            requiresE2EE: requiresE2EE
+            requiresE2EE: requiresE2EE,
+            isGroup: isGroup
         )
         showCallScreen = true
         let action = CXStartCallAction(
@@ -554,24 +563,23 @@ final class CallManager: NSObject, ObservableObject {
     /// sur un chemin cellulaire seulement (en Wi-Fi, l'adresse IP désignerait la
     /// box, pas un réseau mobile).
     private func startNetworkSharing() {
-        guard activeCall != nil, let sources = networkSources else { return }
+        guard let callID = activeCall?.id, let sources = networkSources else { return }
         isSharingNetwork = true
         networkSharingTask?.cancel()
         networkSharingTask = Task { [weak self] in
             var operatorName: String?
             var resolvedOnCellular = false
             while !Task.isCancelled {
-                guard let self, self.activeCall != nil else { break }
+                guard let self, self.activeCall?.id == callID else { break }
                 sources.path.refreshNow()
                 let status = sources.path.status
                 if status.connection == .cellular, let technology = status.cellularTechnology,
                    let identity = self.liveKit.localIdentity {
                     if !resolvedOnCellular {
-                        operatorName = status.operatorName
-                        if operatorName == nil {
-                            let detected = await sources.operator.resolve(viaVpn: VPNDetector.isActive())
-                            operatorName = detected?.shortLabel ?? detected?.label
-                        }
+                        // D.11 : l'opérateur résolu par l'app (réseau qui porte la
+                        // connexion) ; celui de la SIM seulement à défaut.
+                        let detected = await sources.operator.resolve(viaVpn: VPNDetector.isActive())
+                        operatorName = detected?.shortLabel ?? detected?.label ?? status.operatorName
                         resolvedOnCellular = true
                     }
                     let packet = CallRadioPacket(
@@ -590,10 +598,25 @@ final class CallManager: NSObject, ObservableObject {
         }
     }
 
+    /// Nom à mettre sur la carte du réseau d'un participant : celui que l'appel
+    /// connaît pour lui, ou celui de la conversation en tête-à-tête, jamais le
+    /// titre d'un groupe.
+    func peerNetworkName(for identity: String) -> String? {
+        liveKit.remoteDisplayName(identity: identity)
+            ?? (activeCall?.isGroup == false ? activeCall?.handle : nil)
+    }
+
     func stopNetworkSharing() {
         networkSharingTask?.cancel()
         networkSharingTask = nil
         isSharingNetwork = false
+    }
+
+    private func resetNetworkSharing() {
+        stopNetworkSharing()
+        peerNetworkExpiryTask?.cancel()
+        peerNetworkExpiryTask = nil
+        if !peerNetworks.isEmpty { peerNetworks = [:] }
     }
 
     private func receiveNetwork(from sender: String?, data: Data) {
@@ -605,7 +628,7 @@ final class CallManager: NSObject, ObservableObject {
         peerNetworkExpiryTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
-                guard let self else { return }
+                guard !Task.isCancelled, let self else { return }
                 let now = Date()
                 self.peerNetworks = self.peerNetworks.filter { now.timeIntervalSince($0.value.receivedAt) < CallRadioPacket.expiry }
                 if self.peerNetworks.isEmpty { self.peerNetworkExpiryTask = nil; return }
@@ -822,10 +845,6 @@ final class CallManager: NSObject, ObservableObject {
         update.hasVideo = hasVideo
         let completionBox = UnsafeMainActorBox(value: completion)
 
-        // CallKit sonne : la notification « Appel entrant » du même appel, envoyée
-        // en secours, ferait doublon.
-        if let callId { Self.clearRingNotifications(callId: callId) }
-
         // Une push APNs peut arriver après un refus/raccrochage déjà traité.
         // Elle doit toujours être reportée à CallKit (contrat PushKit), puis
         // clôturée immédiatement sans recréer l'état applicatif ni une sonnerie.
@@ -929,6 +948,9 @@ final class CallManager: NSObject, ObservableObject {
                         )
                     }
                 } else if let callId {
+                    // CallKit sonne vraiment : la notification « Appel entrant »
+                    // du même appel, envoyée en secours, ferait doublon.
+                    Self.clearRingNotifications(callId: callId)
                     self?.startIncomingReconciliation(callId: callId)
                     completionBox.value?()
                     self?.verifyRinging(callId: callId)
@@ -1210,10 +1232,7 @@ final class CallManager: NSObject, ObservableObject {
     private func tearDown(notice: EndNotice? = nil) async {
         incomingReconciliationTask?.cancel()
         incomingReconciliationTask = nil
-        stopNetworkSharing()
-        peerNetworkExpiryTask?.cancel()
-        peerNetworkExpiryTask = nil
-        peerNetworks = [:]
+        resetNetworkSharing()
         if let callId = activeCall?.callId { markRecentlyTerminated(callId) }
         await liveKit.disconnect()
         activeCall = nil

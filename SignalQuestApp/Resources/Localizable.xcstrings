@@ -14760,13 +14760,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "You’re the only admin of an encrypted group: its longest-standing member will be made admin."
+                  "value" : "You’re the only admin of an encrypted group: its longest-standing member will be made admin, even if the deletion does not go through."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "You’re the only admin of %lld encrypted groups: their longest-standing member will be made admin."
+                  "value" : "You’re the only admin of %lld encrypted groups: their longest-standing member will be made admin, even if the deletion does not go through."
                 }
               }
             }
@@ -14778,13 +14778,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Tu es le seul admin d’un groupe chiffré : son membre le plus ancien sera nommé admin."
+                  "value" : "Tu es le seul admin d’un groupe chiffré : son membre le plus ancien sera nommé admin, même si la suppression n’aboutit pas."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Tu es le seul admin de %lld groupes chiffrés : leur membre le plus ancien sera nommé admin."
+                  "value" : "Tu es le seul admin de %lld groupes chiffrés : leur membre le plus ancien sera nommé admin, même si la suppression n’aboutit pas."
                 }
               }
             }
@@ -14924,6 +14924,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun signal"
+          }
+        }
+      }
+    },
+    "Aucun autre membre n’est disponible. Ferme cet écran et réessaie." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No other member is available. Close this screen and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun autre membre n’est disponible. Ferme cet écran et réessaie."
           }
         }
       }
