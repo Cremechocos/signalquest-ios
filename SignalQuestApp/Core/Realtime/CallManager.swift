@@ -3,6 +3,7 @@ import CallKit
 import PushKit
 import AVFAudio
 import CryptoKit
+import UserNotifications
 import os
 
 enum CallTerminationAction: String, Codable, Equatable {
@@ -210,8 +211,13 @@ enum CallDiscretionPolicy {
 
     static var fallbackName: String { String(localized: "Appel SignalQuest") }
 
+    /// Décision du 06/10 (spec v0.4.36, §10.5) : les appels chiffrés vont eux
+    /// aussi dans les Récents de l'app Téléphone, comme les autres. La discrétion
+    /// ne porte plus que sur la notification, sans nom.
+    static func includesCallsInRecents(discreet: Bool) -> Bool { true }
+
     static func configuration(_ base: CXProviderConfiguration, discreet: Bool) -> CXProviderConfiguration {
-        base.includesCallsInRecents = !discreet
+        base.includesCallsInRecents = includesCallsInRecents(discreet: discreet)
         return base
     }
 }
@@ -599,11 +605,32 @@ final class CallManager: NSObject, ObservableObject {
     private func updateDiscretion(_ discreet: Bool) {
         guard activeCall == nil || discreet else { return }
         let configuration = provider.configuration
-        guard configuration.includesCallsInRecents == discreet else { return }
+        guard configuration.includesCallsInRecents != CallDiscretionPolicy.includesCallsInRecents(discreet: discreet) else { return }
         provider.configuration = CallDiscretionPolicy.configuration(configuration, discreet: discreet)
     }
 
     // MARK: Incoming
+
+    /// Retire la notification de sonnerie d'un appel (`type: call_incoming`),
+    /// tout de suite puis deux fois encore : elle peut arriver après la VoIP.
+    nonisolated static func clearRingNotifications(callId: String) {
+        let clear: @Sendable () -> Void = {
+            let center = UNUserNotificationCenter.current()
+            center.getDeliveredNotifications { delivered in
+                let ids = delivered
+                    .filter { isRingNotification($0.request.content.userInfo, callId: callId) }
+                    .map(\.request.identifier)
+                if !ids.isEmpty { center.removeDeliveredNotifications(withIdentifiers: ids) }
+            }
+        }
+        clear()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: clear)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: clear)
+    }
+
+    nonisolated static func isRingNotification(_ userInfo: [AnyHashable: Any], callId: String) -> Bool {
+        (userInfo["type"] as? String) == "call_incoming" && (userInfo["callId"] as? String) == callId
+    }
 
     private func reportInvalidIncomingPush(
         uuid: UUID,
@@ -663,6 +690,10 @@ final class CallManager: NSObject, ObservableObject {
         update.localizedCallerName = handle
         update.hasVideo = hasVideo
         let completionBox = UnsafeMainActorBox(value: completion)
+
+        // CallKit sonne : la notification « Appel entrant » du même appel, envoyée
+        // en secours, ferait doublon.
+        if let callId { Self.clearRingNotifications(callId: callId) }
 
         // Une push APNs peut arriver après un refus/raccrochage déjà traité.
         // Elle doit toujours être reportée à CallKit (contrat PushKit), puis

@@ -82,7 +82,7 @@ final class CallDiscretionTests: XCTestCase {
         XCTAssertNil(IncomingCallE2EEExpectation.unresolved.requiresE2EE)
     }
 
-    func testEncryptedConversationCallsStayOutOfTheSystemRecents() {
+    func testEncryptedConversationCallsAlsoGoToTheSystemRecents() {
         let encrypted = CallConversationDirectory.Entry(title: "Léa", isEncrypted: true, seenAtMs: 0)
         let plain = CallConversationDirectory.Entry(title: "Camille", isEncrypted: false, seenAtMs: 0)
         XCTAssertTrue(CallDiscretionPolicy.isDiscreet(requiresE2EE: true, conversation: nil))
@@ -90,9 +90,17 @@ final class CallDiscretionTests: XCTestCase {
         XCTAssertFalse(CallDiscretionPolicy.isDiscreet(requiresE2EE: nil, conversation: plain))
         XCTAssertFalse(CallDiscretionPolicy.isDiscreet(requiresE2EE: nil, conversation: nil))
 
+        // Décision du 06/10 (v0.4.36) : Récents pour tous les appels.
         let configuration = CXProviderConfiguration()
-        XCTAssertFalse(CallDiscretionPolicy.configuration(configuration, discreet: true).includesCallsInRecents)
+        XCTAssertTrue(CallDiscretionPolicy.configuration(configuration, discreet: true).includesCallsInRecents)
         XCTAssertTrue(CallDiscretionPolicy.configuration(configuration, discreet: false).includesCallsInRecents)
+    }
+
+    func testOnlyTheRingNotificationOfThatCallIsCleared() {
+        XCTAssertTrue(CallManager.isRingNotification(["type": "call_incoming", "callId": "call_1"], callId: "call_1"))
+        XCTAssertFalse(CallManager.isRingNotification(["type": "call_incoming", "callId": "call_2"], callId: "call_1"))
+        XCTAssertFalse(CallManager.isRingNotification(["type": "call_missed", "callId": "call_1"], callId: "call_1"))
+        XCTAssertFalse(CallManager.isRingNotification(["type": "message", "conversationId": "c"], callId: "call_1"))
     }
 
     // MARK: - Outils

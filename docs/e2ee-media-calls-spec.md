@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.35**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.36**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,9 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.36 (06/10/2026), proposition : sur iOS, les appels d'une
+>   conversation chiffrée vont dans les Récents de l'app Téléphone, comme les
+>   autres (décision produit, §10.5). Aucun vecteur ne change.
 > - v0.4.35 (05/10/2026), proposition, arrêtée avec le serveur : signatures
 >   passées d'un appareil révoqué depuis, vérifiées par ses certificats
 >   (nouvelle route `…/devices/{deviceId}/certificates`, §2.8). Aucun vecteur
@@ -1381,8 +1384,10 @@ version qui expose `discardFrameWhenCryptorNotReady` et
 - Notification VoIP ou FCM d'une conversation v2 **sans nom d'appelant ni
   titre**. L'app retrouve le nom localement, parmi les membres de la
   conversation ; à défaut, elle affiche « Appel SignalQuest ».
-- iOS : `includesCallsInRecents = false` pour un appel d'une conversation
-  chiffrée, ce qui évite l'historique d'appels synchronisé par iCloud.
+- iOS : `includesCallsInRecents = true` pour tous les appels, chiffrés
+  compris (décision produit du 06/10, v0.4.36). L'historique d'appels d'iOS,
+  synchronisé par iCloud, porte alors le nom local de la conversation, l'heure
+  et la durée de l'appel ; jamais son contenu.
 - Android : `ConnectionService` autogéré, exclu du journal d'appels
   (`EXTRA_LOG_SELF_MANAGED_CALLS = false`, API 34 et plus).
 - Opus à débit constant.
@@ -2128,7 +2133,7 @@ serveur porte aussi le web.
 - **IOS-CALL-4** Règles d'usage (§10.0) : en v2, chiffré ou indisponible. En
   v1, la confirmation est faite (`05fda8fb`).
 - **IOS-CALL-5** Notification VoIP sans nom, nom retrouvé localement ;
-  `includesCallsInRecents = false` (§10.5).
+  appels dans les Récents de Téléphone (§10.5, v0.4.36).
 
 **Android**
 
