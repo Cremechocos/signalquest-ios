@@ -73,6 +73,9 @@ protocol MessagesServicing: Sendable {
     func markUnread(conversationId: String) async throws
     /// Épingle ou désépingle la conversation pour soi ; renvoie la date d'épinglage.
     func setConversationPinned(_ pinned: Bool, conversationId: String) async throws -> Date?
+    /// Sourdine pour soi (#354). `mentionsMuted` absent garde la valeur du serveur ;
+    /// renvoie l'état retenu par le serveur.
+    func setConversationMuted(_ muted: Bool, mentionsMuted: Bool?, conversationId: String) async throws -> (muted: Bool, mentionsMuted: Bool)
     func react(messageId: String, emoji: String, in conversation: MessageConversation) async throws
     func removeReaction(messageId: String, emoji: String, in conversation: MessageConversation) async throws
     func editMessage(messageId: String, text: String, in conversation: MessageConversation, e2ee: E2EEServicing?) async throws
@@ -984,6 +987,19 @@ final class MessagesService: MessagesServicing {
             body: ["pinned": pinned]
         )
         return response.pinnedAt
+    }
+
+    func setConversationMuted(_ muted: Bool, mentionsMuted: Bool?, conversationId: String) async throws -> (muted: Bool, mentionsMuted: Bool) {
+        if AppEnvironment.usesDemoData { return (muted, muted && mentionsMuted == true) }
+        struct Response: Decodable { let muted: Bool; let mentionsMuted: Bool? }
+        var body = ["muted": muted]
+        if let mentionsMuted { body["mentionsMuted"] = mentionsMuted }
+        let response: Response = try await api.requestJSON(
+            "/api/messages/conversations/\(conversationId)/mute",
+            method: .patch,
+            body: body
+        )
+        return (response.muted, response.muted && response.mentionsMuted == true)
     }
 
     func react(messageId: String, emoji: String, in conversation: MessageConversation) async throws {

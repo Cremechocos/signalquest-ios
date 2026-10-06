@@ -45,6 +45,11 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
     /// État v2 de la liste (lot serveur A7) : `null` en v1. Le dernier message
     /// v2 et le nombre de non-lus, sans contenu ; lu de façon tolérante.
     var e2eeV2: E2EEV2ConversationListState? = nil
+    /// Sourdine (#354, clés additives de la liste) : plus de notification
+    /// push. `mentionsMuted` coupe aussi les mentions, en v1 seulement : en v2,
+    /// le serveur ne voit pas les mentions et une conversation coupée l'est en entier.
+    var muted = false
+    var mentionsMuted = false
 
     /// Membres v1 d'une genèse de migration (§14.2, v0.4.20) : dans un
     /// tête-à-tête, les deux participants même archivés ; dans un groupe, les
@@ -88,7 +93,7 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, isGroup, e2eeEnabled, groupPhotoUrl, createdAt, updatedAt, lastMessageAt, lastReadAt, pinnedAt, participants, lastMessage
-        case directPeerUserId, e2eeV2
+        case directPeerUserId, e2eeV2, muted, mentionsMuted
     }
 
     init(
@@ -139,6 +144,8 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         lastMessage = try c.decodeIfPresent(MessageItem.self, forKey: .lastMessage)
         directPeerUserId = try? c.decodeIfPresent(String.self, forKey: .directPeerUserId)
         e2eeV2 = try? c.decodeIfPresent(E2EEV2ConversationListState.self, forKey: .e2eeV2)
+        muted = ((try? c.decodeIfPresent(Bool.self, forKey: .muted)) ?? nil) ?? false
+        mentionsMuted = ((try? c.decodeIfPresent(Bool.self, forKey: .mentionsMuted)) ?? nil) ?? false
     }
 }
 
@@ -496,13 +503,23 @@ extension MessageConversation {
 
     func with(pinnedAt: Date?) -> MessageConversation { copy(lastReadAt: lastReadAt, pinnedAt: pinnedAt) }
 
+    func with(muted: Bool, mentionsMuted: Bool) -> MessageConversation {
+        var copy = self
+        copy.muted = muted
+        copy.mentionsMuted = muted && mentionsMuted
+        return copy
+    }
+
     private func copy(lastReadAt: Date?, pinnedAt: Date?) -> MessageConversation {
-        MessageConversation(
+        var copy = MessageConversation(
             id: id, title: title, isGroup: isGroup, e2eeEnabled: e2eeEnabled, groupPhotoUrl: groupPhotoUrl,
             createdAt: createdAt, updatedAt: updatedAt, lastMessageAt: lastMessageAt,
             lastReadAt: lastReadAt, pinnedAt: pinnedAt, participants: participants, lastMessage: lastMessage,
             directPeerUserId: directPeerUserId, e2eeV2: e2eeV2
         )
+        copy.muted = muted
+        copy.mentionsMuted = mentionsMuted
+        return copy
     }
 }
 

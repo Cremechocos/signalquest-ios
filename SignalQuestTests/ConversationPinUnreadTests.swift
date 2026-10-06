@@ -103,6 +103,57 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertEqual(pinned.with(pinnedAt: nil), original)
     }
 
+    /// Sourdine (#354) : clés additives lues de façon tolérante, gardées par
+    /// les copies d'épinglage et de lecture.
+    func testMuteIsReadLenientlyAndSurvivesTheOtherCopies() throws {
+        func decode(_ extra: String) throws -> MessageConversation {
+            try JSONDecoder.signalQuest.decode(MessageConversation.self, from: Data(#"{"id":"c","isGroup":false\#(extra)}"#.utf8))
+        }
+        let muted = try decode(#","muted":true,"mentionsMuted":true"#)
+        XCTAssertTrue(muted.muted)
+        XCTAssertTrue(muted.mentionsMuted)
+        XCTAssertFalse(try decode("").muted)
+        XCTAssertFalse(try decode(#","muted":"true""#).muted)
+        XCTAssertFalse(try decode(#","muted":null"#).muted)
+
+        let pinned = muted.with(pinnedAt: Date()).with(lastReadAt: nil)
+        XCTAssertTrue(pinned.muted && pinned.mentionsMuted, "Épingler ou lire ne lève pas la sourdine")
+        let unmuted = muted.with(muted: false, mentionsMuted: true)
+        XCTAssertFalse(unmuted.muted)
+        XCTAssertFalse(unmuted.mentionsMuted, "Les mentions ne sont coupées que sous sourdine")
+    }
+
+    func testMuteUsesTheServerRoute() async throws {
+        var bodies: [[String: Any]] = []
+        var paths: [String?] = []
+        MockURLProtocol.requestHandler = { request in
+            let body = (try? JSONSerialization.jsonObject(with: Self.requestBody(request) ?? Data())) as? [String: Any] ?? [:]
+            bodies.append(body)
+            paths.append(request.url?.path)
+            XCTAssertEqual(request.httpMethod, "PATCH")
+            let json = #"{"success":true,"muted":true,"mentionsMuted":false}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(json.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("mute-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let service = MessagesService(api: api)
+
+        let saved = try await service.setConversationMuted(true, mentionsMuted: nil, conversationId: "conv-1")
+        _ = try await service.setConversationMuted(true, mentionsMuted: true, conversationId: "conv-1")
+
+        XCTAssertTrue(saved.muted)
+        XCTAssertFalse(saved.mentionsMuted)
+        XCTAssertEqual(paths, ["/api/messages/conversations/conv-1/mute", "/api/messages/conversations/conv-1/mute"])
+        XCTAssertEqual(bodies[0]["muted"] as? Bool, true)
+        XCTAssertNil(bodies[0]["mentionsMuted"], "Absent : le serveur garde sa valeur")
+        XCTAssertEqual(bodies[1]["mentionsMuted"] as? Bool, true)
+    }
+
     func testPinAndUnreadUseTheServerRoutes() async throws {
         var calls: [(method: String?, path: String?, body: [String: Any])] = []
         MockURLProtocol.requestHandler = { request in

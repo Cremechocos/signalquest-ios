@@ -109,6 +109,20 @@ final class MessagesViewModel: ObservableObject {
         }
     }
 
+    /// Sourdine pour soi (#354) : affichée tout de suite, puis l'état retenu par
+    /// le serveur ; rétablie si le serveur refuse.
+    func setMuted(_ muted: Bool, mentionsMuted: Bool?, _ conversation: MessageConversation) async {
+        let previous = (conversation.muted, conversation.mentionsMuted)
+        update(conversation.id) { $0.with(muted: muted, mentionsMuted: mentionsMuted ?? $0.mentionsMuted) }
+        do {
+            let saved = try await service.setConversationMuted(muted, mentionsMuted: mentionsMuted, conversationId: conversation.id)
+            update(conversation.id) { $0.with(muted: saved.muted, mentionsMuted: saved.mentionsMuted) }
+        } catch {
+            update(conversation.id) { $0.with(muted: previous.0, mentionsMuted: previous.1) }
+            if !error.isCancellation { errorMessage = String(localized: "La sourdine n’a pas pu être enregistrée.") }
+        }
+    }
+
     /// Change une conversation, puis remet la liste dans son ordre d'affichage.
     private func update(_ id: String, _ transform: (MessageConversation) -> MessageConversation) {
         guard let index = conversations.firstIndex(where: { $0.id == id }) else { return }
@@ -265,6 +279,7 @@ struct MessagesView: View {
                 // Mêmes actions à l'appui long, et au clic secondaire sur iPad.
                 .contextMenu {
                     pinButton(conversation)
+                    muteButtons(conversation)
                     if isUnread(conversation) {
                         Button { setRead(true, conversation) } label: {
                             Label("Marquer comme lu", systemImage: "checkmark.message")
@@ -615,6 +630,13 @@ struct MessagesView: View {
             Spacer(minLength: SQSpace.sm)
             VStack(alignment: .trailing, spacing: 5) {
                 HStack(spacing: 4) {
+                    if conversation.muted {
+                        Image(systemName: "bell.slash.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityLabel("En sourdine")
+                            .accessibilityIdentifier("messages.row.muted")
+                    }
                     if conversation.pinnedAt != nil {
                         Image(systemName: "pin.fill")
                             .font(.system(size: 10, weight: .semibold))
@@ -654,6 +676,26 @@ struct MessagesView: View {
                 Task { await model.setPinned(!pinned, conversation) }
             } label: {
                 Label(pinned ? "Désépingler" : "Épingler", systemImage: pinned ? "pin.slash" : "pin")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func muteButtons(_ conversation: MessageConversation) -> some View {
+        Button {
+            Haptics.light()
+            Task { await model.setMuted(!conversation.muted, mentionsMuted: nil, conversation) }
+        } label: {
+            Label(conversation.muted ? "Réactiver les notifications" : "Mettre en sourdine",
+                  systemImage: conversation.muted ? "bell" : "bell.slash")
+        }
+        // En v2, le serveur ne voit pas les mentions : la sourdine coupe tout.
+        if conversation.muted, !EncryptedConversationSurfaces.isV2(conversation) {
+            Toggle(isOn: Binding(
+                get: { conversation.mentionsMuted },
+                set: { value in Task { await model.setMuted(true, mentionsMuted: value, conversation) } }
+            )) {
+                Label("Couper aussi les mentions", systemImage: "at")
             }
         }
     }

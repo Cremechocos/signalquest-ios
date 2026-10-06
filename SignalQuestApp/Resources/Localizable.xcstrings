@@ -14615,6 +14615,74 @@
         }
       }
     },
+    "Mettre en sourdine" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre en sourdine"
+          }
+        }
+      }
+    },
+    "Couper aussi les mentions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute mentions too"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couper aussi les mentions"
+          }
+        }
+      }
+    },
+    "En sourdine" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En sourdine"
+          }
+        }
+      }
+    },
+    "La sourdine n’a pas pu être enregistrée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute could not be saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La sourdine n’a pas pu être enregistrée."
+          }
+        }
+      }
+    },
     "Cet appareil se prépare" : {
       "localizations" : {
         "en" : {
