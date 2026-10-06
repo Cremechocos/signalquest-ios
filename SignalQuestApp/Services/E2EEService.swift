@@ -6056,10 +6056,14 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
         return stored
     }
 
+    /// `includeRestored: false` (lecteurs v2, §2.8) : une clé restaurée depuis
+    /// la sauvegarde ne sert qu'une fois confirmée, c'est-à-dire remplacée par
+    /// la clé vérifiée de la même époque, qui tient l'engagement du manifeste signé.
     func loadEpoch(
         conversationId: String,
         epochNumber: Int,
-        ownerNamespace: String
+        ownerNamespace: String,
+        includeRestored: Bool = true
     ) throws -> E2EEV2StoredEpochKey? {
         guard allowsOwner(ownerNamespace) else { throw E2EEV2DeviceIdentityError.unauthenticated }
         guard epochNumber > 0 else { return nil }
@@ -6071,6 +6075,7 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
             epochNumber: epochNumber
         )
         if let raw = try tokenStore.string(for: historyKey) {
+            if !includeRestored, isRestored(raw) { return nil }
             guard let stored = parse(raw),
                   stored.conversationId == conversationId,
                   stored.epochNumber == epochNumber else { return nil }

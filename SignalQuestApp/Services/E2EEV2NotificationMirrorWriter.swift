@@ -64,7 +64,8 @@ struct E2EEV2NotificationMirrorWriter: Sendable {
             // Seulement une époque dont l'appareil détient la clé, même quand
             // elle n'est pas recopiée.
             guard var stored = try keyStore.loadEpoch(
-                conversationId: conversationId, epochNumber: epoch.epochNumber, ownerNamespace: ownerNamespace
+                conversationId: conversationId, epochNumber: epoch.epochNumber, ownerNamespace: ownerNamespace,
+                includeRestored: false
             ) else { continue }
             let keyB64 = includesKeys ? stored.epochKey.base64EncodedString() : nil
             stored.epochKey.resetBytes(in: 0..<stored.epochKey.count)
@@ -73,7 +74,8 @@ struct E2EEV2NotificationMirrorWriter: Sendable {
             ))
         }
         guard var stored = try keyStore.loadEpoch(
-            conversationId: conversationId, epochNumber: current.epochNumber, ownerNamespace: ownerNamespace
+            conversationId: conversationId, epochNumber: current.epochNumber, ownerNamespace: ownerNamespace,
+            includeRestored: false
         ) else { return nil }
         let currentKeyB64 = includesKeys ? stored.epochKey.base64EncodedString() : nil
         stored.epochKey.resetBytes(in: 0..<stored.epochKey.count)

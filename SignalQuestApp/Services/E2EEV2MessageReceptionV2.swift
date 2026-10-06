@@ -453,7 +453,8 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
         var epoch: E2EEV2StoredEpochKey
         do {
             guard let stored = try keyStore.loadEpoch(
-                conversationId: context.conversationId, epochNumber: epochNumber, ownerNamespace: context.ownerNamespace
+                conversationId: context.conversationId, epochNumber: epochNumber, ownerNamespace: context.ownerNamespace,
+                includeRestored: false
             ) else { return .done(.rejected("e2ee-epoch-key-unavailable")) }
             epoch = stored
         } catch {

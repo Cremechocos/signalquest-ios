@@ -1992,8 +1992,12 @@ final class E2EETests: XCTestCase {
         XCTAssertNil(try store.load(conversationId: conversationId, ownerNamespace: "a"),
                      "Une clé restaurée ne devient jamais l'époque courante")
         XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a")?.epochKey, restoredKey)
+        XCTAssertNil(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a", includeRestored: false),
+                     "Un lecteur v2 ne lit jamais une clé restaurée non confirmée")
         XCTAssertTrue(try store.put(recordInput: record(verifiedKey, epochId: "epoch_verified_000001"),
                                     epochKey: verifiedKey, ownerNamespace: "a"))
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a", includeRestored: false)?.epochKey,
+                       verifiedKey, "La clé vérifiée, elle, sert")
         XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a")?.epochKey, verifiedKey)
         XCTAssertEqual(try store.load(conversationId: conversationId, ownerNamespace: "a")?.epochKey, verifiedKey,
                        "Le pointeur courant suit la clé vérifiée")
@@ -2008,6 +2012,15 @@ final class E2EETests: XCTestCase {
                                      epochKey: other, ownerNamespace: "a"),
                        "Une clé vérifiée ne se remplace pas, même après une restauration identique")
         XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a")?.epochKey, verifiedKey)
+
+        // Restaurée puis confirmée par la clé vérifiée identique : elle sert alors aux lecteurs v2.
+        let confirmed = Data(repeating: 5, count: 32)
+        XCTAssertTrue(try store.put(recordInput: record(confirmed, epochId: "epoch_confirmed_00001", number: 1),
+                                    epochKey: confirmed, ownerNamespace: "a", origin: .restored))
+        XCTAssertNil(try store.loadEpoch(conversationId: conversationId, epochNumber: 1, ownerNamespace: "a", includeRestored: false))
+        XCTAssertTrue(try store.put(recordInput: record(confirmed, epochId: "epoch_confirmed_00001", number: 1),
+                                    epochKey: confirmed, ownerNamespace: "a"))
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 1, ownerNamespace: "a", includeRestored: false)?.epochKey, confirmed)
 
         // Une clé restaurée reste lisible pour l'historique tant que rien ne la remplace.
         XCTAssertTrue(try store.put(recordInput: record(restoredKey, epochId: "epoch_restored_000002", number: 2),

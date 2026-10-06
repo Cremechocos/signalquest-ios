@@ -511,7 +511,8 @@ enum E2EEV2VerifiedEpochKeys {
             guard let current = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
             else { return nil }
             return pinned(try keyStore.loadEpoch(
-                conversationId: conversationId, epochNumber: current.epochNumber, ownerNamespace: ownerNamespace
+                conversationId: conversationId, epochNumber: current.epochNumber, ownerNamespace: ownerNamespace,
+                includeRestored: false
             ), to: current)
         }
         return try keyStore.load(conversationId: conversationId, ownerNamespace: ownerNamespace)
@@ -541,7 +542,9 @@ enum E2EEV2VerifiedEpochKeys {
             guard let current = try stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace),
                   current.epochNumber == epochNumber else { return nil }
             return pinned(
-                try keyStore.loadEpoch(conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace),
+                try keyStore.loadEpoch(
+                    conversationId: conversationId, epochNumber: epochNumber, ownerNamespace: ownerNamespace, includeRestored: false
+                ),
                 to: current
             )
         }
