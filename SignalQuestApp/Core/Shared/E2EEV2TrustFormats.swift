@@ -454,6 +454,10 @@ struct E2EEV2MembershipState: Equatable, Sendable {
     var changeNumber = 0
     /// Appareil qui a signé la genèse.
     var genesisActor: E2EEV2MembershipChain.Actor?
+    /// Membres dans l'ordre de leur dernière arrivée dans la chaîne : un membre
+    /// parti puis ajouté de nouveau arrive en dernier. Le premier est « le plus
+    /// ancien » du successeur désigné avant une suppression de compte (D.4, v0.4.37).
+    var arrivalOrder: [String] = []
 }
 
 /// Genèse et relecture de la chaîne d'appartenance (D.4, §2.5, §14.2).
@@ -529,6 +533,17 @@ enum E2EEV2MembershipChain {
                 if change.changeNumber == genesisLength { try checkGenesis(state, isGroup: isGroup) }
             } else {
                 try applyRule(change, to: &state, isGroup: isGroup)
+            }
+            switch change.action {
+            case "ADD":
+                state.arrivalOrder.removeAll { $0 == change.targetUserId }
+                state.arrivalOrder.append(change.targetUserId)
+            case "REMOVE":
+                state.arrivalOrder.removeAll { $0 == change.targetUserId }
+            case "LEAVE":
+                state.arrivalOrder.removeAll { $0 == change.actorUserId }
+            default:
+                break
             }
             state.lastCanonical = item.canonical
             state.changeNumber = change.changeNumber

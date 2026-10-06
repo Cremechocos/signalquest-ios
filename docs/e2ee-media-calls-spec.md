@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.36**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.37**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,9 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.37 (06/10/2026), proposition : « le membre le plus ancien » du
+>   successeur désigné avant une suppression de compte est défini par la
+>   chaîne signée (dernière arrivée, D.4). Aucun vecteur ne change.
 > - v0.4.36 (06/10/2026), proposition : sur iOS, les appels d'une
 >   conversation chiffrée vont dans les Récents de l'app Téléphone, comme les
 >   autres (décision produit, §10.5). Aucun vecteur ne change.
@@ -2347,7 +2350,11 @@ certificat et la liste, sans `uikWrap` (§2.7).
       changement refusé et invite à nommer un admin ;
     - à la suppression de son compte, son appareil promeut d'abord le membre
       le plus ancien, puis appelle la suppression ; le serveur ne bloque
-      jamais une suppression de compte ;
+      jamais une suppression de compte. « Le plus ancien » se lit dans la
+      chaîne signée (v0.4.37) : parmi les membres restants, celui dont le
+      dernier `ADD` est le plus tôt ; dans la genèse, l'ordre de ses `ADD`.
+      Un membre parti puis ajouté de nouveau compte depuis son retour. Le
+      `joinedAt` du serveur n'entre jamais en compte ;
     - si rien n'a pu se faire, le groupe est figé : plus de changement de
       membres ni de rôle, mais messages, départs et appels continuent ;
     - tout reste signé et vérifiable : aucune règle ne dépend de l'état des

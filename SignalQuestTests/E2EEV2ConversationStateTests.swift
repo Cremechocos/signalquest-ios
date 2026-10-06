@@ -56,6 +56,29 @@ final class E2EEV2ConversationStateTests: XCTestCase {
         XCTAssertFalse(build([alice, alice, bruno], [alice], group: true), "Pas de doublon")
     }
 
+    /// Successeur (D.4, v0.4.37) : ordre d'arrivée dans la chaîne, un membre
+    /// parti puis ajouté de nouveau arrive en dernier ; puis la règle elle-même.
+    func testArrivalOrderAndSuccessorRule() throws {
+        let genesis = try signedGenesis(members: [alice, bruno, carla], admins: [alice], group: true, by: aliceDevice, user: alice)
+        var state = try apply(genesis, group: true, genesisLength: 3 + 1)
+        let genesisOrder = state.arrivalOrder
+        XCTAssertEqual(Set(genesisOrder), [alice, bruno, carla])
+        XCTAssertEqual(E2EEV2MessagingRuntime.successorNeed(admins: state.admins, arrivalOrder: genesisOrder, ownUserId: alice),
+                       .mustName(candidates: genesisOrder.filter { $0 != alice }))
+
+        state = try apply([next(state, "LEAVE", bruno, by: bruno, brunoDevice)], to: state, group: true, genesisLength: 4)
+        state = try apply([next(state, "ADD", bruno, by: alice, aliceDevice)], to: state, group: true, genesisLength: 4)
+        XCTAssertEqual(state.arrivalOrder.last, bruno, "Un retour compte comme une arrivée")
+        XCTAssertEqual(E2EEV2MessagingRuntime.successorNeed(admins: state.admins, arrivalOrder: state.arrivalOrder, ownUserId: alice),
+                       .mustName(candidates: [carla, bruno]))
+
+        // Un autre admin, ou personne d'autre : rien à faire ; plus aucun admin : figé.
+        XCTAssertEqual(E2EEV2MessagingRuntime.successorNeed(admins: [alice, carla], arrivalOrder: state.arrivalOrder, ownUserId: alice), .none)
+        XCTAssertEqual(E2EEV2MessagingRuntime.successorNeed(admins: [alice], arrivalOrder: [alice], ownUserId: alice), .none)
+        XCTAssertEqual(E2EEV2MessagingRuntime.successorNeed(admins: [carla], arrivalOrder: state.arrivalOrder, ownUserId: alice), .none)
+        XCTAssertEqual(E2EEV2MessagingRuntime.successorNeed(admins: [], arrivalOrder: state.arrivalOrder, ownUserId: alice), .frozen)
+    }
+
     func testGroupChainFollowsTheAdminRules() throws {
         let genesis = try signedGenesis(members: [alice, bruno, carla], admins: [alice], group: true, by: aliceDevice, user: alice)
         var state = try apply(genesis, group: true, genesisLength: 3 + 1)

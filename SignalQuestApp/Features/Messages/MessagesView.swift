@@ -134,11 +134,11 @@ final class MessagesViewModel: ObservableObject {
     }
 
     /// Quitte la conversation (swipe) et la retire de la liste localement.
-    func leave(_ conversation: MessageConversation, v2: E2EEV2MessagingRuntime? = nil) async {
+    func leave(_ conversation: MessageConversation, v2: E2EEV2MessagingRuntime? = nil, naming successor: String? = nil) async {
         do {
             // Conversation v2 : le départ passe par la chaîne signée (D.4).
             if let v2, v2.writesEnabled, EncryptedConversationSurfaces.isV2(conversation) {
-                try await v2.apply(.leave, to: conversation)
+                try await v2.leave(conversation, naming: successor)
             } else {
                 try await service.leaveConversation(id: conversation.id)
             }
@@ -162,6 +162,14 @@ struct MessagesView: View {
     @State private var routedConversationId: String?
     /// Quitter se confirme : le balayage suffisait à perdre la conversation (SOC-22).
     @State private var pendingLeave: MessageConversation?
+    /// Dernier admin d'un groupe chiffré : successeur à nommer avant le départ (D.4).
+    @State private var successorRequest: SuccessorRequest?
+
+    struct SuccessorRequest: Identifiable {
+        let conversation: MessageConversation
+        let candidates: [String]
+        var id: String { conversation.id }
+    }
     /// Brouillons par conversation, lus sur l'appareil (plan 3, vague 1).
     @State private var drafts: [String: String] = [:]
     /// Porte E2EE v2 ouverte côté serveur, mais cet appareil n'y est pas encore entré.
@@ -376,11 +384,27 @@ struct MessagesView: View {
         ) { conversation in
             Button("Quitter", role: .destructive) {
                 pendingLeave = nil
-                Task { await model.leave(conversation, v2: services.e2eeV2Messaging); await services.refreshInboxBadge(force: true) }
+                if conversation.isGroup,
+                   case .mustName(let candidates) = services.e2eeV2Messaging.successorNeed(conversationId: conversation.id) {
+                    successorRequest = SuccessorRequest(conversation: conversation, candidates: candidates)
+                } else {
+                    Task { await model.leave(conversation, v2: services.e2eeV2Messaging); await services.refreshInboxBadge(force: true) }
+                }
             }
             Button("Annuler", role: .cancel) { pendingLeave = nil }
         } message: { _ in
             Text("Elle disparaîtra de ta liste et tu ne recevras plus ses messages.")
+        }
+        .sheet(item: $successorRequest) { request in
+            SuccessorPickerSheet(
+                candidates: request.candidates.compactMap { id in request.conversation.participants.first { $0.userId == id } }
+            ) { successor in
+                successorRequest = nil
+                Task {
+                    await model.leave(request.conversation, v2: services.e2eeV2Messaging, naming: successor)
+                    await services.refreshInboxBadge(force: true)
+                }
+            }
         }
         .navigationDestinationItemCompat($routedConversationId) { id in
             if let conversation = model.conversations.first(where: { $0.id == id }) {

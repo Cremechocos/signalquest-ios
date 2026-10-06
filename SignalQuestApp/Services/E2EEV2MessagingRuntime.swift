@@ -514,6 +514,64 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
         )
     }
 
+    // MARK: Successeur (D.4, v0.4.30)
+
+    enum SuccessorNeed: Equatable {
+        /// Rien à faire avant de partir.
+        case none
+        /// Seul admin d'un groupe qui garde d'autres membres : un successeur
+        /// d'abord, parmi ces membres, du plus ancien au plus récent.
+        case mustName(candidates: [String])
+        /// Groupe sans admin : membres et rôles ne changent plus.
+        case frozen
+    }
+
+    func successorNeed(conversationId: String) -> SuccessorNeed {
+        guard writesEnabled, let parts = current(),
+              let roles = parts.messaging.storedGroupRoles(conversationId: conversationId) else { return .none }
+        let ownUserId = String(parts.session.ownerScopeId.dropFirst("user:".count))
+        return Self.successorNeed(admins: roles.admins, arrivalOrder: roles.arrivalOrder, ownUserId: ownUserId)
+    }
+
+    static func successorNeed(admins: Set<String>, arrivalOrder: [String], ownUserId: String) -> SuccessorNeed {
+        if admins.isEmpty { return arrivalOrder.isEmpty ? .none : .frozen }
+        let others = arrivalOrder.filter { $0 != ownUserId }
+        guard admins == [ownUserId], !others.isEmpty else { return .none }
+        return .mustName(candidates: others)
+    }
+
+    /// Administrateurs d'un groupe v2 d'après la chaîne, jamais d'après le
+    /// rôle servi (qui peut dire `owner` sans signature). `nil` hors groupe v2.
+    func groupAdmins(conversationId: String) -> Set<String>? {
+        guard writesEnabled, let parts = current() else { return nil }
+        return parts.messaging.storedGroupRoles(conversationId: conversationId)?.admins
+    }
+
+    /// Départ d'un groupe v2 : le successeur est nommé d'abord, par son propre
+    /// changement signé. Si le départ échoue ensuite, le successeur reste admin.
+    func leave(_ conversation: MessageConversation, naming successor: String?) async throws {
+        if let successor { try await apply(.promote(userId: successor), to: conversation) }
+        try await apply(.leave, to: conversation)
+    }
+
+    /// Avant une suppression de compte : dans chaque groupe v2 dont ce compte
+    /// est le seul admin, le membre le plus ancien est nommé admin (D.4). Au
+    /// mieux : un échec laisse ce groupe sans admin, jamais la suppression bloquée.
+    func promoteSuccessorsBeforeDeletion(_ conversations: [MessageConversation]) async -> (promoted: Int, failed: Int) {
+        var promoted = 0, failed = 0
+        for conversation in conversations where conversation.isGroup {
+            guard case .mustName(let candidates) = successorNeed(conversationId: conversation.id),
+                  let oldest = candidates.first else { continue }
+            do {
+                try await apply(.promote(userId: oldest), to: conversation)
+                promoted += 1
+            } catch {
+                failed += 1
+            }
+        }
+        return (promoted, failed)
+    }
+
     /// Un changement d'appartenance depuis l'écran : lève une erreur lisible
     /// si le changement n'est pas appliqué.
     func apply(_ membership: E2EEV2MembershipWriterV2.Change, to conversation: MessageConversation) async throws {

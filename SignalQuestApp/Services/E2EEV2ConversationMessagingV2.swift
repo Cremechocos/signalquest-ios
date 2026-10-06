@@ -353,6 +353,14 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         return .unreadable
     }
 
+    /// Rôles d'un groupe v2 gardé, d'après sa chaîne vérifiée : administrateurs
+    /// et membres dans l'ordre d'arrivée (successeur, D.4). `nil` hors groupe v2.
+    func storedGroupRoles(conversationId: String) -> (admins: Set<String>, arrivalOrder: [String])? {
+        guard case .v2(true, _, _) = storedMembership(conversationId: conversationId),
+              let context = try? membershipContext(conversationId: conversationId, isGroup: true) else { return nil }
+        return (context.head.admins, context.head.arrivalOrder.filter { context.head.members.contains($0) })
+    }
+
     /// Rotation hors envoi (§3.3) : appareil ajouté ou révoqué, exigence
     /// publiée par le serveur. Synchronise, puis décide comme avant un envoi ;
     /// une époque adoptée ou une chaîne en retard refont la décision.

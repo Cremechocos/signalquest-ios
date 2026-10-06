@@ -38,6 +38,10 @@ struct GroupSettingsView: View {
     @State private var groupPhotoURL: URL?
     /// Aperçu local immédiat de la photo choisie (optimiste, avant l'aller-retour réseau).
     @State private var pickedPreview: UIImage?
+    /// Groupe v2 : admins d'après la chaîne signée, et ce qu'exige un départ (D.4).
+    @State private var chainAdmins: Set<String>?
+    @State private var successorNeed: E2EEV2MessagingRuntime.SuccessorNeed = .none
+    @State private var showsSuccessorPicker = false
 
     init(conversation: MessageConversation, service: MessagesServicing, e2ee: E2EEServicing?,
          onLeft: @escaping () -> Void = {}) {
@@ -58,8 +62,27 @@ struct GroupSettingsView: View {
     /// Le créateur du groupe (`owner`) a tous les droits d'un admin ; il les
     /// perdait ici alors que la conversation, elle, les lui reconnaissait (SOC-10).
     private var isAdmin: Bool {
+        // v2 : la chaîne fait foi, pas le rôle servi.
+        if let chainAdmins { return currentUserId.map(chainAdmins.contains) ?? false }
         let role = participants.first { $0.userId == currentUserId }?.role
         return role == "owner" || role == "admin"
+    }
+
+    /// En v1, le serveur réserve les rôles au créateur ; en v2, à tout admin.
+    private var canChangeRoles: Bool {
+        if chainAdmins != nil { return isAdmin }
+        return participants.first { $0.userId == currentUserId }?.role == "owner"
+    }
+
+    private func isAdminMember(_ participant: ConversationParticipant) -> Bool {
+        if let chainAdmins { return chainAdmins.contains(participant.userId) }
+        return participant.role == "admin"
+    }
+
+    private func refreshChainRoles() {
+        guard usesV2 else { return }
+        chainAdmins = services.e2eeV2Messaging.groupAdmins(conversationId: conversation.id)
+        successorNeed = services.e2eeV2Messaging.successorNeed(conversationId: conversation.id)
     }
 
     var body: some View {
@@ -100,7 +123,7 @@ struct GroupSettingsView: View {
                                     // de personne.
                                     SQUserBadges(badges: participant.user.badges, size: 12)
                                 }
-                                if participant.role == "admin" {
+                                if isAdminMember(participant) {
                                     Text("Admin")
                                         .font(SQType.micro)
                                         .foregroundStyle(SQColor.brandRed)
@@ -109,13 +132,16 @@ struct GroupSettingsView: View {
                             Spacer()
                             if isAdmin && participant.userId != currentUserId {
                                 Menu {
-                                    Button {
-                                        Task { await changeRole(participant, to: participant.role == "admin" ? "member" : "admin") }
-                                    } label: {
-                                        Label(
-                                            participant.role == "admin" ? "Rétrograder" : "Promouvoir admin",
-                                            systemImage: participant.role == "admin" ? "person.badge.minus" : "person.badge.shield.checkmark"
-                                        )
+                                    if canChangeRoles {
+                                        let admin = isAdminMember(participant)
+                                        Button {
+                                            Task { await changeRole(participant, to: admin ? "member" : "admin") }
+                                        } label: {
+                                            Label(
+                                                admin ? "Rétrograder" : "Promouvoir admin",
+                                                systemImage: admin ? "person.badge.minus" : "person.badge.shield.checkmark"
+                                            )
+                                        }
                                     }
                                     Button(role: .destructive) {
                                         // Confirmer avant de retirer (comme « Quitter le
@@ -169,9 +195,24 @@ struct GroupSettingsView: View {
                     .listRowSeparatorTint(SQColor.separator)
                 }
 
+                if successorNeed == .frozen {
+                    Section {
+                        Label("Ce groupe n’a plus d’admin : ses membres et ses rôles ne peuvent plus changer. Les messages et les appels continuent.",
+                              systemImage: "lock")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .listRowBackground(SQColor.surface)
+                }
+
                 Section {
                     Button(role: .destructive) {
-                        confirmLeave = true
+                        if case .mustName = successorNeed {
+                            showsSuccessorPicker = true
+                        } else {
+                            confirmLeave = true
+                        }
                     } label: {
                         Label("Quitter le groupe", systemImage: "rectangle.portrait.and.arrow.right")
                             .font(SQType.body.weight(.medium))
@@ -200,6 +241,17 @@ struct GroupSettingsView: View {
             .confirmationDialog("Quitter le groupe ?", isPresented: $confirmLeave, titleVisibility: .visible) {
                 Button("Quitter", role: .destructive) { Task { await leave() } }
             }
+            .sheet(isPresented: $showsSuccessorPicker) {
+                if case .mustName(let candidates) = successorNeed {
+                    SuccessorPickerSheet(
+                        candidates: candidates.compactMap { id in participants.first { $0.userId == id } }
+                    ) { successor in
+                        showsSuccessorPicker = false
+                        Task { await leave(naming: successor) }
+                    }
+                }
+            }
+            .task { refreshChainRoles() }
             .confirmationDialog(
                 participantToRemove.map { "Retirer \($0.user.displayName) du groupe ?" } ?? "Retirer du groupe ?",
                 isPresented: Binding(get: { participantToRemove != nil }, set: { if !$0 { participantToRemove = nil } }),
@@ -298,6 +350,7 @@ struct GroupSettingsView: View {
                 try await services.e2eeV2Messaging.apply(
                     role == "admin" ? .promote(userId: participant.userId) : .demote(userId: participant.userId), to: conversation
                 )
+                refreshChainRoles()
             } else {
                 try await service.changeRole(conversationId: conversation.id, userId: participant.userId, role: role)
             }
@@ -375,10 +428,10 @@ struct GroupSettingsView: View {
         if errorMessage != nil { withAnimation(SQMotion.resolve(.default, reduceMotion)) { pickedPreview = nil } }
     }
 
-    private func leave() async {
+    private func leave(naming successor: String? = nil) async {
         await run {
             if usesV2 {
-                try await services.e2eeV2Messaging.apply(.leave, to: conversation)
+                try await services.e2eeV2Messaging.leave(conversation, naming: successor)
             } else {
                 try await service.leaveConversation(id: conversation.id)
             }
@@ -401,6 +454,68 @@ struct GroupSettingsView: View {
         } catch {
             errorMessage = error.userFacingMessage
             Haptics.error()
+        }
+    }
+}
+
+/// Dernier admin d'un groupe chiffré : un successeur avant de partir (D.4).
+/// Les membres viennent du plus ancien au plus récent.
+struct SuccessorPickerSheet: View {
+    let candidates: [ConversationParticipant]
+    let onConfirm: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selection: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(candidates) { participant in
+                        Button {
+                            selection = participant.userId
+                        } label: {
+                            HStack(spacing: SQSpace.md) {
+                                SQAvatar(url: participant.user.avatarUrl, name: participant.user.displayName, size: 34)
+                                    .accessibilityHidden(true)
+                                Text(participant.user.displayName)
+                                    .font(SQType.body)
+                                    .foregroundStyle(SQColor.label)
+                                Spacer()
+                                if selection == participant.userId {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(SQColor.brandRed)
+                                        .accessibilityHidden(true)
+                                }
+                            }
+                            .frame(minHeight: 44)
+                        }
+                        .accessibilityAddTraits(selection == participant.userId ? .isSelected : [])
+                    }
+                } footer: {
+                    Text("Tu es le seul admin de ce groupe chiffré. Le membre choisi pourra ajouter, retirer et nommer d’autres admins.")
+                        .font(SQType.caption)
+                }
+                .listRowBackground(SQColor.surface)
+            }
+            .scrollContentBackground(.hidden)
+            .signalQuestBackground()
+            .navigationTitle("Nomme un admin avant de partir")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") { dismiss() }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                GradientButton(String(localized: "Nommer admin et quitter"), systemImage: "rectangle.portrait.and.arrow.right", style: .primary) {
+                    if let selection { onConfirm(selection) }
+                }
+                .disabled(selection == nil)
+                .padding(SQSpace.lg)
+                .accessibilityIdentifier("group.successor.confirm")
+            }
+            .onAppear { if selection == nil { selection = candidates.first?.userId } }
         }
     }
 }

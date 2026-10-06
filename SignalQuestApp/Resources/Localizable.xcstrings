@@ -14683,6 +14683,115 @@
         }
       }
     },
+    "Ce groupe n’a plus d’admin : ses membres et ses rôles ne peuvent plus changer. Les messages et les appels continuent." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This group has no admin left: its members and roles can no longer change. Messages and calls continue."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce groupe n’a plus d’admin : ses membres et ses rôles ne peuvent plus changer. Les messages et les appels continuent."
+          }
+        }
+      }
+    },
+    "Tu es le seul admin de ce groupe chiffré. Le membre choisi pourra ajouter, retirer et nommer d’autres admins." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’re the only admin of this encrypted group. The member you choose will be able to add, remove and appoint other admins."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu es le seul admin de ce groupe chiffré. Le membre choisi pourra ajouter, retirer et nommer d’autres admins."
+          }
+        }
+      }
+    },
+    "Nomme un admin avant de partir" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appoint an admin before leaving"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nomme un admin avant de partir"
+          }
+        }
+      }
+    },
+    "Nommer admin et quitter" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make admin and leave"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nommer admin et quitter"
+          }
+        }
+      }
+    },
+    "Tu es le seul admin de %lld groupe(s) chiffré(s) : leur membre le plus ancien sera nommé admin." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You’re the only admin of an encrypted group: its longest-standing member will be made admin."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You’re the only admin of %lld encrypted groups: their longest-standing member will be made admin."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tu es le seul admin d’un groupe chiffré : son membre le plus ancien sera nommé admin."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tu es le seul admin de %lld groupes chiffrés : leur membre le plus ancien sera nommé admin."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Cet appareil se prépare" : {
       "localizations" : {
         "en" : {
