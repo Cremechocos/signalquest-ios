@@ -67,8 +67,8 @@ final class MapExplorerViewModel: ObservableObject {
     /// l'écran : couche éteinte, elles restent le badge posé sur le point d'antenne.
     @Published var communityOutages: [CommunityOutage] = []
     @Published var coverageHeat: [CoverageHeatPoint] = []
-    /// Photos publiques de tous les membres (couche Photos). Mode « Amis » =
-    /// restreint aux amis (rechargé avec friendsOnly).
+    /// Photos publiques de tous les membres (couche Photos), ou de mes seuls
+    /// amis quand `photosFriendsOnly` est choisi.
     @Published var publicPhotos: [MapPublicPhoto] = []
     /// Incrémenté à chaque publication de couche dans `load`. Sert de signal
     /// O(1) pour reconstruire le cache d'annotations de la vue uniquement quand
@@ -113,6 +113,9 @@ final class MapExplorerViewModel: ObservableObject {
     /// Inclure les cellules seulement « observées » (vs sites probables
     /// consolidés) dans la couche communautaire.
     @Published var includeObservedSites = true
+    /// Couche Photos restreinte aux amis, choisie dans la feuille de filtres.
+    /// La vue la remet à faux sans compte.
+    @Published var photosFriendsOnly = MapPhotosFriendsOnlyStore.load()
     @Published var speedtestDays = 0
     @Published var coverageDays = 0
     @Published var searchQuery: String = ""
@@ -161,6 +164,7 @@ final class MapExplorerViewModel: ObservableObject {
         let focus: AntennaCoverageFocus?
         let sharing: Set<String>
         let includeObserved: Bool
+        let photosFriendsOnly: Bool
         let speedtestDays: Int
         let coverageDays: Int
         let filters: Set<MapDisplayItem.Kind>
@@ -191,7 +195,7 @@ final class MapExplorerViewModel: ObservableObject {
             session: mapService.sessionIdentifier, market: marketFilter, operatorName: operatorFilter,
             technologies: techFilters, bands: bandFilters, bandMatch: bandMatch, focus: coverageFocus,
             sharing: sharingFilters, includeObserved: includeObservedSites,
-            speedtestDays: speedtestDays, coverageDays: coverageDays, filters: filters,
+            photosFriendsOnly: photosFriendsOnly, speedtestDays: speedtestDays, coverageDays: coverageDays, filters: filters,
             lightweight: lightweight, communityOnly: isCommunityOnlyMarket,
             supportsCommunity: supportsCommunityLayers
         )
@@ -500,7 +504,7 @@ final class MapExplorerViewModel: ObservableObject {
             technologies: techFilters, bands: bandFilters, bandMatch: bandMatch,
             azimuthStyle: azimuthStyle, sharing: sharingFilters, speedtestDays: speedtestDays,
             coverageDays: coverageDays, layers: layers, includeObserved: includeObservedSites,
-            plannedStatuses: plannedStatusFilters)
+            plannedStatuses: plannedStatusFilters, photosFriendsOnly: photosFriendsOnly)
     }
 
     /// Commits a complete value on the main actor, before any scheduled load.
@@ -532,6 +536,7 @@ final class MapExplorerViewModel: ObservableObject {
         coverageDays = result.coverageDays
         includeObservedSites = result.includeObserved
         plannedStatusFilters = result.plannedStatuses
+        photosFriendsOnly = result.photosFriendsOnly
         MapMarketStore.saveManual(market: result.market, operator: result.operatorName)
         return result
     }
@@ -881,10 +886,10 @@ final class MapExplorerViewModel: ObservableObject {
         // sens) → on ne la télécharge même pas dans ce cas.
         let wantsCoverage = filters.contains(.coverage) && op.uppercased() != "ALL"
 
-        // Photos : couche dédiée `/api/map/photos` (TOUS les membres), filtrée par
-        // opérateur de la photo + mode « Amis » (= filtre `.friend` actif).
+        // Photos : couche dédiée `/api/map/photos` (TOUS les membres), ou de mes
+        // seuls amis sur choix explicite dans les filtres.
         let wantsPhoto = filters.contains(.photo)
-        let photosFriendsOnly = filters.contains(.friend)
+        let photosFriendsOnly = self.photosFriendsOnly
         // Le snapshot « lightweight » omet validations/sessions (perf). On ne charge
         // le snapshot COMPLET que pour ces couches (les photos ont leur endpoint).
         let needsHeavySnapshot = filters.contains(.validation) || filters.contains(.session)
@@ -1038,7 +1043,7 @@ final class MapExplorerViewModel: ObservableObject {
                     guard wantsPhoto else { return ([], nil) }
                     // Couche communautaire : on veut TOUTES les photos des membres, quel que
                     // soit le filtre opérateur des antennes → opérateur forcé à "ALL". Seul le
-                    // mode « Amis » restreint l'ensemble.
+                    // choix « amis seulement » restreint l'ensemble.
                     do { return (try await svc.publicPhotos(bounds: bounds, zoom: zoom, market: market, operatorName: "ALL", friendsOnly: photosFriendsOnly), nil) }
                     catch { return (nil, error.isCancellation ? nil : error.userFacingMessage) }
                 }()
@@ -1746,6 +1751,8 @@ struct MapExplorerView: View {
             if AppEnvironment.usesDemoFriends {
                 filters = [.friend, .photo, .antenna]
             }
+            // Avant le 1er chargement : sans compte, aucune restriction aux amis.
+            if !services.auth.hasStoredCredentials() { model.photosFriendsOnly = false }
             await model.loadRegistry()
             // Sélection initiale du pays + opérateur (choix manuel/GPS/replis) AVANT le 1er
             // chargement : évite le flash « France/SFR puis Canada/Bell ».
@@ -2633,6 +2640,7 @@ struct MapExplorerView: View {
     private func filtersDidChange(from previous: MapFilterSelection, to current: MapFilterSelection) {
         if previous.layers != current.layers { MapFilterStore.save(current.layers) }
         if previous.plannedStatuses != current.plannedStatuses { MapPlannedStatusStore.save(current.plannedStatuses) }
+        if previous.photosFriendsOnly != current.photosFriendsOnly { MapPhotosFriendsOnlyStore.save(current.photosFriendsOnly) }
         if previous.layers != current.layers || previous.azimuthStyle != current.azimuthStyle
             || previous.plannedStatuses != current.plannedStatuses {
             refreshMapRender()
@@ -2658,6 +2666,7 @@ struct MapExplorerView: View {
         if model.coverageDays != 0 { count += 1 }
         if model.azimuthStyle != .lines { count += 1 }
         if !model.includeObservedSites { count += 1 }
+        if filters.contains(.photo), model.photosFriendsOnly { count += 1 }
         if filters.contains(.planned), model.plannedStatusFilters != Set(PlannedActivationStatus.allCases) { count += 1 }
         if filters != MapFilterStore.defaultFilters { count += 1 }
         return count

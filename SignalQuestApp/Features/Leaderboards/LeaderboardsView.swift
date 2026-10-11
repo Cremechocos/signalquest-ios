@@ -402,6 +402,17 @@ struct LeaderboardsView: View {
         }
     }
 
+    /// Mon score pour la période affichée. Le profil ne porte que le cumul :
+    /// hors « Toujours », il n'est affiché que si ma rangée figure dans la page,
+    /// sinon le rang reste seul plutôt qu'à côté d'un total d'une autre période.
+    private func myPointsText(entries: [PointsLeaderboardEntry]) -> String? {
+        if let mine = entries.first(where: isMe) {
+            return "\(mine.score(for: model.period).formatted()) pts"
+        }
+        guard model.period == "all" else { return nil }
+        return model.profile?.points.map { "\($0.formatted()) pts" }
+    }
+
     @ViewBuilder
     private var pointsContent: some View {
         let entries = model.pointsResult.entries
@@ -430,7 +441,7 @@ struct LeaderboardsView: View {
                 podiumID: "points-\(model.pointsStamp)",
                 isRefreshing: model.isLoadingPoints,
                 myRank: entries.dropFirst(3).contains(where: isMe) ? nil : model.pointsResult.currentUserRank.map { rank in
-                    (rank: rank, total: nil, value: model.profile?.points.map { "\($0.formatted()) pts" })
+                    (rank: rank, total: nil, value: myPointsText(entries: entries))
                 },
                 error: model.pointsError
             ) {
@@ -511,6 +522,7 @@ private struct LeaderboardHeroCard: View {
     let user: AuthUser?
     let gamification: GamificationServicing
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var ringProgress: Double = 0
     @State private var shownPoints = 0
@@ -544,45 +556,22 @@ private struct LeaderboardHeroCard: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            HStack(spacing: SQSpace.lg) {
-                avatarWithRing
-                VStack(alignment: .leading, spacing: SQSpace.xs + 1) {
-                    Text("Ma progression").sqKicker()
-                    HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
-                        Text("\(shownPoints)")
-                            .font(SQFont.display(28, .bold))
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                            .foregroundStyle(SQColor.brandRed)
-                        Text("pts")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    if let remainingXP {
-                        Text("Encore \(remainingXP.formatted()) pts avant le niveau \(level + 1)")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .lineLimit(2)
-                    }
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: SQSpace.sm) {
-                            heroChip(icon: "flame.fill", text: String(localized: "\(streak) jours"))
-                            if !unlockedBadges.isEmpty {
-                                heroChip(icon: "rosette", text: String(localized: "\(unlockedBadges.count) badges"))
-                            }
-                        }
-                        VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            heroChip(icon: "flame.fill", text: String(localized: "\(streak) jours"))
-                            if !unlockedBadges.isEmpty {
-                                heroChip(icon: "rosette", text: String(localized: "\(unlockedBadges.count) badges"))
-                            }
-                        }
-                    }
+            // En très grand texte, l'anneau passe au-dessus : à côté, il ne
+            // laissait au texte qu'une colonne où les phrases se coupaient.
+            if dynamicTypeSize.isAccessibilitySize {
+                HStack {
+                    avatarWithRing
+                    Spacer(minLength: 0)
+                    chevron
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(SQColor.labelTertiary)
+                progressSummary
+            } else {
+                HStack(spacing: SQSpace.lg) {
+                    avatarWithRing
+                    progressSummary
+                    Spacer(minLength: 0)
+                    chevron
+                }
             }
             if !unlockedBadges.isEmpty {
                 badgesPreview
@@ -594,6 +583,48 @@ private struct LeaderboardHeroCard: View {
         .onAppear { animateIn() }
         .onChangeCompat(of: profile) { _, _ in animateIn() }
         .accessibilityElement(children: .combine)
+    }
+
+    private var chevron: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(SQColor.labelTertiary)
+    }
+
+    private var progressSummary: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs + 1) {
+            Text("Ma progression").sqKicker()
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                Text("\(shownPoints)")
+                    .font(SQFont.display(28, .bold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .foregroundStyle(SQColor.brandRed)
+                Text("pts")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            if let remainingXP {
+                Text("Encore \(remainingXP.formatted()) pts avant le niveau \(level + 1)")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: SQSpace.sm) {
+                    heroChip(icon: "flame.fill", text: String(localized: "\(streak) jours"))
+                    if !unlockedBadges.isEmpty {
+                        heroChip(icon: "rosette", text: String(localized: "\(unlockedBadges.count) badges"))
+                    }
+                }
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    heroChip(icon: "flame.fill", text: String(localized: "\(streak) jours"))
+                    if !unlockedBadges.isEmpty {
+                        heroChip(icon: "rosette", text: String(localized: "\(unlockedBadges.count) badges"))
+                    }
+                }
+            }
+        }
     }
 
     private var avatarWithRing: some View {

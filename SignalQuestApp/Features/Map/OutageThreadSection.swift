@@ -33,6 +33,14 @@ struct OutageThreadSection: View {
     @State private var draft = ""
     @State private var loading = true
     @State private var failed = false
+    /// La panne dont le fil est affiché : seul son premier chargement montre le spinner, les
+    /// relectures du direct se font sans faire clignoter le bloc.
+    @State private var loadedPostId: String?
+    @State private var nextCursor: String?
+    /// Vrai dès qu'une page suivante a été ajoutée : une relecture du direct ne la jette pas.
+    @State private var loadedMorePages = false
+    @State private var loadingMore = false
+    @State private var moreFailed = false
     @State private var posting = false
     @State private var postError: String?
     /// Les réponses déjà chargées, par commentaire parent. Une clé absente veut dire « jamais
@@ -75,10 +83,21 @@ struct OutageThreadSection: View {
                     ForEach(comments) { comment in
                         commentRow(comment)
                     }
-                    if commentCount > comments.count {
-                        Text("Et \(commentCount - comments.count) autre(s) commentaire(s)")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
+                    if nextCursor != nil {
+                        Button {
+                            Task { await loadMore() }
+                        } label: {
+                            HStack(spacing: SQSpace.sm) {
+                                Text(moreFailed ? "Réessayer de charger la suite" : "Voir plus de commentaires")
+                                if loadingMore { ProgressView() }
+                            }
+                            .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                        .disabled(loadingMore)
                     }
                 }
             }
@@ -354,14 +373,45 @@ struct OutageThreadSection: View {
     // MARK: - Actions
 
     private func load() async {
-        loading = true
+        let firstLoad = loadedPostId != postId
+        if firstLoad {
+            loading = true
+            loadedMorePages = false
+            nextCursor = nil
+        }
         do {
-            comments = try await services.comments.list(postId: postId, cursor: nil).comments
+            let page = try await services.comments.list(postId: postId, cursor: nil)
+            if loadedMorePages {
+                // Les pages suivantes déjà lues restent sous la première, relue.
+                let ids = Set(page.comments.map(\.id))
+                comments = page.comments + comments.filter { !ids.contains($0.id) }
+            } else {
+                comments = page.comments
+                nextCursor = page.nextCursor
+            }
             failed = false
+            loadedPostId = postId
         } catch {
-            failed = true
+            // Une relecture du direct qui échoue garde le fil déjà affiché.
+            if firstLoad { failed = true }
         }
         loading = false
+    }
+
+    private func loadMore() async {
+        guard let cursor = nextCursor, !loadingMore else { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        do {
+            let page = try await services.comments.list(postId: postId, cursor: cursor)
+            let ids = Set(comments.map(\.id))
+            comments += page.comments.filter { !ids.contains($0.id) }
+            nextCursor = page.nextCursor
+            loadedMorePages = true
+            moreFailed = false
+        } catch {
+            moreFailed = true
+        }
     }
 
     private func post() async {

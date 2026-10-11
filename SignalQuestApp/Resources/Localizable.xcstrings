@@ -863,6 +863,22 @@
         }
       }
     },
+    "Aucune publication récente" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No recent posts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune publication récente"
+          }
+        }
+      }
+    },
     "Avertissement." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -960,6 +976,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications »."
+          }
+        }
+      }
+    },
+    "Charger plus de publications" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load more posts"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Charger plus de publications"
           }
         }
       }
@@ -1100,6 +1132,22 @@
         }
       }
     },
+    "Contributeurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contributors"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contributeurs"
+          }
+        }
+      }
+    },
     "Coupures" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1147,6 +1195,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Demande invalide, expirée ou incohérente avec le serveur."
+          }
+        }
+      }
+    },
+    "Dernière observation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last observed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière observation"
           }
         }
       }
@@ -1214,6 +1278,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En attente du réseau mobile"
+          }
+        }
+      }
+    },
+    "Envoi en attente : ta publication partira automatiquement dès que possible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting to send: your post will go out automatically as soon as possible."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi en attente : ta publication partira automatiquement dès que possible."
           }
         }
       }
@@ -1507,6 +1587,22 @@
         }
       }
     },
+    "Jamais observée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Never observed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jamais observée"
+          }
+        }
+      }
+    },
     "Je comprends que l’ancienne clé sera remplacée et ne fonctionnera plus." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1745,6 +1841,22 @@
         }
       }
     },
+    "Ma zone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My area"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ma zone"
+          }
+        }
+      }
+    },
     "Mauvais" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1931,6 +2043,22 @@
         }
       }
     },
+    "Photos de mes amis seulement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only my friends’ photos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos de mes amis seulement"
+          }
+        }
+      }
+    },
     "Premier appareil approuvé." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2029,6 +2157,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien d'identifié"
+          }
+        }
+      }
+    },
+    "Réessayer de charger la suite" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try loading more again"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer de charger la suite"
           }
         }
       }
@@ -2237,6 +2381,38 @@
         }
       }
     },
+    "Sites opérateurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operator sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites opérateurs"
+          }
+        }
+      }
+    },
+    "Sites opérateurs opérationnels, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operational operator sites, %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites opérateurs opérationnels, %@"
+          }
+        }
+      }
+    },
     "Suivre cette connexion" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2390,6 +2566,22 @@
         }
       }
     },
+    "Un pylône partagé compte une fois par opérateur." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A shared mast counts once per operator."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un pylône partagé compte une fois par opérateur."
+          }
+        }
+      }
+    },
     "Upload incomplet (%lld octets)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2437,6 +2629,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Valider %@ %@"
+          }
+        }
+      }
+    },
+    "Voir plus de commentaires" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show more comments"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir plus de commentaires"
           }
         }
       }
@@ -2852,6 +3060,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "sur 24 heures"
+          }
+        }
+      }
+    },
+    "tout l’historique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "all history"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "tout l’historique"
           }
         }
       }

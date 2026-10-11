@@ -444,7 +444,7 @@ struct SpeedtestWidgetEntryView: View {
         // Layout proportionnel : le cadran se dimensionne selon la place réelle,
         // pour garantir un vrai espacement entre la pastille réseau et la jauge.
         GeometryReader { geo in
-            let dial = min(geo.size.width, geo.size.height * 0.62)
+            let dial = min(geo.size.width, geo.size.height * 0.54)
             VStack(spacing: 0) {
                 HStack {
                     BrandMark(showWordmark: false)
@@ -460,6 +460,14 @@ struct SpeedtestWidgetEntryView: View {
                     CompactMetric(icon: "bolt.fill", value: s.pingMs.map { "\(Int($0.rounded())) ms" } ?? "—", tint: WidgetPalette.latency)
                 }
                 .frame(maxWidth: .infinity)
+                // L'âge du résultat : un débit d'hier ne dit rien du réseau d'aujourd'hui.
+                Text(s.date, style: .relative)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(WidgetPalette.labelSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 3)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -506,7 +514,8 @@ struct SpeedtestWidgetEntryView: View {
         return Gauge(value: speedNormalized(dl)) {
             Image(systemName: "speedometer")
         } currentValueLabel: {
-            Text("\(Int(dl.rounded()))")
+            // Sans test, « — » plutôt qu'un 0 qui se lirait comme une mesure.
+            Text(entry.snapshot == nil ? "—" : "\(Int(dl.rounded()))")
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)

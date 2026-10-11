@@ -178,6 +178,10 @@ struct MapAdvancedFilterSheet: View {
                         || (kind == .communitySite && !communityAvailable))
                 }
             }
+            if showsFriendsLayer && draft.layers.contains(.photo) {
+                Toggle("Photos de mes amis seulement", isOn: $draft.photosFriendsOnly)
+                    .tint(SQColor.accent).accessibilityIdentifier("map.filters.photosFriendsOnly")
+            }
             if draft.operatorName.uppercased() == "ALL" {
                 hint("Choisis un opérateur pour afficher la couverture.")
             }

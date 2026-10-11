@@ -76,7 +76,7 @@ final class ANFRStatsViewModel: ObservableObject {
 
     // MARK: Dérivations (rollups depuis national.latest)
 
-    /// Total national de supports opérationnels (somme bande 4G globale + 5G n78).
+    /// Total national de sites opérateurs (somme par opérateur sur la bande filtrée).
     /// On somme les bandes « porteuses » par opérateur pour un total de sites.
     var totalOperational: Int {
         latestForMetric.reduce(0) { $0 + $1.value }
@@ -324,10 +324,12 @@ struct ANFRStatsView: View {
         let filterLabel = model.selectedFilter.label
         let subtext = model.showProjected
             ? String(localized: "Total opérationnel + projeté, \(filterLabel)")
-            : String(localized: "Supports opérationnels, \(filterLabel)")
+            : String(localized: "Sites opérateurs opérationnels, \(filterLabel)")
             
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Supports déployés")
+            // Somme par opérateur : un pylône partagé compte une fois par opérateur,
+            // à la différence du total « Tous » de l'écran Bandes.
+            Text("Sites opérateurs")
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
@@ -342,6 +344,10 @@ struct ANFRStatsView: View {
             Text(subtext)
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
+            Text("Un pylône partagé compte une fois par opérateur.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.lg)

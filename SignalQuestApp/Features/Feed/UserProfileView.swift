@@ -913,13 +913,18 @@ struct UserProfileView: View {
         if model.isLoading && model.items.isEmpty {
             LoadingSkeleton().sqShimmer()
         } else if model.items.isEmpty {
-            EmptyStateView(
-                title: "Aucune publication",
-                message: model.profile?.isSelf == true
-                    ? "Partage ton premier speedtest ou post."
-                    : "Les publications récentes de ce profil apparaîtront ici.",
-                systemImage: "sparkles"
-            )
+            // Pour un autre profil, seules les publications récentes du fil public
+            // sont parcourues : on le dit, et on laisse chercher plus loin.
+            VStack(spacing: SQSpace.md) {
+                EmptyStateView(
+                    title: model.profile?.isSelf == true ? "Aucune publication" : "Aucune publication récente",
+                    message: model.profile?.isSelf == true
+                        ? "Partage ton premier speedtest ou post."
+                        : "Les publications récentes de ce profil apparaîtront ici.",
+                    systemImage: "sparkles"
+                )
+                loadMoreButton
+            }
         } else {
             LazyVStack(alignment: .leading, spacing: SQSpace.lg + 2) {
                 ForEach(model.items) { item in
@@ -947,8 +952,33 @@ struct UserProfileView: View {
                         .tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, SQSpace.md)
+                } else {
+                    // Une page parcourue sans résultat ne fait apparaître aucune carte :
+                    // le chargement au défilement ne se relancerait pas tout seul.
+                    loadMoreButton
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var loadMoreButton: some View {
+        if model.nextCursor != nil {
+            Button {
+                Task { await model.loadMore() }
+            } label: {
+                HStack(spacing: SQSpace.sm) {
+                    Text("Charger plus de publications")
+                    if model.isLoadingMore { ProgressView() }
+                }
+                .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                .foregroundStyle(SQColor.accentInk)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .disabled(model.isLoadingMore)
+            .accessibilityIdentifier("profile.posts.loadMore")
         }
     }
 

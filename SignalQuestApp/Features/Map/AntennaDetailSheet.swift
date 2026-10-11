@@ -1277,7 +1277,8 @@ struct AntennaDetailSheet: View {
         AntennaRadioIdentifiersView(
             identifiers: core.cellIdentifiers,
             azimuths: displayedAzimuths,
-            tint: operatorColor
+            tint: operatorColor,
+            operatorName: selectedOperator
         )
         .foregroundStyle(SQColor.label)
     }

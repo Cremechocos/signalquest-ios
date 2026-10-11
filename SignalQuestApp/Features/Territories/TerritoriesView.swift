@@ -13,6 +13,14 @@ struct TerritoriesView: View {
 
     @StateObject private var model: TerritoriesViewModel
     @Environment(\.dismiss) private var dismiss
+    /// Cellule touchée : retrouvée par sa clé dans la grille courante, elle
+    /// disparaît d'elle-même quand la zone rechargée ne la contient plus.
+    @State private var selectedCellKey: String?
+
+    private var selectedCell: TerritoryCell? {
+        guard let selectedCellKey else { return nil }
+        return model.grid?.cells.first { $0.cellKey == selectedCellKey }
+    }
 
     init(service: GamificationServicing, marketCode: String? = nil, operatorKey: String? = nil) {
         self.service = service
@@ -27,7 +35,8 @@ struct TerritoriesView: View {
         ZStack(alignment: .bottom) {
             TerritoryMapView(
                 cells: model.grid?.cells ?? [],
-                onRegionChange: { region, span in model.regionChanged(region, span: span) }
+                onRegionChange: { region, span in model.regionChanged(region, span: span) },
+                onSelectCell: { key in selectedCellKey = key }
             )
             .ignoresSafeArea()
 
@@ -58,6 +67,9 @@ struct TerritoriesView: View {
                     .accessibilityIdentifier("territories.loadError")
                 } else if !model.isZoomedOut, model.grid?.cells.isEmpty == true, !model.isLoading {
                     notice("Aucun territoire dans cette zone", icon: "square.grid.3x3")
+                }
+                if let selectedCell, !model.isZoomedOut {
+                    cellCard(selectedCell)
                 }
                 legend
             }
@@ -97,12 +109,72 @@ struct TerritoriesView: View {
         .sqShadowSoft()
     }
 
+    /// Fiche d'une cellule touchée : ce que la grille charge déjà, enfin lisible.
+    private func cellCard(_ cell: TerritoryCell) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(cell.statusLabel)
+                    .font(SQFont.body(15, .semibold, relativeTo: .headline))
+                    .foregroundStyle(SQColor.label)
+                if cell.mine {
+                    Text("Ma zone")
+                        .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                        .foregroundStyle(SQColor.accentInk)
+                }
+                Spacer(minLength: SQSpace.sm)
+                Button {
+                    selectedCellKey = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityLabel(Text("Fermer"))
+                .accessibilityIdentifier("territories.cell.close")
+            }
+            cellRow("Mesures", value: cell.pointsCount.formatted())
+            cellRow("Contributeurs", value: cell.userCount.formatted())
+            cellRow(
+                "Dernière observation",
+                value: cell.lastObservedAt.map { $0.formatted(.relative(presentation: .named)) }
+                    ?? String(localized: "Jamais observée")
+            )
+        }
+        .padding(.leading, SQSpace.md)
+        .padding(.vertical, SQSpace.xs)
+        .background(SQColor.surfaceGlass, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqShadowSoft()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("territories.cell")
+    }
+
+    private func cellRow(_ title: LocalizedStringKey, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .foregroundStyle(SQColor.labelSecondary)
+            Spacer(minLength: SQSpace.sm)
+            Text(value)
+                .foregroundStyle(SQColor.label)
+                .monospacedDigit()
+        }
+        .font(SQFont.body(13, relativeTo: .subheadline))
+        .padding(.trailing, SQSpace.md)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Largeur d'une entrée de légende, qui suit la taille du texte : à 104 pt
+    /// fixes, « Zone inexplorée » se coupait en très grand texte.
+    @ScaledMetric(relativeTo: .caption) private var legendColumnWidth: CGFloat = 104
+
     /// Légende complète (SOC-39) : les cinq états dessinés sur la carte, dont
     /// « À rafraîchir », et le contour brique des zones où tu as contribué.
     private var legend: some View {
         let statuses: [TerritoryCell.Status] = [.virgin, .observed, .reliable, .complete, .stale]
         return LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 104), spacing: SQSpace.sm, alignment: .leading)],
+            columns: [GridItem(.adaptive(minimum: legendColumnWidth), spacing: SQSpace.sm, alignment: .leading)],
             alignment: .leading,
             spacing: SQSpace.xs
         ) {
@@ -114,10 +186,12 @@ struct TerritoriesView: View {
                     lastObservedAt: nil, mine: false
                 )
                 legendItem(sample.statusLabel, fill: Color(sample.fillColor),
-                           stroke: SQColor.label.opacity(0.15), lineWidth: 0.5)
+                           stroke: SQColor.label.opacity(0.15), lineWidth: 0.5,
+                           count: model.isZoomedOut ? nil : model.grid?.count(of: status))
             }
             legendItem(String(localized: "Mes zones"), fill: .clear,
-                       stroke: SQColor.brandRed, lineWidth: 1.5)
+                       stroke: SQColor.brandRed, lineWidth: 1.5,
+                       count: model.isZoomedOut ? nil : model.grid?.cells.filter(\.mine).count)
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
@@ -125,7 +199,7 @@ struct TerritoriesView: View {
         .sqShadowSoft()
     }
 
-    private func legendItem(_ label: String, fill: Color, stroke: Color, lineWidth: CGFloat) -> some View {
+    private func legendItem(_ label: String, fill: Color, stroke: Color, lineWidth: CGFloat, count: Int?) -> some View {
         HStack(spacing: SQSpace.xs) {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(fill)
@@ -146,6 +220,9 @@ struct TerritoriesView: View {
         // VoiceOver.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label)
+        // La grille dessinée est muette pour VoiceOver : la légende en donne
+        // le décompte pour la zone affichée.
+        .accessibilityValue(count.map { $0.formatted() } ?? "")
     }
 }
 
@@ -237,6 +314,11 @@ final class TerritoriesViewModel: ObservableObject {
 struct TerritoryMapView: UIViewRepresentable {
     let cells: [TerritoryCell]
     let onRegionChange: (MKCoordinateRegion, MKCoordinateSpan) -> Void
+    var onSelectCell: (String?) -> Void = { _ in }
+
+    /// Span d'ouverture sur la position : un quartier, bien sous le plafond
+    /// `TerritoriesViewModel.maxSpanDegrees`.
+    static let initialSpanDegrees: Double = 0.05
 
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
@@ -251,6 +333,27 @@ struct TerritoryMapView: UIViewRepresentable {
         let configuration = MKStandardMapConfiguration(elevationStyle: .flat)
         configuration.pointOfInterestFilter = .excludingAll
         map.preferredConfiguration = configuration
+        if let location = map.userLocation.location {
+            context.coordinator.centerOnce(on: location.coordinate, in: map)
+        }
+
+        let tracking = MKUserTrackingButton(mapView: map)
+        tracking.backgroundColor = UIColor(SQColor.surfaceGlass)
+        tracking.layer.cornerRadius = 12
+        tracking.layer.cornerCurve = .continuous
+        tracking.accessibilityIdentifier = "territories.userTracking"
+        tracking.translatesAutoresizingMaskIntoConstraints = false
+        map.addSubview(tracking)
+        NSLayoutConstraint.activate([
+            tracking.widthAnchor.constraint(equalToConstant: 44),
+            tracking.heightAnchor.constraint(equalToConstant: 44),
+            tracking.topAnchor.constraint(equalTo: map.safeAreaLayoutGuide.topAnchor, constant: SQSpace.md),
+            tracking.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -SQSpace.md),
+        ])
+
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
+        tap.delegate = context.coordinator
+        map.addGestureRecognizer(tap)
         return map
     }
 
@@ -266,19 +369,55 @@ struct TerritoryMapView: UIViewRepresentable {
         context.coordinator.render(cells: cells, identity: identity, on: map)
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onRegionChange: onRegionChange) }
+    func makeCoordinator() -> Coordinator { Coordinator(onRegionChange: onRegionChange, onSelectCell: onSelectCell) }
 
-    final class Coordinator: NSObject, MKMapViewDelegate {
+    final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
         let onRegionChange: (MKCoordinateRegion, MKCoordinateSpan) -> Void
+        let onSelectCell: (String?) -> Void
         var lastIdentity: TerritoryRenderIdentity?
+        private var cells: [TerritoryCell] = []
+        private var hasCentered = false
 
-        init(onRegionChange: @escaping (MKCoordinateRegion, MKCoordinateSpan) -> Void) {
+        init(onRegionChange: @escaping (MKCoordinateRegion, MKCoordinateSpan) -> Void,
+             onSelectCell: @escaping (String?) -> Void = { _ in }) {
             self.onRegionChange = onRegionChange
+            self.onSelectCell = onSelectCell
+        }
+
+        /// Premier affichage seulement : ensuite, la carte reste où
+        /// l'utilisateur l'a menée.
+        func centerOnce(on coordinate: CLLocationCoordinate2D, in map: MKMapView) {
+            guard !hasCentered, CLLocationCoordinate2DIsValid(coordinate) else { return }
+            hasCentered = true
+            let span = MKCoordinateSpan(
+                latitudeDelta: TerritoryMapView.initialSpanDegrees,
+                longitudeDelta: TerritoryMapView.initialSpanDegrees
+            )
+            map.setRegion(MKCoordinateRegion(center: coordinate, span: span), animated: false)
+        }
+
+        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+            guard let location = userLocation.location else { return }
+            centerOnce(on: location.coordinate, in: mapView)
+        }
+
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            guard let map = gesture.view as? MKMapView else { return }
+            let point = MKMapPoint(map.convert(gesture.location(in: map), toCoordinateFrom: map))
+            onSelectCell(cells.first { $0.mapRect.contains(point) }?.cellKey)
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            !(touch.view is UIControl)
         }
 
         func render(cells: [TerritoryCell], identity: TerritoryRenderIdentity, on map: MKMapView) {
             guard identity != lastIdentity else { return }
             lastIdentity = identity
+            self.cells = cells
             map.removeOverlays(map.overlays)
             guard !cells.isEmpty else { return }
             let overlay = TerritoryOverlay(cells: cells.map {

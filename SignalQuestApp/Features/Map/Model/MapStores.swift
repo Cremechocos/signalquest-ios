@@ -246,6 +246,18 @@ enum MapMarketStore {
     }
 }
 
+/// Persiste le choix « photos de mes amis seulement ». Absence de clé = toutes
+/// les photos.
+enum MapPhotosFriendsOnlyStore {
+    static let key = "map.photosFriendsOnly.v1"
+
+    static func load() -> Bool { UserDefaults.standard.bool(forKey: key) }
+
+    static func save(_ friendsOnly: Bool) {
+        UserDefaults.standard.set(friendsOnly, forKey: key)
+    }
+}
+
 /// Persiste les statuts prévisionnels visibles. Absence de clé = jamais réglé
 /// → les 4 statuts. Tableau vide stocké = choix explicite « tout masquer ».
 enum MapPlannedStatusStore {

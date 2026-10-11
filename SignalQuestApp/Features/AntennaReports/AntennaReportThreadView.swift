@@ -19,12 +19,21 @@ enum AntennaReportImage: Identifiable {
         }
     }
 
+    /// Images embarquées déjà décodées, par chaîne source : le fil est réévalué
+    /// à chaque frappe, le décodage base64 et la réduction ne doivent pas l'être.
+    /// La même instance garde aussi un `id` stable.
+    @MainActor private static let inlineCache = NSCache<NSString, UIImage>()
+
     /// Parse une chaîne d'image du backend en source affichable.
+    @MainActor
     static func parse(_ raw: String) -> AntennaReportImage? {
         if raw.hasPrefix("data:") {
+            let key = raw as NSString
+            if let cached = inlineCache.object(forKey: key) { return .inline(cached) }
             guard let comma = raw.firstIndex(of: ","),
                   let data = Data(base64Encoded: String(raw[raw.index(after: comma)...])),
                   let image = ImagePipeline.downsample(data: data, maxPixel: 1200) else { return nil }
+            inlineCache.setObject(image, forKey: key)
             return .inline(image)
         }
         guard let url = URL(string: raw), url.scheme?.hasPrefix("http") == true else { return nil }

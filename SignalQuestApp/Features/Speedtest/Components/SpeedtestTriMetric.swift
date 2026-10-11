@@ -52,14 +52,18 @@ struct SpeedtestTriMetric: View {
         return value
     }
 
+    /// Pendant sa phase, la cellule lit le débit instantané, comme l'aiguille ;
+    /// une fois la phase passée, elle garde la moyenne retenue pour le résultat.
     var downloadMbps: Double? {
-        let value = result?.downloadAverageMbps ?? progress.downloadAverageMbps ?? progress.downloadLiveMbps
+        let live = activePhase == .download && result == nil ? progress.downloadLiveMbps : nil
+        let value = live ?? result?.downloadAverageMbps ?? progress.downloadAverageMbps ?? progress.downloadLiveMbps
         guard let value, value.isFinite, value > 0 else { return nil }
         return value
     }
 
     var uploadMbps: Double? {
-        let value = result?.uploadAverageMbps ?? progress.uploadAverageMbps ?? progress.uploadLiveMbps
+        let live = activePhase == .upload && result == nil ? progress.uploadLiveMbps : nil
+        let value = live ?? result?.uploadAverageMbps ?? progress.uploadAverageMbps ?? progress.uploadLiveMbps
         guard let value, value.isFinite, value > 0 else { return nil }
         return value
     }

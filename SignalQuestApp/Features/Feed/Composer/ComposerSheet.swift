@@ -85,6 +85,9 @@ final class ComposerViewModel: ObservableObject {
     @Published var isBusy = false
     @Published var errorMessage: String?
     @Published var didPublish = false
+    /// Envoi resté dans la file après un échec temporaire : il partira tout seul
+    /// au prochain chargement du fil, il ne faut donc pas le republier.
+    @Published var isQueued = false
 
     // Speedtest joint au post (targetType=speedtest côté backend).
     @Published var attachedSpeedtest: SocialShareableSpeedtest?
@@ -208,7 +211,7 @@ final class ComposerViewModel: ObservableObject {
         // En modification, seuls le texte et la visibilité partent (`saveEdit`) :
         // une photo ajoutée ne rendait pas « Enregistrer » utile (AF-FIL-05).
         if isEditing { return !body.isEmpty && !isTextTooLong && !isBusy }
-        return hasContent && !isTextTooLong && !isBusy
+        return hasContent && !isTextTooLong && !isBusy && !isQueued
     }
 
     var previewAuthor: SocialFeedAuthor {
@@ -381,10 +384,24 @@ final class ComposerViewModel: ObservableObject {
             didPublish = true
             clearDraft()
             Haptics.success()
+        } catch where Self.staysQueued(error) {
+            // Le post attend dans la file d'envoi : on le dit et on vide le
+            // brouillon, sinon un second « Publier » le doublerait.
+            isQueued = true
+            errorMessage = nil
+            clearDraft()
         } catch {
             errorMessage = error.userFacingMessage
             Haptics.error()
         }
+    }
+
+    /// Réseau absent ou serveur momentanément indisponible : le post reste dans
+    /// la file. Un refus définitif l'en retire, et l'erreur reste affichée.
+    static func staysQueued(_ error: Error) -> Bool {
+        if error is URLError { return true }
+        guard error is APIError else { return false }
+        return !error.isPermanentRequestFailure
     }
 }
 
@@ -558,6 +575,14 @@ struct ComposerSheet: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.98)))
                     }
 
+                    if model.isQueued {
+                        Label("Envoi en attente : ta publication partira automatiquement dès que possible.",
+                              systemImage: "clock.arrow.circlepath")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .padding(.horizontal, SQSpace.lg)
+                            .accessibilityIdentifier("composer.queued")
+                    }
                     if let error = model.errorMessage {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .font(SQType.caption)
@@ -574,7 +599,7 @@ struct ComposerSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }
+                    Button(model.isQueued ? "Fermer" : "Annuler") { dismiss() }
                         .tint(SQColor.brandRed)
                 }
                 

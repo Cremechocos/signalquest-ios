@@ -1156,6 +1156,16 @@ struct FeedView: View {
             else { return nil }
             return GalleryTile(item: item, url: url)
         }
+        if tiles.isEmpty, !items.isEmpty, !model.isLoadingMore {
+            // Des publications sans image : la grille resterait vide sans rien dire.
+            EmptyStateView(
+                title: String(localized: "Rien ici pour l’instant"),
+                message: model.tab.emptyMessage,
+                systemImage: "photo.on.rectangle"
+            )
+            .padding(.top, SQSpace.xxl)
+            .onAppear { Task { await model.loadMore() } }
+        }
         LazyVGrid(
             columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.xs), count: 3),
             spacing: SQSpace.xs
@@ -1180,6 +1190,12 @@ struct FeedView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("Photo de \(tile.item.author.displayName)"))
+                .onAppear {
+                    // La grille n'a pas de cartes : c'est sa dernière tuile qui demande la suite.
+                    if tile.id == tiles.last?.id {
+                        Task { await model.loadMore() }
+                    }
+                }
             }
         }
     }

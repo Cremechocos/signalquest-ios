@@ -14,12 +14,15 @@ struct MapFilterSelection: Equatable {
     var layers: Set<MapDisplayItem.Kind>
     var includeObserved: Bool
     var plannedStatuses: Set<PlannedActivationStatus>
+    /// Couche Photos restreinte aux amis : un choix à part, jamais déduit de la
+    /// couche Amis.
+    var photosFriendsOnly: Bool
 
     static func defaults(market: String, operatorName: String) -> Self {
         Self(market: market, operatorName: operatorName, technologies: [], bands: [],
              bandMatch: .any, azimuthStyle: .lines, sharing: [], speedtestDays: 0,
              coverageDays: 0, layers: MapFilterStore.defaultFilters, includeObserved: true,
-             plannedStatuses: Set(PlannedActivationStatus.allCases))
+             plannedStatuses: Set(PlannedActivationStatus.allCases), photosFriendsOnly: false)
     }
 
     /// Only context-dependent values are pruned. Layer bits are preserved:

@@ -45,4 +45,15 @@ final class SectorNumberingTests: XCTestCase {
         XCTAssertEqual(SectorNumbering.displayValue(index: 0, operatorName: "UnknownCarrier"), 1)
         XCTAssertEqual(SectorNumbering.submissionValue(index: 0, operatorName: "UnknownCarrier"), 0)
     }
+
+    func testRadioIdentifiersPickTheAzimuthOfTheOperatorNumbering() {
+        // SFR : secteur 0 = premier azimut ; Orange : secteur 1 = premier azimut.
+        XCTAssertEqual(AntennaRadioIdentifiersView.azimuthIndex(forSector: 0, operatorName: "SFR"), 0)
+        XCTAssertEqual(AntennaRadioIdentifiersView.azimuthIndex(forSector: 2, operatorName: "SFR"), 2)
+        XCTAssertEqual(AntennaRadioIdentifiersView.azimuthIndex(forSector: 1, operatorName: "ORANGE"), 0)
+        XCTAssertEqual(AntennaRadioIdentifiersView.azimuthIndex(forSector: 4, operatorName: "FREE MOBILE"), 3)
+        XCTAssertNil(AntennaRadioIdentifiersView.azimuthIndex(forSector: 0, operatorName: "ORANGE"))
+        // Tous opérateurs : convention historique, à partir de 1.
+        XCTAssertEqual(AntennaRadioIdentifiersView.azimuthIndex(forSector: 1, operatorName: "ALL"), 0)
+    }
 }

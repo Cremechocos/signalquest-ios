@@ -130,6 +130,15 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(metrics.mbpsText(metrics.downloadMbps), "198")
         XCTAssertEqual(metrics.mbpsText(metrics.uploadMbps), SpeedtestDetailSheet.formatSpeedParts(64.2).value)
 
+        // Pendant sa phase, la cellule lit le même débit instantané que l'aiguille.
+        let liveProgress = SpeedtestLiveProgress(
+            phase: .download,
+            downloadLiveMbps: 240,
+            downloadAverageMbps: 198.4
+        )
+        XCTAssertEqual(SpeedtestTriMetric(activePhase: .download, progress: liveProgress, result: nil).downloadMbps, 240)
+        XCTAssertEqual(SpeedtestTriMetric(activePhase: .upload, progress: liveProgress, result: nil).downloadMbps, 198.4)
+
         let dial = SignatureSpeedDial(
             value: 198.4,
             unit: "Mbps",

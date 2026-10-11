@@ -590,8 +590,11 @@ struct SignalQuestHomeView: View {
                         .font(SQFont.display(20, .bold))
                         .foregroundStyle(SQColor.label)
                     Spacer()
-                    if let count = pulse?.measurementsCount, count > 0 {
-                        Text("\(count) mesures")
+                    if let pulse, pulse.measurementsCount > 0 {
+                        // La période du pouls, pour qu'on ne la confonde pas avec celle
+                        // de la comparaison ouverte au toucher (tout l'historique).
+                        Text([String(localized: "\(pulse.measurementsCount) mesures"), pulsePeriodLabel(pulse)]
+                            .joined(separator: " · "))
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                     }
@@ -643,6 +646,15 @@ struct SignalQuestHomeView: View {
                 )
                 .environmentObject(services)
             }
+        }
+    }
+
+    private func pulsePeriodLabel(_ pulse: NetworkPulse) -> String {
+        switch pulse.windowDays {
+        case ...7: return String(localized: "7 derniers jours")
+        case ...30: return String(localized: "30 derniers jours")
+        case ...90: return String(localized: "3 derniers mois")
+        default: return String(localized: "12 derniers mois")
         }
     }
 

@@ -15,6 +15,17 @@ enum CarPlayLocationRenderGate {
     }
 }
 
+/// Signale le changement d'onglet. `CPTabBarTemplate.delegate` est une référence
+/// faible : le coordinateur le retient.
+@MainActor
+final class CarPlayTabBarDelegate: NSObject, CPTabBarTemplateDelegate {
+    var onSelect: (CPTemplate) -> Void = { _ in }
+
+    func tabBarTemplate(_ tabBarTemplate: CPTabBarTemplate, didSelect selectedTemplate: CPTemplate) {
+        onSelect(selectedTemplate)
+    }
+}
+
 /// Pilote la surface CarPlay : pile de templates, carte, chargement, cycle de vie.
 ///
 /// Le délégué de scène se contente de le créer et de le détruire ; toute la
@@ -205,6 +216,8 @@ final class CarPlayCoordinator {
         searchController = nil
         layersTemplate = nil
         hereTemplate = nil
+        tabBarDelegate = nil
+        hereLoadedAt = nil
         poiTemplate = nil
         poiController = nil
         sentinelleTemplate = nil
@@ -274,6 +287,11 @@ final class CarPlayCoordinator {
     // MARK: - Racine à onglets
 
     private var hereTemplate: CPInformationTemplate?
+    private var tabBarDelegate: CarPlayTabBarDelegate?
+    /// Dernier remplissage de l'onglet « Ici ». L'onglet suit le trajet : il se
+    /// recharge quand on y revient, au plus une fois par intervalle.
+    private var hereLoadedAt: Date?
+    private static let hereRefreshInterval: TimeInterval = 30
     private var poiTemplate: CPPointOfInterestTemplate?
     private var sentinelleTemplate: CPListTemplate?
     /// Retenu ici : `pointOfInterestDelegate` est une référence faible, un
@@ -323,7 +341,16 @@ final class CarPlayCoordinator {
                                           systemImage: "wifi.router.fill"),
         ]
 
-        interface.setRoot(CarPlayTabBarBuilder.make(tabs: tabs), animated: true) { [weak self] success, _ in
+        let tabBar = CarPlayTabBarBuilder.make(tabs: tabs)
+        let tabDelegate = CarPlayTabBarDelegate()
+        tabDelegate.onSelect = { [weak self] selected in
+            guard let self, let here = hereTemplate, selected === here else { return }
+            refreshHereIfStale(here)
+        }
+        tabBar.delegate = tabDelegate
+        tabBarDelegate = tabDelegate
+
+        interface.setRoot(tabBar, animated: true) { [weak self] success, _ in
             guard let self, !success else { return }
             installListRoot()
         }
@@ -356,6 +383,8 @@ final class CarPlayCoordinator {
     /// d'entitlement qui n'autorisent pas les onglets.
     private func installListRoot() {
         hereTemplate = nil
+        tabBarDelegate = nil
+        hereLoadedAt = nil
         poiTemplate = nil
         poiController = nil
         sentinelleTemplate = nil
@@ -815,6 +844,7 @@ final class CarPlayCoordinator {
     /// Remplit l'écran « Ici ». Séparé de `showHere` pour que l'ONGLET puisse
     /// s'alimenter sans rien empiler : en mode onglets, cet écran est la racine.
     private func loadHere(into template: CPInformationTemplate) {
+        hereLoadedAt = Date()
         let generation = beginScreen(.here)
         track { [weak self] in
             guard let self else { return }
@@ -866,6 +896,11 @@ final class CarPlayCoordinator {
                 showHereWithoutLocation(into: template)
             }
         }
+    }
+
+    private func refreshHereIfStale(_ template: CPInformationTemplate) {
+        if let hereLoadedAt, Date().timeIntervalSince(hereLoadedAt) < Self.hereRefreshInterval { return }
+        loadHere(into: template)
     }
 
     private func showHereWithoutLocation(into template: CPInformationTemplate) {

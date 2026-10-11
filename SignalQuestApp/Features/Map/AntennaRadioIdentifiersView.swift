@@ -13,6 +13,8 @@ struct AntennaRadioIdentifiersView: View {
     /// Azimuts du site, pour donner son orientation à chaque secteur.
     let azimuths: [Double]
     let tint: Color
+    /// Opérateur du site : sa convention dit quel azimut porte chaque numéro.
+    var operatorName: String? = nil
 
     @State private var expandedSector: Int?
     @State private var copiedValue: String?
@@ -242,13 +244,20 @@ struct AntennaRadioIdentifiersView: View {
         return numbers.map { number in
             RadioSector(
                 id: number,
-                // Les secteurs sont numérotés à partir de 1 et suivent l'ordre des
-                // azimuts publiés par l'ANFR.
-                azimuth: azimuths.indices.contains(number - 1) ? azimuths[number - 1] : nil,
+                azimuth: Self.azimuthIndex(forSector: number, operatorName: operatorName)
+                    .flatMap { azimuths.indices.contains($0) ? azimuths[$0] : nil },
                 pcis: pcisBySector[number] ?? [],
                 cells: cellsBySector[number] ?? []
             )
         }
+    }
+
+    /// Rang de l'azimut d'un secteur, dans l'ordre publié par l'ANFR. SFR
+    /// numérote à partir de 0, les autres opérateurs à partir de 1.
+    static func azimuthIndex(forSector number: Int, operatorName: String?) -> Int? {
+        let index = SectorNumbering.resolveMode(mccMnc: nil, operatorName: operatorName) == .zeroBased
+            ? number : number - 1
+        return index >= 0 ? index : nil
     }
 
     /// Ce qui n'a pu être rattaché à aucun secteur — affiché quand même, plutôt

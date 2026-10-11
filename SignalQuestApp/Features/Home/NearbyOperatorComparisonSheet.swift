@@ -147,7 +147,8 @@ struct NearbyOperatorComparisonSheet: View {
     private var footer: some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: "person.3.fill").font(.caption).foregroundStyle(SQColor.labelTertiary)
-            Text("\(totalSamples) mesure au total · rayon \(radiusText)")
+            Text([String(localized: "\(totalSamples) mesure au total · rayon \(radiusText)"),
+                  String(localized: "tout l’historique")].joined(separator: " · "))
                 .font(SQFont.body(12))
                 .foregroundStyle(SQColor.labelSecondary)
         }

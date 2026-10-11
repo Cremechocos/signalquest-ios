@@ -72,6 +72,15 @@ final class MapFilterSelectionTests: XCTestCase {
         XCTAssertTrue(changed.requiresNetworkReload(comparedTo: baseline))
     }
 
+    func testPhotosShowEveryMemberUntilFriendsOnlyIsChosen() {
+        let baseline = MapFilterSelection.defaults(market: "FR", operatorName: "SFR")
+        XCTAssertTrue(baseline.layers.contains(.friend))
+        XCTAssertFalse(baseline.photosFriendsOnly, "La couche Amis ne restreint pas les photos")
+        var changed = baseline
+        changed.photosFriendsOnly = true
+        XCTAssertTrue(changed.requiresNetworkReload(comparedTo: baseline))
+    }
+
     func testBandMatchWithoutBandsStillInvalidatesTheRawLoadContext() {
         let baseline = MapFilterSelection.defaults(market: "FR", operatorName: "SFR")
         var changed = baseline
