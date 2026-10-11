@@ -330,7 +330,7 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         // Un nœud sans PLMN exact n'est pas une recherche mondiale : l'API
         // historique pourrait appliquer son marché par défaut. Il reste lisible,
         // mais aucune réponse ne doit lui fabriquer un rattachement.
-        let eligible = window.filter { $0.observedPlmn != nil && $0.resolvedMarketCode != nil }
+        let eligible = window.filter(\.isCheckable)
         guard !eligible.isEmpty else { return [:] }
         let items = eligible.map(Self.batchItem)
         do {

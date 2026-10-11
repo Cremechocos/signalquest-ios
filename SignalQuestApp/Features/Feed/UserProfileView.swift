@@ -168,6 +168,46 @@ final class UserProfileViewModel: ObservableObject {
         }
     }
 
+    func votePoll(_ item: UnifiedSocialFeedItem, option: FeedPoll.Option) {
+        guard let poll = item.poll, poll.isOpen else { return }
+        let removing = option.votedByMe
+        Task {
+            do {
+                guard let updated = try await service.votePoll(postId: item.id, optionId: option.id, removing: removing) else { return }
+                updateItem(id: item.id) { current in var copy = current; copy.poll = updated; return copy }
+            } catch {
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
+    func muteNotifications(_ item: UnifiedSocialFeedItem) {
+        Task {
+            do {
+                _ = try await service.muteNotifications(postId: item.id)
+                updateItem(id: item.id) { current in
+                    var copy = current
+                    copy.notificationsMutedByMe = !(current.notificationsMutedByMe ?? false)
+                    return copy
+                }
+            } catch {
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
+    /// Renvoie l'id du message créé, nil si échec (la feuille affiche l'échec).
+    func share(_ item: UnifiedSocialFeedItem, to conversation: MessageConversation) async -> String? {
+        do {
+            let messageId = try await service.share(postId: item.id, conversationId: conversation.id)
+            Haptics.success()
+            return messageId
+        } catch {
+            Haptics.error()
+            return nil
+        }
+    }
+
     private func updateItem(id: String, _ transform: (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem) {
         items = items.map { $0.id == id ? transform($0) : $0 }
     }
@@ -276,12 +316,14 @@ struct UserProfileView: View {
         case detail(UnifiedSocialFeedItem)
         case comments(UnifiedSocialFeedItem)
         case report(UnifiedSocialFeedItem)
+        case share(UnifiedSocialFeedItem)
         case reportUser
         var id: String {
             switch self {
             case .detail(let i): return "detail-\(i.id)"
             case .comments(let i): return "comments-\(i.id)"
             case .report(let i): return "report-\(i.id)"
+            case .share(let i): return "share-\(i.id)"
             case .reportUser: return "report-user"
             }
         }
@@ -370,8 +412,9 @@ struct UserProfileView: View {
                     onRepost: { model.repost(item) },
                     onFavorite: { model.favorite(item) },
                     onComment: { presentedSheet = .comments(item) },
-                    onShare: {},
-                    onMute: {},
+                    // Partage et sourdine étaient des actions vides (AF-FIL-01).
+                    onShare: { presentedSheet = .share(item) },
+                    onMute: { model.muteNotifications(item) },
                     onReport: { presentedSheet = .report(item) }
                 )
             case .comments(let item):
@@ -379,6 +422,12 @@ struct UserProfileView: View {
                               profileService: services.feed, reports: services.reports)
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
+            case .share(let item):
+                PostShareSheet(
+                    post: item,
+                    messagesService: services.messages,
+                    onShare: { conversation in await model.share(item, to: conversation) }
+                )
             case .reportUser:
                 ReportSheet(target: .profile(model.userId), service: services.reports)
             }
@@ -879,7 +928,11 @@ struct UserProfileView: View {
                         onLike: { model.react(item) },
                         onRepost: { model.repost(item) },
                         onComment: { presentedSheet = .comments(item) },
-                        onFavorite: { model.favorite(item) }
+                        onFavorite: { model.favorite(item) },
+                        onShare: { presentedSheet = .share(item) },
+                        onReact: { emoji in model.react(item, emoji: emoji) },
+                        // Sans ce vote, le sondage disparaissait du profil (AF-FIL-06).
+                        onPollVote: { option in model.votePoll(item, option: option) }
                     )
                     .sqFadeUp()
                     .onAppear {

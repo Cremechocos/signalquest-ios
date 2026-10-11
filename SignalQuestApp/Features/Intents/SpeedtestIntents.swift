@@ -25,7 +25,9 @@ struct OpenMapIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        SQIntentRoute.requestMap()
+        // Directement sur le routeur, comme le Speedtest : le drapeau n'était lu
+        // qu'au passage au premier plan, donc rien ne bougeait app ouverte (AF-ACC-01).
+        AppServicesHolder.services.router.selectedTab = .map
         return .result()
     }
 }
@@ -38,7 +40,7 @@ struct OpenMessagesIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        SQIntentRoute.requestMessages()
+        AppServicesHolder.services.router.route(toConversation: nil)
         return .result()
     }
 }
@@ -52,7 +54,9 @@ struct RunDriveTestIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        SQIntentRoute.requestDriveTest()
+        let router = AppServicesHolder.services.router
+        router.selectedTab = .speed
+        router.pendingDriveTest = true
         return .result()
     }
 }

@@ -37,8 +37,22 @@ struct MessageComposerBar: View {
     @State private var pickerItem: PhotosPickerItem?
     @StateObject private var recorder = VoiceNoteRecorder()
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        bar
+            // Quitter la conversation abandonne l'enregistrement en cours : la
+            // session audio restait active (autres apps atténuées) et le fichier
+            // temporaire orphelin (AF-MSG-10).
+            .onDisappear { if recorder.isRecording { recorder.cancel() } }
+            // Arrière-plan : le micro s'arrête, la note reste en brouillon.
+            .onChangeCompat(of: scenePhase) { _, phase in
+                if phase == .background, recorder.isRecording { recorder.stop() }
+            }
+    }
+
+    @ViewBuilder
+    private var bar: some View {
         // Pendant l'enregistrement, la barre est REMPLACÉE : garder le champ de
         // saisie inviterait à taper alors que le micro tourne, et laisserait
         // croire qu'on peut faire les deux.

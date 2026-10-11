@@ -62,9 +62,17 @@ final class SiteRemapViewModel: ObservableObject {
                 errorMessage = String(localized: "Le marché doit être connu avant de rechercher un site.")
                 return
             }
-            let list = (try? await antennas.list(bbox: bbox, market: market, operatorName: operatorName, technologies: [])) ?? []
-            guard !Task.isCancelled else { return }
-            sites = list.filter(\.hasValidCoordinate)
+            do {
+                let list = try await antennas.list(bbox: bbox, market: market, operatorName: operatorName, technologies: [])
+                guard !Task.isCancelled else { return }
+                sites = list.filter(\.hasValidCoordinate)
+                errorMessage = nil
+            } catch {
+                // Une carte vide sans explication passait pour « aucun site ici » (AF-RAD-17).
+                guard !Task.isCancelled, !error.isCancellation else { return }
+                sites = []
+                errorMessage = error.userFacingMessage
+            }
         }
     }
 
@@ -97,6 +105,9 @@ struct SiteRemapSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: SiteRemapViewModel
     let onDone: () -> Void
+    /// Le déplacement est public et emporte toutes les cellules du nœud : il se
+    /// confirme, comme le choix sur carte des Logs (AF-RAD-17).
+    @State private var confirmsRemap = false
 
     init(item: MyIdentification, antennas: AntennasServicing, identify: IdentifyServicing, location: LocationService, onDone: @escaping () -> Void) {
         _model = StateObject(wrappedValue: SiteRemapViewModel(item: item, antennas: antennas, identify: identify, location: location))
@@ -195,7 +206,19 @@ struct SiteRemapSheet: View {
                     isBusy: model.isSubmitting,
                     style: .primary
                 ) {
-                    Task { await model.confirm() }
+                    confirmsRemap = true
+                }
+                .confirmationDialog(
+                    "Déplacer ce nœud ?",
+                    isPresented: $confirmsRemap,
+                    titleVisibility: .visible
+                ) {
+                    Button("Déplacer vers \(selected.siteId ?? selected.id)") {
+                        Task { await model.confirm() }
+                    }
+                    Button("Annuler", role: .cancel) {}
+                } message: {
+                    Text("Le nœud et toutes ses cellules quittent \(model.item.siteId) pour ce site. Ce choix est visible par tous.")
                 }
             }
             .padding(SQSpace.md)

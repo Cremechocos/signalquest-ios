@@ -523,6 +523,16 @@ struct E2EEV2ActivationScreen: View {
                     Task { await model.completeBootstrap(code: code) }
                 }
                 .disabled(model.isActing || code.count != 6)
+                // Code faux ou expiré : sans renvoi, seul « Plus tard » restait (AF-PROF-02).
+                Button(String(localized: "Renvoyer le code")) {
+                    code = ""
+                    Task { await model.requestBootstrapEmail() }
+                }
+                .font(SQType.button)
+                .foregroundStyle(SQColor.accentInk)
+                .frame(minHeight: 44)
+                .disabled(model.isActing)
+                .accessibilityIdentifier("e2ee-v2-activation-resend")
             } else {
                 Text("C’est le premier appareil chiffré de ton compte : un code à usage unique, envoyé par e-mail, le confirme. Aucune clé privée ne quitte cet appareil.")
                     .font(SQType.body)
@@ -656,6 +666,23 @@ struct E2EEV2TrustedDevicesView: View {
 
             E2EEV2RotationStatusSection(runtime: services.epochRotations)
 
+            // D.12 : la clé du compte se compare entre ses appareils. L'écran
+            // existait sans entrée en production (AF-PROF-09).
+            if model.currentDevice?.status == .approved, !model.accountKeyMissing,
+               let session = LocalAccountScope.sessionSnapshot() {
+                Section {
+                    NavigationLink {
+                        E2EEV2AccountKeyView(
+                            ownUserId: String(session.ownerScopeId.dropFirst("user:".count)),
+                            ownerNamespace: session.ownerNamespace
+                        )
+                    } label: {
+                        Label("Clé de ton compte", systemImage: "key.horizontal")
+                    }
+                    .accessibilityIdentifier("e2ee.accountKey")
+                }
+            }
+
             if model.accountKeyMissing {
                 Section {
                     Label("La clé du compte n’est pas arrivée sur cet appareil. Saisis ta clé de récupération plus bas, ou fais révoquer cet appareil depuis un autre puis approuve-le à nouveau.", systemImage: "key.slash")
@@ -688,6 +715,14 @@ struct E2EEV2TrustedDevicesView: View {
                                 .frame(minHeight: 48)
                         }
                         .disabled(model.isActing || approvalInput.count != 6)
+                        Button {
+                            approvalInput = ""
+                            Task { await model.requestBootstrapEmail() }
+                        } label: {
+                            Label("Renvoyer le code", systemImage: "arrow.clockwise")
+                                .frame(minHeight: 44)
+                        }
+                        .disabled(model.isActing)
                     } else {
                         Button {
                             Task { await model.requestBootstrapEmail() }

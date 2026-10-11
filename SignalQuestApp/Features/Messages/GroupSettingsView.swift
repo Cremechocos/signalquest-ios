@@ -11,6 +11,9 @@ struct GroupSettingsView: View {
     let e2ee: E2EEServicing?
     /// Appelé après un départ réussi : la conversation quittée se ferme aussi.
     var onLeft: () -> Void = {}
+    var onRenamed: (String) -> Void = { _ in }
+    /// Dernier nom enregistré pendant cette ouverture.
+    @State private var renamedTo: String?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -44,10 +47,12 @@ struct GroupSettingsView: View {
     @State private var showsSuccessorPicker = false
 
     init(conversation: MessageConversation, service: MessagesServicing, e2ee: E2EEServicing?,
+         onRenamed: @escaping (String) -> Void = { _ in },
          onLeft: @escaping () -> Void = {}) {
         self.conversation = conversation
         self.service = service
         self.e2ee = e2ee
+        self.onRenamed = onRenamed
         self.onLeft = onLeft
         _title = State(initialValue: conversation.title ?? "")
         _participants = State(initialValue: conversation.participants)
@@ -234,7 +239,18 @@ struct GroupSettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
+                    // Le nom ne partait qu'avec la touche Retour : « Fermer » le
+                    // perdait sans prévenir (AF-MSG-13).
+                    Button("Fermer") {
+                        Task {
+                            if hasPendingRename {
+                                await rename()
+                                guard errorMessage == nil else { return }
+                            }
+                            dismiss()
+                        }
+                    }
+                    .tint(SQColor.brandRed)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if isBusy { ProgressView() }
@@ -303,11 +319,22 @@ struct GroupSettingsView: View {
         searchResults = results
     }
 
+    /// Nom saisi mais pas encore enregistré.
+    private var hasPendingRename: Bool {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed != (renamedTo ?? conversation.title)
+    }
+
     private func rename() async {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != conversation.title else { return }
+        guard hasPendingRename else { return }
         await run {
             try await service.updateConversation(id: conversation.id, title: trimmed, addUserIds: [], removeUserIds: [])
+        }
+        if errorMessage == nil {
+            renamedTo = trimmed
+            // La conversation ouverte garde sinon l'ancien titre (AF-MSG-13).
+            onRenamed(trimmed)
         }
     }
 

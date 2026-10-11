@@ -410,6 +410,14 @@ struct MapKitMapView: UIViewRepresentable {
             guard recognizer.state == .ended, let map = recognizer.view as? MKMapView,
                   !latestSpeedtestFeatures.isEmpty else { return }
             let tap = recognizer.location(in: map)
+            // Un tap sur un marqueur (antenne, photo, ami) est déjà traité par
+            // `didSelect` : ouvrir aussi le speedtest voisin demandait deux feuilles
+            // à la fois, et une seule pouvait s'afficher (AF-CARTE-06).
+            var hit = map.hitTest(tap, with: nil)
+            while let view = hit {
+                if view is MKAnnotationView { return }
+                hit = view.superview
+            }
             var best: SpeedtestFeature?
             var bestDist: CGFloat = 22
             for f in latestSpeedtestFeatures {

@@ -168,7 +168,15 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
             guard let (kind, nodeValue) = node else { continue }
             let key = "\(kind.rawValue):\(nodeValue)"
             var acc = values[key] ?? Acc(kind: kind, nodeValue: nodeValue, representative: item)
-            if (item.lastValidated ?? item.createdAt ?? .distantPast) > (acc.representative.lastValidated ?? acc.representative.createdAt ?? .distantPast) {
+            // La ligne du NŒUD (eNB/gNB) représente le groupe dès qu'elle existe :
+            // la plus récente pouvait être une cellule PCI, et toucher le nœud ouvrait
+            // alors cette cellule, que « Retirer » retirait seule (AF-RAD-15).
+            let isNodeRow: (MyIdentification) -> Bool = { $0.kind == .enb || $0.kind == .gnb }
+            let newer = (item.lastValidated ?? item.createdAt ?? .distantPast)
+                > (acc.representative.lastValidated ?? acc.representative.createdAt ?? .distantPast)
+            if isNodeRow(item) != isNodeRow(acc.representative) {
+                if isNodeRow(item) { acc.representative = item }
+            } else if newer {
                 acc.representative = item
             }
             acc.validations = max(acc.validations, item.validations)

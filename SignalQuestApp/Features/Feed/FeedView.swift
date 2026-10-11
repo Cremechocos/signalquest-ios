@@ -852,7 +852,9 @@ struct FeedView: View {
             }
         }
         .fullScreenCover(item: Binding(
-            get: { presentedStoryStart.map { _ in StoriesPresentation() } },
+            // Identité stable : un `UUID()` neuf à chaque lecture faisait fermer et
+            // rouvrir le lecteur à chaque recalcul du fil (AF-FIL-13).
+            get: { presentedStoryStart.map { StoriesPresentation(id: $0) } },
             set: { if $0 == nil { presentedStoryStart = nil } }
         )) { _ in
             if let stories = visibleStories, !stories.isEmpty, let start = presentedStoryStart {
@@ -1457,7 +1459,7 @@ struct FeedView: View {
     }
 }
 
-private struct StoriesPresentation: Identifiable { let id = UUID() }
+private struct StoriesPresentation: Identifiable { let id: Int }
 
 struct PostShareSheet: View {
     let post: UnifiedSocialFeedItem

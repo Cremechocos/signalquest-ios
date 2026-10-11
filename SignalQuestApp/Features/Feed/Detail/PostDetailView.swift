@@ -55,7 +55,17 @@ struct PostDetailView: View {
                     onComment: { showCommentsSheet = true },
                     onFavorite: { Task { await actions.mutate(.favorite) } },
                     onShare: { showShareSheet = true },
-                    onAuthorTap: { profileAuthor = actions.item.author }
+                    onAuthorTap: { profileAuthor = actions.item.author },
+                    // Sans ce vote, le sondage disparaissait du détail (AF-FIL-06).
+                    onPollVote: { option in
+                        Task {
+                            guard actions.item.poll?.isOpen == true,
+                                  let poll = try? await feedService.votePoll(
+                                      postId: actions.item.id, optionId: option.id, removing: option.votedByMe
+                                  ) else { return }
+                            actions.applyPoll(poll)
+                        }
+                    }
                 )
                 GradientButton(
                     "Voir tous les commentaires (\(actions.item.commentsCount))",
@@ -85,7 +95,15 @@ struct PostDetailView: View {
                               onLike: { Task { await actions.mutate(.react) } },
                               onRepost: { Task { await actions.mutate(.repost) } },
                               onFavorite: { Task { await actions.mutate(.favorite) } },
-                              onComment: { showCommentsSheet = true },
+                              // Fermer, attendre, puis présenter : ouverte pendant la
+                              // fermeture de la fiche, la feuille était avalée (AF-FIL-02).
+                              onComment: {
+                                  showSignalSheet = false
+                                  Task { @MainActor in
+                                      try? await Task.sleep(nanoseconds: 380_000_000)
+                                      showCommentsSheet = true
+                                  }
+                              },
                               onShare: {
                                   showSignalSheet = false
                                   Task { @MainActor in
@@ -94,7 +112,13 @@ struct PostDetailView: View {
                                   }
                               },
                               onMute: { Task { try? await feedService.muteNotifications(postId: actions.item.id) } },
-                              onReport: { showReportSheet = true },
+                              onReport: {
+                                  showSignalSheet = false
+                                  Task { @MainActor in
+                                      try? await Task.sleep(nanoseconds: 380_000_000)
+                                      showReportSheet = true
+                                  }
+                              },
                               onAuthorTap: {
                                   showSignalSheet = false
                                   pushProfileAfterDismiss(actions.item.author)
@@ -201,6 +225,14 @@ final class PostDetailActions: ObservableObject {
             errorMessage = String(localized: "Une erreur est survenue. Réessaie.")
             Haptics.error()
         }
+    }
+
+    /// Sondage relu après un vote : la carte et le fil d'origine suivent.
+    func applyPoll(_ poll: FeedPoll) {
+        var copy = item
+        copy.poll = poll
+        item = copy
+        onItemChanged(item)
     }
 
     func share(to conversationID: String) async -> String? {

@@ -210,6 +210,8 @@ struct LeaderboardsView: View {
             .sqReadableWidth()
         }
         .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : UIKit coupe le balayage retour, rétabli ici (SOC-30, AF-PROF-10).
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
         .task { await model.loadAll() }
         .refreshable { await model.loadAll() }

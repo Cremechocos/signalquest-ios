@@ -102,15 +102,19 @@ struct RadioLogSiteMapPicker: View {
         self.antennas = antennas
         self.customSites = customSites
         self.onIdentified = onIdentified
-        _region = State(
-            initialValue: MKCoordinateRegion(
-                center: CLLocationCoordinate2D(
-                    latitude: site.latitude ?? 46.6,
-                    longitude: site.longitude ?? 2.5
-                ),
-                span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
-            )
+        let aroundRecord = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: site.latitude ?? 46.6,
+                longitude: site.longitude ?? 2.5
+            ),
+            span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
         )
+        // Les anneaux sont déjà calculés à l'ouverture : on cadre sur eux tout de
+        // suite. Le `.onChange` ne se déclenchait jamais, et la carte iOS 17 ignore
+        // un changement ultérieur de sa région de départ (AF-RAD-13).
+        let framed = Self.regionCovering(picker.taRings)
+        _region = State(initialValue: framed ?? aroundRecord)
+        _didFrameOnRings = State(initialValue: framed != nil)
     }
 
     var body: some View {
@@ -166,6 +170,9 @@ struct RadioLogSiteMapPicker: View {
                             // Forcer le rechargement : le site tout juste créé doit apparaître
                             // comme candidat, sinon on l'a posé sans pouvoir s'y rattacher.
                             loadedKey = nil
+                            // La tâche est liée à la zone, qui ne change pas : sans cet
+                            // appel, rien ne rechargeait et le site semblait absent (AF-RAD-14).
+                            Task { await loadIfNeeded() }
                         }
                     )
                 }

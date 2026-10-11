@@ -278,10 +278,12 @@ struct StoryComposer: View {
             .sheet(isPresented: $model.showHideEditor) {
                 FriendMultiSelectSheet(title: "Masquer à…", friends: model.friends, selected: $model.hiddenUserIds)
             }
-            .sheet(isPresented: $model.showCloseFriendsEditor) {
-                FriendMultiSelectSheet(title: "Amis proches", friends: model.friends, selected: $model.closeFriendIds) {
-                    Task { await model.saveCloseFriends() }
-                }
+            // Enregistré à toute fermeture, « OK » ou glissement : seul « OK »
+            // enregistrait, et le serveur gardait l'ancienne liste (AF-FIL-14).
+            .sheet(isPresented: $model.showCloseFriendsEditor, onDismiss: {
+                Task { await model.saveCloseFriends() }
+            }) {
+                FriendMultiSelectSheet(title: "Amis proches", friends: model.friends, selected: $model.closeFriendIds) {}
             }
             .sheet(isPresented: $showPremiumPaywall) {
                 NavigationStack {

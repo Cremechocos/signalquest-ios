@@ -43,6 +43,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
     @Published private(set) var submitError: String?
     @Published var selectedId: String?
     @Published private(set) var isSubmitting = false
+    private var loadGeneration = UUID()
     /// Anneaux TA du nœud visé — « depuis ce point, le site est à peu près à cette
     /// distance ». Leur intersection le désigne, et c'est ce qui permet de trancher entre
     /// deux antennes voisines. Calculés sur le journal DÉJÀ SYNCHRONISÉ localement : aucun
@@ -102,11 +103,17 @@ final class RadioLogIdentifyPicker: ObservableObject {
     }
 
     func load(for site: RadioLogSite) async {
-        guard !isLoading else { return }
+        // Un nouveau site remplace le chargement en cours au lieu d'être ignoré :
+        // « Passer » pendant la recherche laissait les candidats du site précédent,
+        // déjà présélectionnés (AF-RAD-01).
+        let generation = UUID()
+        loadGeneration = generation
         isLoading = true
         errorMessage = nil
         searchFailed = false
-        defer { isLoading = false }
+        candidates = []
+        selectedId = nil
+        defer { if loadGeneration == generation { isLoading = false } }
 
         loadTaRings(for: site)
 
@@ -145,6 +152,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
         let hypothesis = await hypothesisTask
         // `nil` : la recherche a échoué ; `[]` : rien à moins de 3 km.
         let nearbyResult = await nearbyTask
+        guard loadGeneration == generation, !Task.isCancelled else { return }
         let nearby = nearbyResult ?? []
 
         var result: [RadioLogCandidate] = []
@@ -318,11 +326,13 @@ final class RadioLogIdentifyPicker: ObservableObject {
     /// échec prévisible. Nil = la charge est complète.
     nonisolated static func blockingReason(for site: RadioLogSite) -> String? {
         let hasPlmn = site.mcc != nil && site.mnc != nil
+        // Aucun sélecteur de pays ou d'opérateur n'existe ici : promettre un
+        // « choix manuel » laissait le parcours sans issue (AF-RAD-10).
         if !hasPlmn {
-            return String(localized: "PLMN servant absent : choisis manuellement le pays et l’opérateur avant l’identification.")
+            return String(localized: "Réseau servant absent de ces relevés : ce site ne peut pas être identifié sans inventer son opérateur.")
         }
         if site.resolvedMarketCode == nil {
-            return String(localized: "Pays du relevé inconnu : choisis-le avant l’identification.")
+            return String(localized: "Pays des relevés inconnu : ce site ne peut pas être identifié sans inventer son marché.")
         }
         if !site.hasCoordinate {
             return String(localized: "Aucun de ces relevés ne porte de position.")

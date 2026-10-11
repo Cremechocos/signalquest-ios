@@ -143,6 +143,7 @@ struct AntennaDetailSheet: View {
     @State private var pendingCloseOutage: CommunityOutage?
     /// Fermeture en vol, pour que le bouton se remplace par son indicateur.
     @State private var closingOutageId: String?
+    @State private var votingOutageId: String?
     /// Refus d'une écriture de panne — voix ou fermeture.
     ///
     /// Les votes partaient jusqu'ici en `try?` : un refus (« vous êtes trop loin », « cette panne
@@ -674,6 +675,10 @@ struct AntennaDetailSheet: View {
     /// Le refus est mis en mots par le CLIENT, sur le code applicatif : la phrase du serveur
     /// n'existe qu'en français.
     private func voteOnOutage(_ outageId: String, kind: String) async {
+        // Un double appui envoyait deux voix (AF-CARTE-05).
+        guard votingOutageId == nil else { return }
+        votingOutageId = outageId
+        defer { votingOutageId = nil }
         let here = services.location.cachedLocation()
         outageError = nil
         do {

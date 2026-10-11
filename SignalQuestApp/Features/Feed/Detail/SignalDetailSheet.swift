@@ -90,7 +90,9 @@ struct SignalDetailSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button(role: .destructive) { onReport(); dismiss() } label: {
+                        // Pas de `dismiss()` ici : le parent remplace la fiche par
+                        // le signalement ; fermer en plus annulait cette présentation (AF-FIL-02).
+                        Button(role: .destructive) { onReport() } label: {
                             Label("Signaler", systemImage: "flag")
                         }
                         Button { onMute() } label: {
@@ -356,7 +358,7 @@ struct SignalDetailSheet: View {
             actionButton(systemImage: item.likedByMe ? "heart.fill" : "heart", tint: item.likedByMe ? SQColor.like : SQColor.label, active: item.likedByMe, pop: item.likedByMe) { onLike() }
                 .accessibilityLabel("J’aime")
                 .accessibilityAddTraits(item.likedByMe ? .isSelected : [])
-            actionButton(systemImage: "bubble.right", tint: SQColor.label, active: false) { onComment(); dismiss() }
+            actionButton(systemImage: "bubble.right", tint: SQColor.label, active: false) { onComment() }
                 .accessibilityLabel("Commenter")
             actionButton(systemImage: item.repostedByMe ? "arrow.2.squarepath.circle.fill" : "arrow.2.squarepath", tint: item.repostedByMe ? SQColor.success : SQColor.label, active: item.repostedByMe) { onRepost() }
                 .accessibilityLabel("Repartager")

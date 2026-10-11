@@ -707,7 +707,8 @@ final class MapExplorerViewModel: ObservableObject {
         }
     }
 
-    private func showMarketNotice(_ text: String) {
+    /// Bandeau passager en haut de la carte (changement de marché, site introuvable).
+    func showMarketNotice(_ text: String) {
         noticeTask?.cancel()
         marketSwitchNotice = text
         noticeTask = Task { [weak self] in
@@ -3014,7 +3015,12 @@ struct MapExplorerView: View {
                 market: model.marketFilter,
                 department: model.currentDromRegion?.department
             )) ?? []
-            guard let site = results.first(where: { $0.id == siteId || $0.siteId == siteId }) ?? results.first else { return }
+            // Correspondance exacte seulement : `results.first` ouvrait un site au
+            // texte voisin, c'est-à-dire la fiche d'une autre antenne (AF-CARTE-07).
+            guard let site = results.first(where: { $0.id == siteId || $0.siteId == siteId }) else {
+                model.showMarketNotice(String(localized: "Site introuvable"))
+                return
+            }
             selectedAntenna = site
             if let lat = site.latitude, let lng = site.longitude {
                 mapCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)

@@ -98,6 +98,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
             levels = []
             state = .recording
             startMetering()
+            observeInterruptions()
         } catch {
             state = .failed(String(localized: "Impossible de démarrer l'enregistrement."))
         }
@@ -107,6 +108,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
     /// accidentel ne doit pas produire un message.
     @discardableResult
     func stop() -> URL? {
+        stopObservingInterruptions()
         meterTask?.cancel()
         meterTask = nil
         guard let recorder else { return nil }
@@ -153,6 +155,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
 
     /// Abandon explicite : le fichier est supprimé.
     func cancel() {
+        stopObservingInterruptions()
         meterTask?.cancel()
         meterTask = nil
         if case let .finished(url, _) = state {
@@ -170,6 +173,32 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
         state = .idle
         duration = 0
         levels = []
+    }
+
+    /// Un appel ou une autre app qui prend le micro interrompt la session : la
+    /// note s'arrête et reste en brouillon, au lieu d'un enregistrement figé qui
+    /// garde l'audio des autres apps atténué (AF-MSG-10).
+    private var interruptionObserver: NSObjectProtocol?
+
+    private func observeInterruptions() {
+        stopObservingInterruptions()
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            guard raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:)) == .began else { return }
+            MainActor.assumeIsolated {
+                guard let self, self.isRecording else { return }
+                self.stop()
+            }
+        }
+    }
+
+    private func stopObservingInterruptions() {
+        if let interruptionObserver { NotificationCenter.default.removeObserver(interruptionObserver) }
+        interruptionObserver = nil
     }
 
     private func startMetering() {

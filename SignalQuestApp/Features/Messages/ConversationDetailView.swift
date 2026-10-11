@@ -53,6 +53,9 @@ struct ConversationDetailView: View {
     /// Conversation v2 (§12), lue une fois à l'ouverture : messages programmés
     /// désactivés (§13).
     @State private var conversationIsV2 = false
+    /// Nom donné au groupe depuis ses réglages pendant cette ouverture.
+    @State private var renamedTitle: String?
+    @State private var confirmsLocationShare = false
     /// Vrai une fois la nature v1/v2 de la conversation établie : le bandeau
     /// du mot de passe v1 ne doit jamais apparaître, même un instant, en v2.
     @State private var v2Resolved = false
@@ -466,9 +469,28 @@ struct ConversationDetailView: View {
         } message: { _ in
             Text("Tu ne recevras plus ses messages, dans ce groupe comme ailleurs.")
         }
+        .confirmationDialog(
+            "Envoyer ta position ?",
+            isPresented: $confirmsLocationShare,
+            titleVisibility: .visible
+        ) {
+            Button("Envoyer ma position") { Task { await sendCurrentLocation() } }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Ta position exacte et l’adresse la plus proche seront envoyées dans \(conversationTitle).")
+        }
         .sheet(isPresented: $showSchedulePicker) {
             ScheduleMessageSheet(conversation: conversation, service: service, e2ee: e2ee, initialText: scheduleSeedText) {
                 Haptics.success()
+                // Le texte programmé restait dans le champ et le brouillon : un appui
+                // sur Envoyer le doublait aussitôt (AF-MSG-12).
+                clearComposer()
+                draftAutosaver?.discard()
+                scheduleSeedText = ""
+                inAppNotifications.show(SQInAppNotificationItem(
+                    body: String(localized: "Message programmé."),
+                    variant: .success
+                ))
             }
         }
         .sheet(isPresented: $showNewPoll) {
@@ -527,7 +549,8 @@ struct ConversationDetailView: View {
             }
         }
         .sheet(isPresented: $showGroupSettings, onDismiss: { if leftGroup { dismiss() } }) {
-            GroupSettingsView(conversation: conversation, service: service, e2ee: e2ee) {
+            GroupSettingsView(conversation: conversation, service: service, e2ee: e2ee,
+                              onRenamed: { renamedTitle = $0 }) {
                 // Groupe quitté : rester sur la conversation n'aurait plus de sens.
                 leftGroup = true
             }
@@ -900,7 +923,9 @@ struct ConversationDetailView: View {
                     scheduleSeedText = text
                     showSchedulePicker = true
                 },
-                onShareLocation: { Task { await sendCurrentLocation() } },
+                // Coordonnées précises et adresse : un mauvais choix dans le menu
+                // suffisait à les envoyer (AF-MSG-09).
+                onShareLocation: { confirmsLocationShare = true },
                 onLiveShare: { showLiveShare = true },
                 onPickPhoto: { item, caption in Task { await sendAttachment(item: item, caption: caption) } },
                 onVoiceNote: { url, duration in Task { await sendVoiceNote(url: url, duration: duration) } },
@@ -2845,6 +2870,7 @@ struct ConversationDetailView: View {
 
     /// Titre de la conversation sans inclure l'utilisateur courant.
     private var conversationTitle: String {
+        if let renamedTitle, !renamedTitle.isEmpty { return renamedTitle }
         let title = conversation.displayTitle(excluding: currentUserId)
         return title.isEmpty ? "Conversation" : title
     }

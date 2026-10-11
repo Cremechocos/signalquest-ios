@@ -149,6 +149,8 @@ struct RadioLogIdentifyChainView: View {
                         RadioLogActionButton(label: picker.isSubmitting ? "…" : "Identifier ici") {
                             Task { await identifyCurrent(site) }
                         }
+                        // Rien à identifier tant que les antennes de CE site arrivent.
+                        .disabled(picker.isLoading)
                         RadioLogActionButton(label: "Passer", ghost: true) { advance(skipped: true) }
                     }
                     .padding(.top, M.ctaGap)

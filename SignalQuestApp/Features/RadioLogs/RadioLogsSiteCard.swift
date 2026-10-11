@@ -41,6 +41,14 @@ struct RadioLogPill: View {
 /// identifié ? ». Elle est donc TOUJOURS visible, carte repliée comme dépliée.
 struct RadioLogStatePill: View {
     let state: RadioLogSiteState
+    /// Faux quand le balayage ne peut pas vérifier ce site : il ne reste alors
+    /// pas « Vérification… » pour toujours (AF-RAD-09).
+    var checkable = true
+
+    private var label: String {
+        if state == .unchecked, !checkable { return String(localized: "Non vérifiable") }
+        return state.label
+    }
 
     private var container: Color {
         switch state {
@@ -62,7 +70,7 @@ struct RadioLogStatePill: View {
             Circle()
                 .fill(ink)
                 .frame(width: M.stateDot, height: M.stateDot)
-            Text(state.label)
+            Text(label)
                 .font(SQFont.body(M.stateSize, .bold))
                 .foregroundStyle(ink)
         }
@@ -70,7 +78,9 @@ struct RadioLogStatePill: View {
         .padding(.vertical, M.statePaddingV)
         .background(container, in: Capsule(style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(state.label)
+        .accessibilityLabel(state == .unchecked && !checkable
+            ? String(localized: "Non vérifiable : pays ou opérateur manquant dans les relevés")
+            : state.label)
     }
 }
 
@@ -240,7 +250,7 @@ struct RadioLogSiteCard: View {
                     .foregroundStyle(P.muted)
                     .padding(.top, M.siteMetaTop)
 
-                RadioLogStatePill(state: state)
+                RadioLogStatePill(state: state, checkable: site.isCheckable)
                     .padding(.top, M.stateTop)
 
                 if state.isUnidentified {

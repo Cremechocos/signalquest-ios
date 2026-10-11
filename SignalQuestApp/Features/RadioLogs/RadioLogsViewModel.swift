@@ -81,6 +81,8 @@ final class RadioLogsViewModel: ObservableObject {
     @Published private(set) var identifiedCount = 0
     @Published private(set) var unidentifiedCount = 0
     @Published private(set) var checkedCount = 0
+    /// Sites que le balayage ne peut pas vérifier (PLMN ou pays manquant).
+    @Published private(set) var uncheckableCount = 0
 
     // MARK: Dépendances
 
@@ -120,6 +122,7 @@ final class RadioLogsViewModel: ObservableObject {
         var identified = 0
         var unidentified = 0
         var checked = 0
+        var uncheckable = 0
         var visible: [RadioLogSite] = []
         visible.reserveCapacity(sites.count)
 
@@ -130,6 +133,7 @@ final class RadioLogsViewModel: ObservableObject {
             if state.isIdentified { identified += 1 }
             if state.isUnidentified { unidentified += 1 }
             if state.isChecked { checked += 1 }
+            if !state.isChecked, !site.isCheckable { uncheckable += 1 }
 
             switch filter {
             case .all: break
@@ -143,6 +147,7 @@ final class RadioLogsViewModel: ObservableObject {
         identifiedCount = identified
         unidentifiedCount = unidentified
         checkedCount = checked
+        uncheckableCount = uncheckable
 
         visible.sort(by: order)
         filteredCount = visible.count
@@ -190,8 +195,10 @@ final class RadioLogsViewModel: ObservableObject {
     /// Part du catalogue dont on connaît le statut. Reste affichée APRÈS le
     /// balayage : elle dit l'état de CONNAISSANCE du catalogue, pas une tâche.
     var completion: Double {
-        guard totalCount > 0 else { return 0 }
-        return Double(checkedCount) / Double(totalCount)
+        // Sans les sites invérifiables : la part ne pouvait jamais atteindre 100 %.
+        let verifiable = totalCount - uncheckableCount
+        guard verifiable > 0 else { return 0 }
+        return Double(checkedCount) / Double(verifiable)
     }
 
     func count(for filter: Filter) -> Int {

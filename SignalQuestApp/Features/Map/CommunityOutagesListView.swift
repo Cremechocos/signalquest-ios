@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 /// Les deux onglets de la page : ce que fait la communauté, et ce que j'y ai mis.
 enum OutageFeedScope: String, CaseIterable, Identifiable {
@@ -30,6 +31,8 @@ final class CommunityOutagesListViewModel: ObservableObject {
     @Published private(set) var outages: [CommunityOutage] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isLoadingMore = false
+    /// Pannes dont le vote est en cours.
+    @Published private(set) var votingOutageIds: Set<String> = []
     @Published private(set) var hasMore = false
     /// Panne dont la fermeture est en vol : son bouton s'y remplace par un indicateur.
     @Published private(set) var closingId: String?
@@ -121,15 +124,22 @@ final class CommunityOutagesListViewModel: ObservableObject {
     ///
     /// Recharge plutôt que de retoucher la ligne : un vote peut faire basculer l'état de la panne
     /// — et donc les boutons de la ligne d'à côté —, et seul le serveur sait quand.
-    func vote(outageId: String, kind: String) async {
+    func vote(outageId: String, kind: String, location: CLLocation? = nil) async {
+        // Un second appui pendant le vote envoyait une seconde voix, refusée
+        // alors que la première avait réussi (AF-CARTE-05).
+        guard !votingOutageIds.contains(outageId) else { return }
+        votingOutageIds.insert(outageId)
+        defer { votingOutageIds.remove(outageId) }
         let requestedContext = context
         do {
+            // Le serveur juge l'éligibilité depuis la position : sans elle, la
+            // personne au pied du site était refusée (motif `no_position`).
             _ = try await service.vote(
                 outageId: outageId,
                 kind: kind,
-                latitude: nil,
-                longitude: nil,
-                accuracyMeters: nil
+                latitude: location?.coordinate.latitude,
+                longitude: location?.coordinate.longitude,
+                accuracyMeters: location.flatMap { $0.horizontalAccuracy > 0 ? $0.horizontalAccuracy : nil }
             )
             guard requestedContext == context, !Task.isCancelled else { return }
             await reload()
@@ -188,6 +198,7 @@ final class CommunityOutagesListViewModel: ObservableObject {
 struct CommunityOutagesListView: View {
     @StateObject private var model: CommunityOutagesListViewModel
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var services: AppServices
     /// Panne dont la fermeture attend confirmation. Le geste est irréversible et collectif : il
     /// ne part jamais du premier appui.
     @State private var pendingClose: CommunityOutage?
@@ -329,7 +340,9 @@ struct CommunityOutagesListView: View {
                 // reste rigoureusement le même qu'ailleurs.
                 OutageArbitrationBlock(
                     outage: outage,
-                    onVote: { id, kind in Task { await model.vote(outageId: id, kind: kind) } }
+                    onVote: { id, kind in
+                        Task { await model.vote(outageId: id, kind: kind, location: services.location.cachedLocation()) }
+                    }
                 )
             } else {
                 // Panne close — « Les miennes » les garde en mémoire. Le bloc d'arbitrage ne

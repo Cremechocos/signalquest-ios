@@ -35,6 +35,10 @@ final class ExploreViewModel: ObservableObject {
     @Published var hashtagItems: [UnifiedSocialFeedItem] = []
     @Published var hashtagCursor: String?
     @Published var isLoadingHashtag = false
+    /// Hashtags suivis (sans `#`), lus une fois : Suivre n'existait nulle part
+    /// alors que les Préférences y renvoient (AF-FIL-09).
+    @Published private(set) var followedHashtags: Set<String>?
+    @Published private(set) var isTogglingHashtagFollow = false
     @Published var isLoadingMoreHashtag = false
 
     // Etat optimiste des follows déclenchés depuis les suggestions
@@ -54,6 +58,60 @@ final class ExploreViewModel: ObservableObject {
     func accept(_ item: UnifiedSocialFeedItem) {
         searchPosts = searchPosts.map { $0.id == item.id ? $0.adoptingInteractions(from: item) : $0 }
         hashtagItems = hashtagItems.map { $0.id == item.id ? $0.adoptingInteractions(from: item) : $0 }
+    }
+
+    /// Élément tel qu'il est maintenant dans les listes de l'écran (la fiche
+    /// ouverte suit ainsi les votes et la sourdine).
+    func currentItem(_ item: UnifiedSocialFeedItem) -> UnifiedSocialFeedItem {
+        searchPosts.first { $0.id == item.id } ?? hashtagItems.first { $0.id == item.id } ?? item
+    }
+
+    private func update(_ id: String, _ transform: (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem) {
+        searchPosts = searchPosts.map { $0.id == id ? transform($0) : $0 }
+        hashtagItems = hashtagItems.map { $0.id == id ? transform($0) : $0 }
+    }
+
+    // Mêmes actions que le fil principal (`FeedViewModel`) : les boutons des
+    // cartes d'Explorer ne faisaient rien (AF-FIL-01).
+
+    func votePoll(_ item: UnifiedSocialFeedItem, option: FeedPoll.Option) {
+        guard let poll = item.poll, poll.isOpen else { return }
+        let removing = option.votedByMe
+        Task {
+            do {
+                guard let updated = try await service.votePoll(postId: item.id, optionId: option.id, removing: removing) else { return }
+                update(item.id) { current in var copy = current; copy.poll = updated; return copy }
+            } catch {
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
+    func muteNotifications(_ item: UnifiedSocialFeedItem) {
+        Task {
+            do {
+                _ = try await service.muteNotifications(postId: item.id)
+                update(item.id) { current in
+                    var copy = current
+                    copy.notificationsMutedByMe = !(current.notificationsMutedByMe ?? false)
+                    return copy
+                }
+            } catch {
+                if !error.isCancellation { actionError = error.userFacingMessage }
+            }
+        }
+    }
+
+    /// Renvoie l'id du message créé, nil si échec (la feuille affiche l'échec).
+    func share(_ item: UnifiedSocialFeedItem, to conversation: MessageConversation) async -> String? {
+        do {
+            let messageId = try await service.share(postId: item.id, conversationId: conversation.id)
+            Haptics.success()
+            return messageId
+        } catch {
+            Haptics.error()
+            return nil
+        }
     }
 
     func load() async {
@@ -165,6 +223,35 @@ final class ExploreViewModel: ObservableObject {
         hashtagCursor = nil
         guard let tag else { return }
         Task { await loadHashtagFeed(tag: tag) }
+        if followedHashtags == nil, !AppEnvironment.usesDemoData {
+            Task { await loadFollowedHashtags() }
+        }
+    }
+
+    private func loadFollowedHashtags() async {
+        guard let follows = try? await service.followedHashtags() else { return }
+        followedHashtags = Set(follows.map { $0.hashtag.normalizedHashtag })
+    }
+
+    func isFollowing(hashtag tag: String) -> Bool {
+        followedHashtags?.contains(tag.normalizedHashtag) == true
+    }
+
+    func toggleHashtagFollow(_ tag: String) async {
+        guard !isTogglingHashtagFollow else { return }
+        let normalized = tag.normalizedHashtag
+        let following = !isFollowing(hashtag: tag)
+        isTogglingHashtagFollow = true
+        defer { isTogglingHashtagFollow = false }
+        do {
+            try await service.setHashtagFollowed(tag, following: following)
+            var set = followedHashtags ?? []
+            if following { set.insert(normalized) } else { set.remove(normalized) }
+            followedHashtags = set
+            Haptics.success()
+        } catch {
+            if !error.isCancellation { actionError = error.userFacingMessage }
+        }
     }
 
     private func loadHashtagFeed(tag: String) async {
@@ -261,7 +348,24 @@ struct ExploreView: View {
     private let service: SocialFeedServicing
 
     @State private var profileAuthor: SocialFeedAuthor?
-    @State private var detailItem: UnifiedSocialFeedItem?
+    /// Une seule présentation : la fiche détail cède ainsi la place aux
+    /// commentaires, au signalement ou au partage (AF-FIL-02).
+    @State private var presentedSheet: ExploreSheet?
+
+    private enum ExploreSheet: Identifiable {
+        case detail(UnifiedSocialFeedItem)
+        case comments(UnifiedSocialFeedItem)
+        case report(UnifiedSocialFeedItem)
+        case share(UnifiedSocialFeedItem)
+        var id: String {
+            switch self {
+            case .detail(let i): return "detail-\(i.id)"
+            case .comments(let i): return "comments-\(i.id)"
+            case .report(let i): return "report-\(i.id)"
+            case .share(let i): return "share-\(i.id)"
+            }
+        }
+    }
     /// Profils consultés récemment sur cet appareil (plan 3, vague 1).
     @State private var recentProfiles: [RecentlyViewedStore.Item] = []
     @ScaledMetric(relativeTo: .caption) private var recentTileWidth: CGFloat = 76
@@ -329,13 +433,32 @@ struct ExploreView: View {
         .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(userId: author.id, prefill: author, service: service)
         }
-        .sheet(item: $detailItem) { item in
-            SignalDetailSheet(
-                item: item,
-                onLike: { interact(with: item) { try await service.react(postId: $0, emoji: "❤️") } },
-                onRepost: { interact(with: item) { try await service.repost(postId: $0) } },
-                onFavorite: { interact(with: item) { try await service.favorite(postId: $0) } }
-            )
+        .sheet(item: $presentedSheet) { sheet in
+            switch sheet {
+            case .detail(let opened):
+                let item = model.currentItem(opened)
+                SignalDetailSheet(
+                    item: item,
+                    onLike: { interact(with: item) { try await service.react(postId: $0, emoji: "❤️") } },
+                    onRepost: { interact(with: item) { try await service.repost(postId: $0) } },
+                    onFavorite: { interact(with: item) { try await service.favorite(postId: $0) } },
+                    onComment: { presentedSheet = .comments(item) },
+                    onShare: { presentedSheet = .share(item) },
+                    onMute: { model.muteNotifications(item) },
+                    onReport: { presentedSheet = .report(item) }
+                )
+            case .comments(let item):
+                CommentsSheet(service: services.comments, postId: item.backendPostId,
+                              profileService: services.feed, reports: services.reports)
+            case .report(let item):
+                ReportSheet(target: .post(item.backendPostId), service: services.reports)
+            case .share(let item):
+                PostShareSheet(
+                    post: item,
+                    messagesService: services.messages,
+                    onShare: { conversation in await model.share(item, to: conversation) }
+                )
+            }
         }
     }
 
@@ -355,7 +478,6 @@ struct ExploreView: View {
                 return
             }
             let updated = item.applying(response)
-            if detailItem?.id == updated.id { detailItem = updated }
             model.accept(updated)
         }
     }
@@ -497,9 +619,7 @@ struct ExploreView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, SQSpace.md)
                     ForEach(model.searchPosts) { item in
-                        // `detailItem` sert déjà à ouvrir une publication depuis cet écran :
-                        // en introduire un second dupliquerait la présentation.
-                        FeedItemCard(item: item, onTap: { detailItem = item })
+                        exploreCard(item)
                     }
                 }
                 if !model.searchPlaces.isEmpty || !model.searchSites.isEmpty {
@@ -640,12 +760,29 @@ struct ExploreView: View {
         VStack(alignment: .leading, spacing: SQSpace.lg) {
             if let tag = model.selectedHashtag {
                 SQSectionHeader("#\(tag)") {
-                    Button("Effacer") {
-                        Haptics.selection()
-                        model.selectHashtag(nil)
+                    HStack(spacing: SQSpace.md) {
+                        if model.followedHashtags != nil {
+                            let following = model.isFollowing(hashtag: tag)
+                            // `String(localized:)` : un ternaire de littéraux devient un
+                            // `String` que SwiftUI ne traduit pas.
+                            Button(following ? String(localized: "Suivi") : String(localized: "Suivre")) {
+                                Task { await model.toggleHashtagFollow(tag) }
+                            }
+                            .font(SQType.caption.weight(.semibold))
+                            .tint(following ? SQColor.labelSecondary : SQColor.brandRed)
+                            .disabled(model.isTogglingHashtagFollow)
+                            .accessibilityLabel(following
+                                ? String(localized: "Ne plus suivre #\(tag)")
+                                : String(localized: "Suivre #\(tag)"))
+                            .accessibilityIdentifier("explore.hashtag.follow")
+                        }
+                        Button("Effacer") {
+                            Haptics.selection()
+                            model.selectHashtag(nil)
+                        }
+                        .font(SQType.caption)
+                        .tint(SQColor.brandRed)
                     }
-                    .font(SQType.caption)
-                    .tint(SQColor.brandRed)
                 }
             }
             if model.isLoadingHashtag && model.hashtagItems.isEmpty {
@@ -659,11 +796,7 @@ struct ExploreView: View {
             } else {
                 LazyVStack(alignment: .leading, spacing: SQSpace.lg + 2) {
                     ForEach(model.hashtagItems) { item in
-                        FeedItemCard(
-                            item: item,
-                            onTap: { detailItem = item },
-                            onAuthorTap: { profileAuthor = item.author }
-                        )
+                        exploreCard(item)
                         .sqFadeUp()
                         .onAppear {
                             if item.id == model.hashtagItems.last?.id {
@@ -680,6 +813,22 @@ struct ExploreView: View {
                 }
             }
         }
+    }
+
+    /// Carte d'Explorer, câblée comme celle du fil principal.
+    private func exploreCard(_ item: UnifiedSocialFeedItem) -> some View {
+        FeedItemCard(
+            item: item,
+            onTap: { presentedSheet = .detail(item) },
+            onLike: { interact(with: item) { try await service.react(postId: $0, emoji: "❤️") } },
+            onRepost: { interact(with: item) { try await service.repost(postId: $0) } },
+            onComment: { presentedSheet = .comments(item) },
+            onFavorite: { interact(with: item) { try await service.favorite(postId: $0) } },
+            onShare: { presentedSheet = .share(item) },
+            onAuthorTap: { profileAuthor = item.author },
+            onReact: { emoji in interact(with: item) { try await service.react(postId: $0, emoji: emoji) } },
+            onPollVote: { option in model.votePoll(item, option: option) }
+        )
     }
 
     // MARK: Suggestions

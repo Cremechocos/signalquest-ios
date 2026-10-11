@@ -19,6 +19,28 @@ struct MapPhotoViewer: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
+    /// Photo ou commentaire à signaler : la même photo ouverte depuis l'écran
+    /// Photos se signalait, pas depuis la carte (AF-CARTE-16).
+    @State private var reportTarget: MapPhotoReport?
+
+    private enum MapPhotoReport: Identifiable {
+        case photo(String)
+        case comment(String)
+        var id: String {
+            switch self {
+            case .photo(let id): return "photo-\(id)"
+            case .comment(let id): return "comment-\(id)"
+            }
+        }
+        var target: ReportTarget {
+            switch self {
+            case .photo(let id): return .photo(id)
+            case .comment(let id): return .photoComment(id)
+            }
+        }
+    }
 
     @State private var photo: Photo?
     @State private var comments: [PhotoComment] = []
@@ -53,6 +75,9 @@ struct MapPhotoViewer: View {
                 .frame(maxHeight: .infinity, alignment: .top)
         }
         .preferredColorScheme(.dark)
+        .sheet(item: $reportTarget) { report in
+            ReportSheet(target: report.target, service: services.reports)
+        }
         .task { await load() }
         .onAppear {
             withAnimation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.82)) {
@@ -83,6 +108,22 @@ struct MapPhotoViewer: View {
             }
             .accessibilityLabel("Fermer")
             Spacer()
+            if case .authenticated = session.state {
+                Menu {
+                    Button(role: .destructive) { reportTarget = .photo(photoId) } label: {
+                        Label("Signaler la photo", systemImage: "flag")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .frame(width: 44, height: 44)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .background(SQColor.surfaceGlass, in: Circle())
+                        .sqShadowSoft()
+                }
+                .accessibilityLabel("Plus d'options")
+            }
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.top, SQSpace.sm)
@@ -228,6 +269,21 @@ struct MapPhotoViewer: View {
                 .foregroundStyle(SQColor.labelSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contextMenu {
+            if case let .authenticated(user) = session.state {
+                if comment.userId == user.id {
+                    Button(role: .destructive) {
+                        Task { await deleteComment(comment) }
+                    } label: {
+                        Label("Supprimer", systemImage: "trash")
+                    }
+                } else {
+                    Button(role: .destructive) { reportTarget = .comment(comment.id) } label: {
+                        Label("Signaler le commentaire", systemImage: "flag")
+                    }
+                }
+            }
+        }
     }
 
     private var composer: some View {
@@ -307,6 +363,15 @@ struct MapPhotoViewer: View {
                 liked = previousLiked
                 likeCount = previousCount
             }
+        }
+    }
+
+    private func deleteComment(_ comment: PhotoComment) async {
+        do {
+            try await service.deleteComment(photoId: photoId, commentId: comment.id)
+            comments.removeAll { $0.id == comment.id }
+        } catch {
+            if !error.isCancellation { commentError = error.userFacingMessage }
         }
     }
 

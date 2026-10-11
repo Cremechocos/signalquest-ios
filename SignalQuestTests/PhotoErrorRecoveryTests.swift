@@ -242,6 +242,7 @@ private final class PhotoRecoveryFixture: PhotoServicing, @unchecked Sendable {
         if let sendHandler { return try await sendHandler(photoId, content) }
         return try sendResult.get()
     }
+    func deleteComment(photoId: String, commentId: String) async throws { throw Failure.unavailable }
     func toggleLike(photoId: String, reaction: String) async throws -> PhotoLikeResponse { throw Failure.unavailable }
     func updatePhotoOperator(photoId: String, operatorName: String) async throws { throw Failure.unavailable }
     func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo { throw Failure.unavailable }

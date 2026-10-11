@@ -25,6 +25,21 @@ final class PhotosViewModel: ObservableObject {
     @Published var isLoadingComments = false
     @Published var draft: String = ""
     @Published var isSending = false
+    /// Galerie affichée : `pending` montre les photos de l'utilisateur encore
+    /// en vérification, que la galerie publique ne montre jamais (AF-FIL-10).
+    @Published var filter: GalleryFilter = .approved
+
+    enum GalleryFilter: String, CaseIterable, Identifiable {
+        case approved, mine, pending
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .approved: return String(localized: "Toutes")
+            case .mine: return String(localized: "Mes photos")
+            case .pending: return String(localized: "En vérification")
+            }
+        }
+    }
 
     private let service: PhotoServicing
     private var page = 1
@@ -36,6 +51,17 @@ final class PhotosViewModel: ObservableObject {
 
     init(service: PhotoServicing) {
         self.service = service
+    }
+
+    /// Retire son propre commentaire (le serveur refuse celui d'un autre).
+    func deleteComment(_ comment: PhotoComment) async {
+        guard let photo = selectedPhoto else { return }
+        do {
+            try await service.deleteComment(photoId: photo.id, commentId: comment.id)
+            comments.removeAll { $0.id == comment.id }
+        } catch {
+            if !error.isCancellation { actionError = error.userFacingMessage }
+        }
     }
 
     func load() async {
@@ -52,7 +78,7 @@ final class PhotosViewModel: ObservableObject {
         isLoading = true
         defer { if galleryRequest == request { isLoading = false } }
         do {
-            let response = try await service.listPhotos(filter: "approved", sortBy: "recent", page: 1, limit: pageSize)
+            let response = try await service.listPhotos(filter: filter.rawValue, sortBy: "recent", page: 1, limit: pageSize)
             guard galleryRequest == request, !Task.isCancelled else { return }
             photos = response.photos
             page = 1
@@ -77,7 +103,7 @@ final class PhotosViewModel: ObservableObject {
         let request = galleryRequest
         defer { if galleryRequest == request { isLoadingMore = false } }
         do {
-            let response = try await service.listPhotos(filter: "approved", sortBy: "recent", page: page + 1, limit: pageSize)
+            let response = try await service.listPhotos(filter: filter.rawValue, sortBy: "recent", page: page + 1, limit: pageSize)
             guard galleryRequest == request, !Task.isCancelled else { return }
             var known = Set(photos.map(\.id))
             photos.append(contentsOf: response.photos.filter { known.insert($0.id).inserted })
@@ -291,11 +317,14 @@ final class PhotosViewModel: ObservableObject {
 
 struct PhotosView: View {
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
     @StateObject private var model: PhotosViewModel
     @State private var showingUpload = false
 
-    init(service: PhotoServicing) {
-        _model = StateObject(wrappedValue: PhotosViewModel(service: service))
+    init(service: PhotoServicing, initialFilter: PhotosViewModel.GalleryFilter = .approved) {
+        let model = PhotosViewModel(service: service)
+        model.filter = initialFilter
+        _model = StateObject(wrappedValue: model)
     }
 
     private let twoColumns = [
@@ -312,7 +341,11 @@ struct PhotosView: View {
                 } else if model.photos.isEmpty && model.errorMessage == nil {
                     EmptyStateView(
                         title: "Aucune photo",
-                        message: "Les photos validées apparaîtront ici.",
+                        message: model.filter == .pending
+                            ? "Aucune de tes photos n’attend de vérification."
+                            : model.filter == .mine
+                                ? "Les photos que tu envoies apparaîtront ici."
+                                : "Les photos validées apparaîtront ici.",
                         systemImage: "photo.on.rectangle"
                     )
                 } else {
@@ -370,7 +403,8 @@ struct PhotosView: View {
                     onChangeOperator: { photo, networkOperator in
                         await model.updateOperator(photo, operatorName: networkOperator)
                     },
-                    actionError: model.actionError
+                    actionError: model.actionError,
+                    onDeleteComment: { comment in await model.deleteComment(comment) }
                 )
                 .presentationDetents([.large])
                 .presentationBackgroundCompat(SQColor.bg)
@@ -392,6 +426,17 @@ struct PhotosView: View {
     // « Photos » — on ne garde que le compteur en ligne discrète.
     @ViewBuilder
     private var galleryHeader: some View {
+        // « Mes photos » et « En vérification » n'ont de sens qu'avec un compte.
+        if case .authenticated = session.state {
+            Picker("Galerie", selection: $model.filter) {
+                ForEach(PhotosViewModel.GalleryFilter.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("photos.filter")
+            .onChangeCompat(of: model.filter) { _, _ in
+                Task { await model.load() }
+            }
+        }
         if !model.photos.isEmpty {
             HStack {
                 Text("\(model.photos.count) photos")
@@ -612,11 +657,14 @@ struct PhotoDetailView: View {
     let onShareToConversation: (MessageConversation) async -> Bool
     let onChangeOperator: (Photo, String) async -> Bool
     var actionError: String? = nil
+    /// Supprimer son commentaire ; les autres se signalent (AF-FIL-11).
+    var onDeleteComment: ((PhotoComment) async -> Void)? = nil
 
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showReport = false
+    @State private var reportedComment: PhotoComment?
     @State private var showShareSheet = false
     @State private var showNativeShare = false
     @State private var showAntennaDetail = false
@@ -685,6 +733,9 @@ struct PhotoDetailView: View {
             }
             .sheet(isPresented: $showReport) {
                 ReportSheet(target: .photo(photo.id), service: services.reports)
+            }
+            .sheet(item: $reportedComment) { comment in
+                ReportSheet(target: .photoComment(comment.id), service: services.reports)
             }
             .sheet(isPresented: $showShareSheet) {
                 PhotoShareSheet(photo: photo, messagesService: services.messages, onShare: onShareToConversation)
@@ -970,6 +1021,28 @@ struct PhotoDetailView: View {
             .padding(SQSpace.md)
             .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         }
+        // Contenu d'utilisateurs : il se signale, comme les commentaires des
+        // publications (règle 1.2) ; le sien se supprime.
+        .contextMenu {
+            if isMine(comment) {
+                if let onDeleteComment {
+                    Button(role: .destructive) {
+                        Task { await onDeleteComment(comment) }
+                    } label: {
+                        Label("Supprimer", systemImage: "trash")
+                    }
+                }
+            } else if case .authenticated = session.state {
+                Button(role: .destructive) { reportedComment = comment } label: {
+                    Label("Signaler le commentaire", systemImage: "flag")
+                }
+            }
+        }
+    }
+
+    private func isMine(_ comment: PhotoComment) -> Bool {
+        guard case let .authenticated(user) = session.state else { return false }
+        return comment.userId == user.id
     }
 
     // MARK: Composer

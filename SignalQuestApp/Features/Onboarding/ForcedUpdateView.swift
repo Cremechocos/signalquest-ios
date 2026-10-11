@@ -14,6 +14,26 @@ struct ForcedUpdateView: View {
 
     @Environment(\.openURL) private var openURL
 
+    /// Identifiant App Store de l'app (App Store Connect).
+    private static let appStoreID = "6778608659"
+
+    /// Le lien du serveur est facultatif : sans repli, l'écran bloquant
+    /// n'avait aucun bouton (AF-PROF-08). Un build TestFlight se met à jour
+    /// dans TestFlight, un build App Store dans l'App Store.
+    private var updateURL: URL? {
+        if let storeURL { return storeURL }
+        let isTestFlight = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        return URL(string: isTestFlight
+            ? "itms-beta://beta.itunes.apple.com/v1/app/\(Self.appStoreID)"
+            : "itms-apps://apps.apple.com/app/id\(Self.appStoreID)")
+    }
+
+    /// Le message du serveur n'existe qu'en français : ailleurs, le texte traduit.
+    private var serverMessage: String? {
+        guard let message, Locale.current.language.languageCode?.identifier == "fr" else { return nil }
+        return message
+    }
+
     var body: some View {
         ZStack {
             SQColor.bg.ignoresSafeArea()
@@ -27,8 +47,8 @@ struct ForcedUpdateView: View {
                     .foregroundStyle(SQColor.label)
                     .accessibilityAddTraits(.isHeader)
                 Group {
-                    if let message {
-                        Text(message)
+                    if let serverMessage {
+                        Text(serverMessage)
                     } else {
                         Text("Cette version de SignalQuest n'est plus prise en charge. Mets l'application à jour pour continuer.")
                     }
@@ -36,9 +56,9 @@ struct ForcedUpdateView: View {
                     .font(SQType.body)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
-                if let storeURL {
+                if let updateURL {
                     GradientButton("Mettre à jour", systemImage: "arrow.up.forward.app") {
-                        openURL(storeURL)
+                        openURL(updateURL)
                     }
                 }
             }

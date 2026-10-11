@@ -5,6 +5,8 @@ protocol PhotoServicing: Sendable {
     func photo(id: String) async throws -> Photo
     func comments(photoId: String) async throws -> [PhotoComment]
     func addComment(photoId: String, content: String) async throws -> PhotoComment?
+    /// Retire un commentaire : l'auteur ou un administrateur (le serveur vérifie).
+    func deleteComment(photoId: String, commentId: String) async throws
     func toggleLike(photoId: String, reaction: String) async throws -> PhotoLikeResponse
     func updatePhotoOperator(photoId: String, operatorName: String) async throws
     func uploadPhoto(data: Data, siteId: String, description: String?, anfrCode: String?, operatorName: String?, exifMetadata: String?) async throws -> Photo
@@ -54,6 +56,12 @@ final class PhotoService: PhotoServicing {
         struct Response: Codable { let success: Bool?; let comment: PhotoComment? }
         let response: Response = try await api.requestJSON("/api/photos/\(photoId)/comments", body: ["content": content])
         return response.comment
+    }
+
+    func deleteComment(photoId: String, commentId: String) async throws {
+        try await api.request(
+            APIEndpoint(path: "/api/photos/\(photoId)/comments/\(commentId)", method: .delete)
+        )
     }
 
     func toggleLike(photoId: String, reaction: String = "❤️") async throws -> PhotoLikeResponse {

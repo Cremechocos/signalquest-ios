@@ -138,6 +138,13 @@ struct ProfileView: View {
         .sheet(item: $deepLinkSentinelle) { link in
             NavigationStack {
                 SentinelleView(service: services.sentinelle, initialTargetId: link.targetId)
+                    // Ouverte par un lien : sans « Fermer », seul le glissement en
+                    // sortait (AF-PROF-03).
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Fermer") { deepLinkSentinelle = nil }
+                        }
+                    }
             }
         }
         .sheet(item: $deepLinkShare) { link in
@@ -145,16 +152,37 @@ struct ProfileView: View {
                 // La page Sentinelle habituelle, avec le jeton : l'écran dédié
                 // a été retiré, son contenu a sa place dans la liste.
                 SentinelleView(service: services.sentinelle, initialShareSlug: link.id)
+                    // Ouverte par un lien : sans « Fermer », seul le glissement en
+                    // sortait (AF-PROF-03).
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Fermer") { deepLinkShare = nil }
+                        }
+                    }
             }
         }
         .sheet(item: $deepLinkE2EEApproval) { link in
             NavigationStack {
                 E2EEV2TrustedDevicesView(api: services.api, initialApprovalId: link.id)
+                    // Ouverte par un lien : sans « Fermer », seul le glissement en
+                    // sortait (AF-PROF-03).
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Fermer") { deepLinkE2EEApproval = nil }
+                        }
+                    }
             }
         }
         .sheet(item: $deepLinkE2EEApprovalQR) { link in
             NavigationStack {
                 E2EEV2TrustedDevicesView(api: services.api, initialApprovalQR: link.id)
+                    // Ouverte par un lien : sans « Fermer », seul le glissement en
+                    // sortait (AF-PROF-03).
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Fermer") { deepLinkE2EEApprovalQR = nil }
+                        }
+                    }
             }
         }
         .sheet(isPresented: $showE2EEIdentityReset) {
@@ -709,7 +737,7 @@ struct ProfileView: View {
             .accessibilityIdentifier("profile.todo.missions")
         case .photosInReview(let count):
             NavigationLink {
-                PhotosView(service: services.photos)
+                PhotosView(service: services.photos, initialFilter: .pending)
             } label: {
                 menuRow(title: String(localized: "Photos en cours de vérification : \(count)"), icon: "hourglass")
             }

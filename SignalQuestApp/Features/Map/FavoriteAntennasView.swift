@@ -171,10 +171,19 @@ struct FavoriteAntennaButton: View {
     let latitude: Double?
     let longitude: Double?
     @State private var showsSyncError = false
+    @EnvironmentObject private var session: AuthSessionViewModel
 
     private var isOn: Bool { favorites.isFavorite(siteId: siteId, market: market) }
 
+    /// Sans compte, aucun suivi possible : l'étoile restait sans effet (AF-CARTE-13).
+    @ViewBuilder
     var body: some View {
+        if case .authenticated = session.state {
+            star
+        }
+    }
+
+    private var star: some View {
         Button {
             guard let scope = favorites.captureActionScope() else { return }
             Task {
@@ -207,7 +216,7 @@ struct FavoriteAntennaButton: View {
         .buttonStyle(.plain)
         .disabled(favorites.isLoading && !favorites.hasLoaded)
         .accessibilityLabel(favorites.hasLoaded
-            ? (isOn ? Text("Ne plus suivre cette antenne") : Text("Suivre cette antenne")) : Text("Charger les favoris"))
+            ? (isOn ? Text("Ne plus suivre cette antenne") : Text("Suivre cette antenne")) : Text("Charger les antennes suivies"))
         .accessibilityHint(favorites.isPending(siteId: siteId, market: market)
             ? Text("Synchronisation en attente") : Text(""))
         .accessibilityAddTraits(isOn ? [.isSelected] : [])

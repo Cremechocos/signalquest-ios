@@ -409,6 +409,12 @@ enum RadioLogSiteBuilder {
     }
 }
 
+extension RadioLogSite {
+    /// Le balayage n'interroge que les nœuds au PLMN exact et au marché connu :
+    /// les autres ne reçoivent jamais de statut (AF-RAD-09).
+    var isCheckable: Bool { observedPlmn != nil && resolvedMarketCode != nil }
+}
+
 // MARK: - Statut d'identification d'un site
 
 /// Réponse à l'unique question que pose la page : « ce site est-il déjà identifié ? ».

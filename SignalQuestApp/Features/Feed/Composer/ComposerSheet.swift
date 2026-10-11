@@ -205,6 +205,9 @@ final class ComposerViewModel: ObservableObject {
         // Un sondage seul suffit, comme dans `publish()` : le bouton restait
         // désactivé alors que l'envoi l'acceptait (SOC-18).
         let hasContent = !body.isEmpty || previewImage != nil || attachedSpeedtest != nil || preparedPoll != nil
+        // En modification, seuls le texte et la visibilité partent (`saveEdit`) :
+        // une photo ajoutée ne rendait pas « Enregistrer » utile (AF-FIL-05).
+        if isEditing { return !body.isEmpty && !isTextTooLong && !isBusy }
         return hasContent && !isTextTooLong && !isBusy
     }
 
@@ -634,6 +637,9 @@ struct ComposerSheet: View {
 
     private var bottomToolbar: some View {
         HStack(spacing: SQSpace.md) {
+            // Modifier un post ne change que son texte et sa visibilité : ces
+            // ajouts étaient proposés puis ignorés (AF-FIL-05).
+            if !model.isEditing {
             // Bascule sondage : même gabarit que les autres actions de la barre.
             Button {
                 Haptics.selection()
@@ -691,6 +697,7 @@ struct ComposerSheet: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Joindre un speedtest")
                 .disabled(model.isLoadingSpeedtest)
+            }
             }
 
             // Visibility button — capsule surface + ombre repos, sans bordure.

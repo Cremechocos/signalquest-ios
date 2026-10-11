@@ -28,6 +28,9 @@ struct SentinelleAddressView: View {
     @State private var trendsFailed = false
     @State private var proof: SentinelleProof?
     @State private var proofFailed = false
+    /// Ce qui a échoué : une route absente (404) ou une vraie erreur, qu'on
+    /// peut réessayer. L'annulation, elle, n'est pas un échec (AF-RAD-07).
+    @State private var sectionFailure: String?
 
     @State private var editing = false
 
@@ -580,10 +583,30 @@ struct SentinelleAddressView: View {
     }
 
     private var unavailable: some View {
-        Text("Cette lecture n’est pas encore disponible sur ce serveur.")
-            .font(SQType.caption)
-            .foregroundStyle(SQColor.labelSecondary)
-            .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text(sectionFailure ?? String(localized: "Cette lecture n’est pas encore disponible sur ce serveur."))
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Réessayer") {
+                diagnosticFailed = false
+                trendsFailed = false
+                proofFailed = false
+                sectionFailure = nil
+                Task { await loadSection() }
+            }
+            .font(SQFont.body(14, .semibold))
+            .foregroundStyle(SQColor.accentInk)
+            .frame(minHeight: 44)
+        }
+    }
+
+    /// Un 404 dit que la route manque ; le reste est une erreur à réessayer.
+    private func describeFailure(_ error: Error) -> String {
+        if case APIError.http(let status, _, _, _, _) = error, status == 404 {
+            return String(localized: "Cette lecture n’est pas encore disponible sur ce serveur.")
+        }
+        return error.userFacingMessage
     }
 
     // MARK: Chargements
@@ -634,15 +657,15 @@ struct SentinelleAddressView: View {
         case .diagnostic:
             guard diagnostic == nil, !diagnosticFailed else { return }
             do { diagnostic = try await model.service.diagnostic(targetId: targetId, family: family) }
-            catch { diagnosticFailed = true }
+            catch { if !error.isCancellation { sectionFailure = describeFailure(error); diagnosticFailed = true } }
         case .trends:
             guard trends == nil, !trendsFailed else { return }
             do { trends = try await model.service.trends(targetId: targetId, family: family) }
-            catch { trendsFailed = true }
+            catch { if !error.isCancellation { sectionFailure = describeFailure(error); trendsFailed = true } }
         case .proof:
             guard proof == nil, !proofFailed else { return }
             do { proof = try await model.service.proof(targetId: targetId, family: family) }
-            catch { proofFailed = true }
+            catch { if !error.isCancellation { sectionFailure = describeFailure(error); proofFailed = true } }
         }
     }
 }
