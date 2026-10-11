@@ -36,7 +36,7 @@ final class SentinelleViewModel: ObservableObject {
     private(set) var inviteSlug: String?
     /// Un lien invalide ou expiré doit se DIRE : sinon l'app s'ouvre et il ne se
     /// passe rien, ce qui est le pire retour pour qui vient de cliquer un lien.
-    var shareLinkError: String?
+    @Published var shareLinkError: String?
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var isBusy = false
@@ -188,12 +188,24 @@ final class SentinelleViewModel: ObservableObject {
         (try? await service.followedSeries(followId: box.followId, window: window))?.points ?? []
     }
 
+    /// Suivre ne demande aucun abonnement (c'est le propriétaire qui paie) :
+    /// l'échec se dit, il ne bascule jamais l'écran vers l'offre Premium.
     func followPendingShare() async {
         // Le jeton se lit sur l'invitation affichée et non sur `pendingShareSlug`,
         // qui est effacé dès la première lecture pour ne pas relancer la requête
         // à chaque cycle.
         guard let slug = inviteSlug else { return }
-        await mutate { try await self.service.follow(shareInput: slug) }
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            try await service.follow(shareInput: slug)
+            // Suivie : l'invitation a fait son office.
+            sharedInvite = nil
+            inviteSlug = nil
+            await load(silently: true)
+        } catch {
+            actionError = error.userFacingMessage
+        }
     }
 
     func follow(shareInput: String) async throws {
@@ -205,16 +217,18 @@ final class SentinelleViewModel: ObservableObject {
         await mutate { try await self.service.unfollow(followId: box.followId) }
     }
 
-    func create(label: String, address: String, ownerLabel: String? = nil, ownerEmoji: String? = nil) async {
-        await mutate {
+    /// - Returns: le message d'échec, à afficher dans la feuille de saisie.
+    func create(label: String, address: String, ownerLabel: String? = nil, ownerEmoji: String? = nil) async -> String? {
+        await mutateFromSheet {
             try await self.service.create(
                 label: label, address: address, ownerLabel: ownerLabel, ownerEmoji: ownerEmoji
             )
         }
     }
 
-    func setAddress(targetId: String, family: SentinelleFamily, address: String) async {
-        await mutate { try await self.service.setAddress(targetId: targetId, family: family, address: address) }
+    /// - Returns: le message d'échec, à afficher dans la feuille de saisie.
+    func setAddress(targetId: String, family: SentinelleFamily, address: String) async -> String? {
+        await mutateFromSheet { try await self.service.setAddress(targetId: targetId, family: family, address: address) }
     }
 
     /// - Returns: vrai quand la cible a bien été retirée, pour que la page
@@ -245,6 +259,24 @@ final class SentinelleViewModel: ObservableObject {
         } catch {
             actionError = error.userFacingMessage
             return false
+        }
+    }
+
+    /// Écriture lancée depuis une feuille de saisie : l'erreur revient à la
+    /// feuille, qui reste ouverte avec ce qui a été tapé. L'alerte de la page
+    /// ne peut pas paraître tant qu'une feuille est présentée.
+    private func mutateFromSheet(_ action: @escaping () async throws -> Void) async -> String? {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            try await action()
+            await load(silently: true)
+            return nil
+        } catch is SentinelleAccessDenied {
+            accessDenied = true
+            return String(localized: "Sentinelle nécessite un abonnement Premium.")
+        } catch {
+            return error.userFacingMessage
         }
     }
 }
@@ -284,6 +316,10 @@ struct SentinelleView: View {
         Group {
             if model.isLoading && model.targets.isEmpty {
                 loadingState
+            } else if model.sharedInvite != nil {
+                // L'invitation venue d'un lien passe avant l'offre Premium, l'état
+                // vide et la box unique : suivre ne demande ni abonnement ni box.
+                boxList
             } else if model.accessDenied && model.following.isEmpty {
                 if services.entitlements.confirmedServerTier == .premium {
                     premiumActivationPending
@@ -296,12 +332,18 @@ struct SentinelleView: View {
                 }
                 .padding(SQSpace.lg)
             } else if model.targets.isEmpty && model.following.isEmpty {
-                EmptyStateView(
-                    title: "Aucune connexion surveillée",
-                    message: "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera chaque minute depuis nos serveurs, téléphone éteint compris.",
-                    systemImage: "wifi.router"
-                )
-                .padding(SQSpace.lg)
+                ScrollView {
+                    VStack(spacing: SQSpace.lg) {
+                        EmptyStateView(
+                            title: "Aucune connexion surveillée",
+                            message: "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera chaque minute depuis nos serveurs, téléphone éteint compris.",
+                            systemImage: "wifi.router"
+                        )
+                        SentinelleFollowInvite { showFollow = true }
+                    }
+                    .padding(SQSpace.lg)
+                    .sqReadableWidth()
+                }
             } else if let root = rootTarget {
                 // Une liste à un seul élément n'apporte rien : la box unique EST
                 // l'accueil. Une box désignée par une notification l'est aussi —
@@ -381,7 +423,7 @@ struct SentinelleView: View {
         }
         .sheet(isPresented: $showCreate) {
             SentinelleCreateSheet(quota: model.quota, currentIp: { await model.currentIp() }) { label, address, ownerLabel, ownerEmoji in
-                Task { await model.create(label: label, address: address, ownerLabel: ownerLabel, ownerEmoji: ownerEmoji) }
+                await model.create(label: label, address: address, ownerLabel: ownerLabel, ownerEmoji: ownerEmoji)
             }
         }
         .sheet(isPresented: $showPremiumPaywall, onDismiss: {
@@ -406,6 +448,19 @@ struct SentinelleView: View {
             Button("Fermer", role: .cancel) { model.actionError = nil }
         } message: {
             Text(model.actionError ?? "")
+        }
+        // Un lien invalide ou expiré doit se dire : sinon l'app s'ouvre et il
+        // ne se passe rien.
+        .alert(
+            "Lien de partage",
+            isPresented: Binding(
+                get: { model.shareLinkError != nil },
+                set: { if !$0 { model.shareLinkError = nil } }
+            )
+        ) {
+            Button("Fermer", role: .cancel) { model.shareLinkError = nil }
+        } message: {
+            Text(model.shareLinkError ?? "")
         }
     }
 
@@ -442,7 +497,7 @@ struct SentinelleView: View {
                 // vient de faire, et elle disparaît dès qu'on a suivi.
                 if let invite = model.sharedInvite {
                     SentinelleShareInvite(box: invite) {
-                        Task { await model.followPendingShare() }
+                        await model.followPendingShare()
                     }
                 }
 
@@ -566,8 +621,12 @@ struct SentinelleView: View {
             GradientButton("Découvrir Premium", systemImage: "crown.fill") {
                 showPremiumPaywall = true
             }
+            // Suivre la connexion d'un proche reste gratuit : la personne qu'on
+            // invite est souvent un compte sans abonnement.
+            SentinelleFollowInvite { showFollow = true }
         }
         .padding(SQSpace.lg)
+        .sqReadableWidth()
     }
 
     /// Un droit Apple déjà détecté peut précéder de quelques secondes l'accès

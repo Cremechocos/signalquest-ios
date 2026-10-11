@@ -80,7 +80,7 @@ struct SentinelleAddressView: View {
                     existing: address.address,
                     currentIp: { await model.currentIp() }
                 ) { value in
-                    Task { await model.setAddress(targetId: targetId, family: family, address: value) }
+                    await model.setAddress(targetId: targetId, family: family, address: value)
                 }
             }
         }

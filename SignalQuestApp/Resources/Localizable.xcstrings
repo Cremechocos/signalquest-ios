@@ -1,6 +1,57 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "Sentinelle nécessite un abonnement Premium." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinelle requires a Premium subscription."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinelle nécessite un abonnement Premium."
+          }
+        }
+      }
+    },
+    "Lien de partage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share link"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lien de partage"
+          }
+        }
+      }
+    },
+    "La liste des abonnés n’a pas pu être chargée." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The followers list could not be loaded."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La liste des abonnés n’a pas pu être chargée."
+          }
+        }
+      }
+    },
     "Demande enregistrée. Ton identité sera remplacée à l’échéance, sauf si l’un de tes appareils s’y oppose." : {
       "localizations" : {
         "en" : {

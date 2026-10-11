@@ -83,7 +83,7 @@ struct SentinelleBoxView: View {
                     existing: editing.existing,
                     currentIp: { await model.currentIp() }
                 ) { address in
-                    Task { await model.setAddress(targetId: targetId, family: editing.family, address: address) }
+                    await model.setAddress(targetId: targetId, family: editing.family, address: address)
                 }
             }
         }
@@ -414,11 +414,16 @@ struct SentinelleBoxView: View {
 
                         Button("Enregistrer") {
                             Task {
-                                try? await model.service.setOwner(
-                                    targetId: target.id,
-                                    ownerLabel: ownerLabel.isEmpty ? nil : ownerLabel,
-                                    ownerEmoji: ownerEmoji.isEmpty ? nil : ownerEmoji
-                                )
+                                do {
+                                    try await model.service.setOwner(
+                                        targetId: target.id,
+                                        ownerLabel: ownerLabel.isEmpty ? nil : ownerLabel,
+                                        ownerEmoji: ownerEmoji.isEmpty ? nil : ownerEmoji
+                                    )
+                                } catch {
+                                    // Avalé, l'échec laissait croire l'attribution enregistrée.
+                                    model.actionError = error.userFacingMessage
+                                }
                                 await model.load(silently: true)
                             }
                         }

@@ -17,6 +17,11 @@ struct SentinelleFollowersCard: View {
     @State private var slug: String?
     @State private var sharing = false
     @State private var copied = false
+    /// La liste n'a pas pu être lue : on le dit plutôt que d'affirmer
+    /// « personne ».
+    @State private var loadFailure: String?
+    /// Échec d'un partage ou d'un retrait, dit dans la carte.
+    @State private var actionFailure: String?
 
     var body: some View {
         // Tant que la liste n'est pas arrivée, on n'affiche RIEN plutôt qu'une
@@ -25,6 +30,22 @@ struct SentinelleFollowersCard: View {
             let active = followers.filter(\.isActive)
             let past = followers.filter { !$0.isActive }
             card(active: active, past: past)
+        } else if let loadFailure {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("La liste des abonnés n’a pas pu être chargée.")
+                    .font(SQFont.body(13))
+                    .foregroundStyle(SQColor.label)
+                Text(loadFailure)
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.labelSecondary)
+                Button("Réessayer") { self.loadFailure = nil }
+                    .font(SQFont.body(14, .semibold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(SQSpace.md)
+            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         } else {
             Color.clear.frame(height: 0).task { await load() }
         }
@@ -34,6 +55,13 @@ struct SentinelleFollowersCard: View {
     private func card(active: [SentinelleFollower], past: [SentinelleFollower]) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             sharingControls
+
+            if let actionFailure {
+                Label(actionFailure, systemImage: "exclamationmark.triangle.fill")
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.dangerInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if !active.isEmpty || !past.isEmpty || isShared {
                 Divider().padding(.vertical, SQSpace.xs)
@@ -188,18 +216,27 @@ struct SentinelleFollowersCard: View {
         defer { sharing = false }
         // On relit ce que le serveur a écrit plutôt que de supposer : c'est lui
         // qui crée le lien, et afficher un partage actif sans lien serait faux.
-        if let updated = try? await service.setSharing(targetId: target.id, changes: changes) {
+        actionFailure = nil
+        do {
+            let updated = try await service.setSharing(targetId: target.id, changes: changes)
             shared = updated.isPublic
             expiresAt = updated.publicExpiresAt
             slug = updated.publicSlug
             // Le lien change à chaque réactivation : un « Copié » hérité du
             // précédent laisserait croire qu'on tient le bon.
             copied = false
+        } catch {
+            actionFailure = error.userFacingMessage
         }
     }
 
     private func load() async {
-        followers = (try? await service.followers(targetId: target.id))?.followers ?? []
+        do {
+            followers = try await service.followers(targetId: target.id).followers
+        } catch {
+            guard !error.isCancellation else { return }
+            loadFailure = error.userFacingMessage
+        }
     }
 
     private func revoke(_ userId: String) async {
@@ -207,7 +244,12 @@ struct SentinelleFollowersCard: View {
         defer { busy = nil }
         // On relit après coup : c'est le serveur qui décide, et supposer la
         // révocation réussie afficherait un accès retiré qui ne l'est pas.
-        try? await service.revokeFollower(targetId: target.id, followerId: userId)
+        actionFailure = nil
+        do {
+            try await service.revokeFollower(targetId: target.id, followerId: userId)
+        } catch {
+            actionFailure = error.userFacingMessage
+        }
         await load()
     }
 

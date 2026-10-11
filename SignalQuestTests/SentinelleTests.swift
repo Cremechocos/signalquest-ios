@@ -50,6 +50,103 @@ final class SentinelleAccessRecoveryTests: XCTestCase {
     }
 }
 
+/// AF-RAD-02, AF-RAD-03, AF-RAD-05 : la personne invitée par un lien est
+/// souvent un compte gratuit ; suivre ne demande aucun abonnement.
+@MainActor
+final class SentinelleSharedInviteTests: XCTestCase {
+    func testAFreeAccountArrivingByALinkCanFollowAndTheInviteGoesAway() async {
+        let service = SentinelleInviteService()
+        let model = SentinelleViewModel(service: service)
+        model.pendingShareSlug = "slug_partage_0001"
+        await model.load()
+        XCTAssertTrue(model.accessDenied, "Un compte gratuit n'a pas de box à lui")
+        XCTAssertNotNil(model.sharedInvite, "L'invitation existe malgré le refus Premium")
+        await model.followPendingShare()
+        XCTAssertNil(model.sharedInvite, "Suivie : l'invitation disparaît")
+        XCTAssertNil(model.actionError)
+        XCTAssertEqual(service.follows.value, ["slug_partage_0001"])
+        XCTAssertEqual(model.following.map(\.followId), ["follow_new"])
+    }
+
+    func testAFailedFollowIsToldAndKeepsTheInvite() async {
+        let service = SentinelleInviteService(followFails: true)
+        let model = SentinelleViewModel(service: service)
+        model.pendingShareSlug = "slug_partage_0001"
+        await model.load()
+        await model.followPendingShare()
+        XCTAssertNotNil(model.sharedInvite, "Un nouvel essai reste possible")
+        XCTAssertNotNil(model.actionError)
+    }
+
+    func testAnExpiredLinkIsToldInsteadOfDoingNothing() async {
+        let service = SentinelleInviteService(linkExpired: true)
+        let model = SentinelleViewModel(service: service)
+        model.pendingShareSlug = "slug_expire_00001"
+        await model.load()
+        XCTAssertNil(model.sharedInvite)
+        XCTAssertNotNil(model.shareLinkError)
+    }
+
+    func testACreationRefusedByTheServerComesBackToTheSheet() async {
+        let model = SentinelleViewModel(service: SentinelleInviteService(createFails: true))
+        let failure = await model.create(label: "Maison", address: "192.0.2.10")
+        XCTAssertNotNil(failure, "La feuille garde la saisie et affiche l'échec")
+        XCTAssertNil(model.actionError, "L'alerte de la page ne doit pas doubler le message de la feuille")
+    }
+}
+
+private final class SentinelleRecorded: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [String] = []
+    func append(_ item: String) { lock.lock(); items.append(item); lock.unlock() }
+    var value: [String] { lock.lock(); defer { lock.unlock() }; return items }
+}
+
+private struct SentinelleInviteService: SentinelleServicing {
+    var followFails = false
+    var linkExpired = false
+    var createFails = false
+    let follows = SentinelleRecorded()
+
+    func targets() async throws -> SentinelleTargetsResponse { throw SentinelleAccessDenied() }
+    func following() async throws -> SentinelleFollowingResponse {
+        let json = follows.value.isEmpty
+            ? #"{"following":[]}"#
+            : #"{"following":[{"followId":"follow_new","displayName":"Box de Léa","status":"up","families":["IPv4"],"incidents":[]}]}"#
+        return try JSONDecoder.signalQuest.decode(SentinelleFollowingResponse.self, from: Data(json.utf8))
+    }
+    func sharedBox(slug: String) async throws -> SentinelleSharedBox {
+        if linkExpired { throw APIError.http(status: 404, code: "NOT_FOUND", message: "Ce lien n’est plus actif", requestId: nil, retryAfter: nil) }
+        return try JSONDecoder.signalQuest.decode(SentinelleSharedBox.self, from: Data(#"""
+        {"label":"Box de Léa","status":"up","lastProbeAt":null,"uptimePct":99.9,"families":["IPv4"],"ownerLabel":null,"ownerEmoji":null,"incidents":[],"isOwner":false,"isFollowing":false,"canFollow":true}
+        """#.utf8))
+    }
+    func follow(shareInput: String) async throws {
+        if followFails { throw APIError.http(status: 404, code: "NOT_FOUND", message: "Ce lien n’est plus actif", requestId: nil, retryAfter: nil) }
+        follows.append(shareInput)
+    }
+    func create(label: String, address: String, ownerLabel: String?, ownerEmoji: String?) async throws {
+        if createFails { throw APIError.http(status: 409, code: "TARGET_EXISTS", message: "Adresse déjà surveillée", requestId: nil, retryAfter: nil) }
+    }
+    func detail(targetId: String) async throws -> SentinelleDetailResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func series(targetId: String, window: SentinelleWindow, family: SentinelleFamily?) async throws -> SentinelleSeriesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func diagnostic(targetId: String, family: SentinelleFamily?) async throws -> SentinelleDiagnostic { throw SentinelleAccessTestError.unexpectedCall }
+    func trends(targetId: String, family: SentinelleFamily?) async throws -> SentinelleTrends { throw SentinelleAccessTestError.unexpectedCall }
+    func proof(targetId: String, family: SentinelleFamily?) async throws -> SentinelleProof { throw SentinelleAccessTestError.unexpectedCall }
+    func setOwner(targetId: String, ownerLabel: String?, ownerEmoji: String?) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setAddress(targetId: String, family: SentinelleFamily, address: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func delete(targetId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func currentIp() async throws -> SentinelleCurrentIp { throw SentinelleAccessTestError.unexpectedCall }
+    func preferences() async throws -> SentinellePreferencesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func savePreferences(_ changes: SentinellePreferencesPatch) async throws -> SentinellePreferencesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func testWebhook() async throws -> SentinelleWebhookTest { throw SentinelleAccessTestError.unexpectedCall }
+    func followers(targetId: String) async throws -> SentinelleFollowersResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func followedSeries(followId: String, window: SentinelleWindow) async throws -> SentinelleSeriesResponse { throw SentinelleAccessTestError.unexpectedCall }
+    func unfollow(followId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func revokeFollower(targetId: String, followerId: String) async throws { throw SentinelleAccessTestError.unexpectedCall }
+    func setSharing(targetId: String, changes: SentinelleSharingPatch) async throws -> SentinelleTarget { throw SentinelleAccessTestError.unexpectedCall }
+}
+
 private enum SentinelleAccessTestError: Error { case unexpectedCall, timeout }
 
 private actor SentinelleTargetRequests {

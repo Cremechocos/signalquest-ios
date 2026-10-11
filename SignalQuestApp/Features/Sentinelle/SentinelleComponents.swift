@@ -241,6 +241,19 @@ struct SentinelleDetectedAddress: View {
 }
 
 /// Enveloppe commune des deux feuilles de saisie : poignée, titre, explication.
+/// Échec d'enregistrement, dit dans la feuille même, au-dessus du bouton.
+struct SentinelleSheetFailure: View {
+    let message: String
+
+    var body: some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.dangerInk)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("sentinelle.sheetFailure")
+    }
+}
+
 struct SentinelleSheetShell<Content: View>: View {
     let title: String
     let subtitle: String
@@ -274,9 +287,13 @@ struct SentinelleSheetShell<Content: View>: View {
 struct SentinelleCreateSheet: View {
     let quota: SentinelleQuota?
     let currentIp: () async -> SentinelleCurrentIp?
-    let onCreate: (_ label: String, _ address: String, _ ownerLabel: String?, _ ownerEmoji: String?) -> Void
+    /// Renvoie le message d'échec : la feuille ne se ferme qu'après un
+    /// enregistrement réussi, sans perdre la saisie.
+    let onCreate: (_ label: String, _ address: String, _ ownerLabel: String?, _ ownerEmoji: String?) async -> String?
 
     @Environment(\.dismiss) private var dismiss
+    @State private var busy = false
+    @State private var failure: String?
     @State private var label = ""
     @State private var address = ""
     @State private var ownerLabel = ""
@@ -310,16 +327,25 @@ struct SentinelleCreateSheet: View {
                 }
             }
 
-            GradientButton("Commencer la surveillance", systemImage: "dot.radiowaves.left.and.right") {
-                onCreate(
-                    label.trimmingCharacters(in: .whitespacesAndNewlines),
-                    address.trimmingCharacters(in: .whitespacesAndNewlines),
-                    SentinelleOwnerLabel.normalise(ownerLabel),
-                    ownerEmoji.isEmpty ? nil : ownerEmoji
-                )
-                dismiss()
+            if let failure {
+                SentinelleSheetFailure(message: failure)
             }
-            .disabled(!isValid)
+
+            GradientButton(busy ? "…" : String(localized: "Commencer la surveillance"), systemImage: "dot.radiowaves.left.and.right") {
+                Task {
+                    busy = true
+                    failure = nil
+                    failure = await onCreate(
+                        label.trimmingCharacters(in: .whitespacesAndNewlines),
+                        address.trimmingCharacters(in: .whitespacesAndNewlines),
+                        SentinelleOwnerLabel.normalise(ownerLabel),
+                        ownerEmoji.isEmpty ? nil : ownerEmoji
+                    )
+                    busy = false
+                    if failure == nil { dismiss() }
+                }
+            }
+            .disabled(!isValid || busy)
             .opacity(isValid ? 1 : 0.5)
 
             if let quota {
@@ -355,9 +381,13 @@ struct SentinelleAddressSheet: View {
     /// Valeur actuelle quand il s'agit d'une correction ; nulle pour un ajout.
     let existing: String?
     let currentIp: () async -> SentinelleCurrentIp?
-    let onSubmit: (String) -> Void
+    /// Renvoie le message d'échec : la feuille ne se ferme qu'après un
+    /// enregistrement réussi, sans perdre la saisie.
+    let onSubmit: (String) async -> String?
 
     @Environment(\.dismiss) private var dismiss
+    @State private var busy = false
+    @State private var failure: String?
     @State private var draft = ""
     @State private var detected: SentinelleCurrentIp?
     @State private var touched = false
@@ -391,16 +421,26 @@ struct SentinelleAddressSheet: View {
                 }
             }
 
+            if let failure {
+                SentinelleSheetFailure(message: failure)
+            }
+
             GradientButton(
-                existing == nil
+                busy ? "…"
+                    : existing == nil
                     ? String(localized: "Ajouter cette adresse")
                     : String(localized: "Enregistrer"),
                 systemImage: "checkmark"
             ) {
-                onSubmit(draft.trimmingCharacters(in: .whitespacesAndNewlines))
-                dismiss()
+                Task {
+                    busy = true
+                    failure = nil
+                    failure = await onSubmit(draft.trimmingCharacters(in: .whitespacesAndNewlines))
+                    busy = false
+                    if failure == nil { dismiss() }
+                }
             }
-            .disabled(!isValid)
+            .disabled(!isValid || busy)
             .opacity(isValid ? 1 : 0.5)
         }
         .onAppear { if draft.isEmpty, !touched { draft = existing ?? "" } }

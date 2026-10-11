@@ -264,7 +264,9 @@ struct SentinelleFollowInvite: View {
 /// place dans la liste. Elle disparaît d'elle-même une fois la box suivie.
 struct SentinelleShareInvite: View {
     let box: SentinelleSharedBox
-    let onFollow: () -> Void
+    /// Attendu jusqu'au bout : le bouton se rétablit après un échec, pour
+    /// qu'un nouvel essai reste possible.
+    let onFollow: () async -> Void
 
     @State private var busy = false
 
@@ -298,7 +300,10 @@ struct SentinelleShareInvite: View {
                 if box.canFollow {
                     GradientButton(busy ? "…" : "Suivre cette connexion", systemImage: "person.badge.plus") {
                         busy = true
-                        onFollow()
+                        Task {
+                            await onFollow()
+                            busy = false
+                        }
                     }
                     .disabled(busy)
                 } else {
