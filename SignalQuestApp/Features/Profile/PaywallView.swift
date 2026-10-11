@@ -191,31 +191,44 @@ struct PaywallView: View {
         // rendu. La hiérarchie tient à la taille des textes.
         let primaryText = isPremium ? SQColor.onAccent : SQColor.label
 
+        let titleBlock = VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text(tier.displayName)
+                .font(SQType.title)
+                .foregroundStyle(primaryText)
+            Text(SubscriptionPriceCopy.priceLine(product: product))
+                .font(SQFont.display(18, .bold))
+                .foregroundStyle(primaryText)
+        }
+        // « L'essentiel + » promettait des fonctionnalités que Basic
+        // n'ouvre pas : c'est un palier de soutien, et le nommer ainsi
+        // est la seule formulation exacte.
+        let badge = Group {
+            if isPremium {
+                // Sur brique, l'étiquette standard (encre sombre sur teinte
+                // translucide) restait sous 3:1 : capsule claire, encre d'accent.
+                Text("Le plus complet")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.vertical, SQSpace.xs + 1)
+                    .background(SQColor.onAccent, in: Capsule(style: .continuous))
+            } else {
+                SQEditorialTag(text: String(localized: "Soutien"), color: SQColor.labelSecondary)
+            }
+        }
+
         let card = VStack(alignment: .leading, spacing: SQSpace.md) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text(tier.displayName)
-                        .font(SQType.title)
-                        .foregroundStyle(primaryText)
-                    Text(SubscriptionPriceCopy.priceLine(product: product))
-                        .font(SQFont.display(18, .bold))
-                        .foregroundStyle(primaryText)
+            // En très grand texte, l'étiquette passe sous le titre au lieu de
+            // se replier dans sa capsule à côté de lui.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) {
+                    titleBlock
+                    Spacer()
+                    badge
                 }
-                Spacer()
-                // « L'essentiel + » promettait des fonctionnalités que Basic
-                // n'ouvre pas : c'est un palier de soutien, et le nommer ainsi
-                // est la seule formulation exacte.
-                if isPremium {
-                    // Sur brique, l'étiquette standard (encre sombre sur teinte
-                    // translucide) restait sous 3:1 : capsule claire, encre d'accent.
-                    Text("Le plus complet")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(SQColor.accentInk)
-                        .padding(.horizontal, SQSpace.sm + 2)
-                        .padding(.vertical, SQSpace.xs + 1)
-                        .background(SQColor.onAccent, in: Capsule(style: .continuous))
-                } else {
-                    SQEditorialTag(text: String(localized: "Soutien"), color: SQColor.labelSecondary)
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    titleBlock
+                    badge
                 }
             }
 

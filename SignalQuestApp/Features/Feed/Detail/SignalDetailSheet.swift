@@ -85,6 +85,8 @@ struct SignalDetailSheet: View {
                             .foregroundStyle(SQColor.label)
                             .frame(width: 34, height: 34)
                             .background(SQColor.surfaceMuted, in: Circle())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Fermer")
                 }

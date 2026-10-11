@@ -542,10 +542,10 @@ struct CommentsSheet: View {
             }
             .font(.caption.weight(.semibold))
             .foregroundStyle(isLiked ? SQColor.like : SQColor.labelSecondary)
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.top, 1)
         .accessibilityLabel(isLiked ? "Je n’aime plus" : "J’aime")
         .accessibilityValue(count > 0 ? "\(count) j’aime" : "")
     }

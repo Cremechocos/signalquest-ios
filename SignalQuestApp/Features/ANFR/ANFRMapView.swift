@@ -421,12 +421,13 @@ struct ANFRMapFilterSheet: View {
                 Text(LocalizedStringKey(label)).font(SQFont.body(13, .semibold))
             }
             .padding(.horizontal, SQSpace.md)
-            .frame(height: 38)
+            .frame(minHeight: 44)
             .background(on ? AnyShapeStyle(color) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
             .foregroundStyle(on ? SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme) : SQColor.label)
             .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 
@@ -495,6 +496,7 @@ struct ANFRDatePickerSheet: View {
             .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func prettyDate(_ raw: String) -> String {

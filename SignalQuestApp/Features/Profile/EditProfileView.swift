@@ -153,6 +153,8 @@ struct EditProfileView: View {
                     .frame(width: 32, height: 32)
                     .background(SQColor.brandRed, in: Circle())
                     .overlay { Circle().stroke(SQColor.bg, lineWidth: 2) }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
             .accessibilityLabel("Changer la photo de profil")
         }

@@ -76,6 +76,7 @@ struct PostDetailView: View {
                 }
             }
             .padding(SQSpace.lg)
+            .sqReadableWidth()
         }
         .signalQuestBackground()
         .navigationTitle("Post")

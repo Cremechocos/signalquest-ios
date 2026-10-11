@@ -32,11 +32,18 @@ struct FavoriteAntennasView: View {
                 )
                 .tint(SQColor.brandRed)
                 } else {
-                    HStack {
-                        Text("Me prévenir en cas de panne")
-                        Spacer()
-                        if favorites.isLoading { ProgressView() }
-                        else { Text("Indisponible").foregroundStyle(SQColor.labelSecondary) }
+                    // En très grand texte, l'état passe sous l'intitulé plutôt
+                    // que de le couper.
+                    ViewThatFits(in: .horizontal) {
+                        HStack {
+                            Text("Me prévenir en cas de panne")
+                            Spacer()
+                            notifyUnavailableState
+                        }
+                        VStack(alignment: .leading, spacing: SQSpace.xs) {
+                            Text("Me prévenir en cas de panne")
+                            notifyUnavailableState
+                        }
                     }
                 }
             } footer: {
@@ -125,6 +132,12 @@ struct FavoriteAntennasView: View {
         } else {
             rowContent(favorite)
         }
+    }
+
+    @ViewBuilder
+    private var notifyUnavailableState: some View {
+        if favorites.isLoading { ProgressView() }
+        else { Text("Indisponible").foregroundStyle(SQColor.labelSecondary) }
     }
 
     private func rowContent(_ favorite: FavoriteAntenna) -> some View {

@@ -478,6 +478,8 @@ struct ComposerSheet: View {
                         .padding(.horizontal, SQSpace.sm + 2)
                         .padding(.vertical, SQSpace.xs + 2)
                         .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text("Mentionner ") + Text(user.displayName))
@@ -648,7 +650,7 @@ struct ComposerSheet: View {
                 Image(systemName: "chart.bar.xaxis")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(model.pollEnabled ? SQColor.onAccent : SQColor.brandRed)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .background(model.pollEnabled ? SQColor.brandRed : SQColor.surface, in: Circle())
                     .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .sqShadowSoft()
@@ -661,7 +663,7 @@ struct ComposerSheet: View {
                 Image(systemName: "photo.on.rectangle.angled")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .background(SQColor.surface, in: Circle())
                     .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .sqShadowSoft()
@@ -692,7 +694,7 @@ struct ComposerSheet: View {
                                 .foregroundStyle(SQColor.brandRed)
                         }
                     }
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .background(SQColor.surface, in: Circle())
                     .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .sqShadowSoft()
@@ -738,7 +740,7 @@ struct ComposerSheet: View {
                     Image(systemName: "trash")
                         .font(.body)
                         .foregroundStyle(SQColor.danger)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Supprimer le brouillon")

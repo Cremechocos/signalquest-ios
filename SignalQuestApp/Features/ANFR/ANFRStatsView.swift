@@ -286,11 +286,11 @@ struct ANFRStatsView: View {
             Text(LocalizedStringKey(title))
                 .font(SQFont.body(13, .semibold))
                 .foregroundStyle(active ? SQColor.onAccent : SQColor.label)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, SQSpace.sm + 2)
+                .frame(maxWidth: .infinity, minHeight: 44)
                 .background(active ? SQColor.brandRed : Color.clear, in: Capsule(style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
+        .accessibilityAddTraits(active ? .isSelected : [])
         .sqAnimation(SQMotion.fast, value: active)
     }
 
@@ -524,8 +524,11 @@ struct ANFRStatsView: View {
                         .frame(height: 34)
                         .background(selected ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.surfaceMuted), in: Capsule(style: .continuous))
                         .foregroundStyle(selected ? SQBrand.operatorBadgeForeground(op.label) : SQColor.label)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(SQPressButtonStyle())
+                    .accessibilityAddTraits(selected ? .isSelected : [])
                     .sqAnimation(SQMotion.fast, value: selected)
                 }
             }

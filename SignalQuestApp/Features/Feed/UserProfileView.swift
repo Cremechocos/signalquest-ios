@@ -367,6 +367,7 @@ struct UserProfileView: View {
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         .navigationTitle(model.profile?.displayName ?? model.prefill?.displayName ?? "Profil")
         .navigationBarTitleDisplayMode(.inline)
@@ -468,7 +469,7 @@ struct UserProfileView: View {
             Image(systemName: "ellipsis")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(SQColor.label)
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .background(SQColor.surface, in: Circle())
                 .sqShadowSoft()
                 .contentShape(Circle())

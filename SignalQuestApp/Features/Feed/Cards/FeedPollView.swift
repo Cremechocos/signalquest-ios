@@ -83,7 +83,7 @@ struct FeedPollView: View {
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm + 1)
             }
-            .frame(minHeight: 40)
+            .frame(minHeight: 44)
             .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
         }
         .buttonStyle(.plain)

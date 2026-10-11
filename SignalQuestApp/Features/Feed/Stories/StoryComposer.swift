@@ -448,7 +448,7 @@ struct StoryComposer: View {
                         Text("\(seconds)s")
                             .font(SQFont.body(13, .semibold))
                             .padding(.horizontal, SQSpace.md)
-                            .frame(minHeight: 40)
+                            .frame(minHeight: 44)
                             .background(
                                 selected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
                                 in: Capsule(style: .continuous)

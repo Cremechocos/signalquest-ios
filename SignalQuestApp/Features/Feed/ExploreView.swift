@@ -415,6 +415,7 @@ struct ExploreView: View {
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         .navigationTitle("Explorer")
         .toolbarTitleLargeCompat()

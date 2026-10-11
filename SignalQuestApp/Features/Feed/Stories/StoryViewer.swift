@@ -302,7 +302,7 @@ struct StoryViewer: View {
                 Image(systemName: "xmark")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.white)
-                    .padding(SQSpace.sm + 2)
+                    .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial, in: Circle())
             }
             .accessibilityLabel("Fermer")

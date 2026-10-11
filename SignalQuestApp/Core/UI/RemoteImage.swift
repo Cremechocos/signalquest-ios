@@ -249,6 +249,8 @@ struct RemoteImage<Placeholder: View>: View {
                     Text("Photo indisponible")
                         .font(.caption)
                         .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                         .accessibilityIdentifier("remoteImage.failure")
                 }
                 if url != nil {
