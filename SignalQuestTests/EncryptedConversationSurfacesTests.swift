@@ -39,6 +39,28 @@ final class EncryptedConversationSurfacesTests: XCTestCase {
         XCTAssertFalse(EncryptedConversationSurfaces.listHidesSnapshot([plain], decryptedPreviews: [plain.id: "texte"], drafts: [:]))
     }
 
+    /// AF-MSG-03 : « Supprimer pour moi » d'un message v2 tient après la relève
+    /// suivante, par compte et par conversation, et part avec le compte.
+    func testHiddenV2MessagesStayHiddenPerAccountAndConversation() {
+        let defaults = UserDefaults(suiteName: "EncryptedConversationSurfacesTests.hidden")!
+        defaults.removePersistentDomain(forName: "EncryptedConversationSurfacesTests.hidden")
+        let alice = "user:user_alice_01J7ABCD23456789"
+        let bob = "user:user_bob_0001J7ABCD23456789"
+        E2EEV2HiddenMessagesStore.hide(messageRef: "ref_one", conversationId: "conv_a", ownerScopeId: alice, defaults: defaults)
+        E2EEV2HiddenMessagesStore.hide(messageRef: "ref_two", conversationId: "conv_a", ownerScopeId: alice, defaults: defaults)
+        E2EEV2HiddenMessagesStore.hide(messageRef: "ref_one", conversationId: "conv_a", ownerScopeId: alice, defaults: defaults)
+        XCTAssertEqual(E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: "conv_a", ownerScopeId: alice, defaults: defaults), ["ref_one", "ref_two"])
+        XCTAssertTrue(E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: "conv_b", ownerScopeId: alice, defaults: defaults).isEmpty)
+        XCTAssertTrue(E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: "conv_a", ownerScopeId: bob, defaults: defaults).isEmpty,
+                      "Un autre compte du même appareil ne voit pas ces choix")
+        // Un invité n'a pas de compte auquel rattacher le choix.
+        E2EEV2HiddenMessagesStore.hide(messageRef: "ref_guest", conversationId: "conv_a", ownerScopeId: "guest", defaults: defaults)
+        XCTAssertTrue(E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: "conv_a", ownerScopeId: "guest", defaults: defaults).isEmpty)
+        E2EEV2HiddenMessagesStore.purge(ownerScopeId: alice, defaults: defaults)
+        XCTAssertTrue(E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: "conv_a", ownerScopeId: alice, defaults: defaults).isEmpty)
+        defaults.removePersistentDomain(forName: "EncryptedConversationSurfacesTests.hidden")
+    }
+
     private func conversation(_ id: String, encrypted: Bool) -> MessageConversation {
         MessageConversation(
             id: id, title: "Fixture", isGroup: false, e2eeEnabled: encrypted, groupPhotoUrl: nil, createdAt: nil,

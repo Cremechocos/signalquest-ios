@@ -50,6 +50,36 @@ final class E2EEV2ThreadPresentationTests: XCTestCase {
         XCTAssertTrue(thread.notices.isEmpty)
     }
 
+    /// AF-MSG-01 : le fil v2 présenté se lit et s'écrit à l'écran. Le
+    /// présentateur marque ses bulles `e2eeVersion: 2` avec le texte en clair ;
+    /// l'écran les traitait comme du v1 encore chiffré (« Message chiffré »,
+    /// envoi bloqué derrière le mot de passe v1).
+    func testThePresentedV2ThreadIsShownAndWritable() {
+        let first = stored("ref_first_00000000000000000000000000000001", sequence: 1, sender: bruno.id, text: "Salut", serverTimeMs: 1_790_000_000_000)
+        let deleted = stored("ref_deleted_000000000000000000000000000003", sequence: 2, sender: bruno.id, text: nil,
+                             serverTimeMs: 1_790_000_120_000, editedAtMs: 1_790_000_150_000, deleted: true)
+        let thread = E2EEV2ThreadPresenter.present(
+            E2EEV2MessagesV2(snapshot: .init(cursor: 2, messages: [first, deleted], equivocalRefs: []),
+                             unsupported: [], missingByDevice: [:], waitingForEpoch: false),
+            conversationId: conversationId, members: [bruno.id: bruno], deviceOwners: [:]
+        )
+        XCTAssertEqual(EncryptedConversationSurfaces.displayedText(for: thread.messages[0], usesV2: true, decrypted: [:]), "Salut")
+        XCTAssertEqual(EncryptedConversationSurfaces.displayedText(for: thread.messages[1], usesV2: true, decrypted: [:]), "")
+        // Hors du chemin v2 (verrous fermés), rien ne s'affiche en clair.
+        XCTAssertEqual(EncryptedConversationSurfaces.displayedText(for: thread.messages[0], usesV2: false, decrypted: [:]),
+                       String(localized: "🔒 Message chiffré"))
+        XCTAssertTrue(EncryptedConversationSurfaces.canSend(isEncrypted: true, usesV2: true, legacyUnlocked: false))
+        XCTAssertFalse(EncryptedConversationSurfaces.canSend(isEncrypted: true, usesV2: false, legacyUnlocked: false))
+        XCTAssertFalse(EncryptedConversationSurfaces.showsLegacyUnlockBanner(isEncrypted: true, v2Resolved: true, isV2: true, legacyUnlocked: false))
+        XCTAssertFalse(EncryptedConversationSurfaces.showsLegacyUnlockBanner(isEncrypted: true, v2Resolved: false, isV2: false, legacyUnlocked: false),
+                       "Pas de bandeau v1 tant que la nature de la conversation n'est pas établie")
+        XCTAssertTrue(EncryptedConversationSurfaces.showsLegacyUnlockBanner(isEncrypted: true, v2Resolved: true, isV2: false, legacyUnlocked: false))
+        // Les routes v1 (fil, rappel, enregistrés, épingles) ne connaissent pas un `messageRef`.
+        XCTAssertFalse(EncryptedConversationSurfaces.allowsServerActions(messageId: thread.messages[0].id, isV2: true))
+        XCTAssertFalse(EncryptedConversationSurfaces.allowsServerActions(messageId: "local-1234", isV2: false))
+        XCTAssertTrue(EncryptedConversationSurfaces.allowsServerActions(messageId: "msg_server_01J7ABCD", isV2: false))
+    }
+
     func testNoticesSayWhatIsMissingWithoutShowingIt() {
         let result = E2EEV2MessagesV2(
             snapshot: .init(cursor: 9, messages: [], equivocalRefs: ["ref_a", "ref_b"]),

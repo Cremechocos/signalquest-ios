@@ -367,6 +367,7 @@ final class AuthService: AuthServicing {
         if let ownerScopeId = closing?.ownerScopeId {
             OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
             HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
+            E2EEV2HiddenMessagesStore.purge(ownerScopeId: ownerScopeId)
             RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
             CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
         }
@@ -400,6 +401,7 @@ final class AuthService: AuthServicing {
         if let ownerScopeId = closing?.ownerScopeId {
             OutageReportDraftStore.purge(ownerScopeId: ownerScopeId)
             HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
+            E2EEV2HiddenMessagesStore.purge(ownerScopeId: ownerScopeId)
             RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
             CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
         }
@@ -430,6 +432,7 @@ final class AuthService: AuthServicing {
             let previousScope = "user:\(previousUserId)"
             OutageReportDraftStore.purge(ownerScopeId: previousScope)
             HiddenStoryAuthorsStore.purge(ownerScopeId: previousScope)
+            E2EEV2HiddenMessagesStore.purge(ownerScopeId: previousScope)
             RecentlyViewedStore.purge(ownerScopeId: previousScope)
             Task { await MessageDraftStore.shared.purge(ownerScopeId: previousScope) }
         }

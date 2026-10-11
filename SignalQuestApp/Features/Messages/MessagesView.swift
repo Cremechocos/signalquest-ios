@@ -431,15 +431,17 @@ struct MessagesView: View {
         .onReceive(NotificationCenter.default.publisher(for: E2EEV2ServerGate.didChange).receive(on: RunLoop.main)) { _ in
             refreshV2Activation()
         }
+        // L'écran guidé, comme à l'ouverture de l'app, et non la liste technique
+        // des appareils (qui reste dans Réglages › Appareils).
         .sheet(isPresented: $showV2Activation, onDismiss: refreshV2Activation) {
-            NavigationStack {
-                E2EEV2TrustedDevicesView(api: services.api)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Fermer") { showV2Activation = false }
-                        }
-                    }
-            }
+            E2EEV2ActivationScreen(
+                api: services.api,
+                onFinish: { showV2Activation = false },
+                onLater: {
+                    snoozeV2Activation()
+                    showV2Activation = false
+                }
+            )
         }
         .sheet(isPresented: $showNewConversation) {
             NewConversationSheet(
@@ -477,7 +479,11 @@ struct MessagesView: View {
     /// private JWK — the per-conversation prompt becomes unnecessary.
     private func maybePresentE2EEUnlock() async {
         guard let e2ee, !Self.unlockOffered else { return }
-        guard model.conversations.contains(where: { $0.e2eeEnabled == true }) else { return }
+        // Le mot de passe v1 n'ouvre que les conversations v1 : un compte qui
+        // n'a que des conversations v2 n'a rien à créer ni à déverrouiller.
+        guard model.conversations.contains(where: {
+            $0.e2eeEnabled == true && !EncryptedConversationSurfaces.isV2($0)
+        }) else { return }
         let already = await e2ee.isUnlocked()
         if !already && !showE2EEUnlock {
             // Une fois par lancement : la feuille revenait à chaque retour sur

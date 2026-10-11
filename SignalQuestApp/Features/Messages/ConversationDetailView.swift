@@ -53,6 +53,9 @@ struct ConversationDetailView: View {
     /// Conversation v2 (§12), lue une fois à l'ouverture : messages programmés
     /// désactivés (§13).
     @State private var conversationIsV2 = false
+    /// Vrai une fois la nature v1/v2 de la conversation établie : le bandeau
+    /// du mot de passe v1 ne doit jamais apparaître, même un instant, en v2.
+    @State private var v2Resolved = false
     /// Avis du fil v2 (§2.4, §4.2, §4.3, §3.2), posés en tête.
     @State private var v2Notices: [E2EEV2ThreadPresentation.Notice] = []
     @State private var v2LoadInFlight = false
@@ -147,7 +150,9 @@ struct ConversationDetailView: View {
     @State private var renderCache = MessageRenderCache()
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
-    private var canSend: Bool { !isE2EE || isE2EEUnlocked }
+    private var canSend: Bool {
+        EncryptedConversationSurfaces.canSend(isEncrypted: isE2EE, usesV2: usesV2, legacyUnlocked: isE2EEUnlocked)
+    }
     /// Les médias d'une conversation sont privés même si leur URL ressemble à
     /// une URL CDN ordinaire. La session est capturée avant chaque rendu afin
     /// qu'un résultat tardif ne traverse jamais un changement de compte.
@@ -185,7 +190,9 @@ struct ConversationDetailView: View {
         VStack(spacing: 0) {
             topBar
 
-            if isE2EE && !isE2EEUnlocked {
+            if EncryptedConversationSurfaces.showsLegacyUnlockBanner(
+                isEncrypted: isE2EE, v2Resolved: v2Resolved, isV2: conversationIsV2, legacyUnlocked: isE2EEUnlocked
+            ) {
                 Button {
                     showUnlockSheet = true
                 } label: {
@@ -408,7 +415,10 @@ struct ConversationDetailView: View {
             MessageSearchView(
                 conversation: conversation, service: service, e2ee: e2ee,
                 localCorpus: isE2EE
-                    ? messages.compactMap { message in decryptedMessages[message.id].map { (message: message, text: $0) } }
+                    ? messages.compactMap { message in
+                        (isReadableV2(message) ? message.content : decryptedMessages[message.id])
+                            .map { (message: message, text: $0) }
+                    }
                     : nil
             ) { messageId in
                 handleSearchSelection(messageId)
@@ -504,10 +514,14 @@ struct ConversationDetailView: View {
         }
         .sheet(item: $reportTarget) { message in
             ReportSheet(
-                reasons: ReportReason.messageReasons,
-                notice: isE2EE
+                reasons: usesV2 ? E2EEV2MessageReport.reasons : ReportReason.messageReasons,
+                notice: usesV2
+                    ? E2EEV2MessageReport.notice
+                    : isE2EE
                     ? String(localized: "Conversation chiffrée : si l’équipe de modération dispose d’une clé de vérification, la clé de cette conversation lui est transmise, chiffrée pour elle seule. Elle pourra alors en lire les messages.")
-                    : nil
+                    : nil,
+                // §11, D.10 : le rapport v2 ne porte que son motif en clair.
+                allowsComment: !usesV2
             ) { reason, comment in
                 try await report(message, reason: reason, comment: comment)
             }
@@ -571,6 +585,7 @@ struct ConversationDetailView: View {
                await services.e2eeV2Messaging.migrateIfReady(conversation) {
                 conversationIsV2 = true
             }
+            v2Resolved = true
             await restoreDraftIfNeeded()
             if usesV2 {
                 await loadV2()
@@ -1369,18 +1384,24 @@ struct ConversationDetailView: View {
             }
             Divider()
         }
-        Button {
-            // Quitter une modification pour répondre : le texte du message
-            // modifié ne devient pas la réponse, le brouillon revient.
-            if editTarget != nil {
-                editTarget = nil
-                restoreComposerAfterEdit()
+        // Bulle encore locale (envoi en cours ou en échec) : le serveur ne la
+        // connaît pas, ses boutons « Renvoyer » et « Supprimer » suffisent.
+        let isLocal = message.id.hasPrefix("local-")
+        let serverActions = EncryptedConversationSurfaces.allowsServerActions(messageId: message.id, isV2: conversationIsV2)
+        if !isLocal {
+            Button {
+                // Quitter une modification pour répondre : le texte du message
+                // modifié ne devient pas la réponse, le brouillon revient.
+                if editTarget != nil {
+                    editTarget = nil
+                    restoreComposerAfterEdit()
+                }
+                replyTarget = message
+            } label: {
+                Label("Répondre", systemImage: "arrowshape.turn.up.left")
             }
-            replyTarget = message
-        } label: {
-            Label("Répondre", systemImage: "arrowshape.turn.up.left")
         }
-        if message.deletedAt == nil {
+        if message.deletedAt == nil, serverActions {
             Button {
                 threadTarget = message
             } label: {
@@ -1404,7 +1425,7 @@ struct ConversationDetailView: View {
                 Label("Copier", systemImage: "doc.on.doc")
             }
         }
-        if message.deletedAt == nil {
+        if message.deletedAt == nil, serverActions {
             Button {
                 reminderTarget = message
             } label: {
@@ -1441,7 +1462,7 @@ struct ConversationDetailView: View {
                 }
             }
         }
-        if mine && message.deletedAt == nil {
+        if mine && message.deletedAt == nil && !isLocal {
             Button {
                 replyTarget = nil
                 editTarget = message
@@ -1455,10 +1476,12 @@ struct ConversationDetailView: View {
                 Label("Supprimer pour tous", systemImage: "trash")
             }
         }
-        Button(role: .destructive) {
-            pendingDeletion = PendingMessageDeletion(message: message, forEveryone: false)
-        } label: {
-            Label("Supprimer pour moi", systemImage: "trash.slash")
+        if !isLocal {
+            Button(role: .destructive) {
+                pendingDeletion = PendingMessageDeletion(message: message, forEveryone: false)
+            } label: {
+                Label("Supprimer pour moi", systemImage: "trash.slash")
+            }
         }
         // Signaler un message, en 1:1 comme en groupe (Guideline 1.2, SOC-12).
         if !mine, message.deletedAt == nil, !message.id.hasPrefix("local-") {
@@ -1712,7 +1735,9 @@ struct ConversationDetailView: View {
 
     private func pinnedSnippet(_ pinned: PinnedMessage) -> String {
         guard let message = pinned.message else { return "Message" }
-        if message.isEncrypted { return decryptedMessages[message.id] ?? String(localized: "🔒 Message chiffré") }
+        if message.isEncrypted && !isReadableV2(message) {
+            return decryptedMessages[message.id] ?? String(localized: "🔒 Message chiffré")
+        }
         let value = message.content ?? ""
         return value.isEmpty ? String(localized: "Pièce jointe") : value
     }
@@ -1840,9 +1865,11 @@ struct ConversationDetailView: View {
     }
 
     private func displayedContent(for message: MessageItem) -> String {
-        if message.deletedAt != nil { return "" }
-        if message.isEncrypted { return decryptedMessages[message.id] ?? String(localized: "🔒 Message chiffré") }
-        return message.content ?? ""
+        EncryptedConversationSurfaces.displayedText(for: message, usesV2: usesV2, decrypted: decryptedMessages)
+    }
+
+    private func isReadableV2(_ message: MessageItem) -> Bool {
+        EncryptedConversationSurfaces.isReadableV2(message, usesV2: usesV2)
     }
 
     /// Carte de partage (signal/speedtest/session/social) portée par le metadata —
@@ -1931,7 +1958,8 @@ struct ConversationDetailView: View {
         ) {
         case .thread(let presentation):
             let localPending = messages.filter { pendingSends[$0.id] != nil }
-            messages = Self.normalized(presentation.messages + localPending)
+            let hidden = E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: conversation.id)
+            messages = Self.normalized(presentation.messages.filter { !hidden.contains($0.id) } + localPending)
             v2Notices = presentation.notices
             errorMessage = nil
         case .failure(let failure):
@@ -2708,6 +2736,7 @@ struct ConversationDetailView: View {
             if forEveryone {
                 _ = await sendV2(.delete(targetRef: message.id), replyToId: nil, ttlSeconds: 0, clientRequestId: UUID().uuidString)
             } else {
+                E2EEV2HiddenMessagesStore.hide(messageRef: message.id, conversationId: conversation.id)
                 messages.removeAll { $0.id == message.id }
             }
             return

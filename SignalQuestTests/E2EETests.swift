@@ -4994,7 +4994,7 @@ extension E2EETests {
         guard case .success = await lifecycle.revoke(deviceId: target, reason: "USER_REQUEST") else { return XCTFail("Revocation receipt was lost") }
         switch await recovery.createAndUploadBundle() {
         case .success(var created): created.zeroize()
-        case .failed: return XCTFail("Bundle receipt was lost")
+        case .failed(let failure): return XCTFail("Bundle receipt was lost: \(failure)")
         }
         let beforeReset = LocalAccountScope.sessionSnapshot()!
         guard case .success(let requested) = await lifecycle.resetIdentity(expectedGeneration: 1, reauthentication: .password("synthetic")),
