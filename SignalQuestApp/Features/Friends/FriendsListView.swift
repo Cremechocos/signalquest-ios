@@ -125,7 +125,15 @@ struct FriendsListView: View {
                 ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-            } else if isEverythingEmpty && model.errorMessage == nil {
+            } else if isEverythingEmpty, let error = model.errorMessage {
+                // Rien de chargé : l'erreur tient lieu d'écran, pas une liste
+                // « Amis (0) » qui laisserait croire qu'on n'a aucun ami.
+                ErrorStateView(title: "Amis indisponibles", message: error) {
+                    Task { await model.load() }
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            } else if isEverythingEmpty {
                 EmptyStateView(
                     title: "Aucun ami",
                     message: "Ajoute des membres pour partager ta position et comparer vos mesures.",
@@ -152,6 +160,7 @@ struct FriendsListView: View {
                     sectionHeader("Demandes envoyées")
                 }
             }
+            if !(isEverythingEmpty && model.errorMessage != nil) {
             Section {
                 ForEach(model.friends) { friend in
                     Button {
@@ -183,6 +192,7 @@ struct FriendsListView: View {
             } header: {
                 sectionHeader("Amis (\(model.friends.count))")
             }
+            }
             if !model.blocked.isEmpty {
                 Section {
                     ForEach(model.blocked) { user in
@@ -210,7 +220,8 @@ struct FriendsListView: View {
                     sectionHeader("Bloqués")
                 }
             }
-            if let error = model.errorMessage {
+            // Chargement partiel : ce qui est là reste, l'échec se dit en bas.
+            if let error = model.errorMessage, !isEverythingEmpty {
                 Section {
                     Text(error)
                         .font(SQType.caption)

@@ -488,6 +488,13 @@ struct RadioLogSiteMapPicker: View {
                     .padding(.top, M.siteMetaTop)
             }
 
+            // L'échec de l'envoi (`submit`) se posait sur le sélecteur sans
+            // jamais s'afficher ici (AF-RAD-12).
+            if let submitError = picker.submitError, !picker.isSubmitting {
+                SQInlineError(message: submitError)
+                    .padding(.top, M.siteMetaTop)
+            }
+
             // Ce que la géométrie permet de dire, et ce qu'on a écarté pour le dire. Des
             // anneaux qui divergent APPRENNENT quelque chose — handover, TA périmé, deux sites
             // sous un même identifiant — mais ne doivent pas passer pour une localisation. Et

@@ -215,9 +215,15 @@ struct RadioLogIdentifyChainView: View {
         } else if picker.candidates.isEmpty {
             noticeBanner(
                 picker.errorMessage ?? String(localized: "Aucune antenne connue à proximité."),
-                tint: P.muted,
-                soft: P.chip
+                tint: picker.searchFailed ? SQColor.dangerInk : P.muted,
+                soft: picker.searchFailed ? SQColor.dangerSoft : P.chip
             )
+            if picker.searchFailed {
+                Button("Réessayer") { Task { await picker.load(for: site) } }
+                    .font(SQFont.body(14, .semibold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+            }
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Quelle antenne as-tu relevée ?")

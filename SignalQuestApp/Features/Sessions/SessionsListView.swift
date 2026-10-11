@@ -174,13 +174,20 @@ struct SessionsListView: View {
                 }
 
                 if let errorMessage = model.errorMessage {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.warning)
-                        .padding(.horizontal, SQSpace.xs)
-                    if !model.hasMore {
-                        GradientButton("Réessayer", style: .secondary) {
+                    if model.sessions.isEmpty {
+                        // Rien de chargé : même carte d'erreur que les autres listes.
+                        ErrorStateView(title: "Sessions indisponibles", message: errorMessage) {
                             Task { await model.reload() }
+                        }
+                    } else {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.dangerInk)
+                            .padding(.horizontal, SQSpace.xs)
+                        if !model.hasMore {
+                            GradientButton("Réessayer", style: .secondary) {
+                                Task { await model.reload() }
+                            }
                         }
                     }
                 }

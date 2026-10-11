@@ -78,7 +78,8 @@ final class MyMeasurementsViewModel: ObservableObject {
             hasLoaded = true
         } catch {
             guard requestGeneration == generation, !error.isCancellation else { return }
-            errorMessage = String(localized: "Impossible de charger les mesures. Réessaie.")
+            // La cause réelle (réseau, session…), comme les autres listes.
+            errorMessage = error.userFacingMessage
         }
     }
 }
@@ -256,7 +257,23 @@ struct MyMeasurementsView: View {
         }
     }
 
+    @ViewBuilder
     private var emptyState: some View {
+        if let errorMessage = model.errorMessage {
+            ScrollView {
+                ErrorStateView(title: "Mesures indisponibles", message: errorMessage) {
+                    Task { await model.load() }
+                }
+                .padding(SQSpace.lg)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(SQColor.bg.ignoresSafeArea())
+        } else {
+            emptyContent
+        }
+    }
+
+    private var emptyContent: some View {
         VStack(spacing: SQSpace.lg) {
             EmptyStateView(
                 title: model.errorMessage != nil ? "Chargement impossible"

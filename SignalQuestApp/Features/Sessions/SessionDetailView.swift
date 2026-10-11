@@ -7,6 +7,8 @@ final class SessionDetailViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var identifyingId: String?
     @Published var identifyResult: String?
+    /// Verdict de la dernière identification : seul un succès s'affiche en vert.
+    @Published var identifySucceeded = false
     /// Pages suivantes en cours : le tracé se complète sous les yeux.
     @Published var isLoadingMorePoints = false
     /// Change à chaque lot de points reçu : la carte ne se redessine que là.
@@ -185,6 +187,7 @@ final class SessionDetailViewModel: ObservableObject {
     func identify(_ antenna: ServingAntenna, service: IdentifyServicing, location: LocationService) async {
         identifyingId = antenna.id
         identifyResult = nil
+        identifySucceeded = false
         defer { identifyingId = nil }
         // Seul un point porteur des identifiants de CETTE antenne fait preuve :
         // le premier point radio venu peut appartenir à une autre cellule, voire
@@ -236,10 +239,14 @@ final class SessionDetailViewModel: ObservableObject {
                     longitude: coord.longitude
                 )
             )
-            identifyResult = result.success ? "Site identifié ✓" : (result.message ?? "Identification non confirmée")
-            Haptics.success()
+            // Un refus du serveur n'est pas un succès : icône, couleur et
+            // retour haptique suivent le verdict (AF-MES-03).
+            identifyResult = result.success ? String(localized: "Site identifié ✓") : (result.message ?? String(localized: "Identification non confirmée"))
+            identifySucceeded = result.success
+            if result.success { Haptics.success() } else { Haptics.warning() }
         } catch {
             identifyResult = String(localized: "Échec : \(error.userFacingMessage)")
+            identifySucceeded = false
             Haptics.error()
         }
     }
@@ -278,14 +285,15 @@ struct SessionDetailView: View {
                     emptyAntennasHint
                 }
                 if let result = model.identifyResult {
-                    Label(result, systemImage: "checkmark.seal")
+                    Label(result, systemImage: model.identifySucceeded ? "checkmark.seal" : "exclamationmark.triangle")
                         .font(SQFont.body(13, .semibold, relativeTo: .footnote))
-                        .foregroundStyle(SQColor.success)
+                        .foregroundStyle(model.identifySucceeded ? SQColor.success : SQColor.dangerInk)
                 }
                 if let errorMessage = model.errorMessage {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.warning)
+                    // Sans relance, il fallait quitter et rouvrir la session (AF-MES-09).
+                    ErrorStateView(title: "Détail indisponible", message: errorMessage) {
+                        Task { await model.load(service: services.sessions) }
+                    }
                 }
             }
             .padding()

@@ -49,6 +49,8 @@ final class AntennaReportThreadViewModel: ObservableObject {
     @Published var comments: [AntennaReportComment] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// La discussion n'a pas pu être lue : ce n'est pas un fil vide.
+    @Published var loadFailed = false
     @Published var draft: String = ""
     @Published var pendingImages: [PendingReportImage] = []
     @Published var pickerItems: [PhotosPickerItem] = []
@@ -74,6 +76,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
     func load() async {
         isLoading = true
         errorMessage = nil
+        loadFailed = false
         defer { isLoading = false }
         do {
             let fetched = try await service.comments(reportId: reportId)
@@ -81,6 +84,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
         } catch {
             if error.isCancellation { return }
             errorMessage = String(localized: "Impossible de charger la discussion.")
+            loadFailed = true
         }
         // Deep link (aucune métadonnée de signalement) : on résout l'en-tête au
         // mieux depuis la liste « mes signalements ».
@@ -172,7 +176,9 @@ struct AntennaReportThreadView: View {
     var body: some View {
         VStack(spacing: 0) {
             content
-            if let error = model.errorMessage, !model.comments.isEmpty {
+            // Un échec d'envoi se dit même dans un fil encore vide (AF-RAD-18) ;
+            // l'échec de chargement, lui, prend la place du fil.
+            if let error = model.errorMessage, !(model.loadFailed && model.comments.isEmpty) {
                 errorBanner(error)
             }
             composer
@@ -209,7 +215,11 @@ struct AntennaReportThreadView: View {
                             AntennaReportHeaderCard(report: report)
                                 .padding(.bottom, SQSpace.xs)
                         }
-                        if model.comments.isEmpty {
+                        if model.comments.isEmpty, model.loadFailed, let error = model.errorMessage {
+                            ErrorStateView(title: "Discussion indisponible", message: error) {
+                                Task { await model.load() }
+                            }
+                        } else if model.comments.isEmpty {
                             emptyThread
                         } else {
                             ForEach(model.comments) { comment in

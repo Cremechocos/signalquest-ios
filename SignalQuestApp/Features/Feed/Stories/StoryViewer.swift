@@ -57,7 +57,8 @@ struct StoryViewer: View {
     /// Suppression d'une story (auteur) — le parent supprime côté serveur + rafraîchit.
     var onDelete: (SocialStory) -> Void = { _ in }
     /// Fournit la liste « Vu par » d'une story (auteur uniquement).
-    var viewersProvider: (SocialStory) async -> [StoryViewerEntry] = { _ in [] }
+    /// Lève en cas d'échec : un échec réseau n'est pas « personne n'a vu ».
+    var viewersProvider: (SocialStory) async throws -> [StoryViewerEntry] = { _ in [] }
     /// Signalement des stories des autres (règle 1.2, SOC-12).
     var reports: ReportsServicing? = nil
     /// Masquer les stories de l'auteur sur cet appareil, sans le bloquer.
@@ -67,6 +68,7 @@ struct StoryViewer: View {
     @FocusState private var replyFocused: Bool
     @State private var showViewers = false
     @State private var viewers: [StoryViewerEntry] = []
+    @State private var viewersError: String?
     @State private var loadingViewers = false
     @State private var showDeleteConfirm = false
     @State private var showUnencryptedConfirm = false
@@ -116,7 +118,9 @@ struct StoryViewer: View {
             }
         }
         .sheet(isPresented: $showViewers) {
-            StoryViewersSheet(viewers: viewers, isLoading: loadingViewers)
+            StoryViewersSheet(viewers: viewers, isLoading: loadingViewers, errorMessage: viewersError) {
+                Task { await loadViewers() }
+            }
         }
         .sheet(item: $reportedStory) { story in
             if let reports {
@@ -423,7 +427,12 @@ struct StoryViewer: View {
     private func loadViewers() async {
         guard let story = currentStory else { return }
         loadingViewers = true
-        viewers = await viewersProvider(story)
+        viewersError = nil
+        do {
+            viewers = try await viewersProvider(story)
+        } catch {
+            if !error.isCancellation { viewersError = error.userFacingMessage }
+        }
         loadingViewers = false
     }
 
@@ -548,6 +557,8 @@ struct StoryViewer: View {
 private struct StoryViewersSheet: View {
     let viewers: [StoryViewerEntry]
     let isLoading: Bool
+    var errorMessage: String?
+    var retry: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -555,6 +566,10 @@ private struct StoryViewersSheet: View {
             Group {
                 if isLoading {
                     ProgressView().tint(SQColor.brandRed)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let errorMessage, viewers.isEmpty {
+                    ErrorStateView(title: "Vues indisponibles", message: errorMessage, retry: retry)
+                        .padding(SQSpace.lg)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if viewers.isEmpty {
                     EmptyStateView(title: "Personne pour l'instant", message: "Les vues apparaîtront ici.", systemImage: "eye")

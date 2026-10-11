@@ -31,6 +31,7 @@ final class NotificationSettingsModel: ObservableObject {
         do {
             prefs = try await userService.notificationPreferences()
             prefsLoaded = true
+            errorMessage = nil
         } catch {
             if error.isCancellation { return }
             errorMessage = error.userFacingMessage
@@ -196,6 +197,13 @@ struct NotificationSettingsView: View {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(SQColor.dangerInk)
                         .accessibilityIdentifier("notifications.error")
+                    // Préférences jamais chargées : interrupteurs grisés sans
+                    // issue, il fallait quitter l'écran (AF-PROF-07).
+                    if !model.prefsLoaded {
+                        Button("Réessayer") { Task { await model.load() } }
+                            .foregroundStyle(SQColor.accentInk)
+                            .accessibilityIdentifier("notifications.retry")
+                    }
                 }
                 .listRowBackground(SQColor.dangerSoft)
             }
@@ -205,6 +213,7 @@ struct NotificationSettingsView: View {
         .signalQuestBackground()
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await model.load() }
         .task(id: PushOwnerScope.current) {
             await model.load()
             e2eeNotificationPrivacy = E2EEV2NotificationPrivacyStore.get()

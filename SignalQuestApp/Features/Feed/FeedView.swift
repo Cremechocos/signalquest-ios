@@ -880,7 +880,7 @@ struct FeedView: View {
                                 }
                             },
                             viewersProvider: { story in
-                                (try? await services.stories.viewers(storyId: story.id)) ?? []
+                                try await services.stories.viewers(storyId: story.id)
                             },
                             reports: services.reports,
                             onHideAuthor: { hideStories(of: $0) })

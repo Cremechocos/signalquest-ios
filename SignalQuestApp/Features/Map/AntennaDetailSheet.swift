@@ -199,8 +199,13 @@ struct AntennaDetailSheet: View {
                         keyFigures(details)
                         collapsibleSections(details)
                     } else if let error = model.error {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(SQColor.danger)
+                        // Sans relance, il fallait fermer et rouvrir la fiche (AF-CARTE-12).
+                        ErrorStateView(title: "Détails indisponibles", message: error) {
+                            Task {
+                                model.error = nil
+                                await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                            }
+                        }
                     } else {
                         ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     }

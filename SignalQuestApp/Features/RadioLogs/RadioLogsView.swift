@@ -45,6 +45,21 @@ struct RadioLogsView: View {
                 if model.isScanning || model.isSyncing {
                     scanBanner
                 }
+                // Avec un journal en cache, l'échec de synchronisation ou de
+                // purge ne se voyait nulle part (AF-RAD-08) : le cache reste,
+                // l'échec se dit au-dessus.
+                if let errorMessage = model.errorMessage, !model.sites.isEmpty, !model.isSyncing {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        SQInlineError(message: errorMessage)
+                        Button("Réessayer") { Task { await model.refresh() } }
+                            .font(SQFont.body(14, .semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                    }
+                    .padding(SQSpace.md)
+                    .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .padding(.bottom, SQSpace.md)
+                }
                 tally
                 filterRail
                 completionLine

@@ -5,6 +5,9 @@ final class MessagesViewModel: ObservableObject {
     @Published var conversations: [MessageConversation] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// Échec d'une action sur une conversation (lu, épingle, sourdine, départ) :
+    /// passager, il ne remplace pas la liste par « Messagerie indisponible ».
+    @Published var actionError: String?
     /// Aperçus déchiffrés du dernier message, par id de conversation.
     @Published var decryptedPreviews: [String: String] = [:]
     /// Limite d'épinglage du compte (P2-46), quand le serveur la sert.
@@ -76,7 +79,7 @@ final class MessagesViewModel: ObservableObject {
             try await service.markRead(conversationId: conversation.id, lastMessageId: lastMessageId)
         } catch {
             update(conversation.id) { $0.with(lastReadAt: previous) }
-            if !error.isCancellation { errorMessage = error.userFacingMessage }
+            if !error.isCancellation { actionError = error.userFacingMessage }
         }
     }
 
@@ -89,7 +92,7 @@ final class MessagesViewModel: ObservableObject {
             try await service.markUnread(conversationId: conversation.id)
         } catch {
             update(conversation.id) { $0.with(lastReadAt: previous) }
-            if !error.isCancellation { errorMessage = error.userFacingMessage }
+            if !error.isCancellation { actionError = error.userFacingMessage }
         }
     }
 
@@ -102,9 +105,9 @@ final class MessagesViewModel: ObservableObject {
         } catch {
             update(conversation.id) { $0.with(pinnedAt: previous) }
             if case APIError.http(_, "CONVERSATION_PIN_LIMIT", _, _, _) = error {
-                errorMessage = String(localized: "Tu as déjà épinglé le nombre maximal de conversations. Désépingles-en une pour en épingler une autre.")
+                actionError = String(localized: "Tu as déjà épinglé le nombre maximal de conversations. Désépingles-en une pour en épingler une autre.")
             } else if !error.isCancellation {
-                errorMessage = error.userFacingMessage
+                actionError = error.userFacingMessage
             }
         }
     }
@@ -119,7 +122,7 @@ final class MessagesViewModel: ObservableObject {
             update(conversation.id) { $0.with(muted: saved.muted, mentionsMuted: saved.mentionsMuted) }
         } catch {
             update(conversation.id) { $0.with(muted: previous.0, mentionsMuted: previous.1) }
-            if !error.isCancellation { errorMessage = String(localized: "La sourdine n’a pas pu être enregistrée.") }
+            if !error.isCancellation { actionError = String(localized: "La sourdine n’a pas pu être enregistrée.") }
         }
     }
 
@@ -144,7 +147,7 @@ final class MessagesViewModel: ObservableObject {
             }
             conversations.removeAll { $0.id == conversation.id }
         } catch {
-            errorMessage = error.userFacingMessage
+            if !error.isCancellation { actionError = error.userFacingMessage }
         }
     }
 }
@@ -154,6 +157,7 @@ struct MessagesView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @Environment(\.dismiss) private var dismiss
     private let service: MessagesServicing
     private let e2ee: E2EEServicing?
@@ -419,6 +423,11 @@ struct MessagesView: View {
         }
         .onChangeCompat(of: router.openConversationId) { _, _ in
             Task { await openRoutedConversationIfNeeded() }
+        }
+        .onChangeCompat(of: model.actionError) { _, message in
+            guard let message else { return }
+            inAppNotifications.showError(message)
+            model.actionError = nil
         }
         .onChangeCompat(of: router.openNewConversation) { _, requested in
             if requested { openNewConversationIfRequested() }

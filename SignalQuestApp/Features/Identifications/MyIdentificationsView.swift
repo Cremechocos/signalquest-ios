@@ -149,7 +149,15 @@ struct MyIdentificationsView: View {
                     .listRowBackground(Color.clear)
             }
 
-            if model.filteredGroups.isEmpty && !model.isLoading {
+            if model.filteredGroups.isEmpty && !model.isLoading, let errorMessage = model.errorMessage {
+                // Un échec n'est pas une liste vide : « Aucune identification »
+                // au-dessus de l'erreur se contredisait (AF-RAD-16).
+                ErrorStateView(title: "Identifications indisponibles", message: errorMessage) {
+                    Task { await model.load() }
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+            } else if model.filteredGroups.isEmpty && !model.isLoading {
                 emptyState.listRowBackground(Color.clear)
             } else {
                 ForEach(model.filteredGroups) { group in
@@ -204,10 +212,10 @@ struct MyIdentificationsView: View {
                 }
             }
 
-            if let errorMessage = model.errorMessage {
+            if let errorMessage = model.errorMessage, !model.filteredGroups.isEmpty {
                 Label(errorMessage, systemImage: "exclamationmark.triangle")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.warning)
+                    .foregroundStyle(SQColor.dangerInk)
                     .listRowBackground(Color.clear)
             }
         }

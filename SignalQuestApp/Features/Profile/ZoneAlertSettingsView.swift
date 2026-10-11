@@ -64,6 +64,11 @@ struct ZoneAlertSettingsView: View {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(SQColor.dangerInk)
                         .accessibilityIdentifier("zoneAlerts.error")
+                    if model.settings == nil {
+                        Button("Réessayer") { Task { await model.load() } }
+                            .foregroundStyle(SQColor.accentInk)
+                            .accessibilityIdentifier("zoneAlerts.retry")
+                    }
                 }
                 .listRowBackground(SQColor.dangerSoft)
             }
@@ -73,6 +78,7 @@ struct ZoneAlertSettingsView: View {
         .signalQuestBackground()
         .navigationTitle("Pannes près de mes lieux")
         .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await model.load() }
         .task { if model.settings == nil { await model.load() } }
     }
 

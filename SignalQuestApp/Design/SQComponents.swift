@@ -547,6 +547,25 @@ struct EmptyStateView: View {
     }
 }
 
+/// Échec d'une action, dit près de l'action et annoncé à VoiceOver : une
+/// bannière globale passe sous les feuilles, et un échec avalé laisse croire
+/// que l'action a réussi.
+struct SQInlineError: View {
+    let message: String
+
+    var body: some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.dangerInk)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("state.inlineError")
+            .task(id: message) {
+                UIAccessibility.post(notification: .announcement, argument: message)
+            }
+    }
+}
+
 struct ErrorStateView: View {
     let title: String
     let message: String
@@ -574,10 +593,15 @@ struct ErrorStateView: View {
                 // Mécanisme non élucidé ; le gain (3 arrêts de balayage en 1)
                 // ne valait pas de livrer une régression inexpliquée.
                 if let retry {
+                    // Taille « large » : le bouton système faisait ~34 pt, sous
+                    // la cible tactile de 44 pt (AF-DS-14).
                     Button("Réessayer", action: retry)
                         .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                         .tint(SQColor.brandRed)
                         .foregroundStyle(SQColor.onAccent)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("state.error.retry")
                 }
             }
             .frame(maxWidth: .infinity)

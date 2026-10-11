@@ -68,6 +68,12 @@ struct RadioLogIdentifySheet: View {
                     }
                     if identifiedSiteId == nil, let errorMessage = picker.errorMessage {
                         noticeBanner(errorMessage, systemImage: "exclamationmark.circle.fill", tint: SQColor.dangerInk, soft: SQColor.dangerSoft)
+                        if picker.searchFailed {
+                            Button("Réessayer") { Task { await picker.load(for: site) } }
+                                .font(SQFont.body(14, .semibold))
+                                .foregroundStyle(SQColor.accentInk)
+                                .frame(minHeight: 44)
+                        }
                     }
                 }
                 .padding(.horizontal, M.sheetPaddingH)

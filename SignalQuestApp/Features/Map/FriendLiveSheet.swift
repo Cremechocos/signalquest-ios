@@ -13,6 +13,7 @@ struct FriendLiveSheet: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.dismiss) private var dismiss
     @State private var openingConversation = false
+    @State private var openError: String?
 
     var body: some View {
         ScrollView {
@@ -181,6 +182,7 @@ struct FriendLiveSheet: View {
 
     // MARK: Actions
 
+    @ViewBuilder
     private var actions: some View {
         HStack(spacing: SQSpace.md) {
             Button {
@@ -198,6 +200,9 @@ struct FriendLiveSheet: View {
             }
         }
         .padding(.top, SQSpace.xs)
+        if let openError {
+            SQInlineError(message: openError)
+        }
     }
 
     private func actionLabel(icon: String, title: String, filled: Bool) -> some View {
@@ -220,10 +225,17 @@ struct FriendLiveSheet: View {
     private func openConversation() async {
         guard !openingConversation else { return }
         openingConversation = true
+        openError = nil
         defer { openingConversation = false }
-        guard let response = try? await services.messages.createConversation(
-            participantIds: [friend.id], title: nil, e2ee: true
-        ) else { return }
+        let response: CreateConversationResponse
+        do {
+            response = try await services.messages.createConversation(
+                participantIds: [friend.id], title: nil, e2ee: true
+            )
+        } catch {
+            if !error.isCancellation { openError = error.userFacingMessage }
+            return
+        }
         dismiss()
         router.route(toConversation: response.conversationId)
     }

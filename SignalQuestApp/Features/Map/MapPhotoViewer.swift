@@ -28,6 +28,7 @@ struct MapPhotoViewer: View {
     @State private var likeBusy = false
     @State private var commentDraft = ""
     @State private var sendingComment = false
+    @State private var commentError: String?
     @State private var appeared = false
     @FocusState private var commentFocused: Bool
 
@@ -230,6 +231,10 @@ struct MapPhotoViewer: View {
     }
 
     private var composer: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+        if let commentError {
+            SQInlineError(message: commentError)
+        }
         HStack(spacing: SQSpace.sm) {
             TextField("Ajouter un commentaire…", text: $commentDraft, axis: .vertical)
                 .font(SQFont.body(14, .regular))
@@ -253,6 +258,7 @@ struct MapPhotoViewer: View {
             }
             .disabled(!canSend || sendingComment)
             .accessibilityLabel("Envoyer le commentaire")
+        }
         }
     }
 
@@ -308,6 +314,7 @@ struct MapPhotoViewer: View {
         let content = commentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !content.isEmpty, !sendingComment else { return }
         sendingComment = true
+        commentError = nil
         defer { sendingComment = false }
         commentFocused = false
         do {
@@ -325,7 +332,10 @@ struct MapPhotoViewer: View {
                 }
             }
         } catch {
-            // On garde le brouillon pour permettre un nouvel essai.
+            // On garde le brouillon pour permettre un nouvel essai, et on le dit.
+            if !error.isCancellation {
+                await MainActor.run { commentError = error.userFacingMessage }
+            }
         }
     }
 }

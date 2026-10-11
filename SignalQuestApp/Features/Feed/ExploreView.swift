@@ -24,6 +24,9 @@ final class ExploreViewModel: ObservableObject {
     @Published var searchPlaces: [PlaceResult] = []
     @Published var searchSites: [AntennaSite] = []
     @Published var isSearching = false
+    /// Échec de LA recherche en cours, distinct de l'échec de la page : il
+    /// s'efface à la recherche suivante (AF-FIL-08).
+    @Published var searchError: String?
     /// Posé par la vue : le service des antennes vit dans l'environnement.
     var antennas: AntennasServicing?
 
@@ -90,6 +93,7 @@ final class ExploreViewModel: ObservableObject {
     }
 
     private func performSearch(query: String) async {
+        searchError = nil
         if AppEnvironment.usesDemoData {
             searchPosts = []
             searchHashtags = []
@@ -118,7 +122,7 @@ final class ExploreViewModel: ObservableObject {
             // alors `URLError(.cancelled)` ou `APIError.cancelled`, pas
             // `CancellationError`. Elle s'affichait « Requête annulée » (SOC-15).
             if !error.isCancellation {
-                errorMessage = error.userFacingMessage
+                searchError = error.userFacingMessage
             }
         }
         let found = await map
@@ -176,7 +180,8 @@ final class ExploreViewModel: ObservableObject {
             hashtagItems = page.items
             hashtagCursor = page.nextCursor
         } catch {
-            errorMessage = error.userFacingMessage
+            // Passager : il ne doit pas remplacer la page d'exploration.
+            if !error.isCancellation { actionError = error.userFacingMessage }
         }
     }
 
@@ -341,7 +346,14 @@ struct ExploreView: View {
         _ action: @escaping @MainActor (String) async throws -> ReactionResponse
     ) {
         Task { @MainActor in
-            guard let response = try? await action(item.id) else { return }
+            let response: ReactionResponse
+            do {
+                response = try await action(item.id)
+            } catch {
+                // L'échec d'un « j'aime » se disait nulle part.
+                if !error.isCancellation { model.actionError = error.userFacingMessage }
+                return
+            }
             let updated = item.applying(response)
             if detailItem?.id == updated.id { detailItem = updated }
             model.accept(updated)
@@ -417,6 +429,11 @@ struct ExploreView: View {
                     .tint(SQColor.brandRed)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, SQSpace.lg)
+            } else if let searchError = model.searchError, model.searchResults.isEmpty && model.searchPosts.isEmpty {
+                // Échec : ce n'est pas « aucun résultat ».
+                ErrorStateView(title: "Recherche indisponible", message: searchError) {
+                    model.scheduleSearch()
+                }
             } else if model.searchResults.isEmpty && model.searchPosts.isEmpty
                         && model.searchPlaces.isEmpty && model.searchSites.isEmpty {
                 EmptyStateView(

@@ -190,17 +190,20 @@ struct PrivacySettingsView: View {
             .listRowBackground(SQColor.surface)
 
             Section("Présence") {
+                // Le statut a son propre chargement et son « Réessayer » : la
+                // désactivation de la section le grisait et le rendait inopérant.
                 PresencePreferenceControls(service: services.livePresence)
+                    .disabled(!model.isSessionCurrent)
                 Picker("Afficher ma dernière activité", selection: committing($model.lastSeenVisibility)) {
                     Text("À mes amis").tag(LastSeenVisibility.friends)
                     Text("À personne").tag(LastSeenVisibility.none)
                 }
                 .tint(SQColor.accentInk)
+                .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
             }
             .tint(SQColor.brandRed)
             .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
-            .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
 
             Section {
                 Picker("Qui peut me contacter", selection: committing($model.messageRequestPolicy)) {

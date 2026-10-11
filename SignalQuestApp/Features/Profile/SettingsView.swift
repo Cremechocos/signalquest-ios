@@ -2355,15 +2355,24 @@ struct SettingsView: View {
                 }
             }
             .listRowBackground(SQColor.dangerSoft)
-            if let error = model.errorMessage {
-                Section { Text(error).foregroundStyle(SQColor.dangerInk) }
-                    .listRowBackground(SQColor.dangerSoft)
-            }
         }
         .scrollContentBackground(.hidden)
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Réglages")
+        // L'échec d'une action (export, double authentification) s'affichait
+        // tout en bas du formulaire, hors de vue (AF-PROF-06).
+        .alert(
+            "Action impossible",
+            isPresented: Binding(
+                get: { model.errorMessage != nil },
+                set: { if !$0 { model.errorMessage = nil } }
+            )
+        ) {
+            Button("Fermer", role: .cancel) { model.errorMessage = nil }
+        } message: {
+            Text(model.errorMessage ?? "")
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             canAuthenticateDeviceOwner = BiometricAuth.canAuthenticateDeviceOwner
         }
@@ -2529,13 +2538,18 @@ struct ChangePasswordView: View {
         Form {
             Section("Mot de passe actuel") {
                 SecureField("Mot de passe", text: $current)
+                    .textContentType(.password)
                     .foregroundStyle(SQColor.label)
             }
             .listRowBackground(SQColor.surface)
             Section("Nouveau mot de passe") {
+                // `.newPassword` : le trousseau propose un mot de passe fort et
+                // l'enregistre, au lieu de traiter ce champ comme une connexion.
                 SecureField("Au moins 8 caractères", text: $newValue)
+                    .textContentType(.newPassword)
                     .foregroundStyle(SQColor.label)
                 SecureField("Confirmer", text: $confirm)
+                    .textContentType(.newPassword)
                     .foregroundStyle(SQColor.label)
             }
             .listRowBackground(SQColor.surface)
@@ -2569,12 +2583,21 @@ struct ChangePasswordView: View {
 
     private func save() async {
         isBusy = true
+        // Un essai efface le verdict du précédent : erreur et succès ne
+        // s'affichent plus ensemble (AF-PROF-05).
+        error = nil
+        success = false
         defer { isBusy = false }
         do {
             try await services.auth.changePassword(currentPassword: current, newPassword: newValue)
             success = true
+            current = ""
+            newValue = ""
+            confirm = ""
+            UIAccessibility.post(notification: .announcement, argument: String(localized: "Mot de passe modifié"))
         } catch {
             self.error = error.userFacingMessage
+            UIAccessibility.post(notification: .announcement, argument: error.userFacingMessage)
         }
     }
 }

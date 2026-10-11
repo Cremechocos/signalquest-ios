@@ -989,12 +989,13 @@ struct SpeedtestView: View {
         // Un Drive Test mesure déjà : deux tests simultanés se partageraient la
         // bande passante et se fausseraient l'un l'autre (MES-18).
         if services.driveTest.isRunning {
-            errorMessage = String(localized: "Un Drive Test est en cours : ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple.")
+            // Ce n'est pas un échec de synchronisation (AF-MES-02).
+            runErrorMessage = String(localized: "Un Drive Test est en cours : ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple.")
             return
         }
         // Un test lancé depuis la voiture mesure déjà (CAR-05).
         if services.speedtest.isRunning {
-            errorMessage = SpeedtestBusyError.alreadyRunning.errorDescription
+            runErrorMessage = SpeedtestBusyError.alreadyRunning.errorDescription
             return
         }
         // Réseau mobile ou Mode données réduites : un test peut consommer
@@ -1255,7 +1256,7 @@ struct SpeedtestView: View {
                 } catch {
                     guard runSessionID == sessionID else { return }
                     // Un test raté n'interrompt pas la rafale : on note et on continue.
-                    errorMessage = error.userFacingMessage
+                    runErrorMessage = error.userFacingMessage
                     Haptics.warning()
                 }
                 if index < total {
@@ -1314,7 +1315,7 @@ struct SpeedtestView: View {
 
     private func handleCancellation() {
         if let networkAbortMessage {
-            errorMessage = networkAbortMessage
+            runErrorMessage = networkAbortMessage
             phase = .failed(networkAbortMessage)
         } else {
             phase = .idle
@@ -1368,7 +1369,7 @@ struct SpeedtestView: View {
     private func abortForNetworkChange(from previousNetwork: String, to newNetwork: String) {
         let message = String(localized: "Speedtest arrêté : changement de réseau détecté (\(previousNetwork) -> \(newNetwork)). Relance le test pour mesurer une connexion stable.")
         networkAbortMessage = message
-        errorMessage = message
+        runErrorMessage = message
         runSessionID = nil
         runGeneration &+= 1
         runTask?.cancel()

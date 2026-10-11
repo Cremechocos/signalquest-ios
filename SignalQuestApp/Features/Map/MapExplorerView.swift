@@ -1179,10 +1179,18 @@ final class MapExplorerViewModel: ObservableObject {
             if let error = value.availability.errorMessage { layerError = layerError ?? String(localized: "Prévisionnels") + ": " + error }
             if let info = value.availability.information { displayLimitMessages.append(String(localized: "Prévisionnels") + ": " + info) }
         } else if let error = planned.error { layerError = layerError ?? error }
+        // Couche « Pannes » éteinte, les incidents opérateurs ne servent qu'aux
+        // badges des antennes : leur source en panne ne doit pas se présenter
+        // comme une erreur de toute la carte (AF-CARTE-03).
+        let showsOutageLayer = filters.contains(.outage)
         if let value = outage.value {
-            if let error = value.availability.errorMessage { layerError = layerError ?? String(localized: "Pannes") + ": " + error }
-            if let info = value.availability.information { displayLimitMessages.append(String(localized: "Pannes") + ": " + info) }
-        } else if let error = outage.error { layerError = layerError ?? error }
+            if let error = value.availability.errorMessage {
+                if showsOutageLayer { layerError = layerError ?? String(localized: "Pannes") + ": " + error }
+            }
+            if let info = value.availability.information, showsOutageLayer {
+                displayLimitMessages.append(String(localized: "Pannes") + ": " + info)
+            }
+        } else if let error = outage.error, showsOutageLayer { layerError = layerError ?? error }
         // Community outages remain informational rather than a map-wide error.
         if let error = coverage.error { layerError = layerError ?? error }
         if !AppEnvironment.usesDemoPhotos, photos.value == nil, let error = photos.error {
@@ -1354,18 +1362,21 @@ final class MapExplorerViewModel: ObservableObject {
     private func performSearch(_ q: String) async {
         isSearching = true
         searchFailed = false
-        async let antennasResult = (try? await antennasService.quickSearch(
+        // `nil` : la recherche d'antennes a échoué ; `[]` : elle n'a rien trouvé.
+        async let antennasResult = try? await antennasService.quickSearch(
             query: q,
             market: marketFilter,
             department: currentDromRegion?.department
-        )) ?? []
+        )
         async let placesResult = geocodePlaces(q)
         let antennas = await antennasResult
         let places = await placesResult
         guard !Task.isCancelled, searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) == q else { return }
-        let merged = Self.mergeSearchResults(places: places, antennas: antennas)
+        let merged = Self.mergeSearchResults(places: places, antennas: antennas ?? [])
         searchResults = merged
-        searchFailed = merged.isEmpty && !q.isEmpty
+        // « Indisponible » seulement si la recherche a échoué : une requête
+        // sans résultat n'est pas une panne (AF-CARTE-02).
+        searchFailed = merged.isEmpty && !q.isEmpty && antennas == nil
         isSearching = false
     }
 

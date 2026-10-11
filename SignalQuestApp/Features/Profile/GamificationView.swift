@@ -41,6 +41,7 @@ final class GamificationViewModel: ObservableObject {
             events = try await e
             // Catalogue tolérant : un échec ici ne masque pas profil/activité.
             catalog = (try? await c) ?? []
+            errorMessage = nil
         } catch {
             errorMessage = error.userFacingMessage
         }
@@ -102,15 +103,22 @@ struct GamificationView: View {
                 // plus hauts que le viewport, la scrollTransition ne les amène
                 // jamais à l'identité → sections estompées en permanence (même
                 // piège que le menu Profil).
+                // Rien de chargé : l'erreur tient lieu d'écran, avec de quoi réessayer.
+                if model.profile == nil, let error = model.errorMessage {
+                    ErrorStateView(title: "Récompenses indisponibles", message: error) {
+                        Task { await model.load() }
+                    }
+                }
                 levelBlock
                     .sqFadeUp()
                 questsBlock
                 if !badgeList.isEmpty { badgesGrid }
                 if !lockedBadges.isEmpty { lockedAchievementsSection }
                 if !model.events.isEmpty { eventsList }
-                if let error = model.errorMessage {
+                if model.profile != nil, let error = model.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(SQColor.warning)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
                 }
             }
             .padding(18)

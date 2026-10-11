@@ -42,7 +42,8 @@ struct AntennaReportsListView: View {
                         Task { await model.load() }
                     }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
+                    // Marges de page : sans elles la carte touchait les deux bords.
+                    .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.lg, bottom: SQSpace.sm, trailing: SQSpace.lg))
                 }
             } else if !model.isLoading, model.reports.isEmpty {
                 Section {

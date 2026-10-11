@@ -2899,6 +2899,13 @@ struct ConversationDetailView: View {
         do {
             try await services.friends.block(userId: id)
             Haptics.success()
+            // Le blocage se faisait sans aucun retour (AF-MSG-07) : on le dit,
+            // on indique où l'annuler, et on quitte une conversation devenue muette.
+            inAppNotifications.show(SQInAppNotificationItem(
+                body: String(localized: "\(conversationTitle) est bloqué. Tu peux le débloquer depuis Amis."),
+                variant: .success
+            ))
+            dismiss()
         } catch {
             showActionError(error.userFacingMessage)
             Haptics.error()
@@ -2910,6 +2917,10 @@ struct ConversationDetailView: View {
         do {
             try await services.friends.block(userId: userId)
             Haptics.success()
+            inAppNotifications.show(SQInAppNotificationItem(
+                body: String(localized: "Expéditeur bloqué. Tu peux le débloquer depuis Amis."),
+                variant: .success
+            ))
         } catch {
             showActionError(error.userFacingMessage)
             Haptics.error()

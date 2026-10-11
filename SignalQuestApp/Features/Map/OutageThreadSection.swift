@@ -34,6 +34,7 @@ struct OutageThreadSection: View {
     @State private var loading = true
     @State private var failed = false
     @State private var posting = false
+    @State private var postError: String?
     /// Les réponses déjà chargées, par commentaire parent. Une clé absente veut dire « jamais
     /// demandé » ; présente avec un tableau vide, « chargé, et il n'y en a pas ».
     @State private var repliesByComment: [String: [SocialComment]] = [:]
@@ -134,6 +135,10 @@ struct OutageThreadSection: View {
                     .accessibilityLabel(String(localized: "Annuler la réponse"))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let postError {
+                SQInlineError(message: postError)
             }
 
             TextField(
@@ -363,10 +368,20 @@ struct OutageThreadSection: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         posting = true
+        postError = nil
         let parent = replyTarget?.id
         // Rechargement après envoi plutôt qu'un ajout optimiste : le serveur peut modérer, tronquer
         // ou refuser, et afficher un commentaire qui n'existe pas serait pire que d'attendre.
-        if (try? await services.comments.add(postId: postId, text: text, parentId: parent)) != nil {
+        let sent: Bool
+        do {
+            _ = try await services.comments.add(postId: postId, text: text, parentId: parent)
+            sent = true
+        } catch {
+            // Le brouillon reste pour un nouvel essai ; l'échec se dit (AF-CARTE-14).
+            if !error.isCancellation { postError = error.userFacingMessage }
+            sent = false
+        }
+        if sent {
             draft = ""
             replyTarget = nil
             await load()

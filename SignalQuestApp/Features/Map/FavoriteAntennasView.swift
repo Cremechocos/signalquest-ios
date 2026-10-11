@@ -67,10 +67,19 @@ struct FavoriteAntennasView: View {
             if favorites.favorites.isEmpty {
                 Section {
                     if favorites.hasLoaded { emptyState }
-                    else if favorites.isLoading { ProgressView("Chargement des favoris…") }
-                    else { Text("La liste des favoris n’a pas pu être chargée.").foregroundStyle(SQColor.labelSecondary) }
+                    else if favorites.isLoading { ProgressView("Chargement des antennes suivies…") }
+                    else {
+                        // Même carte d'erreur que les autres listes, avec de quoi réessayer.
+                        ErrorStateView(
+                            title: "Antennes suivies indisponibles",
+                            message: favorites.errorMessage ?? String(localized: "La liste n’a pas pu être chargée. Vérifie ta connexion.")
+                        ) {
+                            Task { await favorites.load() }
+                        }
+                        .listRowInsets(EdgeInsets())
+                    }
                 }
-                .listRowBackground(SQColor.surface)
+                .listRowBackground(favorites.hasLoaded || favorites.isLoading ? SQColor.surface : Color.clear)
             } else {
                 Section("Antennes suivies") {
                     ForEach(favorites.favorites) { favorite in

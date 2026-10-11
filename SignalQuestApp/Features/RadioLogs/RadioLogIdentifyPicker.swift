@@ -35,6 +35,12 @@ final class RadioLogIdentifyPicker: ObservableObject {
     @Published private(set) var candidates: [RadioLogCandidate] = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
+    /// La recherche des antennes voisines a échoué (réseau, serveur) : ce n'est
+    /// pas « aucune antenne connue », et un nouvel essai a un sens.
+    @Published private(set) var searchFailed = false
+    /// Échec du dernier envoi seulement (la carte ne doit pas répéter les
+    /// messages de la recherche).
+    @Published private(set) var submitError: String?
     @Published var selectedId: String?
     @Published private(set) var isSubmitting = false
     /// Anneaux TA du nœud visé — « depuis ce point, le site est à peu près à cette
@@ -99,6 +105,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
+        searchFailed = false
         defer { isLoading = false }
 
         loadTaRings(for: site)
@@ -136,7 +143,9 @@ final class RadioLogIdentifyPicker: ObservableObject {
         )
 
         let hypothesis = await hypothesisTask
-        let nearby = await nearbyTask ?? []
+        // `nil` : la recherche a échoué ; `[]` : rien à moins de 3 km.
+        let nearbyResult = await nearbyTask
+        let nearby = nearbyResult ?? []
 
         var result: [RadioLogCandidate] = []
         var seen = Set<String>()
@@ -187,7 +196,10 @@ final class RadioLogIdentifyPicker: ObservableObject {
         }
         selectedId = candidates.first?.id
         if candidates.isEmpty {
-            errorMessage = String(localized: "Aucune antenne connue à moins de 3 km de ces relevés.")
+            searchFailed = nearbyResult == nil
+            errorMessage = searchFailed
+                ? String(localized: "Recherche des antennes impossible. Vérifie ta connexion et réessaie.")
+                : String(localized: "Aucune antenne connue à moins de 3 km de ces relevés.")
         }
     }
 
@@ -234,17 +246,20 @@ final class RadioLogIdentifyPicker: ObservableObject {
     func submit(site: RadioLogSite) async -> String? {
         guard let selectedId, let candidate = candidates.first(where: { $0.id == selectedId }) else {
             errorMessage = String(localized: "Choisis une antenne avant de valider.")
+            submitError = errorMessage
             return nil
         }
         guard !isSubmitting else { return nil }
         isSubmitting = true
         errorMessage = nil
+        submitError = nil
         defer { isSubmitting = false }
 
         do {
             let result = try await identify.identify(Self.request(for: site, candidate: candidate))
             guard result.success else {
                 errorMessage = result.message ?? String(localized: "Identification non confirmée par le serveur.")
+                submitError = errorMessage
                 Haptics.error()
                 return nil
             }
@@ -252,6 +267,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
             return result.siteId ?? candidate.siteId
         } catch {
             errorMessage = error.userFacingMessage
+            submitError = errorMessage
             Haptics.error()
             return nil
         }

@@ -192,6 +192,31 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertNil(calls[1].body["lastMessageId"], "Sans état explicite, le serveur comprendrait « lu »")
     }
 
+    /// AF-MSG-06 : un échec d'action est passager ; il ne remplace pas la liste
+    /// par « Messagerie indisponible », et l'épingle revient à son état.
+    @MainActor
+    func testAFailedPinIsAnActionErrorAndKeepsTheList() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"boom"}"#.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("pin-failure-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let model = MessagesViewModel(service: MessagesService(api: api))
+        let original = conversation("conv-1", lastMessageAt: Date(timeIntervalSince1970: 1_790_000_000))
+        model.conversations = [original]
+
+        await model.setPinned(true, original)
+
+        XCTAssertNil(model.errorMessage, "La liste reste affichée")
+        XCTAssertNotNil(model.actionError)
+        XCTAssertNil(model.conversations.first?.pinnedAt, "L'épingle revient à son état")
+    }
+
     private func conversation(
         _ id: String,
         lastMessageAt: Date?,
