@@ -3052,8 +3052,8 @@ struct MapExplorerView: View {
                 MapAnnotationPayload(
                     id: "antenna-cluster-\(cluster.id)",
                     kind: .antenna,
-                    title: "\(cluster.count) antennes",
-                    subtitle: "Zoomer pour les détails",
+                    title: String(localized: "\(cluster.count) antennes"),
+                    subtitle: String(localized: "Zoomer pour les détails"),
                     coordinate: CLLocationCoordinate2D(latitude: cluster.lat, longitude: cluster.lng),
                     metric: "cluster",
                     backendId: nil,
@@ -3095,7 +3095,7 @@ struct MapExplorerView: View {
                 return MapAnnotationPayload(
                     id: "antenna-\(site.id)",
                     kind: .antenna,
-                    title: "Site \(site.siteId ?? site.id)",
+                    title: String(localized: "Site \(site.siteId ?? site.id)"),
                     subtitle: [site.operators.joined(separator: "/"), site.technologies.prefix(3).joined(separator: "/")]
                         .filter { !$0.isEmpty }
                         .joined(separator: " · "),
@@ -3121,7 +3121,7 @@ struct MapExplorerView: View {
                     operatorIncident: incidentMarks[site.id]
                 )
             }
-            payloads += clusteredPayloads(from: antennaPayloads, kind: .antenna, idPrefix: "antenna", minCount: 160, label: { "\($0) antennes" })
+            payloads += clusteredPayloads(from: antennaPayloads, kind: .antenna, idPrefix: "antenna", minCount: 160, label: { String(localized: "\($0) antennes") })
         }
         payloads += communitySitePayloads
         payloads += customSitePayloads
@@ -3295,7 +3295,7 @@ struct MapExplorerView: View {
             return MapAnnotationPayload(
                 id: "planned-\(site.id)",
                 kind: .planned,
-                title: site.codeSite ?? "Site prévisionnel",
+                title: site.codeSite ?? String(localized: "Site prévisionnel"),
                 subtitle: [site.operator, site.commune].compactMap { $0 }.joined(separator: " · "),
                 coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
                 metric: techLine.isEmpty ? nil : techLine,
@@ -3314,7 +3314,7 @@ struct MapExplorerView: View {
                 glyphOverride: Self.plannedStatusGlyph(status)
             )
         }
-        return clusteredPayloads(from: individual, kind: .planned, idPrefix: "planned", minCount: 40, label: { "\($0) prévisionnels" })
+        return clusteredPayloads(from: individual, kind: .planned, idPrefix: "planned", minCount: 40, label: { String(localized: "\($0) prévisionnels") })
     }
 
     /// Sites en panne déclarés par les OPÉRATEURS : pastille à la couleur de la gravité
@@ -3336,7 +3336,7 @@ struct MapExplorerView: View {
                 backendId: site.siteId ?? site.id,
                 details: MapItemDetails(
                     operatorName: site.operator,
-                    note: [site.reason, site.estimatedEnd.map { "Rétabli prévu : \($0)" }].compactMap { $0 }.joined(separator: "\n")
+                    note: [site.reason, OutageFeedDate.display(site.estimatedEnd).map { String(localized: "Rétablissement prévu : \($0)") }].compactMap { $0 }.joined(separator: "\n")
                 ),
                 antennaId: nil,
                 clusterCount: nil,
@@ -3346,7 +3346,7 @@ struct MapExplorerView: View {
                 glyphOverride: Self.outageGlyph(for: kindKey)
             )
         }
-        return clusteredPayloads(from: individual, kind: .outage, idPrefix: "outage", minCount: 30, label: { "\($0) sites HS" })
+        return clusteredPayloads(from: individual, kind: .outage, idPrefix: "outage", minCount: 30, label: { String(localized: "\($0) sites HS") })
     }
 
     /// La gravité d'un incident opérateur, résolue à UN seul endroit.
@@ -3481,11 +3481,11 @@ struct MapExplorerView: View {
             return MapAnnotationPayload(
                 id: "community-site-\(marker.id)",
                 kind: .communitySite,
-                title: isProbable ? "Site probable" : "Cellule observée",
+                title: isProbable ? String(localized: "Site probable") : String(localized: "Cellule observée"),
                 subtitle: [
                     marker.operatorKey.map { model.operatorShortLabel($0) },
                     marker.radioNodeType,
-                    marker.confidenceLevel.map { "confiance \($0)" }
+                    marker.confidenceLevel.map { String(localized: "confiance \($0)") }
                 ].compactMap { $0 }.joined(separator: " · "),
                 coordinate: CLLocationCoordinate2D(latitude: marker.lat, longitude: marker.lng),
                 metric: marker.enb.map { "eNB \($0)" } ?? marker.gnb.map { "gNB \($0)" },
@@ -3494,7 +3494,7 @@ struct MapExplorerView: View {
                     timestamp: marker.lastObservedAt,
                     operatorName: marker.operatorKey.map { model.operatorLabel($0) },
                     sampleCount: marker.observationCount,
-                    note: isProbable ? "Site estimé par les observations communautaires" : "Cellule observée par la communauté"
+                    note: isProbable ? String(localized: "Site estimé par les observations communautaires") : String(localized: "Cellule observée par la communauté")
                 ),
                 antennaId: nil,
                 clusterCount: nil,
@@ -3513,7 +3513,7 @@ struct MapExplorerView: View {
             kind: .communitySite,
             idPrefix: "community-site",
             minCount: Self.communityClusterThreshold,
-            label: { "\($0) cellules" }
+            label: { String(localized: "\($0) cellules") }
         )
     }
 
@@ -3541,7 +3541,7 @@ struct MapExplorerView: View {
             return MapAnnotationPayload(
                 id: "custom-site-\(marker.id)",
                 kind: .customSite,
-                title: marker.name ?? marker.typeLabel ?? "Site ajouté",
+                title: marker.name ?? marker.typeLabel ?? String(localized: "Site ajouté"),
                 subtitle: [
                     marker.typeLabel,
                     radio?.operatorName,
@@ -3574,7 +3574,7 @@ struct MapExplorerView: View {
             kind: .customSite,
             idPrefix: "custom-site",
             minCount: Self.communityClusterThreshold,
-            label: { "\($0) sites ajoutés" }
+            label: { String(localized: "\($0) sites ajoutés") }
         )
     }
 
@@ -3600,8 +3600,8 @@ struct MapExplorerView: View {
             return MapAnnotationPayload(
                 id: "photo-\(photo.id)",
                 kind: .photo,
-                title: "Photo",
-                subtitle: photo.operator ?? photo.siteId ?? "Site",
+                title: String(localized: "Photo"),
+                subtitle: photo.operator ?? photo.siteId ?? String(localized: "Site"),
                 coordinate: CLLocationCoordinate2D(latitude: photo.lat, longitude: photo.lng),
                 metric: nil,
                 backendId: photo.id,
@@ -3651,8 +3651,8 @@ struct MapExplorerView: View {
             return MapAnnotationPayload(
                 id: "photo-cluster-\(cell.lat)-\(cell.lng)",
                 kind: .photo,
-                title: "\(group.count) photos",
-                subtitle: "Zoomer pour le détail",
+                title: String(localized: "\(group.count) photos"),
+                subtitle: String(localized: "Zoomer pour le détail"),
                 coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
                 metric: "cluster",
                 backendId: nil,
@@ -4060,7 +4060,7 @@ struct MapExplorerView: View {
                 id: "\(idPrefix)-cluster-\(cell.lat)-\(cell.lng)",
                 kind: kind,
                 title: label(group.count),
-                subtitle: "Zoomer pour le détail",
+                subtitle: String(localized: "Zoomer pour le détail"),
                 coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
                 metric: "cluster",
                 backendId: nil,
@@ -4100,7 +4100,7 @@ struct MapExplorerView: View {
             guard !friend.hasExpiredLocation(now: friendFreshnessNow) else { return nil }
             let info = FriendAnnotationInfo(
                 userId: friend.id,
-                displayName: friend.name ?? "Ami",
+                displayName: friend.name ?? String(localized: "Ami"),
                 avatarURL: friend.avatarUrl,
                 presence: friend.presenceStatus,
                 heading: location.heading.flatMap { $0 >= 0 ? $0 : nil },
@@ -4116,7 +4116,7 @@ struct MapExplorerView: View {
             return MapAnnotationPayload(
                 id: "friend-\(friend.id)",
                 kind: .friend,
-                title: friend.name ?? "Ami",
+                title: friend.name ?? String(localized: "Ami"),
                 subtitle: subtitle,
                 coordinate: CLLocationCoordinate2D(latitude: location.lat, longitude: location.lng),
                 metric: friend.radio?.operator,

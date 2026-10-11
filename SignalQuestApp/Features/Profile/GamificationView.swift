@@ -371,7 +371,7 @@ struct GamificationView: View {
                     .background(SQColor.surfaceMuted, in: Circle())
                     .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(badge.title ?? "Badge")
+                        Text(badge.title ?? String(localized: "Badge"))
                             .font(SQType.subhead)
                             .foregroundStyle(SQColor.label)
                         if let desc = badge.description {
@@ -388,8 +388,8 @@ struct GamificationView: View {
                 .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
                 .opacity(0.75)
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Succès : \(badge.title ?? "Badge")")
-                .accessibilityValue(badge.description ?? "À débloquer")
+                .accessibilityLabel("Succès : \(badge.title ?? String(localized: "Badge"))")
+                .accessibilityValue(badge.description ?? String(localized: "À débloquer"))
             }
         }
     }
@@ -409,7 +409,7 @@ struct GamificationView: View {
             .frame(width: 52, height: 52)
             .background(SQColor.accentSoft, in: Circle())
             .accessibilityHidden(true)
-            Text(badge.title ?? "Badge")
+            Text(badge.title ?? String(localized: "Badge"))
                 .font(SQType.micro)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(SQColor.label)
@@ -466,7 +466,7 @@ struct GamificationView: View {
     /// « 1 jour consécutif » / « 3 jours consécutifs » — accord singulier/pluriel.
     private var streakLabel: String {
         let days = model.profile?.consecutiveDays ?? 0
-        return days == 1 ? "1 jour consécutif" : "\(days) jours consécutifs"
+        return String(localized: "\(days) jours consécutifs")
     }
 }
 
@@ -583,7 +583,7 @@ private struct QuestCardView: View {
                 .background(cadence.tintSoft, in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(quest.title ?? "Quête")
+                Text(quest.title ?? String(localized: "Quête"))
                     .font(SQFont.display(15.5, .semibold))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
@@ -659,14 +659,14 @@ private struct QuestCardView: View {
     }
 
     private var accessibilitySummary: String {
-        var parts = ["\(cadence.voiceOverLabel) : \(quest.title ?? "Quête")"]
+        var parts = ["\(cadence.voiceOverLabel) : \(quest.title ?? String(localized: "Quête"))"]
         if let description = quest.description { parts.append(description) }
         return parts.joined(separator: ". ")
     }
 
     private var accessibilityProgress: String {
-        var parts = ["\(quest.progressValue) sur \(quest.targetValue)"]
-        if quest.rewardXp > 0 { parts.append("plus \(quest.rewardXp) points") }
+        var parts = [String(localized: "\(quest.progressValue) sur \(quest.targetValue)")]
+        if quest.rewardXp > 0 { parts.append(String(localized: "plus \(quest.rewardXp) points")) }
         if quest.isClaimed {
             parts.append(String(localized: "récompense réclamée"))
         } else if quest.isClaimable {

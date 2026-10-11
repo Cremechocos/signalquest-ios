@@ -51,7 +51,7 @@ struct EditProfileView: View {
                                     Text("Nom d’utilisateur")
                                         .font(SQType.micro)
                                         .foregroundStyle(SQColor.labelSecondary)
-                                    Text(currentHandle.isEmpty ? "Choisir un nom d’utilisateur" : "@\(currentHandle)")
+                                    Text(currentHandle.isEmpty ? String(localized: "Choisir un nom d’utilisateur") : "@\(currentHandle)")
                                         .font(SQType.body)
                                         .foregroundStyle(SQColor.label)
                                 }
@@ -167,7 +167,7 @@ struct EditProfileView: View {
         // « réussissait » sans rien changer. On refuse un nom vide explicitement
         // plutôt que de laisser croire à un enregistrement (EDITPROFILE-NAME-EMPTY-06).
         guard !trimmedName.isEmpty else {
-            error = "Le nom ne peut pas être vide."
+            error = String(localized: "Le nom ne peut pas être vide.")
             return
         }
         do {

@@ -91,8 +91,8 @@ final class SectorEditViewModel: ObservableObject {
                 // En France le secteur est imposé par le PCI : on l'affiche honnêtement.
                 let derived = result.sectors.map(String.init).joined(separator: ", ")
                 infoMessage = derived.isEmpty
-                    ? "En France, le secteur est déterminé automatiquement à partir du PCI."
-                    : "En France, le secteur est déterminé automatiquement à partir du PCI : secteur \(derived)."
+                    ? String(localized: "En France, le secteur est déterminé automatiquement à partir du PCI.")
+                    : String(localized: "En France, le secteur est déterminé automatiquement à partir du PCI : secteur \(derived).")
                 if let d = result.sectors.first, d >= 1, d <= azimuths.count { self.selectedIndex = d - 1 }
                 Haptics.warning()
             } else {

@@ -268,7 +268,7 @@ struct RadioLogSiteMapPicker: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(pin.isOrigin ? "Position des relevés" : "Antenne \(pin.antenna?.siteId ?? "")")
+        .accessibilityLabel(pin.isOrigin ? String(localized: "Position des relevés") : String(localized: "Antenne \(pin.antenna?.siteId ?? "")"))
     }
 
     private var legacyMap: some View {
@@ -295,7 +295,7 @@ struct RadioLogSiteMapPicker: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(pin.isOrigin ? "Position des relevés" : "Antenne \(pin.antenna?.siteId ?? "")")
+                .accessibilityLabel(pin.isOrigin ? String(localized: "Position des relevés") : String(localized: "Antenne \(pin.antenna?.siteId ?? "")"))
             }
         }
         .ignoresSafeArea(edges: .bottom)
@@ -335,8 +335,8 @@ struct RadioLogSiteMapPicker: View {
                             Text("\(shown)")
                                 .font(SQFont.body(13, .bold))
                             Text(showOnlyPlausible
-                                ? (plausible.count > 1 ? "compatibles" : "compatible")
-                                : "antennes")
+                                ? (plausible.count > 1 ? String(localized: "compatibles") : String(localized: "compatible"))
+                                : String(localized: "antennes"))
                                 .font(SQFont.body(12, .medium))
                         }
                         .padding(.horizontal, SQSpace.md)
@@ -478,11 +478,7 @@ struct RadioLogSiteMapPicker: View {
                         .padding(.top, M.siteMetaTop)
                 }
             } else {
-                Text(visible.isEmpty && !isLoading
-                     ? (customSites != nil
-                        ? "Aucune antenne connue ici. Crée le site à l'endroit désigné par tes anneaux."
-                        : "Aucune antenne dans cette zone. Déplace la carte.")
-                     : "Touche une antenne sur la carte pour la choisir.")
+                Text(emptyHint)
                     .font(SQFont.body(M.siteMetaSize))
                     .foregroundStyle(P.muted)
                     .padding(.top, M.siteMetaTop)
@@ -549,24 +545,32 @@ struct RadioLogSiteMapPicker: View {
         .padding(SQSpace.md)
     }
 
+    private var emptyHint: String {
+        guard visible.isEmpty, !isLoading else { return String(localized: "Touche une antenne sur la carte pour la choisir.") }
+        return customSites != nil
+            ? String(localized: "Aucune antenne connue ici. Crée le site à l'endroit désigné par tes anneaux.")
+            : String(localized: "Aucune antenne dans cette zone. Déplace la carte.")
+    }
+
     /// Résumé de ce que les anneaux permettent de conclure — jamais un simple décompte.
     private var taGeometrySummary: String {
         let count = picker.taRings.count
         var text: String
         switch picker.taAssessment {
         case .convergent:
-            text = "\(count) anneaux TA — leur intersection désigne le site"
+            text = String(localized: "\(count) anneaux TA — leur intersection désigne le site")
         case .divergent:
-            text = "\(count) anneaux TA — ils ne se croisent pas : relevés à vérifier"
+            text = String(localized: "\(count) anneaux TA — ils ne se croisent pas : relevés à vérifier")
         case .unusable:
             text = count > 1
-                ? "\(count) anneaux TA — trop rapprochés pour désigner un point"
-                : "1 anneau TA — il faut au moins deux passages écartés pour croiser"
+                ? String(localized: "\(count) anneaux TA — trop rapprochés pour désigner un point")
+                : String(localized: "1 anneau TA — il faut au moins deux passages écartés pour croiser")
         }
         if picker.taDiscardedCount > 0 {
+            text += " · "
             text += picker.taDiscardedCount > 1
-                ? " · \(picker.taDiscardedCount) relevés écartés"
-                : " · 1 relevé écarté"
+                ? String(localized: "\(picker.taDiscardedCount) relevés écartés")
+                : String(localized: "1 relevé écarté")
         }
         return text
     }
@@ -578,9 +582,7 @@ struct RadioLogSiteMapPicker: View {
            let originLat = site.latitude, let originLng = site.longitude {
             let distance = CLLocation(latitude: originLat, longitude: originLng)
                 .distance(from: CLLocation(latitude: latitude, longitude: longitude))
-            parts.append(distance >= 1000
-                ? String(format: "à %.1f km", distance / 1000)
-                : "à \(Int(distance.rounded())) m")
+            parts.append(String(localized: "à \(SQUnits.distance(meters: distance))"))
         }
         let operators = selected.operators.filter { $0.uppercased() != "ALL" }
         if !operators.isEmpty { parts.append(operators.joined(separator: ", ")) }
@@ -590,9 +592,9 @@ struct RadioLogSiteMapPicker: View {
     private var confirmationMessage: String {
         let siteId = selected.map { $0.siteId ?? $0.id } ?? "?"
         let place = selected?.address.flatMap { $0.isEmpty ? nil : $0 }
-        let base = "\(site.nodeLabel) sera identifié sur le site \(siteId)"
-        let located = place.map { "\(base) — \($0)" } ?? base
-        return "\(located).\n\nCette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications »."
+        let base = String(localized: "\(site.nodeLabel) sera identifié sur le site \(siteId)")
+        let located = place.map { String(localized: "\(base) — \($0)") } ?? base
+        return located + ".\n\n" + String(localized: "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications ».")
     }
 
     // MARK: Chargement

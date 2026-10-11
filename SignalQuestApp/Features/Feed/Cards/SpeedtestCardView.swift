@@ -90,7 +90,7 @@ struct SpeedtestCardView: View {
     private var subtitle: String {
         [
             signal?.servingOperator ?? signal?.operator,
-            signal?.isRoaming == true ? signal?.simOperator.map { "SIM \($0)" } : nil,
+            signal?.isRoaming == true ? signal?.simOperator.map { String(localized: "SIM \($0)") } : nil,
             signal?.deviceModel,
         ]
             .compactMap { $0 }
@@ -99,8 +99,8 @@ struct SpeedtestCardView: View {
 
     private var footer: String? {
         var parts: [String] = []
-        if let jitter = signal?.jitterMs { parts.append("Jitter \(Int(jitter)) ms") }
-        if let server = signal?.serverName { parts.append("Serveur \(server)") }
+        if let jitter = signal?.jitterMs { parts.append(String(localized: "Jitter \(Int(jitter)) ms")) }
+        if let server = signal?.serverName { parts.append(String(localized: "Serveur \(server)")) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

@@ -271,8 +271,8 @@ struct SentinelleBoxView: View {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 SentinelleSectionTitle(title: "Adresses surveillées", systemImage: "point.3.connected.trianglepath.dotted")
                 Text(target.hostname != nil
-                    ? "Résolues depuis le nom d’hôte à chaque cycle : elles se consultent, elles ne se saisissent pas."
-                    : "Chaque famille est sondée séparément, et répond — ou pas — pour son propre compte.")
+                    ? String(localized: "Résolues depuis le nom d’hôte à chaque cycle : elles se consultent, elles ne se saisissent pas.")
+                    : String(localized: "Chaque famille est sondée séparément, et répond — ou pas — pour son propre compte."))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)

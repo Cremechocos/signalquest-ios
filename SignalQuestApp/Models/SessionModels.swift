@@ -294,6 +294,17 @@ struct SessionSpeedtest: Decodable, Identifiable, Equatable {
         guard let lat, let lng, lat != 0 || lng != 0 else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lng)
     }
+
+    /// Nom du réseau mesuré tel que le registre l'écrit (« Orange », pas la clé « ORANGE ») ;
+    /// repli sur l'opérateur de la SIM quand le réseau n'a pas été résolu.
+    func networkOperatorLabel(in registry: MarketRegistryPayload?) -> String? {
+        if let key = operatorKey?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty {
+            let entry = registry?.markets.first { $0.operatorEntry(forKey: key) != nil }
+            return MarketRegistryEntry.operatorLabel(key, in: entry)
+        }
+        guard let name = mobileOperator?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else { return nil }
+        return name
+    }
 }
 
 // MARK: - Antenne desservante
@@ -348,12 +359,12 @@ struct ServingAntenna: Identifiable, Equatable {
         operatorNames.isEmpty ? operatorName : operatorNames.joined(separator: " + ")
     }
 
-    /// Confiance traduite (HAUTE / MOYENNE / FAIBLE).
+    /// Confiance traduite (« confiance haute / moyenne / faible »).
     var confidenceFR: String? {
         switch (confidenceLabel ?? "").uppercased() {
-        case "HIGH": return "haute"
-        case "MEDIUM": return "moyenne"
-        case "LOW": return "faible"
+        case "HIGH": return String(localized: "confiance haute")
+        case "MEDIUM": return String(localized: "confiance moyenne")
+        case "LOW": return String(localized: "confiance faible")
         default: return nil
         }
     }

@@ -5,6 +5,8 @@ import SwiftUI
 /// méta (génération, opérateur, serveur, lieu, heure). Lecture seule.
 struct DriveSpeedtestDetailSheet: View {
     let point: DriveSpeedtestPoint
+    @EnvironmentObject private var services: AppServices
+    @State private var marketEntry: MarketRegistryEntry?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -40,6 +42,7 @@ struct DriveSpeedtestDetailSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .task { marketEntry = await services.markets.market(forCode: result.marketCode) }
     }
 
     // MARK: Hero — anneau de jauge coloré par débit
@@ -190,8 +193,9 @@ struct DriveSpeedtestDetailSheet: View {
         result.cellularTechnology?.rawValue
     }
     private var operatorText: String? {
-        let name = result.networkOperatorName ?? result.operatorKey
-        return name?.isEmpty == false ? name : nil
+        if let name = result.networkOperatorName, !name.isEmpty { return name }
+        guard let key = result.operatorKey, !key.isEmpty else { return nil }
+        return MarketRegistryEntry.operatorLabel(key, in: marketEntry)
     }
     private var connectionText: String {
         (result.wifiSSID?.isEmpty == false) ? "Wi-Fi" : String(localized: "Cellulaire")

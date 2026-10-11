@@ -274,7 +274,7 @@ struct SentinelleAddressView: View {
             GlassCard {
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
                     SentinelleSectionTitle(
-                        title: "En \(address.familyLabel), sur \(window.periodLabel)",
+                        title: String(localized: "En \(address.familyLabel), sur \(window.periodLabel)"),
                         systemImage: "gauge.with.needle"
                     )
                     SentinelleMetricRow(
@@ -502,7 +502,7 @@ struct SentinelleAddressView: View {
                             // Le dénominateur est le temps RÉELLEMENT couvert :
                             // annoncer 30 jours après trois jours de mesures
                             // serait un chiffre faux, pas une approximation.
-                            hint: "sur \(availability.coveredHours) h réellement mesurées",
+                            hint: String(localized: "sur \(availability.coveredHours) h réellement mesurées"),
                             value: SentinelleWording.percent(availability.uptimePct, decimals: 3)
                         )
                         SentinelleMetricRow(

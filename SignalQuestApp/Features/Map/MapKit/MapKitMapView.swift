@@ -433,9 +433,9 @@ struct MapKitMapView: UIViewRepresentable {
                 id: "speed-\(speedtest.id)",
                 kind: .speedtest,
                 title: "\(Int(speedtest.downloadMbps.rounded())) Mbps",
-                subtitle: speedtest.tech ?? "Speedtest",
+                subtitle: speedtest.tech ?? String(localized: "Speedtest"),
                 coordinate: speedtest.coordinate,
-                metric: speedtest.uploadMbps.map { "\(Int($0.rounded())) Mbps up" },
+                metric: speedtest.uploadMbps.map { String(localized: "\(Int($0.rounded())) Mbps en envoi") },
                 backendId: speedtest.id,
                 details: MapItemDetails(
                     downloadMbps: speedtest.downloadMbps,
@@ -443,7 +443,7 @@ struct MapKitMapView: UIViewRepresentable {
                     pingMs: speedtest.pingMs,
                     tech: speedtest.tech,
                     timestamp: speedtest.timestamp,
-                    note: "Données Speedtest"
+                    note: String(localized: "Données Speedtest")
                 ),
                 antennaId: nil,
                 clusterCount: nil,

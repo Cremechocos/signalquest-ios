@@ -37,6 +37,8 @@ struct ProfileView: View {
     /// Écrans nourris par l'app Android, montrés seulement avec des données.
     @StateObject private var androidPresence: AndroidDataPresence
     @State private var showEdit = false
+    /// Choix du @pseudo depuis l'en-tête quand le compte n'en a pas encore.
+    @State private var showHandleSheet = false
     @State private var stats: UserStats?
     @State private var statsError: String?
     @State private var progression: GamificationProfile?
@@ -121,6 +123,9 @@ struct ProfileView: View {
         .signalQuestBackground()
         .sheet(isPresented: $showEdit) {
             EditProfileView(user: user)
+        }
+        .sheet(isPresented: $showHandleSheet) {
+            ChooseHandleSheet(onSuccess: { _ in Task { await session.refreshUser() } })
         }
         // Deep link « antenna_report_reply » : ouvre DIRECTEMENT le fil du bon
         // signalement, en sheet (l'onglet Profil héberge « Mes signalements »).
@@ -300,11 +305,27 @@ struct ProfileView: View {
                     .lineLimit(user.name == nil ? 1 : nil)
                     .truncationMode(.middle)
                     .accessibilityIdentifier("profile.displayName")
-                Text(user.handle.flatMap { $0.isEmpty ? nil : "@\($0)" } ?? "Ajoute un nom d’utilisateur")
-                    .font(SQFont.body(14, .medium))
-                    .foregroundStyle((user.handle?.isEmpty ?? true) ? SQColor.labelSecondary : SQColor.labelSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                if let handle = user.handle, !handle.isEmpty {
+                    Text("@\(handle)")
+                        .font(SQFont.body(14, .medium))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                } else {
+                    Button {
+                        showHandleSheet = true
+                    } label: {
+                        Text("Ajoute un nom d’utilisateur")
+                            .font(SQFont.body(14, .semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("profile.chooseHandle")
+                }
             }
             if user.twoFactorEnabled == true {
                 Text("2FA activée ✓")

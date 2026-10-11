@@ -180,7 +180,7 @@ struct RadioLogsView: View {
                     .frame(width: M.scanDot, height: M.scanDot)
                     .overlay(Circle().stroke(P.accentSoft, lineWidth: 4))
                     .accessibilityHidden(true)
-                Text(model.isSyncing ? "Récupération du journal" : "Vérification du catalogue")
+                Text(model.isSyncing ? String(localized: "Récupération du journal") : String(localized: "Vérification du catalogue"))
                     .font(SQFont.body(M.scanTitleSize, .bold))
                     .foregroundStyle(P.ink)
                 Spacer(minLength: 0)
@@ -189,7 +189,7 @@ struct RadioLogsView: View {
                         model.toggleScan()
                         Haptics.selection()
                     } label: {
-                        Text(model.isScanning ? "Suspendre" : "Reprendre")
+                        Text(model.isScanning ? String(localized: "Suspendre") : String(localized: "Reprendre"))
                             .font(SQFont.body(M.scanActionSize, .bold))
                             .foregroundStyle(P.accentInk)
                             .padding(.horizontal, M.scanActionPaddingH)
@@ -224,9 +224,9 @@ struct RadioLogsView: View {
         if model.isSyncing {
             return model.syncReceived == 0
                 ? String(localized: "Connexion au journal…")
-                : "\(model.syncReceived.formatted()) relevés reçus"
+                : String(localized: "\(model.syncReceived.formatted()) relevés reçus")
         }
-        return "\(model.checkedCount.formatted()) sites vérifiés sur \(model.totalCount.formatted())"
+        return String(localized: "\(model.checkedCount.formatted()) sites vérifiés sur \(model.totalCount.formatted())")
     }
 
     /// Barre de progression. `value == nil` = indéterminée (on ne connaît pas
@@ -263,7 +263,7 @@ struct RadioLogsView: View {
                 .background(P.accentSoft, in: RoundedRectangle(cornerRadius: M.tallyBadgeRadius, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(model.totalCount <= 1 ? "\(model.totalCount) site" : "\(model.totalCount.formatted()) sites")
+                Text(model.totalCount <= 1 ? String(localized: "\(model.totalCount) site") : String(localized: "\(model.totalCount.formatted()) sites"))
                     .font(SQFont.display(M.tallyNumberSize, .bold))
                     .foregroundStyle(P.ink)
                 Text(tallySubtitle)
@@ -412,7 +412,7 @@ struct RadioLogsView: View {
                     )
                     .contentShape(Rectangle())
                     .onTapGesture { model.toggleExpansion(site) }
-                    .accessibilityAction(named: Text(model.expandedSiteId == site.id ? "Réduire les cellules" : "Afficher les cellules")) {
+                    .accessibilityAction(named: Text(model.expandedSiteId == site.id ? String(localized: "Réduire les cellules") : String(localized: "Afficher les cellules"))) {
                         model.toggleExpansion(site)
                     }
                     .padding(.bottom, M.cardSpacing)

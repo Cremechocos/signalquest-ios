@@ -741,7 +741,7 @@ struct PhotoDetailView: View {
                 PhotoShareSheet(photo: photo, messagesService: services.messages, onShare: onShareToConversation)
             }
             .sheet(isPresented: $showNativeShare) {
-                let shareText = "\(photo.displayCaption) — Partagé via SignalQuest"
+                let shareText = String(localized: "\(photo.displayCaption) — Partagé via SignalQuest")
                 if let url = photo.imageUrl {
                     ShareSheet(items: [shareText, url])
                 } else {
@@ -864,7 +864,7 @@ struct PhotoDetailView: View {
             // Auteur
             HStack(spacing: SQSpace.sm) {
                 SQAvatar(url: photo.authorAvatar, name: photo.authorName ?? "?", size: 28)
-                Text(photo.authorName ?? "Contributeur")
+                Text(photo.authorName ?? String(localized: "Contributeur"))
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(SQColor.label)
                 Spacer()
@@ -895,7 +895,7 @@ struct PhotoDetailView: View {
                 }
             }
             .buttonStyle(SQPressButtonStyle())
-            .accessibilityLabel(isLiked ? "Retirer le like" : "Liker")
+            .accessibilityLabel(isLiked ? String(localized: "Retirer le like") : String(localized: "Liker"))
 
             // Commentaire
             Button { commentFocused = true } label: {
@@ -1003,7 +1003,7 @@ struct PhotoDetailView: View {
             SQAvatar(url: comment.avatarUrl, name: comment.userName ?? "?", size: 32)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(comment.userName ?? "Utilisateur")
+                    Text(comment.userName ?? String(localized: "Utilisateur"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(SQColor.label)
                     Spacer()
@@ -1269,7 +1269,7 @@ struct PhotoUploadView: View {
                             }.value
                             guard let prepared else {
                                 isUploading = false
-                                uploadError = "Image illisible."
+                                uploadError = String(localized: "Image illisible.")
                                 return
                             }
                             // Aucun réseau connu sur le support : on ne l'invente
@@ -1278,7 +1278,7 @@ struct PhotoUploadView: View {
                             let networkOperator = selectedOperator ?? availableOperators.first
                             let ok = await onUpload(prepared.jpeg, site.siteId ?? site.id, description, networkOperator, prepared.exifJSON)
                             isUploading = false
-                            if ok { dismiss() } else { uploadError = "Échec de l'envoi. Réessaie." }
+                            if ok { dismiss() } else { uploadError = String(localized: "Échec de l'envoi. Réessaie.") }
                         }
                     }
                     .disabled(uploadDisabled)
@@ -1395,10 +1395,10 @@ struct PhotoShareSheet: View {
                                     size: 40
                                 )
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(conversation.displayTitle.isEmpty ? "Conversation" : conversation.displayTitle)
+                                    Text(conversation.displayTitle.isEmpty ? String(localized: "Conversation") : conversation.displayTitle)
                                         .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                                         .foregroundStyle(SQColor.label)
-                                    Text(isE2EE ? "Chiffrée · partage indisponible" : "Conversation")
+                                    Text(isE2EE ? String(localized: "Chiffrée · partage indisponible") : String(localized: "Conversation"))
                                         .font(SQType.caption)
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }
@@ -1529,7 +1529,7 @@ struct AntennaSitePickerSheet: View {
                 VStack(spacing: SQSpace.sm) {
                     HStack(spacing: SQSpace.sm) {
                         if isLoading { ProgressView().tint(SQColor.brandRed) }
-                        Text(sites.isEmpty ? "Déplace la carte pour charger" : "\(sites.count) sites visibles")
+                        Text(sites.isEmpty ? String(localized: "Déplace la carte pour charger") : String(localized: "\(sites.count) sites visibles"))
                             .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                             .foregroundStyle(SQColor.label)
                     }
@@ -1539,7 +1539,7 @@ struct AntennaSitePickerSheet: View {
                     .sqShadowSoft()
 
                     if let marketLabel {
-                        Text(isCommunityFallback ? "\(marketLabel) · sites communautaires" : marketLabel)
+                        Text(isCommunityFallback ? String(localized: "\(marketLabel) · sites communautaires") : marketLabel)
                             .font(SQType.micro)
                             .foregroundStyle(SQColor.labelSecondary)
                             .padding(.horizontal, SQSpace.md)

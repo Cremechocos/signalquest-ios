@@ -39,7 +39,7 @@ enum SentinelleTemplateBuilder {
         var items: [CPInformationItem] = [
             CPInformationItem(title: String(localized: "État"), detail: statusLabel(target.status))
         ]
-        if let since = target.statusSince {
+        if let since = SignalFormatters.date(target.statusSince, includingTime: true, relative: true) {
             items.append(CPInformationItem(title: String(localized: "Depuis"), detail: since))
         }
         if let owner = target.ownerLabel {
@@ -47,7 +47,7 @@ enum SentinelleTemplateBuilder {
                                            detail: [target.ownerEmoji, owner].compactMap { $0 }.joined(separator: " ")))
         }
         items.append(CPInformationItem(title: String(localized: "Adresse"), detail: target.displayAddress))
-        if let probe = target.lastProbeAt {
+        if let probe = SignalFormatters.date(target.lastProbeAt, includingTime: true, relative: true) {
             items.append(CPInformationItem(title: String(localized: "Dernière sonde"), detail: probe))
         }
         return CPInformationTemplate(
@@ -66,7 +66,7 @@ enum SentinelleTemplateBuilder {
     }
 
     static func subtitle(for target: SentinelleTarget) -> String {
-        guard let since = target.statusSince, !since.isEmpty else { return statusLabel(target.status) }
+        guard let since = SignalFormatters.date(target.statusSince, includingTime: true, relative: true) else { return statusLabel(target.status) }
         return "\(statusLabel(target.status)) · \(since)"
     }
 

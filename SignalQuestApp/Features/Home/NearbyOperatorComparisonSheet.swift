@@ -76,7 +76,13 @@ struct NearbyOperatorComparisonSheet: View {
     }
 
     private var intro: some View {
-        let sentence = "\(metric.introMetric.prefix(1).uppercased())\(metric.introMetric.dropFirst()) mesuré par la communauté à moins de \(radiusText) de toi, tous opérateurs confondus."
+        let sentence: String
+        switch metric {
+        case .download:
+            sentence = String(localized: "Le débit médian mesuré par la communauté à moins de \(radiusText) de toi, tous opérateurs confondus.")
+        case .signal:
+            sentence = String(localized: "Le signal médian mesuré par la communauté à moins de \(radiusText) de toi, tous opérateurs confondus.")
+        }
         return Text(sentence)
             .font(SQFont.body(14))
             .foregroundStyle(SQColor.labelSecondary)
@@ -135,7 +141,7 @@ struct NearbyOperatorComparisonSheet: View {
                 .stroke(isLeader ? color.opacity(0.35) : SQColor.separator, lineWidth: isLeader ? 1.5 : 1)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(rank). \(stat.operatorName), \(stat.value) \(metric.unit), \(stat.sampleCount) mesures.")
+        .accessibilityLabel("\(rank). \(stat.operatorName), \(stat.value) \(metric.unit), \(measurementCountText(stat.sampleCount)).")
     }
 
     private var footer: some View {
@@ -162,8 +168,12 @@ struct NearbyOperatorComparisonSheet: View {
     private func detailText(_ stat: OperatorMetricStat) -> String {
         var parts: [String] = []
         if let detail = stat.detail { parts.append(detail) }
-        parts.append("\(stat.sampleCount) mesure\(stat.sampleCount > 1 ? "s" : "")")
+        parts.append(measurementCountText(stat.sampleCount))
         return parts.joined(separator: " · ")
+    }
+
+    private func measurementCountText(_ count: Int) -> String {
+        String(localized: "\(count) mesure")
     }
 
     private var radiusText: String {

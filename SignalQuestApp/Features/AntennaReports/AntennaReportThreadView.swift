@@ -104,7 +104,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
                 break
             }
             guard let prepared = await prepare(item) else {
-                attachmentError = "Image illisible."
+                attachmentError = String(localized: "Image illisible.")
                 continue
             }
             pendingImages.append(prepared)
@@ -264,7 +264,7 @@ struct AntennaReportThreadView: View {
             if !isTeam { Spacer(minLength: SQSpace.xxl) }
             VStack(alignment: isTeam ? .leading : .trailing, spacing: SQSpace.xs) {
                 if isTeam {
-                    Label(comment.author?.name?.nonEmpty ?? "Équipe SignalQuest", systemImage: "shield.lefthalf.filled")
+                    Label(comment.author?.name?.nonEmpty ?? String(localized: "Équipe SignalQuest"), systemImage: "shield.lefthalf.filled")
                         .font(SQFont.body(12, .semibold))
                         .foregroundStyle(SQColor.brandRed)
                 }

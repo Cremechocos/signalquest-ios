@@ -297,7 +297,7 @@ struct FriendsListView: View {
     /// l'expéditeur, qui serait moi), avec l'annulation.
     private func sentRequestRow(_ request: FriendRequest) -> some View {
         let recipient = request.recipient
-        let name: String = recipient?.displayName ?? "Utilisateur"
+        let name: String = recipient?.displayName ?? String(localized: "Utilisateur")
         let avatar: URL? = recipient?.avatarUrl
         return HStack(spacing: SQSpace.md) {
             SQAvatar(url: avatar, name: name)
@@ -353,7 +353,7 @@ struct FriendsListView: View {
         HStack(spacing: SQSpace.sm + 2) {
             SQAvatar(url: request.user?.avatarUrl, name: request.user?.displayName ?? "?")
                 .accessibilityHidden(true)
-            Text(request.user?.displayName ?? "Utilisateur")
+            Text(request.user?.displayName ?? String(localized: "Utilisateur"))
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.label)
                 .lineLimit(1)

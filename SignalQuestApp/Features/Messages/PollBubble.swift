@@ -27,7 +27,7 @@ struct PollBubble: View {
                     .background(mine ? SQColor.onAccent.opacity(0.18) : SQColor.accentSoft, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(poll.question.isEmpty ? "Sondage" : poll.question)
+                    Text(poll.question.isEmpty ? String(localized: "Sondage") : poll.question)
                         .font(SQType.heading)
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                     Text(metaLine)
@@ -69,14 +69,14 @@ struct PollBubble: View {
     }
 
     private var metaLine: String {
-        let mode = poll.multiSelect ? "Choix multiples" : "Choix unique"
-        let count = "\(poll.totalVotes) vote\(poll.totalVotes > 1 ? "s" : "")"
+        let mode = poll.multiSelect ? String(localized: "Choix multiples") : String(localized: "Choix unique")
+        let count = String(localized: "\(poll.totalVotes) vote")
         if effectivelyClosed { return String(localized: "Clôturé · \(count)") }
         if let endsAt = poll.endsAt {
             let when = endsAt.formatted(.dateTime.day().month(.abbreviated).hour().minute())
             return String(localized: "\(mode) · clôture le \(when) · \(count)")
         }
-        return "\(mode) · \(count)"
+        return String(localized: "\(mode) · \(count)")
     }
 
     private func optionRow(_ option: PollOption) -> some View {
@@ -118,9 +118,18 @@ struct PollBubble: View {
         .disabled(effectivelyClosed)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(option.text.isEmpty ? option.id : option.text)
-        .accessibilityValue("\(option.count) vote\(option.count > 1 ? "s" : ""), \(Int((ratio * 100).rounded())) %\(votedByMe ? ", sélectionné" : "")")
+        .accessibilityValue(voteAccessibilityValue(for: option, ratio: ratio, votedByMe: votedByMe))
         .accessibilityAddTraits(votedByMe ? [.isButton, .isSelected] : .isButton)
-        .accessibilityHint(effectivelyClosed ? "" : "Toucher pour voter")
+        .accessibilityHint(effectivelyClosed ? "" : String(localized: "Toucher pour voter"))
+    }
+
+    private func voteAccessibilityValue(for option: PollOption, ratio: Double, votedByMe: Bool) -> String {
+        var parts = [
+            String(localized: "\(option.count) vote"),
+            String(localized: "\(Int((ratio * 100).rounded())) %"),
+        ]
+        if votedByMe { parts.append(String(localized: "sélectionné")) }
+        return parts.joined(separator: ", ")
     }
 
     /// Calcule la sélection à envoyer au backend après tap : en choix unique on

@@ -436,6 +436,15 @@ struct OutageService: Equatable, Sendable {
     let status: String
 }
 
+/// Une date de flux opérateur (ISO, « jour seul »…) rendue lisible dans la langue de l'app ; la
+/// chaîne reçue si elle n'est pas reconnue, nil si elle est vide.
+enum OutageFeedDate {
+    static func display(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        return SignalFormatters.date(raw, includingTime: raw.contains("T") || raw.contains(":"))
+    }
+}
+
 struct OutageSiteLive: Decodable, MapFeedSite, Equatable, Sendable {
     let id: String
     let sourceId: String?

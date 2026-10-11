@@ -195,7 +195,7 @@ final class SessionDetailViewModel: ObservableObject {
         let sample = Self.sample(for: antenna, in: detail?.points ?? [])
         let coord = await location.currentLocation(timeoutSeconds: 5)?.coordinate ?? antenna.coordinate
         guard let siteId = antenna.siteId, !siteId.isEmpty else {
-            identifyResult = "Site inconnu : rien à identifier."
+            identifyResult = String(localized: "Site inconnu : rien à identifier.")
             Haptics.error()
             return
         }
@@ -211,7 +211,7 @@ final class SessionDetailViewModel: ObservableObject {
                 Haptics.error()
                 return
             }
-            identifyResult = "PLMN servant absent dans cette session : identifie ce nœud depuis les logs radio ou choisis explicitement son réseau."
+            identifyResult = String(localized: "PLMN servant absent dans cette session : identifie ce nœud depuis les logs radio ou choisis explicitement son réseau.")
             Haptics.error()
             return
         }
@@ -257,6 +257,7 @@ struct SessionDetailView: View {
     @StateObject private var model: SessionDetailViewModel
     @State private var validationTarget: ValidationTarget?
     @State private var pendingIdentify: ServingAntenna?
+    @State private var marketRegistry: MarketRegistryPayload?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     struct ValidationTarget: Identifiable {
@@ -306,6 +307,7 @@ struct SessionDetailView: View {
             if model.isLoading && model.detail == nil { ProgressView().tint(SQColor.brandRed) }
         }
         .task { await model.load(service: services.sessions) }
+        .task { marketRegistry = await services.markets.registry() }
         .sheet(item: $validationTarget) { target in
             ValidationsSheet(siteId: target.siteId, operatorName: target.operatorName, service: services.validations)
         }
@@ -386,6 +388,14 @@ struct SessionDetailView: View {
 
     // MARK: Trace
 
+    private var speedtestOperatorLabels: [String: String] {
+        var labels: [String: String] = [:]
+        for st in model.detail?.speedtests ?? [] {
+            if let label = st.networkOperatorLabel(in: marketRegistry) { labels[st.id] = label }
+        }
+        return labels
+    }
+
     @ViewBuilder
     private var traceSection: some View {
         if let detail = model.detail, !(detail.points.isEmpty && detail.servingAntennas.isEmpty) {
@@ -396,7 +406,8 @@ struct SessionDetailView: View {
                                     drawPath: model.session.isDriveTest,
                                     coloring: model.session.isIosCoverage ? .generation : .rsrp,
                                     renderID: model.renderVersion,
-                                    keepsUserViewport: true)
+                                    keepsUserViewport: true,
+                                    operatorLabels: speedtestOperatorLabels)
                     .frame(height: 300)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
                     .sqShadowCard()
@@ -510,7 +521,7 @@ struct SessionDetailView: View {
                         Circle()
                             .fill(Color(uiColor: SessionGenerationColor.ui(genColorKey(s.generation))))
                             .frame(width: 9, height: 9)
-                        Text(s.generation)
+                        Text(LocalizedStringKey(s.generation))
                             .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
                             .foregroundStyle(SQColor.label)
                         Spacer()
@@ -603,7 +614,7 @@ struct SessionDetailView: View {
                     // Le RÉSEAU d'abord : c'est lui qui décrit la mesure. La SIM ne
                     // sert que de repli quand le réseau n'a pas été résolu (anciennes
                     // lignes sans operatorKey).
-                    Text(st.operatorKey ?? st.mobileOperator ?? "Speedtest")
+                    Text(st.networkOperatorLabel(in: marketRegistry) ?? String(localized: "Speedtest"))
                         .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
@@ -761,7 +772,7 @@ struct SessionDetailView: View {
         // SESS-DETAIL-TELECOM-01 : la confiance n'a de sens que pour une hypothèse scorée ;
         // pour une antenne de proximité, la distance suffit à exprimer l'incertitude.
         if a.status == .hypothesis, let conf = a.confidenceFR {
-            parts.append("confiance \(conf)")
+            parts.append(conf)
         }
         if let d = a.distanceKm, d > 0 { parts.append(String(localized: "à \(formatKm(d))")) }
         return parts.joined(separator: " · ")

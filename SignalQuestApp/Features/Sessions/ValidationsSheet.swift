@@ -106,13 +106,13 @@ struct ValidationsSheet: View {
                             ProgressView().tint(SQColor.brandRed)
                         } else {
                             voteButton("checkmark", tint: SQColor.success, soft: SQColor.successSoft,
-                                       label: "Valider \(title) \(entry.value)") {
+                                       label: String(localized: "Valider \(title) \(entry.value)")) {
                                 Task { await model.vote(type: type, value: entry.value, action: "validate") }
                             }
                             // Le serveur refuse le rejet de sa propre identification.
                             if !entry.isMine {
                                 voteButton("xmark", tint: SQColor.danger, soft: SQColor.dangerSoft,
-                                           label: "Rejeter \(title) \(entry.value)") {
+                                           label: String(localized: "Rejeter \(title) \(entry.value)")) {
                                     Task { await model.vote(type: type, value: entry.value, action: "reject") }
                                 }
                             }
@@ -144,6 +144,6 @@ struct ValidationsSheet: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(LocalizedStringKey(label))
+        .accessibilityLabel(label)
     }
 }

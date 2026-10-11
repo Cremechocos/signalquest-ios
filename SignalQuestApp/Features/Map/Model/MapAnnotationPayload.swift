@@ -201,7 +201,7 @@ extension MapAnnotationPayload {
         return MapAnnotationPayload(
             id: "searched-place-pin",
             kind: .customSite,
-            title: title.isEmpty ? "Lieu recherché" : title,
+            title: title.isEmpty ? String(localized: "Lieu recherché") : title,
             subtitle: subtitle,
             coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
             metric: nil,

@@ -41,7 +41,7 @@ private enum GuestSpeedtestReceiptError: LocalizedError {
     case tokenGenerationFailed
 
     var errorDescription: String? {
-        "Impossible de créer le reçu de suppression local. Le speedtest invité n’a pas été envoyé. Réessaie."
+        String(localized: "Impossible de créer le reçu de suppression local. Le speedtest invité n’a pas été envoyé. Réessaie.")
     }
 }
 
@@ -641,7 +641,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     parallelStreams: parallelStreams,
                     startedAt: startedAt,
                     progress: progress,
-                    notice: "Serveur LibreSpeed injoignable — test via Cloudflare",
+                    notice: String(localized: "Serveur LibreSpeed injoignable — test via Cloudflare"),
                     fallbackReason: "librespeed_failed"
                 )
             }
@@ -694,7 +694,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     parallelStreams: parallelStreams,
                     startedAt: startedAt,
                     progress: progress,
-                    notice: "Serveurs iPerf3 injoignables — test via Cloudflare",
+                    notice: String(localized: "Serveurs iPerf3 injoignables — test via Cloudflare"),
                     fallbackReason: "no_iperf_pop"
                 )
             }
@@ -741,15 +741,15 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                         parallelStreams: parallelStreams,
                         startedAt: startedAt,
                         progress: progress,
-                        notice: "Serveur iPerf3 sélectionné indisponible — test via Cloudflare",
+                        notice: String(localized: "Serveur iPerf3 sélectionné indisponible — test via Cloudflare"),
                         fallbackReason: "no_iperf_pop",
                         requestedServerId: manualRequestedServerId
                     )
                 }
                 resolvedCandidate = fallback
                 requestedServerIdForResult = manualRequestedServerId
-                let requestedLabel = requestedServer?.name ?? "Serveur sélectionné"
-                manualFallbackNotice = "\(requestedLabel) injoignable — test sur \(fallback.server.name)"
+                let requestedLabel = requestedServer?.name ?? String(localized: "Serveur sélectionné")
+                manualFallbackNotice = String(localized: "\(requestedLabel) injoignable — test sur \(fallback.server.name)")
             }
         }
 
@@ -771,7 +771,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 phase: .ping,
                 fraction: 0,
                 serverName: serverName,
-                notice: "Cloudflare temporairement indisponible — test via \(serverName)"
+                notice: String(localized: "Cloudflare temporairement indisponible — test via \(serverName)")
             ))
         }
 
@@ -910,7 +910,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 parallelStreams: parallelStreams,
                 startedAt: startedAt,
                 progress: progress,
-                notice: "\(serverName) indisponible — test via Cloudflare",
+                notice: String(localized: "\(serverName) indisponible — test via Cloudflare"),
                 fallbackReason: "dl_incomplete",
                 requestedServerId: requestedServerIdForResult ?? iperfServer.id
             )
@@ -939,7 +939,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 parallelStreams: parallelStreams,
                 startedAt: startedAt,
                 progress: progress,
-                notice: "\(serverName) indisponible — test via Cloudflare",
+                notice: String(localized: "\(serverName) indisponible — test via Cloudflare"),
                 fallbackReason: "dl_incomplete",
                 requestedServerId: requestedServerIdForResult ?? iperfServer.id
             )
@@ -1122,7 +1122,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     lastULError = NSError(
                         domain: "iPerfClient",
                         code: -8,
-                        userInfo: [NSLocalizedDescriptionKey: "Upload incomplet (\(ulResult.measuredBytes) octets)"]
+                        userInfo: [NSLocalizedDescriptionKey: String(localized: "Upload incomplet (\(ulResult.measuredBytes) octets)")]
                     )
                 } catch is CancellationError {
                     throw CancellationError()

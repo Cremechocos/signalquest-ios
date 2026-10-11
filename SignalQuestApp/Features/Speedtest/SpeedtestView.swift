@@ -1324,7 +1324,7 @@ struct SpeedtestView: View {
     }
 
     private func liveActivityPhaseLabel(_ phase: SpeedtestPhase, runIndex: Int, runTotal: Int) -> String {
-        runTotal > 1 ? "Test \(runIndex)/\(runTotal) · \(phase.displayTitle)" : phase.displayTitle
+        runTotal > 1 ? String(localized: "Test \(runIndex)/\(runTotal) · \(phase.displayTitle)") : phase.displayTitle
     }
 
     private func stop() {

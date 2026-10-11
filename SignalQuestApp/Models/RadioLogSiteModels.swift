@@ -134,10 +134,12 @@ struct RadioLogSite: Identifiable, Sendable, Equatable {
 
     /// `3 cellules · 2 PCI` — la ligne de méta de la maquette.
     var compositionLabel: String {
-        let cellPart = cells.count <= 1 ? "\(cells.count) cellule" : "\(cells.count) cellules"
+        let cellPart = cells.count <= 1
+            ? String(localized: "\(cells.count) cellule")
+            : String(localized: "\(cells.count) cellules")
         let pciCount = distinctPciCount
         guard pciCount > 0 else { return cellPart }
-        return "\(cellPart) · \(pciCount) PCI"
+        return String(localized: "\(cellPart) · \(pciCount) PCI")
     }
 }
 
@@ -491,7 +493,7 @@ struct RadioLogSiteHypothesis: Sendable, Equatable {
     /// `confiance 88 % · 2,9 km` — la ligne de méta de l'état « hypothèse ».
     var summaryLabel: String? {
         var parts: [String] = []
-        if let confidenceScore { parts.append("confiance \(confidenceScore) %") }
+        if let confidenceScore { parts.append(String(localized: "confiance \(confidenceScore) %")) }
         if let distanceMeters {
             parts.append(SQUnits.distance(meters: Double(distanceMeters)))
         }

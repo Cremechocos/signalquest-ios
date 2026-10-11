@@ -14,7 +14,7 @@ final class MyIdentificationsViewModel: ObservableObject {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .all: return "Toutes"
+            case .all: return String(localized: "Toutes")
             case .lte: return "4G"
             case .nr: return "5G"
             }
@@ -102,8 +102,8 @@ final class MyIdentificationsViewModel: ObservableObject {
             if result.success {
                 await load()
                 toast = (result.deleted == 0 && result.softWithdrawn > 0)
-                    ? "Retirée (des cellules sont confirmées par d'autres)"
-                    : "Identification supprimée"
+                    ? String(localized: "Retirée (des cellules sont confirmées par d'autres)")
+                    : String(localized: "Identification supprimée")
                 Haptics.success()
             } else {
                 toast = String(localized: "Suppression impossible")
@@ -460,7 +460,7 @@ private struct IdentificationDetailSheet: View {
                     Text("Site communautaire (consensus)")
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
-                    Text(item.conflictSiteAddress ?? "Site \(consensusId)")
+                    Text(item.conflictSiteAddress ?? String(localized: "Site \(consensusId)"))
                         .font(SQFont.body(14, .semibold))
                         .foregroundStyle(SQColor.label)
                     if let v = item.conflictSiteValidations {
@@ -512,7 +512,7 @@ private struct IdentificationDetailSheet: View {
                 onChanged()
                 dismiss()
             } else {
-                adoptError = "Adoption non appliquée."
+                adoptError = String(localized: "Adoption non appliquée.")
                 Haptics.error()
             }
         } catch {
@@ -553,7 +553,7 @@ private struct IdentificationDetailSheet: View {
                     .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(LocalizedStringKey(title)).font(SQFont.body(15.5, .medium)).foregroundStyle(SQColor.label)
-                    Text(subtitle).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
+                    Text(LocalizedStringKey(subtitle)).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelTertiary)
@@ -574,7 +574,7 @@ private struct IdentificationDetailSheet: View {
             }
             .frame(width: 52, height: 52)
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.operatorName ?? "Opérateur inconnu")
+                Text(item.operatorName ?? String(localized: "Opérateur inconnu"))
                     .font(SQFont.display(20, .bold))
                     .foregroundStyle(SQColor.label)
                 Text(item.nodeLabel)

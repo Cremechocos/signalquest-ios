@@ -40,7 +40,7 @@ struct SentinelleOwnerField: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(emoji.isEmpty ? "Choisir un emoji" : "Emoji : \(emoji). Changer")
+                .accessibilityLabel(emoji.isEmpty ? String(localized: "Choisir un emoji") : String(localized: "Emoji : \(emoji). Changer"))
 
                 TextField("À qui est cette box ? (facultatif)", text: $label)
                     .textFieldStyle(.plain)
@@ -89,7 +89,7 @@ struct SentinelleOwnerField: View {
                                     if emoji.isEmpty { emoji = suggestion.emoji }
                                 }
                             } label: {
-                                Text("\(suggestion.emoji)  \(suggestion.value)")
+                                Text(verbatim: "\(suggestion.emoji)  \(suggestion.title)")
                                     .font(SQFont.body(13))
                                     .foregroundStyle(
                                         suggestion.value == label ? SQColor.accentInk : SQColor.label

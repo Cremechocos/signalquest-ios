@@ -929,7 +929,7 @@ struct FeedView: View {
     // MARK: Annulation d'un partage
 
     private func presentShareUndo(messageId: String, conversation: MessageConversation) {
-        let title = conversation.displayTitle.isEmpty ? "la conversation" : conversation.displayTitle
+        let title = conversation.displayTitle.isEmpty ? String(localized: "la conversation") : conversation.displayTitle
         inAppNotifications.showUndo(
             body: String(localized: "Partagé vers \(title)"),
             actionLabel: String(localized: "Annuler")

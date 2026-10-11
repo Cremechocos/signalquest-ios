@@ -53,7 +53,9 @@ enum MapAccessibility {
         }
 
         let title = payload.title.isEmpty ? fallbackTitle(for: payload.kind) : payload.title
-        let label = "\(noun(for: payload)) \(title)"
+        // Un titre générique (« Photo ») est déjà la nature : le redire donnerait « Photo Photo ».
+        let nature = noun(for: payload)
+        let label = title.caseInsensitiveCompare(nature) == .orderedSame ? nature : "\(nature) \(title)"
         // `subtitle` et `metric` portent l'information utile (opérateur, techno,
         // débit, distance) : elle va en `value`, que VoiceOver énonce APRÈS le
         // label et que le rotor n'utilise pas pour la recherche.

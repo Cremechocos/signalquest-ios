@@ -128,7 +128,7 @@ struct CoverageCardView: View {
 
     private var subtitle: String {
         var parts: [String] = []
-        if let count = signal?.pointsCount, hasSessionAggregate { parts.append("\(count) pts") }
+        if let count = signal?.pointsCount, hasSessionAggregate { parts.append(String(localized: "\(count) pts")) }
         if let distance = signal?.distanceMeters, hasSessionAggregate { parts.append(SignalFormatters.meters(distance)) }
         if !hasSessionAggregate {
             if let op = signal?.operator { parts.append(op) }
@@ -136,17 +136,17 @@ struct CoverageCardView: View {
         }
         let techs = signal?.detectedTechs.prefix(3).joined(separator: " / ") ?? ""
         if !techs.isEmpty && hasSessionAggregate { parts.append(techs) }
-        return parts.joined(separator: " · ").nonEmpty ?? "Parcours radio"
+        return parts.joined(separator: " · ").nonEmpty ?? String(localized: "Parcours radio")
     }
 
     private var footer: String? {
         var parts: [String] = []
         if let min = signal?.minSignalDbm, let max = signal?.maxSignalDbm {
-            parts.append("Signal \(SignalFormatters.dbm(min)) / \(SignalFormatters.dbm(max))")
+            parts.append(String(localized: "Signal \(SignalFormatters.dbm(min)) / \(SignalFormatters.dbm(max))"))
         } else if let avg = signal?.averageSignalDbm {
-            parts.append("Signal \(SignalFormatters.dbm(avg))")
+            parts.append(String(localized: "Signal \(SignalFormatters.dbm(avg))"))
         }
-        if let device = signal?.deviceModel { parts.append("Appareil \(device)") }
+        if let device = signal?.deviceModel { parts.append(String(localized: "Appareil \(device)")) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

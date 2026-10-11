@@ -141,11 +141,12 @@ struct SignupView: View {
                 .accessibilityHint(acceptedTerms ? "" : "Accepte d’abord les conditions d’utilisation")
                 .sqAuthAppear(appeared, delay: 0.12)
 
-                Button("J'ai déjà un compte") { dismiss() }
+                Button("J’ai déjà un compte") { dismiss() }
                     .buttonStyle(.plain)
                     .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.brandRed)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
                     .sqAuthAppear(appeared, delay: 0.14)
             }
             .padding(SQSpace.xl)

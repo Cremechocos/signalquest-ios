@@ -64,7 +64,7 @@ struct Photo: Codable, Identifiable, Equatable {
     }
 
     var displayCaption: String {
-        caption ?? description ?? siteAddress ?? siteId ?? "Photo SignalQuest"
+        caption ?? description ?? siteAddress ?? siteId ?? String(localized: "Photo SignalQuest")
     }
 }
 

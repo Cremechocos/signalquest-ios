@@ -135,14 +135,14 @@ struct ValidationCardView: View {
     private var footer: String? {
         var parts: [String] = []
         // Ce qui a été identifié (eNB / gNB / PCI / cellule).
-        if signal?.identifierType != nil { parts.append("Type \(identifierTileLabel)") }
+        if signal?.identifierType != nil { parts.append(String(localized: "Type \(identifierTileLabel)")) }
         // Méthode : auto-identifiée, déclarée manuellement, ou importée.
         if let method = identifierMethodLabel { parts.append(method) }
         if let sectors = signal?.sectors, !sectors.isEmpty {
             let list = sectors.prefix(3).map(String.init).joined(separator: " / ")
             parts.append(String(localized: "Secteurs \(list)"))
         }
-        if let count = signal?.validationCount { parts.append("\(count) confirmations") }
+        if let count = signal?.validationCount { parts.append(String(localized: "\(count) confirmations")) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

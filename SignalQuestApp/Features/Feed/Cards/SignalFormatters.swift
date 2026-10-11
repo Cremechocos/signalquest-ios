@@ -118,11 +118,25 @@ enum TechAccent {
 /// 11,5 pt en casse normale (« Speedtest », « Photo »). Ni bordure, ni
 /// majuscules.
 struct SQEditorialTag: View {
-    let text: String
-    var color: Color = SQColor.brandRed
+    private let label: Text
+    let color: Color
+
+    /// Littéral ou clé du catalogue : le libellé est localisé.
+    init(text: LocalizedStringKey, color: Color = SQColor.brandRed) {
+        self.label = Text(text)
+        self.color = color
+    }
+
+    /// `String` à l'exécution (technologie, opérateur, nom de site du serveur) :
+    /// affichée telle quelle, sans consulter le catalogue.
+    @_disfavoredOverload
+    init<S: StringProtocol>(text: S, color: Color = SQColor.brandRed) {
+        self.label = Text(verbatim: String(text))
+        self.color = color
+    }
 
     var body: some View {
-        Text(text)
+        label
             .font(.caption.weight(.semibold))
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -199,7 +213,7 @@ struct CardHeader: View {
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
                     authorContent
                     if let kindBadge {
-                        SQEditorialTag(text: kindBadge, color: kindColor)
+                        SQEditorialTag(text: LocalizedStringKey(kindBadge), color: kindColor)
                     }
                 }
             } else {
@@ -207,7 +221,7 @@ struct CardHeader: View {
                     authorContent
                     Spacer()
                     if let kindBadge {
-                        SQEditorialTag(text: kindBadge, color: kindColor)
+                        SQEditorialTag(text: LocalizedStringKey(kindBadge), color: kindColor)
                     }
                 }
             }

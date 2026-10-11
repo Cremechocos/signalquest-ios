@@ -566,15 +566,15 @@ private struct LeaderboardHeroCard: View {
                     }
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: SQSpace.sm) {
-                            heroChip(icon: "flame.fill", text: streak > 1 ? "\(streak) jours" : "\(streak) jour")
+                            heroChip(icon: "flame.fill", text: String(localized: "\(streak) jours"))
                             if !unlockedBadges.isEmpty {
-                                heroChip(icon: "rosette", text: "\(unlockedBadges.count) badge\(unlockedBadges.count > 1 ? "s" : "")")
+                                heroChip(icon: "rosette", text: String(localized: "\(unlockedBadges.count) badges"))
                             }
                         }
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            heroChip(icon: "flame.fill", text: streak > 1 ? "\(streak) jours" : "\(streak) jour")
+                            heroChip(icon: "flame.fill", text: String(localized: "\(streak) jours"))
                             if !unlockedBadges.isEmpty {
-                                heroChip(icon: "rosette", text: "\(unlockedBadges.count) badge\(unlockedBadges.count > 1 ? "s" : "")")
+                                heroChip(icon: "rosette", text: String(localized: "\(unlockedBadges.count) badges"))
                             }
                         }
                     }
@@ -599,7 +599,7 @@ private struct LeaderboardHeroCard: View {
     private var avatarWithRing: some View {
         ZStack {
             XPRing(progress: ringProgress)
-            SQAvatar(url: user?.avatarUrl, name: user?.name ?? user?.handle ?? "Moi", size: 64)
+            SQAvatar(url: user?.avatarUrl, name: user?.name ?? user?.handle ?? String(localized: "Moi"), size: 64)
         }
         .frame(width: 94, height: 94)
         .overlay(alignment: .bottom) {

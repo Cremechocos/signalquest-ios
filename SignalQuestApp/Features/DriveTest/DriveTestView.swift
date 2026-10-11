@@ -2020,7 +2020,7 @@ struct DriveTestView: View {
 
     private var sectorTitle: String {
         guard model.nearestSite != nil else { return String(localized: "Recherche d'antennes…") }
-        return model.inSector ? String(localized: "Dans le secteur") : "Hors secteur"
+        return model.inSector ? String(localized: "Dans le secteur") : String(localized: "Hors secteur")
     }
 
     private var sectorDetail: String? {

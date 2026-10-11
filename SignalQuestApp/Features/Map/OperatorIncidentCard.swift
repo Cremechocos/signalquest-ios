@@ -75,7 +75,7 @@ struct OperatorIncidentCard: View {
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
-                if let end = incident.expectedEndAt, !end.isEmpty {
+                if let end = OutageFeedDate.display(incident.expectedEndAt) {
                     Text("Rétablissement prévu : \(end)")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)

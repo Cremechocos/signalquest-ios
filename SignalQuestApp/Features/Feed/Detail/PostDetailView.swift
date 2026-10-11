@@ -68,7 +68,7 @@ struct PostDetailView: View {
                     }
                 )
                 GradientButton(
-                    "Voir tous les commentaires (\(actions.item.commentsCount))",
+                    String(localized: "Voir tous les commentaires (\(actions.item.commentsCount))"),
                     systemImage: "bubble.left.and.bubble.right",
                     style: .secondary
                 ) {

@@ -862,7 +862,7 @@ struct AntennaDetailSheet: View {
     @ViewBuilder
     private var fhTag: some View {
         if model.details?.core?.hasFhLink == true {
-            SQEditorialTag(text: "Relais hertzien", color: SQColor.labelSecondary)
+            SQEditorialTag(text: String(localized: "Relais hertzien"), color: SQColor.labelSecondary)
         }
     }
 
@@ -1285,9 +1285,9 @@ struct AntennaDetailSheet: View {
                         ForEach(core.radioCarriers.prefix(10)) { carrier in
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
-                                    SQEditorialTag(text: carrier.bandLabel ?? carrier.technology ?? "Radio", color: SQBrand.techColor(carrier.technology ?? ""))
+                                    SQEditorialTag(text: carrier.bandLabel ?? carrier.technology ?? String(localized: "Radio"), color: SQBrand.techColor(carrier.technology ?? ""))
                                     Spacer()
-                                    Text(carrier.source ?? "Officiel")
+                                    Text(carrier.source ?? String(localized: "Officiel"))
                                         .font(SQType.micro)
                                         .foregroundStyle(SQColor.labelSecondary)
                                 }

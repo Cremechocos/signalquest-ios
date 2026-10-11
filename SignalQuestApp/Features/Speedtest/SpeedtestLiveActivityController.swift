@@ -42,7 +42,7 @@ final class SpeedtestLiveActivityController {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         lastPushDate = nil; lastPhaseLabel = nil   // nouveau test : la 1re mise à jour pousse
         let state = SpeedtestActivityAttributes.ContentState(
-            phaseLabel: runTotal > 1 ? "Test \(runIndex)/\(runTotal)" : "Démarrage",
+            phaseLabel: runTotal > 1 ? String(localized: "Test \(runIndex)/\(runTotal)") : String(localized: "Démarrage"),
             downloadMbps: 0, uploadMbps: 0, pingMs: 0, progress: 0.04,
             runIndex: runIndex, runTotal: runTotal, finished: false
         )
@@ -90,7 +90,7 @@ final class SpeedtestLiveActivityController {
         lastPushDate = nil; lastPhaseLabel = nil
         let content = ActivityContent(
             state: SpeedtestActivityAttributes.ContentState(
-                phaseLabel: runTotal > 1 ? "Rafale terminée" : "Terminé",
+                phaseLabel: runTotal > 1 ? String(localized: "Rafale terminée") : String(localized: "Terminé"),
                 downloadMbps: downloadMbps, uploadMbps: uploadMbps, pingMs: pingMs,
                 progress: 1, runIndex: runIndex, runTotal: runTotal, finished: true
             ),

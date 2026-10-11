@@ -161,7 +161,7 @@ private struct LockScreenSpeedtestActivity: View {
 
     private var subtitle: String {
         if state.isBurst {
-            return "Speedtest en rafale \(state.runIndex)/\(state.runTotal)"
+            return String(localized: "Speedtest en rafale \(state.runIndex)/\(state.runTotal)")
         }
         return attributes.serverName.isEmpty ? "Speedtest" : attributes.serverName
     }

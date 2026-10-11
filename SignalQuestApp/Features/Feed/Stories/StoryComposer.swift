@@ -467,7 +467,7 @@ struct StoryComposer: View {
 
 /// Sélecteur multi-amis réutilisable (masquer à… / amis proches).
 struct FriendMultiSelectSheet: View {
-    let title: String
+    let title: LocalizedStringKey
     let friends: [Friend]
     @Binding var selected: Set<String>
     var onDone: () -> Void = {}

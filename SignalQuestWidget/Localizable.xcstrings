@@ -1,6 +1,12 @@
 {
   "sourceLanguage": "fr",
   "strings": {
+    "Speedtest en rafale %lld/%lld": {
+      "localizations": {
+        "fr": { "stringUnit": { "state": "translated", "value": "Speedtest en rafale %lld/%lld" } },
+        "en": { "stringUnit": { "state": "translated", "value": "Burst speedtest %lld/%lld" } }
+      }
+    },
     "Lancer un test": {
       "localizations": {
         "fr": { "stringUnit": { "state": "translated", "value": "Lancer un test" } },

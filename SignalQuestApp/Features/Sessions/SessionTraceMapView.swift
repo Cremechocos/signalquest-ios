@@ -19,6 +19,8 @@ struct SessionTraceMapView: UIViewRepresentable {
     /// Chargement progressif : la carte se cadre tant que l'utilisateur ne l'a
     /// pas déplacée, puis garde sa vue quand de nouveaux points arrivent.
     var keepsUserViewport: Bool = false
+    /// Nom d'opérateur à afficher par id de speedtest (le registre arrive après la carte).
+    var operatorLabels: [String: String] = [:]
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -35,7 +37,8 @@ struct SessionTraceMapView: UIViewRepresentable {
         let signature = renderID.map {
             SessionTraceRenderSignature(id: $0, coloring: coloring,
                 colorScheme: context.environment.colorScheme,
-                contrast: context.environment.colorSchemeContrast)
+                contrast: context.environment.colorSchemeContrast,
+                operatorLabels: operatorLabels)
         }
         guard context.coordinator.shouldRender(signature) else { return }
         map.removeOverlays(map.overlays)
@@ -58,7 +61,7 @@ struct SessionTraceMapView: UIViewRepresentable {
 
         // Speedtests géolocalisés (marqueur « débit » tappable).
         let locatedSpeedtests = speedtests.compactMap { st -> SessionSpeedtestAnnotation? in
-            st.coordinate == nil ? nil : SessionSpeedtestAnnotation(st)
+            st.coordinate == nil ? nil : SessionSpeedtestAnnotation(st, operatorLabel: operatorLabels[st.id])
         }
         map.addAnnotations(locatedSpeedtests)
 
@@ -151,6 +154,7 @@ struct SessionTraceRenderSignature: Equatable {
     let coloring: SessionPointColoring
     let colorScheme: ColorScheme
     let contrast: ColorSchemeContrast
+    var operatorLabels: [String: String] = [:]
 }
 
 /// Overlay « nuage de points » dessiné en une passe Core Graphics : chaque point
@@ -242,9 +246,11 @@ final class ServingAntennaAnnotation: NSObject, MKAnnotation {
 final class SessionSpeedtestAnnotation: NSObject, MKAnnotation {
     let speedtest: SessionSpeedtest
     let coordinate: CLLocationCoordinate2D
-    init?(_ st: SessionSpeedtest) {
+    let operatorLabel: String?
+    init?(_ st: SessionSpeedtest, operatorLabel: String? = nil) {
         guard let coord = st.coordinate else { return nil }
         self.speedtest = st
+        self.operatorLabel = operatorLabel
         self.coordinate = coord
     }
 
@@ -255,7 +261,7 @@ final class SessionSpeedtestAnnotation: NSObject, MKAnnotation {
     }
     var subtitle: String? {
         var parts: [String] = []
-        if let op = speedtest.operatorKey ?? speedtest.mobileOperator, !op.isEmpty { parts.append(op) }
+        if let op = operatorLabel ?? speedtest.networkOperatorLabel(in: nil), !op.isEmpty { parts.append(op) }
         if let mvno = speedtest.mvnoName, !mvno.isEmpty,
            mvno.caseInsensitiveCompare(speedtest.operatorKey ?? "") != .orderedSame {
             parts.append("SIM \(mvno)")

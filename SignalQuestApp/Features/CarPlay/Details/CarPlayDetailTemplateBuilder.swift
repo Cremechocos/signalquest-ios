@@ -86,7 +86,7 @@ enum CarPlayDetailTemplateBuilder {
                                      to: CLLocationCoordinate2D(latitude: lat, longitude: lon)) {
             items.append(bearing)
         }
-        if let status = site.status {
+        if let status = outageStatusLabel(site) {
             items.append(CPInformationItem(title: String(localized: "État"), detail: status))
         }
         if let operatorName = site.operator {
@@ -98,7 +98,7 @@ enum CarPlayDetailTemplateBuilder {
         if let detail = site.detail, !detail.isEmpty {
             items.append(CPInformationItem(title: String(localized: "Détail"), detail: detail))
         }
-        if let startedAt = site.startedAt {
+        if let startedAt = SignalFormatters.date(site.startedAt, includingTime: true, relative: true) {
             items.append(CPInformationItem(title: String(localized: "Depuis"), detail: startedAt))
         }
         return CPInformationTemplate(
@@ -149,6 +149,14 @@ enum CarPlayDetailTemplateBuilder {
         case .declared: return String(localized: "Déclaré")
         case .planned: return String(localized: "Prévu")
         }
+    }
+
+    /// Le motif tel que l'opérateur l'écrit ; à défaut, la nature de l'incident en toutes lettres
+    /// (« down » ne se lit pas au volant).
+    static func outageStatusLabel(_ site: OutageSiteLive) -> String? {
+        if let reason = site.reason, !reason.isEmpty { return reason }
+        guard let issueType = site.issueType, !issueType.isEmpty else { return nil }
+        return OperatorIncidentCard.issueLabel(for: issueType)
     }
 
     /// « à 340 m, à l'est » — distance ET direction. La distance seule ne dit pas

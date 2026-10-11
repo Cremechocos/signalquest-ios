@@ -80,7 +80,7 @@ struct RadioLogIdentifySheet: View {
                 .padding(.bottom, M.sheetPaddingBottom)
             }
             .background(SQColor.bg.ignoresSafeArea())
-            .navigationTitle(identifiedSiteId == nil ? "Identifier ce site" : "Site identifié")
+            .navigationTitle(identifiedSiteId == nil ? String(localized: "Identifier ce site") : String(localized: "Site identifié"))
             .toolbarTitleInlineCompat()
             .toolbar { toolbarContent }
             .task { await picker.load(for: site) }
@@ -106,7 +106,7 @@ struct RadioLogIdentifySheet: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
-            Button(identifiedSiteId == nil ? "Fermer" : "Terminé") { dismiss() }
+            Button(identifiedSiteId == nil ? String(localized: "Fermer") : String(localized: "Terminé")) { dismiss() }
         }
         if identifiedSiteId == nil {
             ToolbarItem(placement: .confirmationAction) {
@@ -385,8 +385,8 @@ struct RadioLogCandidateRow: View {
 
     private var metaLine: String? {
         var parts: [String] = []
-        if let distanceLabel = candidate.distanceLabel { parts.append("à \(distanceLabel)") }
-        if let confidenceScore = candidate.confidenceScore { parts.append("confiance \(confidenceScore) %") }
+        if let distanceLabel = candidate.distanceLabel { parts.append(String(localized: "à \(distanceLabel)")) }
+        if let confidenceScore = candidate.confidenceScore { parts.append(String(localized: "confiance \(confidenceScore) %")) }
         let operators = candidate.operators.filter { $0.uppercased() != "ALL" }
         if !operators.isEmpty { parts.append(operators.joined(separator: ", ")) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")

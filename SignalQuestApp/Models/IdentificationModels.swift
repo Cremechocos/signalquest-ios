@@ -138,8 +138,8 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
     var title: String { "\(kind.rawValue) \(nodeValue)" }
     var subtitle: String {
         let count = cells.count
-        let cellPart = count == 0 ? "aucune cellule" : "\(count) PCI/CI"
-        return "\(representative.operatorName ?? "Opérateur inconnu") · \(representative.techLabel) · \(cellPart)"
+        let cellPart = count == 0 ? String(localized: "aucune cellule") : "\(count) PCI/CI"
+        return "\(representative.operatorName ?? String(localized: "Opérateur inconnu")) · \(representative.techLabel) · \(cellPart)"
     }
 
     static func group(_ items: [MyIdentification]) -> [IdentifiedNodeGroup] {

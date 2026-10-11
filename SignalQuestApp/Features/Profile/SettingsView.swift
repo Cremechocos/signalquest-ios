@@ -124,7 +124,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
             }
         case .failed(let failure):
             devices = []
-            errorMessage = Self.message(for: failure, fallback: "Impossible de charger le registre E2EE v2.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible de charger le registre E2EE v2."))
         }
     }
 
@@ -136,11 +136,11 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         switch await enrollment.registerPendingDevice(label: UIDevice.current.model) {
         case .registered(_, let status, _):
             confirmationMessage = status == .approved
-                ? "Cet appareil est déjà approuvé."
-                : "Appareil préparé. Une approbation reste nécessaire."
+                ? String(localized: "Cet appareil est déjà approuvé.")
+                : String(localized: "Appareil préparé. Une approbation reste nécessaire.")
             await load()
         case .failed(let failure):
-            errorMessage = Self.message(for: failure, fallback: "Impossible de préparer cet appareil.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible de préparer cet appareil."))
         }
     }
 
@@ -153,10 +153,10 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         defer { isActing = false }
         switch await lifecycle.revoke(deviceId: device.descriptor.deviceId, reason: "USER_REQUEST") {
         case .success:
-            confirmationMessage = "Appareil révoqué. Les conversations concernées devront renouveler leurs clés."
+            confirmationMessage = String(localized: "Appareil révoqué. Les conversations concernées devront renouveler leurs clés.")
             await load()
         case .failed(let failure):
-            errorMessage = Self.message(for: failure, fallback: "Impossible de révoquer cet appareil.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible de révoquer cet appareil."))
         }
     }
 
@@ -190,7 +190,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         case .success(let challenge):
             bootstrapChallenge = challenge
         case .failed:
-            approvalErrorMessage = "Impossible d’envoyer le code de vérification."
+            approvalErrorMessage = String(localized: "Impossible d’envoyer le code de vérification.")
         }
     }
 
@@ -207,13 +207,13 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         )) {
         case .success:
             resetApproval()
-            confirmationMessage = "Premier appareil approuvé."
+            confirmationMessage = String(localized: "Premier appareil approuvé.")
             await load()
         case .failed(let failure) where failure.code == "E2EE_IDENTITY_ALREADY_ESTABLISHED":
             approvalErrorMessage = String(localized: "Un autre appareil a déjà établi le chiffrement de ce compte. Fais approuver celui-ci en scannant son QR.")
             await load()
         case .failed:
-            approvalErrorMessage = "Le code est invalide, expiré ou ne correspond plus à cet appareil."
+            approvalErrorMessage = String(localized: "Le code est invalide, expiré ou ne correspond plus à cet appareil.")
         }
     }
 
@@ -244,7 +244,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
             case "e2ee-qr-device-mismatch":
                 approvalErrorMessage = String(localized: "Cet appareil ne correspond pas au code affiché, approbation refusée.")
             default:
-                approvalErrorMessage = "Demande invalide, expirée ou incohérente avec le serveur."
+                approvalErrorMessage = String(localized: "Demande invalide, expirée ou incohérente avec le serveur.")
             }
         }
     }
@@ -268,7 +268,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         switch await lifecycle.approve(detail, comparedQR: qr) {
         case .success:
             resetApproval()
-            confirmationMessage = "Appareil approuvé. La rotation de clés requise a été enregistrée."
+            confirmationMessage = String(localized: "Appareil approuvé. La rotation de clés requise a été enregistrée.")
             await load()
         case .failed(let failure):
             approvalErrorMessage = Self.approvalFailureMessage(failure)
@@ -1097,7 +1097,7 @@ struct E2EEV2TrustedDevicesView: View {
         let regular = ISO8601DateFormatter()
         regular.formatOptions = [.withInternetDateTime]
         guard let date = fractional.date(from: value) ?? regular.date(from: value) else {
-            return "à une date inconnue"
+            return String(localized: "à une date inconnue")
         }
         return date.formatted(date: .omitted, time: .shortened)
     }
@@ -1135,12 +1135,12 @@ struct E2EEV2TrustedDevicesView: View {
     }
 
     private func formattedDate(_ value: String?) -> String {
-        guard let value else { return "jamais" }
+        guard let value else { return String(localized: "jamais") }
         let fractional = ISO8601DateFormatter()
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let regular = ISO8601DateFormatter()
         regular.formatOptions = [.withInternetDateTime]
-        guard let date = fractional.date(from: value) ?? regular.date(from: value) else { return "date inconnue" }
+        guard let date = fractional.date(from: value) ?? regular.date(from: value) else { return String(localized: "date inconnue") }
         return date.formatted(date: .abbreviated, time: .omitted)
     }
 }
@@ -1271,7 +1271,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
         case .failed(let failure):
             currentDeviceStatus = nil
             identityGeneration = nil
-            errorMessage = Self.message(for: failure, fallback: "Impossible de charger l’état de récupération.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible de charger l’état de récupération."))
         }
     }
 
@@ -1312,7 +1312,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
             case .success:
                 await load()
             case .failed(let failure):
-                errorMessage = Self.message(for: failure, fallback: "Impossible d’approuver cet appareil avec cette clé.")
+                errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible d’approuver cet appareil avec cette clé."))
                 return
             }
         } else if currentDeviceStatus != .approved {
@@ -1325,15 +1325,15 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
         case .success(let activeBundle):
             bundle = activeBundle
         case .failed(let failure):
-            errorMessage = Self.message(for: failure, fallback: "Le bundle de récupération actif est indisponible.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Le bundle de récupération actif est indisponible."))
             return
         }
         switch await recoveryEpochs.restoreAll(bundle: bundle, recoveryKey: key) {
         case .success(let summary):
             recoveryInput = ""
-            confirmationMessage = "Restauration terminée : \(summary.restoredEpochCount) clé(s) restaurée(s), \(summary.missingEpochCount) indisponible(s)."
+            confirmationMessage = String(localized: "Restauration terminée : \(summary.restoredEpochCount) clé(s) restaurée(s), \(summary.missingEpochCount) indisponible(s).")
         case .failure(let failure):
-            errorMessage = Self.message(for: failure, fallback: "La restauration de l’historique a échoué.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "La restauration de l’historique a échoué."))
         }
     }
 
@@ -1347,7 +1347,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
         case .success:
             break
         case .failed(let failure):
-            errorMessage = Self.message(for: failure, fallback: "Impossible de préparer la nouvelle identité.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible de préparer la nouvelle identité."))
             return
         }
         switch await lifecycle.requestIdentityResetEmailChallenge(expectedGeneration: generation) {
@@ -1355,7 +1355,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
             resetChallenge = challenge
         case .failed(let failure):
             _ = lifecycle.discardIdentityResetCandidate()
-            errorMessage = Self.message(for: failure, fallback: "Impossible d’envoyer le code de réinitialisation.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible d’envoyer le code de réinitialisation."))
         }
     }
 
@@ -1526,7 +1526,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
             material = created
         case .failed(let failure):
             resetNeedsRecovery = resetCompleted
-            errorMessage = Self.message(for: failure, fallback: "Impossible de créer la clé de récupération.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible de créer la clé de récupération."))
             return
         }
 
@@ -1541,10 +1541,10 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
 
         switch await recoveryEpochs.backfillAll(ownBundle: ownBundle) {
         case .success(let summary):
-            confirmationMessage = "Clé créée : \(summary.backedUpEpochCount) clé(s) d’historique sauvegardée(s), \(summary.missingParticipantUserIds.count) participant(s) sans clé disponible."
+            confirmationMessage = String(localized: "Clé créée : \(summary.backedUpEpochCount) clé(s) d’historique sauvegardée(s), \(summary.missingParticipantUserIds.count) participant(s) sans clé disponible.")
         case .failure(let failure):
-            confirmationMessage = "La clé est créée, mais la sauvegarde de l’historique reste partielle."
-            errorMessage = Self.message(for: failure, fallback: "Toutes les clés d’historique n’ont pas pu être sauvegardées.")
+            confirmationMessage = String(localized: "La clé est créée, mais la sauvegarde de l’historique reste partielle.")
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Toutes les clés d’historique n’ont pas pu être sauvegardées."))
         }
     }
 
@@ -1720,7 +1720,7 @@ struct E2EEV2RecoveryResetView: View {
                     model.changeFlow(.restore)
                 } label: {
                     Label(
-                        model.currentDeviceStatus == .pending ? "Approuver avec ma clé" : "Restaurer l’historique",
+                        model.currentDeviceStatus == .pending ? String(localized: "Approuver avec ma clé") : String(localized: "Restaurer l’historique"),
                         systemImage: "clock.arrow.circlepath"
                     )
                     .frame(minHeight: 48)
@@ -1783,7 +1783,7 @@ struct E2EEV2RecoveryResetView: View {
             Button {
                 revealRecoveryInput.toggle()
             } label: {
-                Label(revealRecoveryInput ? "Masquer la clé" : "Afficher la clé",
+                Label(revealRecoveryInput ? String(localized: "Masquer la clé") : String(localized: "Afficher la clé"),
                       systemImage: revealRecoveryInput ? "eye.slash" : "eye")
                     .frame(minHeight: 48)
             }
@@ -1902,7 +1902,7 @@ struct E2EEV2RecoveryResetView: View {
                             .expirationDate: Date().addingTimeInterval(60),
                         ]
                     )
-                    model.confirmationMessage = "Clé copiée localement. Le presse-papiers l’effacera après 60 secondes."
+                    model.confirmationMessage = String(localized: "Clé copiée localement. Le presse-papiers l’effacera après 60 secondes.")
                 } label: {
                     Label("Copier pendant 60 secondes", systemImage: "doc.on.doc")
                         .frame(minHeight: 48)
@@ -1935,7 +1935,7 @@ struct E2EEV2RecoveryResetView: View {
         .disabled(model.isBusy || !model.mayLeaveSecret)
     }
 
-    private func resetAcknowledgement(_ title: String, isOn: Binding<Bool>) -> some View {
+    private func resetAcknowledgement(_ title: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
         Toggle(title, isOn: isOn)
             .tint(SQColor.danger)
             .frame(minHeight: 48)
@@ -2525,7 +2525,7 @@ struct SettingsView: View {
             guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = credential.identityToken,
                   let token = String(data: tokenData, encoding: .utf8) else {
-                appleError = "Jeton Apple manquant. Réessaie."
+                appleError = String(localized: "Jeton Apple manquant. Réessaie.")
                 return
             }
             Task {
@@ -2541,7 +2541,7 @@ struct SettingsView: View {
             }
         case .failure(let error):
             if (error as? ASAuthorizationError)?.code == .canceled { return }
-            appleError = "Association Apple impossible. Réessaie."
+            appleError = String(localized: "Association Apple impossible. Réessaie.")
         }
     }
 
@@ -2649,9 +2649,9 @@ private struct DeleteAccountSheet: View {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .password: "Mot de passe"
+            case .password: String(localized: "Mot de passe")
             case .apple: "Apple"
-            case .email: "Code e-mail"
+            case .email: String(localized: "Code e-mail")
             }
         }
     }
@@ -2772,7 +2772,7 @@ private struct DeleteAccountSheet: View {
     }
 
     private func inventoryGroup(
-        title: String,
+        title: LocalizedStringKey,
         systemImage: String,
         color: Color,
         values: [String: String]
@@ -2949,13 +2949,13 @@ private struct DeleteAccountSheet: View {
             guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = credential.identityToken,
                   let identityToken = String(data: tokenData, encoding: .utf8) else {
-                model.deletionError = "Jeton Apple manquant. Réessaie."
+                model.deletionError = String(localized: "Jeton Apple manquant. Réessaie.")
                 return
             }
             Task { await delete(using: .apple(identityToken: identityToken)) }
         case .failure(let error):
             if (error as? ASAuthorizationError)?.code == .canceled { return }
-            model.deletionError = "Réauthentification Apple impossible. Réessaie."
+            model.deletionError = String(localized: "Réauthentification Apple impossible. Réessaie.")
         }
     }
 }

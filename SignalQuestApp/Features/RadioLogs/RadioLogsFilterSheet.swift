@@ -74,7 +74,7 @@ struct RadioLogsFilterSheet: View {
     // MARK: Briques
 
     @ViewBuilder
-    private func group<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func group<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
                 .font(SQFont.body(M.groupHeaderSize, .bold))
@@ -85,7 +85,7 @@ struct RadioLogsFilterSheet: View {
         .padding(.bottom, M.groupBottom)
     }
 
-    private func toggleRow(title: String, hint: String, isOn: Binding<Bool>) -> some View {
+    private func toggleRow(title: LocalizedStringKey, hint: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
         HStack(spacing: M.toggleRowGap) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

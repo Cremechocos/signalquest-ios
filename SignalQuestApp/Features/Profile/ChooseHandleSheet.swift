@@ -52,7 +52,7 @@ struct ChooseHandleSheet: View {
                     .sqFadeUp()
 
                     Text(message.isEmpty
-                        ? "Lettres, chiffres, « . », « _ » et « - ». 2 à 32 caractères."
+                        ? String(localized: "Lettres, chiffres, « . », « _ » et « - ». 2 à 32 caractères.")
                         : (normalized.isEmpty ? message : "@\(normalized) · \(message)"))
                         .font(SQType.caption)
                         .foregroundStyle(messageColor)
@@ -151,7 +151,7 @@ struct ChooseHandleSheet: View {
             onSuccess(normalized)
             dismiss()
         } catch let APIError.http(_, code, serverMessage, _, _) {
-            let msg = serverMessage.isEmpty ? "Échec de l’enregistrement." : serverMessage
+            let msg = serverMessage.isEmpty ? String(localized: "Échec de l’enregistrement.") : serverMessage
             switch code {
             case "HANDLE_COOLDOWN": status = .cooldown; message = msg
             case "HANDLE_ALREADY_USED": status = .taken; message = msg

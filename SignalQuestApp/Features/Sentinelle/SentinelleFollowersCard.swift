@@ -75,8 +75,8 @@ struct SentinelleFollowersCard: View {
 
             if active.isEmpty {
                 Text(target.isPublic == true
-                     ? "Personne pour l’instant. Partagez le lien pour qu’un proche puisse suivre."
-                     : "Personne. Le partage est désactivé.")
+                     ? String(localized: "Personne pour l’instant. Partagez le lien pour qu’un proche puisse suivre.")
+                     : String(localized: "Personne. Le partage est désactivé."))
                     .font(SQFont.body(13))
                     .foregroundStyle(SQColor.label)
                     .padding(.top, SQSpace.xs)
@@ -84,7 +84,7 @@ struct SentinelleFollowersCard: View {
                 ForEach(active) { follower in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(follower.name ?? "Compte sans nom")
+                            Text(follower.name ?? String(localized: "Compte sans nom"))
                                 .font(SQFont.body(14, .medium))
                                 .foregroundStyle(SQColor.label)
                             Text("depuis le \(shortDate(follower.since))")
@@ -92,7 +92,7 @@ struct SentinelleFollowersCard: View {
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                         Spacer()
-                        Button(busy == follower.userId ? "Retrait…" : "Retirer") {
+                        Button(busy == follower.userId ? String(localized: "Retrait…") : String(localized: "Retirer")) {
                             Task { await revoke(follower.userId) }
                         }
                         .font(SQFont.body(13, .medium))
@@ -107,8 +107,8 @@ struct SentinelleFollowersCard: View {
 
             if !past.isEmpty {
                 Text(past.count == 1
-                     ? "Un accès a été retiré par le passé."
-                     : "\(past.count) accès ont été retirés par le passé.")
+                     ? String(localized: "Un accès a été retiré par le passé.")
+                     : String(localized: "\(past.count) accès ont été retirés par le passé."))
                     .font(SQFont.body(12))
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(.top, SQSpace.xs)
@@ -129,12 +129,12 @@ struct SentinelleFollowersCard: View {
                 set: { value in Task { await setSharing(.init(isPublic: value)) } }
             )) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(isShared ? "Lien de partage actif" : "Partage désactivé")
+                    Text(isShared ? String(localized: "Lien de partage actif") : String(localized: "Partage désactivé"))
                         .font(SQFont.body(14, .medium))
                         .foregroundStyle(SQColor.label)
                     Text(isShared
-                         ? "Qui a le lien et un compte peut suivre cette connexion."
-                         : "Personne ne peut suivre cette connexion.")
+                         ? String(localized: "Qui a le lien et un compte peut suivre cette connexion.")
+                         : String(localized: "Personne ne peut suivre cette connexion."))
                         .font(SQFont.body(12))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -161,7 +161,7 @@ struct SentinelleFollowersCard: View {
                         copied = true
                         Haptics.light()
                     } label: {
-                        Label(copied ? "Copié" : "Copier", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        Label(copied ? String(localized: "Copié") : String(localized: "Copier"), systemImage: copied ? "checkmark" : "doc.on.doc")
                             .labelStyle(.iconOnly)
                     }
                     .tint(SQColor.labelSecondary)
@@ -195,7 +195,7 @@ struct SentinelleFollowersCard: View {
                     }
                 )) {
                     ForEach(SentinelleShareDuration.allCases) { option in
-                        Text(option.label).tag(option)
+                        Text(LocalizedStringKey(option.label)).tag(option)
                     }
                 }
                 .pickerStyle(.segmented)

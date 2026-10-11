@@ -633,7 +633,7 @@ struct VPNWarningBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Avertissement. \(message)")
+        .accessibilityLabel(Text("Avertissement.") + Text(verbatim: " ") + Text(LocalizedStringKey(message)))
     }
 }
 

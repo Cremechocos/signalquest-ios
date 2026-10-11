@@ -134,7 +134,7 @@ struct MapPhotoViewer: View {
     private var infoPanel: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             header
-            if let caption = photo?.displayCaption, !caption.isEmpty, caption != "Photo SignalQuest" {
+            if let caption = photo?.displayCaption, !caption.isEmpty, caption != String(localized: "Photo SignalQuest") {
                 Text(caption)
                     .font(SQFont.body(14, .regular))
                     .foregroundStyle(SQColor.label)
@@ -255,7 +255,7 @@ struct MapPhotoViewer: View {
     private func commentRow(_ comment: PhotoComment) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                Text(comment.userName ?? "Membre")
+                Text(comment.userName ?? String(localized: "Membre"))
                     .font(SQFont.body(13, .semibold))
                     .foregroundStyle(SQColor.label)
                 if let date = comment.createdAt {

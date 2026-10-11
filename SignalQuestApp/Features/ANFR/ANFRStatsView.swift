@@ -550,7 +550,7 @@ struct ANFRStatsView: View {
         guard !points.isEmpty else {
             return String(localized: "Évolution des supports \(opName) en \(scope) : aucune donnée disponible sur la période.")
         }
-        let metric = model.showProjected ? "opérationnels et projetés" : "opérationnels"
+        let metric = model.showProjected ? String(localized: "opérationnels et projetés") : String(localized: "opérationnels")
         let segments = ANFRGeneration.allCases
             .filter { gen in points.contains { $0.generation == gen } }
             .map { gen -> String in
@@ -650,7 +650,7 @@ struct ANFRStatsView: View {
 
     // MARK: Helpers
 
-    private func sectionHeader(_ title: String, systemImage: String) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey, systemImage: String) -> some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: systemImage)
                 .font(.system(size: 13, weight: .semibold))
@@ -658,7 +658,7 @@ struct ANFRStatsView: View {
                 .frame(width: 32, height: 32)
                 .background(SQColor.accentSoft, in: Circle())
                 .accessibilityHidden(true)
-            Text(LocalizedStringKey(title))
+            Text(title)
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
                 .sqHeader()

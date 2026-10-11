@@ -57,7 +57,7 @@ struct RadioLogIdentifyChainView: View {
                 }
             }
             .background(SQColor.bg.ignoresSafeArea())
-            .navigationTitle(current == nil ? "Terminé" : "\(index + 1) sur \(sites.count)")
+            .navigationTitle(current == nil ? String(localized: "Terminé") : String(localized: "\(index + 1) sur \(sites.count)"))
             .toolbarTitleInlineCompat()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -191,7 +191,7 @@ struct RadioLogIdentifyChainView: View {
                 .padding(.vertical, M.chainCountPaddingV)
                 .background(P.accentSoft, in: Capsule(style: .continuous))
             if identifiedCount > 0 {
-                Text(identifiedCount <= 1 ? "\(identifiedCount) identifié" : "\(identifiedCount) identifiés")
+                Text(identifiedCount <= 1 ? String(localized: "\(identifiedCount) identifié") : String(localized: "\(identifiedCount) identifiés"))
                     .font(SQType.caption)
                     .monospacedDigit()
                     .foregroundStyle(P.muted)
@@ -288,9 +288,13 @@ struct RadioLogIdentifyChainView: View {
 
     private var summaryMessage: String {
         var parts: [String] = []
-        parts.append(identifiedCount <= 1 ? "\(identifiedCount) site identifié" : "\(identifiedCount) sites identifiés")
+        parts.append(identifiedCount <= 1
+            ? String(localized: "\(identifiedCount) site identifié")
+            : String(localized: "\(identifiedCount) sites identifiés"))
         if !skippedIds.isEmpty {
-            parts.append(skippedIds.count <= 1 ? "\(skippedIds.count) passé" : "\(skippedIds.count) passés")
+            parts.append(skippedIds.count <= 1
+                ? String(localized: "\(skippedIds.count) passé")
+                : String(localized: "\(skippedIds.count) passés"))
         }
         return parts.joined(separator: " · ") + "."
     }

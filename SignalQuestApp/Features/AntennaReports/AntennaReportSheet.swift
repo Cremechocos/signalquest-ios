@@ -87,8 +87,8 @@ struct AntennaReportSheet: View {
                         Text("Opérateur porteur")
                     } footer: {
                         Text(leaderReport.sharingKind == "crozon"
-                             ? "Site partagé entre SFR et Bouygues Telecom : l’un des deux le porte pour l’autre."
-                             : "Site en zone blanche : un seul opérateur le porte pour tous les autres.")
+                             ? String(localized: "Site partagé entre SFR et Bouygues Telecom : l’un des deux le porte pour l’autre.")
+                             : String(localized: "Site en zone blanche : un seul opérateur le porte pour tous les autres."))
                             .font(SQType.caption)
                     }
                     .foregroundStyle(SQColor.label)
@@ -168,7 +168,7 @@ struct AntennaReportSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(duplicateMessage == nil ? "Annuler" : "Fermer") { dismiss() }
+                    Button(duplicateMessage == nil ? String(localized: "Annuler") : String(localized: "Fermer")) { dismiss() }
                         .tint(SQColor.brandRed)
                 }
             }
@@ -195,7 +195,7 @@ struct AntennaReportSheet: View {
             if result.duplicate == true {
                 // Déjà signalé ce type pour ce site (HTTP 200) : on le dit sans
                 // fermer, pour que l'utilisateur sache que c'est bien pris en compte.
-                duplicateMessage = result.message ?? "Tu avais déjà signalé ce problème pour ce site. Merci !"
+                duplicateMessage = result.message ?? String(localized: "Tu avais déjà signalé ce problème pour ce site. Merci !")
             } else {
                 dismiss()
             }

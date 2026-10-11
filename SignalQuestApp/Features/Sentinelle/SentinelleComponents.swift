@@ -101,7 +101,7 @@ struct SentinelleWindowPicker: View {
                         onSelect()
                         selection = value
                     } label: {
-                        Text(value.label)
+                        Text(LocalizedStringKey(value.label))
                             .font(SQFont.body(13, .semibold))
                             .padding(.horizontal, SQSpace.md)
                             .frame(minHeight: 44)
@@ -406,7 +406,7 @@ struct SentinelleAddressSheet: View {
             subtitle: String(localized: "Cette adresse rejoint « \(target.label) » : même historique, même alerte, même quota. Ce n’est pas une seconde connexion.")
         ) {
             SentinelleField(
-                title: "\(family.label) de « \(target.label) »",
+                title: String(localized: "\(family.label) de « \(target.label) »"),
                 placeholder: family == .v6 ? "2a01:cb00:1234:5600::1" : "79.88.27.93",
                 text: $draft,
                 hint: hint(usable: usable)

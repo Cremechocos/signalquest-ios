@@ -15,9 +15,26 @@ enum SentinelleOwnerLabel {
     static let labelMax = 40
 
     struct Suggestion: Identifiable, Hashable, Sendable {
+        /// Texte ENREGISTRÉ et partagé avec le web et Android : il reste en
+        /// français quelle que soit la langue de l'app.
         let value: String
         let emoji: String
         var id: String { value }
+
+        /// Texte AFFICHÉ sur la pastille, dans la langue de l'app.
+        var title: String {
+            switch value {
+            case "Moi": return String(localized: "Moi")
+            case "Mes parents": return String(localized: "Mes parents")
+            case "Mes grands-parents": return String(localized: "Mes grands-parents")
+            case "Mon enfant": return String(localized: "Mon enfant")
+            case "Un ami": return String(localized: "Un ami")
+            case "Ma résidence secondaire": return String(localized: "Ma résidence secondaire")
+            case "Mon bureau": return String(localized: "Mon bureau")
+            case "Mon association": return String(localized: "Mon association")
+            default: return value
+            }
+        }
     }
 
     static let suggestions: [Suggestion] = [
@@ -51,6 +68,6 @@ enum SentinelleOwnerLabel {
     static func filter(_ query: String) -> [Suggestion] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !needle.isEmpty else { return suggestions }
-        return suggestions.filter { $0.value.lowercased().contains(needle) }
+        return suggestions.filter { $0.value.lowercased().contains(needle) || $0.title.lowercased().contains(needle) }
     }
 }

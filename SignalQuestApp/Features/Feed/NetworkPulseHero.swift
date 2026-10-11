@@ -124,7 +124,7 @@ struct NetworkPulseHero: View {
     /// sens aux trois nombres du dessous.
     private var contextLine: String {
         var parts: [String] = [windowLabel, String(localized: "\(pulse.measurementsCount) mesures")]
-        if let radius = pulse.radiusMeters { parts.append("rayon \(formatRadius(radius))") }
+        if let radius = pulse.radiusMeters { parts.append(String(localized: "rayon \(formatRadius(radius))")) }
         if let freshness = freshnessLabel { parts.append(freshness) }
         return parts.joined(separator: " · ")
     }
@@ -173,7 +173,7 @@ struct NetworkPulseHero: View {
     private func formatRadius(_ meters: Int) -> String {
         if meters < 1_000 { return "\(meters) m" }
         if meters % 1_000 == 0 { return "\(meters / 1_000) km" }
-        return String(format: "%.1f km", Double(meters) / 1_000)
+        return "\((Double(meters) / 1_000).formatted(.number.precision(.fractionLength(1)))) km"
     }
 
     /// `nil` si le serveur n'a pas renvoyé la date : on n'affiche alors rien plutôt
@@ -183,10 +183,10 @@ struct NetworkPulseHero: View {
         let minutes = Int(freshnessClock.timeIntervalSince(last) / 60)
         guard minutes >= 0 else { return nil }
         switch minutes {
-        case ..<2: return "à l'instant"
-        case ..<60: return "il y a \(minutes) min"
-        case ..<(60 * 24): return "il y a \(minutes / 60) h"
-        default: return "il y a \(minutes / (60 * 24)) j"
+        case ..<2: return String(localized: "à l'instant")
+        case ..<60: return String(localized: "il y a \(minutes) min")
+        case ..<(60 * 24): return String(localized: "il y a \(minutes / 60) h")
+        default: return String(localized: "il y a \(minutes / (60 * 24)) j")
         }
     }
 

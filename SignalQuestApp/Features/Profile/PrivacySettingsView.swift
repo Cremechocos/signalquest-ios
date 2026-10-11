@@ -507,7 +507,7 @@ private struct LiveLocationDisclosureSheet: View {
                 Text(LocalizedStringKey(title))
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.label)
-                Text(detail)
+                Text(LocalizedStringKey(detail))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)

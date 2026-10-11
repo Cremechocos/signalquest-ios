@@ -40,7 +40,7 @@ struct SentinelleFollowedCard: View {
                             .foregroundStyle(SQColor.label)
                             .fixedSize(horizontal: false, vertical: true)
                         // Les piles se nomment, elles ne se montrent pas.
-                        Text(box.families.isEmpty ? "en attente de mesure" : box.families.joined(separator: " · "))
+                        Text(box.families.isEmpty ? String(localized: "en attente de mesure") : box.families.joined(separator: " · "))
                             .font(.system(.caption, design: .monospaced, weight: .medium))
                             .foregroundStyle(SQColor.labelSecondary)
                         Text(summary)
@@ -61,7 +61,7 @@ struct SentinelleFollowedCard: View {
                 .frame(minHeight: 44)
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isButton)
-                .accessibilityHint(open ? "Réduit les détails" : "Affiche les détails")
+                .accessibilityHint(open ? String(localized: "Réduit les détails") : String(localized: "Affiche les détails"))
                 .accessibilityAction {
                     withAnimation(SQMotion.resolve(.easeOut(duration: 0.18), reduceMotion)) { open.toggle() }
                 }
@@ -70,7 +70,7 @@ struct SentinelleFollowedCard: View {
                     Divider().overlay(SQColor.separator)
 
                     Picker("Période", selection: $window) {
-                        ForEach(SentinelleWindow.allCases) { Text($0.label).tag($0) }
+                        ForEach(SentinelleWindow.allCases) { Text(LocalizedStringKey($0.label)).tag($0) }
                     }
                     .pickerStyle(.segmented)
 
@@ -148,7 +148,7 @@ struct SentinelleFollowedCard: View {
 
     private func detailStat(_ label: String, _ value: String?) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(SQFont.body(12, .semibold, relativeTo: .caption2))
                 .textCase(.uppercase)
                 .foregroundStyle(SQColor.labelSecondary)
@@ -170,7 +170,7 @@ struct SentinelleFollowedCard: View {
 
     private var summary: String {
         var parts: [String] = []
-        if let formattedUptime { parts.append("\(formattedUptime) sur 30 j") }
+        if let formattedUptime { parts.append(String(localized: "\(formattedUptime) sur 30 j")) }
         if let rtt = box.lastRttMs { parts.append(SentinelleWording.ms(rtt)) }
         if box.outages > 0 {
             parts.append(SentinelleWording.outages(box.outages))
