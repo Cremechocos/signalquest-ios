@@ -97,7 +97,7 @@ struct NearbyOperatorComparisonSheet: View {
             HStack(spacing: SQSpace.sm) {
                 Text("\(rank)")
                     .font(SQFont.body(13, .bold))
-                    .foregroundStyle(isLeader ? SQColor.onAccent : SQColor.labelSecondary)
+                    .foregroundStyle(isLeader ? SQBrand.operatorBadgeForeground(stat.operatorName) : SQColor.labelSecondary)
                     .frame(width: 24, height: 24)
                     .background(isLeader ? color : SQColor.surfaceMuted, in: Circle())
                 Circle().fill(color).frame(width: 9, height: 9)

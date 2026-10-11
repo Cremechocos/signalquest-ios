@@ -87,7 +87,7 @@ struct OperatorIncidentCard: View {
                 if incident.isGeoMatch, let meters = incident.matchDistanceMeters {
                     Text("Incident rattaché à ce site par proximité (\(meters) m).")
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelTertiary)
+                        .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

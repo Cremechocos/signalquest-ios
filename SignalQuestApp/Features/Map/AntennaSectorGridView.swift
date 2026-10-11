@@ -29,6 +29,8 @@ struct AntennaSectorGridView: View {
     let antennaHeightMeters: Double?
     let tint: Color
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             technologyRow
@@ -89,7 +91,7 @@ struct AntennaSectorGridView: View {
             ForEach(technologies, id: \.self) { tech in
                 Text(tech)
                     .font(SQFont.body(12, .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(SQBrand.operatorBadgeForeground(for: SQBrand.techColor(tech), colorScheme: colorScheme))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(SQBrand.techColor(tech), in: Capsule(style: .continuous))

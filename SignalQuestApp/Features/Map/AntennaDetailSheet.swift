@@ -380,7 +380,7 @@ struct AntennaDetailSheet: View {
             if let message = model.photoUploadMessage {
                 Text(LocalizedStringKey(message))
                     .font(SQType.caption)
-                    .foregroundStyle(message.contains("merci") ? SQColor.success : SQColor.danger)
+                    .foregroundStyle(message.contains("merci") ? SQColor.success : SQColor.dangerInk)
             }
         }
         .foregroundStyle(SQColor.label)
@@ -985,8 +985,8 @@ struct AntennaDetailSheet: View {
     }
 
     /// Tag opérateur. Sur un site partagé, il devient un bouton de bascule :
-    /// l'opérateur actif est en plein (capsule couleur, texte blanc), les autres
-    /// en capsule teintée douce. Sur un site mono-opérateur, simple tag éditorial.
+    /// l'opérateur actif est en plein (capsule couleur, encre calculée), les autres
+    /// en capsule teintée douce, texte à l'encre et couleur portée par un point. Sur un site mono-opérateur, simple tag éditorial.
     @ViewBuilder
     private func operatorTag(_ op: String) -> some View {
         let color = SQBrand.operatorColor(op)
@@ -1004,6 +1004,8 @@ struct AntennaDetailSheet: View {
                     if isActive {
                         Image(systemName: "checkmark")
                             .font(.system(size: 9, weight: .bold))
+                    } else {
+                        Circle().fill(color).frame(width: 8, height: 8)
                     }
                     Text(photoOperatorLabel(op))
                         .font(SQFont.body(12, .semibold))
@@ -1011,7 +1013,7 @@ struct AntennaDetailSheet: View {
                 }
                 .padding(.horizontal, SQSpace.sm + 2)
                 .padding(.vertical, SQSpace.xs + 1)
-                .foregroundStyle(isActive ? Color.white : color)
+                .foregroundStyle(isActive ? SQBrand.operatorBadgeForeground(op) : SQColor.label)
                 .background(
                     isActive ? color : color.opacity(0.13),
                     in: Capsule(style: .continuous)

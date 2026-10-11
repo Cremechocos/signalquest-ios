@@ -78,10 +78,21 @@ struct SignatureSpeedDial: View {
         return CGPoint(x: cos(radians) * radius, y: sin(radians) * radius)
     }
 
-    /// Couleur de qualité (brique → ambre → olive) selon le ratio de remplissage.
+    /// Couleur de l'échelle de qualité commune : paliers de débit de la carte,
+    /// des tuiles et du widget ; latence sur l'échelle inversée de la carte de
+    /// partage (vert sous 20 ms, rouge au-delà de 150 ms).
     var qualityColor: Color {
-        let theme = SpeedtestShareTheme.resolve(colorScheme)
-        return SpeedtestQualityPalette.color(forRatio: normalized, stops: theme.qualityStops)
+        if isLatency {
+            let theme = SQShareCardTheme.resolve(isDark: colorScheme == .dark, isPureBlack: false)
+            return Color(uiColor: theme.latencyColor(ms: value))
+        }
+        return SQNetworkColors.speedColor(value)
+    }
+
+    /// Halo de l'arc : coupé en « Noir intense », où il éclaire le noir autour.
+    var arcGlowOpacity: Double {
+        guard colorScheme == .dark else { return 0.3 }
+        return SQOledPalette.isEnabled ? 0 : 0.5
     }
 
     /// Mesure en cours (latence/téléchargement/envoi/synchro) : badge pulsé.
@@ -129,7 +140,7 @@ struct SignatureSpeedDial: View {
                 .rotationEffect(.degrees(135))
                 .frame(width: arcRadius * 2, height: arcRadius * 2)
 
-            // Arc actif teinté par la qualité (brique → ambre → olive).
+            // Arc actif teinté par l'échelle de qualité commune.
             // À zéro, on ne dessine RIEN : un epsilon avec lineCap rond créait
             // un gros point posé sur « 1 Mbps » avant toute mesure.
             if normalized > 0 {
@@ -138,7 +149,7 @@ struct SignatureSpeedDial: View {
                     .stroke(qualityColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     .rotationEffect(.degrees(135))
                     .frame(width: arcRadius * 2, height: arcRadius * 2)
-                    .shadow(color: qualityColor.opacity(colorScheme == .dark ? 0.5 : 0.3), radius: 10, x: 0, y: 0)
+                    .shadow(color: qualityColor.opacity(arcGlowOpacity), radius: 10, x: 0, y: 0)
                     .sqAnimation(.snappy(duration: 0.32), value: normalized)
             }
 

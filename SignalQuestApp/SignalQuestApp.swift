@@ -943,8 +943,9 @@ struct MainTabView: View {
             .tag(AppRouter.AppTab.profile)
         }
         // Rétraction au scroll (Liquid Glass) : la barre se réduit en pastille
-        // quand on descend et se redéploie quand on remonte.
-        .tabBarMinimizeBehavior(.onScrollDown)
+        // quand on descend et se redéploie quand on remonte. Sur un écran
+        // poussé, elle reste déployée.
+        .tabBarMinimizeBehavior(router.isDockMinimizeSuspended ? .never : .onScrollDown)
         .tint(SQColor.brandRed)
     }
 

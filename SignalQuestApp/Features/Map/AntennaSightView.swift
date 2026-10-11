@@ -467,7 +467,7 @@ struct AntennaSightCard: View {
         } else if model.failed {
             Text("Relief indisponible pour ce trajet.")
                 .font(SQType.caption)
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
         }
     }
 

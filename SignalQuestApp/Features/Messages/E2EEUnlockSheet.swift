@@ -119,7 +119,7 @@ struct E2EEUnlockSheet: View {
                             } label: {
                                 Label("Déverrouiller avec \(BiometricAuth.kind.label)", systemImage: BiometricAuth.kind.systemImage)
                                     .font(SQType.caption.weight(.semibold))
-                                    .foregroundStyle(SQColor.brandRed)
+                                    .foregroundStyle(SQColor.accentInk)
                             }
                             .buttonStyle(.plain)
                         }
@@ -127,7 +127,7 @@ struct E2EEUnlockSheet: View {
                         if let error {
                             Label(error, systemImage: "exclamationmark.triangle.fill")
                                 .font(SQType.caption)
-                                .foregroundStyle(SQColor.danger)
+                                .foregroundStyle(SQColor.dangerInk)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .transition(.opacity)
                         }

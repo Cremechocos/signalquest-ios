@@ -112,7 +112,6 @@ struct SignupView: View {
                     }
                     .disabled(!canSubmit)
                     .accessibilityIdentifier("auth.signup.submit")
-                    .opacity(canSubmit ? 1 : 0.5)
                 }
                 .padding(SQSpace.xl)
                 .sqSoftCard()

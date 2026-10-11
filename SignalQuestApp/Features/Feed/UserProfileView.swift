@@ -615,7 +615,7 @@ struct UserProfileView: View {
                 }
                 if let networks = profile?.networks, let country = networks.countryLabel {
                     if (profile?.handle ?? model.prefill?.handle) != nil {
-                        Text("·").foregroundStyle(SQColor.labelTertiary)
+                        Text("·").foregroundStyle(SQColor.labelSecondary)
                     }
                     // Pas de drapeau : le pays est DÉDUIT des mesures dans le cas
                     // général, et un drapeau donne à cette déduction l'autorité
@@ -628,7 +628,7 @@ struct UserProfileView: View {
             if let createdAt = profile?.createdAt {
                 Text("Membre depuis \(createdAt, format: .dateTime.month(.wide).year())")
                     .font(SQType.micro)
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
         }
         .multilineTextAlignment(.center)
@@ -690,7 +690,7 @@ struct UserProfileView: View {
             // « ses 221 derniers », ce qui laissait croire à une troncature.
             Text("Sur \(networks.sampleSize) tests où un réseau a été détecté.")
                 .font(SQType.micro)
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
         }
     }
 

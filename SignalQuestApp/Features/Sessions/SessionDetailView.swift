@@ -626,11 +626,17 @@ struct SessionDetailView: View {
                             .lineLimit(1)
                     }
                     if let net = st.networkType, !net.isEmpty {
-                        Text(net)
-                            .font(SQFont.body(12, .semibold, relativeTo: .caption2))
-                            .foregroundStyle(Color(uiColor: SessionGenerationColor.ui(net)))
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(Color(uiColor: SessionGenerationColor.ui(net)).opacity(0.16), in: Capsule(style: .continuous))
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color(uiColor: SessionGenerationColor.ui(net)))
+                                .frame(width: 7, height: 7)
+                                .accessibilityHidden(true)
+                            Text(net)
+                                .font(SQFont.body(12, .semibold, relativeTo: .caption2))
+                                .foregroundStyle(SQColor.label)
+                        }
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Color(uiColor: SessionGenerationColor.ui(net)).opacity(0.16), in: Capsule(style: .continuous))
                     }
                 }
                 if let t = st.timestamp {
@@ -646,7 +652,7 @@ struct SessionDetailView: View {
                     .foregroundStyle(SQColor.info)
                 HStack(spacing: 8) {
                     Text("↑ \(st.uploadMbps.map { "\(Int($0.rounded()))" } ?? "—")")
-                        .foregroundStyle(SQColor.brandGreen)
+                        .foregroundStyle(SQColor.success)
                     Text("\(st.pingMs.map { "\(Int($0.rounded()))" } ?? "—") ms")
                         .foregroundStyle(SQColor.labelSecondary)
                 }

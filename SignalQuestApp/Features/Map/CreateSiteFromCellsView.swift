@@ -80,7 +80,7 @@ struct CreateSiteFromCellsView: View {
                     if let errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
                             .font(SQType.subhead)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let pendingMessage {
@@ -126,7 +126,7 @@ struct CreateSiteFromCellsView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Text(String(format: "%.5f, %.5f", region.center.latitude, region.center.longitude))
                 .font(SQFont.body(12.5, .semibold).monospacedDigit())
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
         }
     }
 
@@ -176,20 +176,22 @@ struct CreateSiteFromCellsView: View {
         }
     }
 
+    private var canSubmit: Bool { draft.isValid && !isSubmitting && !isQueued }
+
     private var submitButton: some View {
         Button {
             Task { await submit() }
         } label: {
             HStack(spacing: SQSpace.sm) {
-                if isSubmitting { ProgressView().tint(SQColor.onAccent) }
+                if isSubmitting { ProgressView().tint(SQColor.labelSecondary) }
                 Text(isSubmitting ? "Création…" : isQueued ? "En attente d'envoi" : "Créer le site")
                     .font(SQFont.body(15, .semibold))
             }
-            .foregroundStyle(SQColor.onAccent)
+            .foregroundStyle(canSubmit ? SQColor.onAccent : SQColor.labelSecondary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, SQSpace.md)
             .background(
-                draft.isValid && !isSubmitting && !isQueued ? SQColor.brandRed : SQColor.labelTertiary,
+                canSubmit ? SQColor.brandRed : SQColor.fill,
                 in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
             )
         }

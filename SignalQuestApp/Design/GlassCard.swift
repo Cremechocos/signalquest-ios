@@ -75,6 +75,7 @@ struct GradientButton: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.controlSize) private var controlSize
 
     let title: String
     let systemImage: String?
@@ -131,11 +132,19 @@ struct GradientButton: View {
             .padding(.horizontal, SQSpace.lg)
             .padding(.vertical, SQSpace.sm)
             .frame(maxWidth: .infinity)
-            .frame(minHeight: SQSpace.primaryActionHeight)
+            // Mode terrain : `controlSize(.large)` posé à la racine agrandit la cible.
+            .frame(minHeight: controlSize == .large ? SQSpace.primaryActionHeight + 8 : SQSpace.primaryActionHeight)
             .foregroundStyle(foreground)
             // Charte Crème : capsules pour tous les styles, secondaire = surface
             // posée sur une ombre douce, aucune bordure (DESIGN.md › Buttons).
             .background(background, in: Capsule(style: .continuous))
+            // Désactivé en « Noir intense » : `surfaceMuted` est noir comme le fond,
+            // le liseré garde la forme du bouton.
+            .overlay {
+                if !isEnabled {
+                    Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
+                }
+            }
             .modifier(GradientButtonShadow(style: isEnabled ? style : .ghost))
         }
         .disabled(isBusy)
@@ -148,7 +157,7 @@ struct GradientButton: View {
         case .primary: return SQColor.onInk
         case .accent: return SQColor.onAccent
         case .secondary, .ghost: return SQColor.label
-        case .destructive: return SQColor.danger
+        case .destructive: return SQColor.dangerInk
         }
     }
 

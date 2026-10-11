@@ -210,7 +210,7 @@ struct FriendsListView: View {
                                     unblockTarget = user
                                 }
                                 .font(SQType.button)
-                                .foregroundStyle(SQColor.brandRed)
+                                .foregroundStyle(SQColor.accentInk)
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Débloquer \(user.displayName)")
                             }
@@ -483,7 +483,7 @@ private struct AddFriendSheet: View {
                         .listRowSeparatorTint(SQColor.separator)
                     }
                     if let errorMessage {
-                        Text(errorMessage).font(SQType.caption).foregroundStyle(SQColor.danger)
+                        Text(errorMessage).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                             .listRowBackground(Color.clear)
                     }
                 } header: {

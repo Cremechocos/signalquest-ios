@@ -46,10 +46,6 @@ struct SpeedtestTriMetric: View {
             )
     }
 
-    var qualityStops: [Color] {
-        SpeedtestShareTheme.resolve(colorScheme).qualityStops
-    }
-
     var pingMsValue: Double? {
         let value = result?.primaryPingMs ?? progress.pingFinalMs ?? progress.pingLiveMs
         guard let value, value.isFinite, value >= 0 else { return nil }
@@ -75,14 +71,13 @@ struct SpeedtestTriMetric: View {
 
     var pingQuality: Color? {
         guard let ms = pingMsValue else { return nil }
-        let ratio = max(0, min(1, (120 - ms) / 120))
-        return SpeedtestQualityPalette.color(forRatio: ratio, stops: qualityStops)
+        let theme = SQShareCardTheme.resolve(isDark: colorScheme == .dark, isPureBlack: false)
+        return Color(uiColor: theme.latencyColor(ms: ms))
     }
 
     func mbpsQuality(_ mbps: Double?) -> Color? {
         guard let mbps, mbps > 0 else { return nil }
-        let ratio = max(0, min(1, log10(mbps) / 3))
-        return SpeedtestQualityPalette.color(forRatio: ratio, stops: qualityStops)
+        return SQNetworkColors.speedColor(mbps)
     }
 
     /// Valeur compacte ; l'unité reste visible dans chaque carte, y compris

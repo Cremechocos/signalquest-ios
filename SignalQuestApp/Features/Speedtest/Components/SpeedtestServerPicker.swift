@@ -335,7 +335,7 @@ struct SpeedtestServerPicker: View {
                             // cherche un POP proche.
                             Text(group.country)
                                 .font(SQFont.body(12, .semibold))
-                                .foregroundStyle(SQColor.labelTertiary)
+                                .foregroundStyle(SQColor.labelSecondary)
                                 .padding(.top, 4)
                                 .accessibilityLabel("Pays : \(group.country)")
                             ForEach(group.servers, id: \.id) { server in

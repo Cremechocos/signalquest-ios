@@ -559,7 +559,7 @@ struct ComposerSheet: View {
                     if let error = model.errorMessage {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                             .padding(.horizontal, SQSpace.lg)
                             .transition(.move(edge: .top).combined(with: .opacity))
                     }
@@ -650,6 +650,7 @@ struct ComposerSheet: View {
                     .foregroundStyle(model.pollEnabled ? SQColor.onAccent : SQColor.brandRed)
                     .frame(width: 40, height: 40)
                     .background(model.pollEnabled ? SQColor.brandRed : SQColor.surface, in: Circle())
+                    .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .sqShadowSoft()
             }
             .accessibilityLabel("Sondage")
@@ -662,6 +663,7 @@ struct ComposerSheet: View {
                     .foregroundStyle(SQColor.brandRed)
                     .frame(width: 40, height: 40)
                     .background(SQColor.surface, in: Circle())
+                    .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .sqShadowSoft()
             }
             .accessibilityLabel("Ajouter une photo")
@@ -692,6 +694,7 @@ struct ComposerSheet: View {
                     }
                     .frame(width: 40, height: 40)
                     .background(SQColor.surface, in: Circle())
+                    .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .sqShadowSoft()
                 }
                 .buttonStyle(.plain)
@@ -720,6 +723,7 @@ struct ComposerSheet: View {
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, 10)
                 .background(SQColor.surface, in: Capsule(style: .continuous))
+                .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                 .sqShadowSoft()
             }
 
@@ -793,10 +797,11 @@ struct ComposerSheet: View {
                     } label: {
                         Text(tag)
                             .font(SQFont.body(13, .semibold))
-                            .foregroundStyle(SQColor.brandRed)
+                            .foregroundStyle(SQColor.accentInk)
                             .padding(.horizontal, SQSpace.md)
                             .padding(.vertical, SQSpace.sm)
                             .background(SQColor.surface, in: Capsule(style: .continuous))
+                            .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                             .sqShadowSoft()
                     }
                     .buttonStyle(.plain)

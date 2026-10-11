@@ -35,6 +35,7 @@ struct OutageReportSheet: View {
     var onSubmitted: ((OutageWriteResponse) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var services: AppServices
 
     /// Tout ce que la personne répond, dans un type valeur testable — la vue n'arbitre plus rien.
@@ -87,7 +88,7 @@ struct OutageReportSheet: View {
                     if let errorMessage {
                         Text(errorMessage)
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
                     submitButton
                     Text("Ton signalement est visible tout de suite. Il devient « confirmé » quand deux autres personnes constatent la même chose.")
@@ -326,6 +327,19 @@ struct OutageReportSheet: View {
         return String(localized: "Tu es à \(distanceMeters) m du site, à \(accuracyMeters) m près.")
     }
 
+    /// Aplat du bouton : le jeton `danger` (plus profond que la teinte de marqueur) pour « plus rien »,
+    /// la teinte de gravité pour « dégradé ». Le texte suit l'encre calculée sur l'aplat peint.
+    private var submitFill: Color {
+        draft.severity == .down ? SQColor.danger : tint
+    }
+
+    private var submitForeground: Color {
+        guard canSubmit else { return SQColor.labelSecondary }
+        return draft.severity == .down
+            ? SQColor.onAccent
+            : SQBrand.operatorBadgeForeground(for: submitFill, colorScheme: colorScheme)
+    }
+
     private var submitButton: some View {
         Button {
             Task { await submit() }
@@ -333,17 +347,17 @@ struct OutageReportSheet: View {
             HStack {
                 Spacer()
                 if submitting {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(SQColor.labelSecondary)
                 } else {
                     Text("Signaler la panne")
                         .font(SQFont.body(15, .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(submitForeground)
                 }
                 Spacer()
             }
             .frame(minHeight: 50)
             .background(
-                canSubmit ? tint : SQColor.fill,
+                canSubmit ? submitFill : SQColor.fill,
                 in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
             )
         }

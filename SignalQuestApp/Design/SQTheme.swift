@@ -38,24 +38,25 @@ extension View {
 /// Bricolage Grotesque (titres, chiffres, boutons) et Figtree (corps, UI).
 /// Tailles relatives aux styles système pour préserver Dynamic Type.
 enum SQType {
+    // Calculés à chaque lecture : la graisse suit le mode terrain et « Texte en gras ».
     /// Gros titres de page (salutation, titres d'écran) — Bricolage Bold 26.
-    static let display = SQFont.display(26, .bold, relativeTo: .largeTitle)
+    static var display: Font { SQFont.display(26, .bold, relativeTo: .largeTitle) }
     /// Titres de sections majeures / sheets — Bricolage Bold 24.
-    static let title = SQFont.display(24, .bold, relativeTo: .title2)
+    static var title: Font { SQFont.display(24, .bold, relativeTo: .title2) }
     /// Titres de cartes, tuiles — Bricolage SemiBold 16.5.
-    static let heading = SQFont.display(16.5, .semibold, relativeTo: .headline)
+    static var heading: Font { SQFont.display(16.5, .semibold, relativeTo: .headline) }
     /// Corps de texte — Figtree 15.
-    static let body = SQFont.body(15, relativeTo: .body)
-    static let callout = SQFont.body(14.5, relativeTo: .callout)
+    static var body: Font { SQFont.body(15, relativeTo: .body) }
+    static var callout: Font { SQFont.body(14.5, relativeTo: .callout) }
     /// Sous-titres — Figtree Medium 13.5.
-    static let subhead = SQFont.body(13.5, .medium, relativeTo: .subheadline)
+    static var subhead: Font { SQFont.body(13.5, .medium, relativeTo: .subheadline) }
     /// Sous-titres, horodatages — Figtree 12.5.
-    static let caption = SQFont.body(12.5, relativeTo: .footnote)
+    static var caption: Font { SQFont.body(12.5, relativeTo: .footnote) }
     /// Micro-labels (dock, badges) — Figtree SemiBold 12, casse normale. Pas
     /// moins : à 11 pt, les étiquettes devenaient pénibles à lire (TRX-12).
-    static let micro = SQFont.body(12, .semibold, relativeTo: .caption2)
+    static var micro: Font { SQFont.body(12, .semibold, relativeTo: .caption2) }
     /// Libellés de boutons — Bricolage SemiBold 16.
-    static let button = SQFont.display(16, .semibold)
+    static var button: Font { SQFont.display(16, .semibold) }
 }
 
 /// Ex-« kicker » éditorial. La DA Crème supprime les micro-labels MAJUSCULES

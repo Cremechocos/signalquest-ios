@@ -61,6 +61,7 @@ struct MetricPill: View {
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
         .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
         // VoiceOver : lire « titre : valeur » d'un bloc plutôt que l'icône + 2 textes.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(LocalizedStringKey(title))
@@ -402,6 +403,7 @@ struct MapItemSheet: View {
                 .padding(.vertical, SQSpace.sm)
                 .padding(.horizontal, SQSpace.sm + 2)
                 .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
             }
         }
     }
@@ -730,6 +732,7 @@ struct SQSheetHandle: View {
     var body: some View {
         Capsule()
             .fill(SQColor.surfaceMuted)
+            .overlay { Capsule().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
             .frame(width: 40, height: 5)
             .frame(maxWidth: .infinity)
             .padding(.top, SQSpace.sm)
@@ -777,6 +780,9 @@ struct SQSearchField: View {
         // coupait sa propre saisie (TRX-12).
         .frame(minHeight: 44)
         .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+        // « Noir intense » : `surfaceMuted` est noir comme le fond, le liseré
+        // dessine le champ.
+        .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
     }
 }
 
@@ -809,6 +815,8 @@ struct SQChip: View {
     var isSelected = false
     let action: () -> Void
 
+    @Environment(\.controlSize) private var controlSize
+
     var body: some View {
         Button {
             Haptics.selection()
@@ -834,7 +842,7 @@ struct SQChip: View {
             }
             .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
             .sqShadowSoft()
-            .frame(minHeight: 44)
+            .frame(minHeight: controlSize == .large ? 50 : 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle(scale: 0.97))

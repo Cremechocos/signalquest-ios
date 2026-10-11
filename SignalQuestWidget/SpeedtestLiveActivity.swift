@@ -105,7 +105,8 @@ private struct LockScreenSpeedtestActivity: View {
             header
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                AnimatedNumber(value: downloadValue, size: 40, tint: tint)
+                // Chiffre en encre : la qualité reste portée par la barre et l'icône.
+                AnimatedNumber(value: downloadValue, size: 40, tint: .primary)
                 Text("Mbps")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)

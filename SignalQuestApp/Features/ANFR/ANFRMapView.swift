@@ -283,13 +283,13 @@ struct ANFRMapView: View {
                         withAnimation(reduceMotion ? nil : SQMotion.fast) { model.toggleOperator(op) }
                     } label: {
                         HStack(spacing: SQSpace.xs + 2) {
-                            Circle().fill(on ? SQColor.onAccent : op.color).frame(width: 7, height: 7)
+                            Circle().fill(on ? SQBrand.operatorBadgeForeground(op.label) : op.color).frame(width: 7, height: 7)
                             Text(op.label).font(SQFont.body(13, .semibold))
                         }
                         .padding(.horizontal, SQSpace.md - 2)
                         .frame(height: 36)
                         .background(on ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
-                        .foregroundStyle(on ? SQColor.onAccent : SQColor.label)
+                        .foregroundStyle(on ? SQBrand.operatorBadgeForeground(op.label) : SQColor.label)
                         .sqShadowSoft()
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
@@ -340,7 +340,7 @@ struct ANFRMapView: View {
             } label: {
                 Label("Réessayer", systemImage: "arrow.clockwise")
                     .font(SQFont.body(13, .semibold))
-                    .foregroundStyle(SQColor.brandRed)
+                    .foregroundStyle(SQColor.accentInk)
             }
             .buttonStyle(.plain)
         }
@@ -364,6 +364,7 @@ struct ANFRMapView: View {
 struct ANFRMapFilterSheet: View {
     @ObservedObject var model: ANFRMapViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ScrollView {
@@ -416,13 +417,13 @@ struct ANFRMapFilterSheet: View {
             action()
         } label: {
             HStack(spacing: SQSpace.xs + 2) {
-                Circle().fill(on ? SQColor.onAccent : color).frame(width: 8, height: 8)
+                Circle().fill(on ? SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme) : color).frame(width: 8, height: 8)
                 Text(LocalizedStringKey(label)).font(SQFont.body(13, .semibold))
             }
             .padding(.horizontal, SQSpace.md)
             .frame(height: 38)
             .background(on ? AnyShapeStyle(color) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
-            .foregroundStyle(on ? SQColor.onAccent : SQColor.label)
+            .foregroundStyle(on ? SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme) : SQColor.label)
             .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())

@@ -275,13 +275,13 @@ private struct ANFRTimelineRow: View {
                                 .lineLimit(2)
                             Text(change.modType.label)
                                 .font(SQType.micro)
-                                .foregroundStyle(change.modType.color)
+                                .foregroundStyle(SQColor.labelSecondary)
                         }
                         Spacer()
                         if let gen = change.generationEnum {
                             Text(gen.label)
                                 .font(SQType.micro)
-                                .foregroundStyle(gen.color)
+                                .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
                 }

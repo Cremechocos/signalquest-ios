@@ -319,7 +319,7 @@ struct SpeedtestDetailContent: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.md, elevation: .rest)
     }
 
     // MARK: Méta — serveur, appareil, protocole
@@ -601,7 +601,7 @@ private struct SpeedtestVisibilityControls: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
         .padding(SQSpace.md)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
         .confirmationDialog("Publier ce test ?", isPresented: Binding(
             get: { publicationConfirmation != nil },
             set: { if !$0 { publicationConfirmation = nil } }

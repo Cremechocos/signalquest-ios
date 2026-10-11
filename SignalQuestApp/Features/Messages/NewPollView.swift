@@ -79,7 +79,7 @@ struct NewPollView: View {
                                 } label: {
                                     Label("Ajouter une option", systemImage: "plus.circle")
                                         .font(SQType.caption.weight(.semibold))
-                                        .foregroundStyle(SQColor.brandRed)
+                                        .foregroundStyle(SQColor.accentInk)
                                 }
                                 .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -108,7 +108,7 @@ struct NewPollView: View {
                     if let errorMessage {
                         Text(errorMessage)
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
 
                     GradientButton("Créer le sondage", systemImage: "chart.bar", isBusy: isBusy) {

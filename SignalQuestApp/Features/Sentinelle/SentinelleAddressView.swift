@@ -242,17 +242,17 @@ struct SentinelleAddressView: View {
         HStack(spacing: SQSpace.sm) {
             Text(window.startLabel)
                 .font(SQType.micro)
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
             Spacer(minLength: 0)
             Text(series.lostCount == 0
                 ? String(localized: "aucune mesure perdue")
                 : SentinelleWording.lostBursts(series.lostCount))
                 .font(SQType.micro)
-                .foregroundStyle(series.lostCount == 0 ? SQColor.labelTertiary : SQColor.dangerInk)
+                .foregroundStyle(series.lostCount == 0 ? SQColor.labelSecondary : SQColor.dangerInk)
             Spacer(minLength: 0)
             Text("maintenant")
                 .font(SQType.micro)
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
         }
     }
 
@@ -370,7 +370,7 @@ struct SentinelleAddressView: View {
                         }
                         Text("Chaque maillon est mesuré depuis nos serveurs. Un saut muet ne répond pas aux sondes mais laisse passer le trafic : ce n’est pas une panne.")
                             .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 } else {
@@ -386,7 +386,7 @@ struct SentinelleAddressView: View {
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 Text(hop.collapsed > 1 ? "·" : "\(hop.idx)")
                     .font(.system(.caption, design: .monospaced, weight: .semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
+                    .foregroundStyle(SQColor.labelSecondary)
                     .frame(width: 16, alignment: .trailing)
                 Text(hop.label)
                     .font(SQFont.body(14, hop.alwaysQuiet ? .regular : .semibold))
@@ -397,7 +397,7 @@ struct SentinelleAddressView: View {
                 Text(SentinelleWording.ms(hop.lastMs))
                     .font(SQFont.display(16, .bold))
                     .monospacedDigit()
-                    .foregroundStyle(hop.lastMs == nil ? SQColor.labelTertiary : SQColor.label)
+                    .foregroundStyle(hop.lastMs == nil ? SQColor.labelSecondary : SQColor.label)
             }
             SentinelleBar(
                 fraction: (hop.lastMs ?? 0) / peak,

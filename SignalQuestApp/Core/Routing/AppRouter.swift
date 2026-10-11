@@ -118,6 +118,23 @@ final class AppRouter: ObservableObject {
     /// Dock rétracté en pastille après un scroll vers le bas ; redéployé en
     /// remontant, en changeant d'onglet ou en tapant la pastille.
     @Published var isDockMinimized = false
+    /// Vrai quand aucune racine d'onglet n'est à l'écran (écran poussé) : la
+    /// tab bar native s'y redéploie et ne s'y rétracte pas.
+    @Published private(set) var isDockMinimizeSuspended = false
+    private var visibleDockRoots = Set<ObjectIdentifier>()
+
+    /// Tenu par les racines d'onglet (`sqDockAutoMinimize`) : un ensemble
+    /// plutôt qu'un booléen, l'ordre apparition/disparition d'un changement
+    /// d'onglet n'étant pas garanti.
+    func setDockRoot(_ id: ObjectIdentifier, visible: Bool) {
+        if visible {
+            visibleDockRoots.insert(id)
+        } else {
+            visibleDockRoots.remove(id)
+        }
+        let suspended = visibleDockRoots.isEmpty
+        if isDockMinimizeSuspended != suspended { isDockMinimizeSuspended = suspended }
+    }
 
     /// Une destination reçue de l'extérieur garde la priorité sur le choix
     /// générique de fin d'introduction, notamment après une connexion.

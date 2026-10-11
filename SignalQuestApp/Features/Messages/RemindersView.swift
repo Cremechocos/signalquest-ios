@@ -64,7 +64,7 @@ struct RemindersView: View {
                 if let date = item.remindAt {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
                         .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(SQColor.brandRed)
+                        .foregroundStyle(SQColor.accentInk)
                 }
                 if let reason = item.reason, !reason.isEmpty {
                     Text(reason)

@@ -131,7 +131,7 @@ struct GroupSettingsView: View {
                                 if isAdminMember(participant) {
                                     Text("Admin")
                                         .font(SQType.micro)
-                                        .foregroundStyle(SQColor.brandRed)
+                                        .foregroundStyle(SQColor.accentInk)
                                 }
                             }
                             Spacer()

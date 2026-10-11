@@ -62,7 +62,7 @@ struct ScheduledMessagesView: View {
                 if let date = item.sendAt {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
                         .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(SQColor.brandRed)
+                        .foregroundStyle(SQColor.accentInk)
                 }
                 Text(content(for: item))
                     .font(SQType.body)

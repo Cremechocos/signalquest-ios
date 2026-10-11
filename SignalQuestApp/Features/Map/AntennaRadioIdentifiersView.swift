@@ -17,6 +17,7 @@ struct AntennaRadioIdentifiersView: View {
     @State private var expandedSector: Int?
     @State private var copiedValue: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -100,7 +101,7 @@ struct AntennaRadioIdentifiersView: View {
                         ForEach(sector.technologies, id: \.self) { tech in
                             Text(tech)
                                 .font(SQFont.body(12, .bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(SQBrand.operatorBadgeForeground(for: SQBrand.techColor(tech), colorScheme: colorScheme))
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
                                 .background(SQBrand.techColor(tech), in: Capsule(style: .continuous))
@@ -116,7 +117,7 @@ struct AntennaRadioIdentifiersView: View {
                     if !isExpanded, !sector.cells.isEmpty {
                         Text("\(sector.cells.count) cellule\(sector.cells.count > 1 ? "s" : "")")
                             .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
                 }
                 .contentShape(Rectangle())
@@ -131,7 +132,7 @@ struct AntennaRadioIdentifiersView: View {
                 if sector.cells.isEmpty {
                     Text("Aucune cellule identifiée sur ce secteur.")
                         .font(SQType.micro)
-                        .foregroundStyle(SQColor.labelTertiary)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
             }
         }

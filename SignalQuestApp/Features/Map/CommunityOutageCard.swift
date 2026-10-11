@@ -221,6 +221,8 @@ struct OutageVoteRow: View {
 /// L'appelant garde la CONFIRMATION : le geste est irréversible et collectif, il ne part jamais du
 /// premier appui — mais l'alerte doit vivre dans l'hôte, qui seul sait où la présenter.
 struct OutageCloseButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     /// Fermeture en vol, portée par l'hôte : lui seul sait si c'est CETTE panne qui part.
     let closing: Bool
     let action: () -> Void
@@ -230,7 +232,7 @@ struct OutageCloseButton: View {
             HStack(spacing: SQSpace.sm) {
                 Spacer(minLength: 0)
                 if closing {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(SQBrand.operatorBadgeForeground(for: OutageTint.resolved, colorScheme: colorScheme))
                     Text("Fermeture…")
                 } else {
                     Image(systemName: "checkmark.circle.fill")
@@ -240,7 +242,7 @@ struct OutageCloseButton: View {
                 Spacer(minLength: 0)
             }
             .font(SQFont.body(14, .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(SQBrand.operatorBadgeForeground(for: OutageTint.resolved, colorScheme: colorScheme))
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(OutageTint.resolved, in: Capsule(style: .continuous))
         }

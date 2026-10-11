@@ -25,7 +25,7 @@ struct SpeedtestProvider: TimelineProvider {
     }
 }
 
-// MARK: - Échelle de couleur (identique au cadran de l'app : SignatureSpeedDial)
+// MARK: - Échelle de couleur de la jauge
 
 /// Palette qualité DA « Crème & Terre cuite » (alignée app / share) :
 /// danger brique → ambre → olive (pas le rainbow Tailwind historique).
@@ -43,10 +43,10 @@ func speedRatio(_ mbps: Double) -> Double {
     return max(0, min(1, log10(mbps) / 3))
 }
 
-/// Couleur de qualité d'un débit — interpolation continue des `sqGaugeColors`,
-/// reproduisant exactement `colorForRatio(normalized)` du cadran de l'app
-/// (vert si très bon, rouge si faible). Utilisée par tous les widgets + la
-/// Live Activity pour une teinte strictement identique à l'app.
+/// Couleur de qualité d'un débit — interpolation continue des `sqGaugeColors`
+/// (vert si très bon, rouge si faible). Teinte des arcs, halos et icônes des
+/// widgets et de la Live Activity ; un texte ne la prend que sur le fond noir
+/// de la Dynamic Island.
 func speedColor(_ mbps: Double) -> Color {
     let v = speedRatio(mbps)
     let count = sqGaugeColors.count
@@ -239,10 +239,11 @@ struct SpeedDialView: View {
                 .rotationEffect(.degrees(135))
                 .shadow(color: tint.opacity(0.35), radius: 4)
 
+            // Textes en encre : la teinte de qualité reste portée par l'arc.
             VStack(spacing: 0) {
                 Text(numberString)
                     .font(.system(size: numberSize, weight: .black, design: .rounded))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(WidgetPalette.label)
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -253,7 +254,7 @@ struct SpeedDialView: View {
                 if showQuality, value > 0 {
                     Text(speedQualityLabel(value))
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(tint)
+                        .foregroundStyle(WidgetPalette.labelSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .padding(.top, 2)

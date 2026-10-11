@@ -87,7 +87,7 @@ struct CommunityOutageDetailSheet: View {
                 if let errorMessage {
                     Text(errorMessage)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 // Les MÊMES actions que sur la page « Pannes signalées » : deux chemins vers la
@@ -208,7 +208,7 @@ struct CommunityOutageDetailSheet: View {
                 if !timelineExpanded, events.count > Self.collapsedTimelineCount {
                     Button("Voir tout") { timelineExpanded = true }
                         .font(SQFont.body(13, .semibold))
-                        .foregroundStyle(SQColor.brandRed)
+                        .foregroundStyle(SQColor.accentInk)
                         .frame(minHeight: 44, alignment: .leading)
                 }
             }

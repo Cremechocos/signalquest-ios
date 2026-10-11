@@ -76,7 +76,7 @@ struct ScheduleMessageSheet: View {
                     if let errorMessage {
                         Text(errorMessage)
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
 
                     GradientButton("Programmer l'envoi", systemImage: "clock", isBusy: isBusy) {
@@ -176,7 +176,7 @@ struct AddReminderSheet: View {
                     if let errorMessage {
                         Text(errorMessage)
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
 
                     GradientButton("Ajouter le rappel", systemImage: "bell", isBusy: isBusy) {

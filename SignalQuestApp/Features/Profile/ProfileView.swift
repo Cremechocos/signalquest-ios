@@ -848,6 +848,7 @@ private struct EmailVerificationCard: View {
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.capsule)
             .tint(SQColor.brandRed)
+            .foregroundStyle(SQColor.onAccent)
             .disabled(isSending || isRefreshing)
             .accessibilityIdentifier("profile.emailVerification.resend")
 

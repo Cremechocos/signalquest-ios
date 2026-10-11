@@ -426,6 +426,7 @@ struct SpeedtestView: View {
                 .padding(.horizontal, SQSpace.md)
                 .frame(minHeight: 44)
                 .background(SQColor.surface, in: Capsule(style: .continuous))
+                .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                 .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
@@ -439,6 +440,7 @@ struct SpeedtestView: View {
                 .foregroundStyle(SQColor.label)
                 .frame(width: 44, height: 44)
                 .background(SQColor.surface, in: Circle())
+                .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                 .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
@@ -509,6 +511,7 @@ struct SpeedtestView: View {
         }
         .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
         .background(SQColor.surface, in: Capsule(style: .continuous))
+        .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
         .sqShadowSoft()
     }
 

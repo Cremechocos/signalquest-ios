@@ -516,14 +516,14 @@ struct ANFRStatsView: View {
                         }
                     } label: {
                         HStack(spacing: SQSpace.xs + 2) {
-                            Circle().fill(selected ? SQColor.onAccent : op.color).frame(width: 7, height: 7)
+                            Circle().fill(selected ? SQBrand.operatorBadgeForeground(op.label) : op.color).frame(width: 7, height: 7)
                             Text(op.label)
                                 .font(SQFont.body(13, .semibold))
                         }
                         .padding(.horizontal, SQSpace.md - 2)
                         .frame(height: 34)
                         .background(selected ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.surfaceMuted), in: Capsule(style: .continuous))
-                        .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
+                        .foregroundStyle(selected ? SQBrand.operatorBadgeForeground(op.label) : SQColor.label)
                     }
                     .buttonStyle(SQPressButtonStyle())
                     .sqAnimation(SQMotion.fast, value: selected)

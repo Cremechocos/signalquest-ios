@@ -95,9 +95,9 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
 
     var color: Color {
         switch self {
-        case .new: return Color(hex: 0x3B82F6)
-        case .activated: return Color(hex: 0x10B981)
-        case .deleted: return Color(hex: 0xEF4444)
+        case .new: return SQColor.info
+        case .activated: return SQColor.success
+        case .deleted: return SQColor.danger
         case .added: return SQColor.label
         }
     }

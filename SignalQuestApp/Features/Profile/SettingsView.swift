@@ -1607,6 +1607,7 @@ struct E2EEV2RecoveryResetView: View {
             statusSection
             resetReviewSection
             E2EEV2RotationStatusSection(runtime: services.epochRotations)
+                .listRowBackground(SQColor.surface)
 
             switch model.flow {
             case .menu:
@@ -1628,6 +1629,7 @@ struct E2EEV2RecoveryResetView: View {
                     }
                     .frame(minHeight: 64)
                 }
+                .listRowBackground(SQColor.surface)
             }
 
             if let message = model.confirmationMessage {
@@ -1636,6 +1638,7 @@ struct E2EEV2RecoveryResetView: View {
                         .foregroundStyle(SQColor.success)
                         .accessibilityLabel("Confirmation. \(message)")
                 }
+                .listRowBackground(SQColor.surface)
             }
 
             if let error = model.errorMessage {
@@ -1644,10 +1647,13 @@ struct E2EEV2RecoveryResetView: View {
                         .foregroundStyle(SQColor.danger)
                         .accessibilityLabel("Erreur. \(error)")
                 }
+                .listRowBackground(SQColor.surface)
             }
 
             recoveryKeySection
         }
+        .scrollContentBackground(.hidden)
+        .signalQuestBackground()
         .navigationTitle("Récupération E2EE")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(!model.mayLeaveSecret)
@@ -1676,6 +1682,7 @@ struct E2EEV2RecoveryResetView: View {
             } header: {
                 Text("Sécurité du compte")
             }
+            .listRowBackground(SQColor.surface)
         }
     }
 
@@ -1702,6 +1709,7 @@ struct E2EEV2RecoveryResetView: View {
         } header: {
             Text("État")
         }
+        .listRowBackground(SQColor.surface)
     }
 
     private var menuSection: some View {
@@ -1741,6 +1749,7 @@ struct E2EEV2RecoveryResetView: View {
         } footer: {
             Text("La clé de récupération est créée sur cet appareil et n’est jamais conservée en clair par SignalQuest.")
         }
+        .listRowBackground(SQColor.surface)
     }
 
     private var createSection: some View {
@@ -1760,6 +1769,7 @@ struct E2EEV2RecoveryResetView: View {
         } header: {
             Text("Nouvelle clé")
         }
+        .listRowBackground(SQColor.surface)
     }
 
     private var restoreSection: some View {
@@ -1799,6 +1809,7 @@ struct E2EEV2RecoveryResetView: View {
         } header: {
             Text("Restaurer")
         }
+        .listRowBackground(SQColor.surface)
     }
 
     private var resetSection: some View {
@@ -1883,6 +1894,7 @@ struct E2EEV2RecoveryResetView: View {
         } header: {
             Text("Perte totale d’accès")
         }
+        .listRowBackground(SQColor.surface)
     }
 
     @ViewBuilder
@@ -1924,6 +1936,7 @@ struct E2EEV2RecoveryResetView: View {
             } footer: {
                 Text("SignalQuest ne pourra pas réafficher cette clé. Sans appareil approuvé ni cette clé, l’ancien historique chiffré sera perdu.")
             }
+            .listRowBackground(SQColor.surface)
         }
     }
 
@@ -2173,7 +2186,7 @@ struct SettingsView: View {
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 }
                 if let appleError {
-                    Text(appleError).font(.caption).foregroundStyle(SQColor.danger)
+                    Text(appleError).font(.caption).foregroundStyle(SQColor.dangerInk)
                 }
             } header: {
                 Text("Compte Apple")
@@ -2601,7 +2614,6 @@ struct ChangePasswordView: View {
                     Task { await save() }
                 }
                 .disabled(!canSubmit)
-                .opacity(canSubmit ? 1 : 0.5)
             }
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets())
@@ -2723,7 +2735,7 @@ private struct DeleteAccountSheet: View {
                     if let error = model.deletionError {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
                 }
                 .padding(SQSpace.xl)
@@ -2882,7 +2894,6 @@ private struct DeleteAccountSheet: View {
                 Task { await requestEmailCode() }
             }
             .disabled(!hasAcknowledged || isBusy)
-            .opacity(hasAcknowledged && !isBusy ? 1 : 0.5)
         }
     }
 
@@ -2894,7 +2905,6 @@ private struct DeleteAccountSheet: View {
             Task { await action() }
         }
         .disabled(disabled || !hasAcknowledged || isBusy)
-        .opacity(disabled || !hasAcknowledged ? 0.5 : 1)
     }
 
     private func availableMethods(_ preview: AccountDeletionPreview) -> [ReauthMethod] {

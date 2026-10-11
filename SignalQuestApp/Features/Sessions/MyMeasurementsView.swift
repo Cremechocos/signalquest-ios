@@ -131,6 +131,7 @@ struct MyMeasurementsView: View {
                     .foregroundStyle(SQColor.dangerInk)
                     .padding(SQSpace.sm)
                     .background(SQColor.surface, in: Capsule())
+                    .overlay { Capsule().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .accessibilityIdentifier("measurements.loadError")
                 }
                 if !model.points.isEmpty { coloringPicker }
@@ -175,6 +176,7 @@ struct MyMeasurementsView: View {
         .foregroundStyle(SQColor.label)
         .padding(.horizontal, SQSpace.xs)
         .background(SQColor.surface, in: Capsule())
+        .overlay { Capsule().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
         .sqShadowSoft()
         .buttonStyle(SQPressButtonStyle())
         .accessibilityElement(children: .contain)
@@ -251,8 +253,7 @@ struct MyMeasurementsView: View {
                 .foregroundStyle(SQColor.label)
                 .padding(.horizontal, SQSpace.lg - 2)
                 .padding(.vertical, SQSpace.sm)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md))
-                .sqShadowSoft()
+                .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.md, elevation: .rest)
                 .accessibilityElement(children: .combine)
         }
     }

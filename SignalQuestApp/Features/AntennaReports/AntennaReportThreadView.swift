@@ -266,7 +266,7 @@ struct AntennaReportThreadView: View {
                 if isTeam {
                     Label(comment.author?.name?.nonEmpty ?? String(localized: "Équipe SignalQuest"), systemImage: "shield.lefthalf.filled")
                         .font(SQFont.body(12, .semibold))
-                        .foregroundStyle(SQColor.brandRed)
+                        .foregroundStyle(SQColor.accentInk)
                 }
                 VStack(alignment: isTeam ? .leading : .trailing, spacing: SQSpace.sm) {
                     if !comment.content.isEmpty {
@@ -298,7 +298,7 @@ struct AntennaReportThreadView: View {
     private func errorBanner(_ message: String) -> some View {
         Label(message, systemImage: "exclamationmark.triangle.fill")
             .font(SQType.caption)
-            .foregroundStyle(SQColor.danger)
+            .foregroundStyle(SQColor.dangerInk)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm)
@@ -313,7 +313,7 @@ struct AntennaReportThreadView: View {
             if let error = model.attachmentError {
                 Text(error)
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.danger)
+                    .foregroundStyle(SQColor.dangerInk)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             if !model.pendingImages.isEmpty {

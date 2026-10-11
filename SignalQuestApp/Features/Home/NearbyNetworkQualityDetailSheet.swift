@@ -138,11 +138,19 @@ struct NearbyNetworkQualityDetailSheet: View {
                         .font(SQFont.body(12, .semibold))
                         .foregroundStyle(SQColor.labelSecondary)
                 } else {
-                    Text(band.title)
-                        .font(SQFont.body(12, .bold))
-                        .foregroundStyle(band.swiftUIColor)
-                        .padding(.horizontal, 8).padding(.vertical, 2)
-                        .background(band.swiftUIColor.opacity(0.14), in: Capsule(style: .continuous))
+                    // Texte à l'encre, couleur portée par le point : la teinte de la bande sur
+                    // sa propre teinte à 14 % ne tient pas 4,5:1.
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(band.swiftUIColor)
+                            .frame(width: 8, height: 8)
+                            .accessibilityHidden(true)
+                        Text(band.title)
+                            .font(SQFont.body(12, .bold))
+                            .foregroundStyle(SQColor.label)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 2)
+                    .background(band.swiftUIColor.opacity(0.14), in: Capsule(style: .continuous))
                 }
                 Text(LocalizedStringKey(caption))
                     .font(SQFont.body(12))

@@ -359,11 +359,17 @@ private struct SessionRow: View {
                 if !session.operators.isEmpty {
                     HStack(spacing: 5) {
                         ForEach(session.operators.prefix(4)) { op in
-                            Text(op.label)
-                                .font(SQFont.body(12, .semibold, relativeTo: .caption2))
-                                .padding(.horizontal, 7).padding(.vertical, 2)
-                                .background(SessionDetailView.operatorColor(op.colorHex).opacity(0.14), in: Capsule(style: .continuous))
-                                .foregroundStyle(SessionDetailView.operatorColor(op.colorHex))
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(SessionDetailView.operatorColor(op.colorHex))
+                                    .frame(width: 7, height: 7)
+                                    .accessibilityHidden(true)
+                                Text(op.label)
+                                    .font(SQFont.body(12, .semibold, relativeTo: .caption2))
+                                    .foregroundStyle(SQColor.label)
+                            }
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background(SessionDetailView.operatorColor(op.colorHex).opacity(0.14), in: Capsule(style: .continuous))
                         }
                     }
                 }

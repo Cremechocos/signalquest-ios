@@ -386,7 +386,6 @@ struct GamificationView: View {
                 .padding(SQSpace.md - 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
-                .opacity(0.75)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Succès : \(badge.title ?? String(localized: "Badge"))")
                 .accessibilityValue(badge.description ?? String(localized: "À débloquer"))
@@ -571,7 +570,6 @@ private struct QuestCardView: View {
         .padding(SQSpace.lg)
         .frame(width: QuestCardLayout.width(for: dynamicTypeSize), alignment: .leading)
         .sqCardBackground()
-        .opacity(quest.isClaimed ? 0.62 : 1)
     }
 
     private var header: some View {

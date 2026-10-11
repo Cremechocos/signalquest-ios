@@ -127,6 +127,26 @@ enum SQColor {
         })
     }
 
+    /// Variante sans asset : teintes de base calculées, mêmes encres renforcées.
+    private static func fieldAwareLabel(
+        light: (UInt8, UInt8, UInt8),
+        dark: (UInt8, UInt8, UInt8),
+        highLight: (UInt8, UInt8, UInt8),
+        highDark: (UInt8, UInt8, UInt8)
+    ) -> Color {
+        Color(UIColor { traits in
+            let highContrast = SQFieldMode.isEnabled || traits.accessibilityContrast == .high
+            let isDark = traits.userInterfaceStyle == .dark
+            let rgb = highContrast ? (isDark ? highDark : highLight) : (isDark ? dark : light)
+            return UIColor(
+                red: CGFloat(rgb.0) / 255,
+                green: CGFloat(rgb.1) / 255,
+                blue: CGFloat(rgb.2) / 255,
+                alpha: 1
+            )
+        })
+    }
+
     /// Brique à 12 % (18 % en sombre) : pastilles d'icônes, pilule active du
     /// dock, tags, fonds teintés.
     static let accentSoft = dynamicTint(
@@ -181,10 +201,14 @@ enum SQColor {
         light: (0xFB, 0xF7, 0xEF, 0.95), dark: (0x26, 0x20, 0x19, 0.94),
         oled: (0x0A, 0x0A, 0x0A, 0.94)
     )
-    /// Items inactifs du dock : bruns discrets. Clair assombri à #8D7E68 (3,7:1 sur
-    /// le fond du dock) pour rester lisible en basse vision / plein soleil (A11Y-10).
-    static let dockInactive = dynamicTint(
-        light: (0x8D, 0x7E, 0x68, 1.0), dark: (0x8A, 0x7A, 0x61, 1.0)
+    /// Items inactifs du dock : bruns discrets, au moins 4,5:1 sur le fond du dock
+    /// (#76674F en clair, #A89A80 en sombre). En mode terrain ou avec « Augmenter
+    /// le contraste », ils prennent les encres secondaires renforcées.
+    static let dockInactive = fieldAwareLabel(
+        light: (0x76, 0x67, 0x4F),
+        dark: (0xA8, 0x9A, 0x80),
+        highLight: (0x4E, 0x40, 0x2E),
+        highDark: (0xD8, 0xCD, 0xB8)
     )
 
     // MARK: Ombres (encre chaude en clair, noir en sombre)

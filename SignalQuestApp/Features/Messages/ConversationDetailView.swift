@@ -233,7 +233,7 @@ struct ConversationDetailView: View {
             if otherIsViewing {
                 Text("Actif sur la conversation")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.brandRed)
+                    .foregroundStyle(SQColor.accentInk)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 2)
                     .transition(.opacity)
@@ -892,9 +892,11 @@ struct ConversationDetailView: View {
                     Image(systemName: "timer").font(.system(size: 11)).accessibilityHidden(true)
                     Text("Messages éphémères · disparaissent après 24 h")
                         .font(SQType.micro)
+                        .foregroundStyle(SQColor.accentInk)
                     Spacer(minLength: SQSpace.sm)
                     Button("Désactiver") { ephemeralEnabled = false }
                         .font(SQType.micro.weight(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
                         .buttonStyle(.plain)
                 }
                 .foregroundStyle(SQColor.brandRed)
@@ -955,7 +957,7 @@ struct ConversationDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(SQType.micro)
-                    .foregroundStyle(SQColor.brandRed)
+                    .foregroundStyle(SQColor.accentInk)
                 Text(text)
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -1355,6 +1357,7 @@ struct ConversationDetailView: View {
                         .accessibilityHidden(true)
                     Text("\(count) réponse")
                         .font(SQType.micro)
+                        .foregroundStyle(SQColor.accentInk)
                 }
                 .padding(.horizontal, SQSpace.sm)
                 .padding(.vertical, 4)
@@ -3153,6 +3156,7 @@ private struct LiveShareConversationBar: View {
                 .font(SQType.micro.weight(.semibold))
                 .buttonStyle(.borderedProminent)
                 .tint(SQColor.brandRed)
+                .foregroundStyle(SQColor.onAccent)
                 .controlSize(.small)
                 .frame(minHeight: 44)
         } else {
@@ -3319,6 +3323,7 @@ private struct LiveShareManagementSheet: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(SQColor.brandRed)
+                            .foregroundStyle(SQColor.onAccent)
 
                             Button {
                                 create(offerShare: false)
@@ -3368,7 +3373,7 @@ private struct LiveShareManagementSheet: View {
                 .foregroundStyle(SQColor.labelSecondary)
             Text("iOS partage la position, la technologie et l’opérateur disponibles. Apple n’expose pas les niveaux RSRP/RSRQ à l’app.")
                 .font(SQType.micro)
-                .foregroundStyle(SQColor.labelTertiary)
+                .foregroundStyle(SQColor.labelSecondary)
         }
         .padding(SQSpace.md)
         .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
@@ -3480,6 +3485,7 @@ private struct LiveShareSessionCard: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(SQColor.brandRed)
+                    .foregroundStyle(SQColor.onAccent)
                     Button("Refuser") {
                         Task { await coordinator.decline(sessionId: session.id) }
                     }

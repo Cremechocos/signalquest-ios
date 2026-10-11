@@ -183,6 +183,7 @@ private struct SQDockPressStyle: ButtonStyle {
 /// remonte ou revient en haut — équivalent custom de
 /// `tabBarMinimizeBehavior(.onScrollDown)`. À appliquer sur le `ScrollView`
 /// racine de chaque onglet. iOS 18+ (API scroll geometry) ; no-op avant.
+/// Le dock se redéploie dès que la racine quitte l'écran (push, onglet).
 private struct SQDockAutoMinimize: ViewModifier {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
@@ -236,6 +237,19 @@ private struct SQDockAutoMinimize: ViewModifier {
                     setMinimized(false)
                 }
             }
+            // Écran poussé par-dessus la racine : il n'a pas de rétraction au
+            // scroll, le dock y reste donc déployé (dock custom comme tab bar
+            // native). Le signal : la racine quitte la fenêtre à la fin du push.
+            .background(
+                SQDockRootPresence { id, visible in
+                    router.setDockRoot(id, visible: visible)
+                    guard !visible else { return }
+                    accumulated = 0
+                    setMinimized(false)
+                }
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+            )
         } else {
             content
         }
@@ -245,6 +259,35 @@ private struct SQDockAutoMinimize: ViewModifier {
         guard router.isDockMinimized != value else { return }
         withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
             router.isDockMinimized = value
+        }
+    }
+}
+
+/// Prévient quand l'écran racine d'un onglet entre dans la fenêtre ou la
+/// quitte (push d'un écran par-dessus, changement d'onglet).
+private struct SQDockRootPresence: UIViewRepresentable {
+    let onChange: (ObjectIdentifier, Bool) -> Void
+
+    func makeUIView(context: Context) -> Probe { Probe(onChange: onChange) }
+    func updateUIView(_ probe: Probe, context: Context) {
+        probe.onChange = onChange
+    }
+
+    final class Probe: UIView {
+        var onChange: (ObjectIdentifier, Bool) -> Void
+
+        init(onChange: @escaping (ObjectIdentifier, Bool) -> Void) {
+            self.onChange = onChange
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            onChange(ObjectIdentifier(self), window != nil)
         }
     }
 }

@@ -173,7 +173,7 @@ struct SpeedtestTrendEntryView: View {
                 .foregroundStyle(WidgetPalette.labelSecondary)
             Text("\(Int(value.rounded()))")
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
-                .foregroundStyle(speedColor(value))
+                .foregroundStyle(WidgetPalette.label)
                 .monospacedDigit()
         }
         .lineLimit(1)

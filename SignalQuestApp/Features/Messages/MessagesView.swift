@@ -858,7 +858,7 @@ private struct NewConversationSheet: View {
                 }
 
                 if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(SQColor.danger) }
+                    Section { Text(errorMessage).foregroundStyle(SQColor.dangerInk) }
                 }
             }
             .scrollContentBackground(.hidden)

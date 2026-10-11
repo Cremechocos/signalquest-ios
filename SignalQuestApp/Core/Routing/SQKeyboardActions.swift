@@ -103,6 +103,7 @@ struct SQCommandPalette: View {
                 if matches.isEmpty {
                     Text("Aucune action")
                         .foregroundStyle(SQColor.labelSecondary)
+                        .listRowBackground(SQColor.surface)
                 } else {
                     ForEach(matches) { action in
                         Button { onChoose(action) } label: {
@@ -119,9 +120,12 @@ struct SQCommandPalette: View {
                             .contentShape(Rectangle())
                         }
                         .accessibilityIdentifier("palette.action.\(action.rawValue)")
+                        .listRowBackground(SQColor.surface)
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .signalQuestBackground()
             .safeAreaInset(edge: .top) {
                 // Champ nu plutôt que `SQSearchField` : le focus doit s'y poser
                 // à l'ouverture, pour taper sans toucher l'écran.

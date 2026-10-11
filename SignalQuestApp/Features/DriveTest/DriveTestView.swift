@@ -1524,13 +1524,13 @@ struct DriveTestView: View {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     Text(errorMessage)
                         .font(SQFont.body(12.5, .medium))
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .lineLimit(3)
                     if model.locationDenied, let url = URL(string: UIApplication.openSettingsURLString) {
                         Link("Ouvrir les Réglages", destination: url)
                             .font(SQFont.body(12.5, .semibold))
-                            .foregroundStyle(SQColor.brandRed)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
                 }
                 .padding(.horizontal, SQSpace.sm + 2)
@@ -1546,7 +1546,7 @@ struct DriveTestView: View {
 
     /// Légendes du panneau à 13 pt : posées sur le verre, en brun secondaire, elles
     /// tombaient sous le seuil une fois rendues à 12,5 pt (audit, Lot 4c).
-    private static let panelCaption = SQFont.body(13, relativeTo: .footnote)
+    private static var panelCaption: Font { SQFont.body(13, relativeTo: .footnote) }
 
     private var panelToggle: some View {
         Button {
@@ -1738,7 +1738,7 @@ struct DriveTestView: View {
             if model.livePhase == .download || model.livePhase == .upload {
                 Text(verbatim: SQUnits.throughput(mbps: model.liveMbps))
                     .font(SQFont.body(13, .bold))
-                    .foregroundStyle(SQColor.brandRed)
+                    .foregroundStyle(SQColor.accentInk)
                     .monospacedDigit()
             }
         }

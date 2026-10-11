@@ -41,6 +41,29 @@ enum SQFont {
         .system(style, design: design, weight: weight)
     }
 
+    // MARK: Graisse lisible
+
+    /// Mode terrain ou « Texte en gras » d'iOS : les polices embarquées ne
+    /// suivent pas `legibilityWeight` d'elles-mêmes, la graisse monte donc d'un
+    /// cran ici. Les variantes `…Fixed` (rendus déterministes) n'en tiennent pas compte.
+    private static var emboldens: Bool {
+        if SQFieldMode.isEnabled { return true }
+        // Le réglage système se lit sur le fil principal ; un rendu hors écran
+        // en arrière-plan garde la graisse demandée.
+        guard Thread.isMainThread else { return false }
+        return MainActor.assumeIsolated { UIAccessibility.isBoldTextEnabled }
+    }
+
+    static func legible(_ weight: Font.Weight) -> Font.Weight {
+        guard emboldens else { return weight }
+        switch weight {
+        case .ultraLight, .thin, .light, .regular: return .medium
+        case .medium: return .semibold
+        case .semibold: return .bold
+        default: return weight
+        }
+    }
+
     // MARK: Display / chiffres — Bricolage Grotesque
 
     private static func bricolageName(_ weight: Font.Weight) -> String {
@@ -52,6 +75,7 @@ enum SQFont {
 
     /// Titre display (Bricolage Grotesque). Suit Dynamic Type via un style inféré.
     static func display(_ size: CGFloat, _ weight: Font.Weight = .bold) -> Font {
+        let weight = legible(weight)
         let style = inferredStyle(forSize: size)
         guard bricolageAvailable else { return systemFallback(relativeTo: style, weight: weight) }
         return .custom(bricolageName(weight), size: size, relativeTo: style)
@@ -66,6 +90,7 @@ enum SQFont {
 
     /// Titre display relatif à un style (suit Dynamic Type).
     static func display(_ size: CGFloat, _ weight: Font.Weight = .bold, relativeTo style: Font.TextStyle) -> Font {
+        let weight = legible(weight)
         guard bricolageAvailable else { return systemFallback(relativeTo: style, weight: weight) }
         return .custom(bricolageName(weight), size: size, relativeTo: style)
     }
@@ -82,12 +107,14 @@ enum SQFont {
     }
 
     static func archivo(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
+        let weight = legible(weight)
         let style = inferredStyle(forSize: size)
         guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
         return .custom(figtreeName(weight), size: size, relativeTo: style)
     }
 
     static func archivo(_ size: CGFloat, _ weight: Font.Weight = .semibold, relativeTo style: Font.TextStyle) -> Font {
+        let weight = legible(weight)
         guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
         return .custom(figtreeName(weight), size: size, relativeTo: style)
     }
@@ -95,6 +122,7 @@ enum SQFont {
     // MARK: Corps — Figtree
 
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        let weight = legible(weight)
         let style = inferredStyle(forSize: size)
         guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
         return .custom(figtreeName(weight), size: size, relativeTo: style)
@@ -107,6 +135,7 @@ enum SQFont {
     }
 
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle) -> Font {
+        let weight = legible(weight)
         guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
         return .custom(figtreeName(weight), size: size, relativeTo: style)
     }

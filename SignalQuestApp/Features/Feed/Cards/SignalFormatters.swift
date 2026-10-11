@@ -187,6 +187,7 @@ struct CardMetricTile: View {
         .padding(.vertical, SQSpace.sm + 2)
         .padding(.horizontal, SQSpace.md)
         .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
         // VoiceOver : « libellé : valeur » d'un bloc (Down 240 Mbps), pas 2 textes.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(LocalizedStringKey(label))

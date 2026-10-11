@@ -209,7 +209,7 @@ struct AntennaProfileView: View {
             context.draw(
                 Text("\(SQUnits.distance(meters: total)) · échelle verticale non proportionnelle")
                     .font(SQFont.archivo(9, .semibold))
-                    .foregroundColor(SQColor.labelTertiary),
+                    .foregroundColor(SQColor.labelSecondary),
                 at: CGPoint(x: size.width / 2, y: size.height - 5)
             )
         }
@@ -238,7 +238,7 @@ struct AntennaProfileView: View {
             context.draw(
                 Text("\(Int(value.rounded())) m")
                     .font(SQFont.archivo(9, .semibold))
-                    .foregroundColor(SQColor.labelTertiary),
+                    .foregroundColor(SQColor.labelSecondary),
                 at: CGPoint(x: leftInset - 6, y: lineY),
                 anchor: .trailing
             )

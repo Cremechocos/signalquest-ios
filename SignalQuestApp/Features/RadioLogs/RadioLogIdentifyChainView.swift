@@ -281,6 +281,7 @@ struct RadioLogIdentifyChainView: View {
             Button("Fermer") { dismiss() }
                 .buttonStyle(.borderedProminent)
                 .tint(P.accent)
+                .foregroundStyle(P.onAccent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(SQSpace.lg)
