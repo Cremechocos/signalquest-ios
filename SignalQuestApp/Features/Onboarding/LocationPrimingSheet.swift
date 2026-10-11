@@ -39,7 +39,7 @@ struct LocationPrimingSheet: View {
                     .multilineTextAlignment(.center)
                 Text(isDenied
                      ? "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour situer tes mesures sur la carte. Le test fonctionne quand même sans."
-                     : "Pour situer ton speedtest sur la carte communautaire, SignalQuest a besoin de ta position approximative (~100 m). Tu peux refuser : le test fonctionnera quand même, sans apparaître sur la carte.")
+                     : "Pour situer ton speedtest sur la carte communautaire, SignalQuest a besoin de ta position au moment du test. Elle est publiée telle quelle ; tes zones privées la protègent. Tu peux refuser : le test fonctionnera quand même, sans apparaître sur la carte.")
                     .font(SQType.body)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)

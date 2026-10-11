@@ -6142,7 +6142,8 @@ final class MessageAttachmentOutboxTests: XCTestCase {
                 height: 8,
                 in: conversation,
                 replyToId: "parent-attachment",
-                e2ee: nil
+                e2ee: nil,
+                ttlSeconds: 86_400
             )
             XCTFail("Le premier upload synthetique doit echouer")
         } catch {
@@ -6166,6 +6167,8 @@ final class MessageAttachmentOutboxTests: XCTestCase {
         XCTAssertEqual(messageBodies.count, 1)
         XCTAssertEqual(messageBodies.first?["clientRequestId"] as? String, requestId)
         XCTAssertEqual(messageBodies.first?["replyToId"] as? String, "parent-attachment")
+        // Le mode éphémère survit au passage par la file d'envoi.
+        XCTAssertEqual(messageBodies.first?["ttlSeconds"] as? Int, 86_400)
     }
 
     private static func requestBody(_ request: URLRequest) -> Data {

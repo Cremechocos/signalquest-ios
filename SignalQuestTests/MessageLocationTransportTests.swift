@@ -30,6 +30,7 @@ final class MessageLocationTransportTests: XCTestCase {
                 latitude: 48.8566, longitude: 2.3522, place: "Paris", accuracyMeters: 12.5,
                 observedAt: observedAt, in: conversation,
                 expectedSessionID: credentials.snapshot().sessionID,
+                ttlSeconds: 0,
                 validateBeforeSend: { try fixture.validate() }
             )
             XCTFail("Une position périmée ne doit pas être rejouée")

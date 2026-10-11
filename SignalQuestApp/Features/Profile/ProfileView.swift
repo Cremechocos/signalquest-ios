@@ -192,12 +192,9 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showE2EEIdentityReset) {
             NavigationStack {
-                E2EEV2RecoveryResetView(api: services.api)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("OK") { showE2EEIdentityReset = false }
-                        }
-                    }
+                // Ni « OK » ni glissement tant que la clé affichée n'est pas
+                // sauvegardée (AF-PROF-01).
+                E2EEV2RecoveryResetView(api: services.api) { showE2EEIdentityReset = false }
             }
         }
         .sheet(isPresented: $showNotificationSettings) {

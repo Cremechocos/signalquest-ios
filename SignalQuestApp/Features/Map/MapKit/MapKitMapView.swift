@@ -358,6 +358,7 @@ struct MapKitMapView: UIViewRepresentable {
             guard backdrop != appliedBackdrop else { return }
             appliedBackdrop = backdrop
             if let old = tileOverlay { map.removeOverlay(old); tileOverlay = nil }
+            map.showTileAttribution(backdrop.tileAttribution)
             switch backdrop.mapKitKind {
             case .applePlan:
                 let c = MKStandardMapConfiguration(elevationStyle: .flat)
@@ -557,5 +558,40 @@ struct MapKitMapView: UIViewRepresentable {
             }
             map.deselectAnnotation(view.annotation, animated: false)
         }
+    }
+}
+
+extension MKMapView {
+    private static let tileAttributionTag = 0x5141_7474
+
+    /// Mention de licence des fonds raster (OSM, OpenTopoMap), en bas à droite :
+    /// Apple garde sa propre mention en bas à gauche.
+    func showTileAttribution(_ text: String?) {
+        let existing = viewWithTag(Self.tileAttributionTag) as? UILabel
+        guard let text else {
+            existing?.removeFromSuperview()
+            return
+        }
+        let label = existing ?? {
+            let label = UILabel()
+            label.tag = Self.tileAttributionTag
+            label.font = .preferredFont(forTextStyle: .caption2)
+            label.adjustsFontForContentSizeCategory = true
+            label.textColor = .label
+            label.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.75)
+            label.layer.cornerRadius = 4
+            label.layer.masksToBounds = true
+            label.numberOfLines = 0
+            label.textAlignment = .right
+            label.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(label)
+            NSLayoutConstraint.activate([
+                label.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -6),
+                label.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -6),
+                label.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor, constant: 80),
+            ])
+            return label
+        }()
+        label.text = " \(text) "
     }
 }

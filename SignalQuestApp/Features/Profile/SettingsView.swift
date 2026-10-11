@@ -1193,7 +1193,11 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var confirmationMessage: String?
     @Published private(set) var recoveryKey: Data?
-    @Published var recoveryKeyAcknowledged = false
+    @Published var recoveryKeyAcknowledged = false {
+        // Après une bascule, la clé reste due tant que sa sauvegarde n'est pas
+        // confirmée : quitter avant en crée une nouvelle au prochain passage.
+        didSet { if recoveryKeyAcknowledged, recoveryKey != nil { Self.needsRecoveryAfterReset = false } }
+    }
     @Published var recoveryInput = ""
     @Published private(set) var resetChallenge: E2EEV2IdentityResetEmailChallenge?
     @Published var resetCode = ""
@@ -1537,7 +1541,6 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
         recoveryKeyAcknowledged = false
         acknowledgedNoRecovery = false
         resetNeedsRecovery = false
-        Self.needsRecoveryAfterReset = false
 
         switch await recoveryEpochs.backfillAll(ownBundle: ownBundle) {
         case .success(let summary):
@@ -1597,9 +1600,13 @@ struct E2EEV2RecoveryResetView: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: E2EEV2RecoveryResetViewModel
     @State private var revealRecoveryInput = false
+    /// Présentée en feuille : le bouton de fermeture, retenu comme le retour
+    /// tant que la clé affichée n'est pas sauvegardée.
+    private let onClose: (() -> Void)?
 
-    init(api: APIClient) {
+    init(api: APIClient, onClose: (() -> Void)? = nil) {
         _model = StateObject(wrappedValue: E2EEV2RecoveryResetViewModel(api: api))
+        self.onClose = onClose
     }
 
     var body: some View {
@@ -1657,6 +1664,15 @@ struct E2EEV2RecoveryResetView: View {
         .navigationTitle("Récupération E2EE")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(!model.mayLeaveSecret)
+        .interactiveDismissDisabled(!model.mayLeaveSecret)
+        .toolbar {
+            if let onClose {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("OK", action: onClose)
+                        .disabled(!model.mayLeaveSecret)
+                }
+            }
+        }
         .task { await model.load() }
         .onDisappear { model.wipeTransientSecrets() }
         // La clé de récupération peut être affichée en clair. Masquer aussi

@@ -121,9 +121,11 @@ struct ConversationDetailView: View {
     @State private var showSaved = false
     /// Médias et fichiers de la conversation (plan 3, vague 2).
     @State private var showMedia = false
-    /// Messages éphémères (parité Android) : quand actif, les textes envoyés
-    /// portent un TTL de 24 h (le backend pose `expiresAt`).
+    /// Messages éphémères (parité Android) : quand actif, tout ce qui part
+    /// (texte, photo, note vocale, position) porte un TTL de 24 h (le backend
+    /// pose `expiresAt`).
     @State private var ephemeralEnabled = false
+    private var ephemeralTTL: Int { ephemeralEnabled ? 86_400 : 0 }
     @State private var isSharingLocation = false
     @State private var showLiveShare = false
     @State private var showSchedulePicker = false
@@ -2478,7 +2480,7 @@ struct ConversationDetailView: View {
         // serveur ou la marquera .failed (rejouable au tap).
         let replyToId = replyTarget?.id
         let localId = "local-\(UUID().uuidString)"
-        let ttl = ephemeralEnabled ? 86_400 : 0
+        let ttl = ephemeralTTL
         let optimistic = makeOptimisticMessage(id: localId, text: text, replyToId: replyToId, ttlSeconds: ttl)
         pendingSends[localId] = PendingSend(text: text, replyToId: replyToId, idempotencyKey: UUID().uuidString, ttlSeconds: ttl)
         sendStatus[localId] = .sending
@@ -2636,7 +2638,8 @@ struct ConversationDetailView: View {
                 height: nil,
                 in: conversation,
                 replyToId: replyTarget?.id,
-                e2ee: e2ee
+                e2ee: e2ee,
+                ttlSeconds: ephemeralTTL
             )
             messages = Self.normalized(messages + [sent])
             replyTarget = nil
@@ -2673,7 +2676,8 @@ struct ConversationDetailView: View {
                 height: prepared.height,
                 in: conversation,
                 replyToId: replyTarget?.id,
-                e2ee: e2ee
+                e2ee: e2ee,
+                ttlSeconds: ephemeralTTL
             )
             messages = Self.normalized(messages + [sent])
             if sent.isEncrypted, !caption.isEmpty {
@@ -2827,6 +2831,7 @@ struct ConversationDetailView: View {
                 observedAt: location.timestamp,
                 in: conversation,
                 expectedSessionID: expectedSessionID,
+                ttlSeconds: ephemeralTTL,
                 validateBeforeSend: { [locationService = services.location] in
                     try Task.checkCancellation()
                     let usable = await locationService.isUsable(location, maxAge: 30)

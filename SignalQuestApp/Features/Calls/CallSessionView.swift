@@ -377,16 +377,17 @@ struct CallScreen: View {
                 // D.11 : volontaire, coupé par défaut ; seulement une fois l'appel
                 // connecté (et vérifié, s'il est chiffré).
                 let canShare = liveKit.state == .connected && (callManager.activeCall?.requiresE2EE != true || liveKit.isE2EEVerified)
+                let waitingForCellular = callManager.isSharingNetwork && callManager.isNetworkSharingWaitingForCellular
                 controlButton(
                     systemImage: "antenna.radiowaves.left.and.right",
-                    tint: callManager.isSharingNetwork ? SQColor.success : SQColor.label
+                    tint: waitingForCellular ? SQColor.warning : (callManager.isSharingNetwork ? SQColor.success : SQColor.label)
                 ) {
                     callManager.toggleNetworkSharing()
                 }
                 .disabled(!canShare && !callManager.isSharingNetwork)
                 .opacity(canShare || callManager.isSharingNetwork ? 1 : 0.4)
                 .accessibilityLabel(callManager.isSharingNetwork ? "Arrêter de partager mon réseau" : "Partager mon réseau")
-                .accessibilityValue(callManager.isSharingNetwork ? "Partagé" : "Non partagé")
+                .accessibilityValue(waitingForCellular ? "En attente du réseau mobile" : (callManager.isSharingNetwork ? "Partagé" : "Non partagé"))
                 .accessibilityIdentifier("call.shareNetwork")
 
                 if callManager.activeCall?.hasVideo == true {
@@ -407,6 +408,17 @@ struct CallScreen: View {
                     .opacity(liveKit.canStartPictureInPicture || liveKit.isPictureInPictureActive ? 1 : 0.4)
                     .accessibilityLabel(liveKit.isPictureInPictureActive ? "Quitter l’image dans l’image" : "Activer l’image dans l’image")
                 }
+            }
+
+            // En Wi-Fi, l'adresse désignerait la box : rien ne part tant que la
+            // connexion n'est pas cellulaire, et on le dit.
+            if callManager.isSharingNetwork && callManager.isNetworkSharingWaitingForCellular {
+                Text("Partage en attente : tu n’es pas sur le réseau mobile. Il reprendra dès que tu y passes.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, SQSpace.lg)
             }
         }
     }

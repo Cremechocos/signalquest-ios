@@ -15,6 +15,11 @@ struct ShareCardBubble: View {
     let card: ShareCardData
     let mine: Bool
     @Environment(\.openURL) private var openURL
+    @State private var externalURL: URL?
+
+    private func open(_ url: URL) {
+        if ShareCardData.isSignalQuestURL(url) { openURL(url) } else { externalURL = url }
+    }
 
     private var badge: String {
         switch card.kind.lowercased() {
@@ -79,10 +84,11 @@ struct ShareCardBubble: View {
                 .padding(.top, 1)
             }
             if let url = card.openURL {
-                ShareCardOpenButton(mine: mine) { openURL(url) }
+                ShareCardOpenButton(mine: mine) { open(url) }
             }
         }
         .frame(maxWidth: 280, alignment: .leading)
+        .confirmsExternalLink($externalURL)
     }
 }
 
@@ -93,6 +99,11 @@ struct SignalCardBubble: View {
     let signal: SignalShareData
     let mine: Bool
     @Environment(\.openURL) private var openURL
+    @State private var externalURL: URL?
+
+    private func open(_ url: URL) {
+        if ShareCardData.isSignalQuestURL(url) { openURL(url) } else { externalURL = url }
+    }
 
     private var scoreColor: Color {
         switch signal.resolvedScore ?? 0 {
@@ -170,10 +181,11 @@ struct SignalCardBubble: View {
             }
 
             if let url = card.openURL {
-                ShareCardOpenButton(mine: mine) { openURL(url) }
+                ShareCardOpenButton(mine: mine) { open(url) }
             }
         }
         .frame(maxWidth: 280, alignment: .leading)
+        .confirmsExternalLink($externalURL)
     }
 }
 
@@ -185,6 +197,11 @@ struct SharedPostCardBubble: View {
     let card: ShareCardData
     let mine: Bool
     @Environment(\.openURL) private var openURL
+    @State private var externalURL: URL?
+
+    private func open(_ url: URL) {
+        if ShareCardData.isSignalQuestURL(url) { openURL(url) } else { externalURL = url }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
@@ -202,7 +219,7 @@ struct SharedPostCardBubble: View {
                     .frame(height: 0.5)
                 Button {
                     Haptics.selection()
-                    openURL(url)
+                    open(url)
                 } label: {
                     HStack(spacing: SQSpace.xs) {
                         Text("Voir la publication")
@@ -220,6 +237,7 @@ struct SharedPostCardBubble: View {
             }
         }
         .frame(maxWidth: 280, alignment: .leading)
+        .confirmsExternalLink($externalURL)
     }
 
     private var header: some View {
@@ -432,6 +450,33 @@ struct LocationBubble: View {
 }
 
 // MARK: Bouton « Ouvrir » partagé
+
+/// Un lien de carte hors de SignalQuest n'est ouvert qu'après avoir montré
+/// son domaine : l'expéditeur choisit l'URL, le titre de la carte peut mentir.
+private struct ExternalLinkConfirmation: ViewModifier {
+    @Binding var url: URL?
+    @Environment(\.openURL) private var openURL
+
+    func body(content: Content) -> some View {
+        content.confirmationDialog(
+            "Ouvrir un lien externe ?",
+            isPresented: Binding(get: { url != nil }, set: { if !$0 { url = nil } }),
+            titleVisibility: .visible,
+            presenting: url
+        ) { target in
+            Button("Ouvrir") { openURL(target) }
+            Button("Annuler", role: .cancel) {}
+        } message: { target in
+            Text("Ce lien mène hors de SignalQuest, vers \(target.host ?? "").")
+        }
+    }
+}
+
+private extension View {
+    func confirmsExternalLink(_ url: Binding<URL?>) -> some View {
+        modifier(ExternalLinkConfirmation(url: url))
+    }
+}
 
 /// CTA d'ouverture harmonisé avec la carte de publication : hairline puis
 /// rangée pleine largeur « Ouvrir » + chevron (teinte onAccent/brandRed).

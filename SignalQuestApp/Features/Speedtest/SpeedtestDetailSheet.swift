@@ -543,7 +543,7 @@ private extension String {
 
 
 /// État serveur et actions de cette fiche ; aucun optimisme sur la visibilité.
-private struct SpeedtestVisibilityControls: View {
+struct SpeedtestVisibilityControls: View {
     @ObservedObject var model: SpeedtestVisibilityViewModel
     @State private var publicationConfirmation: SpeedtestVisibilityViewModel.PublicationConfirmation?
 

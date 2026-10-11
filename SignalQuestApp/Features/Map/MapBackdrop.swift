@@ -92,4 +92,13 @@ enum MapBackdrop: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Mention exigée par la licence des tuiles raster, affichée sur la carte.
+    var tileAttribution: String? {
+        switch self {
+        case .osm: return "© OpenStreetMap contributors"
+        case .topo: return "© OpenStreetMap contributors, SRTM · © OpenTopoMap (CC-BY-SA)"
+        case .carto, .applePlan, .satellite: return nil
+        }
+    }
+
 }

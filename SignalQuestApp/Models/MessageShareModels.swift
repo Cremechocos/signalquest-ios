@@ -99,7 +99,31 @@ struct ShareCardData: Equatable {
     let speedtest: SpeedtestShareData?
     let session: SessionShareData?
 
-    var openURL: URL? { url.flatMap(URL.init(string:)) }
+    /// Le lien vient de l'expéditeur : seul `https` est ouvert. Hors des
+    /// domaines SignalQuest, la carte montre la destination avant d'ouvrir.
+    var openURL: URL? {
+        guard let url = url.flatMap(URL.init(string:)),
+              url.scheme?.lowercased() == "https",
+              url.host?.isEmpty == false else { return nil }
+        return url
+    }
+
+    /// Domaine SignalQuest (site, API, médias) ou hôte de l'environnement courant.
+    static func isSignalQuestURL(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https", let host = url.host?.lowercased() else { return false }
+        if host == "signalquest.fr" || host.hasSuffix(".signalquest.fr") { return true }
+        let config = AppConfig.current
+        return [config.appBaseURL.host, config.apiBaseURL.host]
+            .compactMap { $0?.lowercased() }
+            .contains(host)
+    }
+
+    /// Image d'une carte : chargée seulement depuis nos domaines, jamais depuis
+    /// un hôte choisi par l'expéditeur (même règle que les aperçus de lien).
+    private static func signalQuestImageURL(_ value: Any?) -> URL? {
+        guard let url = optString(value).flatMap(URL.init(string:)), isSignalQuestURL(url) else { return nil }
+        return url
+    }
 
     /// Id de la publication partagée (kind « social_post ») — clé de chargement
     /// du post réel dans la conversation. Nil pour les autres kinds ou les
@@ -156,7 +180,7 @@ struct ShareCardData: Equatable {
             author = ShareCardAuthor(
                 name: ShareCardData.optString(a["name"]),
                 handle: ShareCardData.optString(a["handle"]),
-                avatarUrl: ShareCardData.optString(a["avatarUrl"]).flatMap(URL.init(string:))
+                avatarUrl: ShareCardData.signalQuestImageURL(a["avatarUrl"])
             )
         }
         var speedtest: SpeedtestShareData?
@@ -189,7 +213,7 @@ struct ShareCardData: Equatable {
             signal: signal,
             author: author,
             text: ShareCardData.optString(card["text"]),
-            imageUrl: ShareCardData.optString(card["image"]).flatMap(URL.init(string:)),
+            imageUrl: ShareCardData.signalQuestImageURL(card["image"]),
             speedtest: speedtest,
             session: session
         )

@@ -914,6 +914,22 @@
         }
       }
     },
+    "Ce lien mène hors de SignalQuest, vers %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This link leads outside SignalQuest, to %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce lien mène hors de SignalQuest, vers %@."
+          }
+        }
+      }
+    },
     "Cet appareil est déjà approuvé." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1182,6 +1198,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En France, le secteur est déterminé automatiquement à partir du PCI : secteur %@."
+          }
+        }
+      }
+    },
+    "En attente du réseau mobile" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for mobile network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente du réseau mobile"
           }
         }
       }
@@ -1828,6 +1860,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "N'afficher que"
+          }
+        }
+      }
+    },
+    "Ouvrir un lien externe ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open an external link?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir un lien externe ?"
           }
         }
       }
@@ -18381,6 +18429,22 @@
         }
       }
     },
+    "Partage en attente : tu n’es pas sur le réseau mobile. Il reprendra dès que tu y passes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharing on hold: you’re not on mobile data. It resumes as soon as you switch to it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partage en attente : tu n’es pas sur le réseau mobile. Il reprendra dès que tu y passes."
+          }
+        }
+      }
+    },
     "Réseau de %@, en direct" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -33843,18 +33907,18 @@
         }
       }
     },
-    "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées ; tu peux masquer un résultat depuis ton historique." : {
+    "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées. Pour masquer un résultat, touche son point sur la carte du trajet ; le site SignalQuest permet aussi de le faire ensuite." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "New eligible speedtests are published at their exact location. Your private zones remain protected; you can hide a result from your history."
+            "value" : "New eligible speedtests are published at their exact location. Your private zones remain protected. To hide a result, tap its point on the trip map; the SignalQuest website also lets you do it later."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées ; tu peux masquer un résultat depuis ton historique."
+            "value" : "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées. Pour masquer un résultat, touche son point sur la carte du trajet ; le site SignalQuest permet aussi de le faire ensuite."
           }
         }
       }
@@ -42910,18 +42974,18 @@
         }
       }
     },
-    "Pour situer ton speedtest sur la carte communautaire, SignalQuest a besoin de ta position approximative (~100 m). Tu peux refuser : le test fonctionnera quand même, sans apparaître sur la carte." : {
+    "Pour situer ton speedtest sur la carte communautaire, SignalQuest a besoin de ta position au moment du test. Elle est publiée telle quelle ; tes zones privées la protègent. Tu peux refuser : le test fonctionnera quand même, sans apparaître sur la carte." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "To place your speedtest on the community map, SignalQuest needs your approximate location (~100 m). You can decline: the test will still work, it just won't appear on the map."
+            "value" : "To place your speedtest on the community map, SignalQuest needs your location at the time of the test. It is published as is; your private zones protect it. You can decline: the test will still work, it just won't appear on the map."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pour situer ton speedtest sur la carte communautaire, SignalQuest a besoin de ta position approximative (~100 m). Tu peux refuser : le test fonctionnera quand même, sans apparaître sur la carte."
+            "value" : "Pour situer ton speedtest sur la carte communautaire, SignalQuest a besoin de ta position au moment du test. Elle est publiée telle quelle ; tes zones privées la protègent. Tu peux refuser : le test fonctionnera quand même, sans apparaître sur la carte."
           }
         }
       }

@@ -71,10 +71,10 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         if let title, !title.trimmingCharacters(in: .whitespaces).isEmpty { return title }
         let others = participants
             .filter { currentUserId == nil || $0.userId != currentUserId }
-            .map { $0.user.name ?? $0.user.email }
+            .map(\.user.displayName)
             .filter { !$0.isEmpty }
         let names = others.isEmpty
-            ? participants.map { $0.user.name ?? $0.user.email }.filter { !$0.isEmpty }
+            ? participants.map(\.user.displayName).filter { !$0.isEmpty }
             : others
         return names.joined(separator: ", ")
     }
@@ -168,7 +168,13 @@ struct MessageUser: Decodable, Identifiable, Equatable {
     /// l'abonnement actif. Même contrat que `SocialFeedAuthor.badges`.
     let badges: [SocialUserBadge]
 
-    var displayName: String { name ?? email.components(separatedBy: "@").first ?? "Utilisateur" }
+    /// Jamais l'e-mail complet : il apparaîtrait dans la liste, l'en-tête et
+    /// les Récents de CallKit. Vide quand rien n'est connu : l'appelant choisit
+    /// sa formule (« un membre »).
+    var displayName: String {
+        if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { return name }
+        return email.components(separatedBy: "@").first ?? ""
+    }
 
     enum CodingKeys: String, CodingKey { case id, name, email, avatarUrl, badges }
 

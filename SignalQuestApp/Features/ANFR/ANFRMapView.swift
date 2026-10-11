@@ -626,6 +626,7 @@ struct ANFRMapKitView: UIViewRepresentable {
             guard backdrop != appliedBackdrop else { return }
             appliedBackdrop = backdrop
             if let old = tileOverlay { map.removeOverlay(old); tileOverlay = nil }
+            map.showTileAttribution(backdrop.tileAttribution)
             switch backdrop.mapKitKind {
             case .applePlan:
                 let c = MKStandardMapConfiguration(elevationStyle: .flat); c.pointOfInterestFilter = .excludingAll

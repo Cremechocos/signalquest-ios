@@ -20,6 +20,7 @@ protocol MessagesServicing: Sendable {
     /// E2EE (allowedKinds) → l'appelant ne le propose qu'en conversation non chiffrée.
     func sendLocation(latitude: Double, longitude: Double, place: String?, accuracyMeters: Double,
                       observedAt: Date, in conversation: MessageConversation, expectedSessionID: UUID,
+                      ttlSeconds: Int,
                       validateBeforeSend: @escaping @Sendable () async throws -> Void) async throws -> MessageItem
     // Partage GPS/radio en direct
     func liveShareSessions(conversationId: String) async throws -> [LiveShareSession]
@@ -50,7 +51,8 @@ protocol MessagesServicing: Sendable {
         caption: String,
         in conversation: MessageConversation,
         replyToId: String?,
-        e2ee: E2EEServicing?
+        e2ee: E2EEServicing?,
+        ttlSeconds: Int
     ) async throws -> MessageItem
     func sendAttachmentData(
         _ data: Data,
@@ -62,7 +64,8 @@ protocol MessagesServicing: Sendable {
         height: Int?,
         in conversation: MessageConversation,
         replyToId: String?,
-        e2ee: E2EEServicing?
+        e2ee: E2EEServicing?,
+        ttlSeconds: Int
     ) async throws -> MessageItem
     func retryPendingAttachments() async
     func markRead(conversationId: String, lastMessageId: String) async throws
@@ -142,7 +145,8 @@ extension MessagesServicing {
         height: Int?,
         in conversation: MessageConversation,
         replyToId: String?,
-        e2ee: E2EEServicing?
+        e2ee: E2EEServicing?,
+        ttlSeconds: Int
     ) async throws -> MessageItem {
         let uploaded = try await uploadAttachment(
             conversationId: conversation.id,
@@ -164,7 +168,8 @@ extension MessagesServicing {
             caption: caption,
             in: conversation,
             replyToId: replyToId,
-            e2ee: e2ee
+            e2ee: e2ee,
+            ttlSeconds: ttlSeconds
         )
     }
 }
@@ -479,6 +484,7 @@ final class MessagesService: MessagesServicing {
 
     func sendLocation(latitude: Double, longitude: Double, place: String?, accuracyMeters: Double,
                       observedAt: Date, in conversation: MessageConversation, expectedSessionID: UUID,
+                      ttlSeconds: Int,
                       validateBeforeSend: @escaping @Sendable () async throws -> Void) async throws -> MessageItem {
         try await validateBeforeSend()
         try LegacyE2EEWritePolicy.requireAllowed(
@@ -489,6 +495,7 @@ final class MessagesService: MessagesServicing {
             let kind = "LOCATION"
             let content: String
             let metadata: Meta
+            let ttlSeconds: Int?
             struct Meta: Encodable {
                 let location: Loc
                 struct Loc: Encodable {
@@ -505,7 +512,8 @@ final class MessagesService: MessagesServicing {
             content: cleanPlace ?? "",
             metadata: .init(location: .init(lat: latitude, lng: longitude,
                 place: (cleanPlace?.isEmpty == false) ? cleanPlace : nil,
-                accuracyMeters: accuracyMeters, observedAt: ObservationTimestamp.string(observedAt)))
+                accuracyMeters: accuracyMeters, observedAt: ObservationTimestamp.string(observedAt))),
+            ttlSeconds: ttlSeconds > 0 ? ttlSeconds : nil
         )
         let response: CreatedMessageResponse = try await api.request(
             APIEndpoint(path: "/api/messages/conversations/\(conversation.id)/messages", method: .post,
@@ -772,7 +780,8 @@ final class MessagesService: MessagesServicing {
         caption: String,
         in conversation: MessageConversation,
         replyToId: String? = nil,
-        e2ee: E2EEServicing?
+        e2ee: E2EEServicing?,
+        ttlSeconds: Int
     ) async throws -> MessageItem {
         // Ne jamais joindre une URL/métadonnée en clair à une conversation E2EE.
         // Le chiffrement binaire interopérable sera réactivé avec l'enveloppe média
@@ -792,7 +801,7 @@ final class MessagesService: MessagesServicing {
             e2ee: nil,
             replyToId: replyToId,
             attachments: attachments,
-            ttlSeconds: nil,
+            ttlSeconds: ttlSeconds > 0 ? ttlSeconds : nil,
             clientRequestId: clientRequestId
         )
         let record = MessageTextOutboxRecord(
@@ -817,7 +826,8 @@ final class MessagesService: MessagesServicing {
         height: Int?,
         in conversation: MessageConversation,
         replyToId: String?,
-        e2ee: E2EEServicing?
+        e2ee: E2EEServicing?,
+        ttlSeconds: Int
     ) async throws -> MessageItem {
         try LegacyE2EEWritePolicy.requireAllowed(
             e2eeEnabled: conversation.e2eeEnabled == true,
@@ -841,7 +851,8 @@ final class MessagesService: MessagesServicing {
             height: height,
             contentSha256: Self.sha256Hex(data),
             uploadedAttachment: nil,
-            createdAt: Date()
+            createdAt: Date(),
+            ttlSeconds: ttlSeconds > 0 ? ttlSeconds : nil
         )
         try await attachmentOutbox.stage(record, source: data, session: session)
         return try await submitPreparedAttachment(record, session: session)
@@ -921,7 +932,8 @@ final class MessagesService: MessagesServicing {
                 height: record.height,
                 contentSha256: record.contentSha256,
                 uploadedAttachment: attachment,
-                createdAt: record.createdAt
+                createdAt: record.createdAt,
+                ttlSeconds: record.ttlSeconds
             )
         }
         let payload = SendMessageRequest(
@@ -930,7 +942,7 @@ final class MessagesService: MessagesServicing {
             e2ee: nil,
             replyToId: record.replyToId,
             attachments: [attachment],
-            ttlSeconds: nil,
+            ttlSeconds: record.ttlSeconds,
             clientRequestId: record.clientRequestId
         )
         let response: CreatedMessageResponse = try await api.requestJSON(
@@ -1766,6 +1778,8 @@ struct MessageAttachmentOutboxRecord: Codable, Equatable, Sendable {
     let contentSha256: String
     let uploadedAttachment: UploadedAttachment?
     let createdAt: Date
+    /// Mode éphémère au moment de l'envoi ; absent des fichiers plus anciens.
+    var ttlSeconds: Int? = nil
 }
 
 actor MessageAttachmentOutboxStore {
@@ -1912,7 +1926,8 @@ actor MessageAttachmentOutboxStore {
             height: current.height,
             contentSha256: current.contentSha256,
             uploadedAttachment: attachment,
-            createdAt: current.createdAt
+            createdAt: current.createdAt,
+            ttlSeconds: current.ttlSeconds
         )
         let url = metadataURL(clientRequestId, ownerNamespace: session.ownerNamespace)
         let data = try encoder.encode(updated)

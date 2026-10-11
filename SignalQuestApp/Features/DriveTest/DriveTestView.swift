@@ -1320,7 +1320,11 @@ struct DriveTestView: View {
             )
         }
         .sheet(item: $selectedSpeedtest) { point in
-            DriveSpeedtestDetailSheet(point: point)
+            DriveSpeedtestDetailSheet(
+                point: point,
+                visibilityService: services.speedtest,
+                guestMode: services.auth.cachedUser() == nil
+            )
         }
     }
 

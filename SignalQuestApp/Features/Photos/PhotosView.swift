@@ -261,7 +261,8 @@ final class PhotosViewModel: ObservableObject {
                     caption: photo.displayCaption,
                     in: conversation,
                     replyToId: nil,
-                    e2ee: e2ee
+                    e2ee: e2ee,
+                    ttlSeconds: 0
                 )
             }
             Haptics.success()
@@ -359,6 +360,7 @@ struct PhotosView: View {
             .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.md)
             .padding(.bottom, 96)
+            .sqReadableWidth()
         }
         .navigationTitle("Photos")
         .toolbarTitleInlineCompat()
@@ -527,6 +529,9 @@ struct PhotosView: View {
                 // Voile de lisibilité sous les métadonnées (fonctionnel, pas décoratif).
                 LinearGradient(colors: [.clear, .black.opacity(0.72)], startPoint: .top, endPoint: .bottom)
             )
+            // Posées sur l'image, les métadonnées plafonnent leur taille : au-delà,
+            // elles la recouvraient entière. Le détail de la photo les reprend en grand.
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
         .overlay(alignment: .topTrailing) {
             if let op = photo.operator, !op.isEmpty {
@@ -537,6 +542,7 @@ struct PhotosView: View {
                     .padding(.vertical, SQSpace.xs)
                     .background(opColor, in: Capsule(style: .continuous))
                     .padding(SQSpace.sm)
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
@@ -587,6 +593,8 @@ struct PhotosView: View {
                 // Voile de lisibilité sous la légende (fonctionnel, pas décoratif).
                 LinearGradient(colors: [.clear, .black.opacity(0.68)], startPoint: .top, endPoint: .bottom)
             )
+            // Même plafond que la grande tuile : la vignette garde son format 3:4.
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
         .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .sqShadowSoft()

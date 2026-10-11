@@ -412,6 +412,8 @@ final class CallManager: NSObject, ObservableObject {
     /// « Partager mon réseau » (D.11) : volontaire, coupé par défaut, arrêté
     /// avec l'appel.
     @Published private(set) var isSharingNetwork = false
+    /// Partage demandé, mais rien ne part : la connexion n'est pas cellulaire.
+    @Published private(set) var isNetworkSharingWaitingForCellular = false
     /// Réseaux partagés par les autres participants, par identité LiveKit.
     @Published private(set) var peerNetworks: [String: PeerNetwork] = [:]
 
@@ -615,8 +617,10 @@ final class CallManager: NSObject, ObservableObject {
                     if let data = packet.encoded() {
                         try? await self.liveKit.publishData(data, topic: CallRadioPacket.topic)
                     }
+                    if self.isNetworkSharingWaitingForCellular { self.isNetworkSharingWaitingForCellular = false }
                 } else {
                     resolvedOnCellular = false
+                    if !self.isNetworkSharingWaitingForCellular { self.isNetworkSharingWaitingForCellular = true }
                 }
                 try? await Task.sleep(for: CallRadioPacket.interval)
             }
@@ -635,6 +639,7 @@ final class CallManager: NSObject, ObservableObject {
         networkSharingTask?.cancel()
         networkSharingTask = nil
         isSharingNetwork = false
+        isNetworkSharingWaitingForCellular = false
     }
 
     private func resetNetworkSharing() {

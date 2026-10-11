@@ -382,11 +382,13 @@ final class AuthService: AuthServicing {
         }
     }
 
-    /// Ce que l'app expose HORS de l'app (widgets, Spotlight) appartient au compte
-    /// qui se déconnecte : on l'efface avec la session (MES-13).
+    /// Ce que l'app expose HORS de l'app (widgets, Spotlight, destinations
+    /// CarPlay) appartient au compte qui se déconnecte : on l'efface avec la
+    /// session (MES-13).
     private static func clearDeviceSurfaces() {
         WidgetSharedStore.clear()
         SQSpotlight.removeAll()
+        CarPlayDestinationStore.reset()
         WidgetCenter.shared.reloadAllTimelines()
     }
 
@@ -434,6 +436,7 @@ final class AuthService: AuthServicing {
             HiddenStoryAuthorsStore.purge(ownerScopeId: previousScope)
             E2EEV2HiddenMessagesStore.purge(ownerScopeId: previousScope)
             RecentlyViewedStore.purge(ownerScopeId: previousScope)
+            CarPlayDestinationStore.reset()
             Task { await MessageDraftStore.shared.purge(ownerScopeId: previousScope) }
         }
         LocalAccountScope.activate(userId: user.id)

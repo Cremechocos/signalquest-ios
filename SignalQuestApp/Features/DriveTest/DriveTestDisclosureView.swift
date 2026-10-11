@@ -39,7 +39,7 @@ struct DriveTestDisclosureView: View {
                         row(
                             icon: "mappin.and.ellipse",
                             title: "La position exacte de chaque speedtest",
-                            detail: "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées ; tu peux masquer un résultat depuis ton historique."
+                            detail: "Les nouveaux speedtests éligibles sont publiés à leur position exacte. Tes zones privées restent protégées. Pour masquer un résultat, touche son point sur la carte du trajet ; le site SignalQuest permet aussi de le faire ensuite."
                         )
                         row(
                             icon: "speedometer",

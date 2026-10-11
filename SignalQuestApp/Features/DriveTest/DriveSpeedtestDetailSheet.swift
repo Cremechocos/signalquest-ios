@@ -2,13 +2,24 @@ import SwiftUI
 
 /// Détails d'un point speedtest tapé sur la mini-carte Drive Test. UI soignée :
 /// anneau de jauge coloré par débit, tuiles de métriques, sparkline du download et
-/// méta (génération, opérateur, serveur, lieu, heure). Lecture seule.
+/// méta (génération, opérateur, serveur, lieu, heure). Seule la visibilité sur
+/// la carte publique se règle ici : l'historique local ne garde pas tout un trajet.
 struct DriveSpeedtestDetailSheet: View {
     let point: DriveSpeedtestPoint
     @EnvironmentObject private var services: AppServices
     @State private var marketEntry: MarketRegistryEntry?
+    @StateObject private var visibility: SpeedtestVisibilityViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    init(point: DriveSpeedtestPoint, visibilityService: any SpeedtestVisibilityServicing, guestMode: Bool) {
+        self.point = point
+        _visibility = StateObject(wrappedValue: SpeedtestVisibilityViewModel(
+            clientID: point.result.id, service: visibilityService, guestMode: guestMode,
+            vpnIsActive: { VPNDetector.isActive() }
+        ))
+    }
 
     private var result: SpeedtestRunResult { point.result }
 
@@ -22,6 +33,7 @@ struct DriveSpeedtestDetailSheet: View {
                         sparkleCard(series: series)
                     }
                     metaCard
+                    SpeedtestVisibilityControls(model: visibility)
                 }
                 .padding(SQSpace.lg)
                 .padding(.bottom, SQSpace.xl)
@@ -43,6 +55,11 @@ struct DriveSpeedtestDetailSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .task { marketEntry = await services.markets.market(forCode: result.marketCode) }
+        .task { await visibility.load() }
+        .onDisappear { visibility.deactivate() }
+        .onChangeCompat(of: scenePhase) { _, phase in
+            if phase == .active { visibility.refreshAvailability() }
+        }
     }
 
     // MARK: Hero — anneau de jauge coloré par débit

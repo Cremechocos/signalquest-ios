@@ -9,7 +9,8 @@ import CoreLocation
 ///
 /// Persistées dans `UserDefaults` comme `MapRegionStore` et les autres
 /// préférences de carte : ce sont des habitudes locales, pas des données de
-/// compte à synchroniser.
+/// compte à synchroniser. Elles restent propres au compte connecté : la
+/// déconnexion et le changement de compte les effacent (`AuthService`).
 enum CarPlayDestinationStore {
     static let key = "sq.carplay.recentDestinations.v1"
 
