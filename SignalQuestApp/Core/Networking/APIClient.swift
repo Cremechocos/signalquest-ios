@@ -19,6 +19,8 @@ struct AuthSessionExpiration: Sendable {
     let credentials: CredentialStore
     let snapshot: CredentialStore.Snapshot
     let localSession: LocalAccountSession?
+    /// Le serveur a refusé le compte (403 `ACCOUNT_SUSPENDED`), pas seulement le jeton.
+    var accountSuspended = false
 
     var isCurrent: Bool {
         credentials.isCurrent(snapshot, matchingRevision: true)
@@ -476,6 +478,9 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         return request
     }
 
+    /// Code renvoyé (403) pour un compte suspendu, sur toute route authentifiée.
+    static let accountSuspendedCode = "ACCOUNT_SUSPENDED"
+
     // MARK: Throttling (429/503)
 
     /// Nombre maximal de rejeux automatiques sur rate-limit.
@@ -518,10 +523,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 // Réseau coupé, 429, 5xx et annulation gardent leur nature : les
                 // appelants ne doivent pas transformer une panne en déconnexion.
                 guard credentials.isCurrent(sent) else { throw APIError.cancelled }
-                if case APIError.http(let refreshStatus, _, _, _, _) = error,
+                if case APIError.http(let refreshStatus, let refreshCode, _, _, _) = error,
                    refreshStatus == 401 || refreshStatus == 403 {
                     guard credentials.isCurrent(sent, matchingRevision: true) else { throw APIError.cancelled }
-                    notifySessionExpired(for: sent)
+                    notifySessionExpired(for: sent, accountSuspended: refreshCode == Self.accountSuspendedCode)
                 }
                 throw error
             }
@@ -534,6 +539,14 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 notifySessionExpired(for: retryContext)
                 throw APIError.http(status: retryStatus, code: retryCode, message: retryMessage, requestId: retryRequestId, retryAfter: retryRetryAfter)
             }
+        } catch APIError.http(let status, let code, let message, let requestId, let retryAfter)
+            where status == 403 && code == Self.accountSuspendedCode && endpoint.authenticated {
+            // Un compte suspendu est refusé partout : on ramène à la connexion
+            // au lieu d'afficher un refus sur chaque écran.
+            if credentials.isCurrent(sent, matchingRevision: true) {
+                notifySessionExpired(for: sent, accountSuspended: true)
+            }
+            throw APIError.http(status: status, code: code, message: message, requestId: requestId, retryAfter: retryAfter)
         } catch APIError.http(let status, let code, let message, let requestId, let retryAfter)
             where status == 403 && code == "EMAIL_NOT_VERIFIED" {
             NotificationCenter.default.post(name: .sqEmailVerificationRequired, object: sent.sessionID)
@@ -562,10 +575,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     /// Diffuse « session expirée » (ROB-02). `NotificationCenter` est thread-safe ;
     /// l'observateur (AuthSessionViewModel) rebascule sur le main actor. Idempotent :
     /// plusieurs posts rapprochés se résolvent en un seul passage `.loggedOut`.
-    private func notifySessionExpired(for snapshot: CredentialStore.Snapshot) {
+    private func notifySessionExpired(for snapshot: CredentialStore.Snapshot, accountSuspended: Bool = false) {
         guard snapshot.accessToken != nil else { return }
         let expiration = AuthSessionExpiration(credentials: credentials, snapshot: snapshot,
-            localSession: LocalAccountScope.sessionSnapshot())
+            localSession: LocalAccountScope.sessionSnapshot(), accountSuspended: accountSuspended)
         guard expiration.isCurrent else { return }
         NotificationCenter.default.post(name: .sqAuthSessionExpired, object: expiration)
     }

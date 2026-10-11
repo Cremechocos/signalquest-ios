@@ -585,7 +585,9 @@ final class AuthSessionViewModel: ObservableObject {
         guard expiration.isCurrent else { return }
         guard case .authenticated = state else { return }
         state = .loggedOut
-        infoMessage = String(localized: "Ta session a expiré. Reconnecte-toi pour continuer.")
+        infoMessage = expiration.accountSuspended
+            ? String(localized: "Ton compte est suspendu. Contacte le support SignalQuest pour en savoir plus.")
+            : String(localized: "Ta session a expiré. Reconnecte-toi pour continuer.")
         Task {
             guard expiration.isCurrent else { return }
             // La session HTTP est peut-être déjà invalide, mais le secret de révocation

@@ -53983,6 +53983,22 @@
         }
       }
     },
+    "Ton compte est suspendu. Contacte le support SignalQuest pour en savoir plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account is suspended. Contact SignalQuest support to find out more."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton compte est suspendu. Contacte le support SignalQuest pour en savoir plus."
+          }
+        }
+      }
+    },
     "Ton dernier test a utilisé %@." : {
       "localizations" : {
         "en" : {

@@ -265,6 +265,33 @@ final class APIClientTests: XCTestCase {
         await fulfillment(of: [signalled], timeout: 1)
     }
 
+    func testSuspendedAccountRefusalEndsTheSessionAsSuspended() async throws {
+        let client = APIClient(config: .test, cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()), session: Self.mockSession())
+        try client.credentials.setAccessToken("synthetic-session")
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 403, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"error":"Compte suspendu","code":"ACCOUNT_SUSPENDED"}"#.utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+        let signalled = expectation(forNotification: .sqAuthSessionExpired, object: nil) { note in
+            (note.object as? AuthSessionExpiration)?.accountSuspended == true
+        }
+
+        do {
+            let _: SuccessResponse = try await client.request(APIEndpoint(path: "/api/user/profile"), as: SuccessResponse.self)
+            XCTFail("Expected APIError")
+        } catch APIError.http(let status, let code, _, _, _) {
+            XCTAssertEqual(status, 403)
+            XCTAssertEqual(code, "ACCOUNT_SUSPENDED")
+        }
+        await fulfillment(of: [signalled], timeout: 1)
+        XCTAssertNotEqual(
+            APIError.userFacingMessage(status: 403, code: "ACCOUNT_SUSPENDED", serverMessage: ""),
+            APIError.statusFallback(403),
+            "La connexion dit pourquoi le compte est refusé"
+        )
+    }
+
     /// Un message serveur brut (trace ORM/SQL) sur un 5xx ne doit JAMAIS être affiché :
     /// on retombe sur le repli neutre. Régression du leak « Invalid `prisma.$queryRaw()` ».
     func testServerErrorMessageIsNotLeakedToUser() {
