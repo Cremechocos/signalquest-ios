@@ -1608,6 +1608,8 @@ struct MapExplorerView: View {
     /// recherche sans rien saisir (plan 3, vague 1).
     @State private var recentItems: [RecentlyViewedStore.Item] = []
     @State private var selectedPhoto: MapPhotoTarget?
+    /// Fiche ouverte depuis la visionneuse photo, par-dessus elle.
+    @State private var photoSiteAntenna: AntennaSite?
     @State private var selectedOutage: OutageSiteLive?
     /// Panne signalée par la communauté ouverte depuis la carte. Distincte de
     /// `selectedOutage` (incident opérateur) : deux sources, deux feuilles.
@@ -1747,12 +1749,31 @@ struct MapExplorerView: View {
             .onAppear { RecentlyViewedStore.record(.site(site, market: model.marketFilter)) }
         }
         .fullScreenCover(item: $selectedPhoto) { target in
+            let site = photoSite(for: target.id)
             MapPhotoViewer(
-                photoId: target.id,
-                initialThumbnailURL: target.thumbnailURL,
+                items: photoSiblings(of: target),
+                initialId: target.id,
                 service: services.photos,
-                operatorAccent: { model.operatorAccent($0) }
+                operatorAccent: { model.operatorAccent($0) },
+                operatorLabel: { model.operatorLabel($0) },
+                site: site.map(photoViewerSite),
+                onOpenSite: site.map { found in { photoSiteAntenna = found } }
             )
+            // La fiche s'ouvre PAR-DESSUS la photo : la fermer ramène à la photo.
+            .sheet(item: $photoSiteAntenna) { site in
+                AntennaDetailSheet(
+                    site: site,
+                    market: model.marketFilter,
+                    operatorName: model.operatorFilter,
+                    service: services.antennas,
+                    sightOrigin: sightOrigin,
+                    onIsolateCoverage: { focus in
+                        photoSiteAntenna = nil
+                        selectedPhoto = nil
+                        isolateCoverage(focus)
+                    }
+                )
+            }
         }
         .sheet(isPresented: $showFilterSheet) {
             MapAdvancedFilterSheet(
@@ -4353,6 +4374,39 @@ struct MapExplorerView: View {
                 friend: info
             )
         }
+    }
+
+    /// Les photos du même site, dans l'ordre de la carte, pour défiler de
+    /// l'une à l'autre ; une photo sans site reste seule.
+    private func photoSiblings(of target: MapPhotoTarget) -> [MapPhotoTarget] {
+        let siteId = model.publicPhotos.first { $0.id == target.id }?.siteId
+        guard let siteId, !siteId.isEmpty else { return [target] }
+        let siblings = model.publicPhotos
+            .filter { $0.siteId == siteId }
+            .map { MapPhotoTarget(id: $0.id, thumbnailURL: $0.thumbnailUrl, date: $0.uploadedAt) }
+        return siblings.contains { $0.id == target.id } ? siblings : [target]
+    }
+
+    /// Le site d'une photo, s'il est chargé sur la carte.
+    private func photoSite(for photoId: String) -> AntennaSite? {
+        guard let siteId = model.publicPhotos.first(where: { $0.id == photoId })?.siteId, !siteId.isEmpty else { return nil }
+        return model.antennas.first { $0.siteId == siteId || $0.id == siteId }
+    }
+
+    private func photoViewerSite(_ site: AntennaSite) -> MapPhotoSite {
+        let distance = services.location.cachedLocation().flatMap { here -> String? in
+            guard let latitude = site.latitude, let longitude = site.longitude else { return nil }
+            return SQUnits.distance(meters: here.distance(from: CLLocation(latitude: latitude, longitude: longitude)))
+        }
+        let number = site.siteId.flatMap { $0.isEmpty ? nil : String(localized: "Support \($0)") }
+        return MapPhotoSite(
+            kicker: number,
+            title: site.address.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Site \(site.siteId ?? site.id)"),
+            caption: distance,
+            operators: site.operators.map { MapPhotoSite.Operator(label: model.operatorLabel($0), color: model.operatorAccent($0)) },
+            technologies: site.technologies,
+            height: site.height.map { "\(Int($0.rounded())) m" }
+        )
     }
 
     private func selectAnnotation(_ annotation: MapAnnotationPayload) {

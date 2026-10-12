@@ -1,24 +1,73 @@
+import CoreLocation
 import SwiftUI
 
-/// Cible de présentation du viewer photo depuis la carte.
+/// Une photo de la visionneuse. La vignette sert de transition pendant le
+/// chargement ; les autres champs sont ce que l'appelant sait déjà, affiché
+/// tant que le détail du serveur n'a pas répondu (ou s'il ne répond pas).
 struct MapPhotoTarget: Identifiable, Equatable {
     let id: String
     let thumbnailURL: URL?
+    var imageURL: URL? = nil
+    var authorName: String? = nil
+    var caption: String? = nil
+    var date: Date? = nil
+    var likeCount: Int? = nil
+    var commentCount: Int? = nil
 }
 
-/// Viewer plein écran d'une photo d'antenne ouverte depuis la carte :
-/// photo en grand (zoom pincé), infos antenne + badge opérateur, like et
+/// Le site photographié, résumé en tête du panneau : numéro, nom, adresse et
+/// distance, puis statut, opérateurs, technologies et hauteur.
+struct MapPhotoSite {
+    struct Operator: Hashable {
+        let label: String
+        let color: Color
+    }
+    var kicker: String?
+    var title: String
+    var caption: String?
+    var status: String?
+    var statusColor: Color = SQColor.labelSecondary
+    var operators: [Operator] = []
+    var technologies: [String] = []
+    var height: String?
+}
+
+/// Visionneuse plein écran des photos d'un site, ouverte depuis la carte comme
+/// depuis la fiche antenne : défilement entre les photos, zoom (pincement,
+/// double toucher), le site en tête du panneau, puis l'auteur, J'aime et les
 /// commentaires. S'appuie sur `PhotoServicing` (detail / comments / like).
 struct MapPhotoViewer: View {
-    let photoId: String
-    let initialThumbnailURL: URL?
+    let items: [MapPhotoTarget]
     let service: PhotoServicing
     /// Couleur d'accent registry pour un opérateur donné.
     let operatorAccent: (String) -> Color
+    /// Nom d'affichage registry d'un opérateur (« Orange » pour `ORANGE`).
+    let operatorLabel: (String) -> String
+    /// Ce que l'appelant sait du site ; sinon, on le déduit de la photo.
+    let site: MapPhotoSite?
+    /// Ouvre la fiche du site par-dessus la photo ; absent depuis la fiche elle-même.
+    let onOpenSite: (() -> Void)?
+
+    init(
+        items: [MapPhotoTarget],
+        initialId: String,
+        service: PhotoServicing,
+        operatorAccent: @escaping (String) -> Color,
+        operatorLabel: @escaping (String) -> String = { $0 },
+        site: MapPhotoSite? = nil,
+        onOpenSite: (() -> Void)? = nil
+    ) {
+        self.items = items.isEmpty ? [MapPhotoTarget(id: initialId, thumbnailURL: nil)] : items
+        self.service = service
+        self.operatorAccent = operatorAccent
+        self.operatorLabel = operatorLabel
+        self.site = site
+        self.onOpenSite = onOpenSite
+        _currentId = State(initialValue: initialId)
+    }
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
     /// Photo ou commentaire à signaler : la même photo ouverte depuis l'écran
@@ -42,7 +91,8 @@ struct MapPhotoViewer: View {
         }
     }
 
-    @State private var photo: Photo?
+    @State private var currentId: String
+    @State private var details: [String: Photo] = [:]
     @State private var comments: [PhotoComment] = []
     @State private var isLoading = true
     @State private var liked = false
@@ -51,34 +101,39 @@ struct MapPhotoViewer: View {
     @State private var commentDraft = ""
     @State private var sendingComment = false
     @State private var commentError: String?
+    @State private var commentsExpanded = false
+    @State private var photoZoomed = false
+    @State private var pagerDrag: CGFloat = 0
+    @State private var dismissDrag: CGFloat = 0
+    @State private var pagerAxis: Axis?
     @State private var appeared = false
     @FocusState private var commentFocused: Bool
 
-    private var imageURL: URL? {
-        photo?.imageUrl ?? photo?.thumbnailUrl ?? initialThumbnailURL
-    }
-
-    private var operatorName: String? {
-        photo?.operator?.isEmpty == false ? photo?.operator : nil
-    }
+    private var photoId: String { currentId }
+    private var photo: Photo? { details[currentId] }
+    private var current: MapPhotoTarget? { items.first { $0.id == currentId } }
+    private var currentIndex: Int { items.firstIndex { $0.id == currentId } ?? 0 }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                photoArea
+                photoPager
                 infoPanel
             }
 
             topBar
                 .frame(maxHeight: .infinity, alignment: .top)
         }
-        .preferredColorScheme(.dark)
+        // Sombre pour la visionneuse seule : `preferredColorScheme` gagnerait aussi
+        // la fiche ou la carte restées dessous, qui resteraient sombres à la fermeture.
+        .environment(\.colorScheme, .dark)
+        .statusBarHidden(true)
         .sheet(item: $reportTarget) { report in
             ReportSheet(target: report.target, service: services.reports)
         }
-        .task { await load() }
+        .task(id: currentId) { await load() }
         .onAppear {
             withAnimation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.82)) {
                 appeared = true
@@ -87,25 +142,109 @@ struct MapPhotoViewer: View {
         .accessibilityAction(.escape) { dismiss() }
     }
 
-    // MARK: Photo
+    // MARK: Photos
 
-    private var photoArea: some View {
-        ZoomablePhoto(url: imageURL, placeholder: initialThumbnailURL)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black)
+    /// Pager maison plutôt qu'un `TabView` paginé : un seul geste décide de
+    /// l'axe au premier mouvement (horizontal = photo voisine, vers le bas =
+    /// fermer). Un second geste de glissement posé sur les pages d'un `TabView`
+    /// lui vole le défilement. Zoomée, la photo garde le glissement pour elle.
+    private var photoPager: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            HStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    Group {
+                        // Seules la photo affichée et ses voisines se chargent.
+                        if abs(index - currentIndex) <= 1 {
+                            ZoomablePhoto(
+                                url: details[item.id]?.imageUrl ?? item.imageURL ?? details[item.id]?.thumbnailUrl ?? item.thumbnailURL,
+                                placeholder: item.thumbnailURL,
+                                isZoomed: Binding(
+                                    get: { item.id == currentId && photoZoomed },
+                                    set: { if item.id == currentId { photoZoomed = $0 } }
+                                )
+                            )
+                        } else {
+                            Color.black
+                        }
+                    }
+                    .frame(width: width, height: geo.size.height)
+                    .accessibilityHidden(item.id != currentId)
+                }
+            }
+            .offset(x: -CGFloat(currentIndex) * width + pagerDrag, y: dismissDrag)
+            .frame(width: width, alignment: .leading)
+            .clipped()
+            .contentShape(Rectangle())
+            .gesture(pagerGesture(width: width), including: photoZoomed ? .subviews : .all)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black)
+        .overlay(alignment: .bottom) {
+            if items.count > 1 {
+                HStack(spacing: 6) {
+                    ForEach(items) { item in
+                        Circle()
+                            .fill(item.id == currentId ? Color.white : Color.white.opacity(0.35))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                .padding(.bottom, SQSpace.sm)
+                .accessibilityHidden(true)
+            }
+        }
+        .accessibilityAction(named: Text("Photo suivante")) { showPhoto(at: currentIndex + 1) }
+        .accessibilityAction(named: Text("Photo précédente")) { showPhoto(at: currentIndex - 1) }
+    }
+
+    private func pagerGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                if pagerAxis == nil {
+                    pagerAxis = abs(value.translation.width) >= abs(value.translation.height) ? .horizontal : .vertical
+                }
+                switch pagerAxis {
+                case .horizontal:
+                    // Résistance aux bords : pas de page avant la première ni après la dernière.
+                    let atEdge = (currentIndex == 0 && value.translation.width > 0)
+                        || (currentIndex == items.count - 1 && value.translation.width < 0)
+                    pagerDrag = atEdge ? value.translation.width / 3 : value.translation.width
+                case .vertical:
+                    dismissDrag = max(0, value.translation.height)
+                case nil:
+                    break
+                }
+            }
+            .onEnded { value in
+                let axis = pagerAxis
+                pagerAxis = nil
+                if axis == .vertical, dismissDrag > 120 {
+                    dismiss()
+                    return
+                }
+                var target = currentIndex
+                if axis == .horizontal {
+                    let travel = value.predictedEndTranslation.width
+                    if travel < -width / 3 { target += 1 }
+                    if travel > width / 3 { target -= 1 }
+                }
+                withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
+                    pagerDrag = 0
+                    dismissDrag = 0
+                    if items.indices.contains(target) { currentId = items[target].id }
+                }
+            }
+    }
+
+    private func showPhoto(at index: Int) {
+        guard items.indices.contains(index) else { return }
+        withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { currentId = items[index].id }
     }
 
     private var topBar: some View {
         HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(SQColor.label)
-                    .frame(width: 44, height: 44)
-                    .background { sqMapGlassBackground(Circle()) }
-                    .sqShadowSoft()
-            }
-            .accessibilityLabel("Fermer")
+            glassButton(systemImage: "xmark", label: "Fermer") { dismiss() }
+                .accessibilityIdentifier("photoViewer.close")
             Spacer()
             if case .authenticated = session.state {
                 Menu {
@@ -113,101 +252,232 @@ struct MapPhotoViewer: View {
                         Label("Signaler la photo", systemImage: "flag")
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(SQColor.label)
-                        .frame(width: 44, height: 44)
-                        .background { sqMapGlassBackground(Circle()) }
-                        .sqShadowSoft()
+                    glassIcon("ellipsis")
                 }
                 .accessibilityLabel("Plus d'options")
+            }
+        }
+        .overlay {
+            if items.count > 1 {
+                Text(verbatim: "\(currentIndex + 1) / \(items.count)")
+                    .font(SQFont.body(13, .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .accessibilityLabel(Text("Photo \(currentIndex + 1) sur \(items.count)"))
             }
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.top, SQSpace.sm)
     }
 
-    // MARK: Panneau d'infos
+    private func glassButton(systemImage: String, label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+        Button(action: action) { glassIcon(systemImage) }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel(label)
+    }
+
+    private func glassIcon(_ systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(SQColor.label)
+            .frame(width: 44, height: 44)
+            .background { sqMapGlassBackground(Circle()) }
+            .sqShadowSoft()
+    }
+
+    // MARK: Panneau
 
     private var infoPanel: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            header
-            if let caption = photo?.displayCaption, !caption.isEmpty, caption != String(localized: "Photo SignalQuest") {
-                Text(caption)
-                    .font(SQFont.body(14, .regular))
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            actionRow
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            grabber
+            siteBlock
             Divider().overlay(SQColor.separator)
-            commentsSection
+            photoRow
+            if commentsExpanded {
+                commentsSection
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+            composer
         }
-        .padding(SQSpace.lg)
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.bottom, SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface)
-        .clipShape(.rect(topLeadingRadius: SQRadius.xl, topTrailingRadius: SQRadius.xl))
+        // Le panneau descend jusqu'au bord de l'écran, sous l'indicateur d'accueil.
+        .background {
+            SQColor.surface
+                .clipShape(.rect(topLeadingRadius: SQRadius.xl, topTrailingRadius: SQRadius.xl))
+                .ignoresSafeArea(edges: .bottom)
+        }
         .offset(y: appeared ? 0 : 40)
         .opacity(appeared ? 1 : 0)
     }
 
-    private var header: some View {
-        HStack(spacing: SQSpace.sm) {
-            if let operatorName {
-                let accent = operatorAccent(operatorName)
-                Text(operatorName)
-                    .font(SQFont.body(12, .semibold))
-                    .foregroundStyle(SQBrand.operatorBadgeForeground(
-                        for: accent, colorScheme: colorScheme
-                    ))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(accent, in: Capsule(style: .continuous))
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                Text(siteTitle)
-                    .font(SQFont.display(15, .semibold))
-                    .foregroundStyle(SQColor.label)
-                if let subtitle = siteSubtitle {
-                    Text(subtitle)
-                        .font(SQFont.body(12, .regular))
-                        .foregroundStyle(SQColor.labelSecondary)
+    /// Glisser vers le haut déplie les commentaires, vers le bas les replie.
+    private var grabber: some View {
+        Capsule()
+            .fill(SQColor.separator)
+            .frame(width: 36, height: 5)
+            .frame(maxWidth: .infinity, minHeight: 22)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 8).onEnded { value in
+                    if value.translation.height < -20 { setCommentsExpanded(true) }
+                    if value.translation.height > 20 { setCommentsExpanded(false) }
                 }
-            }
-            Spacer()
-        }
+            )
+            .onTapGesture { setCommentsExpanded(!commentsExpanded) }
+            .accessibilityHidden(true)
+    }
+
+    private var resolvedSite: MapPhotoSite {
+        if let site { return site }
+        let operators = (photo?.siteOperators?.isEmpty == false ? photo?.siteOperators ?? [] : [photo?.operator].compactMap { $0 })
+            .filter { !$0.isEmpty }
+            .map { MapPhotoSite.Operator(label: operatorLabel($0), color: operatorAccent($0)) }
+        return MapPhotoSite(
+            kicker: photo?.siteId.flatMap { $0.isEmpty ? nil : String(localized: "Site \($0)") },
+            title: siteTitle,
+            caption: photoDistance,
+            operators: operators
+        )
     }
 
     private var siteTitle: String {
         if let address = photo?.siteAddress, !address.isEmpty { return address }
-        if let site = photo?.siteId, !site.isEmpty { return "Site \(site)" }
+        if let site = photo?.siteId, !site.isEmpty { return String(localized: "Site \(site)") }
         if let enb = photo?.enb, !enb.isEmpty { return "eNB \(enb)" }
         return String(localized: "Antenne")
     }
 
-    private var siteSubtitle: String? {
-        var parts: [String] = []
-        if let author = photo?.authorName, !author.isEmpty { parts.append(author) }
-        if let date = photo?.uploadedAt ?? photo?.createdAt {
-            parts.append(date.formatted(date: .abbreviated, time: .omitted))
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    private var photoDistance: String? {
+        guard let latitude = photo?.latitude, let longitude = photo?.longitude,
+              let here = services.location.cachedLocation() else { return nil }
+        return SQUnits.distance(meters: here.distance(from: CLLocation(latitude: latitude, longitude: longitude)))
     }
 
-    private var actionRow: some View {
-        HStack(spacing: SQSpace.lg) {
+    private var siteBlock: some View {
+        let site = resolvedSite
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .center, spacing: SQSpace.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let kicker = site.kicker {
+                        Text(kicker).sqKicker()
+                    }
+                    Text(site.title)
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(2)
+                    if let caption = site.caption {
+                        Text(caption)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                if let onOpenSite {
+                    Button(action: onOpenSite) {
+                        HStack(spacing: 4) {
+                            Text("Fiche")
+                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                        }
+                        .font(SQType.chip)
+                        .foregroundStyle(SQColor.label)
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minHeight: 44)
+                        .background(SQColor.surface, in: Capsule(style: .continuous))
+                        .overlay { Capsule(style: .continuous).strokeBorder(SQColor.separator, lineWidth: 1) }
+                    }
+                    .buttonStyle(SQPressButtonStyle(scale: 0.97))
+                    .accessibilityLabel("Ouvrir la fiche du site")
+                    .accessibilityIdentifier("photoViewer.openSite")
+                }
+            }
+            if site.status != nil || !site.operators.isEmpty || !site.technologies.isEmpty || site.height != nil {
+                FlowLayout(spacing: SQSpace.xs2) {
+                    if let status = site.status {
+                        SQEditorialTag(text: status, color: site.statusColor)
+                    }
+                    if !site.operators.isEmpty {
+                        HStack(spacing: 5) {
+                            HStack(spacing: -3) {
+                                ForEach(site.operators, id: \.self) { item in
+                                    Circle().fill(item.color).frame(width: 9, height: 9)
+                                        .overlay { Circle().strokeBorder(SQColor.surface, lineWidth: 1.5) }
+                                }
+                            }
+                            Text(site.operators.map(\.label).joined(separator: " · "))
+                                .font(SQType.chip)
+                                .foregroundStyle(SQColor.label)
+                        }
+                        .padding(.horizontal, 8)
+                        .frame(minHeight: 22)
+                        .background(SQColor.fill, in: Capsule(style: .continuous))
+                    }
+                    ForEach(site.technologies, id: \.self) { tech in
+                        MapTechTag(technology: tech, label: tech)
+                    }
+                    if let height = site.height {
+                        Text(height)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .frame(minHeight: 22)
+                    }
+                }
+            }
+        }
+    }
+
+    private var byline: String {
+        let author = photo?.authorName ?? current?.authorName
+        let date = photo?.uploadedAt ?? photo?.createdAt ?? current?.date
+        var parts: [String] = []
+        if let author, !author.isEmpty { parts.append(String(localized: "Photo de \(author)")) }
+        if let date { parts.append(date.formatted(date: .abbreviated, time: .omitted)) }
+        return parts.isEmpty ? String(localized: "Photo") : parts.joined(separator: " · ")
+    }
+
+    private var photoCaption: String? {
+        let caption = photo?.displayCaption ?? current?.caption
+        guard let caption, !caption.isEmpty, caption != String(localized: "Photo SignalQuest") else { return nil }
+        return caption
+    }
+
+    private var commentTotal: Int {
+        isLoading ? max(comments.count, current?.commentCount ?? 0) : comments.count
+    }
+
+    private var photoRow: some View {
+        HStack(alignment: .center, spacing: SQSpace.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(byline)
+                    .font(SQType.caption.weight(.bold))
+                    .foregroundStyle(SQColor.label)
+                if let photoCaption {
+                    Text(photoCaption)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+
             Button {
                 Task { await toggleLike() }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Image(systemName: liked ? "heart.fill" : "heart")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(liked ? SQColor.like : SQColor.label)
+                        .foregroundStyle(liked ? SQColor.like : SQColor.ink2)
                         .symbolEffectBounceCompat(value: liked)
                     Text("\(likeCount)")
-                        .font(SQFont.archivo(14, .semibold))
-                        .foregroundStyle(SQColor.label)
+                        .font(SQType.chip)
+                        .foregroundStyle(SQColor.ink2)
                         .contentTransition(.numericText())
                 }
+                .frame(minWidth: 44, minHeight: 44)
             }
             .disabled(likeBusy)
             .buttonStyle(SQPressButtonStyle())
@@ -215,17 +485,28 @@ struct MapPhotoViewer: View {
             .accessibilityValue("\(likeCount)")
             .accessibilityAddTraits(liked ? .isSelected : [])
 
-            HStack(spacing: 6) {
-                Image(systemName: "bubble.left")
-                    .font(.system(size: 17, weight: .semibold))
-                Text("\(comments.count)")
-                    .font(SQFont.archivo(14, .semibold))
-                    .contentTransition(.numericText())
+            Button { setCommentsExpanded(!commentsExpanded) } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: commentsExpanded ? "bubble.left.fill" : "bubble.left")
+                        .font(.system(size: 17, weight: .semibold))
+                    Text("\(commentTotal)")
+                        .font(SQType.chip)
+                        .contentTransition(.numericText())
+                }
+                .foregroundStyle(SQColor.ink2)
+                .frame(minWidth: 44, minHeight: 44)
             }
-            .foregroundStyle(SQColor.label)
-
-            Spacer()
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel("Commentaires")
+            .accessibilityValue("\(commentTotal)")
+            .accessibilityAddTraits(commentsExpanded ? .isSelected : [])
+            .accessibilityIdentifier("photoViewer.comments")
         }
+    }
+
+    private func setCommentsExpanded(_ expanded: Bool) {
+        guard expanded != commentsExpanded else { return }
+        withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { commentsExpanded = expanded }
     }
 
     // MARK: Commentaires
@@ -239,16 +520,21 @@ struct MapPhotoViewer: View {
                     .font(SQFont.body(13, .regular))
                     .foregroundStyle(SQColor.labelSecondary)
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: SQSpace.sm) {
-                        ForEach(comments) { comment in
-                            commentRow(comment)
-                        }
-                    }
+                // Quelques commentaires prennent leur hauteur ; au-delà, ils défilent.
+                ViewThatFits(in: .vertical) {
+                    commentList
+                    ScrollView { commentList }
                 }
-                .frame(maxHeight: 180)
+                .frame(maxHeight: 220)
             }
-            composer
+        }
+    }
+
+    private var commentList: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            ForEach(comments) { comment in
+                commentRow(comment)
+            }
         }
     }
 
@@ -288,33 +574,37 @@ struct MapPhotoViewer: View {
 
     private var composer: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
-        if let commentError {
-            SQInlineError(message: commentError)
-        }
-        HStack(spacing: SQSpace.sm) {
-            TextField("Ajouter un commentaire…", text: $commentDraft, axis: .vertical)
-                .font(SQFont.body(14, .regular))
-                .foregroundStyle(SQColor.label)
-                .tint(SQColor.brandRed)
-                .focused($commentFocused)
-                .lineLimit(1...3)
-                .padding(.horizontal, SQSpace.md)
-                .padding(.vertical, SQSpace.sm)
-                .frame(minHeight: 44)
-                .sqFieldSurface(in: Capsule(style: .continuous))
-
-            Button {
-                Task { await sendComment() }
-            } label: {
-                Image(systemName: "paperplane.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(canSend ? SQColor.onAccent : SQColor.labelTertiary)
-                    .frame(width: 44, height: 44)
-                    .background(canSend ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surfaceMuted), in: Circle())
+            if let commentError {
+                SQInlineError(message: commentError)
             }
-            .disabled(!canSend || sendingComment)
-            .accessibilityLabel("Envoyer le commentaire")
-        }
+            HStack(spacing: SQSpace.sm) {
+                TextField("Ajouter un commentaire…", text: $commentDraft, axis: .vertical)
+                    .font(SQFont.body(14, .regular))
+                    .foregroundStyle(SQColor.label)
+                    .tint(SQColor.brandRed)
+                    .focused($commentFocused)
+                    .lineLimit(1...3)
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.sm)
+                    .frame(minHeight: 44)
+                    .background(SQColor.fill, in: Capsule(style: .continuous))
+                    .onChange(of: commentFocused) { focused in
+                        if focused { setCommentsExpanded(true) }
+                    }
+
+                Button {
+                    Task { await sendComment() }
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(SQColor.onInk)
+                        .frame(width: 44, height: 44)
+                        .background(SQColor.label, in: Circle())
+                        .opacity(canSend ? 1 : 0.46)
+                }
+                .disabled(!canSend || sendingComment)
+                .accessibilityLabel("Envoyer le commentaire")
+            }
         }
     }
 
@@ -324,20 +614,27 @@ struct MapPhotoViewer: View {
 
     // MARK: Données
 
+    /// Recharge le détail et les commentaires de la photo affichée. Le compteur
+    /// de J'aime repart de ce que l'appelant savait, le temps que le serveur réponde.
     private func load() async {
-        async let detail = try? service.photo(id: photoId)
-        async let loadedComments = try? service.comments(photoId: photoId)
+        let id = currentId
+        isLoading = true
+        comments = []
+        commentError = nil
+        likeCount = details[id].map { $0.likeCount ?? $0.likes ?? 0 } ?? current?.likeCount ?? 0
+        liked = details[id].map { $0.isLikedByMe ?? $0.likedByCurrentUser ?? false } ?? false
+        async let detail = try? service.photo(id: id)
+        async let loadedComments = try? service.comments(photoId: id)
         let photoResult = await detail
         let commentsResult = await loadedComments ?? []
-        await MainActor.run {
-            if let photoResult {
-                self.photo = photoResult
-                self.likeCount = photoResult.likeCount ?? photoResult.likes ?? 0
-                self.liked = photoResult.isLikedByMe ?? photoResult.likedByCurrentUser ?? false
-            }
-            self.comments = commentsResult
-            self.isLoading = false
+        guard !Task.isCancelled, id == currentId else { return }
+        if let photoResult {
+            details[id] = photoResult
+            likeCount = photoResult.likeCount ?? photoResult.likes ?? 0
+            liked = photoResult.isLikedByMe ?? photoResult.likedByCurrentUser ?? false
         }
+        comments = commentsResult
+        isLoading = false
     }
 
     private func toggleLike() async {
@@ -406,10 +703,12 @@ struct MapPhotoViewer: View {
 }
 
 /// Image plein écran zoomable (pincement + double-tap), avec vignette de
-/// transition pendant le chargement de l'image pleine résolution.
+/// transition pendant le chargement de l'image pleine résolution. `isZoomed`
+/// dit au pager quand laisser le glissement à la photo.
 private struct ZoomablePhoto: View {
     let url: URL?
     let placeholder: URL?
+    @Binding var isZoomed: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scale: CGFloat = 1
@@ -450,12 +749,13 @@ private struct ZoomablePhoto: View {
             .simultaneousGesture(
                 DragGesture()
                     .onChanged { value in
-                        guard scale > 1 else { return }
                         offset = CGSize(width: lastOffset.width + value.translation.width,
                                         height: lastOffset.height + value.translation.height)
                     }
-                    .onEnded { _ in lastOffset = offset }
+                    .onEnded { _ in lastOffset = offset },
+                including: scale > 1 ? .all : .subviews
             )
+            .onChange(of: scale > 1) { zoomed in isZoomed = zoomed }
             .onTapGesture(count: 2) {
                 withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) {
                     if scale > 1 { resetZoom() } else { scale = 2.5; lastScale = 2.5 }

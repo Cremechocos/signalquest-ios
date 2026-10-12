@@ -232,7 +232,23 @@ struct AntennaDetailSheet: View {
         .presentationDetents([.medium, .large])
         .sqSheet(background: SQColor.bg)
         .fullScreenCover(item: $viewerPhoto) { photo in
-            AntennaPhotoViewer(photos: model.details?.photos ?? [photo], initialId: photo.id)
+            MapPhotoViewer(
+                items: (model.details?.photos ?? [photo]).map { item in
+                    MapPhotoTarget(
+                        id: item.id,
+                        thumbnailURL: item.thumbnailUrl,
+                        imageURL: item.imageUrl,
+                        authorName: item.userName,
+                        caption: item.description,
+                        likeCount: item.likes,
+                        commentCount: item.commentCount
+                    )
+                },
+                initialId: photo.id,
+                service: services.photos,
+                operatorAccent: registryColor,
+                site: photoViewerSite
+            )
         }
         // `alert` et non `confirmationDialog`, pour la même raison que la page « Pannes signalées »
         // et la feuille de panne : les deux issues doivent être NOMMÉES et la phrase de portée
@@ -515,6 +531,23 @@ struct AntennaDetailSheet: View {
     /// `SQBrand` ne sert que tant que le registre n'a pas répondu.
     private func registryColor(_ key: String) -> Color {
         marketEntry?.operatorColor(forKey: key) ?? SQBrand.operatorColor(key)
+    }
+
+    /// Le site tel que la visionneuse photo le résume : la photo garde sous les
+    /// yeux ce qu'on vient de lire dans l'en-tête de la fiche.
+    private var photoViewerSite: MapPhotoSite {
+        let core = model.details?.core
+        return MapPhotoSite(
+            kicker: supportLine,
+            title: headerTitle,
+            caption: headerCaption,
+            status: core?.displayStatus,
+            statusColor: core.map { $0.isInService ? SQColor.success : $0.isPendingStatus ? SQColor.warning : SQColor.labelSecondary }
+                ?? SQColor.labelSecondary,
+            operators: site.operators.map { MapPhotoSite.Operator(label: photoOperatorLabel($0), color: registryColor($0)) },
+            technologies: displayedTechnologies,
+            height: (core?.siteInfo.supportHeightMeters ?? core?.siteInfo.pylonHeight).map { "\(Int($0.rounded())) m" }
+        )
     }
 
     // MARK: En-tête et onglets
@@ -1711,67 +1744,6 @@ struct AzimuthFanView: View {
         .accessibilityLabel(fhAzimuths.isEmpty
             ? Text("Éventail des azimuts des secteurs")
             : Text("Éventail des azimuts : \(azimuths.count) secteurs et \(fhAzimuths.count) faisceaux hertziens"))
-    }
-}
-
-/// Viewer plein écran des photos du site : pagination horizontale + fermeture.
-private struct AntennaPhotoViewer: View {
-    let photos: [AntennaPhotoSummary]
-    @Environment(\.dismiss) private var dismiss
-    @State private var selection: String
-
-    init(photos: [AntennaPhotoSummary], initialId: String) {
-        self.photos = photos
-        _selection = State(initialValue: initialId)
-    }
-
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            TabView(selection: $selection) {
-                ForEach(photos) { photo in
-                    RemoteImage(url: photo.imageUrl ?? photo.thumbnailUrl, maxDimension: 1400, contentMode: .fit, showsFailureUI: true) {
-                        SQSpinner()
-                            .tint(.white)
-                    }
-                    .tag(photo.id)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: photos.count > 1 ? .automatic : .never))
-
-            VStack {
-                HStack {
-                    Spacer()
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .background(.white.opacity(0.14), in: Circle())
-                    }
-                    .accessibilityLabel("Fermer")
-                    .padding(.trailing, 16)
-                }
-                Spacer()
-                if let current = photos.first(where: { $0.id == selection }) {
-                    let caption = [current.userName, current.description]
-                        .compactMap { $0 }
-                        .filter { !$0.isEmpty }
-                        .joined(separator: " — ")
-                    if !caption.isEmpty {
-                        Text(caption)
-                            .font(SQFont.body(13, .medium))
-                            .foregroundStyle(.white.opacity(0.85))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, SQSpace.xl)
-                            .padding(.bottom, SQSpace.xxl + 4)
-                    }
-                }
-            }
-        }
     }
 }
 
