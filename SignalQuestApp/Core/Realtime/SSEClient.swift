@@ -46,6 +46,13 @@ final class SSEClient: Sendable {
         return max(backoff, min(Double(max(0, retryAfter)), 300))
     }
 
+    /// Mode démo sans jeton : le flux n'est pas ouvert (le serveur le refuserait),
+    /// et la boucle attend son backoff sans réseau jusqu'à une vraie session.
+    static func requireSessionOutsideDemo(_ api: APIClient) throws {
+        guard AppEnvironment.usesDemoData, api.credentials.accessToken() == nil else { return }
+        throw APIClient.demoUnauthorized
+    }
+
     /// Flux des noms d'événements SSE pour une conversation. Se reconnecte
     /// automatiquement (backoff 1,5 s → 30 s). Se termine quand la Task qui le
     /// consomme est annulée.
@@ -57,6 +64,7 @@ final class SSEClient: Sendable {
                 while !Task.isCancelled {
                     lastError = nil
                     do {
+                        try Self.requireSessionOutsideDemo(api)
                         var request = try api.makeURLRequest(APIEndpoint(path: path))
                         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                         request.timeoutInterval = 90
@@ -134,6 +142,7 @@ final class SSEClient: Sendable {
                 while !Task.isCancelled {
                     lastError = nil
                     do {
+                        try Self.requireSessionOutsideDemo(api)
                         var request = try api.makeURLRequest(APIEndpoint(path: path, query: query))
                         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                         request.timeoutInterval = 90

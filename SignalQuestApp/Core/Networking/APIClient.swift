@@ -511,6 +511,12 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         attempt: Int = 0
     ) async throws -> Response {
         let sent = try credentials.snapshot(forSession: context)
+        // Mode démo : l'utilisateur fictif n'a pas de jeton, le serveur refuserait
+        // l'appel à coup sûr. Le refus est rendu ici, sans réseau, pour ne pas
+        // envoyer de requêtes vouées à l'échec ni boucler sur le refresh.
+        if endpoint.authenticated, sent.accessToken == nil, AppEnvironment.usesDemoData {
+            throw Self.demoUnauthorized
+        }
         do {
             return try await perform(endpoint, context: sent)
         } catch APIError.http(let status, _, _, _, _) where status == 401 && endpoint.authenticated && !endpoint.skipsAutoRefresh {
@@ -583,7 +589,14 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         NotificationCenter.default.post(name: .sqAuthSessionExpired, object: expiration)
     }
 
+    /// Refus local d'un appel authentifié sans jeton (mode démo, refresh impossible).
+    static let demoUnauthorized = APIError.http(status: 401, code: nil, message: "",
+                                                requestId: nil, retryAfter: nil)
+
     private func ensureRefreshed(after rejected: CredentialStore.Snapshot) async throws {
+        // Le refresh ne fait que prolonger une session : sans jeton, le serveur le
+        // refuse toujours. Inutile de l'appeler.
+        guard rejected.accessToken != nil else { throw Self.demoUnauthorized }
         let current = try credentials.snapshot(forSession: rejected)
         // Une autre requête a déjà renouvelé le token rejeté : utiliser ce token
         // pour le rejeu sans lancer un deuxième refresh.

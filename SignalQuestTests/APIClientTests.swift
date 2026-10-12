@@ -506,6 +506,24 @@ final class APIClientTests: XCTestCase {
         await fulfillment(of: [expirationReceived], timeout: 1)
     }
 
+    /// Sans jeton, le serveur refuse tout refresh : un 401 ne doit pas en déclencher.
+    func testUnauthorizedWithoutTokenNeverCallsRefresh() async throws {
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        let client = APIClient(config: .test, credentials: credentials, session: Self.mockSession())
+        var paths: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            paths.append(request.url!.path)
+            return (HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
+        }
+        do {
+            try await client.request(APIEndpoint(path: "/api/feed"))
+            XCTFail("Le 401 doit remonter")
+        } catch APIError.http(let status, _, _, _, _) {
+            XCTAssertEqual(status, 401)
+        }
+        XCTAssertEqual(paths, ["/api/feed"])
+    }
+
     func testAlreadyRefreshedTokenRetriesWithoutRedundantRefresh() async throws {
         let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
         try credentials.setAccessToken("stale")
