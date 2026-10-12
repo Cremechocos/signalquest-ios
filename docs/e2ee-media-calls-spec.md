@@ -1,6 +1,6 @@
 # Chiffrement de bout en bout complet — spécification commune (v2)
 
-> Statut : **proposition v0.4.37**, à valider par les sessions iOS, Android et
+> Statut : **proposition v0.4.38**, à valider par les sessions iOS, Android et
 > serveur (qui porte aussi le web) avant tout développement. Le chantier
 > démarre au plan 3. Son **jalon A**, des appels chiffrés de bout en bout sur
 > iOS, Android et le web, est la condition de la bêta TestFlight iOS des
@@ -202,6 +202,11 @@
 >   démarrage ; la clé d'accord et l'UIK restent soumises au déverrouillage ;
 >   la clé de l'époque courante suit la règle des aperçus (§2.6). Aucun
 >   vecteur ne change.
+> - v0.4.38 (12/10/2026), proposition : confirmation des clés d'époque
+>   restaurées par le manifeste signé de leur époque (`GET …/epochs/{n}/manifest`),
+>   époque alors acceptée comme à la découverte, fenêtre de 24 heures partant
+>   de cette confirmation, conversation relue depuis le début (§2.8, §3.4).
+>   Aucun vecteur ne change.
 > - v0.4.37 (06/10/2026), proposition : « le membre le plus ancien » du
 >   successeur désigné avant une suppression de compte est défini par la
 >   chaîne signée (dernière arrivée, D.4). Aucun vecteur ne change.
@@ -723,6 +728,24 @@ conversations chiffrées **sur demande seulement**.
   - elle ne bloque jamais la clé vérifiée au même numéro, qui la remplace.
   Un serveur qui injecte de fausses clés n'ajoute ainsi que des clés
   provisoires, vite écartées.
+  Confirmation (v0.4.38) : pour chaque époque passée dont la clé est
+  provisoire, le client lit `GET …/conversations/{id}/epochs/{n}/manifest`
+  et le vérifie comme à la synchro : signature du créateur certifié,
+  conversation et numéro, genèse pour l'époque 1, liaison à la chaîne
+  d'appartenance gardée (E2EEV2EpochBinding), état encadré par les époques
+  voisines déjà acceptées. Engagement identique : la clé devient vérifiée et
+  l'époque est acceptée à cet instant (§3.4) ; engagement différent : la clé
+  est effacée ; manifeste absent ou invérifiable (créateur révoqué depuis,
+  faute de son certificat de l'époque) : rien ne change, et la demande ne se
+  refait qu'après un délai, une nouvelle restauration ou une nouvelle époque.
+  Le compte doit figurer parmi les destinataires du manifeste. Ordre des
+  écritures : époque acceptée, relecture due (curseur des messages remis au
+  début), puis clé confirmée ; un arrêt entre deux refait le tout. Les
+  messages déjà gardés y sont des doublons. Ne se confirment ainsi que les
+  époques passées : la clé de l'époque courante ne vient que de son
+  enveloppe, et un appareil qui attend sa première époque (§3.2) ne relit
+  rien avant de la recevoir. Par défaut, aucun lecteur ne lit une clé
+  provisoire.
 - **Signatures passées d'un appareil révoqué depuis** (v0.4.35) : un manifeste
   d'ancienne époque, un changement d'appartenance ou un message signé par un
   appareil qui n'est plus dans la liste courante se vérifie avec son
@@ -870,6 +893,12 @@ connue) ouvre aussi les époques antérieures dont il est destinataire (`GET
 groupe renouvelé avant sa première relève garderait ses premiers messages
 illisibles pour lui. Une époque dont il n'est pas destinataire répond 404 et
 se saute. La fenêtre de 24 heures part de cette acceptation locale.
+
+**Époque confirmée après coup** (v0.4.38) : une époque passée dont la clé
+restaurée vient d'être confirmée (§2.8) est acceptée à la confirmation. Sa
+fenêtre de 24 heures part de cette acceptation locale, même si l'époque
+suivante a été acceptée bien avant : sinon l'historique restauré resterait
+illisible.
 
 ### 3.5 Manifeste d'époque
 

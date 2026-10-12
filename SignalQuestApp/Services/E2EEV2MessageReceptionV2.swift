@@ -431,10 +431,13 @@ final class E2EEV2MessageReceiverV2: @unchecked Sendable {
             members = current.memberIds
         } else {
             guard let epoch = context.accepted.first(where: { $0.epochNumber == epochNumber }),
-                  let replacedAtMs = context.accepted.filter({ $0.epochNumber > epochNumber }).map(\.acceptedAtMs).min()
+                  let followedAtMs = context.accepted.filter({ $0.epochNumber > epochNumber }).map(\.acceptedAtMs).min()
                     ?? (current.epochNumber > epochNumber ? current.acceptedAtMs : nil) else {
                 return .done(.rejected("e2ee-epoch-unknown"))
             }
+            // Une époque confirmée après sa suivante (clé restaurée, §2.8)
+            // compte depuis sa propre acceptation, comme à la découverte.
+            let replacedAtMs = max(followedAtMs, epoch.acceptedAtMs)
             guard context.nowMs - replacedAtMs <= Self.replacedEpochWindowMs else {
                 return .done(.rejected("e2ee-epoch-replaced"))
             }

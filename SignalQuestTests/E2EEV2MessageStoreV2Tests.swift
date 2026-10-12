@@ -34,6 +34,12 @@ final class E2EEV2MessageStoreV2Tests: XCTestCase {
         try store.apply([], equivocal: [], cursor: 3, conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
         let after = try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
         XCTAssertEqual(after.cursor, 7, "Le curseur ne recule pas")
+
+        // Clé d'époque confirmée après coup (§2.8) : la liste se relit, les messages restent.
+        try store.rewindCursor(conversationId: conversationId, ownerScopeId: owner)
+        let rewound = try store.snapshot(conversationId: conversationId, ownerScopeId: owner, nowMs: nowMs)
+        XCTAssertEqual(rewound.cursor, 0)
+        XCTAssertEqual(rewound.messages.map(\.text), ["Salut"])
     }
 
     func testOnlyTheAuthorEditsOrDeletesInAnyArrivalOrder() throws {

@@ -302,6 +302,121 @@ final class E2EEV2ConversationSyncV2Tests: XCTestCase {
             .epochNumber, 3, "Sans clé, l'époque courante ne change pas")
     }
 
+    /// §2.8 (v0.4.38) : une clé restaurée d'une époque sautée n'est confirmée
+    /// que par le manifeste signé de son époque. Engagement identique :
+    /// confirmée et époque acceptée ; autre engagement : effacée ; signataire
+    /// inconnu de l'annuaire : rien ne change, elle reste provisoire.
+    func testRestoredKeysAreSettledByTheSignedManifestOfTheirEpoch() async throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let creator = remote(alice, device: "device_alice_ios_01J7ABCD2345")
+        let devices = fixture.deviceSet(adding: [creator.device])
+        let served = try serve(fixture, creator: creator, devices: devices)
+        MockURLProtocol.requestHandler = Self.server(served)
+        let first = await sync(fixture, devices: devices)
+        XCTAssertEqual(first, .received(epochNumber: 1))
+
+        // Époques 2 et 3 sautées (pas destinataire), époque 4 reçue.
+        let keyTwo = Data(repeating: 0x22, count: 32), keyThree = Data(repeating: 0x33, count: 32)
+        let manifestOf = { (number: Int, key: Data, by: Remote) throws -> Data in
+            let epoch = try XCTUnwrap(try JSONSerialization.jsonObject(
+                with: try self.epoch(number, key: key, fixture, creator: by, devices: devices, chain: served.chain)
+            ) as? [String: Any])
+            return try JSONSerialization.data(withJSONObject: ["epochNumber": String(number), "manifest": epoch["manifest"] as Any])
+        }
+        let two = try manifestOf(2, keyTwo, creator), three = try manifestOf(3, keyThree, creator)
+        let four = try epoch(4, key: Data(repeating: 0x44, count: 32), fixture, creator: creator, devices: devices, chain: served.chain)
+        var manifests = ["2": two, "3": three]
+        let notFound = Data(#"{"error":"Aucune enveloppe pour cet appareil.","code":"E2EE_EPOCH_ENVELOPE_NOT_FOUND"}"#.utf8)
+        func handler(_ manifests: [String: Data]) -> MockURLProtocol.Handler {
+            { request in
+                let path = request.url?.path ?? ""
+                for (number, data) in manifests where path.hasSuffix("/epochs/\(number)/manifest") {
+                    return E2EEV2AccountFixture.response(request, data)
+                }
+                if path.hasSuffix("/epochs/2") || path.hasSuffix("/epochs/3") {
+                    return E2EEV2AccountFixture.response(request, notFound, status: 404)
+                }
+                if path.hasSuffix("/epochs/current") { return E2EEV2AccountFixture.response(request, four) }
+                return try Self.server(served)(request)
+            }
+        }
+        MockURLProtocol.requestHandler = handler(manifests)
+        let caughtUp = await sync(fixture, devices: devices)
+        XCTAssertEqual(caughtUp, .received(epochNumber: 4))
+
+        let namespace = fixture.session.ownerNamespace
+        func restore(_ number: Int, _ key: Data) throws {
+            XCTAssertTrue(try fixture.keys.put(
+                recordInput: .init(conversationId: conversationId, epochId: "epoch_restored_0000000\(number)", epochNumber: number,
+                                   keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(key)),
+                epochKey: key, ownerNamespace: namespace, origin: .restored
+            ))
+        }
+        try restore(2, keyTwo)
+        try restore(3, Data(repeating: 0x99, count: 32))
+        let confirmer = E2EEV2ConversationSyncV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let confirmed = await confirmer.confirmRestoredEpochs(
+            conversationId: conversationId, isGroup: false, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(confirmed, 1)
+        XCTAssertEqual(try fixture.keys.loadEpoch(conversationId: conversationId, epochNumber: 2, ownerNamespace: namespace,
+                                                  includeRestored: false)?.epochKey, keyTwo, "Engagement du manifeste : confirmée")
+        XCTAssertNil(try fixture.keys.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: namespace),
+                     "Autre engagement : effacée")
+        XCTAssertEqual(try fixture.states.acceptedEpochs(conversationId: conversationId, ownerNamespace: namespace).map(\.epochNumber),
+                       [1, 2, 4], "Seule l'époque confirmée est acceptée")
+
+        // Manifeste signé par une autre clé que celle de l'annuaire pour cet
+        // appareil : la clé reste provisoire.
+        try restore(3, keyThree)
+        manifests["3"] = try manifestOf(3, keyThree, remote(alice, device: "device_alice_ios_01J7ABCD2345"))
+        MockURLProtocol.requestHandler = handler(manifests)
+        let unverified = await confirmer.confirmRestoredEpochs(
+            conversationId: conversationId, isGroup: false, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(unverified, 0)
+        XCTAssertEqual(try fixture.keys.restoredEpochNumbers(conversationId: conversationId, ownerNamespace: namespace), [3])
+        XCTAssertNil(try fixture.keys.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: namespace))
+
+        // Rien de neuf (ni restauration, ni époque) : pas de nouvelle demande avant le délai.
+        let asked = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            asked.append(request, body: [:])
+            return try handler(manifests)(request)
+        }
+        let throttled = await confirmer.confirmRestoredEpochs(
+            conversationId: conversationId, isGroup: false, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(throttled, 0)
+        XCTAssertTrue(asked.all.isEmpty, "Une clé invérifiable n'est pas redemandée à chaque relève")
+
+        // Le manifeste d'une autre époque, servi sous ce numéro, ne confirme rien.
+        manifests["3"] = try JSONSerialization.data(withJSONObject: [
+            "epochNumber": "3",
+            "manifest": try XCTUnwrap(try JSONSerialization.jsonObject(with: two) as? [String: Any])["manifest"] as Any,
+        ])
+        MockURLProtocol.requestHandler = { request in
+            asked.append(request, body: [:])
+            return try handler(manifests)(request)
+        }
+        let fresh = E2EEV2ConversationSyncV2(
+            api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,
+            expectedSession: fixture.session
+        )
+        let misplaced = await fresh.confirmRestoredEpochs(
+            conversationId: conversationId, isGroup: false, devices: devices, expectedOwnerScopeId: fixture.session.ownerScopeId
+        )
+        XCTAssertEqual(misplaced, 0)
+        XCTAssertTrue(asked.all.contains { $0.0.url?.path.hasSuffix("/epochs/3/manifest") == true }, "Demandé, puis refusé")
+        XCTAssertEqual(try fixture.keys.restoredEpochNumbers(conversationId: conversationId, ownerNamespace: namespace), [3])
+        XCTAssertNil(try fixture.keys.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: namespace))
+        XCTAssertEqual(try fixture.states.acceptedEpochs(conversationId: conversationId, ownerNamespace: namespace).map(\.epochNumber),
+                       [1, 2, 4])
+    }
+
     private func sync(_ fixture: E2EEV2AccountFixture, devices: E2EEV2CertifiedDeviceSet) async -> E2EEV2ConversationSyncResult {
         await E2EEV2ConversationSyncV2(
             api: fixture.api, identityStore: fixture.identity, keyStore: fixture.keys, stateStore: fixture.states,

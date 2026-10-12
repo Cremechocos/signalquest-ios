@@ -3,6 +3,7 @@ import CryptoKit
 import CommonCrypto
 import Security
 import Combine
+import os
 
 private struct ModerationPublicKeyResponse: Decodable {
     let publicKeyJwk: String
@@ -5898,6 +5899,9 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
     private let tokenStore: TokenStore
     private static let sharedLock = NSLock()
     private var lock: NSLock { Self.sharedLock }
+    private static let restoredCounter = OSAllocatedUnfairLock(initialState: 0)
+    /// Change à chaque clé restaurée rangée : une confirmation en attente se retente.
+    static var restoredGeneration: Int { restoredCounter.withLock { $0 } }
     private let allowsOwner: @Sendable (String) -> Bool
     private static let maxHistoryCount = 10_000
     private static let maxConversationCount = 10_000
@@ -6033,6 +6037,7 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
         let encoded = try JSONEncoder().encode(record)
         guard let value = String(data: encoded, encoding: .utf8) else { return false }
         try publish(value, key: historicalKey, expectedSession: expectedSession)
+        if origin == .restored { Self.restoredCounter.withLock { $0 += 1 } }
         if replacesCurrent {
             try publish(value, key: currentKey, expectedSession: expectedSession)
         } else if origin == .restored {
@@ -6056,14 +6061,15 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
         return stored
     }
 
-    /// `includeRestored: false` (lecteurs v2, §2.8) : une clé restaurée depuis
-    /// la sauvegarde ne sert qu'une fois confirmée, c'est-à-dire remplacée par
-    /// la clé vérifiée de la même époque, qui tient l'engagement du manifeste signé.
+    /// Par défaut (lecteurs, §2.8), une clé restaurée depuis la sauvegarde ne
+    /// sert qu'une fois confirmée par l'engagement du manifeste signé de son
+    /// époque, ou remplacée par la clé vérifiée. `includeRestored: true` est
+    /// réservé à la restauration et à la confirmation.
     func loadEpoch(
         conversationId: String,
         epochNumber: Int,
         ownerNamespace: String,
-        includeRestored: Bool = true
+        includeRestored: Bool = false
     ) throws -> E2EEV2StoredEpochKey? {
         guard allowsOwner(ownerNamespace) else { throw E2EEV2DeviceIdentityError.unauthenticated }
         guard epochNumber > 0 else { return nil }
@@ -6086,10 +6092,58 @@ final class E2EEV2EpochKeyStore: @unchecked Sendable {
         // remains readable until a subsequent put indexes it.
         let currentKey = storageKey(ownerNamespace: ownerNamespace, conversationId: conversationId)
         guard let raw = try tokenStore.string(for: currentKey),
+              includeRestored || !isRestored(raw),
               let current = parse(raw),
               current.conversationId == conversationId,
               current.epochNumber == epochNumber else { return nil }
         return current
+    }
+
+    /// Époques dont la clé restaurée attend sa confirmation (§2.8).
+    func restoredEpochNumbers(conversationId: String, ownerNamespace: String) throws -> [Int] {
+        guard allowsOwner(ownerNamespace) else { throw E2EEV2DeviceIdentityError.unauthenticated }
+        lock.lock()
+        defer { lock.unlock() }
+        // Coffre verrouillé : l'erreur remonte, rien n'est tenu pour confirmé.
+        return try loadIndexLocked(ownerNamespace: ownerNamespace, conversationId: conversationId).filter { epochNumber in
+            let key = historyStorageKey(ownerNamespace: ownerNamespace, conversationId: conversationId, epochNumber: epochNumber)
+            return try tokenStore.string(for: key).map(isRestored) ?? false
+        }
+    }
+
+    /// Clé restaurée face à l'engagement du manifeste signé de son époque
+    /// (§2.8) : le même la rend vérifiée, un autre l'efface. Une clé vérifiée
+    /// n'est jamais touchée. Rend `true` si la clé est confirmée.
+    @discardableResult
+    func settleRestored(
+        conversationId: String,
+        epochNumber: Int,
+        keyCommitmentB64: String,
+        ownerNamespace: String,
+        expectedSession: LocalAccountSession? = nil
+    ) throws -> Bool {
+        guard allowsOwner(ownerNamespace) else { throw E2EEV2DeviceIdentityError.unauthenticated }
+        guard expectedSession == nil || (expectedSession?.isCurrent == true && expectedSession?.ownerNamespace == ownerNamespace) else {
+            throw CancellationError()
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        let key = historyStorageKey(ownerNamespace: ownerNamespace, conversationId: conversationId, epochNumber: epochNumber)
+        guard let raw = try tokenStore.string(for: key), isRestored(raw) else { return false }
+        if let stored = parse(raw), stored.conversationId == conversationId, stored.epochNumber == epochNumber,
+           stored.keyCommitmentB64 == keyCommitmentB64,
+           let data = raw.data(using: .utf8), var record = try? JSONDecoder().decode(Record.self, from: data) {
+            record.origin = nil
+            let encoded = try JSONEncoder().encode(record)
+            guard let value = String(data: encoded, encoding: .utf8) else { return false }
+            try publish(value, key: key, expectedSession: expectedSession)
+            return true
+        }
+        try erase(key, expectedSession: expectedSession)
+        var index = try loadIndexLocked(ownerNamespace: ownerNamespace, conversationId: conversationId)
+        index.removeAll { $0 == epochNumber }
+        try writeIndexLocked(index, ownerNamespace: ownerNamespace, conversationId: conversationId, expectedSession: expectedSession)
+        return false
     }
 
     func remove(conversationId: String, ownerNamespace: String) throws {
@@ -6891,7 +6945,8 @@ final class E2EEV2RecoveryEpochCoordinator: @unchecked Sendable {
                         guard try keyStore.loadEpoch(
                             conversationId: delivery.metadata.conversationId,
                             epochNumber: delivery.metadata.epochNumber,
-                            ownerNamespace: account.ownerNamespace
+                            ownerNamespace: account.ownerNamespace,
+                            includeRestored: true
                         ) != nil else {
                             return localFailure("e2ee-recovery-epoch-storage-or-verification-failed")
                         }
@@ -6900,7 +6955,8 @@ final class E2EEV2RecoveryEpochCoordinator: @unchecked Sendable {
                     guard let stored = try keyStore.loadEpoch(
                             conversationId: delivery.metadata.conversationId,
                             epochNumber: delivery.metadata.epochNumber,
-                            ownerNamespace: account.ownerNamespace
+                            ownerNamespace: account.ownerNamespace,
+                            includeRestored: true
                           ),
                           stored.epochId == delivery.metadata.epochId,
                           stored.keyCommitmentB64 == delivery.metadata.keyCommitmentB64,

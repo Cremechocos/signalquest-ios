@@ -25,6 +25,9 @@ enum E2EEV2RefreshResultV2: Equatable, Sendable {
 /// ou un départ.
 final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
     static let maxPages = 20
+    /// Relecture après une clé restaurée confirmée : au-delà du magasin
+    /// (5 000 messages), d'une traite, avant la fin de la fenêtre de 24 heures.
+    static let maxRereadPages = 60
     /// Relèves arrêtées sur un même message avant de le dépasser : un appareil
     /// révoqué reste inconnu de l'annuaire, et rien ne doit bloquer la liste.
     static let maxRereads = 3
@@ -116,6 +119,17 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
                 devices: devices, expectedOwnerScopeId: expectedOwnerScopeId, messageCount: context.messageCount
             )
         }
+        // Clés restaurées : la conversation se relit depuis le début, curseur
+        // remis à zéro AVANT chaque confirmation, puis d'une traite tant que
+        // dure la fenêtre de 24 heures de leurs époques (§2.8, §3.4).
+        // Remis à zéro aussi après : une relève parallèle a pu avancer entre-temps.
+        let store = messageStore
+        let rewound = await syncer.confirmRestoredEpochs(
+            conversationId: conversationId, isGroup: isGroup, devices: devices, expectedOwnerScopeId: expectedOwnerScopeId
+        ) {
+            try store.rewindCursor(conversationId: conversationId, ownerScopeId: expectedOwnerScopeId)
+        } > 0
+        if rewound { try? store.rewindCursor(conversationId: conversationId, ownerScopeId: expectedOwnerScopeId) }
         var unsupported: [String] = []
         var caughtUp = false
         var cursor: Int64
@@ -126,7 +140,7 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
         } catch {
             return .failure(localError("e2ee-message-store-unavailable"))
         }
-        pages: for _ in 0..<Self.maxPages {
+        pages: for _ in 0..<(rewound ? Self.maxRereadPages : Self.maxPages) {
             let data: Data
             switch await transport.bound(to: session).getJSON(
                 path: "/api/e2ee/v2/conversations/\(conversationId)/messages",
@@ -142,7 +156,6 @@ final class E2EEV2ConversationMessagingV2: @unchecked Sendable {
             guard let page = E2EEV2DeliveredMessageV2.parsePage(data, after: cursor) else {
                 return .failure(localError("invalid-e2ee-message-page"))
             }
-            let store = messageStore
             let results = receiver.receive(
                 page.messages, conversationId: conversationId, isGroup: isGroup, devices: devices,
                 expectedOwnerScopeId: expectedOwnerScopeId

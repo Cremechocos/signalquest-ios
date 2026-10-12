@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Réponses des routes de réception v2 (proposition iOS, E.2).
 enum E2EEV2MembershipContractV2 {
@@ -301,6 +302,131 @@ final class E2EEV2ConversationSyncV2: @unchecked Sendable {
         }
         return result
     }
+
+    /// Clés d'époque restaurées depuis la sauvegarde (§2.8) : chacune n'est
+    /// confirmée que par le manifeste signé de son époque, vérifié comme à la
+    /// synchro (créateur certifié, liaison à la chaîne gardée, ce compte parmi
+    /// les destinataires) ; un autre engagement l'efface. L'époque confirmée
+    /// est acceptée maintenant, comme à la découverte (§3.4), puis
+    /// `beforeConfirming` passe (la relecture due) avant que la clé serve :
+    /// un arrêt entre les deux refait le tout. Sans manifeste vérifiable, la
+    /// clé reste provisoire et n'est redemandée qu'après un délai, ou une
+    /// nouvelle restauration ou époque. Rend le nombre de clés confirmées.
+    func confirmRestoredEpochs(
+        conversationId: String,
+        isGroup: Bool,
+        devices: E2EEV2CertifiedDeviceSet,
+        expectedOwnerScopeId: String,
+        beforeConfirming: () throws -> Void = {}
+    ) async -> Int {
+        guard let session = expectedSession ?? LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              session.ownerScopeId == expectedOwnerScopeId, expectedOwnerScopeId.hasPrefix("user:"),
+              E2EEV2Canonical.isOpaque(conversationId) else { return 0 }
+        let ownerNamespace = session.ownerNamespace
+        let ownUserId = String(expectedOwnerScopeId.dropFirst("user:".count))
+        let current = try? stateStore.currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace)
+        let attempt = RestoredAttempt(
+            generation: E2EEV2EpochKeyStore.restoredGeneration, currentEpoch: current?.epochNumber, atMs: nowMs()
+        )
+        let attemptKey = ownerNamespace + "|" + conversationId
+        if let last = restoredAttempts.withLock({ $0[attemptKey] }), last.generation == attempt.generation,
+           last.currentEpoch == attempt.currentEpoch, !last.pending || attempt.atMs - last.atMs < Self.restoredRetryMs {
+            return 0
+        }
+        var confirmed = 0
+        // Une tentative n'est retenue que sur un coffre lisible : verrouillé,
+        // la relève suivante retente.
+        defer {
+            let left = try? keyStore.restoredEpochNumbers(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            restoredAttempts.withLock { $0[attemptKey] = left.map { attempt.with(pending: !$0.isEmpty) } }
+        }
+        guard let restored = try? keyStore.restoredEpochNumbers(conversationId: conversationId, ownerNamespace: ownerNamespace),
+              !restored.isEmpty, let current,
+              let genesis = try? stateStore.genesis(conversationId: conversationId, ownerNamespace: ownerNamespace),
+              let chain = try? stateStore.membershipChain(conversationId: conversationId, ownerNamespace: ownerNamespace)
+        else { return 0 }
+        let bound = transport.bound(to: session)
+        for number in restored where number < current.epochNumber {
+            guard session.isCurrent,
+                  let accepted = try? stateStore.acceptedEpochs(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            else { break }
+            // Plus ancienne que toute la liste pleine : elle n'y tiendrait pas.
+            if accepted.count >= E2EEV2ConversationStateStore.acceptedEpochLimit,
+               number < accepted.first?.epochNumber ?? 0 { continue }
+            guard case .success(let data, _, _) = await bound.getJSON(
+                path: "/api/e2ee/v2/conversations/\(conversationId)/epochs/\(number)/manifest",
+                expectedOwnerScopeId: expectedOwnerScopeId, capabilitySet: .message
+            ), let served = E2EEV2MembershipContractV2.parseManifest(data, epochNumber: number) else { continue }
+            let fields = served.manifest.canonical.components(separatedBy: "\n")
+            // Les époques voisines déjà acceptées encadrent son état d'appartenance.
+            let previous = accepted.last(where: { $0.epochNumber < number })?.membershipChangeNumber
+            let next = accepted.first(where: { $0.epochNumber > number })?.membershipChangeNumber
+                ?? current.membershipChangeNumber
+            guard fields.count == 13, let creatorKey = devices.signingKey(userId: fields[4], deviceId: fields[5]),
+                  let manifest = try? E2EEV2EpochManifest.verify(
+                      served.manifest, recipients: served.recipients, creatorSigningKey: creatorKey
+                  ),
+                  manifest.conversationId == conversationId, manifest.epochNumber == number,
+                  number != 1 || E2EEV2Canonical.sha256B64URL(Data(served.manifest.canonical.utf8)) == genesis.manifestDigest,
+                  manifest.membershipChangeNumber >= genesis.membershipChangeNumber,
+                  manifest.membershipChangeNumber <= min(next, chain.count),
+                  served.recipients.compactMap(E2EEV2EpochManifest.Recipient.parse).contains(where: { $0.userId == ownUserId }),
+                  let state = try? E2EEV2MembershipChain.apply(
+                      Array(chain.prefix(manifest.membershipChangeNumber)), conversationId: conversationId, isGroup: isGroup,
+                      genesisLength: genesis.membershipChangeNumber, verifiedCount: manifest.membershipChangeNumber,
+                      signingKey: { _, _ in nil }
+                  ),
+                  (try? E2EEV2EpochBinding.check(
+                      manifest, recipients: served.recipients, state: state,
+                      genesisLength: genesis.membershipChangeNumber, previousMembershipChangeNumber: previous
+                  )) != nil else { continue }
+            guard session.isCurrent else { break }
+            do {
+                let held = try keyStore.loadEpoch(
+                    conversationId: conversationId, epochNumber: number, ownerNamespace: ownerNamespace, includeRestored: true
+                )
+                // Engagement identique : époque acceptée, relecture due, puis
+                // clé confirmée, dans cet ordre. Sinon, la clé est effacée.
+                if held?.keyCommitmentB64 == manifest.keyCommitmentB64 {
+                    try stateStore.acceptPastEpoch(
+                        .init(
+                            epochNumber: number, membershipChangeNumber: state.changeNumber,
+                            memberIds: state.members.sorted(), acceptedAtMs: nowMs()
+                        ),
+                        conversationId: conversationId, ownerNamespace: ownerNamespace
+                    )
+                    try beforeConfirming()
+                }
+                if try keyStore.settleRestored(
+                    conversationId: conversationId, epochNumber: number, keyCommitmentB64: manifest.keyCommitmentB64,
+                    ownerNamespace: ownerNamespace, expectedSession: session
+                ) { confirmed += 1 }
+            } catch {
+                continue
+            }
+        }
+        return confirmed
+    }
+
+    /// Dernière confirmation tentée par conversation, en mémoire.
+    private struct RestoredAttempt {
+        let generation: Int
+        let currentEpoch: Int?
+        let atMs: Int64
+        var pending = true
+
+        func with(pending: Bool) -> RestoredAttempt {
+            var copy = self
+            copy.pending = pending
+            return copy
+        }
+    }
+
+    /// Une clé encore invérifiable n'est redemandée qu'après ce délai.
+    static let restoredRetryMs: Int64 = 15 * 60 * 1_000
+    private let restoredAttempts = OSAllocatedUnfairLock<[String: RestoredAttempt]>(initialState: [:])
+
+    private func nowMs() -> Int64 { Int64(now().timeIntervalSince1970 * 1_000) }
 
     private func localError(_ message: String) -> E2EEV2TransportFailure {
         .init(kind: .localState, message: message)

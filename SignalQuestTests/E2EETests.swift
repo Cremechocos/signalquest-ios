@@ -1991,9 +1991,10 @@ final class E2EETests: XCTestCase {
                                     epochKey: restoredKey, ownerNamespace: "a", origin: .restored))
         XCTAssertNil(try store.load(conversationId: conversationId, ownerNamespace: "a"),
                      "Une clé restaurée ne devient jamais l'époque courante")
-        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a")?.epochKey, restoredKey)
-        XCTAssertNil(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a", includeRestored: false),
-                     "Un lecteur v2 ne lit jamais une clé restaurée non confirmée")
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a", includeRestored: true)?.epochKey,
+                       restoredKey)
+        XCTAssertNil(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a"),
+                     "Par défaut, aucun lecteur ne lit une clé restaurée non confirmée")
         XCTAssertTrue(try store.put(recordInput: record(verifiedKey, epochId: "epoch_verified_000001"),
                                     epochKey: verifiedKey, ownerNamespace: "a"))
         XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a", includeRestored: false)?.epochKey,
@@ -2025,8 +2026,99 @@ final class E2EETests: XCTestCase {
         // Une clé restaurée reste lisible pour l'historique tant que rien ne la remplace.
         XCTAssertTrue(try store.put(recordInput: record(restoredKey, epochId: "epoch_restored_000002", number: 2),
                                     epochKey: restoredKey, ownerNamespace: "a", origin: .restored))
-        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 2, ownerNamespace: "a")?.epochKey, restoredKey)
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 2, ownerNamespace: "a", includeRestored: true)?.epochKey,
+                       restoredKey)
         XCTAssertEqual(try store.load(conversationId: conversationId, ownerNamespace: "a")?.epochNumber, 3)
+    }
+
+    /// §2.8 (v0.4.38) : l'engagement du manifeste signé confirme une clé
+    /// restaurée, un autre l'efface ; une clé vérifiée n'est jamais touchée.
+    func testV2RestoredEpochKeyIsConfirmedOrErasedByItsManifestCommitment() throws {
+        let store = E2EEV2EpochKeyStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
+        let conversationId = "conv_settled_0000000001"
+        func put(_ key: Data, number: Int, origin: E2EEV2EpochKeyOrigin) throws -> Bool {
+            try store.put(
+                recordInput: .init(conversationId: conversationId, epochId: "epoch_settled_00000\(number)", epochNumber: number,
+                                   keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(key)),
+                epochKey: key, ownerNamespace: "a", origin: origin
+            )
+        }
+        let one = Data(repeating: 1, count: 32), two = Data(repeating: 2, count: 32), three = Data(repeating: 3, count: 32)
+        XCTAssertTrue(try put(three, number: 3, origin: .verified))
+        XCTAssertTrue(try put(one, number: 1, origin: .restored))
+        XCTAssertTrue(try put(two, number: 2, origin: .restored))
+        XCTAssertEqual(try store.restoredEpochNumbers(conversationId: conversationId, ownerNamespace: "a"), [1, 2])
+
+        XCTAssertTrue(try store.settleRestored(conversationId: conversationId, epochNumber: 1,
+                                               keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(one), ownerNamespace: "a"))
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 1, ownerNamespace: "a", includeRestored: false)?.epochKey,
+                       one, "Confirmée : elle sert aux lecteurs v2")
+        XCTAssertFalse(try store.settleRestored(conversationId: conversationId, epochNumber: 2,
+                                                keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(three), ownerNamespace: "a"))
+        XCTAssertNil(try store.loadEpoch(conversationId: conversationId, epochNumber: 2, ownerNamespace: "a"),
+                     "Un autre engagement l'efface")
+        XCTAssertEqual(try store.restoredEpochNumbers(conversationId: conversationId, ownerNamespace: "a"), [])
+        XCTAssertFalse(try store.settleRestored(conversationId: conversationId, epochNumber: 3,
+                                                keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(one), ownerNamespace: "a"))
+        XCTAssertEqual(try store.loadEpoch(conversationId: conversationId, epochNumber: 3, ownerNamespace: "a")?.epochKey, three,
+                       "Une clé vérifiée n'est jamais effacée par ce chemin")
+        XCTAssertEqual(try store.load(conversationId: conversationId, ownerNamespace: "a")?.epochNumber, 3,
+                       "La confirmation ne déplace pas l'époque courante")
+
+        // Coffre verrouillé : l'erreur remonte, jamais une liste vide qui
+        // ferait tenir les clés provisoires pour réglées.
+        final class LockableStore: TokenStore, @unchecked Sendable {
+            let memory = InMemoryTokenStore()
+            var locked = false
+            func string(for key: String) throws -> String? {
+                if locked, key.hasPrefix("epoch-v2-history:") { throw KeychainError.unexpectedStatus(errSecInteractionNotAllowed) }
+                return try memory.string(for: key)
+            }
+            func set(_ value: String, for key: String, accessibility: KeychainAccessibility) throws {
+                try memory.set(value, for: key, accessibility: accessibility)
+            }
+            func remove(_ key: String) throws { try memory.remove(key) }
+            func keys(withPrefix prefix: String) throws -> [String] { try memory.keys(withPrefix: prefix) }
+            func removeAll() throws { try memory.removeAll() }
+        }
+        let vault = LockableStore()
+        let lockable = E2EEV2EpochKeyStore(tokenStore: vault, allowsOwner: { _ in true })
+        XCTAssertTrue(try lockable.put(
+            recordInput: .init(conversationId: conversationId, epochId: "epoch_settled_000002", epochNumber: 2,
+                               keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(two)),
+            epochKey: two, ownerNamespace: "a", origin: .restored
+        ))
+        vault.locked = true
+        XCTAssertThrowsError(try lockable.restoredEpochNumbers(conversationId: conversationId, ownerNamespace: "a"))
+        vault.locked = false
+        XCTAssertEqual(try lockable.restoredEpochNumbers(conversationId: conversationId, ownerNamespace: "a"), [2])
+    }
+
+    /// §2.8 (v0.4.38) : une époque confirmée après coup est acceptée à la
+    /// confirmation ; une confirmation reprise en reprend la date ; une époque
+    /// que la liste pleine ne retiendrait pas est refusée.
+    func testV2PastEpochAcceptedAfterTheFactKeepsTheConfirmationDateAndFitsTheList() throws {
+        let states = E2EEV2ConversationStateStore(tokenStore: InMemoryTokenStore(), allowsOwner: { _ in true })
+        let conversationId = "conv_accepted_000000001"
+        let limit = E2EEV2ConversationStateStore.acceptedEpochLimit
+        for number in 2...(limit + 1) {
+            try states.recordCurrentEpoch(.init(
+                conversationId: conversationId, epochNumber: number, membershipChangeNumber: 2, memberIds: ["a", "b"],
+                recipientsDigest: "digest", excludesWeb: false, createdAtMs: Int64(number), acceptedAtMs: Int64(number)
+            ), ownerNamespace: "a")
+        }
+        func past(_ number: Int, at ms: Int64) -> E2EEV2ConversationStateStore.AcceptedEpoch {
+            .init(epochNumber: number, membershipChangeNumber: 2, memberIds: ["a", "b"], acceptedAtMs: ms)
+        }
+        XCTAssertThrowsError(try states.acceptPastEpoch(past(1, at: 9_000), conversationId: conversationId, ownerNamespace: "a"),
+                             "Plus ancienne que toute la liste pleine")
+        XCTAssertThrowsError(try states.acceptPastEpoch(past(limit + 1, at: 9_000), conversationId: conversationId, ownerNamespace: "a"),
+                             "Jamais l'époque courante")
+        try states.acceptPastEpoch(past(100, at: 9_000), conversationId: conversationId, ownerNamespace: "a")
+        try states.acceptPastEpoch(past(100, at: 9_500), conversationId: conversationId, ownerNamespace: "a")
+        let accepted = try states.acceptedEpochs(conversationId: conversationId, ownerNamespace: "a")
+        XCTAssertEqual(accepted.count, limit)
+        XCTAssertEqual(accepted.filter { $0.epochNumber == 100 }.map(\.acceptedAtMs), [9_500], "Une seule entrée, à la dernière date")
     }
 
     func testV2EpochKeyStoreResetPurgeIsStrictlyAccountScoped() throws {
@@ -4786,8 +4878,12 @@ extension E2EETests {
         XCTAssertEqual(try fixture.keys.loadEpoch(
             conversationId: epoch.conversationId,
             epochNumber: epoch.epochNumber,
-            ownerNamespace: fixture.context.ownerNamespace
+            ownerNamespace: fixture.context.ownerNamespace,
+            includeRestored: true
         )?.epochKey, epochKey)
+        XCTAssertNil(try fixture.keys.loadEpoch(
+            conversationId: epoch.conversationId, epochNumber: epoch.epochNumber, ownerNamespace: fixture.context.ownerNamespace
+        ), "Provisoire jusqu'à la confirmation par le manifeste de son époque")
     }
 
     func testV2RecoveryBackfillWrapsOnlyForTheOwnAccountRecoveryKey() throws {

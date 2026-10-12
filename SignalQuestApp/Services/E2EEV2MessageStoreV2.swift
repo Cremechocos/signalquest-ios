@@ -234,6 +234,19 @@ final class E2EEV2MessageStoreV2: @unchecked Sendable {
         try write(file, conversationId: conversationId, ownerScopeId: ownerScopeId)
     }
 
+    /// Remet le curseur au début (clé d'époque confirmée après coup, §2.8) :
+    /// la liste se relit ; les messages déjà gardés y sont des doublons.
+    func rewindCursor(conversationId: String, ownerScopeId: String) throws {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        var file = try read(conversationId: conversationId, ownerScopeId: ownerScopeId)
+        guard file.cursor > 0 || file.rereadSequence != nil else { return }
+        file.cursor = 0
+        file.rereadSequence = nil
+        file.rereadCount = nil
+        try write(file, conversationId: conversationId, ownerScopeId: ownerScopeId)
+    }
+
     /// Compte les arrêts de la relève sur un même message : au-delà d'une
     /// borne, elle le dépasse, pour qu'aucun message ne bloque la conversation.
     func noteReread(sequence: Int64, conversationId: String, ownerScopeId: String) throws -> Int {

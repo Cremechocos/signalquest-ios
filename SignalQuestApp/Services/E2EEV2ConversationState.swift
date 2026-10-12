@@ -197,7 +197,33 @@ final class E2EEV2ConversationStateStore: @unchecked Sendable {
         )
     }
 
-    /// Époques acceptées, les plus anciennes d'abord (64 au plus).
+    /// Époque passée confirmée après coup (clé restaurée, §2.8) : acceptée
+    /// maintenant, comme à la découverte (§3.4). Jamais la courante ni au-delà.
+    /// Déjà présente (confirmation interrompue), elle reprend cette date. Une
+    /// époque que la liste pleine ne retiendrait pas est refusée.
+    func acceptPastEpoch(_ epoch: AcceptedEpoch, conversationId: String, ownerNamespace: String) throws {
+        guard allowsOwner(ownerNamespace) else { throw Failure.otherAccount }
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        guard let current = try currentEpoch(conversationId: conversationId, ownerNamespace: ownerNamespace),
+              epoch.epochNumber < current.epochNumber else {
+            throw Failure.regressed
+        }
+        var accepted = try acceptedEpochs(conversationId: conversationId, ownerNamespace: ownerNamespace)
+            .filter { $0.epochNumber != epoch.epochNumber }
+        accepted.append(epoch)
+        accepted.sort { $0.epochNumber < $1.epochNumber }
+        let kept = Array(accepted.suffix(Self.acceptedEpochLimit))
+        guard kept.contains(epoch) else { throw Failure.regressed }
+        let history = try JSONEncoder().encode(kept)
+        try tokenStore.set(
+            String(decoding: history, as: UTF8.self),
+            for: acceptedKey(conversationId: conversationId, ownerNamespace: ownerNamespace),
+            accessibility: .afterFirstUnlock
+        )
+    }
+
+    /// Époques acceptées, les plus anciennes d'abord (256 au plus).
     func acceptedEpochs(conversationId: String, ownerNamespace: String) throws -> [AcceptedEpoch] {
         guard let raw = try tokenStore.string(for: acceptedKey(conversationId: conversationId, ownerNamespace: ownerNamespace))
         else { return [] }

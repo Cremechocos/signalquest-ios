@@ -303,6 +303,55 @@ final class E2EEV2MessageReceiverV2Tests: XCTestCase {
         else { return XCTFail("Époque courante") }
     }
 
+    /// §2.8 et §3.4 (v0.4.38) : une époque sautée dont la clé vient de la
+    /// sauvegarde ne se lit qu'acceptée et confirmée ; ses 24 heures partent
+    /// alors de la confirmation, pas du remplacement, bien plus ancien.
+    func testARestoredEpochReadsOnlyOnceConfirmedAndFromItsConfirmation() throws {
+        let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
+        let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
+        let devices = fixture.deviceSet(adding: [phone.device])
+        let seeded = try fixture.seedConversation(with: bruno, devices: devices)
+        let owner = fixture.session.ownerScopeId, namespace = fixture.session.ownerNamespace
+        let epochTwo = Data(repeating: 0x22, count: 32)
+        try fixture.advance(seeded, to: 3, epochKey: Data(repeating: 0x33, count: 32))
+        XCTAssertTrue(try fixture.keys.put(
+            recordInput: .init(conversationId: seeded.conversationId, epochId: "epoch_restored_00000002", epochNumber: 2,
+                               keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(epochTwo)),
+            epochKey: epochTwo, ownerNamespace: namespace, origin: .restored
+        ))
+        let confirmedAt = seeded.current.acceptedAtMs + 30 * 24 * 60 * 60 * 1_000
+        let old = try delivered(from: phone, seeded: seeded, clientRequestId: "message_bruno_0000000002", counter: 2,
+                                epochNumber: 2, epochKey: epochTwo)
+        func receive(at nowMs: Int64) throws -> E2EEV2MessageReceptionV2? {
+            try makeReceiver(fixture, nowMs: nowMs).receive(
+                [old], conversationId: seeded.conversationId, isGroup: false, devices: devices, expectedOwnerScopeId: owner
+            ).first
+        }
+        XCTAssertEqual(try receive(at: confirmedAt), .rejected("e2ee-epoch-unknown"), "Époque jamais acceptée ici")
+
+        try fixture.states.acceptPastEpoch(
+            .init(epochNumber: 2, membershipChangeNumber: seeded.current.membershipChangeNumber,
+                  memberIds: seeded.current.memberIds, acceptedAtMs: confirmedAt),
+            conversationId: seeded.conversationId, ownerNamespace: namespace
+        )
+        XCTAssertEqual(try receive(at: confirmedAt + 1_000), .rejected("e2ee-epoch-key-unavailable"),
+                       "Acceptée, mais la clé restaurée n'est pas encore confirmée")
+        XCTAssertTrue(try fixture.keys.settleRestored(
+            conversationId: seeded.conversationId, epochNumber: 2,
+            keyCommitmentB64: try E2EEV2EpochCrypto.keyCommitment(epochTwo), ownerNamespace: namespace
+        ))
+        XCTAssertEqual(try receive(at: confirmedAt + 25 * 60 * 60 * 1_000), .rejected("e2ee-epoch-replaced"),
+                       "Plus de 24 heures après la confirmation")
+        guard case .received = try receive(at: confirmedAt + 60 * 60 * 1_000) else {
+            return XCTFail("Une heure après la confirmation, l'ancien message se lit")
+        }
+        XCTAssertThrowsError(try fixture.states.acceptPastEpoch(
+            .init(epochNumber: 3, membershipChangeNumber: seeded.current.membershipChangeNumber,
+                  memberIds: seeded.current.memberIds, acceptedAtMs: confirmedAt),
+            conversationId: seeded.conversationId, ownerNamespace: namespace
+        ), "Jamais l'époque courante")
+    }
+
     func testEphemeralMessagesExpireFromTheEarlierClock() throws {
         let fixture = try E2EEV2AccountFixture(); defer { fixture.close() }
         let phone = E2EEV2TestRemote(user: bruno, device: "device_bruno_android_01J7ABCD")
