@@ -29,6 +29,8 @@ struct AntennaProfileView: View {
     var originTimestamp: Date?
     @State private var glossaryEntry: AntennaGlossaryEntry?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var userGround: Double? { profile.first?.groundMeters }
     private var antennaGround: Double? { profile.last?.groundMeters }
@@ -41,49 +43,63 @@ struct AntennaProfileView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    Text(originLabel)
-                        .accessibilityIdentifier("antenna.profile.origin")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
-                    if let originTimestamp {
-                        Text("Position relevée à \(originTimestamp.formatted(date: .omitted, time: .standard))")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                header
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
                     chart
-                        .frame(height: 340)
+                        .frame(height: 300)
                         .frame(maxWidth: .infinity)
-                        // Padding horizontal resserré : le graphe est déjà borné
-                        // par ses propres marges internes, et deux niveaux de
-                        // retrait laissaient une bande vide le long du cadre.
-                        .padding(.vertical, SQSpace.md)
-                        .padding(.horizontal, SQSpace.sm)
-                        .sqCardBackground()
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(SQUnits.distance(meters: distanceMeters))
+                        Spacer(minLength: SQSpace.sm)
+                        Text("échelle verticale non proportionnelle")
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+                }
+                .padding(SQSpace.sm2)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
 
-                    legend
-                    figures
-                    caveat
-                }
-                .padding(SQSpace.cardPadding)
+                legend
+                figures
+                facts
+                caveat
             }
-            .signalQuestBackground()
-            .navigationTitle("Profil d'altitude")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }
-                        .accessibilityIdentifier("antenna.profile.close")
-                        .tint(SQColor.brandRed)
-                }
-            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
         }
+        .background(SQColor.bg.ignoresSafeArea())
         .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .sqSheet(background: SQColor.bg)
         .sheet(item: $glossaryEntry) { entry in
             AntennaGlossarySheet(entry: entry)
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Profil d'altitude")
+                    .font(SQType.title)
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                HStack(spacing: 0) {
+                    Text(originLabel)
+                        .accessibilityIdentifier("antenna.profile.origin")
+                    if let originTimestamp {
+                        Text(verbatim: " · \(originTimestamp.formatted(date: .omitted, time: .shortened))")
+                    }
+                }
+                .font(SQType.subhead)
+                .foregroundStyle(SQColor.labelSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "antenna.profile.close") {
+                dismiss()
+            }
         }
     }
 
@@ -113,9 +129,9 @@ struct AntennaProfileView: View {
             // une bande de largeur au détriment du profil lui-même.
             let leftInset: CGFloat = 48
             let rightInset: CGFloat = 26
-            // Les deux étiquettes d'extrémité (nom puis altitude) et la ligne
-            // d'échelle se superposaient : chacune a maintenant sa ligne.
-            let bottomInset: CGFloat = 54
+            // Deux lignes sous le relief : le nom de chaque extrémité, puis son
+            // altitude. L'échelle est écrite sous le graphe, hors du dessin.
+            let bottomInset: CGFloat = 36
             let topInset: CGFloat = 6
             let plotWidth = size.width - leftInset - rightInset
             let plotHeight = size.height - bottomInset - topInset
@@ -206,12 +222,6 @@ struct AntennaProfileView: View {
                 bottom: size.height - bottomInset
             )
 
-            context.draw(
-                Text("\(SQUnits.distance(meters: total)) · échelle verticale non proportionnelle")
-                    .font(SQType.micro)
-                    .foregroundColor(SQColor.labelSecondary),
-                at: CGPoint(x: size.width / 2, y: size.height - 7)
-            )
         }
         .accessibilityLabel(accessibilitySummary)
         .accessibilityIdentifier("antenna.profile.chart")
@@ -383,59 +393,85 @@ struct AntennaProfileView: View {
         HStack(spacing: 5) {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(color)
-                .frame(width: 14, height: 8)
+                .frame(width: 12, height: 8)
             Text(label)
         }
     }
 
+    /// Trois chiffres qui répondent à « est-ce que ça passe ? » ; un appui
+    /// explique chacun d'eux.
     private var figures: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-            AntennaMetricTile(
-                label: "Distance", value: SQUnits.distance(meters: distanceMeters), highlight: true,
-                entry: AntennaGlossary.distance(distanceMeters), selection: $glossaryEntry
-            )
-            AntennaMetricTile(
-                label: "Dénivelé", value: elevationDifference,
-                entry: AntennaGlossary.elevationGap(user: userGround, site: antennaGround), selection: $glossaryEntry
-            )
-            AntennaMetricTile(
-                label: String(localized: "Altitude de départ"), value: userGround.map { "\(Int($0.rounded())) m" } ?? "—",
-                entry: AntennaGlossary.altitude(userGround, isSite: false), selection: $glossaryEntry
-            )
-            AntennaMetricTile(
-                label: "Altitude du site", value: antennaGround.map { "\(Int($0.rounded())) m" } ?? "—",
-                entry: AntennaGlossary.altitude(antennaGround, isSite: true), selection: $glossaryEntry
-            )
-            AntennaMetricTile(
-                label: "Support", value: supportHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—",
-                entry: AntennaGlossary.supportHeight(supportHeightMeters, label: supportLabel, antennaMeters: antennaHeightMeters),
-                selection: $glossaryEntry
-            )
-            AntennaMetricTile(
-                label: heightIsEstimated ? "Antennes (estim.)" : "Antennes",
-                value: antennaHeightMeters.map { "\(Int($0.rounded())) m" } ?? "—",
-                entry: AntennaGlossary.antennaHeight(antennaHeightMeters, isEstimated: heightIsEstimated,
-                                                    supportMeters: supportHeightMeters, supportLabel: supportLabel),
-                selection: $glossaryEntry
-            )
-            AntennaMetricTile(
-                label: String(localized: "Tilt vers le départ"), value: downtiltLabel,
-                entry: AntennaGlossary.downtilt(downtiltDegrees), selection: $glossaryEntry
-            )
-            AntennaMetricTile(
-                label: "Ligne de visée", value: lineOfSightLabel,
-                entry: AntennaGlossary.lineOfSight(verdict, profile: profile), selection: $glossaryEntry
-            )
-            AntennaMetricTile(
-                label: "Dégagement Fresnel", value: fresnelLabel,
-                entry: AntennaGlossary.fresnelClearance(AntennaSightGeometry.minimumFresnelClearance(for: profile), profile: profile),
-                selection: $glossaryEntry
-            )
-            AntennaMetricTile(
-                label: "Rayon Fresnel max.", value: fresnelRadiusLabel,
-                entry: AntennaGlossary.fresnelRadius(profile.map(\.fresnelRadiusMeters).max(), frequencyMhz: frequencyMhz),
-                selection: $glossaryEntry
-            )
+        let columns = Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm),
+                            count: dynamicTypeSize.isAccessibilitySize ? 1 : 3)
+        return LazyVGrid(columns: columns, spacing: SQSpace.sm) {
+            figureTile("Distance", SQUnits.distance(meters: distanceMeters), ink: true,
+                       entry: AntennaGlossary.distance(distanceMeters))
+            figureTile("Dénivelé", elevationDifference,
+                       entry: AntennaGlossary.elevationGap(user: userGround, site: antennaGround))
+            figureTile("Fresnel", fresnelLabel,
+                       entry: AntennaGlossary.fresnelClearance(AntennaSightGeometry.minimumFresnelClearance(for: profile), profile: profile))
+        }
+    }
+
+    private func figureTile(_ label: String, _ value: String, ink: Bool = false, entry: AntennaGlossaryEntry) -> some View {
+        Button {
+            Haptics.light()
+            glossaryEntry = entry
+        } label: {
+            SQStatTile(label: label, value: value)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .padding(SQSpace.sm2)
+                .frame(maxHeight: .infinity, alignment: .topLeading)
+                .environment(\.colorScheme, ink ? (colorScheme == .dark ? .light : .dark) : colorScheme)
+                .sqSurface(ink ? SQColor.label : SQColor.surface,
+                           in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityHint("Toucher pour comprendre cette mesure")
+    }
+
+    /// Les autres chiffres, en lignes pointillées ; le ⓘ ouvre leur explication.
+    private var facts: some View {
+        VStack(spacing: SQSpace.sm) {
+            factRow(String(localized: "Tilt vers le départ"), downtiltLabel, entry: AntennaGlossary.downtilt(downtiltDegrees))
+            factRow(heightIsEstimated ? String(localized: "Antennes (estim.)") : String(localized: "Antennes"),
+                    antennaHeightMeters.map { "\(Int($0.rounded())) m" },
+                    entry: AntennaGlossary.antennaHeight(antennaHeightMeters, isEstimated: heightIsEstimated,
+                                                        supportMeters: supportHeightMeters, supportLabel: supportLabel))
+            factRow(String(localized: "Ligne de visée"), lineOfSightLabel,
+                    entry: AntennaGlossary.lineOfSight(verdict, profile: profile))
+            factRow(String(localized: "Support"), supportHeightMeters.map { "\(Int($0.rounded())) m" },
+                    entry: AntennaGlossary.supportHeight(supportHeightMeters, label: supportLabel, antennaMeters: antennaHeightMeters))
+            factRow(String(localized: "Altitude de départ"), userGround.map { "\(Int($0.rounded())) m" },
+                    entry: AntennaGlossary.altitude(userGround, isSite: false))
+            factRow(String(localized: "Altitude du site"), antennaGround.map { "\(Int($0.rounded())) m" },
+                    entry: AntennaGlossary.altitude(antennaGround, isSite: true))
+            factRow(String(localized: "Rayon Fresnel max."), fresnelRadiusLabel,
+                    entry: AntennaGlossary.fresnelRadius(profile.map(\.fresnelRadiusMeters).max(), frequencyMhz: frequencyMhz))
+        }
+    }
+
+    @ViewBuilder
+    private func factRow(_ label: String, _ value: String?, entry: AntennaGlossaryEntry) -> some View {
+        if let value, !value.isEmpty, value != "—" {
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                SQFactRow(label: label, value: value)
+                Button {
+                    Haptics.light()
+                    glossaryEntry = entry
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .padding(15)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(-15)
+                .accessibilityLabel(Text("Qu’est-ce que « \(label) » ?"))
+            }
         }
     }
 
@@ -488,19 +524,21 @@ struct AntennaProfileView: View {
         return "\(sign)\(Int(abs(delta).rounded())) m"
     }
 
+    /// La conclusion vient après les chiffres : le titre, puis la méthode et
+    /// ses limites.
     private var caveat: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             Text(verdictHeadline)
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
+                .sqHeader()
             Text(caveatText)
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(SQSpace.lg)
-        .sqCardBackground()
+        .padding(.top, SQSpace.xs)
     }
 
     private var verdictHeadline: String {

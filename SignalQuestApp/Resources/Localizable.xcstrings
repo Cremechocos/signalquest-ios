@@ -65670,6 +65670,96 @@
           }
         }
       }
+    },
+    "Repérage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sighting"
+          }
+        }
+      }
+    },
+    "Relief et bâtiments pris en compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terrain and buildings taken into account"
+          }
+        }
+      }
+    },
+    "Relief seul pris en compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terrain only taken into account"
+          }
+        }
+      }
+    },
+    "Obstacle à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obstruction at %@"
+          }
+        }
+      }
+    },
+    "Toucher pour le profil détaillé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap for the detailed profile"
+          }
+        }
+      }
+    },
+    "Itinéraire jusqu'au site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Directions to the site"
+          }
+        }
+      }
+    },
+    "échelle verticale non proportionnelle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vertical scale not proportional"
+          }
+        }
+      }
+    },
+    "Ouvre l'écran de repérage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the sighting screen"
+          }
+        }
+      }
+    },
+    "Fresnel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fresnel"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -1,9 +1,13 @@
 import SwiftUI
 import CoreLocation
 
-/// Le bloc « depuis ta position » de la fiche antenne : distance, cap, secteur
-/// qui couvre, angle d'élévation, et un aperçu du relief entre les deux points.
+/// Le repérage « depuis ta position » de la fiche antenne : distance, cap,
+/// secteur qui couvre, angle d'élévation, et un aperçu du relief entre les deux
+/// points. En ligne dans l'onglet Essentiel (`.summary`), en écran poussé
+/// depuis cette ligne (`.screen`).
 struct AntennaSightCard: View {
+    enum Style { case summary, screen }
+
     let site: AntennaSite
     let details: AntennaDetails?
     /// Secteurs à utiliser tant que la fiche détaillée n'a pas répondu.
@@ -22,7 +26,12 @@ struct AntennaSightCard: View {
     @ObservedObject var location: LocationService
     let origin: AntennaSightOrigin
     let tint: Color
+    let style: Style
+    /// Nom du site, sous le titre de l'écran.
+    let subtitle: String?
+    let onRoute: (() -> Void)?
     @EnvironmentObject private var services: AppServices
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var model: AntennaSightViewModel
     @State private var presentedProfile: AntennaProfilePresentation?
     @State private var gpsSnapshot = AntennaSightGPSSnapshot()
@@ -39,7 +48,10 @@ struct AntennaSightCard: View {
         location: LocationService,
         origin: AntennaSightOrigin = .device,
         tint: Color,
-        terrain: TerrainServicing
+        terrain: TerrainServicing,
+        style: Style = .screen,
+        subtitle: String? = nil,
+        onRoute: (() -> Void)? = nil
     ) {
         self.site = site
         self.details = details
@@ -47,6 +59,9 @@ struct AntennaSightCard: View {
         self.location = location
         self.origin = origin
         self.tint = tint
+        self.style = style
+        self.subtitle = subtitle
+        self.onRoute = onRoute
         _model = StateObject(wrappedValue: AntennaSightViewModel(terrain: terrain))
     }
 
@@ -138,49 +153,10 @@ struct AntennaSightCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            if case let .searchedAddress(_, _, title) = origin, !title.isEmpty {
-                Text(title)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-            if let originTimestamp {
-                Text("Position relevée à \(originTimestamp.formatted(date: .omitted, time: .standard))")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-            if let distanceMeters, let bearing {
-                HStack(alignment: .center, spacing: SQSpace.lg) {
-                    AntennaCompassDial(
-                        bearing: bearing,
-                        deviceHeading: origin.isDevice ? location.headingDegrees : nil,
-                        sectorAzimuth: alignedSector?.azimuth,
-                        tint: tint
-                    )
-                    .frame(width: 92, height: 92)
-                    .animation(reduceMotion ? nil : SQMotion.standard, value: location.headingDegrees)
-
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        Text(SQUnits.distance(meters: distanceMeters))
-                            .accessibilityIdentifier("antenna.sight.distance")
-                            .font(SQType.title)
-                            .foregroundStyle(SQColor.label)
-                        Text("cap \(Int(bearing.rounded()))° \(AntennaSightGeometry.cardinal(for: bearing))")
-                            .font(SQType.subhead)
-                            .foregroundStyle(SQColor.labelSecondary)
-                        if let elevationAngle {
-                            Text(elevationLabel(elevationAngle))
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
-                    }
-                    Spacer(minLength: 0)
-                    if origin.isDevice { refreshButton }
-                }
-                sectorLine
-                if permitsProfile && model.displayKey == sightTaskKey { terrainPreview }
-            } else {
-                unavailableLine
+        Group {
+            switch style {
+            case .summary: summary
+            case .screen: screen
             }
         }
         .foregroundStyle(SQColor.label)
@@ -210,10 +186,167 @@ struct AntennaSightCard: View {
         }
         .onDisappear { location.stopHeadingUpdates() }
         .task(id: gpsExpiryTaskKey) { await expireGPSOrigin() }
+    }
+
+    /// La ligne de l'onglet Essentiel : boussole, distance, cap et verdict de
+    /// vue. L'appelant l'enveloppe dans le lien vers l'écran de repérage.
+    private var summary: some View {
+        HStack(spacing: SQSpace.sm2) {
+            if let distanceMeters, let bearing {
+                AntennaCompassDial(
+                    bearing: bearing,
+                    deviceHeading: origin.isDevice ? location.headingDegrees : nil,
+                    sectorAzimuth: alignedSector?.azimuth,
+                    tint: tint
+                )
+                .frame(width: 52, height: 52)
+                VStack(alignment: .leading, spacing: 2) {
+                    (Text(SQUnits.distance(meters: distanceMeters)) + Text(verbatim: " · ")
+                        + Text("cap \(Int(bearing.rounded()))° \(AntennaSightGeometry.cardinal(for: bearing))"))
+                        .font(SQType.callout(.bold))
+                        .foregroundStyle(SQColor.label)
+                    summaryCaption
+                }
+            } else {
+                Image(systemName: "location.slash")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .frame(width: 52, height: 52)
+                    .sqSurface(SQColor.chip, in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Repérage")
+                        .font(SQType.callout(.bold))
+                    Text(unavailableText)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(SQColor.labelTertiary)
+        }
+        .padding(SQSpace.sm2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .contentShape(Rectangle())
+    }
+
+    /// Sous la distance : le verdict de vue quand le relief est lu, sinon
+    /// l'origine du calcul.
+    @ViewBuilder
+    private var summaryCaption: some View {
+        if permitsProfile, model.displayKey == sightTaskKey, let verdict = model.verdict {
+            Label {
+                Text(verdictHeadline(verdict.level)).foregroundStyle(SQColor.label)
+            } icon: {
+                Image(systemName: verdictIcon(verdict.level)).foregroundStyle(verdictColor(verdict.level))
+            }
+            .font(SQType.caption(.semibold))
+        } else if permitsProfile, model.isLoading {
+            Text("Lecture du relief…")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+        } else {
+            Text(origin.label)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+    }
+
+    /// L'écran poussé : la boussole en grand, le secteur qui couvre, puis le
+    /// relief et son verdict, qui ouvrent le profil détaillé.
+    private var screen: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                screenHeader
+                if case let .searchedAddress(_, _, title) = origin, !title.isEmpty {
+                    Text(title)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                if let distanceMeters, let bearing {
+                    HStack(alignment: .center, spacing: SQSpace.lg) {
+                        AntennaCompassDial(
+                            bearing: bearing,
+                            deviceHeading: origin.isDevice ? location.headingDegrees : nil,
+                            sectorAzimuth: alignedSector?.azimuth,
+                            tint: tint,
+                            fill: SQColor.surface
+                        )
+                        .frame(width: 120, height: 120)
+                        .animation(reduceMotion ? nil : SQMotion.standard, value: location.headingDegrees)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(origin.label).sqKicker()
+                            Text(SQUnits.distance(meters: distanceMeters))
+                                .accessibilityIdentifier("antenna.sight.distance")
+                                .font(SQFont.display(30, .bold, relativeTo: .title))
+                                .monospacedDigit()
+                                .foregroundStyle(SQColor.label)
+                            bearingLine(bearing)
+                                .font(SQType.subhead(.semibold))
+                                .foregroundStyle(SQColor.label)
+                            if let originTimestamp {
+                                Text("Position relevée à \(originTimestamp.formatted(date: .omitted, time: .standard))")
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    sectorNotice
+                    if permitsProfile && model.displayKey == sightTaskKey { terrainCard }
+                } else {
+                    SQNotice(message: unavailableText, systemImage: "location.slash")
+                }
+                if let onRoute {
+                    GradientButton("Itinéraire jusqu'au site", systemImage: "car.fill", style: .secondary, action: onRoute)
+                }
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
+        }
+        .accessibilityIdentifier("antenna.sight.scroll")
+        .background(SQColor.bg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
         .sheet(item: $presentedProfile) { presentation in
             presentation.view
                 .task(id: scenePhase) { await expirePresentation(presentation) }
         }
+    }
+
+    private var screenHeader: some View {
+        HStack(spacing: SQSpace.sm) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "antenna.sight.back") {
+                dismiss()
+            }
+            VStack(spacing: 1) {
+                Text("Repérage").font(SQType.heading).foregroundStyle(SQColor.label).sqHeader()
+                if let subtitle {
+                    Text(subtitle)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(2)
+                }
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            if origin.isDevice {
+                refreshButton
+            } else {
+                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+            }
+        }
+    }
+
+    private func bearingLine(_ bearing: Double) -> Text {
+        let heading = Text("cap \(Int(bearing.rounded()))° \(AntennaSightGeometry.cardinal(for: bearing))")
+        guard let elevationAngle else { return heading }
+        return heading + Text(verbatim: " · ") + Text(elevationLabel(elevationAngle))
     }
 
     /// Le profil et ses paramètres sont copiés avant toute transition modale.
@@ -307,9 +440,9 @@ struct AntennaSightCard: View {
             Haptics.light()
             Task { await refreshPosition() }
         } label: {
-            Image(systemName: "location.circle")
-                .font(.system(size: 19, weight: .medium))
-                .foregroundStyle(isRefreshing ? SQColor.labelTertiary : tint)
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(isRefreshing ? SQColor.labelTertiary : SQColor.label)
                 .rotationEffect(.degrees(isRefreshing ? 360 : 0))
                 .animation(
                     SQMotion.repeating(
@@ -320,9 +453,8 @@ struct AntennaSightCard: View {
                     ),
                     value: isRefreshing
                 )
-                .frame(width: 34, height: 34)
-                .sqSurface(SQColor.surfaceMuted, in: Circle())
-                .padding(5)
+                .frame(width: 44, height: 44)
+                .sqSurface(SQColor.chip, in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(SQPressButtonStyle())
@@ -398,25 +530,25 @@ struct AntennaSightCard: View {
         value.formatted(.number.precision(.fractionLength(1)))
     }
 
+    /// Le secteur le plus aligné, en encadré vert quand il couvre le point de
+    /// départ, ambre sinon.
     @ViewBuilder
-    private var sectorLine: some View {
+    private var sectorNotice: some View {
         if let sector = alignedSector {
-            HStack(spacing: SQSpace.xs2) {
-                Image(systemName: sector.inSector ? "checkmark.circle.fill" : "circle.dashed")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(sector.inSector ? SQColor.success : SQColor.labelTertiary)
-                Text(sector.inSector
-                     ? String(localized: "Le point de départ est dans le lobe du secteur \(Int(sector.azimuth.rounded()))° (écart \(Int(sector.offset.rounded()))°)")
-                     : String(localized: "Hors lobe — le secteur le plus proche pointe à \(Int(sector.azimuth.rounded()))° (écart \(Int(sector.offset.rounded()))°)"))
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            SQNotice(
+                message: sector.inSector
+                    ? String(localized: "Le point de départ est dans le lobe du secteur \(Int(sector.azimuth.rounded()))° (écart \(Int(sector.offset.rounded()))°)")
+                    : String(localized: "Hors lobe — le secteur le plus proche pointe à \(Int(sector.azimuth.rounded()))° (écart \(Int(sector.offset.rounded()))°)"),
+                systemImage: sector.inSector ? "checkmark.circle" : "circle.dashed",
+                tone: sector.inSector ? .success : .warning
+            )
         }
     }
 
+    /// Verdict de vue en tête, aperçu du relief dessous ; le tout ouvre le
+    /// profil d'altitude détaillé.
     @ViewBuilder
-    private var terrainPreview: some View {
+    private var terrainCard: some View {
         if model.isLoading {
             HStack(spacing: SQSpace.sm) {
                 SQSpinner().tint(tint)
@@ -424,13 +556,29 @@ struct AntennaSightCard: View {
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
+            .padding(SQSpace.md)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         } else if !model.profile.isEmpty {
             Button {
                 Haptics.light()
                 presentProfile()
             } label: {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    if let verdict = model.verdict {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Label {
+                                Text(verdictHeadline(verdict.level)).foregroundStyle(SQColor.label)
+                            } icon: {
+                                Image(systemName: verdictIcon(verdict.level)).foregroundStyle(verdictColor(verdict.level))
+                            }
+                            .font(SQType.callout(.bold))
+                            Text(verdictDetail(verdict))
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                     AntennaTerrainPreview(
                         profile: model.profile,
                         supportLabel: supportLabel,
@@ -441,23 +589,20 @@ struct AntennaSightCard: View {
                         antennaHeightMeters: antennaHeightMeters,
                         tint: tint
                     )
-                    .frame(height: 82)
-                    if let verdict = model.verdict {
-                        HStack(spacing: SQSpace.xs2) {
-                            Image(systemName: verdictIcon(verdict.level))
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(verdictColor(verdict.level))
-                            Text(verdictLabel(verdict))
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .multilineTextAlignment(.leading)
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(SQColor.labelTertiary)
-                        }
+                    .frame(height: 110)
+                    HStack {
+                        Text("Toucher pour le profil détaillé")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(SQColor.labelTertiary)
                     }
                 }
+                .padding(SQSpace.sm2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 .contentShape(Rectangle())
             }
             .buttonStyle(SQPressButtonStyle())
@@ -465,27 +610,16 @@ struct AntennaSightCard: View {
             .accessibilityIdentifier("antenna.profile.open")
             .disabled(isRefreshing)
         } else if model.failed {
-            Text("Relief indisponible pour ce trajet.")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
+            SQNotice(message: String(localized: "Relief indisponible pour ce trajet."))
         }
     }
 
-    private var unavailableLine: some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: "location.slash")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(SQColor.labelTertiary)
-            Text(origin == .unresolved
-                 ? String(localized: "Sélectionne une adresse dans les résultats ou efface la recherche pour utiliser ta position.")
-                 : userLocation == nil
-                    ? String(localized: "Position actuelle indisponible. Actualise la localisation pour situer ce site.")
-                    : String(localized: "Ce site n'a pas de coordonnées exploitables."))
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if origin.isDevice { refreshButton }
-        }
+    private var unavailableText: String {
+        origin == .unresolved
+            ? String(localized: "Sélectionne une adresse dans les résultats ou efface la recherche pour utiliser ta position.")
+            : userLocation == nil
+                ? String(localized: "Position actuelle indisponible. Actualise la localisation pour situer ce site.")
+                : String(localized: "Ce site n'a pas de coordonnées exploitables.")
     }
 
     private func verdictIcon(_ level: AntennaSightGeometry.SightVerdict.Level) -> String {
@@ -504,25 +638,22 @@ struct AntennaSightCard: View {
         }
     }
 
-    private func verdictLabel(_ verdict: AntennaSightGeometry.SightVerdict) -> String {
-        let scope = verdict.includesBuildings
-            ? String(localized: "relief et bâtiments")
-            : String(localized: "relief seul")
-        switch verdict.level {
-        case .clear:
-            return String(localized: "Vue dégagée jusqu'au site — \(scope)")
-        case .grazing:
-            guard let distance = verdict.obstacleDistanceMeters else {
-                return String(localized: "Passage au ras d'un obstacle — \(scope)")
-            }
-            return String(localized: "Ça frôle un obstacle à \(SQUnits.distance(meters: distance)) — \(scope)")
-        case .blocked:
-            guard let distance = verdict.obstacleDistanceMeters else {
-                return String(localized: "Un obstacle masque le site — \(scope)")
-            }
-            let overshoot = verdict.obstacleOvershootMeters.map { " (+\(Int($0.rounded())) m)" } ?? ""
-            return String(localized: "Masqué à \(SQUnits.distance(meters: distance))\(overshoot) — \(scope)")
+    private func verdictHeadline(_ level: AntennaSightGeometry.SightVerdict.Level) -> String {
+        switch level {
+        case .clear: return String(localized: "Rien ne masque le site")
+        case .grazing: return String(localized: "La liaison frôle un obstacle")
+        case .blocked: return String(localized: "Le site est masqué")
         }
+    }
+
+    /// Ce que le calcul a pris en compte, et où se trouve l'obstacle.
+    private func verdictDetail(_ verdict: AntennaSightGeometry.SightVerdict) -> String {
+        let scope = verdict.includesBuildings
+            ? String(localized: "Relief et bâtiments pris en compte")
+            : String(localized: "Relief seul pris en compte")
+        guard verdict.level != .clear, let distance = verdict.obstacleDistanceMeters else { return scope }
+        let overshoot = verdict.obstacleOvershootMeters.map { " (+\(Int($0.rounded())) m)" } ?? ""
+        return String(localized: "Obstacle à \(SQUnits.distance(meters: distance))") + overshoot + " · " + scope
     }
 }
 
@@ -534,6 +665,8 @@ struct AntennaCompassDial: View {
     let deviceHeading: Double?
     let sectorAzimuth: Double?
     let tint: Color
+    /// Fond du cadran : papier dans une carte blanche, blanc sur le papier.
+    var fill: Color = SQColor.surfaceMuted
 
     var body: some View {
         Canvas { context, size in
@@ -544,10 +677,9 @@ struct AntennaCompassDial: View {
             // relèvement absolu : moins direct, mais jamais faux.
             let rotation = deviceHeading ?? 0
 
-            context.fill(
-                Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)),
-                with: .color(SQColor.surfaceMuted)
-            )
+            let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
+            context.fill(disc, with: .color(fill))
+            context.stroke(disc, with: .color(SQColor.separator), lineWidth: 1)
 
             // Repère nord, qui tourne avec le cadran.
             let northAngle = (-rotation - 90) * .pi / 180

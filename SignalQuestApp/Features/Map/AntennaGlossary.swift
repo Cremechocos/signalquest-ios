@@ -168,32 +168,3 @@ enum AntennaGlossary {
         )
     }
 }
-
-/// Feuille d'explication d'un terme, ouverte depuis le « i » d'une tuile.
-/// Tuile de mesure avec son « i ». Le tap n'agrandit pas la valeur : il explique
-/// ce qu'elle veut dire, avec le chiffre du site en exemple.
-struct AntennaMetricTile: View {
-    let label: String
-    let value: String
-    var highlight = false
-    let entry: AntennaGlossaryEntry
-    @Binding var selection: AntennaGlossaryEntry?
-
-    var body: some View {
-        Button {
-            Haptics.light()
-            selection = entry
-        } label: {
-            // Dessin de la tuile partagée (TRX-11) ; son tap explique la mesure.
-            SQMetricTileContent(label: label, value: value, highlight: highlight) {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(Text(LocalizedStringKey(label)) + Text(verbatim: ", \(value)"))
-        .accessibilityHint("Toucher pour comprendre cette mesure")
-    }
-}

@@ -16,6 +16,7 @@ final class MapAntennaProfileQATests: XCTestCase {
         try await assertVisibleStableProfile(in: app, expectedOrigin: "Depuis l’adresse recherchée",
                                              expectedPointTag: "grenoble-address", name: "profile-fr-selected-address")
         try tap(app.buttons["antenna.profile.close"], in: app)
+        try tap(app.buttons["antenna.sight.back"], in: app)
         try tap(app.buttons["antenna.detail.close"], in: app)
 
         let before = try await fixtureState()
@@ -38,11 +39,13 @@ final class MapAntennaProfileQATests: XCTestCase {
         try selectPlace("paris", in: app)
         let before = try await fixtureState()
         try openOfficialAntenna(in: app)
+        try openSight(in: app)
         try reveal(app.staticTexts["antenna.sight.distance"], in: app)
         XCTAssertGreaterThan(try displayedKilometers(in: app), 30,
                              "The searched Paris origin must remain active after opening the Grenoble antenna")
         try await assertProfileAbsentAndNoRequests(in: app, since: before)
         capture(app, name: "profile-en-distant-address-overrides-nearby-gps")
+        try tap(app.buttons["antenna.sight.back"], in: app)
         try tap(app.buttons["antenna.detail.close"], in: app)
 
         try tap(app.buttons["map.search.clear"], in: app)
@@ -109,6 +112,7 @@ final class MapAntennaProfileQATests: XCTestCase {
     private func assertVisibleStableProfile(
         in app: XCUIApplication, expectedOrigin: String, expectedPointTag: String, name: String
     ) async throws {
+        try openSight(in: app)
         try reveal(app.staticTexts["antenna.sight.distance"], in: app)
         try await waitForProfileRequests(originTag: expectedPointTag)
         let open = app.buttons["antenna.profile.open"]
@@ -165,7 +169,17 @@ final class MapAntennaProfileQATests: XCTestCase {
         return kilometers
     }
 
+    /// Le repérage est un écran poussé depuis sa ligne de l'onglet Essentiel.
+    private func openSight(in app: XCUIApplication) throws {
+        guard !app.scrollViews["antenna.sight.scroll"].exists else { return }
+        let row = app.buttons["antenna.sight.open"]
+        try reveal(row, in: app)
+        try tap(row, in: app)
+        XCTAssertTrue(app.scrollViews["antenna.sight.scroll"].waitForExistence(timeout: 10))
+    }
+
     private func refreshDevicePosition(in app: XCUIApplication) throws {
+        try openSight(in: app)
         let refresh = app.buttons.matching(NSPredicate(format: "label IN %@",
             ["Actualiser ma position", "Refresh my location"])).firstMatch
         try reveal(refresh, in: app)
@@ -185,7 +199,8 @@ final class MapAntennaProfileQATests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) throws {
-        let scroll = app.scrollViews["antenna.detail.scroll"]
+        let sight = app.scrollViews["antenna.sight.scroll"]
+        let scroll = sight.exists ? sight : app.scrollViews["antenna.detail.scroll"]
         guard scroll.waitForExistence(timeout: 15) else { throw RecipeFailure.missingControl }
         for _ in 0..<8 {
             if element.exists && element.isHittable { return }

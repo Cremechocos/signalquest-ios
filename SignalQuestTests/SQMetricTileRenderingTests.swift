@@ -3,14 +3,13 @@ import XCTest
 @testable import SignalQuest
 
 /// TRX-11 (plan 3, lot 11) : la tuile de mesure partagée, dans les grilles des
-/// écrans qui l'utilisent (stats d'un trajet, mesure d'un drive test, fiche
-/// antenne), en français et en anglais, en taille normale et agrandie, pour
+/// écrans qui l'utilisent (stats d'un trajet, mesure d'un drive test), en
+/// français et en anglais, en taille normale et agrandie, pour
 /// une relecture visuelle (`build/qa/metric-tile`). Le détail d'un trajet n'a
 /// pas de données de démonstration : ce rendu est sa seule vue hors compte réel.
 @MainActor
 final class SQMetricTileRenderingTests: XCTestCase {
     private struct Grid: View {
-        @State private var selection: AntennaGlossaryEntry?
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
@@ -45,10 +44,6 @@ final class SQMetricTileRenderingTests: XCTestCase {
                         SQMetricTile(label: "Latence", value: "19", unit: "ms", term: .latency, icon: "bolt.horizontal",
                                      iconTint: SQColor.warning, detail: "min 14 · max 31", size: .large)
                     }
-                }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: SQSpace.sm) {
-                    AntennaMetricTile(label: "Hauteur", value: "32 m", entry: AntennaGlossary.distance(1_250), selection: $selection)
-                    AntennaMetricTile(label: "Azimut", value: "120°", highlight: true, entry: AntennaGlossary.distance(1_250), selection: $selection)
                 }
             }
         }

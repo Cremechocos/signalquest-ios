@@ -1073,26 +1073,33 @@ struct AntennaDetailSheet: View {
         }
     }
 
-    /// Le bloc calculé « depuis ta position ». Il est en haut parce que c'est la
-    /// première question qu'on se pose devant un pylône, pas la dernière.
+    /// Le repérage tient en une ligne (boussole, distance, cap, verdict de vue)
+    /// et ouvre son propre écran : c'est la première question qu'on se pose
+    /// devant un pylône, mais le détail n'intéresse que sur le terrain.
     private var sightCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            AntennaSectionHeader(kicker: "Repérage", title: sightOrigin.label, systemImage: "location.north.line")
-                .accessibilityIdentifier("antenna.profile.origin")
-            AntennaSightCard(
-                site: site,
-                details: model.details,
-                fallbackAzimuths: operatorAzimuths,
-                location: services.location,
-                origin: sightOrigin,
-                tint: operatorColor,
-                terrain: services.terrain
-            )
+        NavigationLink {
+            sightView(.screen)
+        } label: {
+            sightView(.summary)
         }
-        .foregroundStyle(SQColor.label)
-        .padding(SQSpace.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityHint("Ouvre l'écran de repérage")
+        .accessibilityIdentifier("antenna.sight.open")
+    }
+
+    private func sightView(_ style: AntennaSightCard.Style) -> AntennaSightCard {
+        AntennaSightCard(
+            site: site,
+            details: model.details,
+            fallbackAzimuths: operatorAzimuths,
+            location: services.location,
+            origin: sightOrigin,
+            tint: operatorColor,
+            terrain: services.terrain,
+            style: style,
+            subtitle: headerTitle,
+            onRoute: siteCoordinate.map { coordinate in { openRoute(to: coordinate) } }
+        )
     }
 
     /// Mini-carte du site. Non interactive : la carte principale est juste
@@ -1595,23 +1602,6 @@ struct AntennaDetailSheet: View {
                 SQFactRow(label: label, value: normalized)
             }
         }
-    }
-}
-
-/// En-tête de section de la fiche antenne : titre Bricolage + icône. L'ancien
-/// kicker MAJUSCULES est supprimé (DA Crème) — le paramètre est conservé pour
-/// ne pas réécrire les appels, mais n'est plus rendu.
-private struct AntennaSectionHeader: View {
-    let kicker: String
-    let title: String
-    let systemImage: String
-
-    var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(SQType.heading)
-            .foregroundStyle(SQColor.label)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .sqHeader()
     }
 }
 
