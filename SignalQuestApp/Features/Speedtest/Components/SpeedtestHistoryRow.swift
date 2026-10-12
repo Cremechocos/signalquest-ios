@@ -34,7 +34,7 @@ struct SpeedtestHistoryRow: View {
                 .foregroundStyle(SQColor.labelTertiary)
                 .accessibilityHidden(true)
         }
-        .padding(.horizontal, SQSpace.lg + 2)
+        .padding(.horizontal, SQSpace.cardPadding)
         .padding(.vertical, SQSpace.md + 3)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)

@@ -383,7 +383,7 @@ struct LoginView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.md2) {
             Image("SQLogoMark")
                 .resizable()
                 .aspectRatio(contentMode: .fit)

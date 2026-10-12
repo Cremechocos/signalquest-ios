@@ -143,12 +143,7 @@ struct ConversationMediaView: View {
     private func fileRow(_ entry: Entry) -> some View {
         Link(destination: entry.url) {
             HStack(spacing: SQSpace.md) {
-                Image(systemName: "doc.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(SQColor.accentInk)
-                    .frame(width: 36, height: 36)
-                    .background(SQColor.accentSoft, in: Circle())
-                    .accessibilityHidden(true)
+                SQIconPastille(systemImage: "doc.fill", size: 36, tint: SQColor.accentInk, font: .system(size: 15, weight: .semibold))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(entry.attachment.fileName ?? String(localized: "Pièce jointe"))
                         .font(SQFont.body(14, .semibold))

@@ -84,7 +84,7 @@ struct ANFRSiteDetailSheet: View {
             Text("Site ANFR")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 Image(systemName: "mappin.circle.fill")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(SQColor.brandRed)
@@ -93,7 +93,7 @@ struct ANFRSiteDetailSheet: View {
                     .foregroundStyle(SQColor.labelSecondary)
             }
             // Pastilles opérateurs + générations présents.
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 ForEach(site.operators) { op in
                     SQEditorialTag(text: op.label, color: op.color)
                 }
@@ -209,12 +209,7 @@ struct ANFRSiteDetailSheet: View {
 
     private func sectionTitle(_ title: String, systemImage: String) -> some View {
         HStack(spacing: SQSpace.sm) {
-            Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 32, height: 32)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: systemImage, size: 32, font: .system(size: 13, weight: .semibold))
             Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)

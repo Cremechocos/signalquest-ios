@@ -71,7 +71,7 @@ struct ProfileView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: SQSpace.lg + 2) {
+            VStack(spacing: SQSpace.cardPadding) {
                 profileHeader
                     .sqFadeUp()
                 if user.isEmailVerificationPending {
@@ -302,7 +302,7 @@ struct ProfileView: View {
     // MARK: - En-tête
 
     private var profileHeader: some View {
-        VStack(spacing: SQSpace.sm + 2) {
+        VStack(spacing: SQSpace.sm2) {
             SQAvatar(url: user.avatarUrl, name: user.displayName, size: 88)
                 .sqShadowAccent()
                 .accessibilityHidden(true)
@@ -458,7 +458,7 @@ struct ProfileView: View {
             .accessibilityHidden(true)
         }
         .padding(.vertical, SQSpace.lg)
-        .padding(.horizontal, SQSpace.lg + 2)
+        .padding(.horizontal, SQSpace.cardPadding)
         .sqCardBackground()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Progression · Niveau \(level)")
@@ -631,7 +631,7 @@ struct ProfileView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, SQSpace.lg)
-        .padding(.vertical, SQSpace.md + 2)
+        .padding(.vertical, SQSpace.md2)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("profile.android.hint")
     }
@@ -771,7 +771,7 @@ struct ProfileView: View {
                     .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.accentInk)
-                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.horizontal, SQSpace.sm2)
                     .padding(.vertical, SQSpace.xs)
                     .background(SQColor.accentSoft, in: Capsule(style: .continuous))
                     .accessibilityIdentifier("profile.menu.badge")
@@ -782,7 +782,7 @@ struct ProfileView: View {
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, SQSpace.lg)
-        .padding(.vertical, SQSpace.md + 2)
+        .padding(.vertical, SQSpace.md2)
         .contentShape(Rectangle())
     }
 

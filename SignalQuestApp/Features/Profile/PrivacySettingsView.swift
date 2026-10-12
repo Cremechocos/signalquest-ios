@@ -462,7 +462,7 @@ private struct LiveLocationDisclosureSheet: View {
                 .padding(SQSpace.xxl)
             }
 
-            VStack(spacing: SQSpace.sm + 2) {
+            VStack(spacing: SQSpace.sm2) {
                 GradientButton(String(localized: "Activer le partage"), style: .accent) {
                     onConfirm()
                     dismiss()

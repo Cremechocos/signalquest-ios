@@ -782,7 +782,7 @@ private struct OnboardingCTA: View {
     }
 
     private func label(_ title: OnboardingCopy, systemImage: String) -> some View {
-        HStack(spacing: SQSpace.sm + 2) {
+        HStack(spacing: SQSpace.sm2) {
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .bold))
             Text(verbatim: title.localized(locale))

@@ -488,7 +488,7 @@ struct SentinelleView: View {
 
     private var boxList: some View {
         ScrollView {
-            VStack(spacing: SQSpace.md + 2) {
+            VStack(spacing: SQSpace.md2) {
                 // L'invitation venue d'un lien passe AVANT tout : c'est ce qu'on
                 // vient de faire, et elle disparaît dès qu'on a suivi.
                 if let invite = model.sharedInvite {
@@ -653,7 +653,7 @@ struct SentinelleBoxCard: View {
     var body: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+                HStack(alignment: .top, spacing: SQSpace.sm2) {
                     SentinelleStatusDot(color: SentinelleWording.statusColor(target.status))
                         .padding(.top, 6)
                     // L'emoji AVANT le verdict : dans une liste, c'est lui qui

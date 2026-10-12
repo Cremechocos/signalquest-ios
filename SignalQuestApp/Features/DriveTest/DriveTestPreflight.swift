@@ -221,7 +221,7 @@ struct DriveTestPreflightSheet: View {
     }
 
     private func issueRow(_ issue: DriveTestPreflightIssue) -> some View {
-        HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
             Image(systemName: icon(for: issue))
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(color(for: issue))

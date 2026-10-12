@@ -17,7 +17,7 @@ struct ForgotPasswordView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
                 header.sqAuthAppear(appeared)
-                VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+                VStack(alignment: .leading, spacing: SQSpace.md2) {
                     if emailRequested {
                         Text("Consulte tes e-mails")
                             .font(SQType.title)
@@ -126,12 +126,7 @@ struct ForgotPasswordView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            Image(systemName: "key.horizontal.fill")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 46, height: 46)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: "key.horizontal.fill", size: 46, font: Font.title3.weight(.semibold))
             Text("Mot de passe oublié ?")
                 .font(SQType.display)
                 .foregroundStyle(SQColor.label)

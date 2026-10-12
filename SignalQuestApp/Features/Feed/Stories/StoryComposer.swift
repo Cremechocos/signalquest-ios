@@ -187,8 +187,7 @@ struct StoryComposer: View {
         let previewImage = model.previewImage
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg + 2) {
-                    SQSheetHandle()
+                VStack(alignment: .leading, spacing: SQSpace.cardPadding) {
                     PhotosPicker(selection: $model.selectedItem, matching: .images) {
                         ZStack {
                             if let image = previewImage {
@@ -237,7 +236,7 @@ struct StoryComposer: View {
                         .font(SQType.body)
                         .foregroundStyle(SQColor.label)
                         .padding(.horizontal, SQSpace.lg)
-                        .padding(.vertical, SQSpace.sm + 2)
+                        .padding(.vertical, SQSpace.sm2)
                         .frame(minHeight: 44)
                         .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
 
@@ -382,7 +381,7 @@ struct StoryComposer: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(SQColor.brandRed)
                     .frame(width: 36, height: 36)
-                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
                     .accessibilityHidden(true)
                 Text(LocalizedStringKey(title))
                     .font(SQFont.body(15.5, .medium))
@@ -393,7 +392,7 @@ struct StoryComposer: View {
                     .foregroundStyle(SQColor.labelTertiary)
                     .accessibilityHidden(true)
             }
-            .padding(SQSpace.sm + 2)
+            .padding(SQSpace.sm2)
             .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         }
         .buttonStyle(SQPressButtonStyle())
@@ -443,7 +442,7 @@ struct StoryComposer: View {
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
             Spacer()
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 ForEach([5, 10, 15], id: \.self) { seconds in
                     let selected = model.displayDuration == seconds
                     Button {

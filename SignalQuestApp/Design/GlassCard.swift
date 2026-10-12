@@ -63,7 +63,7 @@ struct GlassCard<Content: View>: View {
 
     init(
         cornerRadius: CGFloat = SQRadius.xl,
-        padding: CGFloat = SQSpace.lg + 2,
+        padding: CGFloat = SQSpace.cardPadding,
         @ViewBuilder content: () -> Content
     ) {
         self.cornerRadius = cornerRadius
@@ -125,7 +125,7 @@ struct GradientButton: View {
             Haptics.medium()
             action()
         } label: {
-            HStack(spacing: SQSpace.sm + 2) {
+            HStack(spacing: SQSpace.sm2) {
                 if isBusy {
                     ProgressView().tint(foreground)
                 } else if let systemImage {

@@ -212,7 +212,7 @@ struct MyMeasurementsView: View {
             legendRow(Color(uiColor: SessionGenerationColor.ui("Inconnu")), "Inconnu")
             legendRow(Color(uiColor: SessionGenerationColor.ui(nil)), "Aucun")
         }
-        .padding(SQSpace.sm + 2)
+        .padding(SQSpace.sm2)
         .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .padding(SQSpace.md)
         .accessibilityElement(children: .combine)
@@ -250,7 +250,7 @@ struct MyMeasurementsView: View {
             }
                 .font(SQFont.body(13, .semibold, relativeTo: .caption))
                 .foregroundStyle(SQColor.label)
-                .padding(.horizontal, SQSpace.lg - 2)
+                .padding(.horizontal, SQSpace.md2)
                 .padding(.vertical, SQSpace.sm)
                 .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.md, elevation: .rest)
                 .accessibilityElement(children: .combine)

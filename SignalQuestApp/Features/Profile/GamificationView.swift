@@ -159,7 +159,7 @@ struct GamificationView: View {
     /// données plausibles mais fausses pour un compte existant, donc plus
     /// trompeuses qu'un squelette explicite.
     private var levelCardSkeleton: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.md2) {
             HStack {
                 RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
                     .fill(SQColor.surfaceMuted)
@@ -184,7 +184,7 @@ struct GamificationView: View {
     }
 
     private var levelCard: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.md2) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Niveau \(model.profile?.level ?? 0)")
                     .font(SQType.title)
@@ -230,7 +230,7 @@ struct GamificationView: View {
     }
 
     private var badgesGrid: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
             Text("Badges").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.md), count: 3), spacing: SQSpace.md) {
                 ForEach(badgeList) { badge in
@@ -269,7 +269,7 @@ struct GamificationView: View {
     }
 
     private func questsSection(_ quests: [GamificationV2Quest]) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
             Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             if let claimError = model.claimError {
                 Label(claimError, systemImage: "exclamationmark.triangle")
@@ -329,7 +329,7 @@ struct GamificationView: View {
     }
 
     private var questsSkeleton: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
             Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: SQSpace.md) {
@@ -349,7 +349,7 @@ struct GamificationView: View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(spacing: SQSpace.md) {
                 Circle().fill(SQColor.fill).frame(width: 36, height: 36)
-                VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+                VStack(alignment: .leading, spacing: SQSpace.xs2) {
                     SkeletonBlock(width: 96, height: 12)
                     SkeletonBlock(width: 130, height: 9)
                 }
@@ -366,7 +366,7 @@ struct GamificationView: View {
     // MARK: - Succès (badges verrouillés legacy)
 
     private var lockedAchievementsSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
             Text("Succès à débloquer").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             ForEach(lockedBadges) { badge in
                 HStack(spacing: SQSpace.md) {
@@ -395,7 +395,7 @@ struct GamificationView: View {
                     }
                     Spacer()
                 }
-                .padding(SQSpace.md - 2)
+                .padding(SQSpace.sm2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
                 .accessibilityElement(children: .combine)
@@ -427,12 +427,12 @@ struct GamificationView: View {
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity)
-        .padding(SQSpace.md - 2)
+        .padding(SQSpace.sm2)
         .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
     }
 
     private var eventsList: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
             Text("Activité").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
             ForEach(model.events) { event in
                 let display = GamificationEventDisplay(kind: event.kind)
@@ -461,7 +461,7 @@ struct GamificationView: View {
                             .foregroundStyle(delta >= 0 ? SQColor.success : SQColor.danger)
                     }
                 }
-                .padding(SQSpace.md - 2)
+                .padding(SQSpace.sm2)
                 .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
                 .accessibilityElement(children: .combine)
             }
@@ -649,7 +649,7 @@ private struct QuestCardView: View {
 
     private var claimButton: some View {
         Button(action: onClaim) {
-            HStack(spacing: SQSpace.sm - 2) {
+            HStack(spacing: SQSpace.xs2) {
                 if isClaiming {
                     ProgressView()
                         .controlSize(.small)
@@ -659,7 +659,7 @@ private struct QuestCardView: View {
                     .font(SQFont.display(14.5, .semibold))
             }
             .foregroundStyle(SQColor.onAccent)
-            .padding(.horizontal, SQSpace.lg + 2)
+            .padding(.horizontal, SQSpace.cardPadding)
             .frame(minHeight: 44)
             .background(SQColor.brandRed, in: Capsule())
         }

@@ -65,7 +65,7 @@ struct SpeedtestVerdictCard: View {
                     .accessibilityIdentifier("speedtest.verdict.comparison")
             }
         }
-        .padding(SQSpace.lg + 2)
+        .padding(SQSpace.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .sqCardBackground()
         .accessibilityElement(children: .contain)

@@ -430,7 +430,7 @@ struct SpeedtestDetailContent: View {
             }
         }
         .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.md - 2)
+        .padding(.vertical, SQSpace.sm2)
     }
 
     private func metaLabel(_ label: String, icon: String) -> some View {

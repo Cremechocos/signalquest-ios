@@ -260,7 +260,7 @@ struct ANFRStatsView: View {
                 .font(SQType.display)
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.caption.weight(.semibold))
                 Text("Observatoire ANFR — Agence nationale des fréquences · relevé du \(model.latestDateLabel)")
@@ -342,7 +342,7 @@ struct ANFRStatsView: View {
                 .foregroundStyle(SQColor.label)
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 Text(model.totalOperational, format: .number.grouping(.automatic))
-                    .font(SQFont.display(46, .bold))
+                    .font(SQType.metricLarge)
                     .foregroundStyle(SQColor.label)
                     .monospacedDigit()
                     .contentTransition(.numericText())
@@ -361,13 +361,8 @@ struct ANFRStatsView: View {
         .padding(SQSpace.lg)
         .sqCardBackground()
         .overlay(alignment: .topTrailing) {
-            Image(systemName: "antenna.radiowaves.left.and.right")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 44, height: 44)
-                .background(SQColor.accentSoft, in: Circle())
+            SQIconPastille(systemImage: "antenna.radiowaves.left.and.right", size: 44, font: .system(size: 20, weight: .semibold))
                 .padding(SQSpace.lg)
-                .accessibilityHidden(true)
         }
     }
 
@@ -378,12 +373,7 @@ struct ANFRStatsView: View {
             ANFRBandsView(service: service)
         } label: {
             HStack(spacing: SQSpace.md) {
-                Image(systemName: "square.stack.3d.up.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 40, height: 40)
-                    .background(SQColor.accentSoft, in: Circle())
-                    .accessibilityHidden(true)
+                SQIconPastille(systemImage: "square.stack.3d.up.fill", size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Générations et bandes")
                         .font(SQType.heading)
@@ -461,7 +451,7 @@ struct ANFRStatsView: View {
     }
 
     private func operatorBar(_ row: (operator: ANFROperator, value: Int, delta: Int), fraction: Double) -> some View {
-        VStack(spacing: SQSpace.xs + 2) {
+        VStack(spacing: SQSpace.xs2) {
             HStack(spacing: SQSpace.sm) {
                 Circle().fill(row.operator.color).frame(width: 10, height: 10)
                 Text(row.operator.label)
@@ -523,26 +513,14 @@ struct ANFRStatsView: View {
             HStack(spacing: SQSpace.sm) {
                 ForEach(ANFROperator.allCases) { op in
                     let selected = model.selectedOperator == op
-                    Button {
-                        Haptics.selection()
+                    SQChip(
+                        label: op.label, isSelected: selected, dot: op.color, selectedFill: op.color,
+                        selectedInk: SQBrand.operatorBadgeForeground(op.label), restFill: SQColor.surfaceMuted
+                    ) {
                         withAnimation(reduceMotion ? nil : SQMotion.standard) {
                             model.selectedOperator = op
                         }
-                    } label: {
-                        HStack(spacing: SQSpace.xs + 2) {
-                            Circle().fill(selected ? SQBrand.operatorBadgeForeground(op.label) : op.color).frame(width: 7, height: 7)
-                            Text(op.label)
-                                .font(SQFont.body(13, .semibold))
-                        }
-                        .padding(.horizontal, SQSpace.md - 2)
-                        .frame(height: 34)
-                        .background(selected ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.surfaceMuted), in: Capsule(style: .continuous))
-                        .foregroundStyle(selected ? SQBrand.operatorBadgeForeground(op.label) : SQColor.label)
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(SQPressButtonStyle())
-                    .accessibilityAddTraits(selected ? .isSelected : [])
                     .sqAnimation(SQMotion.fast, value: selected)
                 }
             }
@@ -550,7 +528,7 @@ struct ANFRStatsView: View {
     }
 
     private func legendDot(color: Color, label: String) -> some View {
-        HStack(spacing: SQSpace.xs + 2) {
+        HStack(spacing: SQSpace.xs2) {
             Circle().fill(color).frame(width: 9, height: 9)
             Text(LocalizedStringKey(label))
                 .font(SQType.micro)
@@ -669,12 +647,7 @@ struct ANFRStatsView: View {
 
     private func sectionHeader(_ title: LocalizedStringKey, systemImage: String) -> some View {
         HStack(spacing: SQSpace.sm) {
-            Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 32, height: 32)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: systemImage, size: 32, font: .system(size: 13, weight: .semibold))
             Text(title)
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)

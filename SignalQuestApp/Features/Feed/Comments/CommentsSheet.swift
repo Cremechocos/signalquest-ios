@@ -290,7 +290,6 @@ struct CommentsSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                sheetHeader
                 content
                 if let error = model.errorMessage, model.hasLoaded || !model.comments.isEmpty {
                     errorBanner(error)
@@ -336,14 +335,8 @@ struct CommentsSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
+        .presentationDragIndicator(.visible)
         .task { if !model.hasLoaded { await model.load() } }
-    }
-
-    /// En-tête « Crème » : poignée seule, sans filet ni kicker (le titre est
-    /// porté par la barre de navigation).
-    private var sheetHeader: some View {
-        SQSheetHandle()
     }
 
     @ViewBuilder
@@ -470,11 +463,11 @@ struct CommentsSheet: View {
     /// Rangée « Crème » : avatar + bulle douce `SurfaceMuted` rayon 14, sans
     /// bordure ; le like se pose sous la bulle.
     private func commentRow(_ comment: SocialComment) -> some View {
-        HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
             authorButton(comment) {
                 SQAvatar(url: comment.author.avatarUrl, name: comment.author.displayName, size: 36)
             }
-            VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs2) {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     HStack {
                         authorButton(comment) {
@@ -601,7 +594,7 @@ struct CommentsSheet: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .accessibilityIdentifier("comments.replyTarget")
             }
-            HStack(spacing: SQSpace.sm + 2) {
+            HStack(spacing: SQSpace.sm2) {
                 // Champ capsule « Crème » : SurfaceMuted, sans bordure, 44 pt mini.
                 TextField(model.replyTo == nil
                     ? LocalizedStringKey("Ajoute un commentaire")
@@ -610,7 +603,7 @@ struct CommentsSheet: View {
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1...4)
                     .padding(.horizontal, SQSpace.lg)
-                    .padding(.vertical, SQSpace.sm + 2)
+                    .padding(.vertical, SQSpace.sm2)
                     .frame(minHeight: 44)
                     .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
                 Button {

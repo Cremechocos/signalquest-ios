@@ -493,7 +493,7 @@ struct LeaderboardsView: View {
                 MyRankCard(rank: myRank.rank, total: myRank.total, valueText: myRank.value)
                     .sqFadeUp()
             }
-            LazyVStack(spacing: SQSpace.sm + 2) {
+            LazyVStack(spacing: SQSpace.sm2) {
                 rows()
             }
             if let error {
@@ -697,7 +697,7 @@ private struct LeaderboardHeroCard: View {
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(SQColor.label)
         }
-        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.sm2)
         .padding(.vertical, 5)
         .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
@@ -1023,7 +1023,7 @@ private struct SpeedRowMeta: View {
     }
 
     private func line(_ tags: [(text: String, color: Color)]) -> some View {
-        HStack(spacing: SQSpace.xs + 2) {
+        HStack(spacing: SQSpace.xs2) {
             ForEach(Array(tags.enumerated()), id: \.offset) { _, tag in
                 SQEditorialTag(text: tag.text, color: tag.color)
                     .fixedSize(horizontal: true, vertical: false)
@@ -1139,7 +1139,7 @@ private struct MyRankCard: View {
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Mon rang").sqKicker()
-                HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs + 2) {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs2) {
                     Text("#\(rank)")
                         .font(SQFont.display(24, .bold))
                         .monospacedDigit()
@@ -1210,7 +1210,7 @@ private struct LeaderboardRowView<Meta: View>: View {
             SQAvatar(url: avatarUrl, name: name, size: 40)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xs + 1) {
-                HStack(spacing: SQSpace.xs + 2) {
+                HStack(spacing: SQSpace.xs2) {
                     Text(name)
                         .font(SQFont.body(15, .semibold))
                         .foregroundStyle(SQColor.label)
@@ -1257,7 +1257,7 @@ private struct LeaderboardSkeleton: View {
                 skeletonColumn(avatar: 66, step: 92)
                 skeletonColumn(avatar: 56, step: 52)
             }
-            VStack(spacing: SQSpace.sm + 2) {
+            VStack(spacing: SQSpace.sm2) {
                 ForEach(0..<5, id: \.self) { _ in
                     skeletonRow
                 }

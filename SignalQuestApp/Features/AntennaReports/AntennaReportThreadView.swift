@@ -334,7 +334,7 @@ struct AntennaReportThreadView: View {
                     }
                 }
             }
-            HStack(spacing: SQSpace.sm + 2) {
+            HStack(spacing: SQSpace.sm2) {
                 PhotosPicker(
                     selection: $model.pickerItems,
                     maxSelectionCount: AntennaReportThreadViewModel.maxImages,
@@ -354,7 +354,7 @@ struct AntennaReportThreadView: View {
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1...4)
                     .padding(.horizontal, SQSpace.lg)
-                    .padding(.vertical, SQSpace.sm + 2)
+                    .padding(.vertical, SQSpace.sm2)
                     .frame(minHeight: 44)
                     .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
 
@@ -420,7 +420,7 @@ private struct FlexibleImageRow: View {
     let onTap: (AntennaReportImage) -> Void
 
     var body: some View {
-        HStack(spacing: SQSpace.xs + 2) {
+        HStack(spacing: SQSpace.xs2) {
             ForEach(images) { image in
                 Button { onTap(image) } label: {
                     thumbnail(image)
@@ -584,8 +584,8 @@ struct AntennaReportHeaderCard: View {
     let report: AntennaReport
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
-            HStack(spacing: SQSpace.sm + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            HStack(spacing: SQSpace.sm2) {
                 Image(systemName: report.reportType.systemImage)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(SQColor.brandRed)
@@ -608,7 +608,7 @@ struct AntennaReportHeaderCard: View {
                     .foregroundStyle(SQColor.label)
             }
             if let current = report.currentValue?.nonEmpty, let suggested = report.suggestedValue?.nonEmpty {
-                HStack(spacing: SQSpace.xs + 2) {
+                HStack(spacing: SQSpace.xs2) {
                     Text(current).strikethrough().foregroundStyle(SQColor.labelSecondary)
                     Image(systemName: "arrow.right").font(.caption).foregroundStyle(SQColor.labelTertiary)
                     Text(suggested).foregroundStyle(SQColor.success)
@@ -643,7 +643,7 @@ struct AntennaReportStatusChip: View {
         Label(status.label, systemImage: status.systemImage)
             .font(SQFont.body(12, .semibold))
             .foregroundStyle(color)
-            .padding(.horizontal, SQSpace.sm + 2)
+            .padding(.horizontal, SQSpace.sm2)
             .padding(.vertical, SQSpace.xs + 1)
             .background(color.opacity(0.14), in: Capsule(style: .continuous))
     }

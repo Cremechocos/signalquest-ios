@@ -16,7 +16,7 @@ struct ReactionPicker: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: SQSpace.sm + 2) {
+        HStack(spacing: SQSpace.sm2) {
             ForEach(Array(emojis.enumerated()), id: \.element) { index, emoji in
                 Button {
                     Haptics.light()
@@ -24,7 +24,7 @@ struct ReactionPicker: View {
                 } label: {
                     Text(emoji)
                         .font(.title2)
-                        .padding(SQSpace.sm + 2)
+                        .padding(SQSpace.sm2)
                         .sqSurface(SQColor.surfaceMuted, in: Circle())
                 }
                 .buttonStyle(SQPressButtonStyle())

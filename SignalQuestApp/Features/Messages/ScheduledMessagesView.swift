@@ -54,14 +54,9 @@ struct ScheduledMessagesView: View {
     }
 
     private func row(_ item: ScheduledMessage) -> some View {
-        HStack(alignment: .top, spacing: SQSpace.sm + 2) {
-            Image(systemName: "clock.fill")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 36, height: 36)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
+            SQIconPastille(systemImage: "clock.fill", size: 36, font: .system(size: 14, weight: .medium))
+            VStack(alignment: .leading, spacing: SQSpace.xs2) {
                 if let date = item.sendAt {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
                         .font(SQType.caption.weight(.semibold))
@@ -78,14 +73,14 @@ struct ScheduledMessagesView: View {
                 }
             }
         }
-        .padding(SQSpace.md + 2)
+        .padding(SQSpace.md2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .sqCardBackground(cornerRadius: SQRadius.xl, elevation: .rest)
         // Regroupe date + contenu + statut en un seul élément VoiceOver (A11Y-1).
         .accessibilityElement(children: .combine)
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: SQSpace.xs + 2, leading: SQSpace.lg, bottom: SQSpace.xs + 2, trailing: SQSpace.lg))
+        .listRowInsets(EdgeInsets(top: SQSpace.xs2, leading: SQSpace.lg, bottom: SQSpace.xs2, trailing: SQSpace.lg))
     }
 
     private func content(for item: ScheduledMessage) -> String {

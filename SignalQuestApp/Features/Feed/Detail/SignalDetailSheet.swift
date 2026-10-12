@@ -29,7 +29,7 @@ struct SignalDetailSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg + 2) {
+                VStack(alignment: .leading, spacing: SQSpace.cardPadding) {
                     header
                         .padding(SQSpace.lg)
                         .sqEditorialCard()
@@ -129,7 +129,7 @@ struct SignalDetailSheet: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(spacing: SQSpace.md + 2) {
+        HStack(spacing: SQSpace.md2) {
             if let onAuthorTap {
                 Button {
                     Haptics.light()
@@ -164,7 +164,7 @@ struct SignalDetailSheet: View {
     }
 
     private var authorBlock: some View {
-        HStack(spacing: SQSpace.md + 2) {
+        HStack(spacing: SQSpace.md2) {
             SQAvatar(url: item.author.avatarUrl, name: item.author.displayName, size: 56)
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text(item.author.displayName)
@@ -206,38 +206,38 @@ struct SignalDetailSheet: View {
         }
     }
 
-    private func metricTiles(for signal: SocialSignalSummary) -> [CardMetricTile] {
-        var tiles: [CardMetricTile] = []
+    private func metricTiles(for signal: SocialSignalSummary) -> [SQMetricTile] {
+        var tiles: [SQMetricTile] = []
         let kind = item.kind.lowercased()
 
         switch kind {
         case "speedtest":
             let detail = speedtestDetail
-            tiles.append(.init(label: "Réception", value: SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg ?? signal.downloadMbps), highlight: true))
-            tiles.append(.init(label: "Envoi", value: SignalFormatters.speed(detail?.uploadAvg ?? signal.uploadMbps)))
-            tiles.append(.init(label: "Latence min", value: SignalFormatters.ms(detail?.pingMin ?? detail?.ping ?? signal.pingMs)))
-            tiles.append(.init(label: "Gigue", value: SignalFormatters.ms(detail?.jitter ?? signal.jitterMs)))
+            tiles.append(.wrapping(label: "Réception", value: SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg ?? signal.downloadMbps), highlight: true))
+            tiles.append(.wrapping(label: "Envoi", value: SignalFormatters.speed(detail?.uploadAvg ?? signal.uploadMbps)))
+            tiles.append(.wrapping(label: "Latence min", value: SignalFormatters.ms(detail?.pingMin ?? detail?.ping ?? signal.pingMs)))
+            tiles.append(.wrapping(label: "Gigue", value: SignalFormatters.ms(detail?.jitter ?? signal.jitterMs)))
         case "validation":
-            tiles.append(.init(label: "Identifiant", value: signal.identifierValue ?? "—", highlight: true))
-            tiles.append(.init(label: "Type", value: signal.identifierType?.uppercased() ?? "—"))
-            tiles.append(.init(label: "PCI", value: signal.pci.map(String.init) ?? "—"))
-            tiles.append(.init(label: "Cell", value: signal.cellId ?? "—"))
-            tiles.append(.init(label: "Bande", value: signal.band ?? "—"))
-            tiles.append(.init(label: "Fréquence", value: signal.frequency ?? "—"))
+            tiles.append(.wrapping(label: "Identifiant", value: signal.identifierValue ?? "—", highlight: true))
+            tiles.append(.wrapping(label: "Type", value: signal.identifierType?.uppercased() ?? "—"))
+            tiles.append(.wrapping(label: "PCI", value: signal.pci.map(String.init) ?? "—"))
+            tiles.append(.wrapping(label: "Cell", value: signal.cellId ?? "—"))
+            tiles.append(.wrapping(label: "Bande", value: signal.band ?? "—"))
+            tiles.append(.wrapping(label: "Fréquence", value: signal.frequency ?? "—"))
         case "coverage", "session", "drive_test":
-            tiles.append(.init(label: "Distance", value: SignalFormatters.meters(signal.distanceMeters), highlight: true))
-            tiles.append(.init(label: "Durée", value: SignalFormatters.duration(signal.durationSeconds)))
-            tiles.append(.init(label: "Points", value: signal.pointsCount.map(String.init) ?? "—"))
-            tiles.append(.init(label: "Signal moy.", value: SignalFormatters.dbm(signal.averageSignalDbm)))
-            tiles.append(.init(label: "Min / Max", value: rangeText(signal: signal)))
-            tiles.append(.init(label: "Techs", value: signal.detectedTechs.prefix(3).joined(separator: " / ").nonEmptyOrDash))
+            tiles.append(.wrapping(label: "Distance", value: SignalFormatters.meters(signal.distanceMeters), highlight: true))
+            tiles.append(.wrapping(label: "Durée", value: SignalFormatters.duration(signal.durationSeconds)))
+            tiles.append(.wrapping(label: "Points", value: signal.pointsCount.map(String.init) ?? "—"))
+            tiles.append(.wrapping(label: "Signal moy.", value: SignalFormatters.dbm(signal.averageSignalDbm)))
+            tiles.append(.wrapping(label: "Min / Max", value: rangeText(signal: signal)))
+            tiles.append(.wrapping(label: "Techs", value: signal.detectedTechs.prefix(3).joined(separator: " / ").nonEmptyOrDash))
         default:
-            tiles.append(.init(label: "RSRP", value: SignalFormatters.dbm(signal.rsrp), highlight: true))
-            tiles.append(.init(label: "RSRQ", value: SignalFormatters.db(signal.rsrq)))
-            tiles.append(.init(label: "SINR", value: SignalFormatters.db(signal.sinr)))
-            tiles.append(.init(label: "Bande", value: signal.band ?? "—"))
-            tiles.append(.init(label: "Opérateur", value: signal.operator ?? "—"))
-            tiles.append(.init(label: "Cell", value: signal.cellId ?? "—"))
+            tiles.append(.wrapping(label: "RSRP", value: SignalFormatters.dbm(signal.rsrp), highlight: true))
+            tiles.append(.wrapping(label: "RSRQ", value: SignalFormatters.db(signal.rsrq)))
+            tiles.append(.wrapping(label: "SINR", value: SignalFormatters.db(signal.sinr)))
+            tiles.append(.wrapping(label: "Bande", value: signal.band ?? "—"))
+            tiles.append(.wrapping(label: "Opérateur", value: signal.operator ?? "—"))
+            tiles.append(.wrapping(label: "Cell", value: signal.cellId ?? "—"))
         }
         return tiles
     }

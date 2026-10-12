@@ -72,7 +72,7 @@ struct MapAdvancedFilterSheet: View {
                     DisclosureGroup(isExpanded: $expertsExpanded) {
                         expertSections.padding(.top, SQSpace.xl)
                     } label: {
-                        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+                        VStack(alignment: .leading, spacing: SQSpace.xs2) {
                             Text("Réglages experts").font(SQType.heading).foregroundStyle(SQColor.label)
                             Text(expertSummary).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -197,7 +197,7 @@ struct MapAdvancedFilterSheet: View {
     @ViewBuilder
     private var anfrSection: some View {
         if let onOpenANFR {
-            VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.sm2) {
                 HStack(spacing: SQSpace.xs) {
                     Text("Données ANFR").font(SQType.heading).foregroundStyle(SQColor.label)
                     SQInfoButton(term: .anfr)
@@ -383,24 +383,16 @@ struct MapAdvancedFilterSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
     private func chip(_ title: String, icon: String, active: Bool, disabled: Bool = false, action: @escaping () -> Void) -> some View {
-        Button { Haptics.selection(); action() } label: {
-            HStack(spacing: SQSpace.sm) {
-                Image(systemName: active ? "checkmark" : icon).frame(width: 16)
-                Text(LocalizedStringKey(title)).fixedSize(horizontal: false, vertical: true)
-            }
-            .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.xs)
-            .foregroundStyle(disabled ? SQColor.labelSecondary : active ? SQColor.accentInk : SQColor.label)
-            // Sélection = remplissage, sans contour (le liseré OLED est transparent hors « Noir intense »).
-            .sqSurface(active ? SQColor.accentSoft : SQColor.surfaceMuted, in: Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(SQPressButtonStyle()).disabled(disabled)
-        .accessibilityAddTraits(active ? .isSelected : [])
+        // Sélection = remplissage teinté et coche, sans contour.
+        SQChip(
+            label: title, systemImage: icon, isSelected: active, selectedSystemImage: "checkmark",
+            selectedFill: SQColor.accentSoft, selectedInk: SQColor.accentInk, restFill: SQColor.surfaceMuted,
+            fillsWidth: true, action: action
+        )
+        .disabled(disabled)
     }
     private func menuLabel(title: String, symbol: String, accessory: String? = nil) -> some View {
-        HStack(spacing: SQSpace.sm + 2) {
+        HStack(spacing: SQSpace.sm2) {
             if let accessory { Text(accessory).accessibilityHidden(true) }
             else { Image(systemName: symbol).foregroundStyle(SQColor.accentInk).accessibilityHidden(true) }
             Text(title).font(SQType.body).foregroundStyle(SQColor.label)
@@ -408,7 +400,7 @@ struct MapAdvancedFilterSheet: View {
             Spacer(minLength: SQSpace.sm)
             Image(systemName: "chevron.up.chevron.down").foregroundStyle(SQColor.labelSecondary)
         }
-        .padding(.horizontal, SQSpace.md + 2).padding(.vertical, SQSpace.sm).frame(minHeight: 48)
+        .padding(.horizontal, SQSpace.md2).padding(.vertical, SQSpace.sm).frame(minHeight: 48)
         .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md))
     }
     private func periodPicker(_ title: LocalizedStringKey, selection: Binding<Int>, identifier: String) -> some View {

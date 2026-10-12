@@ -210,13 +210,13 @@ struct SharedPostEmbedBubble: View {
 
     private func embed(_ item: UnifiedSocialFeedItem) -> some View {
         surfaceWrap {
-            VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.sm2) {
                 // Contenu tappable → publication complète (parité Android).
                 Button {
                     Haptics.selection()
                     onOpen(item)
                 } label: {
-                    VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+                    VStack(alignment: .leading, spacing: SQSpace.sm2) {
                         header(item)
                         let text = bodyText(item)
                         if !text.isEmpty {
@@ -368,7 +368,7 @@ struct SharedPostEmbedBubble: View {
 
     private var loadingSkeleton: some View {
         surfaceWrap {
-            VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.sm2) {
                 HStack(spacing: SQSpace.sm) {
                     Circle()
                         .fill(SQColor.surfaceMuted)
@@ -402,7 +402,7 @@ struct SharedPostEmbedBubble: View {
         if standalone {
             // L'embed est la bulle : carte crème autonome, rayon 22.
             content()
-                .padding(SQSpace.md + 2)
+                .padding(SQSpace.md2)
                 .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         } else if mine {
             content()
@@ -440,7 +440,7 @@ struct SharedPostEmbedBubble: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.sm2)
         .padding(.vertical, SQSpace.sm)
         .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)

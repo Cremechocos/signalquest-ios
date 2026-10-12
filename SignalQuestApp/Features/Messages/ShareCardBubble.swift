@@ -114,7 +114,7 @@ struct SignalCardBubble: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
             // En-tête : pastille + titre + opérateur·techno
             HStack(spacing: SQSpace.sm) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
@@ -141,7 +141,7 @@ struct SignalCardBubble: View {
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 if let rsrp = signal.rsrp {
                     Text("\(rsrp)")
-                        .font(SQFont.display(30, .bold))
+                        .font(SQType.metricMedium)
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                     Text("dBm · RSRP")
                         .font(SQType.micro)
@@ -168,7 +168,7 @@ struct SignalCardBubble: View {
                 signal.site.map { String(localized: "Site \($0)") }
             ].compactMap { $0 }
             if !chips.isEmpty {
-                HStack(spacing: SQSpace.xs + 2) {
+                HStack(spacing: SQSpace.xs2) {
                     ForEach(chips, id: \.self) { chip in
                         Text(chip)
                             .font(SQType.micro)
@@ -328,7 +328,7 @@ struct SharedPostCardBubble: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.sm2)
         .padding(.vertical, SQSpace.sm)
         .background(mine ? SQColor.onAccent.opacity(0.12) : SQColor.surfaceMuted,
                     in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
@@ -408,7 +408,7 @@ struct LocationBubble: View {
                 .frame(maxWidth: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
 
-                HStack(spacing: SQSpace.xs + 2) {
+                HStack(spacing: SQSpace.xs2) {
                     Image(systemName: "location.fill")
                         .font(.system(size: 11))
                         .foregroundStyle(mine ? SQColor.onAccent.opacity(0.85) : SQColor.brandRed)
@@ -441,7 +441,7 @@ struct LocationBubble: View {
                         .foregroundStyle(mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary)
                         .accessibilityHidden(true)
                 }
-                .padding(.top, SQSpace.xs + 2)
+                .padding(.top, SQSpace.xs2)
             }
             .frame(maxWidth: 260, alignment: .leading)
         }
@@ -488,7 +488,7 @@ private struct ShareCardOpenButton: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
             Rectangle()
                 .fill(mine ? SQColor.onAccent.opacity(0.22) : SQColor.separator)
                 .frame(height: 0.5)

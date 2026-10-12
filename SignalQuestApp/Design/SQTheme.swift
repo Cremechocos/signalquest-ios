@@ -57,6 +57,12 @@ enum SQType {
     static var micro: Font { SQFont.body(12, .semibold, relativeTo: .caption2) }
     /// Libellés de boutons — Bricolage SemiBold 16.
     static var button: Font { SQFont.display(16, .semibold) }
+    /// Chiffres héros d'une carte de stats ou d'un cadran (total, débit mesuré) —
+    /// Bricolage Bold 46. Ajouter `.monospacedDigit()` à l'appel si la valeur change.
+    static var metricLarge: Font { SQFont.display(46, .bold) }
+    /// Valeur chiffrée d'une rangée ou d'une carte (dernière mesure, RSRP) —
+    /// Bricolage Bold 30 (DESIGN.md › Chiffres). Même remarque pour `.monospacedDigit()`.
+    static var metricMedium: Font { SQFont.display(30, .bold) }
 }
 
 /// Ex-« kicker » éditorial. La DA Crème supprime les micro-labels MAJUSCULES

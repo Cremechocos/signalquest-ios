@@ -31,7 +31,7 @@ struct SentinelleFollowedCard: View {
     var body: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+                HStack(alignment: .top, spacing: SQSpace.sm2) {
                     SentinelleStatusDot(color: SentinelleWording.statusColor(box.status))
                         .padding(.top, 6)
                     VStack(alignment: .leading, spacing: 3) {
@@ -287,7 +287,7 @@ struct SentinelleShareInvite: View {
                     .font(SQFont.body(12))
                     .foregroundStyle(SQColor.labelSecondary)
 
-                HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+                HStack(alignment: .top, spacing: SQSpace.sm2) {
                     SentinelleStatusDot(color: SentinelleWording.statusColor(box.status))
                         .padding(.top, 6)
                     if let emoji = box.ownerEmoji, !emoji.isEmpty {

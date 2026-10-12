@@ -75,7 +75,7 @@ struct AntennaRadioIdentifiersView: View {
                     .minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(SQSpace.sm + 2)
+            .padding(SQSpace.sm2)
             .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .contentShape(Rectangle())
         }
@@ -95,7 +95,7 @@ struct AntennaRadioIdentifiersView: View {
                 }
             } label: {
                 VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: SQSpace.xs + 2) {
+                    HStack(spacing: SQSpace.xs2) {
                         Text(sector.title)
                             .font(SQFont.archivo(13, .bold))
                             .foregroundStyle(SQColor.label)

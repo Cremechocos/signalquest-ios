@@ -80,6 +80,8 @@ enum TopSheetPresenter {
         host.rootView = AnyView(makeContent { [weak host] in host?.dismiss(animated: true) })
         host.modalPresentationStyle = .pageSheet
         host.sheetPresentationController?.detents = [.medium(), .large()]
+        // Poignée système, comme les feuilles SwiftUI de l'app.
+        host.sheetPresentationController?.prefersGrabberVisible = true
         presenter.present(host, animated: true)
         return true
     }
@@ -103,14 +105,8 @@ struct NotificationPrimingSheet: View {
 
     private var content: some View {
         VStack(spacing: SQSpace.lg) {
-            SQSheetHandle()
             Spacer(minLength: 0)
-            Image(systemName: "bell.badge.fill")
-                .font(.system(size: 42, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 96, height: 96)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: "bell.badge.fill", size: 96, font: .system(size: 42, weight: .semibold))
 
             VStack(spacing: SQSpace.sm) {
                 Text(title)

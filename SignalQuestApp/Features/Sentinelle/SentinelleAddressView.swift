@@ -42,7 +42,7 @@ struct SentinelleAddressView: View {
     var body: some View {
         ScrollView {
             if let target, let address {
-                VStack(spacing: SQSpace.md + 2) {
+                VStack(spacing: SQSpace.md2) {
                     verdictCard(target, address)
                     seriesStatus
                     latencyCard(address)
@@ -135,7 +135,7 @@ struct SentinelleAddressView: View {
         let state = points?.addressState
         return GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+                HStack(alignment: .top, spacing: SQSpace.sm2) {
                     SentinelleStatusDot(color: SentinelleWording.stateColor(state ?? .unknown), size: 12)
                         .padding(.top, 8)
                     VStack(alignment: .leading, spacing: 3) {
@@ -318,7 +318,7 @@ struct SentinelleAddressView: View {
                         .font(SQFont.body(13, .semibold))
                         .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, SQSpace.sm + 2)
+                        .padding(.vertical, SQSpace.sm2)
                         .frame(minHeight: 44)
                         .background(
                             isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(Color.clear),
@@ -384,7 +384,7 @@ struct SentinelleAddressView: View {
     }
 
     private func hopRow(_ hop: SentinelleHop, peak: Double) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 Text(hop.collapsed > 1 ? "·" : "\(hop.idx)")
                     .font(.system(.caption, design: .monospaced, weight: .semibold))

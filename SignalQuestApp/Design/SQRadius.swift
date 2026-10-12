@@ -5,6 +5,9 @@ import CoreGraphics
 /// (pill) pour tout ce qui se touche. Continuité `.continuous` partout.
 enum SQRadius {
     static let sm: CGFloat = 10
+    /// Tuile d'icône carrée arrondie (28–48 pt) : rangées de menu, métadonnées.
+    /// Les pastilles d'icône circulaires passent par `SQIconPastille`.
+    static let iconTile: CGFloat = 12
     static let md: CGFloat = 14
     static let control = md
     static let lg: CGFloat = 20

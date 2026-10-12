@@ -140,7 +140,7 @@ struct SQEditorialTag: View {
             .font(.caption.weight(.semibold))
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, SQSpace.sm + 2)
+            .padding(.horizontal, SQSpace.sm2)
             .padding(.vertical, SQSpace.xs + 1)
             // La teinte reste portée par la capsule. Le texte utilise l'encre
             // sémantique : plusieurs couleurs opérateur/tech ne garantissent
@@ -148,48 +148,6 @@ struct SQEditorialTag: View {
             .foregroundStyle(SQColor.label)
             .background(color.opacity(0.13), in: Capsule(style: .continuous))
             .accessibilityIdentifier("feed.tag")
-    }
-}
-
-/// Tuile « libellé / valeur » des cartes du fil et des fiches, aux jetons de
-/// la tuile partagée (`SQMetricTile`, TRX-11) : fond `surfaceMuted` rayon 14,
-/// libellé Figtree 12,5 en `labelSecondary`, valeur Figtree Bold 17, en brique
-/// (`accentInk`) si `highlight`. Libellé et valeur passent à la ligne plutôt
-/// que de se tronquer à Dynamic Type élevé.
-struct CardMetricTile: View {
-    let label: String
-    let value: String
-    /// Surligne la valeur en brique (`accentInk`) : une couleur de qualité ne
-    /// tient pas 4,5:1 sur la tuile, comme dans `SQMetricTile`.
-    var highlight: Bool = false
-    /// Nombre de lignes max de la valeur. Deux par défaut : une valeur COMPOSÉE peut en demander
-    /// davantage — « Internet, Voix · 4G, 5G » sur la carte de panne en prend trois.
-    var valueLineLimit: Int = 2
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(LocalizedStringKey(label))
-                .font(SQFont.body(12.5, .medium, relativeTo: .footnote))
-                .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("feed.metric.label")
-            Text(value)
-                .font(SQFont.archivo(17, .bold, relativeTo: .headline))
-                .foregroundStyle(highlight ? SQColor.accentInk : SQColor.label)
-                .lineLimit(valueLineLimit)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("feed.metric.value")
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, SQSpace.sm + 2)
-        .padding(.horizontal, SQSpace.md)
-        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-        // VoiceOver : « libellé : valeur » d'un bloc (Down 240 Mbps), pas 2 textes.
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(LocalizedStringKey(label))
-        .accessibilityValue(value)
     }
 }
 

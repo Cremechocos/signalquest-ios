@@ -66,7 +66,7 @@ struct ThreadView: View {
 
     private var threadHeader: some View {
         let source = parent ?? parentMessage
-        return VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+        return VStack(alignment: .leading, spacing: SQSpace.xs2) {
             HStack(spacing: SQSpace.sm) {
                 SQAvatar(url: source.sender?.avatarUrl, name: source.sender?.displayName ?? "?", size: 30)
                     .accessibilityHidden(true)
@@ -92,7 +92,7 @@ struct ThreadView: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .padding(.top, SQSpace.xs)
         }
-        .padding(SQSpace.md + 2)
+        .padding(SQSpace.md2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .sqCardBackground()
     }
@@ -132,12 +132,12 @@ struct ThreadView: View {
     }
 
     private var composer: some View {
-        HStack(spacing: SQSpace.sm + 2) {
+        HStack(spacing: SQSpace.sm2) {
             TextField("Répondre dans le fil", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
-                .padding(.horizontal, SQSpace.lg + 2)
+                .padding(.horizontal, SQSpace.cardPadding)
                 .padding(.vertical, SQSpace.sm)
                 .frame(minHeight: 44)
                 .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
@@ -154,8 +154,8 @@ struct ThreadView: View {
             .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
             .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer la réponse")
         }
-        .padding(.horizontal, SQSpace.md + 2)
-        .padding(.vertical, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.vertical, SQSpace.sm2)
         .background {
             Rectangle()
                 .fill(.ultraThinMaterial)

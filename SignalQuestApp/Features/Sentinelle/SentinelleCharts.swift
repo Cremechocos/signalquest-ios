@@ -396,7 +396,7 @@ struct SentinelleFamilyChart: View {
     /// Légende maison : celle de Swift Charts ne connaît ni la typographie ni
     /// les teintes de la DA.
     static func legend(for family: SentinelleFamily) -> some View {
-        HStack(spacing: SQSpace.xs + 2) {
+        HStack(spacing: SQSpace.xs2) {
             Capsule()
                 .fill(colors[family] ?? SQColor.brandRed)
                 .frame(width: 14, height: 3)

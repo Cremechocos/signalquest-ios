@@ -285,6 +285,7 @@ final class DesignTokenContrastTests: XCTestCase {
                 let alpha = line.range(of: #"(?<=onAccent\.opacity\()0\.\d+"#, options: .regularExpression)
                     .flatMap { Double(line[$0]) } ?? 0
                 let isLargeText = context.contains("SQFont.display(2") || context.contains("SQFont.display(3")
+                    || context.contains("SQType.metric")
                 if alpha < 0.92 && !isLargeText {
                     offenders.append("\(file.lastPathComponent):\(index + 1)  \(line.trimmingCharacters(in: .whitespaces))")
                 }

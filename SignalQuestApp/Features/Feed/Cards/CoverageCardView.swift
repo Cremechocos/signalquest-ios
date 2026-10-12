@@ -39,7 +39,7 @@ struct CoverageCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
                     place: signal?.city ?? item.placeLabel,
@@ -67,15 +67,15 @@ struct CoverageCardView: View {
                 // Tuile mise en avant en accent brique (DA), pas en couleur techno.
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
                     if hasSessionAggregate {
-                        CardMetricTile(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true)
-                        CardMetricTile(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds))
-                        CardMetricTile(label: "Points", value: signal?.pointsCount.map(String.init) ?? "—")
-                        CardMetricTile(label: "Signal moy.", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
+                        SQMetricTile.wrapping(label: "Distance", value: SignalFormatters.meters(signal?.distanceMeters), highlight: true)
+                        SQMetricTile.wrapping(label: "Durée", value: SignalFormatters.duration(signal?.durationSeconds))
+                        SQMetricTile.wrapping(label: "Points", value: signal?.pointsCount.map(String.init) ?? "—")
+                        SQMetricTile.wrapping(label: "Signal moy.", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
                     } else {
-                        CardMetricTile(label: "Tech", value: signal?.technology ?? "—", highlight: true)
-                        CardMetricTile(label: "Signal", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
-                        CardMetricTile(label: "Cell", value: signal?.cellId ?? "—")
-                        CardMetricTile(label: "PCI", value: signal?.pci.map(String.init) ?? "—")
+                        SQMetricTile.wrapping(label: "Tech", value: signal?.technology ?? "—", highlight: true)
+                        SQMetricTile.wrapping(label: "Signal", value: SignalFormatters.dbm(signal?.averageSignalDbm ?? signal?.rsrp))
+                        SQMetricTile.wrapping(label: "Cell", value: signal?.cellId ?? "—")
+                        SQMetricTile.wrapping(label: "PCI", value: signal?.pci.map(String.init) ?? "—")
                     }
                 }
 

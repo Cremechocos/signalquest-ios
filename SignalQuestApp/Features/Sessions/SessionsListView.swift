@@ -131,7 +131,7 @@ struct SessionsListView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+            LazyVStack(alignment: .leading, spacing: SQSpace.sm2) {
                 SQSegmentedFilter(
                     selection: $model.filter,
                     options: SessionsListViewModel.Filter.allCases.map { (value: $0, label: $0.label, icon: String?.none) }
@@ -249,12 +249,7 @@ private struct LocalCoverageArchiveRow: View {
 
     var body: some View {
         HStack(spacing: SQSpace.md) {
-            Image(systemName: "archivebox")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(SQColor.accentInk)
-                .frame(width: 42, height: 42)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: "archivebox", size: 42, tint: SQColor.accentInk, font: .system(size: 17, weight: .semibold))
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text(archive.state == .recording ? LocalizedStringKey("Brouillon de couverture") : LocalizedStringKey("Ancienne capture de couverture"))
                     .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
@@ -268,7 +263,7 @@ private struct LocalCoverageArchiveRow: View {
                 .foregroundStyle(SQColor.labelTertiary)
                 .accessibilityHidden(true)
         }
-        .padding(SQSpace.md + 2)
+        .padding(SQSpace.md2)
         .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .contentShape(Rectangle())
         .accessibilityIdentifier("sessions.localArchive.row")
@@ -328,12 +323,7 @@ private struct SessionRow: View {
 
     var body: some View {
         HStack(spacing: SQSpace.md) {
-            Image(systemName: session.isDriveTest ? "car.fill" : "dot.radiowaves.left.and.right")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 42, height: 42)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: session.isDriveTest ? "car.fill" : "dot.radiowaves.left.and.right", size: 42, font: .system(size: 17, weight: .semibold))
             VStack(alignment: .leading, spacing: 3) {
                 Text(session.name ?? (session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")))
                     .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
@@ -380,7 +370,7 @@ private struct SessionRow: View {
                 .foregroundStyle(SQColor.labelTertiary)
                 .accessibilityHidden(true)
         }
-        .padding(SQSpace.md + 2)
+        .padding(SQSpace.md2)
         .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .contentShape(Rectangle())
     }

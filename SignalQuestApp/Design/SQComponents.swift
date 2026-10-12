@@ -30,8 +30,8 @@ struct TechBadge: View {
     var body: some View {
         Text(text)
             .font(SQFont.body(12, .semibold))
-            .padding(.horizontal, SQSpace.sm + 2)
-            .padding(.vertical, SQSpace.xs + 2)
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, SQSpace.xs2)
             .background(color.opacity(0.13), in: Capsule(style: .continuous))
             .foregroundStyle(SQColor.label)
     }
@@ -98,366 +98,6 @@ struct SQAvatar: View {
     }
 }
 
-struct StoryBubble: View {
-    let story: SocialStory
-    var viewed: Bool? = nil
-
-    var body: some View {
-        let isViewed = viewed ?? (story.viewedByMe == true)
-        VStack(spacing: SQSpace.sm - 1) {
-            // Anneau décollé de 3 pt : brique 3 pt (non vue) / encre 25 % 1,5 pt (vue).
-            SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 60)
-                .padding(3)
-                .overlay {
-                    if isViewed {
-                        Circle().strokeBorder(SQColor.label.opacity(0.25), lineWidth: 1.5)
-                    } else {
-                        SQStoryRing(lineWidth: 3)
-                    }
-                }
-            // Largeur du cercle : en très grand texte, les prénoms débordaient et
-            // se chevauchaient (UI-15). Deux lignes centrées et une réduction
-            // modérée plutôt qu'une troncature ; VoiceOver lit le nom entier.
-            Text(story.author.displayName)
-                .font(.footnote)
-                .foregroundStyle(SQColor.label)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.7)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(width: 72)
-                .accessibilityIdentifier("feed.story.name")
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-struct SignalBarsView: View {
-    let summary: SocialSignalSummary?
-
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 3) {
-            if summary?.rsrp == nil && summary?.technology == nil {
-                Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                Text("Radio indisponible sur iOS")
-                    .font(SQType.caption)
-            } else {
-                ForEach(0..<4, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(index <= level ? AnyShapeStyle(SQColor.success) : AnyShapeStyle(SQColor.fill))
-                        .frame(width: 6, height: CGFloat(8 + index * 5))
-                }
-                if let technology = summary?.technology {
-                    Text(technology)
-                        .font(SQType.micro)
-                }
-            }
-        }
-        .foregroundStyle(SQColor.labelSecondary)
-        .accessibilityLabel("Résumé radio serveur")
-    }
-
-    private var level: Int {
-        guard let rsrp = summary?.rsrp else { return summary?.technology == nil ? -1 : 2 }
-        if rsrp > -85 { return 3 }
-        if rsrp > -100 { return 2 }
-        if rsrp > -112 { return 1 }
-        return 0
-    }
-}
-
-struct MapItemSheet: View {
-    let item: MapDisplayItem
-    @EnvironmentObject private var services: AppServices
-    @State private var speedtestDetail: SpeedtestDetail?
-    @State private var detailError: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.lg) {
-                SQSheetHandle()
-                switch item.kind {
-                case .speedtest:
-                    speedtestContent
-                case .coverage:
-                    coverageContent
-                default:
-                    genericContent
-                }
-            }
-            .padding()
-        }
-        .task(id: item.backendId) { await loadSpeedtestDetailIfNeeded() }
-        .presentationDetents([.height(360), .medium, .large])
-        .presentationBackgroundCompat(.ultraThinMaterial)
-    }
-
-    private var speedtestContent: some View {
-        let detail = speedtestDetail
-        let local = item.details
-        let downloadAverage = detail?.averageSpeed ?? detail?.downloadAvg ?? detail?.downloadSpeed ?? local?.downloadMbps
-        let downloadMax = detail?.downloadMax ?? detail?.downloadPeakMbps ?? detail?.maxSpeed ?? detail?.downloadSpeed ?? local?.downloadMbps
-        let uploadAverage = detail?.uploadAvg ?? detail?.uploadSpeed ?? local?.uploadMbps
-        let uploadMax = detail?.uploadMax ?? detail?.uploadPeakMbps ?? detail?.uploadSpeed ?? local?.uploadMbps
-        let pingMin = detail?.pingMin ?? detail?.ping ?? local?.pingMs
-        let pingAverage = detail?.pingAvg ?? detail?.ping ?? local?.pingMs
-        let tech = detail?.networkType ?? local?.tech
-        let network = [detail?.connectionType, detail?.networkType].compactMap { $0 }.joined(separator: " / ")
-        return VStack(alignment: .leading, spacing: SQSpace.md + 2) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(SignalFormatters.speed(downloadAverage))
-                        .font(SQType.display)
-                        .foregroundStyle(speedColor(downloadAverage))
-                    Text("Speedtest")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-                Spacer()
-                TechBadge(text: tech ?? "Speedtest", color: SQColor.brandBlue)
-            }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-                // Vocabulaire du lexique (MES-24) : plus de « DL/UL » ni de « Ping ».
-                CardMetricTile(label: "Réception moy.", value: SignalFormatters.speed(downloadAverage), highlight: true)
-                CardMetricTile(label: "Réception max", value: SignalFormatters.speed(downloadMax))
-                CardMetricTile(label: "Envoi moy.", value: SignalFormatters.speed(uploadAverage))
-                CardMetricTile(label: "Envoi max", value: SignalFormatters.speed(uploadMax))
-                CardMetricTile(label: "Latence min", value: SignalFormatters.ms(pingMin))
-                CardMetricTile(label: "Latence moy.", value: SignalFormatters.ms(pingAverage))
-                CardMetricTile(label: "Gigue", value: SignalFormatters.ms(detail?.jitter))
-                CardMetricTile(label: "Réseau", value: network.isEmpty ? (tech ?? "—") : network)
-            }
-            detailRows([
-                ("Opérateur", detail?.mobileOperator ?? local?.operatorName),
-                ("Réseau", network),
-                ("Serveur de mesure", detail?.downloadServerName ?? detail?.server),
-                ("Flux simultanés", detail?.streams.map(String.init)),
-                ("Durée", SignalFormatters.duration(detail?.testDuration)),
-                ("Appareil", [detail?.deviceType, detail?.deviceModel].compactMap { $0 }.joined(separator: " ")),
-                ("Date", formatDate(detail?.timestamp ?? local?.timestamp)),
-                ("Position", coordinatesText(lat: detail?.latitude ?? item.coordinate.latitude, lon: detail?.longitude ?? item.coordinate.longitude))
-            ])
-            if let detailError {
-                Label(detailError, systemImage: "exclamationmark.triangle")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.warning)
-            }
-        }
-    }
-
-    private var coverageContent: some View {
-        let details = item.details
-        let rsrp = details?.rsrp ?? details?.avgRsrp
-        return VStack(alignment: .leading, spacing: SQSpace.md + 2) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(SignalFormatters.dbm(rsrp))
-                        .font(SQType.display)
-                        .foregroundStyle(coverageColor(rsrp))
-                    HStack(spacing: 6) {
-                        Text(details?.clusterCount == nil ? "Couverture" : "Couverture agrégée")
-                            .font(SQType.subhead)
-                            .foregroundStyle(SQColor.labelSecondary)
-                        if let tech = details?.tech {
-                            TechBadge(text: tech, color: TechAccent.color(for: tech))
-                        }
-                        if let band = details?.band {
-                            TechBadge(text: SQUnits.band(band, technology: details?.tech), color: SQColor.brandOrange)
-                        }
-                    }
-                }
-                Spacer()
-                TechBadge(text: kindLabel, color: SQColor.brandGreen)
-            }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                CardMetricTile(label: "RSRP", value: SignalFormatters.dbm(rsrp), highlight: true)
-                CardMetricTile(label: "RSRQ", value: SignalFormatters.db(details?.rsrq))
-                CardMetricTile(label: "SNR", value: SignalFormatters.db(details?.snr))
-                CardMetricTile(label: "Points", value: SignalFormatters.count(details?.clusterCount ?? details?.sampleCount))
-                CardMetricTile(label: "Clusters", value: SignalFormatters.count(details?.returnedClusters ?? details?.totalClusters))
-                CardMetricTile(label: "Type", value: details?.cellType ?? details?.representation ?? "—")
-            }
-            detailRows([
-                ("Opérateur", details?.operatorName),
-                ("Groupe", details?.groupId),
-                ("Primaire", details?.isPrimary.map { $0 ? String(localized: "Oui") : String(localized: "Non") }),
-                ("Date", formatDate(details?.timestamp)),
-                ("Position", coordinatesText(lat: item.coordinate.latitude, lon: item.coordinate.longitude)),
-                ("Source", details?.note ?? "SignalQuest")
-            ])
-        }
-    }
-
-    private var genericContent: some View {
-        VStack(alignment: .leading, spacing: SQSpace.lg) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(item.title)
-                        .font(SQType.title)
-                        .foregroundStyle(SQColor.label)
-                    Text(item.subtitle)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-                Spacer()
-                TechBadge(text: kindLabel, color: SQColor.brandGreen)
-            }
-            if let metric = item.metric {
-                MetricPill(title: "Donnée", value: metric, systemImage: "waveform.path.ecg")
-            }
-        }
-    }
-
-    private func loadSpeedtestDetailIfNeeded() async {
-        guard item.kind == .speedtest, let id = item.backendId, !id.hasPrefix("speed-cluster") else { return }
-        do {
-            speedtestDetail = try await services.speedtest.details(id: id)
-            detailError = nil
-        } catch {
-            detailError = String(localized: "Le détail de cette mesure n’a pas pu être chargé. \(error.userFacingMessage)")
-        }
-    }
-
-    /// Nom du genre d'élément, jamais sa valeur technique (TRX-26).
-    private var kindLabel: String {
-        switch item.kind {
-        case .friend: String(localized: "Ami")
-        case .photo: String(localized: "Photo")
-        case .validation: String(localized: "Validation")
-        case .session: String(localized: "Session de couverture")
-        case .coverage: String(localized: "Couverture")
-        case .speedtest: String(localized: "Speedtest")
-        case .outage: String(localized: "Panne")
-        case .communityOutage: String(localized: "Panne signalée")
-        case .planned: String(localized: "Site prévu")
-        case .antenna: String(localized: "Antenne")
-        case .communitySite: String(localized: "Site communautaire")
-        case .customSite: String(localized: "Site ajouté par un membre")
-        }
-    }
-
-    private func detailRows(_ rows: [(String, String?)]) -> some View {
-        let visibleRows = rows.filter { value in
-            guard let text = value.1?.trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
-            return !text.isEmpty && text != "—"
-        }
-        return VStack(spacing: SQSpace.sm) {
-            ForEach(Array(visibleRows.enumerated()), id: \.offset) { _, row in
-                HStack(alignment: .firstTextBaseline) {
-                    // Clé du catalogue : un libellé passé en `String` restait
-                    // en français dans l'app anglaise.
-                    Text(LocalizedStringKey(row.0))
-                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
-                        .foregroundStyle(SQColor.labelSecondary)
-                    Spacer(minLength: 12)
-                    Text(row.1 ?? "—")
-                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
-                        .foregroundStyle(SQColor.label)
-                        .multilineTextAlignment(.trailing)
-                }
-                .padding(.vertical, SQSpace.sm)
-                .padding(.horizontal, SQSpace.sm + 2)
-                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-            }
-        }
-    }
-
-    private func formatDate(_ date: Date?) -> String? {
-        guard let date else { return nil }
-        return date.formatted(date: .abbreviated, time: .shortened)
-    }
-
-    private func coordinatesText(lat: Double?, lon: Double?) -> String? {
-        guard let lat, let lon else { return nil }
-        return String(format: "%.5f, %.5f", lat, lon)
-    }
-
-    private func speedColor(_ speed: Double?) -> Color {
-        // Échelle canonique unique (SQNetworkColors) ; `nil` garde le bleu
-        // « pas de donnée » propre à cette fiche.
-        guard let speed else { return SQColor.brandBlue }
-        return SQNetworkColors.speedColor(speed)
-    }
-
-    private func coverageColor(_ rsrp: Double?) -> Color {
-        // Échelle canonique unique (SQNetworkColors) ; `nil` garde le bleu
-        // « pas de donnée » propre à cette fiche.
-        guard let rsrp else { return SQColor.brandBlue }
-        return SQNetworkColors.rsrpColor(rsrp)
-    }
-}
-
-struct LeaderboardPodium: View {
-    let entries: [LeaderboardEntry]
-
-    // Podium « Crème » 2-1-3 : nº1 avatar accent + couronne + colonne brique ;
-    // nº2/3 colonnes surface + ombre repos. Colonnes arrondies en haut (rayon 14).
-    var body: some View {
-        HStack(alignment: .bottom, spacing: SQSpace.md) {
-            ForEach(podiumEntries, id: \.rank) { entry in
-                let isFirst = entry.rank == 1
-                VStack(spacing: SQSpace.sm) {
-                    if isFirst {
-                        Text("👑")
-                            .font(SQFont.display(20, .bold))
-                            .accessibilityHidden(true)
-                    }
-                    SQAvatar(url: entry.user.avatarUrl, name: entry.user.displayName, size: isFirst ? 66 : 56)
-                        .modifier(PodiumAccentShadow(active: isFirst))
-                    Text(entry.user.displayName)
-                        .font(SQFont.body(13, .semibold))
-                        .foregroundStyle(SQColor.label)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: SQRadius.md,
-                        bottomLeadingRadius: 0,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: SQRadius.md,
-                        style: .continuous
-                    )
-                    .fill(isFirst ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface))
-                    .frame(height: isFirst ? 92 : (entry.rank == 2 ? 68 : 52))
-                    .overlay(
-                        VStack(spacing: 1) {
-                            Text("\(entry.rank)")
-                                .font(SQFont.display(isFirst ? 24 : 20, .bold))
-                                .foregroundStyle(isFirst ? SQColor.onAccent : SQColor.label)
-                            Text("\(Int(entry.value)) \(entry.unit)")
-                                .font(SQType.micro)
-                                .foregroundStyle(isFirst ? SQColor.onAccent : SQColor.labelSecondary)
-                        }
-                    )
-                    .modifier(PodiumColumnShadow(accent: isFirst))
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-    }
-
-    private var podiumEntries: [LeaderboardEntry] {
-        let top = Array(entries.prefix(3))
-        return top.sorted { lhs, rhs in
-            let order = [2: 0, 1: 1, 3: 2]
-            return (order[lhs.rank] ?? lhs.rank) < (order[rhs.rank] ?? rhs.rank)
-        }
-    }
-}
-
-private struct PodiumAccentShadow: ViewModifier {
-    let active: Bool
-    func body(content: Content) -> some View {
-        if active { content.sqShadowAccent() } else { content }
-    }
-}
-
-private struct PodiumColumnShadow: ViewModifier {
-    let accent: Bool
-    func body(content: Content) -> some View {
-        if accent { content.sqShadowAccent() } else { content.sqShadowSoft() }
-    }
-}
-
     // `Text(String)` NE LOCALISE PAS — seule la surcharge `LocalizedStringKey`
     // le fait. Un libellé qui transite par un paramètre `String` contourne donc
     // le catalogue, ce qui laissait ces états en français une fois l'app passée
@@ -473,12 +113,7 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: SQSpace.md) {
-            Image(systemName: systemImage)
-                .font(.system(size: 26, weight: .medium))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 64, height: 64)
-                .background(SQColor.accentSoft, in: Circle())
-                .sqDecorative()
+            SQIconPastille(systemImage: systemImage, size: 64, font: .system(size: 26, weight: .medium))
             Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
@@ -601,7 +236,7 @@ struct LoadingSkeleton: View {
     var showsMedia: Bool = true
 
     var body: some View {
-        VStack(spacing: SQSpace.md + 2) {
+        VStack(spacing: SQSpace.md2) {
             ForEach(0..<count, id: \.self) { _ in
                 card
             }
@@ -681,16 +316,28 @@ struct ConversationListSkeleton: View {
 
 // MARK: - New primitives
 
-/// Drag handle used at the top of every custom sheet (40×5, `SurfaceMuted`).
-struct SQSheetHandle: View {
+/// Pastille d'icône circulaire teintée (DESIGN.md : « icônes SF Symbols posées
+/// dans des pastilles circulaires teintées ») : icône brique sur `accentSoft`.
+/// Décorative d'office (`accessibilityHidden`) — le libellé voisin porte le sens.
+/// Sans `font`, l'icône fait 40 % du diamètre en semibold ; passer `font` pour
+/// garder un rendu historique (Dynamic Type, taille ou graisse précises).
+/// Pour une pastille carrée, voir `SQRadius.iconTile`.
+struct SQIconPastille: View {
+    let systemImage: String
+    /// Diamètre de la pastille.
+    var size: CGFloat = 40
+    /// Sur `accentSoft`, préférer `SQColor.accentInk` quand l'icône porte du sens.
+    var tint: Color = SQColor.brandRed
+    var fill: Color = SQColor.accentSoft
+    var font: Font? = nil
+
     var body: some View {
-        Capsule()
-            .fill(SQColor.surfaceMuted)
-            .overlay { Capsule().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-            .frame(width: 40, height: 5)
-            .frame(maxWidth: .infinity)
-            .padding(.top, SQSpace.sm)
-            .padding(.bottom, SQSpace.xs)
+        Image(systemName: systemImage)
+            .font(font ?? .system(size: size * 0.4, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: size, height: size)
+            .background(fill, in: Circle())
+            .accessibilityHidden(true)
     }
 }
 
@@ -762,45 +409,86 @@ struct SQSegmentedFilter<Value: Hashable>: View {
 
 /// Pastille sélectionnable du système Crème : inactive en surface avec ombre
 /// repos, active en brique pleine au texte crème, jamais de bordure hors OLED
-/// (DESIGN.md › Chips). Zone de toucher de 44 pt de haut.
+/// (DESIGN.md › Chips). Zone de toucher de 44 pt, état annoncé par VoiceOver
+/// (`.isSelected`).
+///
+/// Une seule implémentation pour tous les filtres en capsule : les variantes
+/// passent par les paramètres (teinte du fond actif, point de couleur, coche,
+/// pleine largeur) plutôt que par une copie locale.
 struct SQChip: View {
     let label: String
     var systemImage: String? = nil
     var isSelected = false
+    /// Remplace `systemImage` quand la pastille est active (ex. une coche : l'état
+    /// ne repose alors pas sur la seule couleur).
+    var selectedSystemImage: String? = nil
+    /// Point de couleur en tête (opérateur) ; il prend l'encre de l'état actif.
+    var dot: Color? = nil
+    /// Fond et encre de l'état actif : brique et crème par défaut. Un fond
+    /// d'opérateur demande l'encre calculée (`SQBrand.operatorBadgeForeground`).
+    var selectedFill: Color = SQColor.brandRed
+    var selectedInk: Color = SQColor.onAccent
+    /// Fond de l'état inactif, posé par `sqSurface` (liseré en « Noir intense »).
+    var restFill: Color = SQColor.surface
+    /// Occupe la largeur proposée (grilles de filtres) au lieu de celle du texte.
+    var fillsWidth = false
+    /// Texte VoiceOver à la place du libellé affiché (clés du catalogue).
+    var spokenLabel: LocalizedStringKey? = nil
+    var spokenValue: LocalizedStringKey? = nil
+    var spokenHint: LocalizedStringKey? = nil
     let action: () -> Void
 
     @Environment(\.controlSize) private var controlSize
+    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
+        let ink = !isEnabled ? SQColor.labelSecondary : isSelected ? selectedInk : SQColor.label
+        let leadingImage = isSelected ? (selectedSystemImage ?? systemImage) : systemImage
         Button {
             Haptics.selection()
             action()
         } label: {
-            HStack(spacing: SQSpace.xs + 2) {
-                if let systemImage {
-                    Image(systemName: systemImage)
+            HStack(spacing: SQSpace.xs2) {
+                if let leadingImage {
+                    Image(systemName: leadingImage)
+                        .accessibilityHidden(true)
+                } else if let dot {
+                    Circle()
+                        .fill(isSelected ? selectedInk : dot)
+                        .frame(width: 8, height: 8)
                         .accessibilityHidden(true)
                 }
                 // Clé du catalogue : un libellé passé en `String` restait en
                 // français dans l'app anglaise.
                 Text(LocalizedStringKey(label))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .font(SQFont.body(13, .semibold))
-            .padding(.horizontal, SQSpace.lg - 2)
+            // Un libellé d'un seul caractère (« 1 », « 5 ») reste une vraie capsule.
+            .frame(minWidth: SQSpace.lg)
+            .frame(maxWidth: fillsWidth ? .infinity : nil)
+            .padding(.horizontal, SQSpace.md2)
             .padding(.vertical, SQSpace.sm)
-            .background(isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
-            .overlay {
-                if !isSelected {
-                    Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
-                }
-            }
-            .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
+            .foregroundStyle(ink)
+            .sqSurface(isSelected ? selectedFill : restFill, in: Capsule(style: .continuous))
             .sqShadowSoft()
-            .frame(minHeight: controlSize == .large ? 50 : 44)
+            .frame(minWidth: 44, minHeight: controlSize == .large ? 50 : 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle(scale: 0.97))
+        .sqChipAccessibility(label: spokenLabel, value: spokenValue, hint: spokenHint)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private extension View {
+    /// Les valeurs absentes ne posent rien : un libellé vide écraserait celui du texte.
+    @ViewBuilder
+    func sqChipAccessibility(label: LocalizedStringKey?, value: LocalizedStringKey?, hint: LocalizedStringKey?) -> some View {
+        let labeled = Group { if let label { self.accessibilityLabel(label) } else { self } }
+        let valued = Group { if let value { labeled.accessibilityValue(value) } else { labeled } }
+        if let hint { valued.accessibilityHint(hint) } else { valued }
     }
 }
 
@@ -812,7 +500,7 @@ struct SQChipMetric: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 if let systemImage {
                     Image(systemName: systemImage)
                         .foregroundStyle(SQColor.brandRed)

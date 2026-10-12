@@ -90,12 +90,7 @@ struct TwoFactorSetupView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            Image(systemName: "lock.shield")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(SQColor.accentInk)
-                .frame(width: 46, height: 46)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: "lock.shield", size: 46, tint: SQColor.accentInk, font: Font.title3.weight(.semibold))
             Text("Double authentification")
                 .font(SQType.title)
                 .sqHeader()

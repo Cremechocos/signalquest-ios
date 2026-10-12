@@ -33,7 +33,7 @@ struct AccountSpeedtestRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, SQSpace.lg + 2)
+        .padding(.horizontal, SQSpace.cardPadding)
         .padding(.vertical, SQSpace.md + 3)
         .accessibilityElement(children: .combine)
     }

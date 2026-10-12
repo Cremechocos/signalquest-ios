@@ -48,7 +48,7 @@ struct OperatorIncidentCard: View {
                 .frame(width: 4)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: SQSpace.xs + 2) {
+                HStack(spacing: SQSpace.xs2) {
                     Image(systemName: Self.glyph(for: incident.issueType))
                         .font(.footnote.weight(.bold))
                         .foregroundStyle(Self.ink(for: incident.issueType))

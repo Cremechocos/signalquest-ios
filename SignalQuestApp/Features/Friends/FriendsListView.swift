@@ -231,7 +231,7 @@ struct FriendsListView: View {
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.dangerInk)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(SQSpace.md + 2)
+                        .padding(SQSpace.md2)
                         .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -339,8 +339,8 @@ struct FriendsListView: View {
     /// pour que le press scale s'applique à toute la carte.
     private func cardSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
-            .padding(.horizontal, SQSpace.md + 2)
-            .padding(.vertical, SQSpace.sm + 2)
+            .padding(.horizontal, SQSpace.md2)
+            .padding(.vertical, SQSpace.sm2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
     }
@@ -354,7 +354,7 @@ struct FriendsListView: View {
     }
 
     private func requestRow(_ request: FriendRequest) -> some View {
-        HStack(spacing: SQSpace.sm + 2) {
+        HStack(spacing: SQSpace.sm2) {
             SQAvatar(url: request.user?.avatarUrl, name: request.user?.displayName ?? "?")
                 .accessibilityHidden(true)
             Text(request.user?.displayName ?? String(localized: "Utilisateur"))

@@ -244,19 +244,19 @@ struct StoryViewer: View {
                 .frame(height: 3)
             }
         }
-        .padding(.horizontal, SQSpace.md + 2)
-        .padding(.top, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.top, SQSpace.sm2)
     }
 
     private var header: some View {
-        HStack(spacing: SQSpace.sm + 2) {
+        HStack(spacing: SQSpace.sm2) {
             if let story = currentStory {
                 Button {
                     Haptics.light()
                     dismiss()
                     onAuthorTap(story)
                 } label: {
-                    HStack(spacing: SQSpace.sm + 2) {
+                    HStack(spacing: SQSpace.sm2) {
                         SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 36)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(story.author.displayName)
@@ -308,13 +308,13 @@ struct StoryViewer: View {
             .accessibilityLabel("Fermer")
         }
         .padding(.horizontal, SQSpace.lg)
-        .padding(.top, SQSpace.xs + 2)
+        .padding(.top, SQSpace.xs2)
     }
 
     private let quickReactions = ["❤️", "🔥", "👏", "😮", "😢", "🙌"]
 
     private var replyAffordance: some View {
-        VStack(spacing: SQSpace.sm + 2) {
+        VStack(spacing: SQSpace.sm2) {
             if replySubmission.sentStoryID == currentStory?.id {
                 Label("Envoyé", systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.bold))
@@ -368,7 +368,7 @@ struct StoryViewer: View {
                     .submitLabel(.send)
                     .onSubmit(sendReply)
                     .padding(.horizontal, SQSpace.md)
-                    .padding(.vertical, SQSpace.sm + 2)
+                    .padding(.vertical, SQSpace.sm2)
                     .frame(minHeight: 44)
                     .background(.ultraThinMaterial, in: Capsule())
                 if !replySubmission.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

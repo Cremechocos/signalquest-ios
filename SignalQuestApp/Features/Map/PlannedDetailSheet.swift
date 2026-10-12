@@ -13,15 +13,16 @@ struct PlannedDetailSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
-                SQSheetHandle()
                 header
                 statusBanner
                 if !plannedTechs.isEmpty { technologiesSection }
                 infoSection
             }
             .padding()
+            .padding(.top, SQSpace.sm)
         }
         .presentationDetents([.height(460), .medium, .large])
+        .presentationDragIndicator(.visible)
         .presentationBackgroundCompat(SQColor.bg)
     }
 

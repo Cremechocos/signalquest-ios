@@ -112,7 +112,7 @@ struct MessageSearchView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(SQSpace.md + 2)
+            .padding(SQSpace.md2)
             .sqCardBackground()
         }
         .buttonStyle(.plain)

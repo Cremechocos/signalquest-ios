@@ -18,7 +18,7 @@ struct PostCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
                     place: item.placeLabel,
@@ -89,5 +89,39 @@ struct PostCardView: View {
             .sqEditorialCard()
         }
         .buttonStyle(SQPressButtonStyle())
+    }
+}
+
+struct SignalBarsView: View {
+    let summary: SocialSignalSummary?
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 3) {
+            if summary?.rsrp == nil && summary?.technology == nil {
+                Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                Text("Radio indisponible sur iOS")
+                    .font(SQType.caption)
+            } else {
+                ForEach(0..<4, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(index <= level ? AnyShapeStyle(SQColor.success) : AnyShapeStyle(SQColor.fill))
+                        .frame(width: 6, height: CGFloat(8 + index * 5))
+                }
+                if let technology = summary?.technology {
+                    Text(technology)
+                        .font(SQType.micro)
+                }
+            }
+        }
+        .foregroundStyle(SQColor.labelSecondary)
+        .accessibilityLabel("Résumé radio serveur")
+    }
+
+    private var level: Int {
+        guard let rsrp = summary?.rsrp else { return summary?.technology == nil ? -1 : 2 }
+        if rsrp > -85 { return 3 }
+        if rsrp > -100 { return 2 }
+        if rsrp > -112 { return 1 }
+        return 0
     }
 }

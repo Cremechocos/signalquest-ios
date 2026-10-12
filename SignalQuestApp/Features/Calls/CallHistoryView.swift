@@ -247,8 +247,8 @@ struct CallHistoryView: View {
     }
 
     private func durationText(_ call: CallSession) -> String? {
-        guard let start = call.createdAt, let end = call.endedAt else { return nil }
-        let seconds = Int(end.timeIntervalSince(start))
+        guard let duration = call.talkDuration else { return nil }
+        let seconds = Int(duration)
         guard seconds > 0 else { return nil }
         return Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond))
     }

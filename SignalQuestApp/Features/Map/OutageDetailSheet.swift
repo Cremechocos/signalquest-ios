@@ -12,14 +12,15 @@ struct OutageDetailSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
-                SQSheetHandle()
                 header
                 if !site.services.isEmpty { servicesSection }
                 infoSection
             }
             .padding()
+            .padding(.top, SQSpace.sm)
         }
         .presentationDetents([.height(440), .medium, .large])
+        .presentationDragIndicator(.visible)
         .presentationBackgroundCompat(SQColor.bg)
     }
 
@@ -64,7 +65,7 @@ struct OutageDetailSheet: View {
                             .font(SQFont.body(12, .bold, relativeTo: .caption2))
                             .foregroundStyle(serviceColor(service.status))
                     }
-                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.horizontal, SQSpace.sm2)
                     .padding(.vertical, 7)
                     .background(serviceColor(service.status).opacity(0.12), in: Capsule(style: .continuous))
                 }

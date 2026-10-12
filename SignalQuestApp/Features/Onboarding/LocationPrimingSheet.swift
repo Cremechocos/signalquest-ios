@@ -23,14 +23,8 @@ struct LocationPrimingSheet: View {
 
     private var content: some View {
         VStack(spacing: SQSpace.lg) {
-            SQSheetHandle()
             Spacer()
-            Image(systemName: isDenied ? "location.slash.fill" : "location.fill.viewfinder")
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 100, height: 100)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: isDenied ? "location.slash.fill" : "location.fill.viewfinder", size: 100, font: .system(size: 44, weight: .semibold))
 
             VStack(spacing: SQSpace.sm) {
                 Text(isDenied ? "Localisation désactivée" : "Localiser ta mesure")

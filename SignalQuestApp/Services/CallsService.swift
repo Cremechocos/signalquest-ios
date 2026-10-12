@@ -5,6 +5,9 @@ struct CallSession: Decodable, Identifiable, Equatable {
     let mode: String?            // "audio" | "video"
     let conversationId: String?
     let createdAt: Date?
+    /// Décroché (`answeredAt` du serveur) : la durée d'appel part de là, pas
+    /// de la sonnerie. Nil pour un appel jamais décroché.
+    let answeredAt: Date?
     let endedAt: Date?
     let participants: [String]?
     let liveKitToken: String?
@@ -25,8 +28,16 @@ struct CallSession: Decodable, Identifiable, Equatable {
     /// Un appel chiffré est celui qui porte un descripteur v2.
     var e2eeRequired: Bool { e2eeV2 != nil }
 
+    /// Durée de conversation, du décroché à la fin : la sonnerie n'en fait pas
+    /// partie, et un appel jamais décroché n'a pas de durée.
+    var talkDuration: TimeInterval? {
+        guard let answeredAt, let endedAt else { return nil }
+        let seconds = endedAt.timeIntervalSince(answeredAt)
+        return seconds > 0 ? seconds : nil
+    }
+
     enum CodingKeys: String, CodingKey {
-        case id, callId, mode, type, callType, conversationId, createdAt, startedAt, endedAt, participants
+        case id, callId, mode, type, callType, conversationId, createdAt, startedAt, answeredAt, endedAt, participants
         case otherParticipants, caller, callerName, conversation, conversationTitle, isGroup
         case liveKitToken, token, liveKitUrl, wsUrl, liveKitRoom, roomName, status, pending
         case e2eeRequired, e2eeV2, livekitIdentity
@@ -47,12 +58,14 @@ struct CallSession: Decodable, Identifiable, Equatable {
         displayName: String? = nil,
         isGroup: Bool = false,
         e2eeV2: E2EEV2SignedCallDescriptor? = nil,
-        livekitIdentity: String? = nil
+        livekitIdentity: String? = nil,
+        answeredAt: Date? = nil
     ) {
         self.id = id
         self.mode = mode
         self.conversationId = conversationId
         self.createdAt = createdAt
+        self.answeredAt = answeredAt
         self.endedAt = endedAt
         self.participants = participants
         self.liveKitToken = liveKitToken
@@ -84,6 +97,7 @@ struct CallSession: Decodable, Identifiable, Equatable {
         conversationId = try? c.decodeIfPresent(String.self, forKey: .conversationId)
         createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt))
             ?? (try? c.decodeIfPresent(Date.self, forKey: .startedAt))
+        answeredAt = try? c.decodeIfPresent(Date.self, forKey: .answeredAt)
         endedAt = try? c.decodeIfPresent(Date.self, forKey: .endedAt)
         let decodedParticipants = (try? c.decodeIfPresent([String].self, forKey: .participants))
             ?? (try? c.decodeLossyParticipants(forKey: .participants))
@@ -249,6 +263,7 @@ struct CachedCallSession: Codable {
     let mode: String?
     let conversationId: String?
     let createdAt: Date?
+    let answeredAt: Date?
     let endedAt: Date?
     let participants: [String]?
     let status: String?
@@ -258,7 +273,7 @@ struct CachedCallSession: Codable {
 
     init(_ c: CallSession) {
         id = c.id; mode = c.mode; conversationId = c.conversationId
-        createdAt = c.createdAt; endedAt = c.endedAt; participants = c.participants
+        createdAt = c.createdAt; answeredAt = c.answeredAt; endedAt = c.endedAt; participants = c.participants
         status = c.status; isPending = c.isPending; displayName = c.displayName; isGroup = c.isGroup
     }
 
@@ -266,7 +281,8 @@ struct CachedCallSession: Codable {
         CallSession(
             id: id, mode: mode, conversationId: conversationId, createdAt: createdAt,
             endedAt: endedAt, participants: participants, liveKitToken: nil, liveKitUrl: nil,
-            liveKitRoom: nil, status: status, isPending: isPending, displayName: displayName, isGroup: isGroup
+            liveKitRoom: nil, status: status, isPending: isPending, displayName: displayName, isGroup: isGroup,
+            answeredAt: answeredAt
         )
     }
 }

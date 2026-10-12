@@ -721,7 +721,7 @@ struct ExploreView: View {
                             Haptics.selection()
                             model.selectHashtag(tag.tag)
                         } label: {
-                            HStack(spacing: SQSpace.xs + 2) {
+                            HStack(spacing: SQSpace.xs2) {
                                 Text("#\(tag.tag)")
                                     .font(SQFont.body(13, .semibold))
                                 Text(SignalFormatters.count(tag.postCount))
@@ -790,7 +790,7 @@ struct ExploreView: View {
                     systemImage: "number"
                 )
             } else {
-                LazyVStack(alignment: .leading, spacing: SQSpace.lg + 2) {
+                LazyVStack(alignment: .leading, spacing: SQSpace.cardPadding) {
                     ForEach(model.hashtagItems) { item in
                         exploreCard(item)
                         .sqFadeUp()
@@ -880,7 +880,7 @@ struct ExploreView: View {
             } label: {
                 Text(followed ? "Abonné" : "Suivre")
                     .font(SQFont.body(13, .semibold))
-                    .padding(.horizontal, SQSpace.md + 2)
+                    .padding(.horizontal, SQSpace.md2)
                     .padding(.vertical, SQSpace.sm)
                     .background(
                         followed ? AnyShapeStyle(SQColor.surfaceMuted) : AnyShapeStyle(SQColor.brandRed),

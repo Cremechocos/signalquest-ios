@@ -165,12 +165,7 @@ struct SiteRemapSheet: View {
 
     private var instructionBanner: some View {
         HStack(spacing: SQSpace.sm) {
-            Image(systemName: "hand.tap.fill")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 28, height: 28)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: "hand.tap.fill", size: 28, font: Font.footnote.weight(.semibold))
             Text("Touche le bon site pour y ré-attribuer \(model.item.nodeLabel)")
                 .font(SQFont.body(12.5, .semibold))
                 .foregroundStyle(SQColor.label)

@@ -67,7 +67,7 @@ struct AntennaProfileView: View {
                     figures
                     caveat
                 }
-                .padding(SQSpace.lg + 2)
+                .padding(SQSpace.cardPadding)
             }
             .signalQuestBackground()
             .navigationTitle("Profil d'altitude")

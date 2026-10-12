@@ -1395,7 +1395,7 @@ struct DriveTestView: View {
                 mark: .diamond
             )
         }
-        .padding(SQSpace.sm + 2)
+        .padding(SQSpace.sm2)
         .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
         .sqShadowCard()
         // Largeur PLAFONNÉE et non figée : à 146 pt fixes, la légende débordait dès
@@ -1479,7 +1479,7 @@ struct DriveTestView: View {
     }
 
     private var panelContent: some View {
-        VStack(spacing: SQSpace.sm + 2) {
+        VStack(spacing: SQSpace.sm2) {
             if model.isVPNActive {
                 VPNWarningBanner(message: "VPN actif : opérateur non détectable, ces tests ne seront pas publiés sur la carte.")
             }
@@ -1542,8 +1542,8 @@ struct DriveTestView: View {
                             .foregroundStyle(SQColor.dangerInk)
                     }
                 }
-                .padding(.horizontal, SQSpace.sm + 2)
-                .padding(.vertical, SQSpace.xs + 2)
+                .padding(.horizontal, SQSpace.sm2)
+                .padding(.vertical, SQSpace.xs2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
@@ -1616,7 +1616,7 @@ struct DriveTestView: View {
     }
 
     private func sessionRecapCard(_ recap: DriveTestViewModel.SessionRecap) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
             HStack(spacing: SQSpace.sm) {
                 Image(systemName: "flag.checkered")
                     .font(.system(size: 13, weight: .semibold))
@@ -1758,7 +1758,7 @@ struct DriveTestView: View {
     }
 
     private var sectorBanner: some View {
-        HStack(spacing: SQSpace.sm + 2) {
+        HStack(spacing: SQSpace.sm2) {
             Image(systemName: sectorIcon)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(sectorColor)
@@ -1866,7 +1866,7 @@ struct DriveTestView: View {
     }
 
     private var sessionStats: some View {
-        VStack(spacing: SQSpace.xs + 2) {
+        VStack(spacing: SQSpace.xs2) {
             // Valeurs du test courant : se remplissent en live et RESTENT jusqu'au test suivant.
             HStack(spacing: 0) {
                 stat(label: "Latence", value: model.livePing > 0 ? "\(Int(model.livePing.rounded()))" : "—", unit: "ms")
@@ -1915,7 +1915,7 @@ struct DriveTestView: View {
     @ViewBuilder
     private var actionButton: some View {
         if model.isRunning {
-            VStack(spacing: SQSpace.xs + 2) {
+            VStack(spacing: SQSpace.xs2) {
                 // La cadence est désormais liée à la DISTANCE : à l'arrêt (bouchon,
                 // point précis à mesurer) aucun test ne partirait jamais. Ce bouton
                 // est l'échappatoire, et il n'a de sens que dans ce cas.

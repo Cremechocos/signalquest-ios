@@ -80,12 +80,7 @@ struct DriveTestDisclosureView: View {
 
     private func row(icon: String, title: LocalizedStringKey, detail: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: SQSpace.md) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 34, height: 34)
-                .background(SQColor.accentSoft, in: Circle())
-                .sqDecorative()
+            SQIconPastille(systemImage: icon, size: 34, font: .system(size: 15, weight: .semibold))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(SQFont.body(14.5, .semibold))

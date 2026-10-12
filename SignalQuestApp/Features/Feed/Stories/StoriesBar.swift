@@ -13,7 +13,7 @@ struct StoriesBar: View {
             // LazyHStack : ne matérialise que les bulles visibles du rail (les stories
             // hors écran ne sont pas construites) — cf. PERF-RING-01.
             // Alignés en haut : un prénom sur deux lignes ne décale pas les cercles.
-            LazyHStack(alignment: .top, spacing: SQSpace.md + 2) {
+            LazyHStack(alignment: .top, spacing: SQSpace.md2) {
                 composeBubble
                 ForEach(stories) { story in
                     Button {
@@ -37,7 +37,7 @@ struct StoriesBar: View {
                 }
             }
             .padding(.horizontal)
-            .padding(.vertical, SQSpace.xs + 2)
+            .padding(.vertical, SQSpace.xs2)
         }
         // Le rail garde des cercles et des prénoms lisibles : au-delà de cette
         // taille, les prénoms ne tenaient plus sous leur cercle (UI-15).
@@ -92,5 +92,39 @@ struct StoriesBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Ajouter à ta story")
+    }
+}
+
+struct StoryBubble: View {
+    let story: SocialStory
+    var viewed: Bool? = nil
+
+    var body: some View {
+        let isViewed = viewed ?? (story.viewedByMe == true)
+        VStack(spacing: SQSpace.sm - 1) {
+            // Anneau décollé de 3 pt : brique 3 pt (non vue) / encre 25 % 1,5 pt (vue).
+            SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 60)
+                .padding(3)
+                .overlay {
+                    if isViewed {
+                        Circle().strokeBorder(SQColor.label.opacity(0.25), lineWidth: 1.5)
+                    } else {
+                        SQStoryRing(lineWidth: 3)
+                    }
+                }
+            // Largeur du cercle : en très grand texte, les prénoms débordaient et
+            // se chevauchaient (UI-15). Deux lignes centrées et une réduction
+            // modérée plutôt qu'une troncature ; VoiceOver lit le nom entier.
+            Text(story.author.displayName)
+                .font(.footnote)
+                .foregroundStyle(SQColor.label)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 72)
+                .accessibilityIdentifier("feed.story.name")
+        }
+        .accessibilityElement(children: .combine)
     }
 }

@@ -30,8 +30,6 @@ struct SpeedtestSharePreviewSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SQSheetHandle()
-
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     header
@@ -85,6 +83,7 @@ struct SpeedtestSharePreviewSheet: View {
                     )
                 }
                 .padding(.horizontal, SQSpace.xl)
+                .padding(.top, SQSpace.xl)
                 .padding(.bottom, SQSpace.xl)
                 .sqReadableWidth()
             }
@@ -94,7 +93,7 @@ struct SpeedtestSharePreviewSheet: View {
         }
         .background(SQColor.bg.ignoresSafeArea())
         .presentationDetents([.large])
-        .presentationDragIndicator(.hidden)
+        .presentationDragIndicator(.visible)
         .presentationBackgroundCompat(SQColor.bg)
         .task(id: renderRequest) {
             await renderPreview(for: renderRequest)

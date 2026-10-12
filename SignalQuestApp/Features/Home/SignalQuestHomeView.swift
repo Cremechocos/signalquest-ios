@@ -64,7 +64,7 @@ struct SignalQuestHomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.lg + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.cardPadding) {
                 header
                 networkSummary
                 outageBanner
@@ -124,7 +124,7 @@ struct SignalQuestHomeView: View {
     // MARK: Header — avatar + salutation + cloche
 
     private var header: some View {
-        HStack(spacing: SQSpace.md + 2) {
+        HStack(spacing: SQSpace.md2) {
             // Le nom est annoncé juste à droite ; relire aussi l'image produit
             // un élément sans description utile dans VoiceOver.
             if let user {
@@ -318,7 +318,7 @@ struct SignalQuestHomeView: View {
                     .foregroundStyle(SQColor.labelTertiary)
             }
         }
-        .padding(.vertical, SQSpace.lg + 2)
+        .padding(.vertical, SQSpace.cardPadding)
         .padding(.horizontal, SQSpace.xl)
         .sqCardBackground()
     }
@@ -450,8 +450,8 @@ struct SignalQuestHomeView: View {
             action()
         } label: {
             let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm + 2))
-                : AnyLayout(HStackLayout(alignment: .center, spacing: SQSpace.sm + 2))
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm2))
+                : AnyLayout(HStackLayout(alignment: .center, spacing: SQSpace.sm2))
             layout {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: systemImage)
@@ -538,12 +538,7 @@ struct SignalQuestHomeView: View {
         let nearbyIsEmpty = pulse?.hasData != true && nearbyMeasures.isEmpty
         if user != nil, nearbyIsEmpty, status == .notDetermined || status == .denied {
             HStack(alignment: .top, spacing: SQSpace.md) {
-                Image(systemName: status == .denied ? "location.slash" : "location")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 40, height: 40)
-                    .background(SQColor.accentSoft, in: Circle())
-                    .accessibilityHidden(true)
+                SQIconPastille(systemImage: status == .denied ? "location.slash" : "location", size: 40, font: .system(size: 18, weight: .semibold))
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
                     Text("Le réseau autour de toi")
                         .font(SQType.heading)
@@ -632,7 +627,7 @@ struct SignalQuestHomeView: View {
                 VStack(spacing: SQSpace.sm) { pulseTiles(pulse) }
             } else {
                 // Tuiles de même hauteur, même quand un libellé passe sur deux lignes.
-                HStack(spacing: SQSpace.sm + 2) { pulseTiles(pulse) }
+                HStack(spacing: SQSpace.sm2) { pulseTiles(pulse) }
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -738,8 +733,8 @@ struct SignalQuestHomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Bande haute réservée au ⓘ posé dans le coin : sans elle, il chevauchait
         // une valeur longue (« 120 Mbit/s »).
-        .padding(.top, SQSpace.lg + 2)
-        .padding(.bottom, SQSpace.sm + 2)
+        .padding(.top, SQSpace.cardPadding)
+        .padding(.bottom, SQSpace.sm2)
         .padding(.horizontal, SQSpace.xs)
         .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
@@ -794,7 +789,7 @@ struct SignalQuestHomeView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(SQColor.labelTertiary)
             }
-            .padding(.vertical, SQSpace.sm + 2)
+            .padding(.vertical, SQSpace.sm2)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -870,7 +865,7 @@ struct SignalQuestHomeView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
                             Text(verbatim: SQUnits.throughputValue(mbps: measurement.downloadMbps))
-                                .font(SQFont.display(30, .bold))
+                                .font(SQType.metricMedium)
                                 .foregroundStyle(SQColor.label)
                             Text(verbatim: SQUnits.throughputUnit(mbps: measurement.downloadMbps))
                                 .font(SQFont.body(15, .medium))
@@ -895,7 +890,7 @@ struct SignalQuestHomeView: View {
                             .background(SQColor.brandRed, in: Capsule(style: .continuous))
                     }
                 }
-                .padding(.vertical, SQSpace.lg + 2)
+                .padding(.vertical, SQSpace.cardPadding)
                 .padding(.horizontal, SQSpace.xl)
                 .sqCardBackground()
                 .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))

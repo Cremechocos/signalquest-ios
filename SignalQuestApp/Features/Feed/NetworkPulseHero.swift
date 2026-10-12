@@ -81,7 +81,7 @@ struct NetworkPulseHero: View {
                 }
             }
         }
-        .padding(.horizontal, SQSpace.lg + 2)
+        .padding(.horizontal, SQSpace.cardPadding)
         .padding(.vertical, SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SQColor.accentTextSurface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))

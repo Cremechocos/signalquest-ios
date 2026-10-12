@@ -426,6 +426,7 @@ struct PhotosView: View {
             }
             .presentationDetents([.large])
             .presentationBackgroundCompat(SQColor.bg)
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -541,7 +542,7 @@ struct PhotosView: View {
                         .foregroundStyle(.white.opacity(0.85))
                 }
             }
-            .padding(SQSpace.md + 2)
+            .padding(SQSpace.md2)
             .background(
                 // Voile de lisibilité sous les métadonnées (fonctionnel, pas décoratif).
                 LinearGradient(colors: [.clear, .black.opacity(0.72)], startPoint: .top, endPoint: .bottom)
@@ -555,7 +556,7 @@ struct PhotosView: View {
                 Text(op)
                     .font(SQType.micro)
                     .foregroundStyle(SQBrand.operatorBadgeForeground(op))
-                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.horizontal, SQSpace.sm2)
                     .padding(.vertical, SQSpace.xs)
                     .background(opColor, in: Capsule(style: .continuous))
                     .padding(SQSpace.sm)
@@ -784,7 +785,7 @@ struct PhotoDetailView: View {
                     .presentationDetents([.medium, .large])
                     .presentationBackgroundCompat(SQColor.bg)
                 } else {
-                    ContentUnavailableCompat(
+                    EmptyStateView(
                         title: "Détails du site indisponibles",
                         message: "Cette ancienne photo ne contient pas de marché vérifiable. SignalQuest ne l’attribue pas automatiquement à la France.",
                         systemImage: "globe.europe.africa"
@@ -840,7 +841,7 @@ struct PhotoDetailView: View {
                 Text(op)
                     .font(SQType.micro)
                     .foregroundStyle(SQBrand.operatorBadgeForeground(op))
-                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.horizontal, SQSpace.sm2)
                     .padding(.vertical, SQSpace.xs)
                     .background(opColor, in: Capsule(style: .continuous))
                     .padding(SQSpace.md)
@@ -908,7 +909,7 @@ struct PhotoDetailView: View {
         HStack(spacing: SQSpace.xl) {
             // Like
             Button(action: onLike) {
-                HStack(spacing: SQSpace.xs + 2) {
+                HStack(spacing: SQSpace.xs2) {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(isLiked ? SQColor.like : SQColor.labelSecondary)
@@ -924,7 +925,7 @@ struct PhotoDetailView: View {
 
             // Commentaire
             Button { commentFocused = true } label: {
-                HStack(spacing: SQSpace.xs + 2) {
+                HStack(spacing: SQSpace.xs2) {
                     Image(systemName: "bubble.left")
                         .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(SQColor.labelSecondary)
@@ -955,7 +956,7 @@ struct PhotoDetailView: View {
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel("Partager")
         }
-        .padding(SQSpace.md + 2)
+        .padding(SQSpace.md2)
         .sqCardBackground()
     }
 
@@ -967,12 +968,7 @@ struct PhotoDetailView: View {
             showAntennaDetail = true
         } label: {
             HStack(spacing: SQSpace.md) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 44, height: 44)
-                    .background(SQColor.accentSoft, in: Circle())
-                    .accessibilityHidden(true)
+                SQIconPastille(systemImage: "antenna.radiowaves.left.and.right", size: 44, font: .system(size: 18, weight: .semibold))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Voir l'antenne")
                         .font(SQType.subhead)
@@ -994,7 +990,7 @@ struct PhotoDetailView: View {
                     .foregroundStyle(SQColor.labelTertiary)
                     .accessibilityHidden(true)
             }
-            .padding(SQSpace.md + 2)
+            .padding(SQSpace.md2)
             .sqCardBackground()
         }
         .buttonStyle(SQPressButtonStyle())
@@ -1080,7 +1076,7 @@ struct PhotoDetailView: View {
                 .foregroundStyle(SQColor.label)
                 .lineLimit(1...4)
                 .padding(.horizontal, SQSpace.lg)
-                .padding(.vertical, SQSpace.sm + 2)
+                .padding(.vertical, SQSpace.sm2)
                 .frame(minHeight: 44)
                 .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
                 .focused($commentFocused)
@@ -1107,8 +1103,8 @@ struct PhotoDetailView: View {
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel("Envoyer le commentaire")
         }
-        .padding(.horizontal, SQSpace.md + 2)
-        .padding(.vertical, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.vertical, SQSpace.sm2)
         .background(SQColor.surface)
         .overlay(alignment: .top) {
             Rectangle().fill(SQColor.separator).frame(height: 1)
@@ -1148,8 +1144,6 @@ struct PhotoUploadView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    SQSheetHandle()
-
                     // Aperçu image
                     ZStack {
                         if let image {
@@ -1183,7 +1177,7 @@ struct PhotoUploadView: View {
                     }
 
                     PhotosPicker(selection: $pickerItem, matching: .images) {
-                        HStack(spacing: SQSpace.sm + 2) {
+                        HStack(spacing: SQSpace.sm2) {
                             Image(systemName: "photo")
                                 .font(.system(size: 16, weight: .semibold))
                             Text("Choisir une photo")
@@ -1231,12 +1225,7 @@ struct PhotoUploadView: View {
                     // Sélection du site
                     Button { showSitePicker = true } label: {
                         HStack(spacing: SQSpace.md) {
-                            Image(systemName: "antenna.radiowaves.left.and.right")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(SQColor.brandRed)
-                                .frame(width: 40, height: 40)
-                                .background(SQColor.accentSoft, in: Circle())
-                                .accessibilityHidden(true)
+                            SQIconPastille(systemImage: "antenna.radiowaves.left.and.right", size: 40, font: .system(size: 16, weight: .medium))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(selectedSite.map { $0.siteId ?? $0.id } ?? String(localized: "Choisir un site"))
                                     .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
@@ -1254,7 +1243,7 @@ struct PhotoUploadView: View {
                                 .foregroundStyle(SQColor.labelTertiary)
                                 .accessibilityHidden(true)
                         }
-                        .padding(SQSpace.md + 2)
+                        .padding(SQSpace.md2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .sqCardBackground()
                     }
@@ -1291,7 +1280,7 @@ struct PhotoUploadView: View {
                         .font(SQType.body)
                         .foregroundStyle(SQColor.label)
                         .lineLimit(2...5)
-                        .padding(SQSpace.md + 2)
+                        .padding(SQSpace.md2)
                         .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
 
                     GradientButton("Uploader", systemImage: "arrow.up.circle", isBusy: isUploading) {
@@ -1570,8 +1559,8 @@ struct AntennaSitePickerSheet: View {
                             .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                             .foregroundStyle(SQColor.label)
                     }
-                    .padding(.horizontal, SQSpace.lg - 2)
-                    .padding(.vertical, SQSpace.sm + 2)
+                    .padding(.horizontal, SQSpace.md2)
+                    .padding(.vertical, SQSpace.sm2)
                     .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                     .sqShadowSoft()
 
@@ -1589,7 +1578,7 @@ struct AntennaSitePickerSheet: View {
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.dangerInk)
                             .padding(.horizontal, SQSpace.md)
-                            .padding(.vertical, SQSpace.xs + 2)
+                            .padding(.vertical, SQSpace.xs2)
                             .background(SQColor.dangerSoft, in: Capsule(style: .continuous))
                     }
                 }

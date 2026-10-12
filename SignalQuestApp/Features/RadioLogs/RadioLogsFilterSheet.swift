@@ -13,8 +13,6 @@ struct RadioLogsFilterSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                SQSheetHandle()
-
                 Text("Trier et filtrer")
                     .font(SQFont.display(M.sheetTitleSize, .bold))
                     .foregroundStyle(P.ink)
@@ -65,10 +63,12 @@ struct RadioLogsFilterSheet: View {
                 )
             }
             .padding(.horizontal, M.sheetPaddingH)
+            .padding(.top, SQSpace.xl)
             .padding(.bottom, M.sheetPaddingBottom)
         }
         .background(SQColor.bg.ignoresSafeArea())
         .presentationDetentsCompat()
+        .presentationDragIndicator(.visible)
     }
 
     // MARK: Briques

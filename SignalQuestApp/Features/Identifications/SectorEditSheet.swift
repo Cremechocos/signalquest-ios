@@ -134,7 +134,7 @@ struct SectorEditSheet: View {
                     if model.isLoading {
                         ProgressView().tint(SQColor.brandRed).frame(height: 260)
                     } else if model.azimuths.isEmpty {
-                        ContentUnavailableCompat(
+                        EmptyStateView(
                             title: "Aucun secteur",
                             message: model.errorMessage ?? "Ce site n'expose pas d'azimuts.",
                             systemImage: "dot.radiowaves.right"
@@ -330,35 +330,5 @@ struct SectorWedge: Shape {
         )
         path.closeSubpath()
         return path
-    }
-}
-
-/// État vide compatible iOS 16 (ContentUnavailableView est iOS 17+),
-/// dans le langage DA Crème : pastille circulaire teintée + typo tokens.
-struct ContentUnavailableCompat: View {
-    let title: String
-    let message: String
-    let systemImage: String
-
-    var body: some View {
-        VStack(spacing: SQSpace.md) {
-            Image(systemName: systemImage)
-                .font(.system(size: 26, weight: .medium))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 64, height: 64)
-                .background(SQColor.accentSoft, in: Circle())
-            Text(LocalizedStringKey(title)).font(SQType.heading).foregroundStyle(SQColor.label)
-            Text(LocalizedStringKey(message))
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, SQSpace.xl)
-        // Lu d'un bloc, comme `EmptyStateView` : titre puis explication.
-        .sqCard(
-            label: NSLocalizedString(title, comment: ""),
-            value: NSLocalizedString(message, comment: "")
-        )
     }
 }

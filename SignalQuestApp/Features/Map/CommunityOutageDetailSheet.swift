@@ -71,7 +71,6 @@ struct CommunityOutageDetailSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
-                SQSheetHandle()
                 header
                 if outage.state.isVisible {
                     // L'ARBITRAGE seul : l'en-tête ci-dessus vient d'écrire l'état et la gravité,
@@ -105,12 +104,14 @@ struct CommunityOutageDetailSheet: View {
                 infoSection
             }
             .padding()
+            .padding(.top, SQSpace.sm)
             // L'arrivée sur l'état de la panne, et son basculement quand un vote la fait changer :
             // deux des trois moments où le mouvement dit quelque chose. Rien ne bouge en régime
             // permanent.
             .sqAnimation(SQMotion.standard, value: outage.state)
         }
         .presentationDetents([.height(440), .medium, .large])
+        .presentationDragIndicator(.visible)
         .presentationBackgroundCompat(SQColor.bg)
         .task { await loadTimeline() }
         // `alert` et non `confirmationDialog`, pour la même raison que la page « Pannes

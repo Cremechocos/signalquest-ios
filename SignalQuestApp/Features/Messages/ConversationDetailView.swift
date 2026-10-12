@@ -203,7 +203,7 @@ struct ConversationDetailView: View {
                 } label: {
                     Label("Chiffrée — déverrouille pour lire", systemImage: "lock.shield")
                         .font(SQType.caption.weight(.semibold))
-                        .padding(SQSpace.sm + 2)
+                        .padding(SQSpace.sm2)
                         .frame(maxWidth: .infinity)
                         .background(SQColor.warningSoft)
                         .foregroundStyle(SQColor.label)
@@ -220,7 +220,7 @@ struct ConversationDetailView: View {
                         systemImage: isResyncingKey ? "arrow.triangle.2.circlepath" : "key.viewfinder"
                     )
                     .font(SQType.caption.weight(.semibold))
-                    .padding(SQSpace.sm + 2)
+                    .padding(SQSpace.sm2)
                     .frame(maxWidth: .infinity)
                     .background(SQColor.warningSoft)
                     .foregroundStyle(SQColor.label)
@@ -1125,7 +1125,7 @@ struct ConversationDetailView: View {
                     Button {
                         jumpToQuoted(quoted)
                     } label: {
-                        HStack(spacing: SQSpace.xs + 2) {
+                        HStack(spacing: SQSpace.xs2) {
                             RoundedRectangle(cornerRadius: 2, style: .continuous)
                                 // 0,6 donnait 2,82:1 : sous le seuil de 3:1 que
                                 // WCAG 1.4.11 impose aux objets graphiques.
@@ -1140,7 +1140,7 @@ struct ConversationDetailView: View {
                             }
                         }
                         .opacity(0.75)
-                        .padding(SQSpace.xs + 2)
+                        .padding(SQSpace.xs2)
                         .background((mine ? SQColor.onAccent.opacity(0.14) : SQColor.surfaceMuted.opacity(0.6)), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                         .contentShape(Rectangle())
                     }
@@ -1311,7 +1311,7 @@ struct ConversationDetailView: View {
                 }
             }
             .offset(y: 12)
-            .padding(.horizontal, SQSpace.sm + 2)
+            .padding(.horizontal, SQSpace.sm2)
         }
     }
 
@@ -1343,7 +1343,7 @@ struct ConversationDetailView: View {
                         .font(SQType.micro.weight(.semibold))
                 }
                 .foregroundStyle(SQColor.dangerInk)
-                .padding(.horizontal, SQSpace.sm + 2)
+                .padding(.horizontal, SQSpace.sm2)
                 .padding(.vertical, 5)
                 .background(SQColor.dangerSoft, in: Capsule(style: .continuous))
                 .frame(minHeight: 44)
@@ -1401,7 +1401,7 @@ struct ConversationDetailView: View {
 
     @ViewBuilder
     private func transcriptionView(_ text: String, mine: Bool) -> some View {
-        HStack(alignment: .top, spacing: SQSpace.xs + 2) {
+        HStack(alignment: .top, spacing: SQSpace.xs2) {
             Image(systemName: "waveform")
                 .font(.system(size: 11))
                 .foregroundStyle(mine ? SQColor.onAccent.opacity(0.75) : SQColor.labelSecondary)
@@ -1829,7 +1829,7 @@ struct ConversationDetailView: View {
                 .accessibilityHidden(true)
                 TypingDotsView()
                     .padding(.horizontal, SQSpace.md)
-                    .padding(.vertical, SQSpace.sm + 2)
+                    .padding(.vertical, SQSpace.sm2)
                     .background(SQColor.surface, in: bubbleShape(mine: false))
                     .sqShadowSoft()
                 Spacer(minLength: 0)
@@ -3173,7 +3173,7 @@ private struct LiveShareConversationBar: View {
                         .accessibilityIdentifier("liveshare.error")
                 }
             }
-            .padding(SQSpace.sm + 2)
+            .padding(SQSpace.sm2)
             .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         }
     }

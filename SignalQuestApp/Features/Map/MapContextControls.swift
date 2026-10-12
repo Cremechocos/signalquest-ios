@@ -366,7 +366,7 @@ private struct MapDisplayLimitControl: View {
 
     var body: some View {
         Button(action: onOpen) {
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 Image(systemName: "info.circle")
                     .font(.system(size: 14, weight: .medium))
                     .accessibilityHidden(true)

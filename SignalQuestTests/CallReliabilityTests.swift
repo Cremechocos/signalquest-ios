@@ -102,6 +102,30 @@ final class CallReliabilityTests: XCTestCase {
         XCTAssertTrue(call.isGroup)
     }
 
+    func testHistoryDurationStartsWhenTheCallIsAnswered() throws {
+        let answered = try decoder.decode(CallSession.self, from: Data(#"""
+        {"id":"h-1","status":"ENDED","startedAt":"2026-07-10T10:00:00.000Z",
+         "answeredAt":"2026-07-10T10:00:20.000Z","endedAt":"2026-07-10T10:02:20.000Z"}
+        """#.utf8))
+        XCTAssertEqual(answered.talkDuration, 120)
+
+        let missed = try decoder.decode(CallSession.self, from: Data(#"""
+        {"id":"h-2","status":"MISSED","startedAt":"2026-07-10T10:00:00.000Z",
+         "answeredAt":null,"endedAt":"2026-07-10T10:00:30.000Z"}
+        """#.utf8))
+        XCTAssertNil(missed.talkDuration)
+
+        // Le cache disque garde le décroché, et un ancien cache sans lui se relit.
+        let cached = try JSONDecoder().decode(
+            CachedCallSession.self, from: JSONEncoder().encode(CachedCallSession(answered))
+        )
+        XCTAssertEqual(cached.session.talkDuration, 120)
+        let legacy = try JSONDecoder().decode(
+            CachedCallSession.self, from: Data(#"{"id":"h-3","isGroup":false}"#.utf8)
+        )
+        XCTAssertNil(legacy.session.talkDuration)
+    }
+
     func testLifecyclePolicyIsCaseInsensitiveAndChoosesCorrectTermination() {
         XCTAssertTrue(CallLifecyclePolicy.isRinging("RINGING"))
         XCTAssertTrue(CallLifecyclePolicy.isRinging("pending"))

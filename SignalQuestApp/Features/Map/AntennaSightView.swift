@@ -401,7 +401,7 @@ struct AntennaSightCard: View {
     @ViewBuilder
     private var sectorLine: some View {
         if let sector = alignedSector {
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 Image(systemName: sector.inSector ? "checkmark.circle.fill" : "circle.dashed")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(sector.inSector ? SQColor.success : SQColor.labelTertiary)
@@ -443,7 +443,7 @@ struct AntennaSightCard: View {
                     )
                     .frame(height: 82)
                     if let verdict = model.verdict {
-                        HStack(spacing: SQSpace.xs + 2) {
+                        HStack(spacing: SQSpace.xs2) {
                             Image(systemName: verdictIcon(verdict.level))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(verdictColor(verdict.level))

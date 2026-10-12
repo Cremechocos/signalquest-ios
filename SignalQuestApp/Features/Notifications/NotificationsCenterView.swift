@@ -300,12 +300,7 @@ struct NotificationsCenterView: View {
         let isUnread = item.read != true
         let titleText = item.title ?? Self.title(for: item.type)
         HStack(alignment: .top, spacing: SQSpace.md) {
-            Image(systemName: icon(for: item.type))
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 38, height: 38)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: icon(for: item.type), size: 38, font: .system(size: 15, weight: .medium))
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: SQSpace.sm) {
                     Text(titleText)
@@ -329,7 +324,7 @@ struct NotificationsCenterView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(SQSpace.md + 2)
+        .padding(SQSpace.md2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .contentShape(Rectangle())

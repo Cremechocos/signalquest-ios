@@ -44,7 +44,7 @@ struct SentinelleBoxView: View {
     var body: some View {
         ScrollView {
             if let target {
-                VStack(spacing: SQSpace.md + 2) {
+                VStack(spacing: SQSpace.md2) {
                     verdictCard(target)
                     if hasBothFamilies { comparisonCard }
                     metricsCard
@@ -110,7 +110,7 @@ struct SentinelleBoxView: View {
     private func verdictCard(_ target: SentinelleTarget) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                HStack(alignment: .top, spacing: SQSpace.sm + 2) {
+                HStack(alignment: .top, spacing: SQSpace.sm2) {
                     SentinelleStatusDot(color: SentinelleWording.statusColor(target.status), size: 12)
                         .padding(.top, 8)
                     VStack(alignment: .leading, spacing: 3) {
@@ -307,7 +307,7 @@ struct SentinelleBoxView: View {
             Haptics.light()
             openedFamily = address.family
         } label: {
-            HStack(spacing: SQSpace.sm + 2) {
+            HStack(spacing: SQSpace.sm2) {
                 SentinelleStatusDot(color: SentinelleWording.stateColor(state))
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: SQSpace.sm) {
@@ -331,7 +331,7 @@ struct SentinelleBoxView: View {
                     .foregroundStyle(SQColor.labelTertiary)
                     .sqDecorative()
             }
-            .padding(.vertical, SQSpace.sm + 2)
+            .padding(.vertical, SQSpace.sm2)
             .padding(.horizontal, SQSpace.md)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
@@ -466,7 +466,7 @@ struct SentinelleBoxView: View {
                 .font(SQFont.body(14, .semibold))
                 .foregroundStyle(SQColor.dangerInk)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, SQSpace.md + 2)
+                .padding(.vertical, SQSpace.md2)
                 .background(SQColor.dangerSoft, in: Capsule(style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())

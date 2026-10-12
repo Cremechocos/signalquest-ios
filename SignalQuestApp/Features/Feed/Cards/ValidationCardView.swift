@@ -20,7 +20,7 @@ struct ValidationCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
                     place: signal?.city ?? item.placeLabel,
@@ -47,14 +47,14 @@ struct ValidationCardView: View {
 
                 // Tuile mise en avant en accent brique (DA), pas en couleur techno.
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    CardMetricTile(
+                    SQMetricTile.wrapping(
                         label: identifierTileLabel,
                         value: signal?.identifierValue ?? signal?.cellId ?? "—",
                         highlight: true
                     )
-                    CardMetricTile(label: "PCI", value: signal?.pci.map(String.init) ?? "—")
-                    CardMetricTile(label: "Cell", value: signal?.cellId ?? "—")
-                    CardMetricTile(label: "Bande", value: signal?.band ?? "—")
+                    SQMetricTile.wrapping(label: "PCI", value: signal?.pci.map(String.init) ?? "—")
+                    SQMetricTile.wrapping(label: "Cell", value: signal?.cellId ?? "—")
+                    SQMetricTile.wrapping(label: "Bande", value: signal?.band ?? "—")
                 }
 
                 if let footer = footer {

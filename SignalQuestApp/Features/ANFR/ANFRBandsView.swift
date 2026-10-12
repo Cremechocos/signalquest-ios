@@ -406,7 +406,7 @@ struct ANFRBandsView: View {
                     .font(SQFont.body(12.5, .semibold))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.label)
-                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.horizontal, SQSpace.sm2)
                     .padding(.vertical, SQSpace.xs + 1)
                     .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             }
@@ -475,12 +475,7 @@ struct ANFRBandsView: View {
 
     private func sectionHeader(_ title: String, systemImage: String) -> some View {
         HStack(spacing: SQSpace.sm) {
-            Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 32, height: 32)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: systemImage, size: 32, font: .system(size: 13, weight: .semibold))
             Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)

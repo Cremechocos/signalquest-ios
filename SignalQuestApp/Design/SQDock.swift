@@ -308,7 +308,7 @@ extension SQDock {
         if #available(iOS 26.0, *), !usesLegacyDock {
             return SQSpace.lg
         }
-        return SQSpace.lg + 2 + clearance
+        return SQSpace.cardPadding + clearance
     }
 
     /// Dégagement RESTANT à ajouter quand le contenu porte déjà une marge.

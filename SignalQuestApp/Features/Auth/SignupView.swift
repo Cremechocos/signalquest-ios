@@ -24,7 +24,7 @@ struct SignupView: View {
                 header
                     .sqAuthAppear(appeared)
 
-                VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+                VStack(alignment: .leading, spacing: SQSpace.md2) {
                     Text("Créer un compte")
                         .font(SQType.title)
                         .sqHeader()
@@ -247,12 +247,7 @@ struct SignupView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            Image(systemName: "person.badge.plus")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 46, height: 46)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: "person.badge.plus", size: 46, font: Font.title3.weight(.semibold))
             Text("Rejoins SignalQuest")
                 .font(SQType.display)
                 .foregroundStyle(SQColor.label)

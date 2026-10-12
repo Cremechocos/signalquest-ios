@@ -40,7 +40,7 @@ struct PostDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: SQSpace.lg + 2) {
+            VStack(spacing: SQSpace.cardPadding) {
                 if let errorMessage = actions.errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
                         .font(SQType.caption)

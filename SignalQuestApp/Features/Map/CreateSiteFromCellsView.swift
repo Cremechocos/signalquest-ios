@@ -229,7 +229,7 @@ struct CreateSiteFromCellsView: View {
                 .font(SQFont.body(15))
                 .foregroundStyle(SQColor.label)
                 .padding(.horizontal, SQSpace.md)
-                .padding(.vertical, SQSpace.sm + 2)
+                .padding(.vertical, SQSpace.sm2)
                 .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         }
     }

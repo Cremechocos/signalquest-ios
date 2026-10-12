@@ -338,7 +338,7 @@ struct E2EEV2SafetyNumberContent: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(SQSpace.lg + 2)
+        .padding(SQSpace.cardPadding)
         .sqCardBackground()
     }
 
@@ -354,7 +354,7 @@ struct E2EEV2SafetyNumberContent: View {
             .font(SQType.subhead)
             .foregroundStyle(SQColor.success)
             .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.xs + 2)
+            .padding(.vertical, SQSpace.xs2)
             .background(SQColor.successSoft, in: Capsule(style: .continuous))
             .accessibilityIdentifier("safetyNumber.status.verified")
         case .unverified, .changed:
@@ -366,7 +366,7 @@ struct E2EEV2SafetyNumberContent: View {
             .font(SQType.subhead)
             .foregroundStyle(SQColor.labelSecondary)
             .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.xs + 2)
+            .padding(.vertical, SQSpace.xs2)
             .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             .accessibilityIdentifier("safetyNumber.status.unverified")
         }

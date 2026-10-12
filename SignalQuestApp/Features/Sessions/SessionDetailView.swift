@@ -679,7 +679,7 @@ struct SessionDetailView: View {
                     Rectangle()
                         .fill(SQColor.separator)
                         .frame(height: 1)
-                        .padding(.leading, SQSpace.lg + 2)
+                        .padding(.leading, SQSpace.cardPadding)
                 }
             }
         }
@@ -720,7 +720,7 @@ struct SessionDetailView: View {
                         }
                     }
                     .foregroundStyle(SQColor.onAccent)
-                    .padding(.horizontal, SQSpace.md + 2)
+                    .padding(.horizontal, SQSpace.md2)
                     .frame(minHeight: 34)
                     .background(SQColor.brandRed, in: Capsule(style: .continuous))
                     // Capsule visuelle 34 pt, zone tactile étendue à ≥ 44 pt.

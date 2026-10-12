@@ -160,7 +160,7 @@ struct OutageCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
                     place: place,
@@ -173,13 +173,13 @@ struct OutageCardView: View {
                 hero
 
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    CardMetricTile(
+                    SQMetricTile.wrapping(
                         label: String(localized: "Opérateur"),
                         value: string("operator") ?? string("operatorKey") ?? "—",
                         highlight: true
                     )
                     if let siteCode {
-                        CardMetricTile(label: siteCode.label, value: siteCode.value)
+                        SQMetricTile.wrapping(label: siteCode.label, value: siteCode.value)
                     }
                     // Le point médian sépare deux listes INDÉPENDANTES : « Internet, Voix » d'un
                     // côté, « 4G, 5G » de l'autre. Il ne dit pas « Internet en 4G » — le
@@ -192,7 +192,7 @@ struct OutageCardView: View {
                     // coupait la ligne à « Voix · 4G,… » : les générations, qui sont l'information
                     // ajoutée ici, disparaissaient précisément chez les gens qui grossissent le
                     // texte. Avec trois, elle se pose entière sur « Internet, / Voix · / 4G, 5G ».
-                    CardMetricTile(
+                    SQMetricTile.wrapping(
                         label: String(localized: "Touché"),
                         value: affected,
                         valueLineLimit: 3
@@ -205,9 +205,9 @@ struct OutageCardView: View {
                 // totale, où la question n'est même pas posée.
                 if !precisions.isEmpty {
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 52), spacing: SQSpace.xs + 2)],
+                        columns: [GridItem(.adaptive(minimum: 52), spacing: SQSpace.xs2)],
                         alignment: .leading,
-                        spacing: SQSpace.xs + 2
+                        spacing: SQSpace.xs2
                     ) {
                         ForEach(precisions, id: \.self) { token in
                             Text(token)

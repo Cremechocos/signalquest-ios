@@ -22,7 +22,7 @@ struct PhotoCardView: View {
         Button(action: onTap) {
             // DA Crème : header d'abord, média encadré (rayon 14) dans la carte,
             // tag « Photo » olive. Le double-tap sur le média like toujours.
-            VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
                     place: item.signal?.city ?? item.placeLabel,

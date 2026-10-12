@@ -90,7 +90,7 @@ struct NewPollView: View {
                     }
 
                     section(title: "Réglages") {
-                        VStack(spacing: SQSpace.sm + 2) {
+                        VStack(spacing: SQSpace.sm2) {
                             Toggle("Choix multiples", isOn: $multiSelect)
                                 .tint(SQColor.brandRed)
                             Toggle("Échéance", isOn: $hasDeadline)
@@ -103,7 +103,7 @@ struct NewPollView: View {
                         }
                         .font(SQType.body)
                         .foregroundStyle(SQColor.label)
-                        .padding(SQSpace.md + 2)
+                        .padding(SQSpace.md2)
                         .sqCardBackground()
                     }
 
@@ -174,7 +174,7 @@ private extension View {
             .font(SQType.body)
             .foregroundStyle(SQColor.label)
             .padding(.horizontal, SQSpace.lg)
-            .padding(.vertical, SQSpace.sm + 2)
+            .padding(.vertical, SQSpace.sm2)
             .frame(minHeight: 44)
             .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }

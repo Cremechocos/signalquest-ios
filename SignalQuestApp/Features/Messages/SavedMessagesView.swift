@@ -114,7 +114,7 @@ struct SavedMessagesView: View {
             .disabled(removing.contains(message.id))
             .accessibilityLabel("Retirer des enregistrés")
         }
-        .padding(SQSpace.md + 2)
+        .padding(SQSpace.md2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .sqCardBackground()
         .opacity(removing.contains(message.id) ? 0.4 : 1)

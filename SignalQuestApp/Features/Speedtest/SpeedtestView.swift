@@ -13,7 +13,6 @@ struct SpeedtestView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .subheadline) private var settingsOptionSize: CGFloat = 44
     // Défaut « Auto » : préflight hybride iPerf3 (OVH/Bouygues/Scaleway/MilkyWan)
     // + Cloudflare, le plus rapide gagne.
     @AppStorage("speedtest_download_target") private var downloadTargetRaw = SpeedtestDownloadTarget.hybridAuto.rawValue
@@ -301,6 +300,7 @@ struct SpeedtestView: View {
                 onSkip: { showLocationPriming = false; dispatchConfiguredRun(requestLocation: false) }
             )
             .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sqAnimation(.snappy(duration: 0.32), value: phase)
         .sqAnimation(.snappy(duration: 0.28), value: result)
@@ -373,7 +373,7 @@ struct SpeedtestView: View {
     // MARK: - Header (titre centré + capsule serveur, DA « Crème & Terre cuite »)
 
     private var header: some View {
-        VStack(spacing: SQSpace.sm + 2) {
+        VStack(spacing: SQSpace.sm2) {
             // Titre centré entre deux emplacements de même largeur : le Drive Test
             // s'y nomme en toutes lettres quand la place le permet (UI-12).
             HStack(spacing: SQSpace.sm) {
@@ -617,7 +617,7 @@ struct SpeedtestView: View {
             }
             }
         }
-        .padding(SQSpace.lg + 2)
+        .padding(SQSpace.cardPadding)
         .sqCardBackground()
     }
 
@@ -675,7 +675,7 @@ struct SpeedtestView: View {
                 detailItem(label: "Latence (minimum)", value: ms(s.minPing))
             }
         }
-        .padding(SQSpace.lg + 2)
+        .padding(SQSpace.cardPadding)
         .sqCardBackground()
     }
 
@@ -685,24 +685,12 @@ struct SpeedtestView: View {
         selection: Binding<Int>
     ) -> some View {
         ForEach(options, id: \.value) { option in
-                Button {
-                    selection.wrappedValue = option.value
-                    Haptics.selection()
-                } label: {
-                    Text(option.label)
-                        .font(.subheadline.weight(.semibold))
-                        .fixedSize()
-                        .padding(.horizontal, SQSpace.md)
-                        .frame(minWidth: max(44, settingsOptionSize), minHeight: max(44, settingsOptionSize))
-                        .background(
-                            selection.wrappedValue == option.value ? SQColor.brandRed : SQColor.fill,
-                            in: Capsule(style: .continuous)
-                        )
-                        .foregroundStyle(selection.wrappedValue == option.value ? SQColor.onAccent : SQColor.label)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(accessibilityContext), \(option.label)")
-                .accessibilityAddTraits(selection.wrappedValue == option.value ? [.isSelected] : [])
+            SQChip(
+                label: option.label, isSelected: selection.wrappedValue == option.value, restFill: SQColor.fill,
+                spokenLabel: "\(accessibilityContext), \(option.label)"
+            ) {
+                selection.wrappedValue = option.value
+            }
         }
     }
 
@@ -712,7 +700,7 @@ struct SpeedtestView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+                    VStack(alignment: .leading, spacing: SQSpace.md2) {
                         VStack(alignment: .leading, spacing: SQSpace.sm) {
                             Text("Nombre de tests").foregroundStyle(SQColor.label)
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -823,7 +811,7 @@ struct SpeedtestView: View {
                 )
             } else {
                 if !history.isEmpty {
-                    VStack(spacing: SQSpace.sm + 2) {
+                    VStack(spacing: SQSpace.sm2) {
                         ForEach(Array(history.enumerated()), id: \.element.id) { _, item in
                             Button {
                                 Haptics.selection()
@@ -850,7 +838,7 @@ struct SpeedtestView: View {
     /// ou sur un nouvel iPhone, l'onglet n'affiche plus « Aucun test » pour un
     /// compte qui en a des centaines (UI-12).
     private var accountHistorySection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Sur ton compte")
                     .font(SQType.heading)
@@ -1336,15 +1324,20 @@ struct SpeedtestView: View {
         runTotal > 1 ? String(localized: "Test \(runIndex)/\(runTotal) · \(phase.displayTitle)") : phase.displayTitle
     }
 
-    private func stop() {
-        // Bilan partiel d'une rafale arrêtée : la tâche annulée ne peut plus le
-        // publier une fois la session remise à zéro, on le construit donc ici.
+    /// Bilan partiel d'une rafale interrompue (arrêt ou changement de réseau) :
+    /// la tâche annulée ne peut plus le publier une fois la session remise à
+    /// zéro, on le construit donc avant.
+    private func keepPartialBurstSummary() {
         if let burstProgress, !burstResults.isEmpty {
             burstSummary = SpeedtestBurstSummary(
                 results: burstResults,
                 truncatedAt: max(0, burstProgress.index - 1)
             )
         }
+    }
+
+    private func stop() {
+        keepPartialBurstSummary()
         runSessionID = nil
         runTask?.cancel()
         runTask = nil
@@ -1387,6 +1380,7 @@ struct SpeedtestView: View {
         let message = String(localized: "Speedtest arrêté : changement de réseau détecté (\(previousNetwork) -> \(newNetwork)). Relance le test pour mesurer une connexion stable.")
         networkAbortMessage = message
         runErrorMessage = message
+        keepPartialBurstSummary()
         runSessionID = nil
         runGeneration &+= 1
         runTask?.cancel()

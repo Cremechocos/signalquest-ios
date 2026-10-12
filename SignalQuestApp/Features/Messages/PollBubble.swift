@@ -18,7 +18,7 @@ struct PollBubble: View {
     private var effectivelyClosed: Bool { poll.isClosed || isExpired }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
             HStack(alignment: .top, spacing: SQSpace.sm) {
                 Image(systemName: "chart.bar.fill")
                     .font(.system(size: 14, weight: .medium))
@@ -108,7 +108,7 @@ struct PollBubble: View {
                         .font(SQType.caption.weight(.semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                 }
-                .padding(.horizontal, SQSpace.sm + 2)
+                .padding(.horizontal, SQSpace.sm2)
                 .padding(.vertical, SQSpace.sm)
                 .frame(minHeight: 44)
             }

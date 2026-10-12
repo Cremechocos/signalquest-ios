@@ -77,7 +77,7 @@ struct DriveSpeedtestDetailSheet: View {
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 2) {
                     Text(verbatim: SQUnits.throughputValue(mbps: download))
-                        .font(SQFont.display(46, .bold))
+                        .font(SQType.metricLarge)
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
                     Text(verbatim: SQUnits.throughputUnit(mbps: download))
@@ -189,7 +189,7 @@ struct DriveSpeedtestDetailSheet: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(SQColor.brandRed)
                 .frame(width: 36, height: 36)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
             Text(LocalizedStringKey(label)).font(SQFont.body(14.5, .medium)).foregroundStyle(SQColor.labelSecondary)
             if let term { SQInfoButton(term: term) }
             Spacer()

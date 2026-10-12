@@ -901,6 +901,7 @@ struct FeedView: View {
             StoryComposer(service: services.stories, friendsService: services.friends) { story in
                 model.insertPublishedStory(story)
             }
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showComposer) {
             ComposerSheet(service: services.feed, userService: services.users)

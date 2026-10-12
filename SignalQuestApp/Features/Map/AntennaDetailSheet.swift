@@ -214,7 +214,7 @@ struct AntennaDetailSheet: View {
                     siteActions
                     reportCard
                 }
-                .padding(SQSpace.lg + 2)
+                .padding(SQSpace.cardPadding)
             }
             .accessibilityIdentifier("antenna.detail.scroll")
             .signalQuestBackground()
@@ -492,7 +492,7 @@ struct AntennaDetailSheet: View {
 
     private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 Image(systemName: icon).font(.system(size: 14, weight: .semibold))
                 Text(LocalizedStringKey(title)).font(SQFont.body(14, .semibold))
             }
@@ -627,7 +627,7 @@ struct AntennaDetailSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: SQSpace.xs + 2) {
+                HStack(spacing: SQSpace.xs2) {
                     ForEach(site.operators, id: \.self) { op in
                         operatorTag(op)
                     }
@@ -1000,35 +1000,18 @@ struct AntennaDetailSheet: View {
         let isSwitchable = site.operators.count > 1
         let isActive = op == selectedOperator
         if isSwitchable {
-            Button {
+            // Une coche sur l'actif : sans elle, « plein contre teinté » se
+            // lit comme une différence décorative, pas comme un état.
+            SQChip(
+                label: photoOperatorLabel(op), isSelected: isActive, selectedSystemImage: "checkmark", dot: color,
+                selectedFill: color,
+                selectedInk: SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme),
+                restFill: color.opacity(0.13),
+                spokenHint: isActive ? nil : "Affiche la fiche de cet opérateur"
+            ) {
                 guard op != selectedOperator else { return }
-                Haptics.selection()
                 selectedOperator = op
-            } label: {
-                HStack(spacing: 4) {
-                    // Une coche sur l'actif : sans elle, « plein contre teinté » se
-                    // lit comme une différence décorative, pas comme un état.
-                    if isActive {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 9, weight: .bold))
-                    } else {
-                        Circle().fill(color).frame(width: 8, height: 8)
-                    }
-                    Text(photoOperatorLabel(op))
-                        .font(SQFont.body(12, .semibold))
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, SQSpace.sm + 2)
-                .padding(.vertical, SQSpace.xs + 1)
-                .foregroundStyle(isActive ? SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme) : SQColor.label)
-                .background(
-                    isActive ? color : color.opacity(0.13),
-                    in: Capsule(style: .continuous)
-                )
             }
-            .buttonStyle(SQPressButtonStyle())
-            .accessibilityAddTraits(isActive ? .isSelected : [])
-            .accessibilityHint(isActive ? "" : String(localized: "Affiche la fiche de cet opérateur"))
         } else {
             // Nom du registre (« Orange »), pas la clé brute (« ORANGE ») : les
             // pastilles étaient en capitales, sauf SFR (UI-10).
@@ -1044,8 +1027,8 @@ struct AntennaDetailSheet: View {
             ? String(localized: "Hauteur (support)")
             : String(localized: "Hauteur")
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-            CardMetricTile(label: heightLabel, value: heightValue.map { "\(Int($0.rounded())) m" } ?? "—", highlight: true)
-            CardMetricTile(
+            SQMetricTile.wrapping(label: heightLabel, value: heightValue.map { "\(Int($0.rounded())) m" } ?? "—", highlight: true)
+            SQMetricTile.wrapping(
                 label: "Secteurs",
                 value: details.core?.siteInfo.sectorCount.map(String.init)
                     ?? (displayedAzimuths.isEmpty ? "—" : String(displayedAzimuths.count))
@@ -1053,14 +1036,14 @@ struct AntennaDetailSheet: View {
             // Les bandes figuraient ici ET dans la grille juste en dessous. À la
             // place, le signal communautaire : combien de personnes ont identifié
             // ce site — c'est ce que porte la coche sur la carte.
-            CardMetricTile(
+            SQMetricTile.wrapping(
                 label: "Identifications",
                 value: (details.validationsCount ?? (site.validationCount > 0 ? site.validationCount : nil))
                     .map(String.init) ?? "—"
             )
             // `photosCount` est nil sur le chemin wrapper : la galerie déjà
             // chargée est alors la seule source fiable du nombre.
-            CardMetricTile(
+            SQMetricTile.wrapping(
                 label: "Photos",
                 value: (details.photosCount ?? (details.photos.isEmpty ? nil : details.photos.count))
                     .map(String.init) ?? "—"
@@ -1142,10 +1125,10 @@ struct AntennaDetailSheet: View {
     private func communityContent(_ details: AntennaDetails) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-                CardMetricTile(label: "Validations", value: details.validationsCount.map(String.init) ?? "—", highlight: true)
-                CardMetricTile(label: "Mesures", value: details.signalStats.map { "\($0.measurementCount)" } ?? "—")
-                CardMetricTile(label: "Speedtests", value: details.speedtestsCount.map(String.init) ?? "—")
-                CardMetricTile(label: "RSRP moy.", value: SignalFormatters.dbm(details.signalStats?.avgRsrp))
+                SQMetricTile.wrapping(label: "Validations", value: details.validationsCount.map(String.init) ?? "—", highlight: true)
+                SQMetricTile.wrapping(label: "Mesures", value: details.signalStats.map { "\($0.measurementCount)" } ?? "—")
+                SQMetricTile.wrapping(label: "Speedtests", value: details.speedtestsCount.map(String.init) ?? "—")
+                SQMetricTile.wrapping(label: "RSRP moy.", value: SignalFormatters.dbm(details.signalStats?.avgRsrp))
             }
             if let stats = details.signalStats {
                 detailRow("RSRQ moy.", SignalFormatters.db(stats.avgRsrq))
@@ -1407,7 +1390,7 @@ struct AntennaDetailSheet: View {
                 .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, SQSpace.sm - 1)
-        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.sm2)
         .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
     }
 }

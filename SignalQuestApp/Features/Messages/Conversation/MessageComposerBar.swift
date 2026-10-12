@@ -115,7 +115,7 @@ struct MessageComposerBar: View {
     }
 
     private var inputRow: some View {
-        HStack(spacing: SQSpace.sm + 2) {
+        HStack(spacing: SQSpace.sm2) {
             Menu {
                 if canSchedule {
                     Button { onSchedule(text) } label: {
@@ -170,7 +170,7 @@ struct MessageComposerBar: View {
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
                 .focused($fieldFocused)
-                .padding(.horizontal, SQSpace.lg + 2)
+                .padding(.horizontal, SQSpace.cardPadding)
                 .padding(.vertical, SQSpace.sm)
                 .frame(minHeight: 44)
                 // Toute la capsule ouvre le clavier, pas seulement la ligne de
@@ -216,8 +216,8 @@ struct MessageComposerBar: View {
             .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer le message")
             }
         }
-        .padding(.horizontal, SQSpace.md + 2)
-        .padding(.vertical, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.vertical, SQSpace.sm2)
         .onChangeCompat(of: text) { _, newValue in
             onTyping(newValue)
             refreshMentions()
@@ -236,7 +236,7 @@ struct MessageComposerBar: View {
             HStack(spacing: SQSpace.sm) {
                 ForEach(mentionCandidates) { candidate in
                     Button { applyMention(candidate) } label: {
-                        HStack(spacing: SQSpace.xs + 2) {
+                        HStack(spacing: SQSpace.xs2) {
                             SQAvatar(url: candidate.avatarUrl, name: candidate.displayName, size: 26)
                                 .accessibilityHidden(true)
                             Text(verbatim: candidate.displayName)
@@ -256,7 +256,7 @@ struct MessageComposerBar: View {
                     .accessibilityIdentifier("composer.mention.\(candidate.handle)")
                 }
             }
-            .padding(.horizontal, SQSpace.md + 2)
+            .padding(.horizontal, SQSpace.md2)
             .padding(.top, SQSpace.sm)
         }
     }

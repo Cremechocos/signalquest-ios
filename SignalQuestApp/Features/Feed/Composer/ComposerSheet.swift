@@ -492,8 +492,8 @@ struct ComposerSheet: View {
                                 .font(SQFont.body(13, .medium))
                                 .lineLimit(1)
                         }
-                        .padding(.horizontal, SQSpace.sm + 2)
-                        .padding(.vertical, SQSpace.xs + 2)
+                        .padding(.horizontal, SQSpace.sm2)
+                        .padding(.vertical, SQSpace.xs2)
                         .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
@@ -639,7 +639,7 @@ struct ComposerSheet: View {
                             }
                         }
                         .foregroundStyle(SQColor.onAccent)
-                        .padding(.horizontal, SQSpace.lg - 2)
+                        .padding(.horizontal, SQSpace.md2)
                         .padding(.vertical, SQSpace.sm - 1)
                         .background(SQColor.brandRed, in: Capsule(style: .continuous))
                         .opacity(model.canPublish ? 1 : 0.45)
@@ -841,12 +841,7 @@ struct ComposerSheet: View {
     private func attachedSpeedtestChip(_ speedtest: SocialShareableSpeedtest) -> some View {
         HStack(spacing: SQSpace.md) {
             // Pastille circulaire teintée : icône brique sur accentSoft.
-            Image(systemName: "speedometer")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 40, height: 40)
-                .background(SQColor.accentSoft, in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(systemImage: "speedometer", size: 40, font: .system(size: 17, weight: .semibold))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Speedtest joint")
                     .font(SQFont.body(13, .semibold))
@@ -888,7 +883,7 @@ struct PostPreviewCard: View {
     let visibility: SocialVisibility
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.md2) {
             // Header
             HStack(spacing: SQSpace.md) {
                 SQAvatar(url: author.avatarUrl, name: author.displayName)
@@ -943,20 +938,20 @@ struct PostPreviewCard: View {
             if let speedtest {
                 HStack(spacing: SQSpace.sm) {
                     if let down = speedtest.downloadSpeed {
-                        CardMetricTile(
+                        SQMetricTile.wrapping(
                             label: "Réception",
                             value: SignalFormatters.speed(down),
                             highlight: true
                         )
                     }
                     if let ping = speedtest.ping {
-                        CardMetricTile(
+                        SQMetricTile.wrapping(
                             label: "Latence",
                             value: SignalFormatters.ms(ping)
                         )
                     }
                     if let tech = speedtest.networkType {
-                        CardMetricTile(
+                        SQMetricTile.wrapping(
                             label: "Réseau",
                             value: tech
                         )

@@ -2122,7 +2122,7 @@ struct MapExplorerView: View {
     private var controlsLayer: some View {
         GeometryReader { proxy in
             ZStack {
-                VStack(spacing: SQSpace.sm + 2) {
+                VStack(spacing: SQSpace.sm2) {
                     mapTopControlBar
                         .padding(.horizontal, SQSpace.md)
                     if filters.contains(.friend), services.auth.hasStoredCredentials() {
@@ -2298,7 +2298,7 @@ struct MapExplorerView: View {
                     .fixedSize(horizontal: true, vertical: false)
             }
             .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.label)
-            .padding(.horizontal, SQSpace.sm + 2)
+            .padding(.horizontal, SQSpace.sm2)
             .frame(minHeight: 44)
             .background(isSelected ? SQColor.accentSoft : SQColor.surfaceMuted, in: Capsule())
         }
@@ -2376,7 +2376,7 @@ struct MapExplorerView: View {
                         .lineLimit(2)
                 }
                 .padding(.horizontal, SQSpace.lg)
-                .padding(.vertical, SQSpace.sm + 2)
+                .padding(.vertical, SQSpace.sm2)
                 .background { sqMapGlassBackground(Capsule(style: .continuous)) }
                 .sqShadowCard()
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -2469,7 +2469,7 @@ struct MapExplorerView: View {
                 .accessibilityIdentifier("map.search.clear")
             }
         }
-        .padding(.horizontal, SQSpace.md + 2)
+        .padding(.horizontal, SQSpace.md2)
         .frame(minHeight: 44)
         .frame(maxWidth: .infinity)
         .background { sqMapGlassBackground(Capsule(style: .continuous)) }
@@ -2675,8 +2675,8 @@ struct MapExplorerView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("map.status.text")
         }
-        .padding(.horizontal, SQSpace.md + 2)
-        .padding(.vertical, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.vertical, SQSpace.sm2)
         .sqCardBackground(cornerRadius: SQRadius.md)
         // Bornée à 280 (repli 2 lignes pour les erreurs longues) et CENTRÉE dans la
         // colonne bas-centre (alignement centré par défaut du `.frame`) — plus
@@ -2757,7 +2757,7 @@ struct MapExplorerView: View {
 
     private var searchSuggestions: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs2) {
                 if model.searchResults.isEmpty {
                     searchStatusRow
                 } else {
@@ -2795,7 +2795,7 @@ struct MapExplorerView: View {
 
     private var recentsPanel: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs2) {
                 HStack(spacing: SQSpace.sm) {
                     Text("Récents")
                         .font(SQFont.body(14, .semibold))
@@ -2816,7 +2816,7 @@ struct MapExplorerView: View {
                     .accessibilityLabel("Effacer les récents")
                     .accessibilityIdentifier("map.recents.clear")
                 }
-                .padding(.leading, SQSpace.md + 2)
+                .padding(.leading, SQSpace.md2)
                 .padding(.trailing, SQSpace.sm)
                 .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
                 .sqShadowSoft()
@@ -2868,8 +2868,8 @@ struct MapExplorerView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
             }
-            .padding(.horizontal, SQSpace.md + 2)
-            .padding(.vertical, SQSpace.sm + 2)
+            .padding(.horizontal, SQSpace.md2)
+            .padding(.vertical, SQSpace.sm2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
             .sqShadowSoft()
@@ -2905,8 +2905,8 @@ struct MapExplorerView: View {
             }
             Spacer()
         }
-        .padding(.horizontal, SQSpace.md + 2)
-        .padding(.vertical, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.vertical, SQSpace.sm2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
         .sqShadowSoft()
@@ -4486,3 +4486,225 @@ private enum MapProfileQASearch {
     }
 }
 #endif
+
+struct MapItemSheet: View {
+    let item: MapDisplayItem
+    @EnvironmentObject private var services: AppServices
+    @State private var speedtestDetail: SpeedtestDetail?
+    @State private var detailError: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                switch item.kind {
+                case .speedtest:
+                    speedtestContent
+                case .coverage:
+                    coverageContent
+                default:
+                    genericContent
+                }
+            }
+            .padding()
+            .padding(.top, SQSpace.sm)
+        }
+        .task(id: item.backendId) { await loadSpeedtestDetailIfNeeded() }
+        .presentationDetents([.height(360), .medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackgroundCompat(SQColor.bg)
+    }
+
+    private var speedtestContent: some View {
+        let detail = speedtestDetail
+        let local = item.details
+        let downloadAverage = detail?.averageSpeed ?? detail?.downloadAvg ?? detail?.downloadSpeed ?? local?.downloadMbps
+        let downloadMax = detail?.downloadMax ?? detail?.downloadPeakMbps ?? detail?.maxSpeed ?? detail?.downloadSpeed ?? local?.downloadMbps
+        let uploadAverage = detail?.uploadAvg ?? detail?.uploadSpeed ?? local?.uploadMbps
+        let uploadMax = detail?.uploadMax ?? detail?.uploadPeakMbps ?? detail?.uploadSpeed ?? local?.uploadMbps
+        let pingMin = detail?.pingMin ?? detail?.ping ?? local?.pingMs
+        let pingAverage = detail?.pingAvg ?? detail?.ping ?? local?.pingMs
+        let tech = detail?.networkType ?? local?.tech
+        let network = [detail?.connectionType, detail?.networkType].compactMap { $0 }.joined(separator: " / ")
+        return VStack(alignment: .leading, spacing: SQSpace.md2) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(SignalFormatters.speed(downloadAverage))
+                        .font(SQType.display)
+                        .foregroundStyle(speedColor(downloadAverage))
+                    Text("Speedtest")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                Spacer()
+                TechBadge(text: tech ?? "Speedtest", color: SQColor.brandBlue)
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+                // Vocabulaire du lexique (MES-24) : plus de « DL/UL » ni de « Ping ».
+                SQMetricTile.wrapping(label: "Réception moy.", value: SignalFormatters.speed(downloadAverage), highlight: true)
+                SQMetricTile.wrapping(label: "Réception max", value: SignalFormatters.speed(downloadMax))
+                SQMetricTile.wrapping(label: "Envoi moy.", value: SignalFormatters.speed(uploadAverage))
+                SQMetricTile.wrapping(label: "Envoi max", value: SignalFormatters.speed(uploadMax))
+                SQMetricTile.wrapping(label: "Latence min", value: SignalFormatters.ms(pingMin))
+                SQMetricTile.wrapping(label: "Latence moy.", value: SignalFormatters.ms(pingAverage))
+                SQMetricTile.wrapping(label: "Gigue", value: SignalFormatters.ms(detail?.jitter))
+                SQMetricTile.wrapping(label: "Réseau", value: network.isEmpty ? (tech ?? "—") : network)
+            }
+            detailRows([
+                ("Opérateur", detail?.mobileOperator ?? local?.operatorName),
+                ("Réseau", network),
+                ("Serveur de mesure", detail?.downloadServerName ?? detail?.server),
+                ("Flux simultanés", detail?.streams.map(String.init)),
+                ("Durée", SignalFormatters.duration(detail?.testDuration)),
+                ("Appareil", [detail?.deviceType, detail?.deviceModel].compactMap { $0 }.joined(separator: " ")),
+                ("Date", formatDate(detail?.timestamp ?? local?.timestamp)),
+                ("Position", coordinatesText(lat: detail?.latitude ?? item.coordinate.latitude, lon: detail?.longitude ?? item.coordinate.longitude))
+            ])
+            if let detailError {
+                Label(detailError, systemImage: "exclamationmark.triangle")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.warning)
+            }
+        }
+    }
+
+    private var coverageContent: some View {
+        let details = item.details
+        let rsrp = details?.rsrp ?? details?.avgRsrp
+        return VStack(alignment: .leading, spacing: SQSpace.md2) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(SignalFormatters.dbm(rsrp))
+                        .font(SQType.display)
+                        .foregroundStyle(coverageColor(rsrp))
+                    HStack(spacing: 6) {
+                        Text(details?.clusterCount == nil ? "Couverture" : "Couverture agrégée")
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
+                        if let tech = details?.tech {
+                            TechBadge(text: tech, color: TechAccent.color(for: tech))
+                        }
+                        if let band = details?.band {
+                            TechBadge(text: SQUnits.band(band, technology: details?.tech), color: SQColor.brandOrange)
+                        }
+                    }
+                }
+                Spacer()
+                TechBadge(text: kindLabel, color: SQColor.brandGreen)
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                SQMetricTile.wrapping(label: "RSRP", value: SignalFormatters.dbm(rsrp), highlight: true)
+                SQMetricTile.wrapping(label: "RSRQ", value: SignalFormatters.db(details?.rsrq))
+                SQMetricTile.wrapping(label: "SNR", value: SignalFormatters.db(details?.snr))
+                SQMetricTile.wrapping(label: "Points", value: SignalFormatters.count(details?.clusterCount ?? details?.sampleCount))
+                SQMetricTile.wrapping(label: "Clusters", value: SignalFormatters.count(details?.returnedClusters ?? details?.totalClusters))
+                SQMetricTile.wrapping(label: "Type", value: details?.cellType ?? details?.representation ?? "—")
+            }
+            detailRows([
+                ("Opérateur", details?.operatorName),
+                ("Groupe", details?.groupId),
+                ("Primaire", details?.isPrimary.map { $0 ? String(localized: "Oui") : String(localized: "Non") }),
+                ("Date", formatDate(details?.timestamp)),
+                ("Position", coordinatesText(lat: item.coordinate.latitude, lon: item.coordinate.longitude)),
+                ("Source", details?.note ?? "SignalQuest")
+            ])
+        }
+    }
+
+    private var genericContent: some View {
+        VStack(alignment: .leading, spacing: SQSpace.lg) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(item.title)
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                    Text(item.subtitle)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                Spacer()
+                TechBadge(text: kindLabel, color: SQColor.brandGreen)
+            }
+            if let metric = item.metric {
+                MetricPill(title: "Donnée", value: metric, systemImage: "waveform.path.ecg")
+            }
+        }
+    }
+
+    private func loadSpeedtestDetailIfNeeded() async {
+        guard item.kind == .speedtest, let id = item.backendId, !id.hasPrefix("speed-cluster") else { return }
+        do {
+            speedtestDetail = try await services.speedtest.details(id: id)
+            detailError = nil
+        } catch {
+            detailError = String(localized: "Le détail de cette mesure n’a pas pu être chargé. \(error.userFacingMessage)")
+        }
+    }
+
+    /// Nom du genre d'élément, jamais sa valeur technique (TRX-26).
+    private var kindLabel: String {
+        switch item.kind {
+        case .friend: String(localized: "Ami")
+        case .photo: String(localized: "Photo")
+        case .validation: String(localized: "Validation")
+        case .session: String(localized: "Session de couverture")
+        case .coverage: String(localized: "Couverture")
+        case .speedtest: String(localized: "Speedtest")
+        case .outage: String(localized: "Panne")
+        case .communityOutage: String(localized: "Panne signalée")
+        case .planned: String(localized: "Site prévu")
+        case .antenna: String(localized: "Antenne")
+        case .communitySite: String(localized: "Site communautaire")
+        case .customSite: String(localized: "Site ajouté par un membre")
+        }
+    }
+
+    private func detailRows(_ rows: [(String, String?)]) -> some View {
+        let visibleRows = rows.filter { value in
+            guard let text = value.1?.trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
+            return !text.isEmpty && text != "—"
+        }
+        return VStack(spacing: SQSpace.sm) {
+            ForEach(Array(visibleRows.enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .firstTextBaseline) {
+                    // Clé du catalogue : un libellé passé en `String` restait
+                    // en français dans l'app anglaise.
+                    Text(LocalizedStringKey(row.0))
+                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.labelSecondary)
+                    Spacer(minLength: 12)
+                    Text(row.1 ?? "—")
+                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.label)
+                        .multilineTextAlignment(.trailing)
+                }
+                .padding(.vertical, SQSpace.sm)
+                .padding(.horizontal, SQSpace.sm2)
+                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
+            }
+        }
+    }
+
+    private func formatDate(_ date: Date?) -> String? {
+        guard let date else { return nil }
+        return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func coordinatesText(lat: Double?, lon: Double?) -> String? {
+        guard let lat, let lon else { return nil }
+        return String(format: "%.5f, %.5f", lat, lon)
+    }
+
+    private func speedColor(_ speed: Double?) -> Color {
+        // Échelle canonique unique (SQNetworkColors) ; `nil` garde le bleu
+        // « pas de donnée » propre à cette fiche.
+        guard let speed else { return SQColor.brandBlue }
+        return SQNetworkColors.speedColor(speed)
+    }
+
+    private func coverageColor(_ rsrp: Double?) -> Color {
+        // Échelle canonique unique (SQNetworkColors) ; `nil` garde le bleu
+        // « pas de donnée » propre à cette fiche.
+        guard let rsrp else { return SQColor.brandBlue }
+        return SQNetworkColors.rsrpColor(rsrp)
+    }
+}

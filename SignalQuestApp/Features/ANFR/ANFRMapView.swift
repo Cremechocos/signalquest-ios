@@ -182,7 +182,7 @@ struct ANFRMapView: View {
     // MARK: Controls overlay
 
     private var controlsLayer: some View {
-        VStack(spacing: SQSpace.sm + 2) {
+        VStack(spacing: SQSpace.sm2) {
             topBar
             operatorStrip
             Spacer()
@@ -227,7 +227,7 @@ struct ANFRMapView: View {
                             .lineLimit(1)
                     }
                 }
-                .padding(.horizontal, SQSpace.md - 2)
+                .padding(.horizontal, SQSpace.sm2)
                 .frame(height: 48)
                 .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
@@ -237,7 +237,7 @@ struct ANFRMapView: View {
             Spacer()
 
             // Count badge
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .font(.system(size: 12, weight: .semibold))
                 Text("\(model.filteredSites.count)")
@@ -286,26 +286,14 @@ struct ANFRMapView: View {
             HStack(spacing: SQSpace.sm - 1) {
                 ForEach(ANFROperator.allCases) { op in
                     let on = model.operatorFilters.contains(op)
-                    Button {
-                        Haptics.selection()
+                    SQChip(
+                        label: op.label, isSelected: on, dot: op.color, selectedFill: op.color,
+                        selectedInk: SQBrand.operatorBadgeForeground(op.label),
+                        spokenLabel: "Filtre \(op.label)",
+                        spokenValue: on ? "activé" : "désactivé"
+                    ) {
                         withAnimation(reduceMotion ? nil : SQMotion.fast) { model.toggleOperator(op) }
-                    } label: {
-                        HStack(spacing: SQSpace.xs + 2) {
-                            Circle().fill(on ? SQBrand.operatorBadgeForeground(op.label) : op.color).frame(width: 7, height: 7)
-                            Text(op.label).font(SQFont.body(13, .semibold))
-                        }
-                        .padding(.horizontal, SQSpace.md - 2)
-                        .frame(height: 36)
-                        .background(on ? AnyShapeStyle(op.color) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
-                        .foregroundStyle(on ? SQBrand.operatorBadgeForeground(op.label) : SQColor.label)
-                        .sqShadowSoft()
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(SQPressButtonStyle())
-                    .accessibilityLabel("Filtre \(op.label)")
-                    .accessibilityValue(on ? "activé" : "désactivé")
-                    .accessibilityAddTraits(on ? .isSelected : [])
                 }
             }
             .padding(.horizontal, SQSpace.xs)
@@ -419,22 +407,10 @@ struct ANFRMapFilterSheet: View {
     }
 
     private func chip(label: String, color: Color, on: Bool, action: @escaping () -> Void) -> some View {
-        Button {
-            Haptics.selection()
-            action()
-        } label: {
-            HStack(spacing: SQSpace.xs + 2) {
-                Circle().fill(on ? SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme) : color).frame(width: 8, height: 8)
-                Text(LocalizedStringKey(label)).font(SQFont.body(13, .semibold))
-            }
-            .padding(.horizontal, SQSpace.md)
-            .frame(minHeight: 44)
-            .background(on ? AnyShapeStyle(color) : AnyShapeStyle(SQColor.surface), in: Capsule(style: .continuous))
-            .foregroundStyle(on ? SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme) : SQColor.label)
-            .sqShadowSoft()
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .accessibilityAddTraits(on ? .isSelected : [])
+        SQChip(
+            label: label, isSelected: on, dot: color, selectedFill: color,
+            selectedInk: SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme), action: action
+        )
     }
 }
 

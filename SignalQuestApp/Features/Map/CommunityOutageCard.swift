@@ -1,55 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// Couleurs de sévérité, identiques à Android et fixes en clair comme en sombre.
-///
-/// Sémantiques, donc jamais dérivées du thème : une panne qui changerait de couleur selon
-/// l'apparence obligerait à réapprendre le code à chaque bascule. Les mêmes valeurs que la
-/// couche carte Android, pour qu'un utilisateur des deux plateformes lise la même chose.
-enum OutageTint {
-    static let down = Color(red: 0xEF / 255, green: 0x44 / 255, blue: 0x44 / 255)
-    /// Ambre PROFOND. Le jaune-500 d'avant (#EAB308) tombait à 1,80:1 sur la crème : une pastille
-    /// qu'on ne voyait pas, et un texte de gravité illisible. Même valeur qu'Android.
-    static let degraded = Color(red: 0xB4 / 255, green: 0x53 / 255, blue: 0x09 / 255)
-    static let resolved = Color(red: 0x2E / 255, green: 0x7D / 255, blue: 0x5B / 255)
-
-    static func of(_ severity: OutageSeverity) -> Color {
-        severity == .degraded ? degraded : down
-    }
-
-    // MARK: Encres
-
-    /// Les encres à poser quand la gravité doit ÉCRIRE, et non seulement signaler.
-    ///
-    /// Les trois teintes ci-dessus sont calibrées comme des APLATS — marqueur, pastille, jauge —
-    /// où WCAG 1.4.11 ne demande que 3:1. Posées en texte sur une surface de carte elles tombent
-    /// sous le 4,5:1 que réclame WCAG 1.4.3, et le rouge y échoue dans les deux apparences. Ces
-    /// encres les remplacent partout où la couleur porte des mots.
-    ///
-    /// Dynamiques, et pas une constante choisie au moment de l'appel : la feuille et la liste ne
-    /// sont pas ré-instanciées au basculement clair/sombre, une couleur figée y resterait celle de
-    /// l'ancien thème. Mêmes valeurs qu'Android (`OutageColors.onLight` / `onDark`).
-    static let downInk = ink(light: (0xB3, 0x26, 0x1E), dark: (0xE0, 0x7A, 0x7E))
-    static let degradedInk = ink(light: (0x8A, 0x3F, 0x06), dark: (0xE3, 0xB6, 0x5E))
-    static let resolvedInk = ink(light: (0x1F, 0x6B, 0x4A), dark: (0x7B, 0xD8, 0x9A))
-
-    static func inkOf(_ severity: OutageSeverity) -> Color {
-        severity == .degraded ? degradedInk : downInk
-    }
-
-    private static func ink(light: (UInt8, UInt8, UInt8), dark: (UInt8, UInt8, UInt8)) -> Color {
-        Color(UIColor { traits in
-            let c = traits.userInterfaceStyle == .dark ? dark : light
-            return UIColor(
-                red: CGFloat(c.0) / 255,
-                green: CGFloat(c.1) / 255,
-                blue: CGFloat(c.2) / 255,
-                alpha: 1
-            )
-        })
-    }
-}
-
 /// L'ARBITRAGE seul : progression vers la confirmation, services touchés, et les deux voix.
 ///
 /// Séparé de `CommunityOutageCard` à dessein, et c'est le correctif du grief n°1 des essais sur

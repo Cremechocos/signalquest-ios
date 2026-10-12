@@ -22,7 +22,7 @@ struct RatingCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
                     place: signal?.city ?? item.placeLabel,
@@ -51,9 +51,9 @@ struct RatingCardView: View {
 
                 // Contexte antenne (le sujet noté).
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    CardMetricTile(label: identifierTileLabel, value: signal?.identifierValue ?? signal?.cellId ?? "—", highlight: true)
-                    CardMetricTile(label: "Bande", value: signal?.band ?? "—")
-                    CardMetricTile(label: "RSRP", value: SignalFormatters.dbm(signal?.rsrp))
+                    SQMetricTile.wrapping(label: identifierTileLabel, value: signal?.identifierValue ?? signal?.cellId ?? "—", highlight: true)
+                    SQMetricTile.wrapping(label: "Bande", value: signal?.band ?? "—")
+                    SQMetricTile.wrapping(label: "RSRP", value: SignalFormatters.dbm(signal?.rsrp))
                 }
 
                 if let footer = footer {

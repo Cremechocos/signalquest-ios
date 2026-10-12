@@ -151,7 +151,7 @@ struct SpeedtestTriMetric: View {
                 .frame(width: 26, height: 4)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, SQSpace.md + 2)
+        .padding(.vertical, SQSpace.md2)
         .padding(.horizontal, SQSpace.sm)
         .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .sqAnimation(.snappy(duration: 0.25), value: state)

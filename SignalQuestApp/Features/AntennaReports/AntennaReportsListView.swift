@@ -103,12 +103,7 @@ struct AntennaReportsListView: View {
     private func reportRow(_ report: AntennaReport) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(alignment: .top, spacing: SQSpace.md) {
-                Image(systemName: report.reportType.systemImage)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 38, height: 38)
-                    .background(SQColor.accentSoft, in: Circle())
-                    .accessibilityHidden(true)
+                SQIconPastille(systemImage: report.reportType.systemImage, size: 38, font: .system(size: 15, weight: .medium))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(report.reportType.label)
                         .font(SQType.heading)
@@ -149,7 +144,7 @@ struct AntennaReportsListView: View {
                 .font(SQType.caption)
             }
         }
-        .padding(SQSpace.md + 2)
+        .padding(SQSpace.md2)
         .frame(maxWidth: .infinity, alignment: .leading)
         .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .contentShape(Rectangle())

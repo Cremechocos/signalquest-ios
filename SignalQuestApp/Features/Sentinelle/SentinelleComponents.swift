@@ -34,12 +34,7 @@ struct SentinelleSectionTitle: View {
 
     var body: some View {
         HStack(spacing: SQSpace.sm) {
-            Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 32, height: 32)
-                .background(SQColor.accentSoft, in: Circle())
-                .sqDecorative()
+            SQIconPastille(systemImage: systemImage, size: 32, font: .system(size: 13, weight: .semibold))
             Text(LocalizedStringKey(title))
                 .font(SQType.heading)
                 .foregroundStyle(SQColor.label)
@@ -75,7 +70,7 @@ struct SentinelleMetricRow: View {
                 .monospacedDigit()
                 .foregroundStyle(SQColor.label)
         }
-        .padding(.vertical, SQSpace.sm - 2)
+        .padding(.vertical, SQSpace.xs2)
         .sqMetric(name: NSLocalizedString(label, comment: ""), value: value)
     }
 }
@@ -154,7 +149,7 @@ struct SentinelleField: View {
     var hint: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
             Text(LocalizedStringKey(title))
                 .font(SQType.micro)
                 .foregroundStyle(SQColor.labelSecondary)
@@ -268,7 +263,6 @@ struct SentinelleSheetShell<Content: View>: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
-                SQSheetHandle()
                 // Ces feuilles s'ouvrent aussi depuis un lien : le bouton évite de
                 // dépendre du seul geste de glissement pour les refermer.
                 HStack(alignment: .top, spacing: SQSpace.sm) {
@@ -290,10 +284,12 @@ struct SentinelleSheetShell<Content: View>: View {
                 content()
             }
             .padding(SQSpace.lg)
+            .padding(.top, SQSpace.sm)
             .sqReadableWidth()
         }
         .background(SQColor.bg)
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
         .presentationBackgroundCompat(.ultraThinMaterial)
     }
 }

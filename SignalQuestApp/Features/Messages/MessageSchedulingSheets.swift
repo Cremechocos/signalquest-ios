@@ -227,7 +227,7 @@ private extension View {
             .font(SQType.body)
             .foregroundStyle(SQColor.label)
             .padding(.horizontal, SQSpace.lg)
-            .padding(.vertical, SQSpace.sm + 2)
+            .padding(.vertical, SQSpace.sm2)
             .frame(minHeight: 44)
             .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }

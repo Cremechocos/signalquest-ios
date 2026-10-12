@@ -116,7 +116,7 @@ struct SQGlossarySheet: View {
                         }
                     }
                 }
-                .padding(SQSpace.lg + 2)
+                .padding(SQSpace.cardPadding)
             }
             .signalQuestBackground()
             .navigationTitle(entry.title)
@@ -188,20 +188,50 @@ struct SQMetricTile: View {
     /// Prend la hauteur que lui donne sa rangée (`HStack` en `fixedSize`) :
     /// des tuiles voisines de même hauteur, même si un libellé passe à la ligne.
     var fillsHeight = false
+    /// `nil` : valeur sur une ligne, réduite jusqu'à 0,7 (grilles de stats).
+    /// Un nombre : la valeur passe à la ligne jusqu'à cette limite, sans réduction
+    /// — pour une valeur textuelle (« Internet, Voix · 4G, 5G » en prend trois).
+    var valueLineLimit: Int? = nil
+    /// Préfixe des identifiants des tests UI (`<préfixe>.label`, `<préfixe>.value`).
+    /// Posé, la tuile reste un seul bloc VoiceOver (libellé, valeur) et ses textes
+    /// gardent leurs identifiants.
+    var identifierPrefix: String? = nil
 
+    /// Tuile aux valeurs textuelles des cartes du fil et des fiches : la valeur
+    /// passe à la ligne (2 lignes par défaut) et les identifiants gardent le
+    /// préfixe `feed.metric` lu par les tests UI.
+    static func wrapping(label: String, value: String, highlight: Bool = false, valueLineLimit: Int = 2) -> SQMetricTile {
+        SQMetricTile(
+            label: label, value: value, highlight: highlight,
+            valueLineLimit: valueLineLimit, identifierPrefix: "feed.metric"
+        )
+    }
+
+    @ViewBuilder
     var body: some View {
-        SQMetricTileContent(
+        let tile = SQMetricTileContent(
             label: label, value: value, unit: unit, highlight: highlight, icon: icon, iconTint: iconTint,
-            detail: detail, size: size, fillsHeight: fillsHeight
+            detail: detail, size: size, fillsHeight: fillsHeight, valueLineLimit: valueLineLimit,
+            identifierPrefix: identifierPrefix
         ) {
             if let term {
                 SQInfoButton(term: term)
                     .accessibilityHidden(true)
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(LocalizedStringKey(label)) + Text(verbatim: " : ") + Text(verbatim: spokenValue))
-        .modifier(SQOptionalExplains(term: term))
+        if identifierPrefix == nil {
+            tile
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(LocalizedStringKey(label)) + Text(verbatim: " : ") + Text(verbatim: spokenValue))
+                .modifier(SQOptionalExplains(term: term))
+        } else {
+            // VoiceOver : « libellé : valeur » d'un bloc (Réception : 240 Mbit/s), pas deux textes.
+            tile
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text(LocalizedStringKey(label)))
+                .accessibilityValue(spokenValue)
+                .modifier(SQOptionalExplains(term: term))
+        }
     }
 
     private var spokenValue: String {
@@ -223,6 +253,8 @@ struct SQMetricTileContent<Trailing: View>: View {
     var detail: String? = nil
     var size: SQMetricTile.Size = .regular
     var fillsHeight = false
+    var valueLineLimit: Int? = nil
+    var identifierPrefix: String? = nil
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
@@ -237,6 +269,7 @@ struct SQMetricTileContent<Trailing: View>: View {
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .modifier(SQOptionalIdentifier(identifier: identifier("label")))
                 Spacer(minLength: 0)
                 trailing()
             }
@@ -244,8 +277,10 @@ struct SQMetricTileContent<Trailing: View>: View {
                 Text(value)
                     .font(valueFont)
                     .foregroundStyle(highlight ? SQColor.accentInk : SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .lineLimit(valueLineLimit ?? 1)
+                    .minimumScaleFactor(valueLineLimit == nil ? 0.7 : 1)
+                    .fixedSize(horizontal: false, vertical: valueLineLimit != nil)
+                    .modifier(SQOptionalIdentifier(identifier: identifier("value")))
                 if let unit {
                     Text(unit)
                         .font(SQType.caption)
@@ -266,6 +301,10 @@ struct SQMetricTileContent<Trailing: View>: View {
         .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
     }
 
+    private func identifier(_ part: String) -> String? {
+        identifierPrefix.map { "\($0).\(part)" }
+    }
+
     private var valueFont: Font {
         switch size {
         case .regular: return SQFont.archivo(17, .bold)
@@ -278,12 +317,28 @@ extension SQMetricTileContent where Trailing == EmptyView {
     init(
         label: String, value: String, unit: String? = nil, highlight: Bool = false, icon: String? = nil,
         iconTint: Color = SQColor.labelSecondary, detail: String? = nil, size: SQMetricTile.Size = .regular,
-        fillsHeight: Bool = false
+        fillsHeight: Bool = false, valueLineLimit: Int? = nil, identifierPrefix: String? = nil
     ) {
         self.init(
             label: label, value: value, unit: unit, highlight: highlight, icon: icon, iconTint: iconTint,
-            detail: detail, size: size, fillsHeight: fillsHeight, trailing: { EmptyView() }
+            detail: detail, size: size, fillsHeight: fillsHeight, valueLineLimit: valueLineLimit,
+            identifierPrefix: identifierPrefix, trailing: { EmptyView() }
         )
+    }
+}
+
+/// Pose l'identifiant seulement s'il existe : un identifiant vide écraserait
+/// celui d'un conteneur.
+private struct SQOptionalIdentifier: ViewModifier {
+    let identifier: String?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let identifier {
+            content.accessibilityIdentifier(identifier)
+        } else {
+            content
+        }
     }
 }
 

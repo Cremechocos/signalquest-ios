@@ -38,7 +38,7 @@ struct EditProfileView: View {
                         .padding(.top, SQSpace.md)
                         .sqFadeUp()
 
-                    VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
+                    VStack(alignment: .leading, spacing: SQSpace.sm2) {
                         Text("Identité")
                             .font(SQType.heading)
                             .foregroundStyle(SQColor.label)

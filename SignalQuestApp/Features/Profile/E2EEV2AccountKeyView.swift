@@ -170,7 +170,7 @@ struct E2EEV2AccountKeyContent: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("accountKey.explanation")
             }
-            .padding(SQSpace.lg + 2)
+            .padding(SQSpace.cardPadding)
             .sqCardBackground()
 
             if !content.verified {
@@ -204,7 +204,7 @@ struct E2EEV2AccountKeyContent: View {
             .font(SQType.subhead)
             .foregroundStyle(SQColor.success)
             .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.xs + 2)
+            .padding(.vertical, SQSpace.xs2)
             .background(SQColor.successSoft, in: Capsule(style: .continuous))
             .accessibilityIdentifier("accountKey.status.verified")
         } else {
@@ -216,7 +216,7 @@ struct E2EEV2AccountKeyContent: View {
             .font(SQType.subhead)
             .foregroundStyle(SQColor.labelSecondary)
             .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.xs + 2)
+            .padding(.vertical, SQSpace.xs2)
             .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             .accessibilityIdentifier("accountKey.status.unverified")
         }

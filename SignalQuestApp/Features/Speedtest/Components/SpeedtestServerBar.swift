@@ -36,7 +36,7 @@ struct SpeedtestServerBar: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 7)
-        .padding(.horizontal, SQSpace.md + 2)
+        .padding(.horizontal, SQSpace.md2)
         .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
         .sqShadowSoft()
         .accessibilityElement(children: .combine)

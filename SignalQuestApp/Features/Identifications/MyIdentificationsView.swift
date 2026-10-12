@@ -325,7 +325,7 @@ private struct IdentificationNodeRow: View {
                     if group.conflict {
                         Text("conflit")
                             .font(SQType.micro)
-                            .padding(.horizontal, SQSpace.xs + 2).padding(.vertical, SQSpace.xxs)
+                            .padding(.horizontal, SQSpace.xs2).padding(.vertical, SQSpace.xxs)
                             .background(SQColor.warningSoft, in: Capsule(style: .continuous))
                             .foregroundStyle(SQColor.warning)
                     }
@@ -485,7 +485,7 @@ private struct IdentificationDetailSheet: View {
                     Haptics.medium()
                     Task { await adoptConsensus(toSiteId: consensusId) }
                 } label: {
-                    HStack(spacing: SQSpace.xs + 2) {
+                    HStack(spacing: SQSpace.xs2) {
                         if adoptBusy { ProgressView().tint(SQColor.onAccent) } else { Image(systemName: "checkmark.seal.fill") }
                         Text("Adopter le site communautaire").font(SQFont.body(13, .semibold))
                     }
@@ -650,7 +650,7 @@ private struct IdentificationDetailSheet: View {
         Button {
             confirmingDelete = true
         } label: {
-            HStack(spacing: SQSpace.xs + 2) {
+            HStack(spacing: SQSpace.xs2) {
                 if isWithdrawing {
                     ProgressView().tint(SQColor.danger)
                 } else {

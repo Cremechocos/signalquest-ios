@@ -343,7 +343,7 @@ struct UserProfileView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.lg + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.cardPadding) {
                 if model.isLoading && model.profile == nil {
                     profileSkeleton
                 } else {
@@ -880,7 +880,7 @@ struct UserProfileView: View {
                 .monospacedDigit()
         }
         .foregroundStyle(accented ? SQColor.accentInk : SQColor.labelSecondary)
-        .padding(.horizontal, SQSpace.sm + 2)
+        .padding(.horizontal, SQSpace.sm2)
         .padding(.vertical, 6)
         .background(
             accented ? SQColor.brandRed.opacity(0.12) : SQColor.fill,
@@ -923,7 +923,7 @@ struct UserProfileView: View {
                 loadMoreButton
             }
         } else {
-            LazyVStack(alignment: .leading, spacing: SQSpace.lg + 2) {
+            LazyVStack(alignment: .leading, spacing: SQSpace.cardPadding) {
                 ForEach(model.items) { item in
                     FeedItemCard(
                         item: item,

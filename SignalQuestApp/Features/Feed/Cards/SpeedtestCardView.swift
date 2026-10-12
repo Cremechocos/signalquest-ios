@@ -19,7 +19,7 @@ struct SpeedtestCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: SQSpace.md + 2) {
+            VStack(alignment: .leading, spacing: SQSpace.md2) {
                 CardHeader(
                     author: item.author,
                     place: signal?.city ?? item.placeLabel,
@@ -42,10 +42,10 @@ struct SpeedtestCardView: View {
                 // et unités illisibles sur iPhone. Une mesure reste toujours
                 // compréhensible hors contexte et par VoiceOver.
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    CardMetricTile(label: "Réception", value: SignalFormatters.speed(signal?.downloadMbps), highlight: true)
-                    CardMetricTile(label: "Envoi", value: SignalFormatters.speed(signal?.uploadMbps))
-                    CardMetricTile(label: "Latence", value: SignalFormatters.ms(signal?.pingMs))
-                    CardMetricTile(
+                    SQMetricTile.wrapping(label: "Réception", value: SignalFormatters.speed(signal?.downloadMbps), highlight: true)
+                    SQMetricTile.wrapping(label: "Envoi", value: SignalFormatters.speed(signal?.uploadMbps))
+                    SQMetricTile.wrapping(label: "Latence", value: SignalFormatters.ms(signal?.pingMs))
+                    SQMetricTile.wrapping(
                         label: signal?.rsrp == nil ? "Technologie" : "RSRP",
                         value: signal?.rsrp == nil ? (signal?.technology ?? "—") : SignalFormatters.dbm(signal?.rsrp)
                     )

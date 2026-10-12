@@ -40,7 +40,7 @@ struct E2EEUnlockSheet: View {
                     badge
                         .padding(.top, SQSpace.md)
 
-                    VStack(spacing: SQSpace.xs + 2) {
+                    VStack(spacing: SQSpace.xs2) {
                         Text(needsCreation ? "Créer ta clé" : "Déverrouiller")
                             .font(SQType.title)
                             .foregroundStyle(SQColor.label)
@@ -63,7 +63,7 @@ struct E2EEUnlockSheet: View {
                             .font(SQType.body)
                             .foregroundStyle(SQColor.label)
                             .padding(.horizontal, SQSpace.lg)
-                            .padding(.vertical, SQSpace.sm + 2)
+                            .padding(.vertical, SQSpace.sm2)
                             .frame(minHeight: 44)
                             .sqSurface(SQColor.surfaceMuted, in: Capsule())
                             .focused($passwordFocused)
@@ -78,7 +78,7 @@ struct E2EEUnlockSheet: View {
                                 .font(SQType.body)
                                 .foregroundStyle(SQColor.label)
                                 .padding(.horizontal, SQSpace.lg)
-                                .padding(.vertical, SQSpace.sm + 2)
+                                .padding(.vertical, SQSpace.sm2)
                                 .frame(minHeight: 44)
                                 .sqSurface(SQColor.surfaceMuted, in: Capsule())
                                 .focused($confirmationFocused)
@@ -134,7 +134,7 @@ struct E2EEUnlockSheet: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(SQSpace.lg + 2)
+                .padding(SQSpace.cardPadding)
             }
             .scrollDismissesKeyboard(.interactively)
             .signalQuestBackground()
@@ -158,7 +158,7 @@ struct E2EEUnlockSheet: View {
                 }
                 .disabled(!canSubmit)
                 .opacity(canSubmit ? 1 : 0.5)
-                .padding(.horizontal, SQSpace.lg + 2)
+                .padding(.horizontal, SQSpace.cardPadding)
                 .padding(.top, SQSpace.sm)
                 .padding(.bottom, SQSpace.md)
                 .background {
