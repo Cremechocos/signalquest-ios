@@ -307,7 +307,7 @@ struct StoryComposer: View {
             Toggle(isOn: $model.attachRadio) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Joindre mon relevé réseau")
-                        .font(SQFont.body(15, .medium))
+                        .font(SQType.body(.medium))
                     Text("Techno, opérateur et qualité au moment du partage.")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -331,7 +331,7 @@ struct StoryComposer: View {
                         model.audience = audience
                     } label: {
                         Text(audience.label)
-                            .font(SQFont.body(13, .semibold))
+                            .font(SQType.subhead(.semibold))
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
                             .background(
@@ -384,7 +384,7 @@ struct StoryComposer: View {
                     .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
                     .accessibilityHidden(true)
                 Text(LocalizedStringKey(title))
-                    .font(SQFont.body(15.5, .medium))
+                    .font(SQType.body(.medium))
                     .foregroundStyle(SQColor.label)
                 Spacer()
                 Image(systemName: "chevron.right")
@@ -418,7 +418,7 @@ struct StoryComposer: View {
                             Text("\(hours) h")
                             if hours != 24 { Image(systemName: "lock.fill").font(.system(size: 9)) }
                         }
-                        .font(SQFont.body(13, .semibold))
+                        .font(SQType.subhead(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, SQSpace.sm)
                         .background(
@@ -450,7 +450,7 @@ struct StoryComposer: View {
                         model.displayDuration = seconds
                     } label: {
                         Text("\(seconds)s")
-                            .font(SQFont.body(13, .semibold))
+                            .font(SQType.subhead(.semibold))
                             .padding(.horizontal, SQSpace.md)
                             .frame(minHeight: 44)
                             .background(

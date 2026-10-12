@@ -126,7 +126,7 @@ struct GroupSettingsView: View {
                                     Text(participant.user.displayName)
                                         .font(SQType.body)
                                         .foregroundStyle(SQColor.label)
-                                        .lineLimit(1)
+                                        .sqSingleLine()
                                     // Dans un GROUPE, c'est ici que le badge a un
                                     // sens : à côté du membre qu'il qualifie. Le
                                     // poser à côté du nom du groupe ne dirait rien
@@ -267,7 +267,7 @@ struct GroupSettingsView: View {
                     .tint(SQColor.brandRed)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    if isBusy { ProgressView() }
+                    if isBusy { SQSpinner() }
                 }
             }
             .confirmationDialog("Quitter le groupe ?", isPresented: $confirmLeave, titleVisibility: .visible) {

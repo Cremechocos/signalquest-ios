@@ -1738,11 +1738,11 @@ struct DriveTestView: View {
 
     private var liveReadout: some View {
         HStack(spacing: SQSpace.sm) {
-            ProgressView().controlSize(.small).tint(SQColor.brandRed)
+            SQSpinner().controlSize(.small).tint(SQColor.brandRed)
             Text(model.statusLabel)
                 .font(SQFont.body(13, .semibold))
                 .foregroundStyle(SQColor.label)
-                .lineLimit(1)
+                .sqSingleLine()
             Spacer()
             if model.livePhase == .download || model.livePhase == .upload {
                 Text(verbatim: SQUnits.throughput(mbps: model.liveMbps))

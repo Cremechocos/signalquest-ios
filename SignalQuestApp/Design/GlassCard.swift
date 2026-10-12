@@ -127,7 +127,7 @@ struct GradientButton: View {
         } label: {
             HStack(spacing: SQSpace.sm2) {
                 if isBusy {
-                    ProgressView().tint(foreground)
+                    SQSpinner().tint(foreground)
                 } else if let systemImage {
                     Image(systemName: systemImage)
                         .font(.system(size: 16, weight: .semibold))

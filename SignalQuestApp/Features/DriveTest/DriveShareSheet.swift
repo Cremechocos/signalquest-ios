@@ -105,7 +105,7 @@ struct DriveShareSheet: View {
                                 .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                                 .sqShadowCard()
                         } else {
-                            ProgressView().frame(maxWidth: .infinity, minHeight: 240)
+                            SQSpinner().frame(maxWidth: .infinity, minHeight: 240)
                         }
                     }
                     .accessibilityElement(children: .ignore)

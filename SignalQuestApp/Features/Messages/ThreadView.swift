@@ -30,7 +30,7 @@ struct ThreadView: View {
                         threadHeader
                         Divider().overlay(SQColor.separator)
                         if isLoading && replies.isEmpty {
-                            ProgressView().frame(maxWidth: .infinity).padding(.vertical, SQSpace.xl)
+                            SQSpinner().frame(maxWidth: .infinity).padding(.vertical, SQSpace.xl)
                         } else if replies.isEmpty {
                             Text("Aucune réponse pour l'instant. Lance le fil.")
                                 .font(SQType.caption)

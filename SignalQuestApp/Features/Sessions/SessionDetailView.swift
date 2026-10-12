@@ -304,7 +304,7 @@ struct SessionDetailView: View {
         .navigationTitle(model.session.name ?? (model.session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")))
         .toolbarTitleInlineCompat()
         .overlay {
-            if model.isLoading && model.detail == nil { ProgressView().tint(SQColor.brandRed) }
+            if model.isLoading && model.detail == nil { SQSpinner().tint(SQColor.brandRed) }
         }
         .task { await model.load(service: services.sessions) }
         .task { marketRegistry = await services.markets.registry() }
@@ -444,7 +444,7 @@ struct SessionDetailView: View {
                 if let percent {
                     Text(percent).monospacedDigit()
                 } else {
-                    ProgressView().controlSize(.small).tint(SQColor.brandRed)
+                    SQSpinner().controlSize(.small).tint(SQColor.brandRed)
                 }
             }
             .font(SQType.caption)
@@ -620,13 +620,13 @@ struct SessionDetailView: View {
                     Text(st.networkOperatorLabel(in: marketRegistry) ?? String(localized: "Speedtest"))
                         .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
                         .foregroundStyle(SQColor.label)
-                        .lineLimit(1)
+                        .sqSingleLine()
                     if let mvno = st.mvnoName, !mvno.isEmpty,
                        mvno.caseInsensitiveCompare(st.operatorKey ?? "") != .orderedSame {
                         Text("SIM \(mvno)")
                             .font(SQFont.body(12, .semibold, relativeTo: .caption2))
                             .foregroundStyle(SQColor.labelSecondary)
-                            .lineLimit(1)
+                            .sqSingleLine()
                     }
                     if let net = st.networkType, !net.isEmpty {
                         HStack(spacing: 4) {
@@ -695,7 +695,7 @@ struct SessionDetailView: View {
                 Text(antenna.operatorDisplayName ?? antenna.displayName ?? String(localized: "Antenne"))
                     .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
+                    .sqSingleLine()
                 Text(Self.statusLabel(antenna))
                     .font(SQFont.body(12, relativeTo: .caption2))
                     .foregroundStyle(SQColor.labelSecondary)
@@ -714,7 +714,7 @@ struct SessionDetailView: View {
                 } label: {
                     Group {
                         if model.identifyingId == antenna.id {
-                            ProgressView().tint(SQColor.onAccent)
+                            SQSpinner().tint(SQColor.onAccent)
                         } else {
                             Text("Valider").font(SQFont.body(13, .semibold, relativeTo: .caption))
                         }

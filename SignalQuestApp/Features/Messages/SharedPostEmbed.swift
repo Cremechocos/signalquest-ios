@@ -248,9 +248,9 @@ struct SharedPostEmbedBubble: View {
             SQAvatar(url: item.author.avatarUrl, name: item.author.displayName, size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.author.displayName)
-                    .font(SQFont.body(14, .semibold))
+                    .font(SQType.callout(.semibold))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
+                    .sqSingleLine()
                 Text(sourceLine(item))
                     .font(SQType.micro)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -345,7 +345,7 @@ struct SharedPostEmbedBubble: View {
                     .sqLikePop(trigger: popTrigger ?? false)
                 if count > 0 {
                     Text(SignalFormatters.count(count))
-                        .font(SQFont.body(12, .semibold))
+                        .font(SQType.micro)
                         .contentTransition(.numericText())
                 }
             }
@@ -426,7 +426,7 @@ struct SharedPostEmbedBubble: View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(measure.primary)
-                    .font(SQFont.display(20, .bold))
+                    .font(SQType.metricSmall)
                     .foregroundStyle(measure.tint)
                 Text(measure.unit)
                     .font(SQType.micro)

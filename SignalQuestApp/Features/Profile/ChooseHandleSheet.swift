@@ -85,7 +85,7 @@ struct ChooseHandleSheet: View {
     private var statusIcon: some View {
         switch status {
         case .checking:
-            ProgressView()
+            SQSpinner()
         case .available:
             Image(systemName: "checkmark.circle.fill").foregroundStyle(SQColor.success)
         case .taken, .invalid, .error, .cooldown:

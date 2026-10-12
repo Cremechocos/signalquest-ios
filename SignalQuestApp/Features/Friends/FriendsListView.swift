@@ -122,7 +122,7 @@ struct FriendsListView: View {
     var body: some View {
         List {
             if model.isLoading && model.friends.isEmpty && model.receivedRequests.isEmpty {
-                ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
+                SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             } else if isEverythingEmpty, let error = model.errorMessage {
@@ -360,7 +360,7 @@ struct FriendsListView: View {
             Text(request.user?.displayName ?? String(localized: "Utilisateur"))
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.label)
-                .lineLimit(1)
+                .sqSingleLine()
             Spacer(minLength: SQSpace.sm)
             compactButton("Accepter", accented: true) { Task { await model.accept(request) } }
             compactButton("Refuser", accented: false) { Task { await model.decline(request) } }
@@ -476,7 +476,7 @@ private struct AddFriendSheet: View {
                             // L'état d'amitié était décodé puis ignoré : le bouton
                             // « ajouter » s'affichait pour un ami (SOC-44).
                             if busyId == user.id {
-                                ProgressView().tint(SQColor.brandRed)
+                                SQSpinner().tint(SQColor.brandRed)
                             } else if user.isFriend == true {
                                 friendStatus("Ami", systemImage: "person.fill.checkmark")
                             } else if user.hasPendingRequest == true {

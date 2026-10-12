@@ -76,7 +76,7 @@ struct ValidationsSheet: View {
             .background(SQColor.bg.ignoresSafeArea())
             .navigationTitle("Validations")
             .toolbarTitleInlineCompat()
-            .overlay { if model.isLoading && model.validations == nil { ProgressView().tint(SQColor.brandRed) } }
+            .overlay { if model.isLoading && model.validations == nil { SQSpinner().tint(SQColor.brandRed) } }
             .task { await model.load() }
         }
         .presentationDetents([.medium, .large])
@@ -105,7 +105,7 @@ struct ValidationsSheet: View {
                             .foregroundStyle(SQColor.danger)
                             .accessibilityLabel(Text("\(entry.rejections) rejet"))
                         if model.pendingVote == "\(type)-\(entry.value)" {
-                            ProgressView().tint(SQColor.brandRed)
+                            SQSpinner().tint(SQColor.brandRed)
                         } else {
                             voteButton("checkmark", tint: SQColor.success, soft: SQColor.successSoft,
                                        label: String(localized: "Valider \(title) \(entry.value)")) {

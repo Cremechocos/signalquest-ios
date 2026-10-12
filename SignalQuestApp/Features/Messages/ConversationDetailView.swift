@@ -257,7 +257,7 @@ struct ConversationDetailView: View {
                                 .onAppear { Task { await loadOlder() } }
                         }
                         if isLoadingOlder {
-                            ProgressView()
+                            SQSpinner()
                                 .tint(SQColor.brandRed)
                                 .padding(.vertical, SQSpace.sm)
                         }
@@ -348,7 +348,7 @@ struct ConversationDetailView: View {
                             if let last = messages.last { withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) } }
                         } label: {
                             Label("Nouveaux messages", systemImage: "arrow.down")
-                                .font(SQFont.body(13, .semibold))
+                                .font(SQType.subhead(.semibold))
                                 .foregroundStyle(SQColor.onAccent)
                                 .padding(.horizontal, SQSpace.md)
                                 .padding(.vertical, SQSpace.sm)
@@ -742,7 +742,7 @@ struct ConversationDetailView: View {
                         // Deux lignes, puis réduction : en très grand texte, le nom
                         // était coupé.
                         Text(conversationTitle)
-                            .font(SQFont.body(16, .semibold))
+                            .font(SQType.rowTitle)
                             .foregroundStyle(SQColor.label)
                             .lineLimit(2)
                             .minimumScaleFactor(0.6)
@@ -756,7 +756,7 @@ struct ConversationDetailView: View {
                         HStack(spacing: 4) {
                             if otherIsOnline {
                                 Text("en ligne")
-                                    .font(SQFont.body(12))
+                                    .font(SQType.micro(.regular))
                                     .foregroundStyle(SQColor.success)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.6)
@@ -769,7 +769,7 @@ struct ConversationDetailView: View {
                                 // appartient au bouton, puis est rendue à la mise en page.
                                 Button { showEncryptionInfo = true } label: {
                                     Label("Chiffrée · texte seulement", systemImage: "lock.fill")
-                                        .font(SQFont.body(12))
+                                        .font(SQType.micro(.regular))
                                         .foregroundStyle(SQColor.labelSecondary)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.6)
@@ -981,7 +981,7 @@ struct ConversationDetailView: View {
                 Text(text)
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .sqSingleLine()
             }
             Spacer()
             Button { onClose() } label: {
@@ -1096,7 +1096,7 @@ struct ConversationDetailView: View {
                 }
                 if message.editedAt != nil { Text("modifié") }
             }
-            .font(SQFont.body(12, relativeTo: .caption2))
+            .font(SQType.micro(.regular))
             .foregroundStyle(SQColor.labelSecondary)
             .accessibilityIdentifier("message.time")
         }
@@ -1211,7 +1211,7 @@ struct ConversationDetailView: View {
                 HStack(spacing: SQSpace.xs) {
                     if let created = message.createdAt {
                         Text(created, format: .dateTime.hour().minute())
-                            .font(SQFont.body(12, relativeTo: .caption2))
+                            .font(SQType.micro(.regular))
                             .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                             .accessibilityIdentifier("message.time")
                     }
@@ -1223,7 +1223,7 @@ struct ConversationDetailView: View {
                     }
                     if message.editedAt != nil && message.deletedAt == nil {
                         Text("modifié")
-                            .font(SQFont.body(12, relativeTo: .caption2))
+                            .font(SQType.micro(.regular))
                             .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                             .accessibilityIdentifier("message.time.edited")
                     }
@@ -1280,7 +1280,7 @@ struct ConversationDetailView: View {
                                 .font(.system(size: 13))
                             if reaction.count > 1 {
                                 Text("\(reaction.count)")
-                                    .font(SQFont.body(12, .semibold))
+                                    .font(SQType.micro)
                                     .foregroundStyle(reaction.mine ? SQColor.brandRed : SQColor.labelSecondary)
                             }
                         }
@@ -1321,7 +1321,7 @@ struct ConversationDetailView: View {
     @ViewBuilder
     private func sendStatusIndicator(for message: MessageItem) -> some View {
         if sendStatus[message.id] == .sending {
-            ProgressView()
+            SQSpinner()
                 .controlSize(.mini)
                 .tint(SQColor.onAccent.opacity(0.8))
                 .accessibilityLabel("Envoi en cours")
@@ -1685,7 +1685,7 @@ struct ConversationDetailView: View {
                         .accessibilityLabel("Message éphémère")
                 }
                 Text(created, format: .dateTime.hour().minute())
-                    .font(SQFont.body(12, .medium, relativeTo: .caption2))
+                    .font(SQType.micro(.medium))
             }
             .foregroundStyle(Color.white.opacity(0.95))
             .padding(.horizontal, SQSpace.sm)
@@ -1708,7 +1708,7 @@ struct ConversationDetailView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(attachment.fileName ?? String(localized: "Pièce jointe"))
-                        .font(SQFont.body(13, .semibold))
+                        .font(SQType.subhead(.semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(1)
                             .truncationMode(.middle)
@@ -1770,7 +1770,7 @@ struct ConversationDetailView: View {
                         Text(pinnedSnippet(pinned))
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.label)
-                            .lineLimit(1)
+                            .sqSingleLine()
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -3466,7 +3466,7 @@ private struct LiveShareSessionCard: View {
                                          ? SQColor.success : SQColor.labelSecondary)
                 }
                 Spacer()
-                if coordinator.isBusy { ProgressView().controlSize(.small) }
+                if coordinator.isBusy { SQSpinner().controlSize(.small) }
             }
 
             if let message = session.message, !message.isEmpty {

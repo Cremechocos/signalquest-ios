@@ -119,7 +119,7 @@ struct RadioLogIdentifySheet: View {
                     }
                 } label: {
                     if picker.isSubmitting {
-                        ProgressView()
+                        SQSpinner()
                     } else {
                         Text("Identifier")
                     }
@@ -277,7 +277,7 @@ struct RadioLogIdentifySheet: View {
     private var candidateList: some View {
         if picker.isLoading {
             HStack(spacing: SQSpace.sm) {
-                ProgressView()
+                SQSpinner()
                 Text("Recherche des antennes voisines…")
                     .font(SQType.caption)
                     .foregroundStyle(P.muted)
@@ -335,7 +335,7 @@ struct RadioLogCandidateRow: View {
                         Text("Site \(candidate.siteId)")
                             .font(.sqTechnical(13, .semibold))
                             .foregroundStyle(P.ink)
-                            .lineLimit(1)
+                            .sqSingleLine()
                         if candidate.isServerHypothesis {
                             Text("Proposé")
                                 .font(SQFont.body(M.techSize, .heavy))
@@ -359,7 +359,7 @@ struct RadioLogCandidateRow: View {
                             .font(SQFont.body(M.siteMetaSize))
                             .monospacedDigit()
                             .foregroundStyle(P.muted)
-                            .lineLimit(1)
+                            .sqSingleLine()
                     }
                 }
                 Spacer(minLength: 0)

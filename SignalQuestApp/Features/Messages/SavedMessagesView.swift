@@ -19,7 +19,7 @@ struct SavedMessagesView: View {
         NavigationStack {
             Group {
                 if isLoading && entries.isEmpty {
-                    ProgressView()
+                    SQSpinner()
                         .tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let errorMessage, entries.isEmpty {
@@ -75,7 +75,7 @@ struct SavedMessagesView: View {
                     Text(conversationLabel(entry))
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(1)
+                        .sqSingleLine()
                 }
                 Text(snippet(message))
                     .font(SQType.body)

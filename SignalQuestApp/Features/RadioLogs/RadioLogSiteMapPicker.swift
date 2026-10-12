@@ -455,7 +455,7 @@ struct RadioLogSiteMapPicker: View {
                     .foregroundStyle(P.ink)
                 RadioLogTechBadge(label: site.techLabel)
                 Spacer(minLength: 0)
-                if isLoading { ProgressView().controlSize(.small) }
+                if isLoading { SQSpinner().controlSize(.small) }
             }
 
             if let selected {

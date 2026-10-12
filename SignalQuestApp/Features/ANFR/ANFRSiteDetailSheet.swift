@@ -154,7 +154,7 @@ struct ANFRSiteDetailSheet: View {
 
             if model.isLoading {
                 HStack(spacing: SQSpace.sm) {
-                    ProgressView().tint(SQColor.brandRed)
+                    SQSpinner().tint(SQColor.brandRed)
                     Text("Chargement de l'historique…")
                         .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)

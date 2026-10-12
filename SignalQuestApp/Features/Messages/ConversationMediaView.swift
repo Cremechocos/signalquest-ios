@@ -22,7 +22,7 @@ struct ConversationMediaView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
                 if isLoading && messages.isEmpty {
-                    ProgressView()
+                    SQSpinner()
                         .frame(maxWidth: .infinity, minHeight: 200)
                 } else if let errorMessage, messages.isEmpty {
                     ErrorStateView(title: "Médias indisponibles", message: errorMessage) {
@@ -146,7 +146,7 @@ struct ConversationMediaView: View {
                 SQIconPastille(systemImage: "doc.fill", size: 36, tint: SQColor.accentInk, font: .system(size: 15, weight: .semibold))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(entry.attachment.fileName ?? String(localized: "Pièce jointe"))
-                        .font(SQFont.body(14, .semibold))
+                        .font(SQType.callout(.semibold))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
                         .truncationMode(.middle)

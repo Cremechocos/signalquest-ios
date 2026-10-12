@@ -108,7 +108,7 @@ struct MyMeasurementsView: View {
                     .ignoresSafeArea(edges: .bottom)
             }
             if model.isLoading {
-                ProgressView().controlSize(.large).tint(SQColor.brandRed)
+                SQSpinner().controlSize(.large).tint(SQColor.brandRed)
             }
         }
         .navigationTitle(mapTitle)

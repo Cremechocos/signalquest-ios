@@ -28,7 +28,7 @@ struct MobileChallengeSheet: View {
             MobileChallengeWebView(attempt: attempt, onCompletion: onCompletion, onLoaded: { isLoading = false })
                 .overlay {
                     if isLoading {
-                        ProgressView()
+                        SQSpinner()
                             .allowsHitTesting(false)
                             .accessibilityIdentifier("auth.challenge.loading")
                     }

@@ -77,7 +77,7 @@ struct ReportSheet: View {
                     } label: {
                         HStack {
                             if isBusy {
-                                ProgressView().tint(SQColor.dangerInk)
+                                SQSpinner().tint(SQColor.dangerInk)
                             } else {
                                 Text("Envoyer le signalement")
                                     .font(SQType.button)

@@ -14,7 +14,7 @@ struct FeedPollView: View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             if let question = poll.question, !question.isEmpty {
                 Text(verbatim: question)
-                    .font(SQFont.body(15, .semibold))
+                    .font(SQType.body(.semibold))
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -68,14 +68,14 @@ struct FeedPollView: View {
                             .accessibilityHidden(true)
                     }
                     Text(verbatim: option.label)
-                        .font(SQFont.body(14, option.votedByMe ? .semibold : .regular))
+                        .font(SQType.callout(option.votedByMe ? .semibold : .regular))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: SQSpace.sm)
                     if revealed {
                         Text(share.formatted(.percent.precision(.fractionLength(0))))
-                            .font(SQFont.body(13, .semibold))
+                            .font(SQType.subhead(.semibold))
                             .foregroundStyle(SQColor.labelSecondary)
                             .monospacedDigit()
                     }

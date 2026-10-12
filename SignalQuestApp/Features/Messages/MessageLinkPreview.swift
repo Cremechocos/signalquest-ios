@@ -90,15 +90,15 @@ struct MessageLinkPreview: View {
     private func card(title: String, source: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(verbatim: title)
-                .font(SQFont.body(13.5, .semibold))
+                .font(SQType.subhead(.semibold))
                 .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             if !source.isEmpty {
                 Text(verbatim: source)
-                    .font(SQFont.body(12))
+                    .font(SQType.micro(.regular))
                     .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .sqSingleLine()
             }
         }
         .padding(.horizontal, 10)

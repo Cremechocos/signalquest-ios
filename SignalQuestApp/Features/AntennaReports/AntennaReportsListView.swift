@@ -52,7 +52,7 @@ struct AntennaReportsListView: View {
                 }
             } else if !model.hasLoaded, model.reports.isEmpty {
                 Section {
-                    ProgressView()
+                    SQSpinner()
                         .tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, SQSpace.xl)

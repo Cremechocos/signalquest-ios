@@ -81,7 +81,7 @@ struct TerritoriesView: View {
         }
         .overlay(alignment: .top) {
             if model.isLoading {
-                ProgressView()
+                SQSpinner()
                     .tint(SQColor.brandRed)
                     .padding(SQSpace.md)
                     .background(SQColor.surfaceGlass, in: Capsule())

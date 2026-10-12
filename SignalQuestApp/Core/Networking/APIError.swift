@@ -189,7 +189,7 @@ extension Error {
         if let url = self as? URLError {
             switch url.code {
             case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff:
-                return String(localized: "Pas de connexion Internet. Vérifie ton réseau puis réessaie.")
+                return SQOfflineText.message
             case .timedOut:
                 return String(localized: "Le serveur met trop de temps à répondre. Réessaie.")
             default:
@@ -211,4 +211,10 @@ extension Error {
         }
         return String(localized: "Une erreur inattendue est survenue. Réessaie.")
     }
+}
+
+/// Texte unique d'une panne de connexion : `ErrorStateView` le reconnaît pour
+/// présenter l'état hors ligne plutôt qu'une erreur (TRX-10).
+enum SQOfflineText {
+    static var message: String { String(localized: "Pas de connexion Internet. Vérifie ton réseau puis réessaie.") }
 }

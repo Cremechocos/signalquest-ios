@@ -209,7 +209,7 @@ struct AntennaDetailSheet: View {
                             }
                         }
                     } else {
-                        ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
+                        SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     }
                     siteActions
                     reportCard
@@ -364,7 +364,7 @@ struct AntennaDetailSheet: View {
             PhotosPicker(selection: $photoPickerItem, matching: .images) {
                 HStack(spacing: SQSpace.sm) {
                     if uploading {
-                        ProgressView().tint(SQColor.onAccent)
+                        SQSpinner().tint(SQColor.onAccent)
                     } else {
                         Image(systemName: "camera.fill").font(.system(size: 15, weight: .semibold))
                     }
@@ -1612,7 +1612,7 @@ private struct AntennaPhotoViewer: View {
             TabView(selection: $selection) {
                 ForEach(photos) { photo in
                     RemoteImage(url: photo.imageUrl ?? photo.thumbnailUrl, maxDimension: 1400, contentMode: .fit, showsFailureUI: true) {
-                        ProgressView()
+                        SQSpinner()
                             .tint(.white)
                     }
                     .tag(photo.id)

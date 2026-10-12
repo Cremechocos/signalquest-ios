@@ -32,7 +32,7 @@ struct FeedPreferencesView: View {
                         .foregroundStyle(SQColor.dangerInk)
                     if loadFailed {
                         Button("Réessayer") { Task { await load() } }
-                            .font(SQFont.body(13, .semibold))
+                            .font(SQType.subhead(.semibold))
                             .foregroundStyle(SQColor.accentInk)
                             .frame(minHeight: 44)
                             .disabled(isLoading)
@@ -51,7 +51,7 @@ struct FeedPreferencesView: View {
                             Text(follow.displayTag)
                             Spacer()
                             Button("Ne plus suivre") { unfollow(follow.hashtag) }
-                                .font(SQFont.body(13, .medium))
+                                .font(SQType.subhead)
                                 .foregroundStyle(SQColor.accentInk)
                         }
                     }
@@ -70,7 +70,7 @@ struct FeedPreferencesView: View {
                         Text(muted.displayTag)
                         Spacer()
                         Button("Retirer") { unmuteHashtag(muted.hashtag) }
-                            .font(SQFont.body(13, .medium))
+                            .font(SQType.subhead)
                             .foregroundStyle(SQColor.accentInk)
                     }
                 }
@@ -88,7 +88,7 @@ struct FeedPreferencesView: View {
                         Text(muted.pattern)
                         Spacer()
                         Button("Retirer") { unmuteWord(muted.pattern) }
-                            .font(SQFont.body(13, .medium))
+                            .font(SQType.subhead)
                             .foregroundStyle(SQColor.accentInk)
                     }
                 }
@@ -112,7 +112,7 @@ struct FeedPreferencesView: View {
                             Button("Afficher de nouveau") {
                                 HiddenStoryAuthorsStore.unhide(authorId: entry.authorId)
                             }
-                            .font(SQFont.body(13, .medium))
+                            .font(SQType.subhead)
                             .foregroundStyle(SQColor.accentInk)
                         }
                     }
@@ -129,7 +129,7 @@ struct FeedPreferencesView: View {
         .navigationTitle("Préférences du fil")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
-            if isLoading { ProgressView().tint(SQColor.brandRed) }
+            if isLoading { SQSpinner().tint(SQColor.brandRed) }
         }
         .task { await load() }
         .onDisappear { if didChange { didChange = false; onChange() } }
@@ -146,7 +146,7 @@ struct FeedPreferencesView: View {
                 .submitLabel(.done)
                 .onSubmit(action)
             Button("Ajouter", action: action)
-                .font(SQFont.body(13, .semibold))
+                .font(SQType.subhead(.semibold))
                 .foregroundStyle(SQColor.accentInk)
                 .disabled(text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty)
         }

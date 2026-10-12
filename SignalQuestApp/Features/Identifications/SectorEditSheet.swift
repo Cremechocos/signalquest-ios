@@ -132,7 +132,7 @@ struct SectorEditSheet: View {
                         .frame(maxWidth: .infinity)
 
                     if model.isLoading {
-                        ProgressView().tint(SQColor.brandRed).frame(height: 260)
+                        SQSpinner().tint(SQColor.brandRed).frame(height: 260)
                     } else if model.azimuths.isEmpty {
                         EmptyStateView(
                             title: "Aucun secteur",

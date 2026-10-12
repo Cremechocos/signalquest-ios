@@ -265,8 +265,8 @@ struct ANFRMapView: View {
                         .foregroundStyle(SQColor.label)
                     if activeFilterCount > 0 {
                         Text("\(activeFilterCount)")
-                            .font(SQFont.body(10, .semibold))
-                            .frame(minWidth: 17, minHeight: 17)
+                            .font(SQType.micro)
+                            .frame(minWidth: 20, minHeight: 20)
                             .background(SQColor.brandRed, in: Circle())
                             .foregroundStyle(SQColor.onAccent)
                             .offset(x: 5, y: -5)
@@ -303,7 +303,7 @@ struct ANFRMapView: View {
 
     private var loadingPill: some View {
         HStack(spacing: SQSpace.sm) {
-            ProgressView().tint(SQColor.brandRed)
+            SQSpinner().tint(SQColor.brandRed)
             Text("Chargement des sites ANFR…")
                 .font(SQFont.body(13, .semibold))
                 .foregroundStyle(SQColor.label)

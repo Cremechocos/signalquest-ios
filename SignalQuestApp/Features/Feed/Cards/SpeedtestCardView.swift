@@ -53,7 +53,7 @@ struct SpeedtestCardView: View {
 
                 if let footer = footer {
                     Text(footer)
-                        .font(SQFont.body(12.5, relativeTo: .footnote))
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
                 }

@@ -419,7 +419,7 @@ struct AntennaSightCard: View {
     private var terrainPreview: some View {
         if model.isLoading {
             HStack(spacing: SQSpace.sm) {
-                ProgressView().tint(tint)
+                SQSpinner().tint(tint)
                 Text("Lecture du relief…")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

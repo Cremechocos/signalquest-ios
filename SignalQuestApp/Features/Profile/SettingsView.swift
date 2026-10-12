@@ -486,7 +486,7 @@ struct E2EEV2ActivationScreen: View {
             // Inventaire pas encore lu, ou en échec : sans lui, impossible de
             // savoir si ce compte a déjà un appareil chiffré.
             if model.isLoading {
-                ProgressView()
+                SQSpinner()
                     .tint(SQColor.brandRed)
                     .frame(maxWidth: .infinity)
             } else {
@@ -2148,7 +2148,7 @@ struct SettingsView: View {
                     HStack(spacing: SQSpace.sm) {
                         settingsLabel("Double authentification", systemImage: "lock.shield")
                         Spacer(minLength: 0)
-                        ProgressView()
+                        SQSpinner()
                             .accessibilityLabel(Text("Vérification de la double authentification"))
                     }
                     .task { await session.refreshUser() }
@@ -2412,7 +2412,7 @@ struct SettingsView: View {
                         settingsLabel("Télécharger mes données (RGPD)", systemImage: "square.and.arrow.down")
                         if model.isExporting {
                             Spacer()
-                            ProgressView().tint(SQColor.brandRed)
+                            SQSpinner().tint(SQColor.brandRed)
                         }
                     }
                 }
@@ -2744,7 +2744,7 @@ private struct DeleteAccountSheet: View {
 
                     if model.isDeletionPreviewLoading && model.deletionPreview == nil {
                         HStack(spacing: SQSpace.sm) {
-                            ProgressView().tint(SQColor.brandRed)
+                            SQSpinner().tint(SQColor.brandRed)
                             Text("Vérification des données concernées…")
                                 .foregroundStyle(SQColor.labelSecondary)
                         }

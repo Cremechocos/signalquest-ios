@@ -183,7 +183,7 @@ struct CreateSiteFromCellsView: View {
             Task { await submit() }
         } label: {
             HStack(spacing: SQSpace.sm) {
-                if isSubmitting { ProgressView().tint(SQColor.labelSecondary) }
+                if isSubmitting { SQSpinner().tint(SQColor.labelSecondary) }
                 Text(isSubmitting ? "Création…" : isQueued ? "En attente d'envoi" : "Créer le site")
                     .font(SQFont.body(15, .semibold))
             }

@@ -193,7 +193,7 @@ struct SentinelleBoxView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         } else {
-            ProgressView()
+            SQSpinner()
                 .tint(SQColor.brandRed)
                 .frame(maxWidth: .infinity, minHeight: 150)
         }
@@ -317,7 +317,7 @@ struct SentinelleBoxView: View {
                         Text(SentinelleWording.addressStateLabel(state, familyPoints.addressMetrics))
                             .font(SQType.caption)
                             .foregroundStyle(state == .down ? SQColor.dangerInk : SQColor.labelSecondary)
-                            .lineLimit(1)
+                            .sqSingleLine()
                     }
                     Text(address.address)
                         .font(.system(.caption, design: .monospaced, weight: .medium))

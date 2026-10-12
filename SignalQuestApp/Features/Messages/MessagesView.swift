@@ -552,7 +552,7 @@ struct MessagesView: View {
             .accessibilityLabel("Retour")
 
             Text("Messages")
-                .font(SQFont.display(24, .bold))
+                .font(SQType.title)
                 .foregroundStyle(SQColor.label)
 
             Spacer(minLength: SQSpace.sm)
@@ -610,9 +610,9 @@ struct MessagesView: View {
     private func draftPreview(_ draft: String) -> some View {
         (Text("Brouillon").foregroundColor(SQColor.accentInk)
             + Text(verbatim: " · " + draft.replacingOccurrences(of: "\n", with: " ")))
-            .font(SQFont.body(13.5))
+            .font(SQType.subhead(.regular))
             .foregroundStyle(SQColor.labelSecondary)
-            .lineLimit(1)
+            .sqSingleLine()
             .accessibilityIdentifier("messages.row.draft")
     }
 
@@ -653,9 +653,9 @@ struct MessagesView: View {
             VStack(alignment: .leading, spacing: SQSpace.xxs) {
                 HStack(spacing: 5) {
                     Text(title.isEmpty ? String(localized: "Conversation") : title)
-                        .font(SQFont.body(16, .semibold))
+                        .font(SQType.rowTitle)
                         .foregroundStyle(SQColor.label)
-                        .lineLimit(1)
+                        .sqSingleLine()
                         .accessibilityIdentifier("messages.row.title")
                     // Badges de l'interlocuteur, comme dans le fil.
                     SQUserBadges(badges: conversation.otherParticipantBadges(excluding: currentUserId), size: 12)
@@ -671,9 +671,9 @@ struct MessagesView: View {
                         draftPreview(draft)
                     } else {
                         Text(lastMessagePreview(conversation))
-                            .font(unread ? SQFont.body(13.5, .medium) : SQFont.body(13.5))
+                            .font(unread ? SQType.subhead : SQType.subhead(.regular))
                             .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
-                            .lineLimit(1)
+                            .sqSingleLine()
                             .accessibilityIdentifier("messages.row.preview")
                     }
                 }
@@ -698,7 +698,7 @@ struct MessagesView: View {
                     if let date = conversation.listDate {
                         // `accentInk` : la brique n'est garantie que pour le grand texte.
                         Text(verbatim: ConversationListDate.label(for: date))
-                            .font(SQFont.body(12, .medium))
+                            .font(SQType.micro(.medium))
                             .foregroundStyle(unread ? SQColor.accentInk : SQColor.labelSecondary)
                             .accessibilityIdentifier("messages.row.date")
                     }
@@ -1163,7 +1163,7 @@ struct UserSearchStatusRow: View {
     var body: some View {
         if isSearching {
             HStack(spacing: SQSpace.sm) {
-                ProgressView().tint(SQColor.brandRed)
+                SQSpinner().tint(SQColor.brandRed)
                 Text("Recherche en cours")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

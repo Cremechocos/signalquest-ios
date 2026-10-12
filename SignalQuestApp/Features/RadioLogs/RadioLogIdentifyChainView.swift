@@ -208,7 +208,7 @@ struct RadioLogIdentifyChainView: View {
             noticeBanner(blocking, tint: SQColor.warning, soft: SQColor.warningSoft)
         } else if picker.isLoading {
             HStack(spacing: SQSpace.sm) {
-                ProgressView()
+                SQSpinner()
                 Text("Recherche des antennes voisines…")
                     .font(SQType.caption)
                     .foregroundStyle(P.muted)

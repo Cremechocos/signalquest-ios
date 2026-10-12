@@ -50,7 +50,7 @@ struct MessageImageViewer: View {
                     cacheScope: .privateAccount(target.accountSession),
                     showsFailureUI: true
                 ) {
-                    ProgressView()
+                    SQSpinner()
                         .tint(.white)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }

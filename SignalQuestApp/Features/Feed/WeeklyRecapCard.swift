@@ -26,10 +26,10 @@ struct WeeklyRecapCard: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Ma semaine")
-                .font(SQFont.display(26, .bold))
+                .font(SQType.display)
                 .foregroundStyle(forExport ? SQColor.onAccent : SQColor.label)
             Text(weekRange)
-                .font(SQFont.body(13))
+                .font(SQType.subhead(.regular))
                 .foregroundStyle(forExport ? SQColor.onAccent : SQColor.labelSecondary)
         }
     }
@@ -68,14 +68,14 @@ struct WeeklyRecapCard: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
                 Text(value)
-                    .font(SQFont.display(52, .bold))
+                    .font(SQType.metricLarge)
                     .monospacedDigit()
                 Text(LocalizedStringKey(unit))
                     .font(SQFont.display(20, .semibold))
             }
             .foregroundStyle(forExport ? SQColor.onAccent : SQColor.brandRed)
             Text(LocalizedStringKey(caption))
-                .font(SQFont.body(14))
+                .font(SQType.callout)
                 .foregroundStyle(forExport ? SQColor.onAccent : SQColor.labelSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -96,11 +96,11 @@ struct WeeklyRecapCard: View {
             ForEach(tiles, id: \.1) { value, label in
                 VStack(alignment: .leading, spacing: 1) {
                     Text(value)
-                        .font(SQFont.display(20, .bold))
+                        .font(SQType.metricSmall)
                         .monospacedDigit()
                         .foregroundStyle(forExport ? SQColor.onAccent : SQColor.label)
                     Text(LocalizedStringKey(label))
-                        .font(SQFont.body(12))
+                        .font(SQType.micro(.regular))
                         .foregroundStyle(forExport ? SQColor.onAccent : SQColor.labelSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -124,7 +124,7 @@ struct WeeklyRecapCard: View {
                 .font(SQFont.archivo(13, .bold))
             Spacer()
             Text("signalquest.fr")
-                .font(SQFont.body(12))
+                .font(SQType.micro(.regular))
         }
         .foregroundStyle(SQColor.onAccent)
     }

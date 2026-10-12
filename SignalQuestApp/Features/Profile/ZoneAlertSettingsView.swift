@@ -100,7 +100,7 @@ struct ZoneAlertSettingsView: View {
             if let settings = model.settings {
                 content(settings)
             } else if model.isLoading {
-                ProgressView()
+                SQSpinner()
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
             }

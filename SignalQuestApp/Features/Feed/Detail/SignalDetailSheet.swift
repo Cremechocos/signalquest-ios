@@ -191,7 +191,7 @@ struct SignalDetailSheet: View {
                 Text("·").accessibilityHidden(true)
             }
             Text(date, format: .dateTime.day().month(.abbreviated).hour().minute())
-                .lineLimit(1)
+                .sqSingleLine()
         }
     }
 

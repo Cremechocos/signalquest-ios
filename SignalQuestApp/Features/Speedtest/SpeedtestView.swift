@@ -424,7 +424,7 @@ struct SpeedtestView: View {
             Label("Drive Test", systemImage: "location.north.line.fill")
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.label)
-                .lineLimit(1)
+                .sqSingleLine()
                 .fixedSize()
                 .accessibilityIdentifier("speedtest.driveTest.label")
                 .padding(.horizontal, SQSpace.md)

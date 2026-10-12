@@ -103,7 +103,7 @@ struct E2EEV2AccountKeyView: View {
             Group {
                 switch model.state {
                 case .loading:
-                    ProgressView()
+                    SQSpinner()
                         .frame(maxWidth: .infinity, minHeight: 240)
                         .accessibilityLabel(Text("Chargement de la clé de ton compte"))
                 case .failed(let message):
@@ -234,7 +234,7 @@ struct E2EEV2AccountKeyContent: View {
                         Text(verbatim: group)
                             .font(SQFont.display(22, .semibold, relativeTo: .title3).monospacedDigit())
                             .foregroundStyle(SQColor.label)
-                            .lineLimit(1)
+                            .sqSingleLine()
                             .fixedSize()
                     }
                 }

@@ -139,7 +139,7 @@ struct FavoriteAntennasView: View {
 
     @ViewBuilder
     private var notifyUnavailableState: some View {
-        if favorites.isLoading { ProgressView() }
+        if favorites.isLoading { SQSpinner() }
         else { Text("Indisponible").foregroundStyle(SQColor.labelSecondary) }
     }
 

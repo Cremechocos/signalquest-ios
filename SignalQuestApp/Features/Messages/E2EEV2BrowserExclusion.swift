@@ -61,7 +61,7 @@ struct E2EEV2BrowserExclusionRow: View {
                         .font(SQType.body)
                         .foregroundStyle(SQColor.label)
                     if model.isSaving {
-                        ProgressView()
+                        SQSpinner()
                             .controlSize(.small)
                     }
                 }

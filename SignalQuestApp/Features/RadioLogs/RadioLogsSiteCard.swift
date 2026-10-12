@@ -28,7 +28,7 @@ struct RadioLogPill: View {
         Text(label)
             .font(.sqTechnical(M.pillSize))
             .foregroundStyle(P.chipInk)
-            .lineLimit(1)
+            .sqSingleLine()
             .padding(.horizontal, M.pillPaddingH)
             .padding(.vertical, M.pillPaddingV)
             .background(P.chip, in: RoundedRectangle(cornerRadius: M.pillRadius, style: .continuous))
@@ -99,7 +99,7 @@ struct RadioLogActionButton: View {
         Button(action: action) {
             Text(label)
                 .font(SQFont.body(M.buttonSize, .bold))
-                .lineLimit(1)
+                .sqSingleLine()
                 .foregroundStyle(ghost ? P.ink : P.onAccent)
                 .padding(.horizontal, M.buttonPaddingH)
                 .padding(.vertical, M.buttonPaddingV)
@@ -129,7 +129,7 @@ struct RadioLogCellPciTag: View {
             .font(.sqTechnical(M.cellPciSize, .bold))
             .foregroundStyle(P.accentInk)
             .multilineTextAlignment(.center)
-            .lineLimit(1)
+            .sqSingleLine()
             .frame(minWidth: M.cellPciMinWidth)
             .padding(.horizontal, M.cellPciPaddingH)
             .padding(.vertical, M.cellPciPaddingV)
@@ -184,15 +184,15 @@ struct RadioLogOperatorHeader: View {
             Text(operatorName)
                 .font(SQFont.body(M.operatorHeaderSize, .bold))
                 .foregroundStyle(P.muted)
-                .lineLimit(1)
+                .sqSingleLine()
             Text(String(localized: "\(siteCount) site"))
                 .font(SQFont.body(M.operatorHeaderStrongSize, .bold))
                 .foregroundStyle(P.ink)
-                .lineLimit(1)
+                .sqSingleLine()
             Text(String(localized: "\(logCount) relevé"))
                 .font(SQFont.body(M.operatorHeaderSize, .bold))
                 .foregroundStyle(P.muted)
-                .lineLimit(1)
+                .sqSingleLine()
             Spacer(minLength: 0)
         }
         .monospacedDigit()
@@ -241,7 +241,7 @@ struct RadioLogSiteCard: View {
                     Text("Site \(identifiedSiteId)")
                         .font(.sqTechnical(M.siteMetaSize, .semibold))
                         .foregroundStyle(P.muted)
-                        .lineLimit(1)
+                        .sqSingleLine()
                         .padding(.top, siteName == nil ? M.siteNameTop : 1)
                 }
                 Text(metaLine)
@@ -298,7 +298,7 @@ struct RadioLogSiteCard: View {
                 .font(.sqTechnical(M.siteIdSize, .semibold))
                 .tracking(M.siteIdTracking)
                 .foregroundStyle(P.ink)
-                .lineLimit(1)
+                .sqSingleLine()
             RadioLogTechBadge(label: site.techLabel)
             Spacer(minLength: 0)
         }
@@ -325,7 +325,7 @@ struct RadioLogSiteCard: View {
         Text(cell.identityLabel ?? "—")
             .font(.sqTechnical(M.cellIdSize))
             .foregroundStyle(P.ink)
-            .lineLimit(1)
+            .sqSingleLine()
     }
 
     private func cellBand(_ label: String) -> some View {
@@ -333,7 +333,7 @@ struct RadioLogSiteCard: View {
             .font(SQFont.body(M.cellBandSize))
             .monospacedDigit()
             .foregroundStyle(P.muted)
-            .lineLimit(1)
+            .sqSingleLine()
     }
 
     private var cellsPanel: some View {

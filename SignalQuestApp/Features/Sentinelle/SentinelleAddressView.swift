@@ -206,7 +206,7 @@ struct SentinelleAddressView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 } else if !seriesLoad.failed {
-                    ProgressView()
+                    SQSpinner()
                         .tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity, minHeight: 120)
                 }
@@ -579,7 +579,7 @@ struct SentinelleAddressView: View {
     // MARK: États partagés
 
     private var loading: some View {
-        ProgressView()
+        SQSpinner()
             .tint(SQColor.brandRed)
             .frame(maxWidth: .infinity, minHeight: 60)
     }

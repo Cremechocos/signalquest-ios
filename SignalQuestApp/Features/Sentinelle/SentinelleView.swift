@@ -596,7 +596,7 @@ struct SentinelleView: View {
 
     private var loadingState: some View {
         VStack(spacing: SQSpace.lg) {
-            ProgressView().tint(SQColor.brandRed)
+            SQSpinner().tint(SQColor.brandRed)
             Text("Lecture de la surveillance…")
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
@@ -683,7 +683,7 @@ struct SentinelleBoxCard: View {
                             Text(owner)
                                 .font(SQFont.body(12))
                                 .foregroundStyle(SQColor.labelSecondary)
-                                .lineLimit(1)
+                                .sqSingleLine()
                         }
                     }
                     Spacer(minLength: SQSpace.sm)

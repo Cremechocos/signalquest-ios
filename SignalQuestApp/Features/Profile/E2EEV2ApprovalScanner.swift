@@ -24,7 +24,7 @@ struct E2EEV2ApprovalScannerView: View {
             Group {
                 switch access {
                 case .checking:
-                    ProgressView()
+                    SQSpinner()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .granted:
                     E2EEV2QRCameraView(

@@ -299,7 +299,7 @@ struct PrivacySettingsView: View {
             .accessibilityHint("Modifier cette zone")
             .accessibilityIdentifier("privacy.zone.row.\(zone.id)")
             if model.zoneBusyId == zone.id {
-                ProgressView()
+                SQSpinner()
             } else {
                 Toggle("", isOn: Binding(
                     get: { zone.isActive && zone.hideSpeedtestsOnMap },
@@ -399,7 +399,7 @@ private struct PresencePreferenceControls: View {
             } label: {
                 HStack {
                     Text("Réessayer")
-                    if isRetrying { ProgressView() }
+                    if isRetrying { SQSpinner() }
                 }
             }
             .disabled(isRetrying)

@@ -36,13 +36,13 @@ struct RemoteVoiceNoteBubble: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(mine ? SQColor.brandRed : SQColor.onAccent)
                 } else {
-                    ProgressView()
+                    SQSpinner()
                         .controlSize(.small)
                         .tint(mine ? SQColor.brandRed : SQColor.onAccent)
                 }
             }
             Text(failed ? "Note vocale indisponible" : "Note vocale")
-                .font(SQFont.body(13, .semibold))
+                .font(SQType.subhead(.semibold))
                 .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
         }
         .frame(minWidth: 180, minHeight: 44, alignment: .leading)

@@ -268,7 +268,7 @@ struct CommunityOutagesListView: View {
                     if model.isLoadingMore {
                         HStack {
                             Spacer()
-                            ProgressView()
+                            SQSpinner()
                             Spacer()
                         }
                         .listRowBackground(Color.clear)
@@ -287,7 +287,7 @@ struct CommunityOutagesListView: View {
         .onDisappear { model.stop() }
         .refreshable { await model.reload() }
         .overlay {
-            if model.isLoading && model.outages.isEmpty { ProgressView() }
+            if model.isLoading && model.outages.isEmpty { SQSpinner() }
         }
         // `alert` et non `confirmationDialog`, contrairement au retrait d'une identification :
         // fermer une panne est irréversible ET collectif, donc les deux issues doivent être
@@ -377,7 +377,7 @@ struct CommunityOutagesListView: View {
                 Text(siteLabel(outage))
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
+                    .sqSingleLine()
                 if let address = secondaryAddress(outage) {
                     Text(address)
                         .font(SQType.caption)

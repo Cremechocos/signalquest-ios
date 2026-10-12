@@ -54,7 +54,7 @@ struct VoiceNoteRecordingBar: View {
                 .frame(height: 28)
 
             Text(VoiceNotePlayer.formatted(recorder.duration))
-                .font(SQFont.body(13, .semibold))
+                .font(SQType.subhead(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(SQColor.labelSecondary)
 
@@ -173,7 +173,7 @@ struct VoiceNoteBubble: View {
             .frame(height: 26)
 
             Text(VoiceNotePlayer.formatted(player.isPlaying(url) ? player.duration : duration))
-                .font(SQFont.body(12, .semibold))
+                .font(SQType.micro)
                 .monospacedDigit()
                 .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
         }

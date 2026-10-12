@@ -45,7 +45,7 @@ struct MessageSearchView: View {
     @ViewBuilder
     private var content: some View {
         if isSearching && results.isEmpty {
-            ProgressView().frame(maxWidth: .infinity).padding(.top, SQSpace.xxl)
+            SQSpinner().frame(maxWidth: .infinity).padding(.top, SQSpace.xxl)
             Spacer()
         } else if let errorMessage {
             ErrorStateView(title: "Recherche indisponible", message: errorMessage)

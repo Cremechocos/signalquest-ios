@@ -286,7 +286,7 @@ struct CallScreen: View {
             Text(remote.displayName)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white)
-                .lineLimit(1)
+                .sqSingleLine()
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
                 .background(.black.opacity(0.66), in: Capsule())
@@ -335,7 +335,7 @@ struct CallScreen: View {
     @ViewBuilder
     private var statusGlyph: some View {
         if isWaiting {
-            ProgressView()
+            SQSpinner()
                 .controlSize(.small)
                 .tint(SQColor.label)
                 .accessibilityHidden(true)
@@ -515,7 +515,7 @@ struct ActiveCallBanner: View {
                 HStack(spacing: SQSpace.sm) {
                     Image(systemName: call.hasVideo ? "video.fill" : "phone.fill")
                     Text(verbatim: call.handle)
-                        .lineLimit(1)
+                        .sqSingleLine()
                     if let joinedAt = liveKit.remoteJoinedAt {
                         Text(joinedAt, style: .timer)
                             .monospacedDigit()

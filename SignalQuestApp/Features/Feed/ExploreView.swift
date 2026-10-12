@@ -543,7 +543,7 @@ struct ExploreView: View {
                 SQSectionHeader("Utilisateurs")
             }
             if model.isSearching {
-                ProgressView()
+                SQSpinner()
                     .tint(SQColor.brandRed)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, SQSpace.lg)
@@ -723,7 +723,7 @@ struct ExploreView: View {
                         } label: {
                             HStack(spacing: SQSpace.xs2) {
                                 Text("#\(tag.tag)")
-                                    .font(SQFont.body(13, .semibold))
+                                    .font(SQType.subhead(.semibold))
                                 Text(SignalFormatters.count(tag.postCount))
                                     .font(SQType.micro)
                                     .opacity(0.8)
@@ -801,7 +801,7 @@ struct ExploreView: View {
                         }
                     }
                     if model.isLoadingMoreHashtag {
-                        ProgressView()
+                        SQSpinner()
                             .tint(SQColor.brandRed)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, SQSpace.md)
@@ -879,7 +879,7 @@ struct ExploreView: View {
                 model.toggleFollow(author)
             } label: {
                 Text(followed ? "Abonné" : "Suivre")
-                    .font(SQFont.body(13, .semibold))
+                    .font(SQType.subhead(.semibold))
                     .padding(.horizontal, SQSpace.md2)
                     .padding(.vertical, SQSpace.sm)
                     .background(

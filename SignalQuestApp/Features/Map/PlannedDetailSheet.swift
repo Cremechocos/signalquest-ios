@@ -74,7 +74,7 @@ struct PlannedDetailSheet: View {
                     Text(tech)
                         .font(SQFont.body(12, .semibold))
                         .foregroundStyle(techColor(tech))
-                        .lineLimit(1)
+                        .sqSingleLine()
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                         .background(techColor(tech).opacity(0.14), in: Capsule(style: .continuous))

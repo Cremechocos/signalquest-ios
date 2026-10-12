@@ -25,7 +25,7 @@ struct NearbyOperatorComparisonSheet: View {
         NavigationStack {
             ScrollView {
                 if !loaded {
-                    ProgressView()
+                    SQSpinner()
                         .frame(maxWidth: .infinity)
                         .padding(.top, SQSpace.xxl)
                 } else if loadFailed {

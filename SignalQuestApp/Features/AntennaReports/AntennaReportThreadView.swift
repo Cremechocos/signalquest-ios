@@ -215,7 +215,7 @@ struct AntennaReportThreadView: View {
     @ViewBuilder
     private var content: some View {
         if model.isLoading && model.comments.isEmpty {
-            ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity, maxHeight: .infinity)
+            SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
@@ -495,7 +495,7 @@ struct AntennaReportImageViewer: View {
         switch image {
         case .remote(let url):
             RemoteImage(url: url, maxDimension: 1600, contentMode: .fit, showsFailureUI: true) {
-                ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
+                SQSpinner().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         case .inline(let uiImage):
             Image(uiImage: uiImage).resizable().aspectRatio(contentMode: .fit)

@@ -240,10 +240,10 @@ struct MessageComposerBar: View {
                             SQAvatar(url: candidate.avatarUrl, name: candidate.displayName, size: 26)
                                 .accessibilityHidden(true)
                             Text(verbatim: candidate.displayName)
-                                .font(SQFont.body(13, .semibold))
+                                .font(SQType.subhead(.semibold))
                                 .foregroundStyle(SQColor.label)
                             Text(verbatim: "@\(candidate.handle)")
-                                .font(SQFont.body(12))
+                                .font(SQType.micro(.regular))
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                         .padding(.horizontal, SQSpace.md)

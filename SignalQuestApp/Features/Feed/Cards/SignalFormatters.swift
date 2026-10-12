@@ -207,7 +207,7 @@ struct CardHeader: View {
             VStack(alignment: .leading, spacing: SQSpace.xs + 1) {
                 HStack(spacing: 5) {
                     Text(author.displayName)
-                        .font(SQFont.body(16, .semibold, relativeTo: .headline))
+                        .font(SQType.rowTitle)
                         .foregroundStyle(SQColor.label)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -215,7 +215,7 @@ struct CardHeader: View {
                     SQUserBadges(badges: author.badges)
                 }
                 metadata
-                .font(SQFont.body(12.5, relativeTo: .footnote))
+                .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
             }
         }
@@ -239,7 +239,7 @@ struct CardHeader: View {
     private func metadataItems(includeSeparator: Bool = false) -> some View {
         if let place {
             Text(place)
-                .lineLimit(1)
+                .sqSingleLine()
                 .accessibilityIdentifier("feed.metadata.place")
         }
         if let createdAt {
@@ -249,7 +249,7 @@ struct CardHeader: View {
                     .accessibilityIdentifier("feed.metadata.separator")
             }
             Text(createdAt, format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                .lineLimit(1)
+                .sqSingleLine()
                 .accessibilityIdentifier("feed.metadata.date")
         }
     }
@@ -318,7 +318,7 @@ struct CardActionsBar: View {
             in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
         )
         .buttonStyle(.plain)
-        .font(SQFont.body(15, .medium))
+        .font(SQType.body(.medium))
         .overlay(alignment: .topLeading) {
             if showReactionPicker {
                 ReactionPicker { emoji in

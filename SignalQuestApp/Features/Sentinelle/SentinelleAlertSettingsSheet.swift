@@ -31,7 +31,7 @@ struct SentinelleAlertSettingsSheet: View {
                     }
                     .padding(SQSpace.lg)
                 } else {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    SQSpinner().frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .navigationTitle("Alertes")

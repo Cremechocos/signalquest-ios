@@ -207,7 +207,7 @@ struct ANFRBandsView: View {
                     // sans indicateur, les anciens passeraient pour ceux de la nouvelle puce.
                     if model.isLoading {
                         HStack(spacing: SQSpace.sm) {
-                            ProgressView().tint(SQColor.brandRed)
+                            SQSpinner().tint(SQColor.brandRed)
                             Text("Chargement…")
                                 .font(SQType.subhead)
                                 .foregroundStyle(SQColor.labelSecondary)
@@ -486,7 +486,7 @@ struct ANFRBandsView: View {
 
     private var loadingState: some View {
         VStack(spacing: SQSpace.lg) {
-            ProgressView()
+            SQSpinner()
                 .tint(SQColor.brandRed)
             Text("Chargement des générations et des bandes…")
                 .font(SQType.subhead)

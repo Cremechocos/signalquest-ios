@@ -24,7 +24,7 @@ struct WeeklyRecapSheet: View {
             ScrollView {
                 VStack(spacing: SQSpace.lg) {
                     if isLoading {
-                        ProgressView().tint(SQColor.brandRed).padding(.top, SQSpace.xxl)
+                        SQSpinner().tint(SQColor.brandRed).padding(.top, SQSpace.xxl)
                     } else if let stats, stats.hasSomethingToShow {
                         WeeklyRecapCard(stats: stats)
                             .frame(maxWidth: .infinity)
@@ -78,7 +78,7 @@ struct WeeklyRecapSheet: View {
                 Task { await publish() }
             } label: {
                 if isPublishing {
-                    ProgressView().tint(SQColor.brandRed)
+                    SQSpinner().tint(SQColor.brandRed)
                 } else {
                     Label("Publier en story", systemImage: "sparkles")
                 }

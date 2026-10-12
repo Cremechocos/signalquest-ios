@@ -572,7 +572,7 @@ struct UserProfileView: View {
 
             if let bio = profile?.bio, !bio.isEmpty {
                 Text(bio)
-                    .font(SQFont.body(14.5))
+                    .font(SQType.callout)
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -651,7 +651,7 @@ struct UserProfileView: View {
     private func measuredNetworks(_ networks: SocialProfileNetworks) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Réseaux mesurés")
-                .font(SQFont.body(12.5, .semibold))
+                .font(SQType.caption(.semibold))
                 .foregroundStyle(SQColor.labelSecondary)
             GeometryReader { proxy in
                 HStack(spacing: 0) {
@@ -678,7 +678,7 @@ struct UserProfileView: View {
                             .fill(Self.tint(for: entry))
                             .frame(width: 9, height: 9)
                         Text("\(name) \(entry.percentLabel)")
-                            .font(SQFont.body(12))
+                            .font(SQType.micro(.regular))
                             .monospacedDigit()
                             .foregroundStyle(SQColor.labelSecondary)
                     }
@@ -876,7 +876,7 @@ struct UserProfileView: View {
             Image(systemName: systemImage)
                 .font(.system(size: 11, weight: .semibold))
             Text(title)
-                .font(SQFont.body(12, .medium))
+                .font(SQType.micro(.medium))
                 .monospacedDigit()
         }
         .foregroundStyle(accented ? SQColor.accentInk : SQColor.labelSecondary)
@@ -945,7 +945,7 @@ struct UserProfileView: View {
                     }
                 }
                 if model.isLoadingMore {
-                    ProgressView()
+                    SQSpinner()
                         .tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, SQSpace.md)
@@ -966,9 +966,9 @@ struct UserProfileView: View {
             } label: {
                 HStack(spacing: SQSpace.sm) {
                     Text("Charger plus de publications")
-                    if model.isLoadingMore { ProgressView() }
+                    if model.isLoadingMore { SQSpinner() }
                 }
-                .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                .font(SQType.callout(.semibold))
                 .foregroundStyle(SQColor.accentInk)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(Rectangle())

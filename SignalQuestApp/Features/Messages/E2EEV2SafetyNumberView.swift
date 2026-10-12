@@ -204,7 +204,7 @@ struct E2EEV2SafetyNumberView: View {
             Group {
                 switch model.state {
                 case .loading:
-                    ProgressView()
+                    SQSpinner()
                         .frame(maxWidth: .infinity, minHeight: 240)
                         .accessibilityLabel(Text("Chargement du numéro de sécurité"))
                 case .failed(let message):
@@ -384,7 +384,7 @@ struct E2EEV2SafetyNumberContent: View {
                         Text(verbatim: group)
                             .font(SQFont.display(22, .semibold, relativeTo: .title3).monospacedDigit())
                             .foregroundStyle(SQColor.label)
-                            .lineLimit(1)
+                            .sqSingleLine()
                             .fixedSize()
                     }
                 }

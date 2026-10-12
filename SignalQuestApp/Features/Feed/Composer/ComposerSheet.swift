@@ -434,7 +434,7 @@ struct ComposerSheet: View {
     private var pollEditor: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             TextField("Ta question (optionnel)", text: $model.pollQuestion)
-                .font(SQFont.body(15, .medium))
+                .font(SQType.body(.medium))
                 .submitLabel(.next)
 
             ForEach($model.pollOptions) { $option in
@@ -462,13 +462,13 @@ struct ComposerSheet: View {
                     model.pollOptions.append(ComposerViewModel.PollOptionDraft())
                 } label: {
                     Label("Ajouter une option", systemImage: "plus.circle")
-                        .font(SQFont.body(13, .semibold))
+                        .font(SQType.subhead(.semibold))
                         .foregroundStyle(SQColor.accentInk)
                 }
             }
 
             Toggle("Choix multiples", isOn: $model.pollAllowMultiple)
-                .font(SQFont.body(13))
+                .font(SQType.subhead(.regular))
                 .tint(SQColor.brandRed)
         }
         .padding(SQSpace.md)
@@ -489,8 +489,8 @@ struct ComposerSheet: View {
                         HStack(spacing: SQSpace.xs + 1) {
                             SQAvatar(url: user.avatarUrl, name: user.displayName, size: 22)
                             Text(user.handle.map { "@\($0)" } ?? user.displayName)
-                                .font(SQFont.body(13, .medium))
-                                .lineLimit(1)
+                                .font(SQType.subhead)
+                                .sqSingleLine()
                         }
                         .padding(.horizontal, SQSpace.sm2)
                         .padding(.vertical, SQSpace.xs2)
@@ -632,10 +632,10 @@ struct ComposerSheet: View {
                     } label: {
                         Group {
                             if model.isBusy {
-                                ProgressView().controlSize(.mini).tint(SQColor.onAccent)
+                                SQSpinner().controlSize(.mini).tint(SQColor.onAccent)
                             } else {
                                 Text(model.isEditing ? "Enregistrer" : "Publier")
-                                    .font(SQFont.body(14, .semibold))
+                                    .font(SQType.callout(.semibold))
                             }
                         }
                         .foregroundStyle(SQColor.onAccent)
@@ -710,7 +710,7 @@ struct ComposerSheet: View {
                 } label: {
                     Group {
                         if model.isLoadingSpeedtest {
-                            ProgressView()
+                            SQSpinner()
                                 .controlSize(.mini)
                                 .tint(SQColor.brandRed)
                         } else {
@@ -742,7 +742,7 @@ struct ComposerSheet: View {
                     Image(systemName: model.visibility.icon)
                         .font(.caption)
                     Text(model.visibility.label)
-                        .font(SQFont.body(13, .semibold))
+                        .font(SQType.subhead(.semibold))
                     Image(systemName: "chevron.down")
                         .font(.caption2)
                 }
@@ -791,7 +791,7 @@ struct ComposerSheet: View {
             if charCount > 0 {
                 if isClose {
                     Text("\(limit - charCount)")
-                        .font(SQFont.body(12, .semibold))
+                        .font(SQType.micro)
                         .foregroundStyle(isOver ? SQColor.dangerInk : SQColor.warning)
                         .contentTransition(.numericText())
                 }
@@ -823,7 +823,7 @@ struct ComposerSheet: View {
                         Haptics.light()
                     } label: {
                         Text(tag)
-                            .font(SQFont.body(13, .semibold))
+                            .font(SQType.subhead(.semibold))
                             .foregroundStyle(SQColor.accentInk)
                             .padding(.horizontal, SQSpace.md)
                             .padding(.vertical, SQSpace.sm)
@@ -844,7 +844,7 @@ struct ComposerSheet: View {
             SQIconPastille(systemImage: "speedometer", size: 40, font: .system(size: 17, weight: .semibold))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Speedtest joint")
-                    .font(SQFont.body(13, .semibold))
+                    .font(SQType.subhead(.semibold))
                     .foregroundStyle(SQColor.label)
                 HStack(spacing: SQSpace.sm) {
                     if let down = speedtest.downloadSpeed {

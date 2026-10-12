@@ -342,7 +342,7 @@ struct CommentsSheet: View {
     @ViewBuilder
     private var content: some View {
         if model.isLoading && model.comments.isEmpty {
-            ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity, maxHeight: .infinity)
+            SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !model.hasLoaded, let error = model.errorMessage {
             VStack(spacing: SQSpace.md) {
                 EmptyStateView(title: "Chargement impossible", message: error, systemImage: "wifi.exclamationmark")
@@ -367,7 +367,7 @@ struct CommentsSheet: View {
                                 .sqFadeUp()
                         }
                         if model.isLoadingMore {
-                            ProgressView().tint(SQColor.brandRed)
+                            SQSpinner().tint(SQColor.brandRed)
                                 .frame(maxWidth: .infinity)
                         } else if model.nextCursor != nil {
                             GradientButton(model.paginationErrorMessage == nil ? "Charger la suite" : "Réessayer", style: .secondary) {
@@ -432,7 +432,7 @@ struct CommentsSheet: View {
     private func replies(for parent: SocialComment) -> some View {
         let page = model.repliesByParent[parent.id] ?? CommentsViewModel.ReplyPage()
         if page.isLoading && page.comments.isEmpty {
-            ProgressView().tint(SQColor.brandRed).padding(.leading, SQSpace.xl)
+            SQSpinner().tint(SQColor.brandRed).padding(.leading, SQSpace.xl)
         }
         ForEach(page.comments) { reply in
             commentRow(reply).padding(.leading, SQSpace.xl).id(reply.id)
@@ -472,7 +472,7 @@ struct CommentsSheet: View {
                     HStack {
                         authorButton(comment) {
                             Text(comment.author.displayName)
-                                .font(SQFont.body(15, .semibold))
+                                .font(SQType.body(.semibold))
                                 .foregroundStyle(SQColor.label)
                         }
                         Spacer()

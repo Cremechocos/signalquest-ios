@@ -46,7 +46,7 @@ struct FriendLiveSheet: View {
                 Text(friend.name ?? String(localized: "Ami"))
                     .font(SQFont.display(22, .bold))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
+                    .sqSingleLine()
                 Text(statusLine)
                     .font(SQFont.body(14))
                     .foregroundStyle(SQColor.labelSecondary)

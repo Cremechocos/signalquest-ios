@@ -264,7 +264,7 @@ struct StoryViewer: View {
                                 .foregroundStyle(.white)
                             if let date = story.createdAt {
                                 Text(date, format: .relative(presentation: .named))
-                                    .font(SQFont.body(12, relativeTo: .caption2))
+                                    .font(SQType.micro(.regular))
                                     .foregroundStyle(.white.opacity(0.78))
                             }
                         }
@@ -565,7 +565,7 @@ private struct StoryViewersSheet: View {
         NavigationStack {
             Group {
                 if isLoading {
-                    ProgressView().tint(SQColor.brandRed)
+                    SQSpinner().tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let errorMessage, viewers.isEmpty {
                     ErrorStateView(title: "Vues indisponibles", message: errorMessage, retry: retry)

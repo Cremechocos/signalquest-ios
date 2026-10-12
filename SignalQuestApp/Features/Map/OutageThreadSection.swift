@@ -65,7 +65,7 @@ struct OutageThreadSection: View {
             composer
 
             if loading {
-                ProgressView()
+                SQSpinner()
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, SQSpace.md)
             } else if failed {
@@ -89,7 +89,7 @@ struct OutageThreadSection: View {
                         } label: {
                             HStack(spacing: SQSpace.sm) {
                                 Text(moreFailed ? "Réessayer de charger la suite" : "Voir plus de commentaires")
-                                if loadingMore { ProgressView() }
+                                if loadingMore { SQSpinner() }
                             }
                             .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
                             .foregroundStyle(SQColor.accentInk)
@@ -140,7 +140,7 @@ struct OutageThreadSection: View {
                     Text(String(localized: "Réponse à @\(target.author.handle ?? target.author.displayName ?? "")"))
                         .font(SQFont.body(13, .semibold, relativeTo: .caption))
                         .foregroundStyle(SQColor.brandRed)
-                        .lineLimit(1)
+                        .sqSingleLine()
                     Spacer()
                     Button {
                         replyTarget = nil
@@ -301,7 +301,8 @@ struct OutageThreadSection: View {
     private func replyRow(_ reply: SocialComment) -> some View {
         HStack(alignment: .top, spacing: SQSpace.sm) {
             Text(String((reply.author.displayName ?? "?").prefix(2)).uppercased())
-                .font(SQFont.body(10, .semibold, relativeTo: .caption2))
+                .font(SQType.micro)
+                .minimumScaleFactor(0.8)
                 .frame(width: 27, height: 27)
                 .background(SQColor.accentSoft, in: Circle())
                 .foregroundStyle(SQColor.brandRed)

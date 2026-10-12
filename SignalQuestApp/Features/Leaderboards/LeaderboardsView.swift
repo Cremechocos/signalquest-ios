@@ -637,7 +637,7 @@ private struct LeaderboardHeroCard: View {
             Text("Niv. \(level)")
                 .font(SQType.micro)
                 .monospacedDigit()
-                .lineLimit(1)
+                .sqSingleLine()
                 .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, SQSpace.sm)
                 .padding(.vertical, 3)
@@ -693,7 +693,7 @@ private struct LeaderboardHeroCard: View {
             Text(text)
                 .font(SQType.micro)
                 .monospacedDigit()
-                .lineLimit(1)
+                .sqSingleLine()
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(SQColor.label)
         }
@@ -1090,7 +1090,7 @@ private struct PointsRowMeta: View {
             Text(count.formatted())
                 .font(SQType.micro)
                 .monospacedDigit()
-                .lineLimit(1)
+                .sqSingleLine()
         }
         .foregroundStyle(SQColor.labelSecondary)
         .fixedSize(horizontal: true, vertical: false)
@@ -1108,7 +1108,7 @@ private struct LevelPill: View {
         Text("Niv. \(level)")
             .font(SQType.micro)
             .monospacedDigit()
-            .lineLimit(1)
+            .sqSingleLine()
             .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, SQSpace.sm)
             .padding(.vertical, 3)
@@ -1227,7 +1227,7 @@ private struct LeaderboardRowView<Meta: View>: View {
                 .font(SQFont.body(14, .semibold))
                 .monospacedDigit()
                 .foregroundStyle(isMe ? SQColor.brandRed : SQColor.labelSecondary)
-                .lineLimit(1)
+                .sqSingleLine()
                 // La valeur classée ne doit jamais être tronquée (« 12 4… ») : elle garde
                 // sa largeur, c'est le nom (scale + lineLimit) qui cède.
                 .fixedSize(horizontal: true, vertical: false)

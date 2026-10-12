@@ -233,7 +233,7 @@ struct MapPhotoViewer: View {
     private var commentsSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             if isLoading {
-                ProgressView().tint(SQColor.label).frame(maxWidth: .infinity)
+                SQSpinner().tint(SQColor.label).frame(maxWidth: .infinity)
             } else if comments.isEmpty {
                 Text("Commente en premier")
                     .font(SQFont.body(13, .regular))
@@ -428,9 +428,9 @@ private struct ZoomablePhoto: View {
                     AsyncImage(url: placeholder) { p in
                         (p.image ?? Image(systemName: "photo")).resizable().scaledToFit().blur(radius: 8).opacity(0.6)
                     }
-                    .overlay { ProgressView().tint(.white) }
+                    .overlay { SQSpinner().tint(.white) }
                 } else {
-                    ProgressView().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    SQSpinner().tint(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .scaleEffect(scale)

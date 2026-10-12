@@ -211,7 +211,7 @@ struct NotificationsCenterView: View {
                 }
             }
             if model.isLoading && model.items.isEmpty {
-                Section { ProgressView().frame(maxWidth: .infinity).listRowBackground(Color.clear) }
+                Section { SQSpinner().frame(maxWidth: .infinity).listRowBackground(Color.clear) }
             } else if let error = model.errorMessage, model.items.isEmpty {
                 Section {
                     ErrorStateView(title: "Notifications indisponibles", message: error) {
@@ -249,7 +249,7 @@ struct NotificationsCenterView: View {
                         }
                     }
                     if model.isLoadingMore {
-                        ProgressView().frame(maxWidth: .infinity)
+                        SQSpinner().frame(maxWidth: .infinity)
                     } else if model.nextCursor != nil {
                         Button(model.paginationErrorMessage == nil ? "Charger la suite" : "Réessayer") {
                             Task { await model.loadMore() }

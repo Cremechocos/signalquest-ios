@@ -90,7 +90,7 @@ struct CallHistoryView: View {
         List {
             Section {
                 if model.isLoading && model.calls.isEmpty {
-                    ProgressView().tint(SQColor.brandRed).frame(maxWidth: .infinity)
+                    SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                         .listRowBackground(Color.clear)
                 } else if let error = model.errorMessage, model.calls.isEmpty {
                     ErrorStateView(title: "Appels indisponibles", message: error) { Task { await model.load() } }
@@ -177,7 +177,7 @@ struct CallHistoryView: View {
                     }
                 }
                 if model.isLoadingMore {
-                    ProgressView()
+                    SQSpinner()
                         .tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity)
                         .listRowBackground(Color.clear)

@@ -787,7 +787,7 @@ private struct OnboardingCTA: View {
                 .font(.system(size: 16, weight: .bold))
             Text(verbatim: title.localized(locale))
                 .font(SQType.button)
-                .lineLimit(1)
+                .sqSingleLine()
         }
     }
 }

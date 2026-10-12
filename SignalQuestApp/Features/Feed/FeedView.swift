@@ -658,7 +658,7 @@ struct FeedView: View {
                         }
                     }
                     if model.isLoadingMore {
-                        HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
+                        HStack { Spacer(); SQSpinner().tint(SQColor.brandRed); Spacer() }
                             .padding(.vertical, SQSpace.md)
                             .frame(maxWidth: .infinity)
                     }
@@ -1118,7 +1118,7 @@ struct FeedView: View {
     /// très grand texte et de pousser le menu (UI-15).
     private func headerTitle(singleLine: Bool) -> some View {
         Text("Communauté")
-            .font(SQFont.display(26, .bold))
+            .font(SQType.display)
             .foregroundStyle(SQColor.label)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
@@ -1269,13 +1269,13 @@ struct FeedView: View {
                     .font(.system(size: 15, weight: .semibold))
                 // Se réduit un peu avant de se couper : « Messa… » dès le XXL (UI-15).
                 Text(LocalizedStringKey(title))
-                    .font(SQFont.body(13, .semibold, relativeTo: .subheadline))
+                    .font(SQType.subhead(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .accessibilityIdentifier("community.header.action.\(identifier).label")
                 if badgeCount > 0 {
                     Text("\(min(badgeCount, 99))")
-                        .font(SQFont.body(12, .bold, relativeTo: .caption2))
+                        .font(SQType.micro(.bold))
                         .foregroundStyle(SQColor.onAccent)
                         .frame(minWidth: 18, minHeight: 18)
                         .background(SQColor.brandRed, in: Circle())
@@ -1399,7 +1399,7 @@ struct FeedView: View {
                     .font(.system(size: 11, weight: .bold))
                     .accessibilityHidden(true)
                 Text("\(model.pendingCount) nouveauté")
-                    .font(SQFont.body(13, .semibold))
+                    .font(SQType.subhead(.semibold))
             }
             .foregroundStyle(SQColor.onAccent)
             .padding(.horizontal, SQSpace.md)
@@ -1431,8 +1431,8 @@ struct FeedView: View {
                                 .font(.system(size: 11, weight: .semibold))
                                 .accessibilityHidden(true)
                             Text(LocalizedStringKey(tab.title))
-                                .font(SQFont.body(13, .semibold))
-                                .lineLimit(1)
+                                .font(SQType.subhead(.semibold))
+                                .sqSingleLine()
                                 .fixedSize(horizontal: true, vertical: false)
                         }
                         .padding(.horizontal, SQSpace.md)
@@ -1523,7 +1523,7 @@ struct PostShareSheet: View {
 
                 Section("Partager vers") {
                     if isLoading {
-                        ProgressView()
+                        SQSpinner()
                     } else if conversations.isEmpty, errorMessage == nil {
                         Text("Aucune conversation active")
                             .font(SQType.caption)
@@ -1550,7 +1550,7 @@ struct PostShareSheet: View {
                                 }
                                 Spacer()
                                 if busyConversationId == conversation.id {
-                                    ProgressView().tint(SQColor.brandRed)
+                                    SQSpinner().tint(SQColor.brandRed)
                                 } else {
                                     Image(systemName: isE2EE ? "lock.slash" : "paperplane.fill")
                                         .foregroundStyle(isE2EE ? SQColor.labelTertiary : SQColor.brandRed)

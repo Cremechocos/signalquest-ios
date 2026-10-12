@@ -131,7 +131,7 @@ struct SiteRemapSheet: View {
                     )
                     .ignoresSafeArea(edges: .bottom)
                 } else {
-                    ProgressView().tint(SQColor.brandRed)
+                    SQSpinner().tint(SQColor.brandRed)
                 }
 
                 VStack(spacing: SQSpace.sm) {
@@ -170,7 +170,7 @@ struct SiteRemapSheet: View {
                 .font(SQFont.body(12.5, .semibold))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
-            if model.isLoading { ProgressView().controlSize(.mini) }
+            if model.isLoading { SQSpinner().controlSize(.mini) }
         }
         .padding(SQSpace.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -188,7 +188,7 @@ struct SiteRemapSheet: View {
                             .font(SQFont.body(14, .semibold))
                             .monospacedDigit()
                             .foregroundStyle(SQColor.label)
-                            .lineLimit(1)
+                            .sqSingleLine()
                         if let address = selected.address, !address.isEmpty {
                             Text(address).font(SQType.micro).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
                         }

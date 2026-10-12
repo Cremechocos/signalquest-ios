@@ -21,7 +21,7 @@ struct RemindersView: View {
     var body: some View {
         Group {
             if isLoading && items.isEmpty {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                SQSpinner().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage, items.isEmpty {
                 ErrorStateView(title: "Indisponible", message: errorMessage) {
                     Task { await load() }

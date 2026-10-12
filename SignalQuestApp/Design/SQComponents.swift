@@ -157,19 +157,46 @@ struct SQInlineError: View {
     }
 }
 
+/// Une ligne en taille normale ; en très grand texte (tailles d'accessibilité),
+/// jusqu'à trois lignes plutôt qu'un texte coupé en « … » (TRX-12).
+private struct SQSingleLine: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    func body(content: Content) -> some View {
+        content.lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+    }
+}
+
+extension View {
+    func sqSingleLine() -> some View { modifier(SQSingleLine()) }
+}
+
+/// Roue d'activité du design system. Une `SQSpinner()` nue ne disait rien
+/// d'utile à VoiceOver : celle-ci s'annonce « Chargement… » (TRX-10).
+struct SQSpinner: View {
+    var body: some View {
+        ProgressView()
+            .accessibilityLabel(Text("Chargement…"))
+    }
+}
+
 struct ErrorStateView: View {
     let title: String
     let message: String
     var retry: (() -> Void)?
 
+    /// Une panne de connexion n'est pas une erreur de l'écran : elle se dit
+    /// « Hors ligne », avec son icône, sur tous les écrans à la fois (TRX-10).
+    private var isOffline: Bool { message == SQOfflineText.message }
+
     var body: some View {
         GlassCard {
             VStack(spacing: SQSpace.md) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: isOffline ? "wifi.slash" : "exclamationmark.triangle.fill")
                     .font(.title)
-                    .foregroundStyle(SQColor.warning)
+                    .foregroundStyle(isOffline ? SQColor.labelSecondary : SQColor.warning)
                     .sqDecorative()
-                Text(LocalizedStringKey(title))
+                Text(LocalizedStringKey(isOffline ? "Hors ligne" : title))
                     .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
                     .accessibilityIdentifier("state.error.title")
@@ -184,14 +211,9 @@ struct ErrorStateView: View {
                 // Mécanisme non élucidé ; le gain (3 arrêts de balayage en 1)
                 // ne valait pas de livrer une régression inexpliquée.
                 if let retry {
-                    // Taille « large » : le bouton système faisait ~34 pt, sous
-                    // la cible tactile de 44 pt (AF-DS-14).
-                    Button("Réessayer", action: retry)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .tint(SQColor.brandRed)
-                        .foregroundStyle(SQColor.onAccent)
-                        .frame(minHeight: 44)
+                    // Bouton du design system (44 pt et plus, encre onAccent) plutôt
+                    // que le style système (AF-DS-14, TRX-10).
+                    GradientButton(String(localized: "Réessayer"), systemImage: "arrow.clockwise", action: retry)
                         .accessibilityIdentifier("state.error.retry")
                 }
             }

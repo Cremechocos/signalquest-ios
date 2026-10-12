@@ -352,7 +352,7 @@ struct OutageReportSheet: View {
             HStack {
                 Spacer()
                 if submitting {
-                    ProgressView().tint(SQColor.labelSecondary)
+                    SQSpinner().tint(SQColor.labelSecondary)
                 } else {
                     Text("Signaler la panne")
                         .font(SQFont.body(15, .semibold))

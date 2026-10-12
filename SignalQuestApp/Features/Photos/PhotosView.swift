@@ -498,7 +498,7 @@ struct PhotosView: View {
             }
         }
         if model.isLoadingMore {
-            ProgressView()
+            SQSpinner()
                 .tint(SQColor.brandRed)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, SQSpace.md)
@@ -529,7 +529,7 @@ struct PhotosView: View {
                         Label(address, systemImage: "mappin")
                             .font(SQFont.body(12, .medium))
                             .foregroundStyle(.white.opacity(0.78))
-                            .lineLimit(1)
+                            .sqSingleLine()
                     }
                 }
                 Spacer()
@@ -594,7 +594,7 @@ struct PhotosView: View {
                         Text(op)
                             .font(SQFont.body(12, .medium))
                             .foregroundStyle(.white.opacity(0.82))
-                            .lineLimit(1)
+                            .sqSingleLine()
                     }
                     Spacer()
                     Image(systemName: isLiked ? "heart.fill" : "heart")
@@ -664,7 +664,7 @@ struct PhotoCommentsFeedback: View {
                                systemImage: "bubble.right")
                     .accessibilityIdentifier("photo.comments.empty")
             }
-            if isLoading && !isEmpty { ProgressView().accessibilityIdentifier("photo.comments.loading") }
+            if isLoading && !isEmpty { SQSpinner().accessibilityIdentifier("photo.comments.loading") }
         }
     }
 }
@@ -1089,7 +1089,7 @@ struct PhotoDetailView: View {
                         .fill(canSend ? SQColor.brandRed : SQColor.surfaceMuted)
                         .frame(width: 44, height: 44)
                     if isSending {
-                        ProgressView()
+                        SQSpinner()
                             .tint(SQColor.onAccent)
                             .scaleEffect(0.75)
                     } else {
@@ -1397,7 +1397,7 @@ struct PhotoShareSheet: View {
 
                 Section {
                     if isLoading {
-                        ProgressView().tint(SQColor.brandRed)
+                        SQSpinner().tint(SQColor.brandRed)
                             .listRowBackground(SQColor.surface)
                     } else if conversations.isEmpty {
                         Text("Aucune conversation active")
@@ -1430,7 +1430,7 @@ struct PhotoShareSheet: View {
                                 }
                                 Spacer()
                                 if busyConversationId == conversation.id {
-                                    ProgressView().tint(SQColor.brandRed)
+                                    SQSpinner().tint(SQColor.brandRed)
                                 } else {
                                     Image(systemName: isE2EE ? "lock.slash" : "paperplane.fill")
                                         .foregroundStyle(isE2EE ? SQColor.labelTertiary : SQColor.brandRed)
@@ -1554,7 +1554,7 @@ struct AntennaSitePickerSheet: View {
 
                 VStack(spacing: SQSpace.sm) {
                     HStack(spacing: SQSpace.sm) {
-                        if isLoading { ProgressView().tint(SQColor.brandRed) }
+                        if isLoading { SQSpinner().tint(SQColor.brandRed) }
                         Text(sites.isEmpty ? String(localized: "Déplace la carte pour charger") : String(localized: "\(sites.count) site visible"))
                             .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                             .foregroundStyle(SQColor.label)

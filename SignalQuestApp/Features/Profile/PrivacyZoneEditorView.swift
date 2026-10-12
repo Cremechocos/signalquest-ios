@@ -51,7 +51,7 @@ struct PrivacyZoneEditorView: View {
                     } label: {
                         HStack {
                             Label("Utiliser ma position", systemImage: "location.fill")
-                            if locating { Spacer(); ProgressView() }
+                            if locating { Spacer(); SQSpinner() }
                         }
                     }
                     .disabled(locating)
@@ -149,7 +149,7 @@ struct PrivacyZoneEditorView: View {
                             apply: { saved in if saved { closeRequests(); dismiss() } }
                         )
                     } label: {
-                        if isBusy { ProgressView() } else { Text("Enregistrer") }
+                        if isBusy { SQSpinner() } else { Text("Enregistrer") }
                     }
                     .accessibilityIdentifier("privacy-zone.save")
                     .disabled(!canSave)

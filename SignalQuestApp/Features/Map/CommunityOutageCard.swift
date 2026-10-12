@@ -183,7 +183,7 @@ struct OutageCloseButton: View {
             HStack(spacing: SQSpace.sm) {
                 Spacer(minLength: 0)
                 if closing {
-                    ProgressView().tint(SQBrand.operatorBadgeForeground(for: OutageTint.resolved, colorScheme: colorScheme))
+                    SQSpinner().tint(SQBrand.operatorBadgeForeground(for: OutageTint.resolved, colorScheme: colorScheme))
                     Text("Fermeture…")
                 } else {
                     Image(systemName: "checkmark.circle.fill")

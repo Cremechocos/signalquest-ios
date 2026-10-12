@@ -162,7 +162,7 @@ struct AntennaReportSheet: View {
                     } label: {
                         HStack {
                             if isBusy {
-                                ProgressView().tint(SQColor.brandRed)
+                                SQSpinner().tint(SQColor.brandRed)
                             } else {
                                 Text("Envoyer le signalement")
                                     .font(SQType.button)

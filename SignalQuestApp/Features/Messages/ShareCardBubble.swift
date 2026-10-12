@@ -54,7 +54,7 @@ struct ShareCardBubble: View {
                         .font(SQType.micro)
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
                     Text(card.title)
-                        .font(SQFont.body(14, .semibold))
+                        .font(SQType.callout(.semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(2)
                 }
@@ -124,7 +124,7 @@ struct SignalCardBubble: View {
                     .background(mine ? SQColor.onAccent.opacity(0.16) : SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(card.title)
-                        .font(SQFont.body(14, .semibold))
+                        .font(SQType.callout(.semibold))
                         .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
                         .lineLimit(2)
                     if let sub = signal.subtitleLine ?? card.subtitle {
@@ -248,9 +248,9 @@ struct SharedPostCardBubble: View {
             SQAvatar(url: card.author?.avatarUrl, name: card.author?.displayName ?? "SignalQuest", size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(card.author?.displayName ?? card.title)
-                    .font(SQFont.body(14, .semibold))
+                    .font(SQType.callout(.semibold))
                     .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
-                    .lineLimit(1)
+                    .sqSingleLine()
                 Text(sourceLine)
                     .font(SQType.micro)
                     .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
@@ -314,7 +314,7 @@ struct SharedPostCardBubble: View {
         return VStack(alignment: .leading, spacing: SQSpace.xs) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(primary)
-                    .font(SQFont.display(20, .bold))
+                    .font(SQType.metricSmall)
                     .foregroundStyle(mine ? SQColor.onAccent : tint)
                 Text(unit)
                     .font(SQType.micro)

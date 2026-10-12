@@ -573,7 +573,7 @@ struct ANFRStatsView: View {
                         Text(band.bandLabel)
                             .font(SQType.subhead)
                             .foregroundStyle(SQColor.label)
-                            .lineLimit(1)
+                            .sqSingleLine()
                         Spacer()
                         Text(model.showProjected ? band.total : band.operational, format: .number.grouping(.automatic))
                             .font(SQFont.display(15, .bold))
@@ -657,7 +657,7 @@ struct ANFRStatsView: View {
 
     private var loadingState: some View {
         VStack(spacing: SQSpace.lg) {
-            ProgressView()
+            SQSpinner()
                 .tint(SQColor.brandRed)
             Text("Chargement des statistiques ANFR…")
                 .font(SQType.subhead)

@@ -651,7 +651,7 @@ private struct QuestCardView: View {
         Button(action: onClaim) {
             HStack(spacing: SQSpace.xs2) {
                 if isClaiming {
-                    ProgressView()
+                    SQSpinner()
                         .controlSize(.small)
                         .tint(SQColor.onAccent)
                 }

@@ -231,7 +231,7 @@ struct MyIdentificationsView: View {
         .toolbarTitleInlineCompat()
         .refreshable { await model.load() }
         .overlay {
-            if model.isLoading && model.items.isEmpty { ProgressView().tint(SQColor.brandRed) }
+            if model.isLoading && model.items.isEmpty { SQSpinner().tint(SQColor.brandRed) }
         }
         .task { if model.items.isEmpty { await model.load() } }
         .confirmationDialog(
@@ -321,7 +321,7 @@ private struct IdentificationNodeRow: View {
                         .font(SQFont.body(14, .semibold))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
-                        .lineLimit(1)
+                        .sqSingleLine()
                     if group.conflict {
                         Text("conflit")
                             .font(SQType.micro)
@@ -346,7 +346,7 @@ private struct IdentificationNodeRow: View {
                 .lineLimit(2)
             }
             Spacer()
-            if isWithdrawing { ProgressView() }
+            if isWithdrawing { SQSpinner() }
             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelTertiary)
         }
         .padding(.vertical, SQSpace.xs)
@@ -382,7 +382,7 @@ private struct IdentificationCellRow: View {
                 .lineLimit(2)
             }
             Spacer()
-            if isWithdrawing { ProgressView() }
+            if isWithdrawing { SQSpinner() }
             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelTertiary)
         }
         .padding(.vertical, SQSpace.xs)
@@ -486,7 +486,7 @@ private struct IdentificationDetailSheet: View {
                     Task { await adoptConsensus(toSiteId: consensusId) }
                 } label: {
                     HStack(spacing: SQSpace.xs2) {
-                        if adoptBusy { ProgressView().tint(SQColor.onAccent) } else { Image(systemName: "checkmark.seal.fill") }
+                        if adoptBusy { SQSpinner().tint(SQColor.onAccent) } else { Image(systemName: "checkmark.seal.fill") }
                         Text("Adopter le site communautaire").font(SQFont.body(13, .semibold))
                     }
                     .frame(maxWidth: .infinity)
@@ -652,7 +652,7 @@ private struct IdentificationDetailSheet: View {
         } label: {
             HStack(spacing: SQSpace.xs2) {
                 if isWithdrawing {
-                    ProgressView().tint(SQColor.danger)
+                    SQSpinner().tint(SQColor.danger)
                 } else {
                     Image(systemName: "trash.slash")
                 }

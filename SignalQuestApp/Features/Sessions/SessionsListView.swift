@@ -158,7 +158,7 @@ struct SessionsListView: View {
                     }
                     if model.hasMore {
                         if model.isLoading {
-                            HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
+                            HStack { Spacer(); SQSpinner().tint(SQColor.brandRed); Spacer() }
                                 .padding(.vertical, SQSpace.md)
                         } else if model.filtered.isEmpty || model.errorMessage != nil {
                             GradientButton("Charger la suite", style: .secondary) {
@@ -166,7 +166,7 @@ struct SessionsListView: View {
                             }
                                 .accessibilityIdentifier("sessions.loadMore")
                         } else {
-                            HStack { Spacer(); ProgressView().tint(SQColor.brandRed); Spacer() }
+                            HStack { Spacer(); SQSpinner().tint(SQColor.brandRed); Spacer() }
                                 .padding(.vertical, SQSpace.md)
                                 .task { await model.loadMore() }
                         }
@@ -236,7 +236,7 @@ struct SessionsListView: View {
         .overlay {
             if model.isLoading && model.sessions.isEmpty &&
                 (!model.showsLocalCoverageArchive || archiveModel.snapshot.entries.isEmpty) {
-                ProgressView().tint(SQColor.brandRed)
+                SQSpinner().tint(SQColor.brandRed)
             }
         }
         .task { if model.sessions.isEmpty { await model.reload() } }
@@ -328,7 +328,7 @@ private struct SessionRow: View {
                 Text(session.name ?? (session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")))
                     .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
+                    .sqSingleLine()
                 HStack(spacing: SQSpace.sm) {
                     if let points = session.totalPoints {
                         Label("\(points)", systemImage: "mappin.and.ellipse")
@@ -345,7 +345,7 @@ private struct SessionRow: View {
                 }
                 .font(SQFont.body(12, .medium, relativeTo: .caption2))
                 .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(1)
+                .sqSingleLine()
                 if !session.operators.isEmpty {
                     HStack(spacing: 5) {
                         ForEach(session.operators.prefix(4)) { op in

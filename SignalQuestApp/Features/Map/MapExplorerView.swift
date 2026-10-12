@@ -2196,7 +2196,7 @@ struct MapExplorerView: View {
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
                 if effectiveFriendsConnectionState == .connecting {
-                    ProgressView()
+                    SQSpinner()
                         .controlSize(.mini)
                         .tint(presentation.color)
                         .accessibilityHidden(true)
@@ -2294,7 +2294,7 @@ struct MapExplorerView: View {
                 }
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
+                    .sqSingleLine()
                     .fixedSize(horizontal: true, vertical: false)
             }
             .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.label)
@@ -2402,7 +2402,7 @@ struct MapExplorerView: View {
             // chevauchait le dock). Largeur figée → pas de saut de mise en page.
             ZStack {
                 if model.isLoading || model.isSearching {
-                    ProgressView()
+                    SQSpinner()
                         .scaleEffect(0.7)
                         .tint(SQColor.brandRed)
                 } else {
