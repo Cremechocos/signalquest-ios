@@ -4538,7 +4538,6 @@ struct MapExplorerView: View {
             cell: cell,
             nearbyCells: nearby,
             operatorLabel: { model.operatorLabel($0) },
-            accent: model.operatorAccent(cell.operatorKey ?? "ALL"),
             onCreateSite: { selected in
                 selectedObservedCell = nil
                 // Laisser la première feuille se fermer avant d'en présenter une

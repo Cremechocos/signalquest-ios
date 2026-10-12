@@ -65760,6 +65760,46 @@
           }
         }
       }
+    },
+    "vue par %lld contributeurs" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "seen by %lld contributor"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "seen by %lld contributors"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "vue par %lld contributeur"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "vue par %lld contributeurs"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

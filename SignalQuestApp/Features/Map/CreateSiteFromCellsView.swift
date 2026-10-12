@@ -69,39 +69,57 @@ struct CreateSiteFromCellsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    positionPicker
-                    field(String(localized: "Nom du site"), text: $name, placeholder: String(localized: "Pylône rue des Lilas"))
-                    typePicker
-                    field(String(localized: "Note (facultatif)"), text: $note, placeholder: String(localized: "Ce qui aide à le reconnaître"))
-                    radioSummary
-                    if let errorMessage {
-                        Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .font(SQType.subhead)
-                            .foregroundStyle(SQColor.dangerInk)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let pendingMessage {
-                        Label(pendingMessage, systemImage: "clock.arrow.circlepath")
-                            .font(SQType.subhead)
-                            .foregroundStyle(SQColor.success)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    submitButton
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                header
+                positionPicker
+                field(String(localized: "Nom du site"), text: $name, placeholder: String(localized: "Pylône rue des Lilas"))
+                typePicker
+                field(String(localized: "Note (facultatif)"), text: $note, placeholder: String(localized: "Ce qui aide à le reconnaître"))
+                radioSummary
+                if let errorMessage {
+                    SQNotice(message: errorMessage, tone: .danger)
                 }
-                .padding(SQSpace.lg)
-            }
-            .signalQuestBackground()
-            .navigationTitle("Nouveau site")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(isQueued ? "Fermer" : "Annuler") { dismiss() }
-                        .tint(SQColor.labelSecondary)
+                if let pendingMessage {
+                    SQNotice(message: pendingMessage, systemImage: "clock.arrow.circlepath", tone: .success)
                 }
             }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(SQColor.bg.ignoresSafeArea())
+        // Le bouton reste en bas, au-dessus du clavier : on le valide sans
+        // avoir à fermer la saisie ni à redescendre.
+        .safeAreaInset(edge: .bottom) {
+            submitButton
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.sm)
+                .padding(.bottom, SQSpace.sm)
+                .background(SQColor.bg.ignoresSafeArea())
+        }
+        .sqSheet(background: SQColor.bg)
+    }
+
+    private var header: some View {
+        HStack(spacing: SQSpace.sm) {
+            Button(isQueued ? "Fermer" : "Annuler") { dismiss() }
+                .font(SQType.body(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                .accessibilityIdentifier("createSite.cancel")
+            Text("Nouveau site")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+                .frame(maxWidth: .infinity)
+                .sqHeader()
+            // Contrepoids du bouton de gauche, pour centrer le titre.
+            Button(isQueued ? "Fermer" : "Annuler") {}
+                .font(SQType.body(.semibold))
+                .frame(minWidth: 44, minHeight: 44)
+                .hidden()
+                .accessibilityHidden(true)
         }
     }
 
@@ -112,34 +130,35 @@ struct CreateSiteFromCellsView: View {
             Text("Où est l'antenne ?").sqKicker()
             ZStack {
                 Map(coordinateRegion: $region)
-                    .frame(height: 220)
+                    .frame(height: 190)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
                 Image(systemName: "plus.viewfinder")
-                    .font(.system(size: 30, weight: .light))
+                    .font(.system(size: 34, weight: .regular))
                     .foregroundStyle(SQColor.brandRed)
                     .shadow(color: .black.opacity(0.25), radius: 3)
                     .allowsHitTesting(false)
             }
-            Text("Déplace la carte pour viser le pylône. Le point de départ est la moyenne des mesures, pas l'antenne.")
+            (Text("Déplace la carte pour viser le pylône. Le point de départ est la moyenne des mesures, pas l'antenne.")
+                + Text(verbatim: " · ")
+                + Text(verbatim: String(format: "%.5f, %.5f", region.center.latitude, region.center.longitude))
+                    .font(SQFont.body(12, .semibold).monospacedDigit()))
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(String(format: "%.5f, %.5f", region.center.latitude, region.center.longitude))
-                .font(SQFont.body(12.5, .semibold).monospacedDigit())
-                .foregroundStyle(SQColor.labelSecondary)
         }
     }
 
+    /// Pastilles plutôt qu'un menu : les six types se lisent d'un coup d'œil.
     private var typePicker: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Type de support").sqKicker()
-            Picker("Type de support", selection: $type) {
+            Text("Type de support")
+                .font(SQType.callout(.bold))
+                .foregroundStyle(SQColor.label)
+            FlowLayout(spacing: SQSpace.xs2) {
                 ForEach(Self.types, id: \.value) { entry in
-                    Text(entry.label).tag(entry.value)
+                    SQChip(label: entry.label, isSelected: type == entry.value) { type = entry.value }
                 }
             }
-            .pickerStyle(.menu)
-            .tint(SQColor.brandRed)
         }
     }
 
@@ -149,54 +168,57 @@ struct CreateSiteFromCellsView: View {
         let radios = draft.normalized().operatorRadios
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text("Identifiants repris").sqKicker()
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(spacing: 0) {
                 ForEach(radios, id: \.operator) { radio in
-                    HStack(alignment: .top) {
-                        Text(operatorLabel(radio.operator))
-                            .font(SQFont.body(14, .semibold))
-                            .foregroundStyle(SQColor.label)
-                        Spacer()
-                        Text([
-                            radio.enb.map { "eNB \($0)" },
-                            radio.gnb.map { "gNB \($0)" },
-                            radio.pci.map { "PCI \($0)" },
-                            radio.band.map { SQUnits.band($0, technology: radio.technology ?? (radio.gnb != nil ? "NR" : nil)) }
-                        ].compactMap { $0 }.joined(separator: " · "))
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .multilineTextAlignment(.trailing)
+                    HStack(spacing: SQSpace.sm) {
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(SQBrand.operatorColor(operatorLabel(radio.operator)))
+                            .frame(width: 4, height: 22)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(operatorLabel(radio.operator))
+                                .font(SQType.callout(.semibold))
+                                .foregroundStyle(SQColor.label)
+                            let identifiers = [
+                                radio.enb.map { "eNB \($0)" },
+                                radio.gnb.map { "gNB \($0)" },
+                                radio.pci.map { "PCI \($0)" },
+                                radio.band.map { SQUnits.band($0, technology: radio.technology ?? (radio.gnb != nil ? "NR" : nil)) }
+                            ].compactMap { $0 }.joined(separator: " · ")
+                            if !identifiers.isEmpty {
+                                Text(identifiers)
+                                    .font(SQType.caption.monospacedDigit())
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        if let tech = radio.technology, !tech.isEmpty {
+                            MapTechTag(technology: tech, label: tech)
+                        }
                     }
-                    .padding(.horizontal, SQSpace.md)
-                    .padding(.vertical, SQSpace.sm + 1)
-                    Divider().overlay(SQColor.separator).padding(.leading, SQSpace.md)
+                    .frame(minHeight: 46)
+                    if radio.operator != radios.last?.operator {
+                        Divider().overlay(SQColor.separator)
+                    }
                 }
             }
+            .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.xs)
-            .sqCardBackground()
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         }
     }
 
     private var canSubmit: Bool { draft.isValid && !isSubmitting && !isQueued }
 
     private var submitButton: some View {
-        Button {
+        GradientButton(
+            isQueued ? String(localized: "En attente d'envoi") : String(localized: "Créer le site"),
+            systemImage: isQueued ? "clock.arrow.circlepath" : nil,
+            isBusy: isSubmitting
+        ) {
             Task { await submit() }
-        } label: {
-            HStack(spacing: SQSpace.sm) {
-                if isSubmitting { SQSpinner().tint(SQColor.labelSecondary) }
-                Text(isSubmitting ? "Création…" : isQueued ? "En attente d'envoi" : "Créer le site")
-                    .font(SQFont.body(15, .semibold))
-            }
-            .foregroundStyle(canSubmit ? SQColor.onAccent : SQColor.labelSecondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, SQSpace.md)
-            .background(
-                canSubmit ? SQColor.brandRed : SQColor.fill,
-                in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-            )
         }
-        .buttonStyle(SQPressButtonStyle())
-        .disabled(!draft.isValid || isSubmitting || isQueued)
+        .disabled(!canSubmit)
+        .accessibilityIdentifier("createSite.submit")
     }
 
     private func submit() async {
@@ -224,7 +246,9 @@ struct CreateSiteFromCellsView: View {
     @ViewBuilder
     private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(LocalizedStringKey(label)).sqKicker()
+            Text(LocalizedStringKey(label))
+                .font(SQType.callout(.bold))
+                .foregroundStyle(SQColor.label)
             TextField(placeholder, text: text)
                 .font(SQFont.body(15))
                 .foregroundStyle(SQColor.label)

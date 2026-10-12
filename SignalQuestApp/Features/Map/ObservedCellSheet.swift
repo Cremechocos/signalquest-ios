@@ -15,28 +15,11 @@ struct ObservedCellSheet: View {
     /// de sites que d'opérateurs.
     let nearbyCells: [AndroidCommunitySiteMarker]
     let operatorLabel: (String) -> String
-    let accent: Color
     /// Appelé avec les cellules retenues quand l'utilisateur veut créer le site.
     let onCreateSite: ([AndroidCommunitySiteMarker]) -> Void
 
     @State private var selectedIds: Set<String> = []
     @Environment(\.dismiss) private var dismiss
-
-    private var radio: [(String, String?)] {
-        [
-            ("Opérateur", cell.operatorKey.map(operatorLabel)),
-            ("Technologie", cell.radioNodeType),
-            ("PLMN", plmn),
-            ("eNB", cell.enb),
-            ("gNB", cell.gnb),
-            ("CI", cell.cellId ?? cell.ci),
-            ("PCI", cell.pci.map(String.init)),
-            ("TAC", cell.tac),
-            ("EARFCN", cell.earfcn.map(String.init)),
-            ("NR-ARFCN", cell.nrarfcn.map(String.init)),
-            ("Bande", cell.band.map { SQUnits.band($0, isNR: cell.nrarfcn != nil) })
-        ]
-    }
 
     private var plmn: String? {
         guard let mcc = cell.mcc, let mnc = cell.mnc else { return nil }
@@ -44,73 +27,60 @@ struct ObservedCellSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    header
-                    provenanceBanner
-                    section("Identifiants radio") { rows(radio) }
-                    section("Ce qu'on en sait") { rows(evidence) }
-                    if !groupCandidates.isEmpty { grouping }
-                    createButton
-                }
-                .padding(SQSpace.lg)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                header
+                provenanceBanner
+                VStack(spacing: SQSpace.sm) { rows(facts) }
+                if !groupCandidates.isEmpty { grouping }
+                createButton
             }
-            .signalQuestBackground()
-            .navigationTitle("Cellule observée")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
-                }
-            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
         }
+        .background(SQColor.bg.ignoresSafeArea())
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .sqSheet(background: SQColor.bg)
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: SQSpace.md) {
-            Image(systemName: "dot.radiowaves.up.forward")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(SQColor.onAccent)
-                .frame(width: 46, height: 46)
-                .background(accent, in: Circle())
-            VStack(alignment: .leading, spacing: 3) {
-                Text(cell.enb.map { "eNB \($0)" } ?? cell.gnb.map { "gNB \($0)" } ?? String(localized: "Cellule"))
-                    .font(SQFont.display(20, .bold))
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Cellule observée").sqKicker()
+                Text(title)
+                    .font(SQType.title)
                     .foregroundStyle(SQColor.label)
-                if let key = cell.operatorKey {
-                    Text(operatorLabel(key))
-                        .font(SQFont.body(14.5, .semibold))
-                        .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .sqHeader()
+                HStack(spacing: SQSpace.xs2) {
+                    if let tech = cell.radioNodeType, !tech.isEmpty {
+                        MapTechTag(technology: tech, label: tech)
+                    }
+                    if let count = cell.distinctUserCount, count > 0 {
+                        Text("vue par \(count) contributeurs")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
                 }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "observedCell.close") { dismiss() }
         }
+    }
+
+    /// « eNB 812977 · Orange » : l'identité radio d'abord, l'opérateur ensuite.
+    private var title: String {
+        let identity = cell.enb.map { "eNB \($0)" } ?? cell.gnb.map { "gNB \($0)" } ?? String(localized: "Cellule")
+        guard let key = cell.operatorKey else { return identity }
+        return identity + " · " + operatorLabel(key)
     }
 
     /// Le point de la carte n'est PAS le pylône. Le dire est la seule façon
     /// d'éviter qu'on prenne un centroïde à 1 km pour une position d'antenne.
     private var provenanceBanner: some View {
-        HStack(alignment: .top, spacing: SQSpace.sm) {
-            Image(systemName: "scope")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(SQColor.warning)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Position estimée, pas relevée")
-                    .font(SQFont.body(13.5, .semibold))
-                    .foregroundStyle(SQColor.label)
-                Text(radiusSentence)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(SQSpace.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        SQNotice(message: radiusSentence, title: String(localized: "Position estimée, pas relevée"),
+                 systemImage: "scope", tone: .warning)
     }
 
     private var radiusSentence: String {
@@ -120,15 +90,22 @@ struct ObservedCellSheet: View {
         return String(localized: "Ce point est la moyenne des endroits où la cellule a été captée. L'antenne se trouve quelque part dans un rayon de \(SQUnits.distance(meters: radius)).")
     }
 
-    private var evidence: [(String, String?)] {
+    /// Identifiants et fiabilité en une seule liste ; l'opérateur, la
+    /// technologie et les contributeurs sont déjà dans l'en-tête.
+    private var facts: [(String, String?)] {
         [
+            ("PLMN", plmn),
+            ("CI", cell.cellId ?? cell.ci),
+            ("PCI", cell.pci.map(String.init)),
+            ("TAC", cell.tac),
+            ("EARFCN", cell.earfcn.map(String.init)),
+            ("NR-ARFCN", cell.nrarfcn.map(String.init)),
+            ("Bande", cell.band.map { SQUnits.band($0, isNR: cell.nrarfcn != nil) }),
             ("Confiance", cell.confidenceLevel.map { level in
                 cell.confidenceScore.map { "\(level) (\(Int($0))/100)" } ?? level
             }),
             ("Mesures", cell.observationCount.map { "\($0)" }),
-            ("Contributeurs", cell.distinctUserCount.map { "\($0)" }),
             ("Précision GPS médiane", cell.medianAccuracyMeters.map { SQUnits.distance(meters: $0) }),
-            ("Rayon d'incertitude", cell.radiusMeters.map { SQUnits.distance(meters: $0) }),
             ("Première mesure", cell.firstObservedAt.map { SignalFormatters.date($0) }),
             ("Dernière mesure", cell.lastObservedAt.map { SignalFormatters.date($0, relative: true) })
         ]
@@ -142,86 +119,72 @@ struct ObservedCellSheet: View {
 
     private var grouping: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Autres cellules à proximité")
-                .font(SQType.heading)
-                .foregroundStyle(SQColor.label)
+            Text("Autres cellules à proximité").sqKicker()
+            VStack(spacing: 0) {
+                ForEach(groupCandidates, id: \.id) { other in
+                    candidateRow(other)
+                    if other.id != groupCandidates.last?.id {
+                        Divider().overlay(SQColor.separator)
+                    }
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             Text("Un même pylône porte souvent plusieurs opérateurs. Coche celles qui sont sur le même support pour n'en faire qu'un site.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            VStack(spacing: 0) {
-                ForEach(groupCandidates, id: \.id) { other in
-                    Button {
-                        Haptics.selection()
-                        if selectedIds.contains(other.id) { selectedIds.remove(other.id) }
-                        else { selectedIds.insert(other.id) }
-                    } label: {
-                        HStack(spacing: SQSpace.sm) {
-                            Image(systemName: selectedIds.contains(other.id) ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 17))
-                                .foregroundStyle(selectedIds.contains(other.id) ? SQColor.success : SQColor.labelTertiary)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(other.operatorKey.map(operatorLabel) ?? String(localized: "Opérateur inconnu"))
-                                    .font(SQFont.body(14, .semibold))
-                                    .foregroundStyle(SQColor.label)
-                                Text([other.enb.map { "eNB \($0)" }, other.radioNodeType]
-                                    .compactMap { $0 }.joined(separator: " · "))
-                                    .font(SQType.caption)
-                                    .foregroundStyle(SQColor.labelSecondary)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, SQSpace.md)
-                        .padding(.vertical, SQSpace.sm + 1)
-                    }
-                    .buttonStyle(SQPressButtonStyle())
-                    Divider().overlay(SQColor.separator).padding(.leading, SQSpace.md)
-                }
-            }
-            .padding(.vertical, SQSpace.xs)
-            .sqCardBackground()
         }
     }
 
+    private func candidateRow(_ other: AndroidCommunitySiteMarker) -> some View {
+        let isSelected = selectedIds.contains(other.id)
+        let name = other.operatorKey.map(operatorLabel) ?? String(localized: "Opérateur inconnu")
+        return Button {
+            Haptics.selection()
+            if isSelected { selectedIds.remove(other.id) } else { selectedIds.insert(other.id) }
+        } label: {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 20))
+                    .foregroundStyle(isSelected ? SQColor.label : SQColor.labelTertiary)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(SQBrand.operatorColor(name))
+                    .frame(width: 4, height: 22)
+                Text(([name] + [other.enb.map { "eNB \($0)" } ?? other.gnb.map { "gNB \($0)" }].compactMap { $0 })
+                    .joined(separator: " · "))
+                    .font(SQType.callout(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let tech = other.radioNodeType, !tech.isEmpty {
+                    MapTechTag(technology: tech, label: tech)
+                }
+            }
+            .frame(minHeight: 46)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// Le bouton dit combien de cellules seront reprises et suit les cases.
     private var createButton: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Button {
+            GradientButton(
+                selectedIds.isEmpty
+                    ? String(localized: "Créer le site à partir de cette cellule")
+                    : String(localized: "Créer le site à partir de \(selectedIds.count + 1) cellules"),
+                systemImage: "plus",
+                allowsMultiline: true
+            ) {
                 Haptics.selection()
                 let selected = [cell] + groupCandidates.filter { selectedIds.contains($0.id) }
                 onCreateSite(selected)
-            } label: {
-                HStack(spacing: SQSpace.sm) {
-                    Image(systemName: "mappin.and.ellipse")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text(selectedIds.isEmpty
-                         ? "Créer le site à partir de cette cellule"
-                         : "Créer le site à partir de \(selectedIds.count + 1) cellules")
-                        .font(SQFont.body(15, .semibold))
-                }
-                .foregroundStyle(SQColor.onAccent)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, SQSpace.md)
-                .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
-            .buttonStyle(SQPressButtonStyle())
             Text("Les identifiants radio sont repris tels quels ; c'est toi qui places l'antenne au bon endroit.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    // MARK: Habillage
-
-    @ViewBuilder
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(LocalizedStringKey(title))
-                .font(SQType.heading)
-                .foregroundStyle(SQColor.label)
-            VStack(alignment: .leading, spacing: 0) { content() }
-                .padding(.vertical, SQSpace.xs)
-                .sqCardBackground()
         }
     }
 
@@ -230,19 +193,7 @@ struct ObservedCellSheet: View {
         ForEach(values.indices, id: \.self) { index in
             let (label, value) = values[index]
             if let value, !value.isEmpty {
-                HStack(alignment: .top) {
-                    Text(LocalizedStringKey(label))
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
-                    Spacer()
-                    Text(value)
-                        .font(SQFont.body(14, .semibold))
-                        .foregroundStyle(SQColor.label)
-                        .multilineTextAlignment(.trailing)
-                }
-                .padding(.horizontal, SQSpace.md)
-                .padding(.vertical, SQSpace.sm + 1)
-                Divider().overlay(SQColor.separator).padding(.leading, SQSpace.md)
+                SQFactRow(label: label, value: value)
             }
         }
     }
