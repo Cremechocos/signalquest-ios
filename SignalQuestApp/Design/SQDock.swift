@@ -1,32 +1,29 @@
 import SwiftUI
 
-/// Dock de navigation flottant « Crème & Terre cuite ». Remplace la tab bar
-/// système avant iOS 26 (dès iOS 26, la tab bar Liquid Glass native prend le
-/// relais ; le dock reste forçable pour la QA). Il est posé 8 pt AU-DESSUS de
-/// la safe area (~42 pt du bord), jamais sur l'indicateur home. Matériau :
-/// capsule crème translucide + blur avant iOS 26, `UIGlassEffect` quand le
-/// dock est forcé sur iOS 26+, capsule opaque avec « Réduire la transparence ».
-/// Item actif = pilule teintée brique ; inactifs = bruns discrets.
-/// `minimized` rétracte le dock en pastille (icône de l'onglet actif),
-/// piloté au scroll par `sqDockAutoMinimize`.
+/// Dock de navigation Halo : barre pleine largeur sur le papier, filet en haut,
+/// libellés 12/600 gris, onglet actif à l'encre marqué d'un point carmin de
+/// 5 pt. Remplace la tab bar système avant iOS 26 (dès iOS 26, la tab bar
+/// Liquid Glass native prend le relais ; le dock reste forçable pour la QA).
+/// Le fond descend sous l'indicateur home ; les onglets restent au-dessus.
+/// `minimized` masque les libellés au scroll vers le bas (`sqDockAutoMinimize`) ;
+/// un tap sur un onglet ou une remontée les rend.
 struct SQDock: View {
     @Binding var selection: AppRouter.AppTab
     /// Conversations non lues — badge sur l'onglet Communauté.
     var communityBadge: Int = 0
-    /// Rétracté en pastille après un scroll vers le bas.
+    /// Libellés masqués après un scroll vers le bas.
     var minimized: Bool = false
-    /// Appelé quand on tape la pastille rétractée pour redéployer le dock.
+    /// Appelé quand on tape la barre rétractée pour rendre les libellés.
     var onExpand: () -> Void = {}
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Écart entre le bas du dock et la safe area (indicateur home sur
-    /// Face ID, bord physique sur les appareils à bouton).
-    static let bottomGap: CGFloat = 8
+    /// Écart entre le bas du dock et la safe area : la barre y est posée à ras.
+    static let bottomGap: CGFloat = 0
 
     /// Hauteur réservée AU-DESSUS de la safe area pour que le contenu ne se
-    /// cache pas derrière le dock (capsule ~64 + bottomGap 8 + respiration 8).
-    /// Sert au `safeAreaInset` des contenus.
-    static let clearance: CGFloat = 80
+    /// cache pas derrière la barre (~60 pt déployée). Sert au `safeAreaInset`
+    /// des contenus.
+    static let clearance: CGFloat = 64
 
     private let items: [(tab: AppRouter.AppTab, label: String, icon: String)] = [
         (.home, String(localized: "Accueil"), "house"),
@@ -38,19 +35,17 @@ struct SQDock: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            if minimized {
-                expandButton
-            } else {
-                ForEach(items, id: \.tab) { item in
-                    dockItem(item)
-                }
+            ForEach(items, id: \.tab) { item in
+                dockItem(item)
             }
         }
-        .padding(minimized ? 5 : 8)
-        // Sur iPad la capsule reste une pilule compacte centrée, pas un ruban.
-        .frame(maxWidth: minimized ? nil : 560)
+        .padding(.horizontal, SQSpace.xs2)
+        .padding(.top, 7)
+        .padding(.bottom, SQSpace.xs)
+        // Sur iPad, les onglets restent groupés au centre de la barre.
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
         .sqDockChrome()
-        .padding(.horizontal, SQSpace.lg)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Navigation principale")
         .accessibilityIdentifier("main.navigation")
@@ -61,46 +56,41 @@ struct SQDock: View {
         let badge = item.tab == .community ? communityBadge : 0
         return Button {
             Haptics.selection()
+            if minimized { onExpand() }
             withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) {
                 selection = item.tab
             }
         } label: {
-            VStack(spacing: 2) {
+            VStack(spacing: 3) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: item.icon)
-                        .font(.system(size: 19, weight: .medium))
+                        .font(.system(size: 19, weight: isActive ? .semibold : .medium))
                         .frame(height: 22)
                     if badge > 0 {
-                        Text(verbatim: badge > 99 ? "99+" : "\(badge)")
-                            // Police relative au texte : le badge suit Dynamic
-                            // Type, avec 12 pt au minimum.
-                            .font(SQType.micro)
-                            .foregroundStyle(SQColor.onAccent)
-                            .padding(.horizontal, 4)
-                            .frame(minWidth: 17, minHeight: 17)
-                            .background(SQColor.brandRed, in: Capsule(style: .continuous))
-                            .offset(x: 12, y: -7)
+                        SQCountBadge(count: badge)
+                            .offset(x: 14, y: -7)
                     }
                 }
-                Text(item.label)
-                    // Libellés de la navigation PRINCIPALE : 12 pt au minimum,
-                    // à la taille de texte choisie par l'utilisateur.
-                    .font(SQType.micro)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                if !minimized {
+                    Text(item.label)
+                        // Libellés de la navigation PRINCIPALE : 12 pt au minimum,
+                        // à la taille de texte choisie par l'utilisateur.
+                        .font(SQType.micro)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Circle()
+                    .fill(SQColor.brandRed)
+                    .frame(width: 5, height: 5)
+                    .opacity(isActive ? 1 : 0)
+                    .accessibilityHidden(true)
             }
-            .padding(.vertical, 7)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 44)
             // accessibility2 avoisine 200 % : le précédent plafond AX1
             // arrêtait la navigation principale avant le critère demandé.
             .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-            .foregroundStyle(isActive ? SQColor.brandRed : SQColor.dockInactive)
-            .background {
-                if isActive {
-                    Capsule(style: .continuous).fill(SQColor.accentSoft)
-                }
-            }
-            .contentShape(Capsule(style: .continuous))
+            .foregroundStyle(isActive ? SQColor.label : SQColor.dockInactive)
+            .contentShape(Rectangle())
         }
         .buttonStyle(SQDockPressStyle())
         // Large Content Viewer : appui long = HUD agrandi de l'onglet, seul moyen
@@ -112,60 +102,14 @@ struct SQDock: View {
         .accessibilityLabel(badge > 0 ? "\(item.label), \(String(localized: "\(badge) conversation non lue"))" : item.label)
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
-
-    /// Pastille rétractée : icône de l'onglet actif ; point rouge si des
-    /// messages attendent ailleurs. Un tap redéploie le dock.
-    private var expandButton: some View {
-        let active = items.first { $0.tab == selection } ?? items[0]
-        return Button {
-            Haptics.selection()
-            onExpand()
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: active.icon)
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 48, height: 48)
-                if communityBadge > 0, selection != .community {
-                    Circle()
-                        .fill(SQColor.brandRed)
-                        .frame(width: 8, height: 8)
-                        .offset(x: -5, y: 7)
-                }
-            }
-            .contentShape(Circle())
-        }
-        .buttonStyle(SQDockPressStyle())
-        .accessibilityLabel("Déployer la navigation")
-    }
 }
 
 private extension View {
-    /// Habillage du dock : vrai matériau Liquid Glass sur iOS 26+ via l'API
-    /// UIKit `UIGlassEffect` (rendu système fidèle : lentille, bords lumineux,
-    /// adaptation au contenu qui défile dessous), capsule crème translucide
-    /// avant. Pas d'ombre sur le verre : elle se verrait à travers et le
-    /// rendrait laiteux.
-    @ViewBuilder
+    /// Habillage du dock : papier opaque et filet en haut ; le fond descend
+    /// jusqu'au bord de l'écran.
     func sqDockChrome() -> some View {
         modifier(SQDockChrome())
     }
-}
-
-/// Capsule Liquid Glass via UIKit : `UIVisualEffectView` + `UIGlassEffect`,
-/// le matériau exact des barres système (la version SwiftUI `.glassEffect`
-/// rendait plat/opaque en overlay d'un TabView).
-@available(iOS 26.0, *)
-private struct SQGlassCapsuleBackground: UIViewRepresentable {
-    func makeUIView(context: Context) -> UIVisualEffectView {
-        let glass = UIGlassEffect()
-        glass.isInteractive = true
-        let view = UIVisualEffectView(effect: glass)
-        view.cornerConfiguration = .capsule()
-        return view
-    }
-
-    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
 }
 
 /// Press = scale 0.94 (léger, comme le prototype).
@@ -352,31 +296,17 @@ extension View {
 }
 
 
-/// Habillage du dock, sensible à « Réduire la transparence ».
-///
-/// Le réglage système n'était honoré nulle part : le dock restait translucide
-/// quel que soit le choix de l'utilisateur, alors que ce réglage existe
-/// précisément pour les personnes que la superposition gêne.
+/// Habillage du dock Halo : papier opaque (rien à atténuer sous « Réduire la
+/// transparence »), filet `--h-hair` en haut, encre en mode terrain.
 private struct SQDockChrome: ViewModifier {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
     func body(content: Content) -> some View {
-        if reduceTransparency {
-            content
-                .background {
-                    Capsule(style: .continuous).fill(SQColor.surface)
-                }
-                .sqShadowDock()
-        } else if #available(iOS 26.0, *) {
-            content.background { SQGlassCapsuleBackground() }
-        } else {
-            content
-                .background {
-                    Capsule(style: .continuous)
-                        .fill(SQColor.dockBackground)
-                        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
-                }
-                .sqShadowDock()
-        }
+        content
+            .background(SQColor.bg.ignoresSafeArea(edges: .bottom))
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(SQOledPalette.fieldStroke)
+                    .frame(height: 1)
+                    .accessibilityHidden(true)
+            }
     }
 }

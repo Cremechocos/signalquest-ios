@@ -48,7 +48,7 @@ struct ChooseHandleSheet: View {
                     }
                     .padding(.horizontal, SQSpace.lg)
                     .frame(minHeight: 48)
-                    .sqFieldSurface(in: Capsule(style: .continuous))
+                    .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     .sqFadeUp()
 
                     Text(message.isEmpty

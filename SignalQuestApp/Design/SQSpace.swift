@@ -16,8 +16,8 @@ enum SQSpace {
     static let xs2: CGFloat = 6
     static let sm2: CGFloat = 10
     static let md2: CGFloat = 14
-    /// Padding interne d'une carte de contenu (DESIGN.md › Cards : 18 pt).
-    static let cardPadding: CGFloat = 18
-    /// Hauteur des boutons capsules (DESIGN.md › Buttons : 56 pt).
-    static let primaryActionHeight: CGFloat = 56
+    /// Marge interne d'une carte de contenu (Halo, téléphone : 14 pt).
+    static let cardPadding: CGFloat = 14
+    /// Hauteur des boutons pilules (Halo, cible tactile : 44 pt ; 52 en mode terrain).
+    static let primaryActionHeight: CGFloat = 44
 }

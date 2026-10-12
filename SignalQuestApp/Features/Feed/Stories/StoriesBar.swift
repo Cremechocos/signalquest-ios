@@ -44,8 +44,8 @@ struct StoriesBar: View {
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
-    /// « Ta story » : cercle 60 SurfaceMuted, initiale (ou +) en encre
-    /// secondaire, badge « + » brique 21 pt cerclé de la couleur du fond.
+    /// « Ta story » : avatar 60 sur la puce, initiale (ou +) en encre de puce,
+    /// badge « + » carmin 21 pt cerclé de la couleur du fond.
     private var composeBubble: some View {
         Button {
             Haptics.light()
@@ -53,17 +53,17 @@ struct StoriesBar: View {
         } label: {
             VStack(spacing: SQSpace.sm - 1) {
                 ZStack {
-                    Circle().fill(SQColor.surfaceMuted)
+                    SQAvatarShape().fill(SQColor.chip)
                     if let initial = currentUser?.displayName.first {
                         Text(String(initial).uppercased())
-                            .font(SQFont.display(23, .semibold, relativeTo: .title2))
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .font(SQFont.display(22, .bold, relativeTo: .title2))
+                            .foregroundStyle(SQColor.chipInk)
                             .accessibilityHidden(true)
                             .accessibilityIdentifier("feed.avatar.initial")
                     } else {
                         Image(systemName: "plus")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .foregroundStyle(SQColor.chipInk)
                     }
                 }
                 .frame(width: 60, height: 60)
@@ -102,12 +102,12 @@ struct StoryBubble: View {
     var body: some View {
         let isViewed = viewed ?? (story.viewedByMe == true)
         VStack(spacing: SQSpace.sm - 1) {
-            // Anneau décollé de 3 pt : brique 3 pt (non vue) / encre 25 % 1,5 pt (vue).
+            // Anneau décollé de 3 pt : carmin 3 pt (non vue) / encre 25 % 1,5 pt (vue).
             SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 60)
                 .padding(3)
                 .overlay {
                     if isViewed {
-                        Circle().strokeBorder(SQColor.label.opacity(0.25), lineWidth: 1.5)
+                        SQAvatarShape().strokeBorder(SQColor.label.opacity(0.25), lineWidth: 1.5)
                     } else {
                         SQStoryRing(lineWidth: 3)
                     }

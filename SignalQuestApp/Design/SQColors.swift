@@ -45,6 +45,17 @@ enum SQColor {
         highLight: (0x3C, 0x44, 0x3F),
         highDark: (0xC9, 0xD2, 0xCC)
     )
+    /// Encre secondaire forte (`--h-ink-2`) : descriptions, boutons discrets,
+    /// icônes des tuiles. Plus foncée que `labelSecondary` (`--h-muted`).
+    static let ink2 = fieldAwareLabel(
+        light: (0x3C, 0x44, 0x3F), dark: (0xC9, 0xD2, 0xCC),
+        highLight: (0x3C, 0x44, 0x3F), highDark: (0xC9, 0xD2, 0xCC)
+    )
+    /// Texte des puces neutres (`--h-chip-ink`).
+    static let chipInk = fieldAwareLabel(
+        light: (0x4A, 0x52, 0x4D), dark: (0xC4, 0xCD, 0xC7),
+        highLight: (0x3C, 0x44, 0x3F), highDark: (0xC9, 0xD2, 0xCC)
+    )
 
     // MARK: Lines / fills
     /// En mode terrain, le filet passe à l'encre à 34 %, comme `[data-field]` web.
@@ -53,6 +64,35 @@ enum SQColor {
         return SQOledPalette.surface(asset: "Separator", oled: .outline)
     }
     static var fill: Color { SQOledPalette.surface(asset: "Fill", oled: .highest) }
+    /// Fond des puces, tuiles d'icône et survols (`--h-chip`).
+    static var chip: Color { fill }
+    /// Pointillés des lignes clé-valeur, contours de cases, poignées (`--h-dots`).
+    static let dots = dynamicTint(
+        light: (0x1C, 0x20, 0x1E, 0.30), dark: (0xF1, 0xF4, 0xF1, 0.28)
+    )
+    /// Piste des sélecteurs segmentés et des interrupteurs éteints (`--h-seg`).
+    static let segTrack = dynamicTint(
+        light: (0xE6, 0xE3, 0xD9, 1.0), dark: (0x20, 0x26, 0x23, 1.0),
+        oled: (0x16, 0x1B, 0x19, 1.0)
+    )
+    /// Pastille active d'un segmenté (`--h-seg-thumb`).
+    static let segThumb = dynamicTint(
+        light: (0xFF, 0xFF, 0xFF, 1.0), dark: (0x2A, 0x30, 0x2D, 1.0)
+    )
+    /// Blocs de squelette (`--h-skel`).
+    static let skeleton = dynamicTint(
+        light: (0xE9, 0xE6, 0xDD, 1.0), dark: (0x23, 0x29, 0x27, 1.0),
+        oled: (0x17, 0x1C, 0x1A, 1.0)
+    )
+    /// Voile posé sous une fenêtre maison (`--h-scrim`).
+    static let scrim = dynamicTint(
+        light: (0x1C, 0x20, 0x1E, 0.45), dark: (0x00, 0x00, 0x00, 0.55)
+    )
+    /// Verre posé sur une photo ou une vidéo (`--h-glass`) : identique dans les
+    /// deux thèmes, puisque l'image ne change pas avec eux. Texte en `onGlass`.
+    static let glass = Color(red: 0x0F / 255, green: 0x13 / 255, blue: 0x12 / 255).opacity(0.52)
+    static let glassLine = Color(red: 0xF4 / 255, green: 0xF2 / 255, blue: 0xEC / 255).opacity(0.16)
+    static let onGlass = Color(red: 0xF4 / 255, green: 0xF2 / 255, blue: 0xEC / 255)
 
     // MARK: Semantic
     static let like = Color("Like")
@@ -187,13 +227,8 @@ enum SQColor {
         light: (0xFF, 0xFF, 0xFF, 0.92), dark: (0x18, 0x1D, 0x1B, 0.92),
         oled: (0x0A, 0x0D, 0x0C, 0.92)
     )
-    /// Fond du dock flottant : SurfaceElevated à 95 % (94 % en sombre).
-    static let dockBackground = dynamicTint(
-        light: (0xFF, 0xFF, 0xFF, 0.95), dark: (0x18, 0x1D, 0x1B, 0.94),
-        oled: (0x0A, 0x0D, 0x0C, 0.94)
-    )
     /// Items inactifs du dock : le gris-vert `--h-muted`, au moins 4,5:1 sur le
-    /// fond du dock. En mode terrain ou avec « Augmenter le contraste », ils
+    /// papier. En mode terrain ou avec « Augmenter le contraste », ils
     /// prennent les encres secondaires renforcées.
     static let dockInactive = fieldAwareLabel(
         light: (0x63, 0x6B, 0x66),

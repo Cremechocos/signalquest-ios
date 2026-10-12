@@ -60,9 +60,9 @@ private struct SQCardShadow: ViewModifier {
     }
 }
 
-/// Carte douce de la DA « Crème & Terre cuite » : fond `SurfaceElevated`,
-/// rayon 22 continu, ombre carte chaude. Ni bordure, ni glassmorphism.
-/// (Nom historique conservé — c'était le conteneur « glass » de l'ancienne DA.)
+/// Carte Halo : surface blanche posée sur le papier, 22 pt de coins, 14 pt de
+/// marge, ombre douce, aucune bordure hors « Noir intense » et mode terrain.
+/// (Nom historique conservé — c'était le conteneur « glass » d'une ancienne DA.)
 struct GlassCard<Content: View>: View {
     private let cornerRadius: CGFloat
     private let padding: CGFloat
@@ -85,9 +85,17 @@ struct GlassCard<Content: View>: View {
     }
 }
 
-/// Actions partagées : primaire encre, accent terracotta ; API historique conservée.
+/// Bouton pilule Halo (planche P2-33, « Boutons et liens ») ; nom historique conservé.
+/// - `primary` : pilule d'encre, l'action principale de l'écran (une seule).
+/// - `secondary` : fond carte et filet ; `ghost` : sans fond, encre secondaire.
+/// - `destructive` : fond carte, filet et texte rouge, pour supprimer depuis une page ;
+///   `destructiveFill` (rouge plein) ne sert que dans la confirmation d'un geste
+///   irréversible.
+/// - `glass` sur une photo ou une vidéo ; `inverse` sur un bandeau d'encre.
+/// - `accent` est conservé pour l'API : Halo ne remplit jamais un bouton de carmin,
+///   il se dessine donc comme `primary`.
 struct GradientButton: View {
-    enum Style { case primary, secondary, ghost, accent, destructive }
+    enum Style { case primary, secondary, ghost, accent, destructive, destructiveFill, glass, inverse }
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.isEnabled) private var isEnabled
@@ -132,12 +140,12 @@ struct GradientButton: View {
             Haptics.medium()
             action()
         } label: {
-            HStack(spacing: SQSpace.sm2) {
+            HStack(spacing: SQSpace.sm) {
                 if isBusy {
                     SQSpinner().tint(foreground)
                 } else if let systemImage {
                     Image(systemName: systemImage)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(SQFont.body(15, .semibold, relativeTo: .body))
                 }
                 Text(LocalizedStringKey(title))
                     .font(SQType.button)
@@ -151,51 +159,50 @@ struct GradientButton: View {
             // Mode terrain : `controlSize(.large)` posé à la racine agrandit la cible.
             .frame(minHeight: controlSize == .large ? SQSpace.primaryActionHeight + 8 : SQSpace.primaryActionHeight)
             .foregroundStyle(foreground)
-            // Charte Crème : capsules pour tous les styles, secondaire = surface
-            // posée sur une ombre douce, aucune bordure (DESIGN.md › Buttons).
             .background(background, in: Capsule(style: .continuous))
-            // Désactivé en « Noir intense » : `surfaceMuted` est noir comme le fond,
-            // le liseré garde la forme du bouton.
             .overlay {
-                if !isEnabled {
-                    Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
+                if let line = outline {
+                    Capsule(style: .continuous).strokeBorder(line, lineWidth: 1)
                 }
             }
-            .modifier(GradientButtonShadow(style: isEnabled ? style : .ghost))
+            // Désactivé : le bouton garde son dessin, atténué (Halo : 46 %).
+            .opacity(isEnabled ? 1 : 0.46)
         }
         .disabled(isBusy)
         .buttonStyle(SQPressButtonStyle(scale: 0.97))
     }
 
     private var foreground: Color {
-        guard isEnabled else { return SQColor.labelSecondary }
         switch style {
-        case .primary: return SQColor.onInk
-        case .accent: return SQColor.onAccent
-        case .secondary, .ghost: return SQColor.label
+        case .primary, .accent: return SQColor.onInk
+        case .secondary: return SQColor.label
+        case .ghost: return SQColor.ink2
         case .destructive: return SQColor.dangerInk
+        case .destructiveFill: return SQColor.bg
+        case .glass: return SQColor.onGlass
+        case .inverse: return SQColor.label
         }
     }
 
     private var background: AnyShapeStyle {
-        guard isEnabled else { return AnyShapeStyle(SQColor.surfaceMuted) }
         switch style {
-        case .primary: return AnyShapeStyle(SQColor.label)
-        case .accent: return AnyShapeStyle(SQColor.accent)
-        case .secondary: return AnyShapeStyle(SQColor.surface)
+        case .primary, .accent: return AnyShapeStyle(SQColor.label)
+        case .secondary, .destructive: return AnyShapeStyle(SQColor.surface)
         case .ghost: return AnyShapeStyle(Color.clear)
-        case .destructive: return AnyShapeStyle(SQColor.dangerSoft)
+        case .destructiveFill: return AnyShapeStyle(SQColor.danger)
+        case .glass: return AnyShapeStyle(SQColor.glass)
+        case .inverse: return AnyShapeStyle(SQColor.onInk)
         }
     }
-}
 
-private struct GradientButtonShadow: ViewModifier {
-    let style: GradientButton.Style
-
-    func body(content: Content) -> some View {
+    /// Filet des boutons posés sur une surface : `--h-hair`, encre en mode terrain.
+    private var outline: Color? {
         switch style {
-        case .secondary: content.sqShadowSoft()
-        case .primary, .accent, .ghost, .destructive: content
+        case .secondary, .destructive: return SQColor.separator
+        case .glass: return SQColor.glassLine
+        case .primary, .accent, .ghost, .destructiveFill, .inverse:
+            // Les aplats pleins n'ont pas de filet, sauf en « Noir intense ».
+            return SQOledPalette.cardStroke
         }
     }
 }

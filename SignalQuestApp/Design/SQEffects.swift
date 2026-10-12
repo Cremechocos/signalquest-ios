@@ -1,55 +1,40 @@
 import SwiftUI
 
 // Effets signature de la DA SignalQuest : SQStoryRing (anneau de story),
-// sqShimmer (squelettes), sqLikePop (pop du like) et sqFadeUp (entrée des
+// sqShimmer (pulsation des squelettes), sqLikePop (pop du like) et sqFadeUp (entrée des
 // cards). Tous respectent Reduce Motion.
 
-/// Anneau de story « Crème » : cercle brique statique, décollé de l'avatar
-/// (le décalage de 3 pt est porté par le padding du parent). Remplace l'ancien
-/// anneau conique rotatif — plus aucune animation permanente.
+/// Anneau de story : liseré carmin statique de la forme de l'avatar, décollé de
+/// lui (le décalage est porté par le padding du parent). Aucune animation
+/// permanente.
 struct SQStoryRing: View {
     var lineWidth: CGFloat = 3
 
     var body: some View {
-        Circle()
+        SQAvatarShape()
             .strokeBorder(SQColor.brandRed, lineWidth: lineWidth)
     }
 }
 
-/// Balayage lumineux des squelettes de chargement (web `sqShimmer`, 1,6 s).
+/// Pulsation des squelettes de chargement Halo (`h-skel`) : opacité 1 → 0,5 → 1
+/// en 2 s. Sous Reduce Motion, le squelette reste fixe.
 private struct SQShimmerModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var phase: CGFloat = -1
+    @State private var dimmed = false
 
     func body(content: Content) -> some View {
-        if reduceMotion {
-            content.opacity(0.6)
-        } else {
-            content
-                .overlay {
-                    GeometryReader { proxy in
-                        LinearGradient(
-                            colors: [.clear, .white.opacity(0.35), .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .frame(width: proxy.size.width * 0.6)
-                        .offset(x: phase * proxy.size.width * 1.6)
-                        .blendMode(.plusLighter)
-                    }
+        content
+            .opacity(dimmed ? 0.5 : 1)
+            .onAppear {
+                guard let animation = SQMotion.repeating(
+                    .easeInOut(duration: 1),
+                    autoreverses: true,
+                    reduceMotion: reduceMotion
+                ) else { return }
+                withAnimation(animation) {
+                    dimmed = true
                 }
-                .clipped()
-                .onAppear {
-                    guard let animation = SQMotion.repeating(
-                        .linear(duration: 1.6),
-                        autoreverses: false,
-                        reduceMotion: reduceMotion
-                    ) else { return }
-                    withAnimation(animation) {
-                        phase = 1
-                    }
-                }
-        }
+            }
     }
 }
 

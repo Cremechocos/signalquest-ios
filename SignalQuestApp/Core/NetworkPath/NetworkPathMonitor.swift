@@ -200,6 +200,11 @@ struct CellularServiceLoss: Equatable, Sendable {
     let lostAt: Date
 }
 
+extension Notification.Name {
+    /// Retour d'un chemin réseau exploitable après une coupure.
+    static let sqNetworkRestored = Notification.Name("sqNetworkRestored")
+}
+
 @MainActor
 final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkInfoDelegate {
     @Published private(set) var status: NetworkPathStatus = .unknown
@@ -252,7 +257,11 @@ final class NetworkPathMonitor: NSObject, ObservableObject, CTTelephonyNetworkIn
                 // `@Published` émet à CHAQUE assignation, égalité ou non. Cet
                 // objet est injecté en `@EnvironmentObject` à la racine : une
                 // émission inutile réinvalide tout l'arbre de vues qui l'observe.
-                if self.isOnline != satisfied { self.isOnline = satisfied }
+                if self.isOnline != satisfied {
+                    self.isOnline = satisfied
+                    // Les écrans restés sur « Hors ligne » se rechargent seuls.
+                    if satisfied { NotificationCenter.default.post(name: .sqNetworkRestored, object: nil) }
+                }
                 self.refreshStatus()
             }
         }

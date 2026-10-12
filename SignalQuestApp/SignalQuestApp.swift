@@ -959,8 +959,8 @@ struct MainTabView: View {
     // MARK: Dock flottant custom (avant iOS 26)
 
     /// La tab bar système est masquée sur chaque onglet et remplacée par
-    /// `SQDock`, posé 8 pt au-dessus de la safe area, avec rétraction au
-    /// scroll custom (`sqDockAutoMinimize` sur les racines, iOS 18+).
+    /// `SQDock`, barre Halo posée à ras de la safe area, dont les libellés se
+    /// replient au scroll (`sqDockAutoMinimize` sur les racines, iOS 18+).
     private var dockTabView: some View {
         TabView(selection: $router.selectedTab) {
             NavigationStack { SignalQuestHomeView(user: user).toolbar(.hidden, for: .tabBar) }
@@ -995,9 +995,8 @@ struct MainTabView: View {
         }
         .tint(SQColor.brandRed)
         .overlay(alignment: .bottom) {
-            // Posé DANS la safe area : 8 pt au-dessus de l'indicateur home
-            // (Face ID) ou du bord physique (bouton). Jamais sur l'indicateur —
-            // le prototype HTML le posait à 14 pt du bord physique, trop bas.
+            // Onglets posés DANS la safe area, jamais sur l'indicateur home ;
+            // seul le fond papier de la barre descend jusqu'au bord.
             if !router.isDockHidden {
                 SQDock(
                     selection: $router.selectedTab,

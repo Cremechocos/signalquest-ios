@@ -32,6 +32,13 @@ extension View {
         modifier(SQReadableWidthModifier(maxWidth: maxWidth))
     }
 
+    /// Feuille Halo : 26 pt de coins en haut, poignée visible, fond carte (ou
+    /// papier quand la feuille contient des cartes). Coins et fond sont iOS 16.4+ ;
+    /// avant, la feuille système garde les siens.
+    func sqSheet(background: Color = SQColor.surface) -> some View {
+        modifier(SQSheetModifier(background: background))
+    }
+
     /// `.presentationBackground(_:)` est iOS 16.4+ ; sur 16.0–16.3, fond de sheet par défaut.
     @ViewBuilder
     func presentationBackgroundCompat<S: ShapeStyle>(_ style: S) -> some View {
@@ -133,6 +140,22 @@ private struct SQReadableWidthModifier: ViewModifier {
 /// sont donc remplacés par `SQColor.surface`. Passer par cette primitive
 /// (comme `sqDockChrome` pour le dock) fait que le réglage est honoré partout
 /// où l'app présente une feuille, sans avoir à le rappeler sur chaque site.
+private struct SQSheetModifier: ViewModifier {
+    let background: Color
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 16.4, *) {
+            content
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(SQRadius.xxl)
+                .presentationBackgroundCompat(background)
+        } else {
+            content.presentationDragIndicator(.visible)
+        }
+    }
+}
+
 private struct SQPresentationBackground<S: ShapeStyle>: ViewModifier {
     let style: S
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency

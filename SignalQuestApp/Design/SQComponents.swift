@@ -10,8 +10,8 @@ struct SQFormFieldLabel: View {
 
     var body: some View {
         Text(title)
-            .font(SQType.caption)
-            .foregroundStyle(SQColor.labelSecondary)
+            .font(SQFont.body(14, .bold, relativeTo: .subheadline))
+            .foregroundStyle(SQColor.label)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityHidden(true)
     }
@@ -69,6 +69,23 @@ struct MetricPill: View {
     }
 }
 
+/// Forme des avatars Halo : carré à coins de 30 % (« squircle »), quelle que
+/// soit la taille. L'anneau de story reprend la même forme.
+struct SQAvatarShape: InsettableShape {
+    var inset: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        let r = rect.insetBy(dx: inset, dy: inset)
+        let radius = min(rect.width, rect.height) * 0.3 - inset
+        return RoundedRectangle(cornerRadius: max(0, radius), style: .continuous).path(in: r)
+    }
+
+    func inset(by amount: CGFloat) -> SQAvatarShape {
+        SQAvatarShape(inset: inset + amount)
+    }
+}
+
+/// Avatar Halo : photo ou initiale sur la puce, coins à 30 %.
 struct SQAvatar: View {
     let url: URL?
     let name: String
@@ -76,7 +93,7 @@ struct SQAvatar: View {
 
     var body: some View {
         ZStack {
-            Circle().fill(SQColor.brandRed)
+            SQAvatarShape().fill(SQColor.chip)
             if let url {
                 RemoteImage(url: url, maxDimension: size, contentMode: .fill) {
                     initials
@@ -86,13 +103,13 @@ struct SQAvatar: View {
             }
         }
         .frame(width: size, height: size)
-        .clipShape(Circle())
+        .clipShape(SQAvatarShape())
     }
 
     private var initials: some View {
         Text(String(name.prefix(1)).uppercased())
-            .font(SQFont.display(max(13, size * 0.38), .semibold, relativeTo: .title3))
-            .foregroundStyle(SQColor.onAccent)
+            .font(SQFont.display(max(12, size * 0.36), .bold, relativeTo: .title3))
+            .foregroundStyle(SQColor.chipInk)
             .accessibilityHidden(true)
             .accessibilityIdentifier("feed.avatar.initial")
     }
@@ -112,13 +129,16 @@ struct EmptyStateView: View {
     var messageColor: Color = SQColor.labelSecondary
 
     var body: some View {
-        VStack(spacing: SQSpace.md) {
-            SQIconPastille(systemImage: systemImage, size: 64, font: .system(size: 26, weight: .medium))
+        VStack(spacing: SQSpace.sm) {
+            SQIconPastille(systemImage: systemImage, size: 46, tint: SQColor.chipInk, fill: SQColor.chip,
+                           font: SQFont.body(22, .medium, relativeTo: .title3))
+                .padding(.bottom, SQSpace.xs)
             Text(LocalizedStringKey(title))
-                .font(SQType.heading)
+                .font(SQType.stateTitle)
                 .foregroundStyle(SQColor.label)
+                .multilineTextAlignment(.center)
             Text(LocalizedStringKey(message))
-                .font(SQType.caption)
+                .font(SQType.callout)
                 .foregroundStyle(messageColor)
                 .multilineTextAlignment(.center)
         }
@@ -191,17 +211,22 @@ struct ErrorStateView: View {
 
     var body: some View {
         GlassCard {
-            VStack(spacing: SQSpace.md) {
-                Image(systemName: isOffline ? "wifi.slash" : "exclamationmark.triangle.fill")
-                    .font(.title)
-                    .foregroundStyle(isOffline ? SQColor.labelSecondary : SQColor.warning)
-                    .sqDecorative()
+            VStack(spacing: SQSpace.sm) {
+                SQIconPastille(
+                    systemImage: isOffline ? "wifi.slash" : "exclamationmark.triangle",
+                    size: 46,
+                    tint: isOffline ? SQColor.warning : SQColor.dangerInk,
+                    fill: isOffline ? SQColor.warningSoft : SQColor.dangerSoft,
+                    font: SQFont.body(22, .medium, relativeTo: .title3)
+                )
+                .padding(.bottom, SQSpace.xs)
                 Text(LocalizedStringKey(isOffline ? "Hors ligne" : title))
-                    .font(SQType.heading)
+                    .font(SQType.stateTitle)
                     .foregroundStyle(SQColor.label)
+                    .multilineTextAlignment(.center)
                     .accessibilityIdentifier("state.error.title")
                 Text(LocalizedStringKey(message))
-                    .font(SQType.caption)
+                    .font(SQType.callout)
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
                 // Volontairement PAS de `.sqCard` ici : regrouper ce bloc faisait
@@ -211,13 +236,20 @@ struct ErrorStateView: View {
                 // Mécanisme non élucidé ; le gain (3 arrêts de balayage en 1)
                 // ne valait pas de livrer une régression inexpliquée.
                 if let retry {
-                    // Bouton du design system (44 pt et plus, encre onAccent) plutôt
-                    // que le style système (AF-DS-14, TRX-10).
-                    GradientButton(String(localized: "Réessayer"), systemImage: "arrow.clockwise", action: retry)
+                    // Bouton secondaire du design system (planche Halo, « Retours »).
+                    GradientButton(String(localized: "Réessayer"), systemImage: "arrow.clockwise",
+                                   style: .secondary, action: retry)
                         .accessibilityIdentifier("state.error.retry")
+                        .padding(.top, SQSpace.sm)
                 }
             }
             .frame(maxWidth: .infinity)
+        }
+        // Hors ligne : l'écran se recharge seul au retour du réseau ; « Réessayer »
+        // reste là pour qui n'attend pas.
+        .onReceive(NotificationCenter.default.publisher(for: .sqNetworkRestored)) { _ in
+            guard isOffline, let retry else { return }
+            retry()
         }
     }
 }
@@ -268,7 +300,7 @@ struct LoadingSkeleton: View {
     private var card: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(spacing: SQSpace.sm) {
-                Circle().fill(SQColor.fill).frame(width: 44, height: 44)
+                Circle().fill(SQColor.skeleton).frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 7) {
                     SkeletonBlock(width: 130, height: 12)
                     SkeletonBlock(width: 84, height: 10)
@@ -308,7 +340,7 @@ struct SkeletonBlock: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: radius, style: .continuous)
-            .fill(SQColor.fill)
+            .fill(SQColor.skeleton)
             .frame(width: width, height: height)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
     }
@@ -323,7 +355,7 @@ struct ConversationListSkeleton: View {
         VStack(spacing: SQSpace.lg) {
             ForEach(0..<count, id: \.self) { _ in
                 HStack(spacing: SQSpace.md) {
-                    Circle().fill(SQColor.fill).frame(width: 52, height: 52)
+                    Circle().fill(SQColor.skeleton).frame(width: 52, height: 52)
                     VStack(alignment: .leading, spacing: 8) {
                         SkeletonBlock(width: 150, height: 13)
                         SkeletonBlock(width: 220, height: 11)
@@ -338,8 +370,8 @@ struct ConversationListSkeleton: View {
 
 // MARK: - New primitives
 
-/// Pastille d'icône circulaire teintée (DESIGN.md : « icônes SF Symbols posées
-/// dans des pastilles circulaires teintées ») : icône brique sur `accentSoft`.
+/// Pastille d'icône circulaire Halo : icône à l'encre secondaire sur la puce
+/// (`--h-chip`). Le carmin reste à l'identité et à la sélection.
 /// Décorative d'office (`accessibilityHidden`) — le libellé voisin porte le sens.
 /// Sans `font`, l'icône fait 40 % du diamètre en semibold ; passer `font` pour
 /// garder un rendu historique (Dynamic Type, taille ou graisse précises).
@@ -349,8 +381,8 @@ struct SQIconPastille: View {
     /// Diamètre de la pastille.
     var size: CGFloat = 40
     /// Sur `accentSoft`, préférer `SQColor.accentInk` quand l'icône porte du sens.
-    var tint: Color = SQColor.brandRed
-    var fill: Color = SQColor.accentSoft
+    var tint: Color = SQColor.ink2
+    var fill: Color = SQColor.chip
     var font: Font? = nil
 
     var body: some View {
@@ -363,8 +395,8 @@ struct SQIconPastille: View {
     }
 }
 
-/// Compact rounded search field. Capsule 44 pt, fond crème secondaire, sans
-/// bordure (règle Inputs de la DA Crème).
+/// Barre de recherche Halo (`SearchField`) : 44 pt, 13 pt de coins, fond carte
+/// et filet de 1 pt, loupe 16 pt.
 struct SQSearchField: View {
     @Binding var text: String
     /// Clé du catalogue, traduite à l'affichage : passée en `String`, elle
@@ -375,7 +407,7 @@ struct SQSearchField: View {
     var body: some View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: "magnifyingglass")
-                .font(.subheadline.weight(.medium))
+                .font(SQFont.body(16, .medium, relativeTo: .body))
                 .foregroundStyle(SQColor.labelSecondary)
                 .accessibilityHidden(true)
             TextField(LocalizedStringKey(placeholder), text: $text)
@@ -397,40 +429,74 @@ struct SQSearchField: View {
                 .accessibilityLabel(Text("Effacer la recherche"))
             }
         }
-        .padding(.leading, SQSpace.lg)
-        .padding(.trailing, text.isEmpty ? SQSpace.lg : SQSpace.xs)
+        .padding(.leading, SQSpace.md)
+        .padding(.trailing, text.isEmpty ? SQSpace.md : SQSpace.xs)
         // Hauteur minimale et non fixe : en grande taille de texte, le champ
         // coupait sa propre saisie (TRX-12).
         .frame(minHeight: 44)
-        // Le fond tuile a la couleur de la page : le filet dessine le champ.
-        .sqFieldSurface(in: Capsule(style: .continuous))
-    }
-}
-
-/// Pill segmented filter used in Messages, Friends, Photos, Leaderboards, etc.
-struct SQSegmentedFilter<Value: Hashable>: View {
-    @Binding var selection: Value
-    let options: [(value: Value, label: String, icon: String?)]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm) {
-                ForEach(Array(options.enumerated()), id: \.offset) { _, option in
-                    SQChip(label: option.label, systemImage: option.icon,
-                           isSelected: option.value == selection) {
-                        selection = option.value
-                    }
-                }
-            }
-            .padding(.horizontal)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .strokeBorder(SQOledPalette.fieldStroke, lineWidth: 1)
+                .allowsHitTesting(false)
         }
     }
 }
 
-/// Pastille sélectionnable du système Crème : inactive en surface avec ombre
-/// repos, active en brique pleine au texte crème, jamais de bordure hors OLED
-/// (DESIGN.md › Chips). Zone de toucher de 44 pt, état annoncé par VoiceOver
-/// (`.isSelected`).
+/// Sélecteur segmenté Halo (`Segmented`) : piste `segTrack` à 14 pt de coins,
+/// segment actif en pastille pleine (`segThumb`), jamais un soulignement.
+/// Au téléphone, la piste défile quand les segments dépassent la largeur.
+struct SQSegmentedFilter<Value: Hashable>: View {
+    @Binding var selection: Value
+    let options: [(value: Value, label: String, icon: String?)]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 3) {
+                ForEach(Array(options.enumerated()), id: \.offset) { _, option in
+                    segment(option)
+                }
+            }
+            .padding(SQSpace.xs)
+            .background(SQColor.segTrack, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .padding(.horizontal)
+        }
+    }
+
+    private func segment(_ option: (value: Value, label: String, icon: String?)) -> some View {
+        let isSelected = option.value == selection
+        return Button {
+            Haptics.selection()
+            withAnimation(reduceMotion ? nil : SQMotion.snappy) { selection = option.value }
+        } label: {
+            HStack(spacing: SQSpace.xs) {
+                if let icon = option.icon {
+                    Image(systemName: icon).accessibilityHidden(true)
+                }
+                Text(LocalizedStringKey(option.label))
+            }
+            .font(SQType.chip)
+            .foregroundStyle(isSelected ? SQColor.label : SQColor.labelSecondary)
+            .padding(.horizontal, 13)
+            .frame(minHeight: 44)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(SQColor.segThumb)
+                        .shadow(color: SQColor.shadowSoft, radius: 2, y: 1)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// Puce de filtre Halo (`FilterChip`) : inactive sur la puce (`--h-chip`), active
+/// en carmin doux au texte carmin, sans ombre ni bordure hors OLED. Zone de
+/// toucher de 44 pt, état annoncé par VoiceOver (`.isSelected`).
 ///
 /// Une seule implémentation pour tous les filtres en capsule : les variantes
 /// passent par les paramètres (teinte du fond actif, point de couleur, coche,
@@ -444,12 +510,12 @@ struct SQChip: View {
     var selectedSystemImage: String? = nil
     /// Point de couleur en tête (opérateur) ; il prend l'encre de l'état actif.
     var dot: Color? = nil
-    /// Fond et encre de l'état actif : brique et crème par défaut. Un fond
+    /// Fond et encre de l'état actif : carmin doux et carmin par défaut. Un fond
     /// d'opérateur demande l'encre calculée (`SQBrand.operatorBadgeForeground`).
-    var selectedFill: Color = SQColor.brandRed
-    var selectedInk: Color = SQColor.onAccent
+    var selectedFill: Color = SQColor.accentSoft
+    var selectedInk: Color = SQColor.accentInk
     /// Fond de l'état inactif, posé par `sqSurface` (liseré en « Noir intense »).
-    var restFill: Color = SQColor.surface
+    var restFill: Color = SQColor.chip
     /// Occupe la largeur proposée (grilles de filtres) au lieu de celle du texte.
     var fillsWidth = false
     /// Texte VoiceOver à la place du libellé affiché (clés du catalogue).
@@ -462,7 +528,7 @@ struct SQChip: View {
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
-        let ink = !isEnabled ? SQColor.labelSecondary : isSelected ? selectedInk : SQColor.label
+        let ink = !isEnabled ? SQColor.labelSecondary : isSelected ? selectedInk : SQColor.chipInk
         let leadingImage = isSelected ? (selectedSystemImage ?? systemImage) : systemImage
         Button {
             Haptics.selection()
@@ -484,15 +550,14 @@ struct SQChip: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .font(SQFont.body(13, .semibold))
+            .font(SQType.chip)
             // Un libellé d'un seul caractère (« 1 », « 5 ») reste une vraie capsule.
             .frame(minWidth: SQSpace.lg)
             .frame(maxWidth: fillsWidth ? .infinity : nil)
-            .padding(.horizontal, SQSpace.md2)
+            .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm)
             .foregroundStyle(ink)
             .sqSurface(isSelected ? selectedFill : restFill, in: Capsule(style: .continuous))
-            .sqShadowSoft()
             .frame(minWidth: 44, minHeight: controlSize == .large ? 50 : 44)
             .contentShape(Rectangle())
         }
@@ -558,6 +623,230 @@ struct SQSectionHeader<Trailing: View>: View {
             Spacer()
             trailing()
         }
+    }
+}
+
+// MARK: - Données et listes Halo (planche P2-33)
+
+/// Chiffre clé Halo (`Stat`) : surtitre, valeur 26/800 et unité 14/600 grise.
+/// Sans fond : se pose dans une carte ou une tuile.
+struct SQStatTile: View {
+    let label: String
+    let value: String
+    var unit: String? = nil
+    var caption: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            Text(LocalizedStringKey(label)).sqKicker()
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                Text(value)
+                    .font(SQType.metricMedium)
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.label)
+                if let unit {
+                    Text(LocalizedStringKey(unit))
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            if let caption {
+                Text(LocalizedStringKey(caption))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Ligne clé-valeur Halo (`KeyValue`) : libellé gris, points de conduite, valeur
+/// en 600. En très grand texte, la valeur passe sous le libellé.
+struct SQFactRow: View {
+    let label: String
+    let value: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                    labelText
+                    valueText
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    labelText
+                    SQDotLeader()
+                        .frame(height: 1)
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
+                    valueText
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var labelText: some View {
+        Text(LocalizedStringKey(label))
+            .font(SQType.subhead(.regular))
+            .foregroundStyle(SQColor.labelSecondary)
+    }
+
+    private var valueText: some View {
+        Text(value)
+            .font(SQType.subhead(.semibold))
+            .foregroundStyle(SQColor.label)
+            .multilineTextAlignment(.trailing)
+    }
+}
+
+/// Points de conduite d'une ligne clé-valeur (`--h-dots`).
+private struct SQDotLeader: View {
+    var body: some View {
+        GeometryReader { proxy in
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: proxy.size.height / 2))
+                path.addLine(to: CGPoint(x: proxy.size.width, y: proxy.size.height / 2))
+            }
+            .stroke(SQColor.dots, style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [1, 3]))
+        }
+        .frame(minWidth: SQSpace.lg)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Rangée de liste Halo (`ListRow`) : tuile d'icône 38 pt à 12 pt de coins, titre
+/// 13/600, sous-titre 12 gris, pas de séparateur. 44 pt de hauteur au moins.
+struct SQListRow<Trailing: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    var systemImage: String? = nil
+    @ViewBuilder var trailing: () -> Trailing
+
+    init(
+        _ title: String,
+        subtitle: String? = nil,
+        systemImage: String? = nil,
+        @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.trailing = trailing
+    }
+
+    var body: some View {
+        HStack(spacing: SQSpace.md) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(SQFont.body(16, .semibold, relativeTo: .body))
+                    .foregroundStyle(SQColor.ink2)
+                    .frame(width: 38, height: 38)
+                    .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                Text(LocalizedStringKey(title))
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let subtitle {
+                    Text(LocalizedStringKey(subtitle))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            trailing()
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+    }
+}
+
+/// Encadré Halo (`Notice`) : 14 pt de coins ; neutre sur la tuile avec un filet,
+/// sinon sur un ton doux. Le texte reste à l'encre, l'icône porte la teinte.
+struct SQNotice: View {
+    enum Tone { case neutral, brand, success, warning, danger }
+
+    let message: String
+    var title: String? = nil
+    var systemImage: String? = nil
+    var tone: Tone = .neutral
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm2) {
+            Image(systemName: systemImage ?? defaultIcon)
+                .font(SQFont.body(15, .semibold, relativeTo: .body))
+                .foregroundStyle(iconTint)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                if let title {
+                    Text(LocalizedStringKey(title))
+                        .font(SQType.callout(.bold))
+                        .foregroundStyle(SQColor.label)
+                }
+                Text(LocalizedStringKey(message))
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(SQSpace.md)
+        .background(fill, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                .strokeBorder(tone == .neutral ? SQOledPalette.fieldStroke : SQOledPalette.cardStroke, lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var defaultIcon: String {
+        switch tone {
+        case .neutral, .brand: return "info.circle"
+        case .success: return "checkmark.circle"
+        case .warning, .danger: return "exclamationmark.triangle"
+        }
+    }
+
+    private var fill: Color {
+        switch tone {
+        case .neutral: return SQColor.surfaceMuted
+        case .brand: return SQColor.accentSoft
+        case .success: return SQColor.successSoft
+        case .warning: return SQColor.warningSoft
+        case .danger: return SQColor.dangerSoft
+        }
+    }
+
+    private var iconTint: Color {
+        switch tone {
+        case .neutral: return SQColor.ink2
+        case .brand: return SQColor.accentInk
+        case .success: return SQColor.success
+        case .warning: return SQColor.warning
+        case .danger: return SQColor.dangerInk
+        }
+    }
+}
+
+/// Compteur Halo (`CountBadge`) : fond d'encre, chiffre couleur papier, 6 pt de coins.
+struct SQCountBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text(count > 99 ? "99+" : "\(count)")
+            .font(SQType.micro(.bold))
+            .monospacedDigit()
+            .foregroundStyle(SQColor.bg)
+            .padding(.horizontal, SQSpace.xs2)
+            .frame(minWidth: 20, minHeight: 20)
+            .background(SQColor.label, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 
@@ -769,12 +1058,11 @@ struct SQInAppNotificationHost: View {
                 .padding(.trailing, SQSpace.xs)
                 .padding(.vertical, SQSpace.xs)
                 .frame(maxWidth: 520)
-                .background(SQColor.surface, in: Capsule(style: .continuous))
-                // Ombre seule, jamais avec un contour (règle No-Border) : la
-                // variante se lit à l'icône teintée. Le liseré ne sert qu'en OLED,
-                // où l'ombre disparaît sur le noir.
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                // Ombre seule, jamais avec un contour : la variante se lit à l'icône
+                // teintée. Le liseré ne sert qu'en OLED et en mode terrain.
                 .overlay {
-                    Capsule(style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
                 }
                 .sqShadowDock()
@@ -798,7 +1086,7 @@ struct SQInAppNotificationHost: View {
 
     private func tint(for variant: SQInAppNotificationVariant) -> Color {
         switch variant {
-        case .info: return SQColor.brandRed
+        case .info: return SQColor.ink2
         case .success: return SQColor.success
         case .warning: return SQColor.warning
         case .error: return SQColor.dangerInk

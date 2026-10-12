@@ -522,16 +522,16 @@ struct GuestSpeedtestReceiptsView: View {
     }
 }
 
-/// Champ Halo : capsule 44, fond tuile et filet de 1 pt (`sqFieldSurface`).
+/// Champ Halo : 44 pt, 14 pt de coins, fond tuile et filet de 1 pt (`sqFieldSurface`).
 struct SQTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .font(SQType.body)
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.vertical, SQSpace.md)
+            .padding(.horizontal, SQSpace.md2)
+            .padding(.vertical, SQSpace.sm2)
             .frame(minHeight: 44)
             // Le fond tuile a la couleur de la page : le filet dessine le champ.
-            .sqFieldSurface(in: Capsule(style: .continuous))
+            .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .foregroundStyle(SQColor.label)
             .tint(SQColor.brandRed)
     }

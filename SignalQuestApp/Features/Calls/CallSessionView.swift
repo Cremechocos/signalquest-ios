@@ -207,7 +207,7 @@ struct CallScreen: View {
         return SQAvatar(url: nil, name: (handle?.isEmpty == false ? handle! : "?"), size: 120)
             .padding(6)
             .overlay {
-                Circle().stroke(SQColor.brandRed, lineWidth: 3)
+                SQAvatarShape().stroke(SQColor.brandRed, lineWidth: 3)
             }
     }
 

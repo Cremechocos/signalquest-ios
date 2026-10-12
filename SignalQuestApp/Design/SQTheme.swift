@@ -70,6 +70,10 @@ enum SQType {
     static var metricSmall: Font { SQFont.display(20, .bold) }
     /// Nom en tête d'une rangée (conversation, auteur) — Sora Bold 15.
     static var rowTitle: Font { SQFont.body(15, .bold, relativeTo: .headline) }
+    /// Titre d'un état vide, d'erreur ou hors ligne — Sora ExtraBold 16 (planche « Retours »).
+    static var stateTitle: Font { SQFont.display(16, .bold, relativeTo: .headline) }
+    /// Puces de filtre et segments — Sora SemiBold 12 (`FilterChip`, `Segmented`).
+    static var chip: Font { SQFont.body(12, .semibold, relativeTo: .footnote) }
 
     // Mêmes tailles avec une autre graisse. Passer par ici plutôt que par
     // `.weight()` : la graisse reste ajustée au mode terrain et à « Texte en gras ».
