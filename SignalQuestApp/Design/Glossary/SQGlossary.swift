@@ -42,92 +42,109 @@ struct SQGlossarySheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    if let reading = entry.reading {
-                        Text(reading)
-                            .font(SQType.heading)
-                            .foregroundStyle(SQColor.label)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(SQSpace.lg)
-                            .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
-                    }
-
-                    if let illustration = entry.illustration {
-                        AntennaGlossaryIllustrationView(illustration: illustration)
-                    }
-
-                    Text(entry.definition)
-                        .font(SQType.body)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                // En-tête Halo : le terme en titre et un bouton rond pour fermer,
+                // comme les autres feuilles ; un terme lié remplace le titre sur place.
+                HStack(alignment: .top, spacing: SQSpace.sm) {
+                    Text(entry.title)
+                        .font(SQType.title)
                         .foregroundStyle(SQColor.label)
                         .fixedSize(horizontal: false, vertical: true)
-
-                    if let example = entry.example {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Par exemple").sqKicker()
-                            Text(example)
-                                .font(SQType.body)
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityAddTraits(.isHeader)
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "glossary.close") {
+                        dismiss()
                     }
-
-                    if !entry.scale.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Repères").sqKicker()
-                            ForEach(entry.scale, id: \.0) { bound, meaning in
-                                HStack(alignment: .top, spacing: SQSpace.md) {
-                                    Text(bound)
-                                        .font(SQFont.archivo(12.5, .bold))
-                                        .foregroundStyle(SQColor.accentInk)
-                                        // « −90 à −100 dBm » tient sur une ligne.
-                                        .frame(width: 116, alignment: .leading)
-                                    Text(meaning)
-                                        .font(SQType.caption)
-                                        .foregroundStyle(SQColor.labelSecondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .accessibilityElement(children: .combine)
-                            }
-                        }
+                }
+                if let reading = entry.reading {
+                    Text(reading)
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(SQSpace.lg)
-                        .sqCardBackground()
-                    }
+                        .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                }
 
-                    if !entry.related.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Voir aussi").sqKicker()
-                            ForEach(entry.related) { term in
+                if let illustration = entry.illustration {
+                    AntennaGlossaryIllustrationView(illustration: illustration)
+                }
+
+                Text(entry.definition)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let example = entry.example {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Par exemple").sqKicker()
+                        Text(example)
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                if !entry.scale.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Repères").sqKicker()
+                        ForEach(entry.scale, id: \.0) { bound, meaning in
+                            HStack(alignment: .top, spacing: SQSpace.md) {
+                                Text(bound)
+                                    .font(SQFont.archivo(12.5, .bold))
+                                    .foregroundStyle(SQColor.accentInk)
+                                    // « −90 à −100 dBm » tient sur une ligne.
+                                    .frame(width: 116, alignment: .leading)
+                                Text(meaning)
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(SQSpace.lg)
+                    .sqCardBackground()
+                }
+
+                if !entry.related.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Voir aussi").sqKicker()
+                        // Lignes sur carte blanche, comme les listes Halo ; le terme
+                        // lié remplace celui-ci sur place.
+                        VStack(spacing: 0) {
+                            ForEach(Array(entry.related.enumerated()), id: \.element) { index, term in
+                                if index > 0 { Divider().overlay(SQColor.separator) }
                                 Button {
                                     Haptics.light()
                                     entry = term.entry
                                 } label: {
-                                    Label(term.entry.title, systemImage: "arrow.right.circle")
-                                        .font(SQType.body)
-                                        .foregroundStyle(SQColor.accentInk)
-                                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                        .contentShape(Rectangle())
+                                    HStack(spacing: SQSpace.sm) {
+                                        Text(term.entry.title)
+                                            .font(SQType.callout(.semibold))
+                                            .foregroundStyle(SQColor.label)
+                                        Spacer(minLength: SQSpace.sm)
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(SQColor.labelTertiary)
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                             }
                         }
+                        .padding(.horizontal, SQSpace.lg)
+                        .padding(.vertical, SQSpace.xs)
+                        .sqCardBackground()
                     }
                 }
-                .padding(SQSpace.cardPadding)
             }
-            .signalQuestBackground()
-            .navigationTitle(entry.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }
-                        .tint(SQColor.brandRed)
-                }
-            }
+            .padding(SQSpace.cardPadding)
         }
+        .signalQuestBackground()
         .frame(minWidth: 320, idealWidth: 400, minHeight: 360, idealHeight: 520)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
