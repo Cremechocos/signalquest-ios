@@ -18,6 +18,38 @@
         }
       }
     },
+    "%@ en download%@, ping %@, %@ — mesuré avec SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ download%@, ping %@, %@ — measured with SignalQuest."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en download%@, ping %@, %@ — mesuré avec SignalQuest."
+          }
+        }
+      }
+    },
+    "%@ en upload" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ up"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en upload"
+          }
+        }
+      }
+    },
     "%@ indisponible — test via Cloudflare" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -188,6 +220,38 @@
         }
       }
     },
+    "%@° bas" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@° down"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@° bas"
+          }
+        }
+      }
+    },
+    "%@° haut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@° up"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@° haut"
+          }
+        }
+      }
+    },
     "%lld anneaux TA — ils ne se croisent pas : relevés à vérifier" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -325,15 +389,39 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld cell"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cell"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cells"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld cellule"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cellule"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cellules"
+                }
+              }
+            }
           }
         }
       }
@@ -413,6 +501,47 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld confirmations"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld conversation non lue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unread conversation"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unread conversations"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld conversation non lue"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld conversations non lues"
                 }
               }
             }
@@ -502,36 +631,125 @@
         }
       }
     },
-    "%lld passé" : {
+    "%lld lieu détecté automatiquement" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld skipped"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld automatically detected place"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld automatically detected places"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld passé"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lieu détecté automatiquement"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lieux détectés automatiquement"
+                }
+              }
+            }
           }
         }
       }
     },
-    "%lld passés" : {
+    "%lld masqué sur la carte" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld skipped"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld hidden on the map"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld hidden on the map"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld passés"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld masqué sur la carte"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld masqués sur la carte"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld passé" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skipped"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld skipped"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld passé"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld passés"
+                }
+              }
+            }
           }
         }
       }
@@ -594,19 +812,100 @@
         }
       }
     },
-    "%lld site identifié" : {
-      "extractionState" : "manual",
+    "%lld s" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld site identified"
+            "value" : "%lld s"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld site identifié"
+            "value" : "%lld s"
+          }
+        }
+      }
+    },
+    "%lld secteur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sector"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sectors"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld secteur"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld secteurs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld site identifié" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld site identified"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sites identified"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld site identifié"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sites identifiés"
+                }
+              }
+            }
           }
         }
       }
@@ -693,23 +992,6 @@
         }
       }
     },
-    "%lld sites identifiés" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld sites identified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld sites identifiés"
-          }
-        }
-      }
-    },
     "%lld. %@, %lld %@, %@." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -723,6 +1005,63 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld. %@, %lld %@, %@."
+          }
+        }
+      }
+    },
+    "(vide)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(empty)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(vide)"
+          }
+        }
+      }
+    },
+    "+ %lld autre session" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+ %lld other session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+ %lld other sessions"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+ %lld autre session"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "+ %lld autres sessions"
+                }
+              }
+            }
           }
         }
       }
@@ -795,6 +1134,22 @@
         }
       }
     },
+    "Amis (%lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Friends (%lld)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amis (%lld)"
+          }
+        }
+      }
+    },
     "Annuler cette demande" : {
       "localizations" : {
         "en" : {
@@ -807,6 +1162,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annuler cette demande"
+          }
+        }
+      }
+    },
+    "Antennes (estim.)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennas (est.)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennes (estim.)"
           }
         }
       }
@@ -945,6 +1316,22 @@
         }
       }
     },
+    "Bande %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bande %@"
+          }
+        }
+      }
+    },
     "Bandes — %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -974,6 +1361,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce lien mène hors de SignalQuest, vers %@."
+          }
+        }
+      }
+    },
+    "Ce qu'on en sait" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What we know"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qu'on en sait"
+          }
+        }
+      }
+    },
+    "Ce qui aide à le reconnaître" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What helps to recognize it"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui aide à le reconnaître"
           }
         }
       }
@@ -1227,6 +1646,22 @@
         }
       }
     },
+    "Confiance" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confidence"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confiance"
+          }
+        }
+      }
+    },
     "Contributeur" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1344,6 +1779,22 @@
         }
       }
     },
+    "Déjà vue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déjà vue"
+          }
+        }
+      }
+    },
     "En %@, sur %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1406,6 +1857,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Envoi en attente : ta publication partira automatiquement dès que possible."
+          }
+        }
+      }
+    },
+    "Fichier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichier"
           }
         }
       }
@@ -1474,6 +1941,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "IPv4 et IPv6, côte à côte"
+          }
+        }
+      }
+    },
+    "Identifier %lld site à la suite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Identify %lld site"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Identify %lld sites in sequence"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Identifier %lld site"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Identifier %lld sites à la suite"
+                }
+              }
+            }
           }
         }
       }
@@ -2000,6 +2508,22 @@
         }
       }
     },
+    "Ma progression : niveau %lld, %lld points, %@. Ouvre les récompenses." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My progress: level %lld, %lld points, %@. Open rewards."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ma progression : niveau %lld, %lld points, %@. Ouvre les récompenses."
+          }
+        }
+      }
+    },
     "Ma résidence secondaire" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2046,6 +2570,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mauvais"
+          }
+        }
+      }
+    },
+    "Membres (%lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Members (%lld)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membres (%lld)"
           }
         }
       }
@@ -2219,6 +2759,22 @@
         }
       }
     },
+    "Pas encore vue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore vue"
+          }
+        }
+      }
+    },
     "Photos de mes amis seulement" : {
       "localizations" : {
         "en" : {
@@ -2252,6 +2808,54 @@
         }
       }
     },
+    "Première mesure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First measurement"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Première mesure"
+          }
+        }
+      }
+    },
+    "Précision GPS médiane" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median GPS accuracy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Précision GPS médiane"
+          }
+        }
+      }
+    },
+    "Pylône rue des Lilas" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mast on Station Road"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pylône rue des Lilas"
+          }
+        }
+      }
+    },
     "QR indisponible. Crée une nouvelle demande." : {
       "localizations" : {
         "en" : {
@@ -2281,6 +2885,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "RSRP moyen"
+          }
+        }
+      }
+    },
+    "Rayon Fresnel max." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Max. Fresnel radius"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rayon Fresnel max."
+          }
+        }
+      }
+    },
+    "Rayon d'incertitude" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uncertainty radius"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rayon d'incertitude"
           }
         }
       }
@@ -2551,6 +3187,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Site ajouté"
+          }
+        }
+      }
+    },
+    "Site en service ; reste à activer : %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site in service; still to be switched on: %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site en service ; reste à activer : %@."
           }
         }
       }
@@ -3348,6 +4000,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "tout l’historique"
+          }
+        }
+      }
+    },
+    "un participant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a participant"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "un participant"
           }
         }
       }
@@ -7021,38 +7689,6 @@
         }
       }
     },
-    "%@ relevé" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ measurement"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ relevé"
-          }
-        }
-      }
-    },
-    "%@ relevés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ measurements"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ relevés"
-          }
-        }
-      }
-    },
     "%1$@ pour %2$@" : {
       "localizations" : {
         "en" : {
@@ -7665,38 +8301,6 @@
         }
       }
     },
-    "%@ sites" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ sites"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ sites"
-          }
-        }
-      }
-    },
-    "%@ sites · %@ relevés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ sites · %@ measurements"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ sites · %2$@ relevés"
-          }
-        }
-      }
-    },
     "%@ sur %lld." : {
       "localizations" : {
         "en" : {
@@ -8236,22 +8840,6 @@
         }
       }
     },
-    "%lld Mbps en download%@, ping %@, %@ — mesuré avec SignalQuest." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Mbps download%@, ping %@, %@ — measured with SignalQuest."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld Mbps en download%@, ping %@, %@ — mesuré avec SignalQuest."
-          }
-        }
-      }
-    },
     "%lld Mbps en réception" : {
       "localizations" : {
         "en" : {
@@ -8476,22 +9064,6 @@
         }
       }
     },
-    "%lld conversations non lues" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld unread conversations"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld conversations non lues"
-          }
-        }
-      }
-    },
     "%lld coupure" : {
       "localizations" : {
         "en" : {
@@ -8613,33 +9185,42 @@
       }
     },
     "%lld identifié" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld identified"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld identified"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld identified"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld identifié"
-          }
-        }
-      }
-    },
-    "%lld identifiés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld identified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld identifiés"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld identifié"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld identifiés"
+                }
+              }
+            }
           }
         }
       }
@@ -8656,22 +9237,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld j’aime"
-          }
-        }
-      }
-    },
-    "%lld lieux détectés automatiquement" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld automatically detected places"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld lieux détectés automatiquement"
           }
         }
       }
@@ -8704,22 +9269,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld m au-dessus du niveau de la mer."
-          }
-        }
-      }
-    },
-    "%lld masqué(s) sur la carte" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld hidden on the map"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld masqué(s) sur la carte"
           }
         }
       }
@@ -8896,22 +9445,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "%lld mesures" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld measurements"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld mesures"
           }
         }
       }
@@ -9218,33 +9751,42 @@
       }
     },
     "%lld relevé" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld measurement"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurement"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld measurements"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld relevé"
-          }
-        }
-      }
-    },
-    "%lld relevés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld measurements"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld relevés"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld relevé"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld relevés"
+                }
+              }
+            }
           }
         }
       }
@@ -9362,33 +9904,42 @@
       }
     },
     "%lld site" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld site"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld site"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sites"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld site"
-          }
-        }
-      }
-    },
-    "%lld sites" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld sites"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld sites"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld site"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sites"
+                }
+              }
+            }
           }
         }
       }
@@ -9566,32 +10117,39 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld visit"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld visit"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld visits"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld visite"
-          }
-        }
-      }
-    },
-    "%lld visites" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld visits"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld visites"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld visite"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld visites"
+                }
+              }
+            }
           }
         }
       }
@@ -9826,22 +10384,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "+ %@"
-          }
-        }
-      }
-    },
-    "+ %lld autre(s) session(s)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "+ %lld other session(s)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "+ %lld autre(s) session(s)"
           }
         }
       }
@@ -24196,7 +24738,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Last known settings preserved."
+            "value" : "Last known state kept."
           }
         },
         "fr" : {
@@ -27735,22 +28277,6 @@
         }
       }
     },
-    "Et %lld autre(s) commentaire(s)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "And %lld other comment(s)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Et %lld autre(s) commentaire(s)"
-          }
-        }
-      }
-    },
     "Europe" : {
       "localizations" : {
         "en" : {
@@ -29549,22 +30075,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identifier"
-          }
-        }
-      }
-    },
-    "Identifier %lld sites à la suite" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identify %lld sites in sequence"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identifier %lld sites à la suite"
           }
         }
       }
@@ -35619,22 +36129,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ma progression"
-          }
-        }
-      }
-    },
-    "Ma progression : niveau %lld, %lld points, %lld jours consécutifs. Ouvre les récompenses." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "My progress: level %lld, %lld points, %lld days in a row. Open rewards."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ma progression : niveau %1$lld, %2$lld points, %3$lld jours consécutifs. Ouvre les récompenses."
           }
         }
       }
@@ -63612,22 +64106,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "↓ %@"
-          }
-        }
-      }
-    },
-    "↓ %@ Mbps" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "↓ %@ Mbps"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "↓ %@ Mbps"
           }
         }
       }

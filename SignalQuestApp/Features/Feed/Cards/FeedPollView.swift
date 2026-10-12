@@ -13,7 +13,7 @@ struct FeedPollView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             if let question = poll.question, !question.isEmpty {
-                Text(LocalizedStringKey(question))
+                Text(verbatim: question)
                     .font(SQFont.body(15, .semibold))
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
@@ -67,7 +67,7 @@ struct FeedPollView: View {
                             .foregroundStyle(SQColor.accentInk)
                             .accessibilityHidden(true)
                     }
-                    Text(LocalizedStringKey(option.label))
+                    Text(verbatim: option.label)
                         .font(SQFont.body(14, option.votedByMe ? .semibold : .regular))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(2)
@@ -92,7 +92,7 @@ struct FeedPollView: View {
         // Balayer trois textes par option rendrait un sondage à quatre choix
         // interminable au lecteur d'écran.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(LocalizedStringKey(option.label))
+        .accessibilityLabel(Text(verbatim: option.label))
         .accessibilityValue(
             revealed
                 ? Text(share.formatted(.percent.precision(.fractionLength(0))))

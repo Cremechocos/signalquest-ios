@@ -110,7 +110,7 @@ struct SQDock: View {
         .accessibilityShowsLargeContentViewer {
             Label(item.label, systemImage: item.icon)
         }
-        .accessibilityLabel(badge > 0 ? "\(item.label), \(String(localized: "\(badge) conversations non lues"))" : item.label)
+        .accessibilityLabel(badge > 0 ? "\(item.label), \(String(localized: "\(badge) conversation non lue"))" : item.label)
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 

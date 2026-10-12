@@ -33,7 +33,7 @@ struct PlannedDetailSheet: View {
                 .frame(width: 46, height: 46)
                 .background(operatorAccent, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text(site.codeSite ?? site.idStation ?? "Site prévisionnel")
+                Text(site.codeSite ?? site.idStation ?? String(localized: "Site prévisionnel"))
                     .font(SQFont.display(20, .bold))
                     .foregroundStyle(SQColor.label)
                 Text(statusLabel)
@@ -175,8 +175,8 @@ struct PlannedDetailSheet: View {
             return String(localized: "Site en service — toutes les technologies prévues émettent.")
         case .upgradePending:
             return pending.isEmpty
-                ? "Site en service, mise à niveau en cours."
-                : "Site en service ; reste à activer : \(pending.joined(separator: ", "))."
+                ? String(localized: "Site en service, mise à niveau en cours.")
+                : String(localized: "Site en service ; reste à activer : \(pending.formatted(.list(type: .and))).")
         case .declared:
             return String(localized: "Station enregistrée à l'ANFR, pas encore d'émetteur actif.")
         case .planned:

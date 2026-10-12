@@ -329,7 +329,7 @@ private struct IdentificationNodeRow: View {
                     Label("validée \(group.validations)×", systemImage: "checkmark.seal.fill")
                         .foregroundStyle(SQColor.success)
                     if !group.sectorsUnion.isEmpty {
-                        Label("\(group.sectorsUnion.count) secteur\(group.sectorsUnion.count > 1 ? "s" : "")", systemImage: "dot.radiowaves.right")
+                        Label("\(group.sectorsUnion.count) secteur", systemImage: "dot.radiowaves.right")
                     }
                 }
                 .font(SQType.micro)

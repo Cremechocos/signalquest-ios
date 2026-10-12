@@ -123,7 +123,7 @@ struct NetworkPulseHero: View {
     /// « 7 derniers jours · 214 mesures · il y a 12 min » — la ligne qui donne son
     /// sens aux trois nombres du dessous.
     private var contextLine: String {
-        var parts: [String] = [windowLabel, String(localized: "\(pulse.measurementsCount) mesures")]
+        var parts: [String] = [windowLabel, String(localized: "\(pulse.measurementsCount) mesure")]
         if let radius = pulse.radiusMeters { parts.append(String(localized: "rayon \(formatRadius(radius))")) }
         if let freshness = freshnessLabel { parts.append(freshness) }
         return parts.joined(separator: " · ")

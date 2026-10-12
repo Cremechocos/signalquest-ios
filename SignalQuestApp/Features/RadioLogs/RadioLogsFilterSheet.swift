@@ -18,7 +18,7 @@ struct RadioLogsFilterSheet: View {
                 Text("Trier et filtrer")
                     .font(SQFont.display(M.sheetTitleSize, .bold))
                     .foregroundStyle(P.ink)
-                Text("\(model.totalCount.formatted()) sites · \(model.logCount.formatted()) relevés")
+                Text(verbatim: [String(localized: "\(model.totalCount) site"), String(localized: "\(model.logCount) relevé")].joined(separator: " · "))
                     .font(SQFont.body(M.sheetSubtitleSize))
                     .monospacedDigit()
                     .foregroundStyle(P.muted)

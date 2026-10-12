@@ -551,7 +551,7 @@ private struct LeaderboardHeroCard: View {
             card
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel("Ma progression : niveau \(level), \(points) points, \(streak) jours consécutifs. Ouvre les récompenses.")
+        .accessibilityLabel("Ma progression : niveau \(level), \(points) points, \(String(localized: "\(streak) jours consécutifs")). Ouvre les récompenses.")
     }
 
     private var card: some View {

@@ -117,7 +117,7 @@ struct AntennaRadioIdentifiersView: View {
                         FlowChips(items: sector.pcis.map { "PCI \($0.value)" }, tint: tint)
                     }
                     if !isExpanded, !sector.cells.isEmpty {
-                        Text("\(sector.cells.count) cellule\(sector.cells.count > 1 ? "s" : "")")
+                        Text("\(sector.cells.count) cellule")
                             .font(SQType.micro)
                             .foregroundStyle(SQColor.labelSecondary)
                     }

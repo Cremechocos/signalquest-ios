@@ -100,7 +100,7 @@ struct SpeedtestDetailContent: View {
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         if let generation { generationTitle(generation) }
-                        Text(Self.dateFormatter.string(from: result.createdAt))
+                        Text(result.createdAt.formatted(date: .abbreviated, time: .shortened))
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                     }
@@ -108,7 +108,7 @@ struct SpeedtestDetailContent: View {
                     HStack(spacing: SQSpace.sm) {
                         if let generation { generationTitle(generation) }
                         Spacer(minLength: 0)
-                        Text(Self.dateFormatter.string(from: result.createdAt))
+                        Text(result.createdAt.formatted(date: .abbreviated, time: .shortened))
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                     }
@@ -470,13 +470,6 @@ struct SpeedtestDetailContent: View {
     }
 
     // MARK: Formats
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.autoupdatingCurrent
-        formatter.dateFormat = "d MMM yyyy · HH:mm"
-        return formatter
-    }()
 
     private static let frFormatter: NumberFormatter = {
         let formatter = NumberFormatter()

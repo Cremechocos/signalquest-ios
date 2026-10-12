@@ -263,7 +263,7 @@ struct RadioLogsView: View {
                 .background(P.accentSoft, in: RoundedRectangle(cornerRadius: M.tallyBadgeRadius, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(model.totalCount <= 1 ? String(localized: "\(model.totalCount) site") : String(localized: "\(model.totalCount.formatted()) sites"))
+                Text(String(localized: "\(model.totalCount) site"))
                     .font(SQFont.display(M.tallyNumberSize, .bold))
                     .foregroundStyle(P.ink)
                 Text(tallySubtitle)
@@ -278,10 +278,9 @@ struct RadioLogsView: View {
     }
 
     private var tallySubtitle: String {
-        // Traduit, et au singulier jusqu'à 1 (« 0 relevé ») : la ligne
-        // s'affichait telle quelle, en français dans l'app anglaise.
-        let count = model.logCount.formatted()
-        var parts = [model.logCount <= 1 ? String(localized: "\(count) relevé") : String(localized: "\(count) relevés")]
+        // Traduit, avec les variantes de pluriel du catalogue (« 0 relevé » en
+        // français, « 0 measurements » en anglais).
+        var parts = [String(localized: "\(model.logCount) relevé")]
         if let lastSyncedAt = model.lastSyncedAt {
             parts.append(String(localized: "synchronisé \(lastSyncedAt.formatted(.relative(presentation: .named)))"))
         }
@@ -358,7 +357,7 @@ struct RadioLogsView: View {
                 Image(systemName: "list.bullet.rectangle.portrait")
                     .font(.system(size: 15, weight: .semibold))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Identifier \(min(candidates.count, 50)) sites à la suite")
+                    Text("Identifier \(min(candidates.count, 50)) site à la suite")
                         .font(SQFont.body(13, .bold))
                     Text("un site après l'autre, sortie à tout moment")
                         .font(SQFont.body(12))

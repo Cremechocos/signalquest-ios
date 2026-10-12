@@ -290,6 +290,6 @@ struct SignatureSpeedDial: View {
         if unit == "ms" || value >= 100 {
             return "\(Int(value.rounded()))"
         }
-        return String(format: "%.1f", value)
+        return value.formatted(.number.precision(.fractionLength(1)))
     }
 }

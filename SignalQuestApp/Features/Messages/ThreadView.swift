@@ -71,7 +71,7 @@ struct ThreadView: View {
                 SQAvatar(url: source.sender?.avatarUrl, name: source.sender?.displayName ?? "?", size: 30)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(source.sender?.displayName ?? "Message")
+                    Text(source.sender?.displayName ?? String(localized: "Message"))
                         .font(SQType.caption.weight(.semibold))
                         .foregroundStyle(SQColor.label)
                     if let date = source.createdAt {
@@ -208,7 +208,7 @@ struct ThreadView: View {
 
     private func displayedContent(for message: MessageItem) -> String {
         if message.deletedAt != nil { return String(localized: "Message supprimé") }
-        if message.isEncrypted { return decrypted[message.id] ?? "🔒 Message chiffré" }
+        if message.isEncrypted { return decrypted[message.id] ?? String(localized: "🔒 Message chiffré") }
         return message.content ?? ""
     }
 

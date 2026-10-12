@@ -44,7 +44,7 @@ enum OperatorComparisonTemplateBuilder {
     static func detail(for stat: OperatorMetricStat, metric: NearbyOperatorMetric) -> String {
         var parts = ["\(stat.value) \(metric.unit)"]
         if let extra = stat.detail, !extra.isEmpty { parts.append(extra) }
-        parts.append(String(localized: "\(stat.sampleCount) mesures"))
+        parts.append(String(localized: "\(stat.sampleCount) mesure"))
         return parts.joined(separator: " · ")
     }
 

@@ -213,7 +213,7 @@ struct RadioLogIdentifySheet: View {
     private var metaLine: String {
         [site.operatorName ?? String(localized: "Opérateur inconnu"),
          site.compositionLabel,
-         site.logCount <= 1 ? String(localized: "\(site.logCount) relevé") : String(localized: "\(site.logCount) relevés")]
+         String(localized: "\(site.logCount) relevé")]
             .joined(separator: " · ")
     }
 

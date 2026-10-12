@@ -164,8 +164,8 @@ struct SignalCardBubble: View {
 
             // Puces bande / site
             let chips: [String] = [
-                signal.band.map { "Bande \($0)" },
-                signal.site.map { "Site \($0)" }
+                signal.band.map { String(localized: "Bande \($0)") },
+                signal.site.map { String(localized: "Site \($0)") }
             ].compactMap { $0 }
             if !chips.isEmpty {
                 HStack(spacing: SQSpace.xs + 2) {
@@ -281,14 +281,14 @@ struct SharedPostCardBubble: View {
                 unit: "dBm",
                 tint: rsrpColor(rsrp),
                 chips: [signal.operatorName, signal.technology,
-                        signal.band.map { "Bande \($0)" }, signal.site.map { "Site \($0)" }]
+                        signal.band.map { String(localized: "Bande \($0)") }, signal.site.map { String(localized: "Site \($0)") }]
             )
         } else if let speedtest = card.speedtest, speedtest.downloadMbps != nil {
             measurementBanner(
                 primary: formatMbps(speedtest.downloadMbps),
-                unit: "Mbps",
+                unit: SQUnits.throughputUnit(mbps: speedtest.downloadMbps ?? 0),
                 tint: mine ? SQColor.onAccent : SQColor.brandRed,
-                chips: [speedtest.uploadMbps.map { "↑ \(formatMbps($0)) Mbps" },
+                chips: [speedtest.uploadMbps.map { "↑ \(SQUnits.throughput(mbps: $0))" },
                         speedtest.pingMs.map { "\(Int($0.rounded())) ms" },
                         speedtest.operatorName, speedtest.technology]
             )
@@ -339,7 +339,7 @@ struct SharedPostCardBubble: View {
 
     private func formatMbps(_ value: Double?) -> String {
         guard let value else { return "—" }
-        return value >= 100 ? String(Int(value.rounded())) : String(format: "%.1f", value)
+        return SQUnits.throughputValue(mbps: value)
     }
 
     private func formatDuration(_ seconds: Int) -> String {

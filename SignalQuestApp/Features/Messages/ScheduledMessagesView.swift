@@ -86,9 +86,9 @@ struct ScheduledMessagesView: View {
     }
 
     private func content(for item: ScheduledMessage) -> String {
-        if item.isEncrypted { return decrypted[item.id] ?? "🔒 Message chiffré" }
+        if item.isEncrypted { return decrypted[item.id] ?? String(localized: "🔒 Message chiffré") }
         let value = item.content ?? ""
-        return value.isEmpty ? "(vide)" : value
+        return value.isEmpty ? String(localized: "(vide)") : value
     }
 
     private func statusLabel(_ status: String) -> String {

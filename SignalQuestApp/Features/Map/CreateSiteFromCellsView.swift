@@ -73,9 +73,9 @@ struct CreateSiteFromCellsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     positionPicker
-                    field(String(localized: "Nom du site"), text: $name, placeholder: "Pylône rue des Lilas")
+                    field(String(localized: "Nom du site"), text: $name, placeholder: String(localized: "Pylône rue des Lilas"))
                     typePicker
-                    field(String(localized: "Note (facultatif)"), text: $note, placeholder: "Ce qui aide à le reconnaître")
+                    field(String(localized: "Note (facultatif)"), text: $note, placeholder: String(localized: "Ce qui aide à le reconnaître"))
                     radioSummary
                     if let errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")

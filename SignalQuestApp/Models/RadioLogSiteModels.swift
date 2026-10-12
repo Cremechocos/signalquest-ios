@@ -134,9 +134,7 @@ struct RadioLogSite: Identifiable, Sendable, Equatable {
 
     /// `3 cellules · 2 PCI` — la ligne de méta de la maquette.
     var compositionLabel: String {
-        let cellPart = cells.count <= 1
-            ? String(localized: "\(cells.count) cellule")
-            : String(localized: "\(cells.count) cellules")
+        let cellPart = String(localized: "\(cells.count) cellule")
         let pciCount = distinctPciCount
         guard pciCount > 0 else { return cellPart }
         return String(localized: "\(cellPart) · \(pciCount) PCI")

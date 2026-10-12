@@ -236,7 +236,7 @@ struct E2EEUnlockSheet: View {
     /// Déverrouillage E2EE via Face ID / Touch ID : lit le mot de passe mémorisé
     /// (déclenche la biométrie) puis exécute le déverrouillage normal.
     private func biometricUnlock() async {
-        guard let stored = await E2EEBiometric.retrieve(reason: "Déverrouille ta messagerie chiffrée") else {
+        guard let stored = await E2EEBiometric.retrieve(reason: String(localized: "Déverrouille ta messagerie chiffrée")) else {
             passwordFocused = true
             return
         }

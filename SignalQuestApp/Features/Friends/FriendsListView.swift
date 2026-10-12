@@ -190,7 +190,7 @@ struct FriendsListView: View {
                     .accessibilityHint("Ouvre le profil de \(friend.displayName)")
                 }
             } header: {
-                sectionHeader("Amis (\(model.friends.count))")
+                sectionHeader(String(localized: "Amis (\(model.friends.count))"))
             }
             }
             if !model.blocked.isEmpty {

@@ -1127,7 +1127,7 @@ struct FeedView: View {
         }
         .accessibilityValue(services.unreadConversations == 0
                             ? "Aucun message non lu"
-                            : "\(services.unreadConversations) conversations non lues")
+                            : "\(services.unreadConversations) conversation non lue")
         headerActionButton(identifier: "explore", systemImage: "magnifyingglass", title: "Explorer") {
             showExplore = true
         }

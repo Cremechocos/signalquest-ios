@@ -1112,7 +1112,7 @@ struct ConversationDetailView: View {
                                 .fill(mine ? SQColor.onAccent.opacity(0.7) : SQColor.brandRed)
                                 .frame(width: 3)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(quoted.sender?.displayName ?? "Message")
+                                Text(quoted.sender?.displayName ?? String(localized: "Message"))
                                     .font(SQType.micro)
                                 Text(displayedContent(for: quoted))
                                     .font(SQType.caption)
@@ -1718,7 +1718,7 @@ struct ConversationDetailView: View {
            ext.count <= 5, !ext.isEmpty, attachment.fileName?.contains(".") == true {
             parts.append(ext.uppercased())
         }
-        return parts.isEmpty ? "Fichier" : parts.joined(separator: " · ")
+        return parts.isEmpty ? String(localized: "Fichier") : parts.joined(separator: " · ")
     }
 
     // MARK: Barre d'épinglés
@@ -1764,7 +1764,7 @@ struct ConversationDetailView: View {
     }
 
     private func pinnedSnippet(_ pinned: PinnedMessage) -> String {
-        guard let message = pinned.message else { return "Message" }
+        guard let message = pinned.message else { return String(localized: "Message") }
         if message.isEncrypted && !isReadableV2(message) {
             return decryptedMessages[message.id] ?? String(localized: "🔒 Message chiffré")
         }
@@ -2625,7 +2625,7 @@ struct ConversationDetailView: View {
             // n'est pas encore disponible partout. Le dire plutôt que d'envoyer
             // un audio en clair dans une conversation chiffrée.
             guard !isE2EE else {
-                throw E2EEError.unsupported("Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils.")
+                throw E2EEError.unsupported(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
             }
             guard let data = try? Data(contentsOf: url), !data.isEmpty else { return }
             let sent = try await service.sendAttachmentData(
@@ -2655,7 +2655,7 @@ struct ConversationDetailView: View {
         defer { isSending = false }
         do {
             guard !isE2EE else {
-                throw E2EEError.unsupported("Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils.")
+                throw E2EEError.unsupported(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
             }
             guard let raw = try await item.loadTransferable(type: Data.self) else { return }
             // Décodage/redimensionnement/encodage hors du main thread pour ne pas
@@ -2663,7 +2663,7 @@ struct ConversationDetailView: View {
             guard let prepared = await Task.detached(priority: .userInitiated, operation: {
                 Self.preparedJPEG(from: raw)
             }).value else {
-                throw E2EEError.unsupported("Image illisible")
+                throw E2EEError.unsupported(String(localized: "Image illisible."))
             }
             let caption = rawCaption.trimmingCharacters(in: .whitespacesAndNewlines)
             let sent = try await service.sendAttachmentData(
@@ -2880,7 +2880,7 @@ struct ConversationDetailView: View {
     private var conversationTitle: String {
         if let renamedTitle, !renamedTitle.isEmpty { return renamedTitle }
         let title = conversation.displayTitle(excluding: currentUserId)
-        return title.isEmpty ? "Conversation" : title
+        return title.isEmpty ? String(localized: "Conversation") : title
     }
 
     private func startCall(mode: String) {
@@ -3133,7 +3133,7 @@ private struct LiveShareConversationBar: View {
                     }
                 }
                 if sessions.count > 3 {
-                    Text("+ \(sessions.count - 3) autre(s) session(s)")
+                    Text("+ \(sessions.count - 3) autre session")
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -3218,7 +3218,7 @@ private struct LiveShareConversationBar: View {
         if userId == currentUserId { return String(localized: "toi") }
         if let name = conversation.participants.first(where: { $0.userId == userId })?.user.displayName,
            !name.isEmpty { return name }
-        return "un participant"
+        return String(localized: "un participant")
     }
 }
 
@@ -3552,7 +3552,7 @@ private struct LiveShareSessionCard: View {
         if userId == currentUserId { return String(localized: "toi") }
         return conversation.participants.first(where: { $0.userId == userId })?.user.displayName
             ?? (userId == session.requesterId ? session.requester?.name : session.sharer?.name)
-            ?? "un participant"
+            ?? String(localized: "un participant")
     }
 }
 

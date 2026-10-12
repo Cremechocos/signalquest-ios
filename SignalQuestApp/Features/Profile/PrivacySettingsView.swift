@@ -151,12 +151,12 @@ struct PrivacySettingsView: View {
                             }
                         } label: {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text("\(model.detectedZones.count) lieux détectés automatiquement")
+                                Text("\(model.detectedZones.count) lieu détecté automatiquement")
                                     .font(SQFont.body(15, .medium))
                                     .foregroundStyle(SQColor.label)
                                 Text(model.hiddenDetectedCount == 0
                                      ? "Aucun n'est masqué"
-                                     : "\(model.hiddenDetectedCount) masqué(s) sur la carte")
+                                     : "\(model.hiddenDetectedCount) masqué sur la carte")
                                     .font(SQType.caption)
                                     .foregroundStyle(SQColor.labelSecondary)
                             }

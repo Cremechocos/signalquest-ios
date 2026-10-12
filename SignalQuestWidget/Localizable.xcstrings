@@ -1,25 +1,96 @@
 {
-  "sourceLanguage": "fr",
-  "strings": {
-    "Speedtest en rafale %lld/%lld": {
-      "localizations": {
-        "fr": { "stringUnit": { "state": "translated", "value": "Speedtest en rafale %lld/%lld" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Burst speedtest %lld/%lld" } }
+  "sourceLanguage" : "fr",
+  "strings" : {
+    "%lld test" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld test"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tests"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld test"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tests"
+                }
+              }
+            }
+          }
+        }
       }
     },
-    "Lancer un test": {
-      "localizations": {
-        "fr": { "stringUnit": { "state": "translated", "value": "Lancer un test" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Run a test" } }
+    "Speedtest en rafale %lld/%lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtest en rafale %lld/%lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Burst speedtest %lld/%lld"
+          }
+        }
       }
     },
-    "Un toucher pour lancer un speedtest.": {
-      "localizations": {
-        "fr": { "stringUnit": { "state": "translated", "value": "Un toucher pour lancer un speedtest." } },
-        "en": { "stringUnit": { "state": "translated", "value": "One tap to run a speedtest." } }
+    "Lancer un test" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lancer un test"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run a test"
+          }
+        }
       }
     },
-    "Tendance du débit": {
+    "Un toucher pour lancer un speedtest." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un toucher pour lancer un speedtest."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One tap to run a speedtest."
+          }
+        }
+      }
+    },
+    "Tendance du débit" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -35,7 +106,7 @@
         }
       }
     },
-    "Moy.": {
+    "Moy." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -51,7 +122,7 @@
         }
       }
     },
-    "Record": {
+    "Record" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -67,7 +138,7 @@
         }
       }
     },
-    "Envoi": {
+    "Envoi" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -83,7 +154,7 @@
         }
       }
     },
-    "Réception": {
+    "Réception" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -99,7 +170,7 @@
         }
       }
     },
-    "Latence": {
+    "Latence" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -115,7 +186,7 @@
         }
       }
     },
-    "Gigue": {
+    "Gigue" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -131,7 +202,7 @@
         }
       }
     },
-    "ms": {
+    "ms" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -147,7 +218,7 @@
         }
       }
     },
-    "Rafale": {
+    "Rafale" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -163,7 +234,7 @@
         }
       }
     },
-    "Terminé": {
+    "Terminé" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -179,7 +250,7 @@
         }
       }
     },
-    "Enregistrement": {
+    "Enregistrement" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -195,7 +266,7 @@
         }
       }
     },
-    "Test": {
+    "Test" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -211,7 +282,7 @@
         }
       }
     },
-    "Test %lld/%lld": {
+    "Test %lld/%lld" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -227,7 +298,7 @@
         }
       }
     },
-    "%lld": {
+    "%lld" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -243,7 +314,7 @@
         }
       }
     },
-    "%lld %%": {
+    "%lld %%" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -259,7 +330,7 @@
         }
       }
     },
-    "%lld Mbps ↓": {
+    "%lld Mbps ↓" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -275,7 +346,7 @@
         }
       }
     },
-    "%lld ms": {
+    "%lld ms" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -291,23 +362,7 @@
         }
       }
     },
-    "%lld tests": {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld tests"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld tests"
-          }
-        }
-      }
-    },
-    "%lld%%": {
+    "%lld%%" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -323,7 +378,7 @@
         }
       }
     },
-    "Affiche ton dernier test de débit SignalQuest.": {
+    "Affiche ton dernier test de débit SignalQuest." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -339,7 +394,7 @@
         }
       }
     },
-    "Antenne à %@": {
+    "Antenne à %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -355,7 +410,7 @@
         }
       }
     },
-    "Aucun test": {
+    "Aucun test" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -371,7 +426,7 @@
         }
       }
     },
-    "Dernier Speedtest": {
+    "Dernier Speedtest" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -387,7 +442,7 @@
         }
       }
     },
-    "Débit %@ mégabits par seconde, %@": {
+    "Débit %@ mégabits par seconde, %@" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -403,7 +458,7 @@
         }
       }
     },
-    "Lance un Drive Test": {
+    "Lance un Drive Test" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -419,7 +474,7 @@
         }
       }
     },
-    "Lance un test pour voir ton réseau": {
+    "Lance un test pour voir ton réseau" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -435,7 +490,7 @@
         }
       }
     },
-    "Lance un speedtest": {
+    "Lance un speedtest" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -451,7 +506,7 @@
         }
       }
     },
-    "Lancer un Speedtest SignalQuest": {
+    "Lancer un Speedtest SignalQuest" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -467,7 +522,7 @@
         }
       }
     },
-    "Mbps": {
+    "Mbps" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -483,7 +538,7 @@
         }
       }
     },
-    "Ouvre SignalQuest pour lancer un test de débit.": {
+    "Ouvre SignalQuest pour lancer un test de débit." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -499,7 +554,7 @@
         }
       }
     },
-    "Pas encore de tendance": {
+    "Pas encore de tendance" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -515,7 +570,7 @@
         }
       }
     },
-    "Progression": {
+    "Progression" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -531,7 +586,7 @@
         }
       }
     },
-    "Rafale %lld/%lld": {
+    "Rafale %lld/%lld" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -547,7 +602,7 @@
         }
       }
     },
-    "Réseau autour de moi": {
+    "Réseau autour de moi" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -563,7 +618,7 @@
         }
       }
     },
-    "SIGNALQUEST": {
+    "SIGNALQUEST" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -579,7 +634,7 @@
         }
       }
     },
-    "Speedtest": {
+    "Speedtest" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -595,7 +650,7 @@
         }
       }
     },
-    "Speedtest SignalQuest": {
+    "Speedtest SignalQuest" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -611,7 +666,7 @@
         }
       }
     },
-    "TENDANCE DÉBIT": {
+    "TENDANCE DÉBIT" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -627,7 +682,7 @@
         }
       }
     },
-    "Tendance débit": {
+    "Tendance débit" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -643,7 +698,7 @@
         }
       }
     },
-    "Tes derniers tests de débit en un coup d'œil.": {
+    "Tes derniers tests de débit en un coup d'œil." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -659,7 +714,7 @@
         }
       }
     },
-    "Ton opérateur, l'antenne la plus proche et ton dernier débit.": {
+    "Ton opérateur, l'antenne la plus proche et ton dernier débit." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -675,7 +730,7 @@
         }
       }
     },
-    "—": {
+    "—" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -691,48 +746,108 @@
         }
       }
     },
-    "Excellent": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": { "stringUnit": { "state": "translated", "value": "Excellent" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Excellent" } }
+    "Excellent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excellent"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excellent"
+          }
+        }
       }
     },
-    "Très bon": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": { "stringUnit": { "state": "translated", "value": "Très bon" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Very good" } }
+    "Très bon" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Très bon"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Very good"
+          }
+        }
       }
     },
-    "Rapide": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": { "stringUnit": { "state": "translated", "value": "Rapide" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Fast" } }
+    "Rapide" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapide"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fast"
+          }
+        }
       }
     },
-    "Correct": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": { "stringUnit": { "state": "translated", "value": "Correct" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Fair" } }
+    "Correct" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correct"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fair"
+          }
+        }
       }
     },
-    "Lent": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": { "stringUnit": { "state": "translated", "value": "Lent" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Slow" } }
+    "Lent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lent"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slow"
+          }
+        }
       }
     },
-    "Faible": {
-      "extractionState": "manual",
-      "localizations": {
-        "fr": { "stringUnit": { "state": "translated", "value": "Faible" } },
-        "en": { "stringUnit": { "state": "translated", "value": "Weak" } }
+    "Faible" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faible"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weak"
+          }
+        }
       }
     }
   },
-  "version": "1.0"
+  "version" : "1.0"
 }

@@ -248,7 +248,7 @@ final class SQShareCardBuilderTests: XCTestCase {
             )
         )
 
-        XCTAssertTrue(text.contains("770 Mbps"))
+        XCTAssertTrue(text.contains("770 \(SQUnits.throughputUnit(mbps: 770))"))
         XCTAssertTrue(text.contains("ping 24 ms"))
         XCTAssertTrue(text.contains("#SignalQuest"))
         XCTAssertFalse(text.contains("Orange"))

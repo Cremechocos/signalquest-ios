@@ -193,7 +193,7 @@ struct AntennaMetricTile: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel("\(label) : \(value)")
+        .accessibilityLabel(Text(LocalizedStringKey(label)) + Text(verbatim: ", \(value)"))
         .accessibilityHint("Toucher pour comprendre cette mesure")
     }
 }

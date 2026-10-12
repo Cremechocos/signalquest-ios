@@ -90,7 +90,7 @@ struct SpeedtestTrendEntryView: View {
                     .foregroundStyle(WidgetPalette.labelSecondary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                Text("\(entry.recent.count) tests")
+                Text("\(entry.recent.count) test")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(WidgetPalette.labelSecondary)
                     .monospacedDigit()

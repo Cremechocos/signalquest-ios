@@ -94,7 +94,7 @@ struct MessageSearchView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
-                        Text(message.sender?.displayName ?? "Message")
+                        Text(message.sender?.displayName ?? String(localized: "Message"))
                             .font(SQType.caption.weight(.semibold))
                             .foregroundStyle(SQColor.label)
                         Spacer()
@@ -123,7 +123,7 @@ struct MessageSearchView: View {
             return String(localized: "Pièce jointe")
         }
         if message.isEncrypted {
-            return decrypted[message.id] ?? "🔒 Message chiffré"
+            return decrypted[message.id] ?? String(localized: "🔒 Message chiffré")
         }
         return message.content ?? ""
     }

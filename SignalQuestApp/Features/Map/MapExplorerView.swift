@@ -1661,7 +1661,7 @@ struct MapExplorerView: View {
         }
         .sheet(item: $selectedItem) { item in MapItemSheet(item: item) }
         .sheet(item: $selectedOutage) { site in
-            OutageDetailSheet(site: site)
+            OutageDetailSheet(site: site, operatorLabel: model.operatorLabel)
         }
         .sheet(item: $selectedCommunityOutage) { outage in
             CommunityOutageDetailSheet(

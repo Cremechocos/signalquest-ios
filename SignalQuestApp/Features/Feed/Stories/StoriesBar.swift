@@ -24,6 +24,7 @@ struct StoriesBar: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Story de \(story.author.displayName)")
+                    .accessibilityValue(story.viewedByMe == true ? "Déjà vue" : "Pas encore vue")
                     .contextMenu {
                         if story.isMine != true, let onHide {
                             Button {

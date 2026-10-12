@@ -104,7 +104,7 @@ struct PrivacyZone: Codable, Identifiable, Equatable, Sendable {
         var parts: [String] = []
         if let radius { parts.append(SQUnits.radius(meters: radius)) }
         if let visitCount, visitCount > 0 {
-            parts.append(visitCount <= 1 ? String(localized: "\(visitCount) visite") : String(localized: "\(visitCount) visites"))
+            parts.append(String(localized: "\(visitCount) visite"))
         }
         if isAutoDetected { parts.append(String(localized: "détectée")) }
         return parts.joined(separator: " · ")

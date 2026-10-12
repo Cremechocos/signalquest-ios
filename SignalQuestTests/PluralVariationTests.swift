@@ -115,3 +115,42 @@ final class PluralVariationTests: XCTestCase {
         }
     }
 }
+
+extension PluralVariationTests {
+    private func served(_ key: String.LocalizationValue, _ language: String) throws -> String {
+        let bundle = try XCTUnwrap(Bundle.main.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:)))
+        return String(localized: key, bundle: bundle, locale: Locale(identifier: language))
+    }
+
+    /// Décomptes des relevés radio, de la vie privée, du dock et de l'accueil :
+    /// une seule clé au singulier, et chaque langue applique sa propre règle.
+    func testCountersFollowEachLanguagePluralRule() throws {
+        let cases: [(String.LocalizationValue, String.LocalizationValue, String, String, String, String)] = [
+            ("\(0) relevé", "\(2) relevé", "0 relevé", "2 relevés", "0 measurements", "2 measurements"),
+            ("\(0) site", "\(1) site", "0 site", "1 site", "0 sites", "1 site"),
+            ("\(0) mesure", "\(1) mesure", "0 mesure", "1 mesure", "0 measurements", "1 measurement"),
+            ("\(1) conversation non lue", "\(3) conversation non lue", "1 conversation non lue", "3 conversations non lues", "1 unread conversation", "3 unread conversations"),
+            ("\(1) lieu détecté automatiquement", "\(2) lieu détecté automatiquement", "1 lieu détecté automatiquement", "2 lieux détectés automatiquement", "1 automatically detected place", "2 automatically detected places"),
+            ("\(1) masqué sur la carte", "\(2) masqué sur la carte", "1 masqué sur la carte", "2 masqués sur la carte", "1 hidden on the map", "2 hidden on the map"),
+            ("\(1) cellule", "\(2) cellule", "1 cellule", "2 cellules", "1 cell", "2 cells"),
+            ("\(1) secteur", "\(3) secteur", "1 secteur", "3 secteurs", "1 sector", "3 sectors"),
+            ("\(0) site identifié", "\(2) site identifié", "0 site identifié", "2 sites identifiés", "0 sites identified", "2 sites identified"),
+            ("\(1) visite", "\(4) visite", "1 visite", "4 visites", "1 visit", "4 visits"),
+            ("+ \(1) autre session", "+ \(2) autre session", "+ 1 autre session", "+ 2 autres sessions", "+ 1 other session", "+ 2 other sessions"),
+        ]
+        for (first, second, frFirst, frSecond, enFirst, enSecond) in cases {
+            XCTAssertEqual(try served(first, "fr"), frFirst)
+            XCTAssertEqual(try served(second, "fr"), frSecond)
+            XCTAssertEqual(try served(first, "en"), enFirst)
+            XCTAssertEqual(try served(second, "en"), enSecond)
+        }
+        XCTAssertEqual(try served("Dernier état connu conservé.", "en"), "Last known state kept.")
+        let plugIns = try XCTUnwrap(Bundle.main.builtInPlugInsURL)
+        let widget = try XCTUnwrap(Bundle(url: plugIns.appendingPathComponent("SignalQuestWidget.appex")))
+        for (language, one, many) in [("fr", "1 test", "3 tests"), ("en", "1 test", "3 tests")] {
+            let bundle = try XCTUnwrap(widget.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:)))
+            XCTAssertEqual(String(localized: "\(1) test", bundle: bundle, locale: Locale(identifier: language)), one)
+            XCTAssertEqual(String(localized: "\(3) test", bundle: bundle, locale: Locale(identifier: language)), many)
+        }
+    }
+}

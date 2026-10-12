@@ -185,11 +185,11 @@ struct RadioLogOperatorHeader: View {
                 .font(SQFont.body(M.operatorHeaderSize, .bold))
                 .foregroundStyle(P.muted)
                 .lineLimit(1)
-            Text(siteCount <= 1 ? String(localized: "\(siteCount) site") : String(localized: "\(siteCount) sites"))
+            Text(String(localized: "\(siteCount) site"))
                 .font(SQFont.body(M.operatorHeaderStrongSize, .bold))
                 .foregroundStyle(P.ink)
                 .lineLimit(1)
-            Text(logCount <= 1 ? String(localized: "\(logCount) relevé") : String(localized: "\(logCount) relevés"))
+            Text(String(localized: "\(logCount) relevé"))
                 .font(SQFont.body(M.operatorHeaderSize, .bold))
                 .foregroundStyle(P.muted)
                 .lineLimit(1)
@@ -307,9 +307,7 @@ struct RadioLogSiteCard: View {
     /// `3 cellules · 2 PCI · 128 relevés` — la composition, jamais une promesse.
     private var metaLine: String {
         var parts = [site.compositionLabel]
-        parts.append(site.logCount <= 1
-            ? String(localized: "\(site.logCount) relevé")
-            : String(localized: "\(site.logCount) relevés"))
+        parts.append(String(localized: "\(site.logCount) relevé"))
         return parts.joined(separator: " · ")
     }
 

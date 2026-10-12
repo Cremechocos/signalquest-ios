@@ -753,7 +753,7 @@ struct SpeedtestView: View {
                             HStack {
                                 Text("Durée").foregroundStyle(SQColor.label)
                                 Spacer()
-                                Text("\(durationSeconds)s")
+                                Text("\(durationSeconds) s")
                                     .foregroundStyle(SQColor.labelSecondary)
                             }
                             Slider(

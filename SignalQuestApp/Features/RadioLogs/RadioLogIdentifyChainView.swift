@@ -191,7 +191,7 @@ struct RadioLogIdentifyChainView: View {
                 .padding(.vertical, M.chainCountPaddingV)
                 .background(P.accentSoft, in: Capsule(style: .continuous))
             if identifiedCount > 0 {
-                Text(identifiedCount <= 1 ? String(localized: "\(identifiedCount) identifié") : String(localized: "\(identifiedCount) identifiés"))
+                Text(String(localized: "\(identifiedCount) identifié"))
                     .font(SQType.caption)
                     .monospacedDigit()
                     .foregroundStyle(P.muted)
@@ -289,13 +289,9 @@ struct RadioLogIdentifyChainView: View {
 
     private var summaryMessage: String {
         var parts: [String] = []
-        parts.append(identifiedCount <= 1
-            ? String(localized: "\(identifiedCount) site identifié")
-            : String(localized: "\(identifiedCount) sites identifiés"))
+        parts.append(String(localized: "\(identifiedCount) site identifié"))
         if !skippedIds.isEmpty {
-            parts.append(skippedIds.count <= 1
-                ? String(localized: "\(skippedIds.count) passé")
-                : String(localized: "\(skippedIds.count) passés"))
+            parts.append(String(localized: "\(skippedIds.count) passé"))
         }
         return parts.joined(separator: " · ") + "."
     }
@@ -322,7 +318,7 @@ struct RadioLogIdentifyChainView: View {
     private func metaLine(for site: RadioLogSite) -> String {
         [site.operatorName ?? String(localized: "Opérateur inconnu"),
          site.compositionLabel,
-         site.logCount <= 1 ? String(localized: "\(site.logCount) relevé") : String(localized: "\(site.logCount) relevés")]
+         String(localized: "\(site.logCount) relevé")]
             .joined(separator: " · ")
     }
 

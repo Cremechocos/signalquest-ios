@@ -107,7 +107,7 @@ struct CallHistoryView: View {
                             .background(style.soft, in: Circle())
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(call.displayName ?? call.participants?.joined(separator: ", ") ?? "Conversation")
+                            Text(call.displayName ?? call.participants?.joined(separator: ", ") ?? String(localized: "Conversation"))
                                 .font(SQFont.body(15, .medium))
                                 .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.label)
                             if let date = call.createdAt {

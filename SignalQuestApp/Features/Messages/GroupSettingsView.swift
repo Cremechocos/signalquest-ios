@@ -164,7 +164,7 @@ struct GroupSettingsView: View {
                         }
                     }
                 } header: {
-                    sectionHeader("Membres (\(participants.count))")
+                    sectionHeader(String(localized: "Membres (\(participants.count))"))
                 }
                 .listRowBackground(SQColor.surface)
                 .listRowSeparatorTint(SQColor.separator)

@@ -13,8 +13,11 @@ enum SpeedtestShareImageRenderer {
         for result: SpeedtestRunResult,
         options: SpeedtestShareOptions = .init()
     ) -> String {
-        let download = Int(result.downloadAverageMbps.rounded())
-        let upload = result.uploadAverageMbps.map { "\(Int($0.rounded())) Mbps up" } ?? "-- Mbps up"
+        // Unité de l'app (Mbit/s en français, Mbps en anglais), pas « Mbps » figé.
+        let download = SQUnits.throughput(mbps: result.downloadAverageMbps)
+        let uploadValue = result.uploadAverageMbps.map { SQUnits.throughput(mbps: $0) }
+            ?? "-- \(SQUnits.throughputUnit(mbps: 0))"
+        let upload = String(localized: "\(uploadValue) en upload")
         let ping = (result.primaryPingMs).map { "\(Int($0.rounded())) ms" } ?? "--"
         var context = ""
         if options.includeNetworkContext {
@@ -30,7 +33,7 @@ enum SpeedtestShareImageRenderer {
         }
         // Dans la langue de l'app : l'app anglaise partageait un texte en
         // français (TRX-06).
-        return String(localized: "\(download) Mbps en download\(context), ping \(ping), \(upload) — mesuré avec SignalQuest.")
+        return String(localized: "\(download) en download\(context), ping \(ping), \(upload) — mesuré avec SignalQuest.")
             + "\n#SignalQuest · signalquest.fr"
     }
 

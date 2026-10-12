@@ -77,7 +77,7 @@ struct ObservedCellSheet: View {
                 .frame(width: 46, height: 46)
                 .background(accent, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text(cell.enb.map { "eNB \($0)" } ?? cell.gnb.map { "gNB \($0)" } ?? "Cellule")
+                Text(cell.enb.map { "eNB \($0)" } ?? cell.gnb.map { "gNB \($0)" } ?? String(localized: "Cellule"))
                     .font(SQFont.display(20, .bold))
                     .foregroundStyle(SQColor.label)
                 if let key = cell.operatorKey {
@@ -161,7 +161,7 @@ struct ObservedCellSheet: View {
                                 .font(.system(size: 17))
                                 .foregroundStyle(selectedIds.contains(other.id) ? SQColor.success : SQColor.labelTertiary)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(other.operatorKey.map(operatorLabel) ?? "Opérateur inconnu")
+                                Text(other.operatorKey.map(operatorLabel) ?? String(localized: "Opérateur inconnu"))
                                     .font(SQFont.body(14, .semibold))
                                     .foregroundStyle(SQColor.label)
                                 Text([other.enb.map { "eNB \($0)" }, other.radioNodeType]

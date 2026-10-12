@@ -452,11 +452,10 @@ struct AntennaProfileView: View {
     /// Inclinaison géométrique qui pointerait l'antenne exactement sur toi.
     private var downtiltLabel: String {
         guard let tilt = downtiltDegrees else { return "—" }
-        let rounded = (abs(tilt) * 10).rounded() / 10
-        let value = String(format: "%.1f", rounded).replacingOccurrences(of: ".", with: ",")
+        let value = abs(tilt).formatted(.number.precision(.fractionLength(1)))
         // Un tilt négatif voudrait dire viser au-dessus de l'horizontale : c'est
         // le cas quand on domine l'antenne, et ça se dit « uptilt ».
-        return tilt >= 0 ? "\(value)° bas" : "\(value)° haut"
+        return tilt >= 0 ? String(localized: "\(value)° bas") : String(localized: "\(value)° haut")
     }
 
     private var lineOfSightLabel: String {

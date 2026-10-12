@@ -287,7 +287,7 @@ struct SharedPostEmbedBubble: View {
             .frame(maxWidth: .infinity)
             .frame(height: 140)
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .accessibilityLabel(attachment?.altText ?? "Photo de la publication")
+            .accessibilityLabel(attachment?.altText ?? String(localized: "Photo de la publication"))
         } else if let measure = measure(for: item) {
             measurementTile(measure)
         }
@@ -455,10 +455,10 @@ struct SharedPostEmbedBubble: View {
                 if let down = signal.downloadMbps {
                     return EmbedMeasure(
                         primary: formatMbps(down),
-                        unit: "Mbps",
+                        unit: SQUnits.throughputUnit(mbps: down),
                         tint: SQColor.brandRed,
                         chips: [
-                            signal.uploadMbps.map { "↑ \(formatMbps($0))" },
+                            signal.uploadMbps.map { "↑ \(SQUnits.throughput(mbps: $0))" },
                             signal.pingMs.map { "\(Int($0.rounded())) ms" },
                             signal.operator,
                             signal.technology
@@ -486,7 +486,7 @@ struct SharedPostEmbedBubble: View {
                     chips: [
                         signal.operator,
                         signal.technology,
-                        signal.band.map { "Bande \($0)" },
+                        signal.band.map { String(localized: "Bande \($0)") },
                         signal.siteLabel
                     ].compactMap { $0 }
                 )
@@ -498,16 +498,16 @@ struct SharedPostEmbedBubble: View {
                 primary: "\(rsrp)",
                 unit: "dBm · RSRP",
                 tint: rsrpColor(rsrp),
-                chips: [s.operatorName, s.technology, s.band.map { "Bande \($0)" }, s.site.map { "Site \($0)" }].compactMap { $0 }
+                chips: [s.operatorName, s.technology, s.band.map { String(localized: "Bande \($0)") }, s.site.map { String(localized: "Site \($0)") }].compactMap { $0 }
             )
         }
         if let sp = card.speedtest, let down = sp.downloadMbps {
             return EmbedMeasure(
                 primary: formatMbps(down),
-                unit: "Mbps",
+                unit: SQUnits.throughputUnit(mbps: down),
                 tint: SQColor.brandRed,
                 chips: [
-                    sp.uploadMbps.map { "↑ \(formatMbps($0))" },
+                    sp.uploadMbps.map { "↑ \(SQUnits.throughput(mbps: $0))" },
                     sp.pingMs.map { "\(Int($0.rounded())) ms" },
                     sp.operatorName,
                     sp.technology
@@ -536,6 +536,6 @@ struct SharedPostEmbedBubble: View {
     }
 
     private func formatMbps(_ value: Double) -> String {
-        value >= 100 ? String(Int(value.rounded())) : String(format: "%.1f", value)
+        SQUnits.throughputValue(mbps: value)
     }
 }

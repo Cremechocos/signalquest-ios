@@ -530,7 +530,7 @@ final class SpeedtestTests: XCTestCase {
     func testShareTextIncludesDownloadAndHashtag() {
         let result = makeSpeedtestResult(downloadSeries: [120, 480], uploadSeries: [40, 90])
         let text = SpeedtestShareImageRenderer.shareText(for: result)
-        XCTAssertTrue(text.contains("Mbps"))
+        XCTAssertTrue(text.contains(SQUnits.throughputUnit(mbps: 480)))
         XCTAssertTrue(text.contains("#SignalQuest"))
         XCTAssertTrue(text.contains("signalquest.fr"))
     }

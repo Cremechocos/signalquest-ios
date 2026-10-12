@@ -6,6 +6,8 @@ import MapKit
 /// rétablissement prévu, localisation.
 struct OutageDetailSheet: View {
     let site: OutageSiteLive
+    /// Code opérateur → nom affiché, résolu par la carte selon le marché courant.
+    var operatorLabel: (String) -> String = { $0 }
 
     var body: some View {
         ScrollView {
@@ -25,7 +27,7 @@ struct OutageDetailSheet: View {
         HStack(alignment: .top, spacing: SQSpace.md) {
             Image(systemName: issueGlyph)
                 .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(SQColor.onAccent)
                 .frame(width: 46, height: 46)
                 .background(issueColor, in: Circle())
             VStack(alignment: .leading, spacing: 3) {
@@ -34,9 +36,9 @@ struct OutageDetailSheet: View {
                     .foregroundStyle(SQColor.label)
                 Text(issueLabel)
                     .font(SQFont.body(14.5, .semibold, relativeTo: .callout))
-                    .foregroundStyle(issueColor)
+                    .foregroundStyle(OperatorIncidentCard.ink(for: issueKey))
                 if let op = site.operator {
-                    Text(op)
+                    Text(operatorLabel(op))
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -74,7 +76,7 @@ struct OutageDetailSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             infoRow("Raison", reasonText)
             infoRow("Début", formattedDate(site.startedAt))
-            infoRow("Rétablissement prévu", formattedDate(site.estimatedEnd) ?? "Non communiqué")
+            infoRow("Rétablissement prévu", formattedDate(site.estimatedEnd) ?? String(localized: "Non communiqué"))
             infoRow("Commune", site.commune?.capitalized)
             infoRow("Département", site.departement)
             infoRow("Site", site.siteId)
@@ -116,21 +118,10 @@ struct OutageDetailSheet: View {
 
     /// Teintes des pannes communautaires (`OutageTint`, identiques sur Android) :
     /// le jaune Tailwind d'avant tombait à 1,8:1 sur la crème (MES-36).
-    var issueColor: Color {
-        switch issueKey {
-        case "maintenance": return SQColor.info
-        case "degraded": return OutageTint.degraded
-        default: return OutageTint.down
-        }
-    }
+    var issueColor: Color { OperatorIncidentCard.tint(for: issueKey) }
 
-    var issueGlyph: String {
-        switch issueKey {
-        case "maintenance": return "wrench.and.screwdriver.fill"
-        case "degraded": return "exclamationmark.circle.fill"
-        default: return "exclamationmark.triangle.fill"
-        }
-    }
+    /// Triangle des incidents opérateur, comme leur marqueur sur la carte.
+    var issueGlyph: String { OperatorIncidentCard.glyph(for: issueKey) }
 
     /// Code opérateur brut → libellé lisible (au lieu d'« INT » / « MAINT »).
     var reasonText: String {

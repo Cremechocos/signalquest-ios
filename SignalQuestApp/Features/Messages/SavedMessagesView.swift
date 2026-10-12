@@ -120,7 +120,7 @@ struct SavedMessagesView: View {
 
     private func conversationLabel(_ entry: SavedMessageEntry) -> String {
         if let title = entry.conversation?.title, !title.isEmpty { return title }
-        return entry.conversation?.isGroup == true ? "Groupe" : "Conversation"
+        return entry.conversation?.isGroup == true ? String(localized: "Groupe") : String(localized: "Conversation")
     }
 
     private func snippet(_ message: MessageItem) -> String {
@@ -129,7 +129,7 @@ struct SavedMessagesView: View {
         if MessageLocationData.parse(fromMetadataJSON: message.metadata) != nil { return String(localized: "📍 Position partagée") }
         let content = message.content ?? ""
         if !content.isEmpty { return content }
-        return message.attachments.isEmpty ? "Message" : "Pièce jointe"
+        return message.attachments.isEmpty ? String(localized: "Message") : String(localized: "Pièce jointe")
     }
 
     private func load() async {

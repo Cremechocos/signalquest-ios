@@ -88,7 +88,7 @@ struct RemindersView: View {
     }
 
     private func content(for item: MessageReminder) -> String {
-        guard let message = item.message else { return "Message" }
+        guard let message = item.message else { return String(localized: "Message") }
         if message.deletedAt != nil { return String(localized: "Message supprimé") }
         if message.isEncrypted { return decrypted[message.id] ?? String(localized: "🔒 Message chiffré") }
         let value = message.content ?? ""

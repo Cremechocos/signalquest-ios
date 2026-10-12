@@ -647,7 +647,7 @@ struct SessionDetailView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 1) {
-                Text("↓ \(st.downloadMbps.map { "\(Int($0.rounded()))" } ?? "—") Mbps")
+                Text(verbatim: "↓ \(st.downloadMbps.map { "\(Int($0.rounded()))" } ?? "—") \(String(localized: "Mbit/s"))")
                     .font(SQFont.body(14, .bold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.info)
                 HStack(spacing: 8) {

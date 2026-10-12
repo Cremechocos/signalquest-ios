@@ -348,7 +348,7 @@ struct SignalQuestHomeView: View {
             if let mbps = quality.medianDownloadMbps {
                 return "\(quality.operatorLabel) · \(SQUnits.throughput(mbps: Double(mbps)))"
             }
-            return "\(quality.operatorLabel) · " + String(localized: "\(quality.sampleCount) mesures")
+            return "\(quality.operatorLabel) · " + String(localized: "\(quality.sampleCount) mesure")
         }
         switch networkStatus.connection {
         case .cellular:
@@ -593,7 +593,7 @@ struct SignalQuestHomeView: View {
                     if let pulse, pulse.measurementsCount > 0 {
                         // La période du pouls, pour qu'on ne la confonde pas avec celle
                         // de la comparaison ouverte au toucher (tout l'historique).
-                        Text([String(localized: "\(pulse.measurementsCount) mesures"), pulsePeriodLabel(pulse)]
+                        Text([String(localized: "\(pulse.measurementsCount) mesure"), pulsePeriodLabel(pulse)]
                             .joined(separator: " · "))
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
