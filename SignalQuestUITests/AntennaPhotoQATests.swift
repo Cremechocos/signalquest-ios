@@ -1,7 +1,7 @@
 import XCTest
 
 /// QA : la fiche d'antenne propose bien d'ajouter une photo. Ouvre la première
-/// antenne (pan zoomé sur Paris via le hook QA), scrolle la sheet et vérifie le
+/// antenne (pan zoomé sur Paris via le hook QA), ouvre l'onglet Photos et vérifie le
 /// bouton d'ajout de photo. Nécessite SQ_AUTH_TOKEN.
 @MainActor
 final class AntennaPhotoQATests: XCTestCase {
@@ -15,16 +15,12 @@ final class AntennaPhotoQATests: XCTestCase {
         app.launchArguments += ["--start-map", "--reset-map", "--qa-open-antenna"]
         app.sqLaunch()
 
-        // La fiche s'ouvre (kicker « Fiche site »).
-        let fiche = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "Fiche site")).firstMatch
-        XCTAssertTrue(fiche.waitForExistence(timeout: 40), "La fiche d'antenne ne s'est pas ouverte")
-
-        // Le bouton d'ajout de photo est plus bas : on scrolle la sheet.
-        let addPhoto = app.buttons.containing(NSPredicate(format: "label CONTAINS[c] %@", "photo du site")).firstMatch
-        for _ in 0..<6 where !addPhoto.exists {
-            app.swipeUp()
-        }
-        XCTAssertTrue(addPhoto.waitForExistence(timeout: 5), "Bouton « Choisir une photo du site » introuvable dans la fiche")
+        // La fiche s'ouvre ; l'ajout de photo est en tête de l'onglet Photos.
+        XCTAssertTrue(app.scrollViews["antenna.detail.scroll"].waitForExistence(timeout: 40),
+                      "La fiche d'antenne ne s'est pas ouverte")
+        app.buttons["antenna.detail.tab.photos"].tap()
+        let addPhoto = app.buttons["antenna.detail.addPhoto"]
+        XCTAssertTrue(addPhoto.waitForExistence(timeout: 5), "Bouton « Ajouter une photo » introuvable dans la fiche")
         // Le sélecteur s'ouvre bien au tap (l'envoi réel est couvert séparément :
         // l'endpoint /api/photos a été validé en direct, le câblage iOS réutilise
         // `PhotoService.uploadPhoto`). On évite d'automatiser le PHPicker système,

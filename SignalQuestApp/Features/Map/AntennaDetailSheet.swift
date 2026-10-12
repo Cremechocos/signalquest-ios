@@ -110,6 +110,7 @@ struct AntennaDetailSheet: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var viewerPhoto: AntennaPhotoSummary?
     @State private var photoPickerItem: PhotosPickerItem?
     /// L'image est conservée quelques instants le temps de choisir sa facette
@@ -124,6 +125,7 @@ struct AntennaDetailSheet: View {
         let operatorName: String
     }
     @State private var showPhotoOperatorPicker = false
+    @State private var tab: AntennaDetailTab = .essential
     @State private var showReportSheet = false
     /// Type présélectionné à l'ouverture du signalement (lien « opérateur porteur »).
     @State private var reportInitialType: AntennaReportType = .other
@@ -189,58 +191,30 @@ struct AntennaDetailSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                // Ordre voulu : ce qui répond aux questions du terrain d'abord
-                // (où est ce site par rapport à moi, est-ce que je le vois), la
-                // fiche technique ensuite, repliée. Les trois premiers blocs
-                // doivent tenir dans le detent `.medium`.
-                VStack(alignment: .leading, spacing: 14) {
+                // Quatre onglets, comme sur le web : ce qui sert sur le terrain
+                // d'abord (Essentiel), le registre, les mesures et les photos
+                // ensuite, chacun à un appui au lieu de huit sections repliées.
+                VStack(alignment: .leading, spacing: SQSpace.md) {
                     header
-                    sightCard
-                    miniMap
-                    if let details = model.details {
-                        keyFigures(details)
-                        collapsibleSections(details)
-                    } else if let error = model.error {
-                        // Sans relance, il fallait fermer et rouvrir la fiche (AF-CARTE-12).
-                        ErrorStateView(title: "Détails indisponibles", message: error) {
-                            Task {
-                                model.error = nil
-                                await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
-                            }
-                        }
-                    } else {
-                        SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
+                    MapSegmented(selection: $tab,
+                                 options: AntennaDetailTab.allCases.map { ($0, tabLabel($0)) },
+                                 identifier: "antenna.detail.tab")
+                    switch tab {
+                    case .essential: essentialTab
+                    case .identifiers: detailsTab { identifiersTab($0) }
+                    case .measures: detailsTab { measuresTab($0) }
+                    case .photos: detailsTab { photosContent($0) }
                     }
-                    siteActions
-                    reportCard
                 }
-                .padding(SQSpace.cardPadding)
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.lg)
+                .padding(.bottom, SQSpace.xl)
             }
             .accessibilityIdentifier("antenna.detail.scroll")
-            .signalQuestBackground()
+            .background(SQColor.bg.ignoresSafeArea())
             .navigationTitle(headerTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    // À GAUCHE, pas à côté de « Fermer » : suivre et fermer sont deux gestes
-                    // opposés, et les mettre côte à côte fait rater l'un pour l'autre.
-                    FavoriteAntennaButton(
-                        favorites: services.favoriteAntennas,
-                        siteId: site.writeSiteId,
-                        market: market,
-                        operatorName: selectedOperator,
-                        name: site.address,
-                        address: site.address,
-                        latitude: site.latitude,
-                        longitude: site.longitude
-                    )
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }
-                        .accessibilityIdentifier("antenna.detail.close")
-                        .tint(SQColor.brandRed)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             // `id: selectedOperator` → recharge la fiche quand l'utilisateur change
             // d'opérateur sur un site partagé.
             .task(id: selectedOperator) {
@@ -256,7 +230,7 @@ struct AntennaDetailSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .sqSheet(background: SQColor.bg)
         .fullScreenCover(item: $viewerPhoto) { photo in
             AntennaPhotoViewer(photos: model.details?.photos ?? [photo], initialId: photo.id)
         }
@@ -364,19 +338,20 @@ struct AntennaDetailSheet: View {
             PhotosPicker(selection: $photoPickerItem, matching: .images) {
                 HStack(spacing: SQSpace.sm) {
                     if uploading {
-                        SQSpinner().tint(SQColor.onAccent)
+                        SQSpinner().tint(SQColor.onInk)
                     } else {
                         Image(systemName: "camera.fill").font(.system(size: 15, weight: .semibold))
                     }
-                    Text(uploading ? "Envoi…" : "Choisir une photo du site")
+                    Text(uploading ? "Envoi…" : "Ajouter une photo")
                         .font(SQType.button)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 52)
-                .foregroundStyle(SQColor.onAccent)
-                .background(SQColor.brandRed, in: Capsule(style: .continuous))
-                .sqShadowAccent()
+                .frame(minHeight: SQSpace.primaryActionHeight)
+                .foregroundStyle(SQColor.onInk)
+                .background(SQColor.label, in: Capsule(style: .continuous))
             }
+            .buttonStyle(SQPressButtonStyle(scale: 0.97))
+            .accessibilityIdentifier("antenna.detail.addPhoto")
             .disabled(model.isUploadingPhoto)
             if let message = model.photoUploadMessage {
                 Text(LocalizedStringKey(message))
@@ -430,14 +405,15 @@ struct AntennaDetailSheet: View {
     private var siteActions: some View {
         if let coordinate = siteCoordinate {
             HStack(spacing: SQSpace.sm) {
-                actionButton("Itinéraire", icon: "car.fill") {
-                    openRoute(to: coordinate)
-                }
                 if let onIsolateCoverage, let focus = coverageFocus {
-                    actionButton("Sa couverture", icon: "dot.radiowaves.left.and.right") {
+                    GradientButton("Sa couverture", systemImage: "dot.radiowaves.left.and.right") {
                         onIsolateCoverage(focus)
                         dismiss()
                     }
+                }
+                GradientButton("Itinéraire", systemImage: "car.fill",
+                               style: onIsolateCoverage != nil && coverageFocus != nil ? .secondary : .primary) {
+                    openRoute(to: coordinate)
                 }
             }
         }
@@ -490,60 +466,11 @@ struct AntennaDetailSheet: View {
         ])
     }
 
-    private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: SQSpace.xs2) {
-                Image(systemName: icon).font(.system(size: 14, weight: .semibold))
-                Text(LocalizedStringKey(title)).font(SQFont.body(14, .semibold))
-            }
-            .foregroundStyle(SQColor.label)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, SQSpace.md - 1)
-            .sqCardBackground(cornerRadius: SQRadius.md)
-        }
-        .buttonStyle(SQPressButtonStyle())
-    }
-
     /// Site partagé (Crozon, zone blanche) dont l'opérateur porteur peut être signalé.
     private var leaderReport: AntennaLeaderReport? {
         guard let core = model.details?.core else { return nil }
         return AntennaLeaderReport(sharingKind: core.sharingKind, crozonLeader: core.crozonLeader,
                                    zbLeader: core.zbLeader, operators: core.operators)
-    }
-
-    /// Carte « Signaler un problème » : ouvre le formulaire de signalement d'antenne.
-    /// Style secondaire (surface) pour respecter la règle brique (le bouton photo
-    /// tient déjà l'unique grand aplat brique de la fiche).
-    private var reportCard: some View {
-        Button {
-            Haptics.light()
-            reportInitialType = .other
-            showReportSheet = true
-        } label: {
-            HStack(spacing: SQSpace.md) {
-                Image(systemName: "exclamationmark.bubble")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 40, height: 40)
-                    .background(SQColor.accentSoft, in: Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Signaler un problème")
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                    Text("Une donnée incorrecte sur ce site ? Préviens la modération.")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .multilineTextAlignment(.leading)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .sqSheetCard()
     }
 
     /// Azimuts connus (degrés arrondis) proposés comme « secteur concerné » dans
@@ -590,91 +517,350 @@ struct AntennaDetailSheet: View {
         marketEntry?.operatorColor(forKey: key) ?? SQBrand.operatorColor(key)
     }
 
+    // MARK: En-tête et onglets
+
+    /// En-tête Halo : n° du support en petites capitales, le nom du site, son
+    /// adresse et sa distance, puis Suivre, Partager et Fermer en boutons ronds.
     private var header: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            HStack(alignment: .top, spacing: SQSpace.md) {
-                Image(systemName: isCustomSite ? "mappin.and.ellipse" : "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 44, height: 44)
-                    .background(SQColor.accentSoft, in: Circle())
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            HStack(alignment: .top, spacing: SQSpace.sm) {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    if let supportLine {
+                        Text(supportLine).sqKicker()
+                    }
                     Text(headerTitle)
                         .font(SQType.title)
                         .foregroundStyle(SQColor.label)
-                    // L'adresse était reléguée tout en bas de la fiche : c'est
-                    // pourtant ce qui permet de reconnaître le site sur place.
-                    if let subtitle = headerSubtitle {
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let subtitle = headerCaption {
                         Text(subtitle)
                             .font(SQType.subhead)
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                Spacer()
-            }
-            // Les tags opérateur SONT des boutons sur un site partagé, mais rien
-            // ne le disait : personne ne découvrait qu'on peut basculer d'une
-            // fiche à l'autre sans rouvrir la carte. Le dire coûte une ligne.
-            if site.operators.count > 1 {
-                HStack(spacing: SQSpace.xs) {
-                    Image(systemName: "hand.tap")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text("Site partagé — touche un opérateur pour voir sa fiche")
-                }
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
                 HStack(spacing: SQSpace.xs2) {
-                    ForEach(site.operators, id: \.self) { op in
-                        operatorTag(op)
+                    FavoriteAntennaButton(
+                        favorites: services.favoriteAntennas,
+                        siteId: site.writeSiteId,
+                        market: market,
+                        operatorName: selectedOperator,
+                        name: site.address,
+                        address: site.address,
+                        latitude: site.latitude,
+                        longitude: site.longitude
+                    )
+                    .sqSurface(SQColor.chip, in: Circle())
+                    if let shareURL {
+                        ShareLink(item: shareURL, subject: Text(headerTitle)) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(SQColor.label)
+                                .frame(width: 44, height: 44)
+                                .sqSurface(SQColor.chip, in: Circle())
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                        .accessibilityLabel("Partager ce site")
+                        .accessibilityIdentifier("antenna.detail.share")
                     }
-                    ForEach(displayedTechnologies, id: \.self) { tech in
-                        SQEditorialTag(text: tech, color: SQBrand.techColor(tech))
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "antenna.detail.close") {
+                        dismiss()
+                    }
+                }
+            }
+            if hasStatusTags {
+                HStack(spacing: SQSpace.xs2) {
+                    statusTag
+                    if site.operators.count > 1 {
+                        SQEditorialTag(
+                            text: String(localized: "Partagé · \(site.operators.count) opérateurs"),
+                            color: SQColor.labelSecondary
+                        )
                     }
                     fhTag
-                    statusTag
                 }
-                .padding(.vertical, 1)
             }
             contributionBanner
-            // Juste sous l'identité du site, avant toute mesure : une coupure en cours prime sur
-            // la caractérisation du signal. Plus bas, elle serait lue après ce qu'elle invalide.
-            //
+        }
+    }
+
+    /// « Support 0381234 » : le numéro du registre, que l'on recopie sur place.
+    private var supportLine: String? {
+        let number = model.details?.core?.supId ?? site.siteId
+        guard let number, !number.isEmpty, !isCustomSite else { return nil }
+        return String(localized: "Support \(number)")
+    }
+
+    /// Adresse (ou nature du site) et distance depuis l'origine du repérage.
+    private var headerCaption: String? {
+        let parts = [headerSubtitle, distanceText].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private var distanceText: String? {
+        guard let coordinate = siteCoordinate,
+              let origin = sightOrigin.coordinate(deviceLocation: services.location.cachedLocation()) else { return nil }
+        let distance = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+            .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+        return SQUnits.distance(meters: distance)
+    }
+
+    private var hasStatusTags: Bool {
+        model.details?.core?.displayStatus != nil || site.operators.count > 1
+            || model.details?.core?.hasFhLink == true
+    }
+
+    /// Lien du site sur la carte web, au format de `buildMapLink` côté site :
+    /// il ouvre la même fiche, sur le même opérateur.
+    private var shareURL: URL? {
+        guard !isCustomSite, let coordinate = siteCoordinate else { return nil }
+        var components = URLComponents(
+            url: AppConfig.current.appBaseURL.appendingPathComponent("carte"),
+            resolvingAgainstBaseURL: false
+        )
+        var items = [
+            URLQueryItem(name: "lat", value: String(format: "%.5f", coordinate.latitude)),
+            URLQueryItem(name: "lng", value: String(format: "%.5f", coordinate.longitude)),
+            URLQueryItem(name: "siteId", value: site.writeSiteId),
+            URLQueryItem(name: "market", value: market),
+        ]
+        if selectedOperator != "ALL" {
+            items.append(URLQueryItem(name: "operator", value: selectedOperator))
+        }
+        items.append(URLQueryItem(name: "open", value: "antenna"))
+        components?.queryItems = items
+        return components?.url
+    }
+
+    private func tabLabel(_ tab: AntennaDetailTab) -> String {
+        switch tab {
+        case .essential: return String(localized: "Essentiel")
+        case .identifiers: return String(localized: "Identifiants")
+        case .measures: return String(localized: "Mesures")
+        case .photos:
+            let count = model.details.map { $0.photosCount ?? $0.photos.count } ?? 0
+            return count > 0 ? String(localized: "Photos \(count)") : String(localized: "Photos")
+        }
+    }
+
+    /// Les onglets qui lisent la fiche détaillée : chargement, erreur, contenu.
+    @ViewBuilder
+    private func detailsTab<Content: View>(@ViewBuilder _ content: (AntennaDetails) -> Content) -> some View {
+        if let details = model.details {
+            content(details)
+        } else if let error = model.error {
+            // Sans relance, il fallait fermer et rouvrir la fiche (AF-CARTE-12).
+            ErrorStateView(title: "Détails indisponibles", message: error) {
+                Task {
+                    model.error = nil
+                    await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                }
+            }
+        } else {
+            SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity).padding(.vertical, SQSpace.xl)
+        }
+    }
+
+    // MARK: Essentiel
+
+    /// Ce qu'on vient chercher devant un pylône : une panne en cours d'abord,
+    /// qui émet ici, où est le site, ce qu'il rayonne, puis les gestes.
+    private var essentialTab: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
             // L'OPÉRATEUR D'ABORD, la communauté ensuite. C'est l'ordre de l'autorité : une
             // déclaration de première main précède une observation qui attend d'être corroborée.
-            // Les deux blocs restent distincts et ne se remplacent jamais l'un l'autre — un site
-            // peut très bien porter les deux, et c'est même le cas le plus intéressant.
+            // Les deux blocs restent distincts et ne se remplacent jamais l'un l'autre.
             OperatorIncidentCard(
                 incidents: operatorIncidents,
                 operatorLabel: { MarketRegistryEntry.operatorLabel($0, in: marketEntry) }
             )
             CommunityOutageCard(
                 outages: outages,
-                onReport: { showOutageReport = true },
                 onVote: { outageId, kind in
                     Task { await voteOnOutage(outageId, kind: kind) }
                 },
                 // Décision produit n° 12 : la fiche antenne est le quatrième chemin vers une panne,
-                // et le seul qui n'offrait pas « La panne est terminée ». C'est pourtant celui par
-                // lequel on revient vérifier son propre signalement une fois sur place.
+                // et le seul qui n'offrait pas « La panne est terminée ».
                 onClose: { pendingCloseOutage = $0 },
                 closingOutageId: closingOutageId
             )
             if let outageError {
-                Label(outageError, systemImage: "exclamationmark.triangle.fill")
+                SQNotice(message: outageError, tone: .warning)
+            }
+            radioBlock
+            sightCard
+            if let details = model.details {
+                if !displayedAzimuths.isEmpty || !details.bands.isEmpty {
+                    section("Secteurs et bandes") {
+                        sectorContent(details)
+                            .padding(SQSpace.md)
+                            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                    }
+                }
+            } else if let error = model.error {
+                ErrorStateView(title: "Détails indisponibles", message: error) {
+                    Task {
+                        model.error = nil
+                        await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
+                    }
+                }
+            } else {
+                SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
+            }
+            // Ouverte depuis la carte, la fiche a le site juste derrière elle :
+            // la mini-carte ne sert que depuis une liste (favoris, photos, trajet).
+            if onIsolateCoverage == nil { miniMap }
+            siteActions
+            reportRows
+        }
+    }
+
+    /// Une ligne par opérateur du support : sa couleur, ses technologies et son
+    /// identifiant. Sur un site partagé, une ligne bascule la fiche sur lui.
+    private var radioBlock: some View {
+        section("Radio") {
+            VStack(spacing: 0) {
+                ForEach(Array(site.operators.enumerated()), id: \.element) { index, op in
+                    operatorRow(op)
+                        .overlay(alignment: .top) {
+                            if index > 0 { Rectangle().fill(SQColor.separator).frame(height: 1) }
+                        }
+                }
+                if site.operators.isEmpty {
+                    operatorRow(selectedOperator)
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            if site.operators.count > 1 {
+                Text("Touche un opérateur pour voir sa fiche.")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.warning)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(SQSpace.md)
-                    .background(
-                        SQColor.warningSoft,
-                        in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                    )
+                    .foregroundStyle(SQColor.labelSecondary)
             }
         }
+    }
+
+    @ViewBuilder
+    private func operatorRow(_ op: String) -> some View {
+        let isActive = op == selectedOperator
+        let isSwitchable = site.operators.count > 1 && !isActive
+        let row = HStack(spacing: SQSpace.sm) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(registryColor(op))
+                .frame(width: 4, height: 22)
+            Text(photoOperatorLabel(op))
+                .font(SQType.callout(.bold))
+                .foregroundStyle(SQColor.label)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            ForEach(technologies(for: op), id: \.self) { tech in
+                MapTechTag(technology: tech, label: tech)
+            }
+            if isActive, model.details != nil {
+                Text(identityLine ?? String(localized: "n° non publié"))
+                    .font(SQType.caption(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(1)
+            } else if isSwitchable {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
+        }
+        .frame(minHeight: 46)
+        .contentShape(Rectangle())
+        if isSwitchable {
+            Button {
+                Haptics.selection()
+                selectedOperator = op
+            } label: { row }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityHint("Affiche la fiche de cet opérateur")
+            .accessibilityIdentifier("antenna.detail.operator.\(op)")
+        } else {
+            row
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(site.operators.count > 1 ? .isSelected : [])
+                .accessibilityIdentifier("antenna.detail.operator.\(op)")
+        }
+    }
+
+    /// « eNB 812345 » ou « gNB 1203344 » : le numéro du site pour l'opérateur affiché.
+    private var identityLine: String? {
+        let identifiers = model.details?.core?.cellIdentifiers
+        if let enb = identifiers?.enb.first ?? customSite?.radio?.enb {
+            return "eNB \(enb)"
+        }
+        if let gnb = identifiers?.gnb.first ?? customSite?.radio?.gnb {
+            return "gNB \(gnb)"
+        }
+        return nil
+    }
+
+    /// Technologies d'un opérateur du support : celles de la fiche pour
+    /// l'opérateur affiché, sinon la fusion du support, sans prêter la 5G d'un
+    /// voisin (`operators5G`).
+    private func technologies(for op: String) -> [String] {
+        if op == selectedOperator { return displayedTechnologies }
+        guard !site.operators5G.isEmpty else { return site.technologies }
+        let has5G = site.operators5G.contains { $0.caseInsensitiveCompare(op) == .orderedSame }
+        return has5G ? site.technologies : site.technologies.filter { $0 != "5G" }
+    }
+
+    /// Les signalements, en lignes au bas de l'onglet plutôt qu'en grande carte.
+    private var reportRows: some View {
+        VStack(spacing: 0) {
+            if !outages.contains(where: { $0.state.isVisible }) {
+                reportRow("Signaler une panne", icon: "exclamationmark.triangle", identifier: "antenna.detail.reportOutage") {
+                    showOutageReport = true
+                }
+                Rectangle().fill(SQColor.separator).frame(height: 1)
+            }
+            reportRow("Signaler une erreur sur ce site", icon: "exclamationmark.bubble", identifier: "antenna.detail.reportError") {
+                reportInitialType = .other
+                showReportSheet = true
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    private func reportRow(_ title: String, icon: String, identifier: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            HStack(spacing: SQSpace.sm2) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(width: 22)
+                Text(LocalizedStringKey(title))
+                    .font(SQType.callout(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityIdentifier(identifier)
+    }
+
+    /// Bloc à petites capitales : le titre, puis son contenu.
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            Text(LocalizedStringKey(title)).sqKicker().accessibilityAddTraits(.isHeader)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Se prononcer sur une panne, puis relire : les compteurs affichés doivent suivre le vote.
@@ -904,7 +1090,9 @@ struct AntennaDetailSheet: View {
             )
         }
         .foregroundStyle(SQColor.label)
-        .sqSheetCard(strong: true)
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     /// Mini-carte du site. Non interactive : la carte principale est juste
@@ -991,66 +1179,6 @@ struct AntennaDetailSheet: View {
         return has5G ? site.technologies : site.technologies.filter { $0 != "5G" }
     }
 
-    /// Tag opérateur. Sur un site partagé, il devient un bouton de bascule :
-    /// l'opérateur actif est en plein (capsule couleur, encre calculée), les autres
-    /// en capsule teintée douce, texte à l'encre et couleur portée par un point. Sur un site mono-opérateur, simple tag éditorial.
-    @ViewBuilder
-    private func operatorTag(_ op: String) -> some View {
-        let color = registryColor(op)
-        let isSwitchable = site.operators.count > 1
-        let isActive = op == selectedOperator
-        if isSwitchable {
-            // Une coche sur l'actif : sans elle, « plein contre teinté » se
-            // lit comme une différence décorative, pas comme un état.
-            SQChip(
-                label: photoOperatorLabel(op), isSelected: isActive, selectedSystemImage: "checkmark", dot: color,
-                selectedFill: color,
-                selectedInk: SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme),
-                restFill: color.opacity(0.13),
-                spokenHint: isActive ? nil : "Affiche la fiche de cet opérateur"
-            ) {
-                guard op != selectedOperator else { return }
-                selectedOperator = op
-            }
-        } else {
-            // Nom du registre (« Orange »), pas la clé brute (« ORANGE ») : les
-            // pastilles étaient en capitales, sauf SFR (UI-10).
-            SQEditorialTag(text: photoOperatorLabel(op), color: color)
-        }
-    }
-
-    /// Quatre chiffres, pas six : validations et speedtests redescendent dans
-    /// leurs sections respectives, où ils ont le contexte qui les rend lisibles.
-    private func keyFigures(_ details: AntennaDetails) -> some View {
-        let heightValue = details.core?.siteInfo.radiatingHeightMeters ?? details.height
-        let heightLabel = details.core?.siteInfo.radiatingHeightIsEstimated == true
-            ? String(localized: "Hauteur (support)")
-            : String(localized: "Hauteur")
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-            SQMetricTile.wrapping(label: heightLabel, value: heightValue.map { "\(Int($0.rounded())) m" } ?? "—", highlight: true)
-            SQMetricTile.wrapping(
-                label: "Secteurs",
-                value: details.core?.siteInfo.sectorCount.map(String.init)
-                    ?? (displayedAzimuths.isEmpty ? "—" : String(displayedAzimuths.count))
-            )
-            // Les bandes figuraient ici ET dans la grille juste en dessous. À la
-            // place, le signal communautaire : combien de personnes ont identifié
-            // ce site — c'est ce que porte la coche sur la carte.
-            SQMetricTile.wrapping(
-                label: "Identifications",
-                value: (details.validationsCount ?? (site.validationCount > 0 ? site.validationCount : nil))
-                    .map(String.init) ?? "—"
-            )
-            // `photosCount` est nil sur le chemin wrapper : la galerie déjà
-            // chargée est alors la seule source fiable du nombre.
-            SQMetricTile.wrapping(
-                label: "Photos",
-                value: (details.photosCount ?? (details.photos.isEmpty ? nil : details.photos.count))
-                    .map(String.init) ?? "—"
-            )
-        }
-    }
-
     // MARK: Secteurs & azimuts
 
     /// Le rayonnement du site : technologies, bandes, et — seulement quand les
@@ -1069,75 +1197,122 @@ struct AntennaDetailSheet: View {
         .foregroundStyle(SQColor.label)
     }
 
-    // MARK: Sections repliables
+    // MARK: Identifiants
 
-    /// Toute la fiche technique, repliée. Rien n'est retiré par rapport à la
-    /// version précédente : les mêmes blocs sont là, mais fermés par défaut —
-    /// sauf le rayonnement, qui est ce qu'on vient chercher le plus souvent.
+    /// Le registre : identité radio par secteur, faits du site, porteuses.
     @ViewBuilder
-    private func collapsibleSections(_ details: AntennaDetails) -> some View {
-        if !displayedAzimuths.isEmpty || !details.bands.isEmpty {
-            AntennaDisclosureSection(title: "Secteurs & azimuts", systemImage: "safari", initiallyExpanded: true) {
-                sectorContent(details)
+    private func identifiersTab(_ details: AntennaDetails) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            if let core = details.core {
+                section("Identifiants radio") {
+                    factCard { radioIdentifiersContent(core) }
+                }
+                section("Site") {
+                    factCard { siteContent(core) }
+                }
+                section("Technique") {
+                    factCard { technicalContent(core) }
+                }
+                if !core.radioCarriers.isEmpty {
+                    NavigationLink {
+                        carriersPage(core)
+                    } label: {
+                        HStack(spacing: SQSpace.sm2) {
+                            Image(systemName: "dot.radiowaves.left.and.right")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .frame(width: 22)
+                            Text("Porteuses (\(core.radioCarriers.count))")
+                                .font(SQType.callout(.semibold))
+                                .foregroundStyle(SQColor.label)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(SQColor.labelTertiary)
+                        }
+                        .frame(minHeight: 48)
+                        .padding(.horizontal, SQSpace.md)
+                        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityIdentifier("antenna.detail.carriers")
+                }
+            } else {
+                SQNotice(message: "Aucun identifiant publié pour ce site.")
             }
         }
-        if let core = details.core {
-            AntennaDisclosureSection(title: "Site", systemImage: "mappin.and.ellipse") {
-                siteContent(core)
-            }
-            AntennaDisclosureSection(title: "Technique", systemImage: "antenna.radiowaves.left.and.right") {
-                technicalContent(core)
-            }
-            if !core.cellIdentifiers.enb.isEmpty || !core.cellIdentifiers.gnb.isEmpty
-                || !core.cellIdentifiers.pci.isEmpty || !core.cellIdentifiers.cellId.isEmpty {
-                AntennaDisclosureSection(title: "Identifiants radio", systemImage: "number") {
-                    radioIdentifiersContent(core)
-                }
-            }
-            if !core.radioCarriers.isEmpty {
-                AntennaDisclosureSection(title: "Porteuses radio", systemImage: "dot.radiowaves.left.and.right") {
-                    carriersContent(core)
-                }
-            }
+    }
+
+    /// Les porteuses intéressent peu de monde et allongeaient la fiche : elles
+    /// ont leur propre page.
+    private func carriersPage(_ core: AntennaCoreDetails) -> some View {
+        ScrollView {
+            factCard { carriersContent(core) }
+                .padding(SQSpace.lg)
         }
-        AntennaDisclosureSection(title: "Communauté", systemImage: "checkmark.seal") {
+        .background(SQColor.bg.ignoresSafeArea())
+        .navigationTitle(Text("Porteuses"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func factCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .padding(SQSpace.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    // MARK: Mesures
+
+    private func measuresTab(_ details: AntennaDetails) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
             communityContent(details)
-        }
-        if !details.nearbySpeedtests.isEmpty {
-            AntennaDisclosureSection(title: "Speedtests proches", systemImage: "speedometer") {
-                speedtestsContent(details)
+            if !details.nearbySpeedtests.isEmpty {
+                section("Speedtests proches") {
+                    speedtestsContent(details)
+                }
             }
+            SQNotice(message: "Ces données radio viennent des mesures faites avec l’app Android et de sources publiques : un iPhone ne peut pas les relever.")
         }
-        AntennaDisclosureSection(
-            title: details.photos.isEmpty ? "Photos" : "Photos (\(details.photos.count))",
-            systemImage: "photo.on.rectangle",
-            // Ouverte quand le site EST photographié : une galerie repliée derrière
-            // un titre se lit comme une absence de photos.
-            initiallyExpanded: !details.photos.isEmpty
-        ) {
-            photosContent(details)
-        }
-        Text("Ces données radio viennent des mesures faites avec l’app Android et de sources publiques : un iPhone ne peut pas les relever.")
-            .font(SQType.caption)
-            .foregroundStyle(SQColor.labelSecondary)
     }
 
     private func communityContent(_ details: AntennaDetails) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-                SQMetricTile.wrapping(label: "Validations", value: details.validationsCount.map(String.init) ?? "—", highlight: true)
-                SQMetricTile.wrapping(label: "Mesures", value: details.signalStats.map { "\($0.measurementCount)" } ?? "—")
-                SQMetricTile.wrapping(label: "Speedtests", value: details.speedtestsCount.map(String.init) ?? "—")
-                SQMetricTile.wrapping(label: "RSRP moy.", value: SignalFormatters.dbm(details.signalStats?.avgRsrp))
+        let columns = Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm),
+                            count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
+        return VStack(alignment: .leading, spacing: SQSpace.md) {
+            LazyVGrid(columns: columns, spacing: SQSpace.sm) {
+                measureTile("Validations",
+                            (details.validationsCount ?? (site.validationCount > 0 ? site.validationCount : nil)).map(String.init),
+                            ink: true)
+                measureTile("Mesures", details.signalStats.map { "\($0.measurementCount)" })
+                measureTile("RSRP moyen", details.signalStats?.avgRsrp.map { "\(Int($0.rounded()))" }, unit: "dBm")
+                measureTile("Speedtests", details.speedtestsCount.map(String.init))
             }
             if let stats = details.signalStats {
-                detailRow("RSRQ moy.", SignalFormatters.db(stats.avgRsrq))
-                detailRow("SNR moy.", SignalFormatters.db(stats.avgSnr))
-                detailRow("TAC", stats.tac)
-                detailRow("Dernière mesure", SignalFormatters.date(stats.lastMeasurement, includingTime: true, relative: true))
+                factCard {
+                    VStack(spacing: SQSpace.sm) {
+                        detailRow("RSRQ moyen", SignalFormatters.db(stats.avgRsrq))
+                        detailRow("SNR moyen", SignalFormatters.db(stats.avgSnr))
+                        detailRow("TAC", stats.tac)
+                        detailRow("Dernière mesure", SignalFormatters.date(stats.lastMeasurement, includingTime: true, relative: true))
+                    }
+                }
             }
         }
         .foregroundStyle(SQColor.label)
+    }
+
+    /// Tuile chiffrée ; la première (`ink`) est en encre, comme sur le web.
+    private func measureTile(_ label: String, _ value: String?, unit: String? = nil, ink: Bool = false) -> some View {
+        SQStatTile(label: label, value: value ?? "—", unit: value == nil ? nil : unit)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .padding(SQSpace.sm2)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
+            .environment(\.colorScheme, ink ? (colorScheme == .dark ? .light : .dark) : colorScheme)
+            .sqSurface(ink ? SQColor.label : SQColor.surface,
+                       in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private func siteContent(_ core: AntennaCoreDetails) -> some View {
@@ -1303,48 +1478,79 @@ struct AntennaDetailSheet: View {
         .foregroundStyle(SQColor.label)
     }
 
+    /// Débit en gras, le reste en dessous, la technologie à droite.
     private func speedtestsContent(_ details: AntennaDetails) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-                ForEach(details.nearbySpeedtests.prefix(5)) { speed in
-                    detailRow(
-                        SignalFormatters.speed(speed.downloadMbps),
-                        [
-                            SignalFormatters.speed(speed.uploadMbps),
-                            SignalFormatters.ms(speed.pingMs),
-                            speed.tech,
-                            SignalFormatters.date(speed.timestamp, includingTime: true, relative: true)
-                        ].compactMap { $0 }.joined(separator: " · ")
-                    )
+        VStack(spacing: 0) {
+            ForEach(Array(details.nearbySpeedtests.prefix(5).enumerated()), id: \.element.id) { index, speed in
+                HStack(spacing: SQSpace.sm) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(SQUnits.throughputValue(mbps: speed.downloadMbps))
+                                .font(SQFont.display(17, .heavy))
+                                .monospacedDigit()
+                                .foregroundStyle(SQColor.label)
+                            Text(SQUnits.throughputUnit(mbps: speed.downloadMbps))
+                                .font(SQType.caption(.semibold))
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                        Text(speedtestCaption(speed))
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if let tech = speed.tech, !tech.isEmpty {
+                        MapTechTag(technology: tech, label: tech)
+                    }
                 }
+                .frame(minHeight: 50)
+                .accessibilityElement(children: .combine)
+                .overlay(alignment: .top) {
+                    if index > 0 { Rectangle().fill(SQColor.separator).frame(height: 1) }
+                }
+            }
         }
-        .foregroundStyle(SQColor.label)
+        .padding(.horizontal, SQSpace.md)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
+    /// « ↑ 41 Mb/s · 22 ms · hier » sous le débit descendant.
+    private func speedtestCaption(_ speed: NearbySpeedtest) -> String {
+        var parts: [String] = []
+        if speed.uploadMbps != nil { parts.append("↑ " + SignalFormatters.speed(speed.uploadMbps)) }
+        if speed.pingMs != nil { parts.append(SignalFormatters.ms(speed.pingMs)) }
+        if let date = SignalFormatters.date(speed.timestamp, includingTime: true, relative: true) { parts.append(date) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// « Ajouter une photo » en tête, puis la galerie en grille de trois.
     private func photosContent(_ details: AntennaDetails) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if !details.photos.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(details.photos.prefix(8)) { photo in
-                            Button {
-                                Haptics.light()
-                                viewerPhoto = photo
-                            } label: {
-                                RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 110, contentMode: .fill) {
-                                    SQColor.surfaceMuted
+        let columns = Array(repeating: GridItem(.flexible(), spacing: SQSpace.xs2), count: 3)
+        return VStack(alignment: .leading, spacing: SQSpace.md) {
+            addPhotoContent
+            if details.photos.isEmpty {
+                SQNotice(message: "Aucune photo de ce site pour l’instant. La tienne sera la première.")
+            } else {
+                LazyVGrid(columns: columns, spacing: SQSpace.xs2) {
+                    ForEach(details.photos) { photo in
+                        Button {
+                            Haptics.light()
+                            viewerPhoto = photo
+                        } label: {
+                            Color.clear
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay {
+                                    RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 240, contentMode: .fill) {
+                                        SQColor.surfaceMuted
+                                    }
                                 }
-                                .frame(width: 110, height: 84)
                                 .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                                .sqShadowSoft()
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Photo du site, toucher pour agrandir")
+                                .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Photo du site, toucher pour agrandir")
                     }
                 }
             }
-            // Toujours proposer la contribution d'une photo (avec ou sans galerie).
-            addPhotoContent
         }
         .foregroundStyle(SQColor.label)
     }
@@ -1374,97 +1580,21 @@ struct AntennaDetailSheet: View {
         }
     }
 
-    /// `term` : ⓘ du glossaire à côté du libellé, à la première occurrence du
-    /// terme dans la fiche.
+    /// Ligne à points de conduite ; une valeur vide masque la ligne. `term` :
+    /// ⓘ du glossaire à côté du libellé.
+    @ViewBuilder
     private func detailRow(_ label: String, _ value: String?, term: SQTerm? = nil) -> some View {
-        let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return HStack(alignment: .firstTextBaseline) {
-            Text(LocalizedStringKey(label))
-                .font(SQFont.body(12))
-                .foregroundStyle(SQColor.labelSecondary)
-            if let term { SQInfoButton(term: term) }
-            Spacer(minLength: SQSpace.md)
-            Text((normalized?.isEmpty == false ? normalized : "—") ?? "—")
-                .font(SQFont.body(13, .semibold))
-                .foregroundStyle(SQColor.label)
-                .multilineTextAlignment(.trailing)
-        }
-        .padding(.vertical, SQSpace.sm - 1)
-        .padding(.horizontal, SQSpace.sm2)
-        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-    }
-}
-
-/// Carte douce de la fiche antenne : surface crème, rayon 22 continu, ombre
-/// carte — sans bordure (règle No-Border de la DA « Crème & Terre cuite »).
-/// Entrée fondu-translation douce au scroll (`sqFadeUp`, respecte Reduce Motion).
-private extension View {
-    func sqSheetCard(strong: Bool = false) -> some View {
-        self
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(SQSpace.lg)
-            .sqCardBackground()
-            .sqFadeUp()
-    }
-}
-
-/// Section repliable de la fiche antenne : même carte crème que les blocs
-/// pleins, mais son en-tête est un bouton.
-///
-/// La fiche empilait huit cartes ouvertes : exhaustive, illisible, et le bloc
-/// utile sur le terrain se trouvait au bout de plusieurs écrans de défilement.
-/// Rien n'est retiré — tout est à un tap.
-private struct AntennaDisclosureSection<Content: View>: View {
-    let title: String
-    let systemImage: String
-    var initiallyExpanded = false
-    @ViewBuilder let content: () -> Content
-
-    @State private var isExpanded: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(
-        title: String,
-        systemImage: String,
-        initiallyExpanded: Bool = false,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self.title = title
-        self.systemImage = systemImage
-        self.initiallyExpanded = initiallyExpanded
-        self.content = content
-        _isExpanded = State(initialValue: initiallyExpanded)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: isExpanded ? 12 : 0) {
-            Button {
-                Haptics.light()
-                withAnimation(reduceMotion ? nil : SQMotion.standard) { isExpanded.toggle() }
-            } label: {
-                HStack(spacing: SQSpace.sm) {
-                    Label(LocalizedStringKey(title), systemImage: systemImage)
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(SQColor.labelTertiary)
-                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
+        let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !normalized.isEmpty, normalized != "—" {
+            if let term {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                    SQFactRow(label: label, value: normalized)
+                    SQInfoButton(term: term)
                 }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(SQPressButtonStyle())
-            .accessibilityValue(isExpanded ? String(localized: "Développé") : String(localized: "Réduit"))
-            .accessibilityHint(isExpanded ? "Toucher pour replier" : "Toucher pour déplier")
-            if isExpanded {
-                content()
+            } else {
+                SQFactRow(label: label, value: normalized)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(SQSpace.lg)
-        .sqCardBackground()
-        .sqFadeUp()
     }
 }
 
@@ -1653,4 +1783,9 @@ private struct AntennaPhotoViewer: View {
             }
         }
     }
+}
+
+/// Les quatre onglets de la fiche antenne.
+private enum AntennaDetailTab: Hashable, CaseIterable {
+    case essential, identifiers, measures, photos
 }

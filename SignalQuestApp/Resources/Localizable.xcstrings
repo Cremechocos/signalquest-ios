@@ -65470,6 +65470,206 @@
           }
         }
       }
+    },
+    "Essentiel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essentials"
+          }
+        }
+      }
+    },
+    "Identifiants" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifiers"
+          }
+        }
+      }
+    },
+    "Photos %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos %lld"
+          }
+        }
+      }
+    },
+    "Secteurs et bandes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sectors and bands"
+          }
+        }
+      }
+    },
+    "Touche un opérateur pour voir sa fiche." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap an operator to see its details."
+          }
+        }
+      }
+    },
+    "n° non publié" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "number not published"
+          }
+        }
+      }
+    },
+    "Signaler une panne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report an outage"
+          }
+        }
+      }
+    },
+    "Signaler une erreur sur ce site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report an error on this site"
+          }
+        }
+      }
+    },
+    "Partager ce site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share this site"
+          }
+        }
+      }
+    },
+    "Porteuses (%lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carriers (%lld)"
+          }
+        }
+      }
+    },
+    "Porteuses" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carriers"
+          }
+        }
+      }
+    },
+    "Aucun identifiant publié pour ce site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No identifier published for this site."
+          }
+        }
+      }
+    },
+    "dBm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dBm"
+          }
+        }
+      }
+    },
+    "RSRQ moyen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average RSRQ"
+          }
+        }
+      }
+    },
+    "SNR moyen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average SNR"
+          }
+        }
+      }
+    },
+    "Aucune photo de ce site pour l’instant. La tienne sera la première." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No photo of this site yet. Yours will be the first."
+          }
+        }
+      }
+    },
+    "Partagé · %lld opérateurs" : {
+      "localizations" : {
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Partagé · %lld opérateur"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Partagé · %lld opérateurs"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shared · %lld operator"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shared · %lld operators"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
