@@ -1,15 +1,17 @@
 import SwiftUI
 import UIKit
 
-/// Polices de la DA « Crème & Terre cuite » (SignalQuest Crème) :
-/// - **Bricolage Grotesque** pour les titres display et les chiffres (rond, affirmé).
-/// - **Figtree** pour l'UI, les labels, les boutons ET le corps de texte.
+/// Police Halo : **Sora** pour tout — titres, chiffres, UI et corps de texte
+/// (`tokens.css`, planche P2-33). Fichier variable : un seul `Sora-Variable.ttf`
+/// porte l'axe de graisse 100 à 800, que `Font.weight` règle directement.
 /// Les noms d'API historiques (`display`/`archivo`/`body`) sont conservés pour
-/// ne pas réécrire ~170 appels : `archivo` rend désormais du Figtree.
-/// Retombe sur San Francisco si une famille n'est pas chargée.
+/// ne pas réécrire ~170 appels ; ils rendent tous du Sora.
+/// Retombe sur San Francisco si la police n'est pas chargée.
 enum SQFont {
-    private static let bricolageAvailable = UIFont(name: "BricolageGrotesque-Bold", size: 12) != nil
-    private static let figtreeAvailable = UIFont(name: "Figtree-Regular", size: 12) != nil
+    /// Nom PostScript de l'instance par défaut du fichier variable : `UIFont(name:)`
+    /// renvoie `nil` sur le nom de famille (voir `SQShareFonts`).
+    private static let soraName = "Sora-Regular"
+    private static let soraAvailable = UIFont(name: soraName, size: 12) != nil
 
     /// Style Dynamic Type inféré d'une taille en points. Permet aux helpers
     /// historiquement « à taille fixe » de suivre malgré tout l'accessibilité
@@ -60,78 +62,62 @@ enum SQFont {
         case .ultraLight, .thin, .light, .regular: return .medium
         case .medium: return .semibold
         case .semibold: return .bold
+        case .bold: return .heavy
         default: return weight
         }
     }
 
-    // MARK: Display / chiffres — Bricolage Grotesque
+    private static func sora(_ size: CGFloat, _ weight: Font.Weight, relativeTo style: Font.TextStyle) -> Font {
+        guard soraAvailable else { return systemFallback(relativeTo: style, weight: weight) }
+        return .custom(soraName, size: size, relativeTo: style).weight(weight)
+    }
 
-    private static func bricolageName(_ weight: Font.Weight) -> String {
+    // MARK: Display / chiffres
+
+    /// Les titres Halo sont en 800 (`.h-h1`, `.h-title`, `.h-data`) : la graisse
+    /// d'affichage monte d'un cran par rapport au corps.
+    private static func displayWeight(_ weight: Font.Weight) -> Font.Weight {
         switch weight {
-        case .bold, .heavy, .black: return "BricolageGrotesque-Bold"
-        default: return "BricolageGrotesque-SemiBold"
+        case .bold, .heavy, .black: return .heavy
+        default: return .bold
         }
     }
 
-    /// Titre display (Bricolage Grotesque). Suit Dynamic Type via un style inféré.
+    /// Titre display. Suit Dynamic Type via un style inféré.
     static func display(_ size: CGFloat, _ weight: Font.Weight = .bold) -> Font {
-        let weight = legible(weight)
-        let style = inferredStyle(forSize: size)
-        guard bricolageAvailable else { return systemFallback(relativeTo: style, weight: weight) }
-        return .custom(bricolageName(weight), size: size, relativeTo: style)
+        sora(size, legible(displayWeight(weight)), relativeTo: inferredStyle(forSize: size))
     }
 
     /// Titre display à taille STRICTEMENT fixe (pour les rendus déterministes :
     /// images de partage, etc., qui ne doivent pas suivre l'accessibilité).
     static func displayFixed(_ size: CGFloat, _ weight: Font.Weight = .bold) -> Font {
-        guard bricolageAvailable else { return .system(size: size, weight: .bold, design: .default) }
-        return .custom(bricolageName(weight), fixedSize: size)
+        guard soraAvailable else { return .system(size: size, weight: .bold, design: .default) }
+        return .custom(soraName, fixedSize: size).weight(displayWeight(weight))
     }
 
     /// Titre display relatif à un style (suit Dynamic Type).
     static func display(_ size: CGFloat, _ weight: Font.Weight = .bold, relativeTo style: Font.TextStyle) -> Font {
-        let weight = legible(weight)
-        guard bricolageAvailable else { return systemFallback(relativeTo: style, weight: weight) }
-        return .custom(bricolageName(weight), size: size, relativeTo: style)
+        sora(size, legible(displayWeight(weight)), relativeTo: style)
     }
 
-    // MARK: UI / labels — Figtree (ex-Archivo, nom d'API conservé)
-
-    private static func figtreeName(_ weight: Font.Weight) -> String {
-        switch weight {
-        case .bold, .heavy, .black: return "Figtree-Bold"
-        case .semibold: return "Figtree-SemiBold"
-        case .medium: return "Figtree-Medium"
-        default: return "Figtree-Regular"
-        }
-    }
+    // MARK: UI / labels (ex-Archivo, nom d'API conservé)
 
     static func archivo(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
-        let weight = legible(weight)
-        let style = inferredStyle(forSize: size)
-        guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
-        return .custom(figtreeName(weight), size: size, relativeTo: style)
+        sora(size, legible(weight), relativeTo: inferredStyle(forSize: size))
     }
 
     static func archivo(_ size: CGFloat, _ weight: Font.Weight = .semibold, relativeTo style: Font.TextStyle) -> Font {
-        let weight = legible(weight)
-        guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
-        return .custom(figtreeName(weight), size: size, relativeTo: style)
+        sora(size, legible(weight), relativeTo: style)
     }
 
-    // MARK: Corps — Figtree
+    // MARK: Corps
 
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        let weight = legible(weight)
-        let style = inferredStyle(forSize: size)
-        guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
-        return .custom(figtreeName(weight), size: size, relativeTo: style)
+        sora(size, legible(weight), relativeTo: inferredStyle(forSize: size))
     }
 
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle) -> Font {
-        let weight = legible(weight)
-        guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }
-        return .custom(figtreeName(weight), size: size, relativeTo: style)
+        sora(size, legible(weight), relativeTo: style)
     }
 
 }

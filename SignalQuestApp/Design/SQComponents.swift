@@ -402,10 +402,8 @@ struct SQSearchField: View {
         // Hauteur minimale et non fixe : en grande taille de texte, le champ
         // coupait sa propre saisie (TRX-12).
         .frame(minHeight: 44)
-        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
-        // « Noir intense » : `surfaceMuted` est noir comme le fond, le liseré
-        // dessine le champ.
-        .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
+        // Le fond tuile a la couleur de la page : le filet dessine le champ.
+        .sqFieldSurface(in: Capsule(style: .continuous))
     }
 }
 

@@ -450,7 +450,7 @@ private struct AddFriendSheet: View {
                         .foregroundStyle(SQColor.label)
                         .padding(.horizontal, SQSpace.lg)
                         .frame(height: 44)
-                        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                        .sqFieldSurface(in: Capsule(style: .continuous))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: SQSpace.lg, bottom: SQSpace.sm, trailing: SQSpace.lg))

@@ -178,6 +178,10 @@ struct MessageComposerBar: View {
                 .background {
                     RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
                         .fill(SQColor.surfaceMuted)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
+                                .strokeBorder(SQOledPalette.fieldStroke, lineWidth: 1)
+                        }
                         .onTapGesture { if canSend { fieldFocused = true } }
                 }
                 .disabled(!canSend)

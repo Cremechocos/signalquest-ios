@@ -9,8 +9,8 @@ import UIKit
 /// allumé. Ce mode remplace donc les surfaces par du noir pur et une échelle de
 /// gris très sombres pour l'élévation.
 ///
-/// **Valeurs reprises à l'identique d'Android** (`ReadableColorScheme.withOledSurfaces`) :
-/// les deux apps doivent se ressembler, et cette échelle a déjà été éprouvée là-bas.
+/// **Valeurs Halo** (`.dark[data-contrast="oled"]` de `tokens.css`) : noir pur, gris
+/// à peine verdis pour l'élévation, et le filet à la place de l'ombre.
 ///
 /// **Ce qui NE change pas** : les textes, les couleurs de marque et les couleurs
 /// sémantiques. Passer les libellés au blanc pur sur fond noir pur produirait un
@@ -28,30 +28,30 @@ enum SQOledPalette {
     /// Niveaux d'élévation, du fond à la surface la plus haute.
     enum Level {
         case background   // #000000 — fond de l'app
-        case low          // #0A0A0A
+        case low          // #0A0D0C
         case container    // #121212 — cartes
-        case high         // #181818
-        case highest      // #1F1F1F — remplissages
-        case variant      // #1A1A1A — surfaces atténuées
-        case outline      // #2A2A2A — séparateurs
+        case high         // #171C1A
+        case highest      // #171C1A — remplissages (`--h-chip`)
+        case variant      // #0A0D0C — tuiles (`--h-tile`)
+        case outline      // encre à 12 % — séparateurs (`--h-hair`)
 
         var color: UIColor {
             switch self {
             case .background: return UIColor(white: 0, alpha: 1)
-            case .low:        return UIColor(hex: 0x0A0A0A)
+            case .low:        return UIColor(hex: 0x0A0D0C)
             // Les cartes passent au NOIR PUR, pas à un gris d'élévation : l'app
             // étant faite de cartes, un fond noir couvert de #121212 lisait « gris
             // très sombre » et pas « noir ». La hiérarchie passe donc du
             // remplissage au CONTOUR (voir `cardStroke`), comme le font la plupart
             // des vrais modes OLED.
             case .container:  return UIColor(white: 0, alpha: 1)
-            case .high:       return UIColor(hex: 0x181818)
-            case .highest:    return UIColor(hex: 0x1F1F1F)
-            // Tuiles et surfaces atténuées : noires elles aussi. À #1A1A1A elles
+            case .high:       return UIColor(hex: 0x171C1A)
+            case .highest:    return UIColor(hex: 0x171C1A)
+            // Tuiles et surfaces atténuées : à peine au-dessus du noir. À #1A1A1A elles
             // ressortaient nettement grises sur le fond noir — c'est ce que
             // l'utilisateur voyait en premier en disant « ce n'est pas vraiment OLED ».
-            case .variant:    return UIColor(white: 0, alpha: 1)
-            case .outline:    return UIColor(hex: 0x2A2A2A)
+            case .variant:    return UIColor(hex: 0x0A0D0C)
+            case .outline:    return UIColor(red: 241 / 255, green: 244 / 255, blue: 241 / 255, alpha: 0.12)
             }
         }
     }
@@ -67,13 +67,35 @@ enum SQOledPalette {
         return isEnabled ? .whiteOutline : .white
     }
 
-    /// Liseré des cartes. Transparent hors OLED : la hiérarchie y vient du
-    /// remplissage. En OLED, carte et fond étant tous deux noirs, c'est lui — et
-    /// lui seul — qui empêche les tuiles de fusionner en un bloc unique.
+    /// Liseré des cartes. Transparent hors OLED et hors terrain : la hiérarchie y
+    /// vient du remplissage et de l'ombre.
+    /// - OLED : carte et fond étant tous deux noirs, c'est lui — et lui seul — qui
+    ///   empêche les tuiles de fusionner en un bloc unique (`--h-card-line` à 14 %).
+    /// - Terrain : les ombres disparaissent et la structure passe au filet d'encre,
+    ///   lisible en plein soleil (`[data-field="on"]`).
     static var cardStroke: Color {
         Color(UIColor { traits in
-            guard traits.userInterfaceStyle == .dark, isEnabled else { return .clear }
-            return UIColor(hex: 0x1F1F1F)
+            let isDark = traits.userInterfaceStyle == .dark
+            if SQFieldMode.isEnabled {
+                return UIColor(named: "LabelPrimary", in: .main, compatibleWith: traits) ?? .label
+            }
+            guard isDark, isEnabled else { return .clear }
+            return UIColor(red: 241 / 255, green: 244 / 255, blue: 241 / 255, alpha: 0.14)
+        })
+    }
+
+    /// Filet des champs de saisie. Le fond tuile a la couleur de la page : ce filet
+    /// dessine le champ dans les quatre modes, comme l'Input du kit web
+    /// (`border-hair`). En mode terrain, le liseré d'encre le remplace.
+    static var fieldStroke: Color {
+        Color(UIColor { traits in
+            if SQFieldMode.isEnabled {
+                return UIColor(named: "LabelPrimary", in: .main, compatibleWith: traits) ?? .label
+            }
+            if traits.userInterfaceStyle == .dark, isEnabled {
+                return UIColor(red: 241 / 255, green: 244 / 255, blue: 241 / 255, alpha: 0.14)
+            }
+            return UIColor(named: "Separator", in: .main, compatibleWith: traits) ?? .separator
         })
     }
 

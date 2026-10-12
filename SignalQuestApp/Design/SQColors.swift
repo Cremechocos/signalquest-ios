@@ -4,10 +4,10 @@ import UIKit
 /// Color tokens. All values resolve through the asset catalog so they adapt to
 /// the system light/dark appearance set in iOS Settings.
 enum SQColor {
-    /// Alias utilisé par les actions partagées ; conserve l'accent Crème existant.
+    /// Alias utilisé par les actions partagées.
     static let accent = brandRed
     // MARK: Brand
-    /// Brique signature de la DA « Crème & Terre cuite ». Accent primaire unique.
+    /// Carmin Halo (`--h-brand`) : identité, sélection, focus et états.
     static let brandRed = Color("BrandRed")
     /// Alias rétro-compat : l'ancien orange/rose pointe désormais sur le rouge,
     /// pour ne pas casser les vues existantes pendant le réalignement.
@@ -37,17 +37,21 @@ enum SQColor {
     static let label = Color("LabelPrimary")
     static let labelSecondary = fieldAwareLabel(
         asset: "LabelSecondary",
-        highLight: (0x4E, 0x40, 0x2E),
-        highDark: (0xD8, 0xCD, 0xB8)
+        highLight: (0x3C, 0x44, 0x3F),
+        highDark: (0xC9, 0xD2, 0xCC)
     )
     static let labelTertiary = fieldAwareLabel(
         asset: "LabelTertiary",
-        highLight: (0x5C, 0x4C, 0x38),
-        highDark: (0xC8, 0xBB, 0xA4)
+        highLight: (0x3C, 0x44, 0x3F),
+        highDark: (0xC9, 0xD2, 0xCC)
     )
 
     // MARK: Lines / fills
-    static var separator: Color { SQOledPalette.surface(asset: "Separator", oled: .outline) }
+    /// En mode terrain, le filet passe à l'encre à 34 %, comme `[data-field]` web.
+    static var separator: Color {
+        guard !SQFieldMode.isEnabled else { return label.opacity(0.34) }
+        return SQOledPalette.surface(asset: "Separator", oled: .outline)
+    }
     static var fill: Color { SQOledPalette.surface(asset: "Fill", oled: .highest) }
 
     // MARK: Semantic
@@ -59,46 +63,32 @@ enum SQColor {
 
     // MARK: Texte sur aplats
 
-    /// Texte posé sur une surface accent (brique).
+    /// Texte posé sur une surface accent : blanc en clair (7,5:1 sur le carmin),
+    /// NUIT carmin en sombre (6,4:1), parce qu'en sombre l'accent est un carmin
+    /// clair (`--h-on-brand`). Même bascule que `onInk`, qui traite le cas symétrique.
     ///
-    /// Était crème dans LES DEUX modes. Or `brandRed` s'éclaircit en sombre
-    /// (`#D97A66`) : du crème dessus tombait à **2,84:1**, très en dessous du
-    /// seuil AA — et c'est le bouton principal de l'app (`GradientButton`
-    /// `.accent`). L'encre nuit y remonte à 6,03:1. Même bascule que `onInk`,
-    /// qui traite déjà ce cas symétrique.
-    ///
-    /// **Ne pas l'atténuer par `.opacity()` sur du texte.** Mesuré sur
-    /// `brandRed` en mode clair : α 0,7 → 3,30:1, α 0,85 → 4,11:1, et le seuil
-    /// AA du petit texte (4,5:1) n'est franchi qu'à α ≈ 0,92, visuellement
-    /// indiscernable du plein. Autrement dit, une hiérarchie de texte par
-    /// l'alpha est impossible sur brique : la faire porter par la taille et la
-    /// graisse. L'alpha reste légitime sur les objets graphiques (traits,
-    /// icônes décoratives, `ProgressView`), au-dessus de **0,7** — seuil de
+    /// **Ne pas l'atténuer par `.opacity()` sur du texte** : une hiérarchie de texte
+    /// par l'alpha passe vite sous le seuil AA sur un aplat. La faire porter par la
+    /// taille et la graisse. L'alpha reste légitime sur les objets graphiques
+    /// (traits, icônes décoratives, `ProgressView`), au-dessus de **0,7** — seuil de
     /// WCAG 1.4.11. `DesignTokenContrastTests.testTranslucentOnAccentStaysReadable`
     /// verrouille ce plancher.
-    /// Texte posé sur une surface accent : crème en clair, NUIT en sombre — parce
-    /// qu'en sombre l'accent est un saumon clair.
     ///
-    /// ⚠️ Ne pas assombrir `brandRed` en sombre sans traiter ce jeton : les deux
-    /// forment un système. Un accent profond (carmin) exigerait un texte clair,
-    /// or `brandRed` sert AUSSI de couleur de premier plan sur les surfaces, où il
-    /// doit rester clair pour atteindre 3:1. Recherche exhaustive faite : aucune
-    /// teinte ne satisfait les deux rôles à la fois. Changer d'accent en sombre
-    /// suppose donc de SÉPARER les deux usages en deux jetons distincts.
+    /// ⚠️ `brandRed` et ce jeton forment un système : changer l'un suppose de
+    /// remesurer l'autre, et `brandRed` sert AUSSI de premier plan sur les surfaces.
     static let onAccent = dynamicTint(
-        light: (0xFB, 0xF7, 0xEF, 1.0), dark: (0x19, 0x14, 0x10, 1.0)
+        light: (0xFF, 0xFF, 0xFF, 1.0), dark: (0x24, 0x06, 0x10, 1.0)
     )
-    /// Aplat brique portant plusieurs lignes de petit texte (héro du Feed).
-    /// Le `brandRed` nominal atteint 5,05:1 en clair, mais l'anticrénelage des
-    /// libellés 11-13 pt le fait passer sous AA. Cette surface plus profonde
-    /// monte à 8,05:1 en clair, avec une marge réelle pour l'anticrénelage et
-    /// les petites légendes denses ; le sombre conserve son couple spécifique.
+    /// Aplat accent portant plusieurs lignes de petit texte (héro du Feed) :
+    /// le carmin profond (`--h-brand-deep`) monte à 9,6:1 sous du blanc, avec une
+    /// marge réelle pour l'anticrénelage ; le sombre garde le carmin clair.
     static let accentTextSurface = dynamicTint(
-        light: (0x80, 0x34, 0x2A, 1.0), dark: (0xD9, 0x7A, 0x66, 1.0)
+        light: (0x8A, 0x0E, 0x30, 1.0), dark: (0xFF, 0x5C, 0x7A, 1.0)
     )
-    /// Texte posé sur le bouton encre (`label`) : crème en clair, nuit en sombre.
+    /// Texte posé sur le bouton encre (`label`) : papier en clair, nuit en sombre
+    /// (`--h-go-ink`).
     static let onInk = dynamicTint(
-        light: (0xFB, 0xF7, 0xEF, 1.0), dark: (0x19, 0x14, 0x10, 1.0)
+        light: (0xF4, 0xF2, 0xEC, 1.0), dark: (0x0F, 0x13, 0x12, 1.0)
     )
 
     // MARK: Teintes translucides (calculées, pas de colorset)
@@ -147,22 +137,23 @@ enum SQColor {
         })
     }
 
-    /// Brique à 12 % (18 % en sombre) : pastilles d'icônes, pilule active du
-    /// dock, tags, fonds teintés.
+    /// Carmin à 10 % (14 % en sombre, `--h-brand-soft`) : pastilles d'icônes,
+    /// pilule active du dock, tags, fonds teintés.
     static let accentSoft = dynamicTint(
-        light: (0xB0, 0x4A, 0x3C, 0.12), dark: (0xD9, 0x7A, 0x66, 0.18)
+        light: (0xA8, 0x12, 0x3A, 0.10), dark: (0xFF, 0x5C, 0x7A, 0.14)
     )
-    /// Olive à 14 % (18 % en sombre) : succès, badges « Stable », validations.
+    /// Vert à 12 % (14 % en sombre, `--h-success-soft`) : succès, badges
+    /// « Stable », validations.
     static let successSoft = dynamicTint(
-        light: (0x7E, 0x8C, 0x5C, 0.14), dark: (0xA3, 0xB3, 0x7A, 0.18)
+        light: (0x18, 0x7B, 0x38, 0.12), dark: (0x7B, 0xD8, 0x9A, 0.14)
     )
-    /// Danger à 10 % (16 % en sombre) : fond du bouton destructif.
+    /// Danger à 10 % (12 % en sombre, `--h-danger-soft`) : fond du bouton destructif.
     static let dangerSoft = dynamicTint(
-        light: (0xC1, 0x3B, 0x2C, 0.10), dark: (0xE3, 0x7E, 0x6B, 0.16)
+        light: (0xC5, 0x36, 0x3B, 0.10), dark: (0xE0, 0x7A, 0x7E, 0.12)
     )
-    /// Ambre à 14 % (18 % en sombre) : avertissements teintés.
+    /// Ambre à 13 % (14 % en sombre, `--h-amb-soft`) : avertissements teintés.
     static let warningSoft = dynamicTint(
-        light: (0xC0, 0x8A, 0x3E, 0.14), dark: (0xDC, 0xA9, 0x5E, 0.18)
+        light: (0x8C, 0x63, 0x13, 0.13), dark: (0xE3, 0xB6, 0x5E, 0.14)
     )
 
     // MARK: Encres pour texte posé SUR une pastille teintée
@@ -177,15 +168,15 @@ enum SQColor {
     // Règle : `.foregroundStyle(SQColor.accentInk)` dès qu'on est sur
     // `SQColor.accentSoft` ; `SQColor.brandRed` sur un fond de surface normal.
 
-    /// Brique lisible sur `accentSoft` (4,76:1 en clair, 4,72:1 en sombre).
+    /// Carmin lisible sur `accentSoft` (6,24:1 en clair, 6,37:1 en sombre).
     static let accentInk = dynamicTint(
-        light: (0xA6, 0x44, 0x37, 1.0), dark: (0xE0, 0x8A, 0x78, 1.0)
+        light: (0xA8, 0x12, 0x3A, 1.0), dark: (0xFF, 0x8A, 0xA0, 1.0)
     )
-    /// Danger lisible sur `dangerSoft` (5,86:1 en clair, 5,08:1 en sombre).
+    /// Danger lisible sur `dangerSoft` (5,96:1 en clair, 6,02:1 en sombre).
     /// En clair, cette marge couvre aussi les erreurs de formulaire sur fond crème
     /// après rendu : l'ancienne encre tombait à 4,29:1 sur la feuille de reset.
     static let dangerInk = dynamicTint(
-        light: (0xA2, 0x2B, 0x1F, 1.0), dark: (0xE8, 0x8D, 0x7C, 1.0)
+        light: (0xA8, 0x2A, 0x2F, 1.0), dark: (0xEC, 0x8D, 0x90, 1.0)
     )
 
     // MARK: Surfaces spéciales
@@ -193,48 +184,48 @@ enum SQColor {
     /// Surface « verre » : SurfaceElevated à 92 % — à combiner avec un blur
     /// (barres de conversation, recherche carte, FABs).
     static let surfaceGlass = dynamicTint(
-        light: (0xFB, 0xF7, 0xEF, 0.92), dark: (0x26, 0x20, 0x19, 0.92),
-        oled: (0x0A, 0x0A, 0x0A, 0.92)
+        light: (0xFF, 0xFF, 0xFF, 0.92), dark: (0x18, 0x1D, 0x1B, 0.92),
+        oled: (0x0A, 0x0D, 0x0C, 0.92)
     )
     /// Fond du dock flottant : SurfaceElevated à 95 % (94 % en sombre).
     static let dockBackground = dynamicTint(
-        light: (0xFB, 0xF7, 0xEF, 0.95), dark: (0x26, 0x20, 0x19, 0.94),
-        oled: (0x0A, 0x0A, 0x0A, 0.94)
+        light: (0xFF, 0xFF, 0xFF, 0.95), dark: (0x18, 0x1D, 0x1B, 0.94),
+        oled: (0x0A, 0x0D, 0x0C, 0.94)
     )
-    /// Items inactifs du dock : bruns discrets, au moins 4,5:1 sur le fond du dock
-    /// (#76674F en clair, #A89A80 en sombre). En mode terrain ou avec « Augmenter
-    /// le contraste », ils prennent les encres secondaires renforcées.
+    /// Items inactifs du dock : le gris-vert `--h-muted`, au moins 4,5:1 sur le
+    /// fond du dock. En mode terrain ou avec « Augmenter le contraste », ils
+    /// prennent les encres secondaires renforcées.
     static let dockInactive = fieldAwareLabel(
-        light: (0x76, 0x67, 0x4F),
-        dark: (0xA8, 0x9A, 0x80),
-        highLight: (0x4E, 0x40, 0x2E),
-        highDark: (0xD8, 0xCD, 0xB8)
+        light: (0x63, 0x6B, 0x66),
+        dark: (0x98, 0xA2, 0x9C),
+        highLight: (0x3C, 0x44, 0x3F),
+        highDark: (0xC9, 0xD2, 0xCC)
     )
 
-    // MARK: Ombres (encre chaude en clair, noir en sombre)
+    // MARK: Ombres (encre en clair, noir en sombre ; aucune en OLED ni en terrain)
 
     /// Ombre repos (chips, petites tuiles) : 5 % encre / 30 % noir.
     static let shadowSoft = dynamicTint(
-        light: (0x33, 0x28, 0x18, 0.05), dark: (0x00, 0x00, 0x00, 0.30),
-        oled: (0x00, 0x00, 0x00, 0)
+        light: (0x1C, 0x20, 0x1E, 0.05), dark: (0x00, 0x00, 0x00, 0.30),
+        oled: (0x00, 0x00, 0x00, 0), clearedInFieldMode: true
     )
-    /// Ombre carte : 6 % encre / 35 % noir.
+    /// Ombre carte : 8 % encre / 35 % noir (`--h-shadow`).
     static let shadowCard = dynamicTint(
-        light: (0x33, 0x28, 0x18, 0.06), dark: (0x00, 0x00, 0x00, 0.35),
-        oled: (0x00, 0x00, 0x00, 0)
+        light: (0x1C, 0x20, 0x1E, 0.08), dark: (0x00, 0x00, 0x00, 0.35),
+        oled: (0x00, 0x00, 0x00, 0), clearedInFieldMode: true
     )
-    /// Ombre accent (28 %) : uniquement sous les surfaces brique.
+    /// Ombre accent (22 %) : uniquement sous les surfaces carmin.
     /// ⚠️ En OLED, cette ombre est ANNULÉE : un saumon à 28 % posé sur du noir pur
     /// ne se lit pas comme une ombre mais comme un halo lumineux autour des
-    /// surfaces brique — le défaut le plus voyant du mode sur appareil réel.
+    /// surfaces carmin — le défaut le plus voyant du mode sur appareil réel.
     static let shadowAccent = dynamicTint(
-        light: (0xB0, 0x4A, 0x3C, 0.28), dark: (0xD9, 0x7A, 0x66, 0.28),
-        oled: (0x00, 0x00, 0x00, 0)
+        light: (0xA8, 0x12, 0x3A, 0.22), dark: (0xFF, 0x5C, 0x7A, 0.22),
+        oled: (0x00, 0x00, 0x00, 0), clearedInFieldMode: true
     )
-    /// Ombre du dock flottant : 14 % encre / 50 % noir.
+    /// Ombre du dock flottant : 22 % encre / 50 % noir (`--h-shadow-dock`).
     static let shadowDock = dynamicTint(
-        light: (0x33, 0x28, 0x18, 0.14), dark: (0x00, 0x00, 0x00, 0.50),
-        oled: (0x00, 0x00, 0x00, 0)
+        light: (0x1C, 0x20, 0x1E, 0.22), dark: (0x00, 0x00, 0x00, 0.50),
+        oled: (0x00, 0x00, 0x00, 0), clearedInFieldMode: true
     )
 
     /// Couleur dynamique clair/sombre avec alpha, hors asset catalog.
@@ -242,12 +233,16 @@ enum SQColor {
     /// actif. Sans elle, les surfaces calculées — dock et verre en tête — gardaient
     /// leur brun chaud au milieu d'une app passée au noir. Le dock étant visible
     /// sur CHAQUE écran, c'était le défaut le plus voyant du mode.
+    /// `clearedInFieldMode` : les ombres disparaissent en mode terrain, où la
+    /// structure passe au filet (`SQOledPalette.cardStroke`), comme `[data-field]` web.
     private static func dynamicTint(
         light: (UInt8, UInt8, UInt8, CGFloat),
         dark: (UInt8, UInt8, UInt8, CGFloat),
-        oled: (UInt8, UInt8, UInt8, CGFloat)? = nil
+        oled: (UInt8, UInt8, UInt8, CGFloat)? = nil,
+        clearedInFieldMode: Bool = false
     ) -> Color {
         Color(UIColor { traits in
+            if clearedInFieldMode, SQFieldMode.isEnabled { return .clear }
             let isDark = traits.userInterfaceStyle == .dark
             let c = isDark ? ((oled != nil && SQOledPalette.isEnabled) ? oled! : dark) : light
             return UIColor(

@@ -939,14 +939,17 @@ private struct PodiumColumn: View {
     }
 
     private var step: some View {
-        UnevenRoundedRectangle(
+        let shape = UnevenRoundedRectangle(
             topLeadingRadius: SQRadius.md,
             bottomLeadingRadius: 0,
             bottomTrailingRadius: 0,
             topTrailingRadius: SQRadius.md,
             style: .continuous
         )
+        return shape
         .fill(isFirst ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface))
+        // « Noir intense » : `surface` est noir comme le fond, le liseré garde la marche.
+        .overlay { if !isFirst { shape.strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) } }
         .frame(height: stepHeight)
         .overlay(
             VStack(spacing: 1) {

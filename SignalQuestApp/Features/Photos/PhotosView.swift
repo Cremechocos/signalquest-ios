@@ -1078,7 +1078,7 @@ struct PhotoDetailView: View {
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.vertical, SQSpace.sm2)
                 .frame(minHeight: 44)
-                .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
+                .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
                 .focused($commentFocused)
             Button {
                 onSend()
@@ -1281,7 +1281,7 @@ struct PhotoUploadView: View {
                         .foregroundStyle(SQColor.label)
                         .lineLimit(2...5)
                         .padding(SQSpace.md2)
-                        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
 
                     GradientButton("Uploader", systemImage: "arrow.up.circle", isBusy: isUploading) {
                         guard let original = imageData, let site = selectedSite else { return }

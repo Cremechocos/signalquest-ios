@@ -165,14 +165,14 @@ struct SQInfoButton: View {
 /// une icône, une précision et le ⓘ du terme affiché. VoiceOver lit « libellé :
 /// valeur unité » d'un bloc et propose l'action « Expliquer ».
 ///
-/// La valeur reste à l'encre, en brique (`accentInk`) si `highlight` : une
+/// La valeur reste à l'encre, en carmin (`accentInk`) si `highlight` : une
 /// couleur de débit ou de qualité ne tient pas 4,5:1 sur la tuile. La couleur
 /// qui porte le sens (réception, envoi, latence) va à l'icône.
 struct SQMetricTile: View {
     enum Size {
-        /// Figtree Bold 17 : grilles de stats.
+        /// Sora Bold 17 : grilles de stats.
         case regular
-        /// Bricolage Bold 22, chiffres alignés : résultats d'une mesure.
+        /// Sora ExtraBold 22, chiffres alignés : résultats d'une mesure.
         case large
     }
 

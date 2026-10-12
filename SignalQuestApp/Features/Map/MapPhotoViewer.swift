@@ -301,7 +301,7 @@ struct MapPhotoViewer: View {
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm)
                 .frame(minHeight: 44)
-                .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                .sqFieldSurface(in: Capsule(style: .continuous))
 
             Button {
                 Task { await sendComment() }

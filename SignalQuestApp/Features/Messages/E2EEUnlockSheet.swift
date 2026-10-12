@@ -79,7 +79,7 @@ struct E2EEUnlockSheet: View {
                             .padding(.horizontal, SQSpace.lg)
                             .padding(.vertical, SQSpace.sm2)
                             .frame(minHeight: 44)
-                            .sqSurface(SQColor.surfaceMuted, in: Capsule())
+                            .sqFieldSurface(in: Capsule())
                             .focused($passwordFocused)
                             .submitLabel(choosesNewPassword ? .next : .go)
                             .onSubmit {
@@ -94,7 +94,7 @@ struct E2EEUnlockSheet: View {
                                 .padding(.horizontal, SQSpace.lg)
                                 .padding(.vertical, SQSpace.sm2)
                                 .frame(minHeight: 44)
-                                .sqSurface(SQColor.surfaceMuted, in: Capsule())
+                                .sqFieldSurface(in: Capsule())
                                 .focused($confirmationFocused)
                                 .submitLabel(.done)
                                 .onSubmit { if canSubmit { Task { await unlockOrCreate() } } }
@@ -254,7 +254,7 @@ struct E2EEUnlockSheet: View {
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.vertical, SQSpace.sm2)
                 .frame(minHeight: 44)
-                .sqSurface(SQColor.surfaceMuted, in: Capsule())
+                .sqFieldSurface(in: Capsule())
                 .submitLabel(.go)
                 .onSubmit { if canSubmit { Task { await replaceKey(using: .password(accountPassword)) } } }
                 .accessibilityIdentifier("e2ee.key.accountPassword")

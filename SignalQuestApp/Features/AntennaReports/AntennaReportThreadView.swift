@@ -356,7 +356,7 @@ struct AntennaReportThreadView: View {
                     .padding(.horizontal, SQSpace.lg)
                     .padding(.vertical, SQSpace.sm2)
                     .frame(minHeight: 44)
-                    .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
+                    .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
 
                 Button {
                     Task { await model.send() }

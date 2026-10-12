@@ -41,12 +41,14 @@ struct SignalQuestApp: App {
         Self.configureNavigationTypography()
     }
 
-    /// Bricolage Grotesque pour les titres de navigation (DA Crème) — les
+    /// Sora pour les titres de navigation (Halo `.h-h1` à 22, `.h-h2` à 17) — les
     /// `navigationTitle` SwiftUI passent par UINavigationBar, qu'on ne peut
     /// styler que via l'appearance UIKit. Retombe sur SF si la police manque.
     private static func configureNavigationTypography() {
-        guard let large = UIFont(name: "BricolageGrotesque-Bold", size: 26),
-              let inline = UIFont(name: "BricolageGrotesque-SemiBold", size: 17) else { return }
+        guard SQShareFonts.areEmbedded else { return }
+        // Fichier variable : la graisse se règle sur l'axe `wght`, comme pour la carte de partage.
+        let large = SQShareFonts.display(size: 22, weight: 800)
+        let inline = SQShareFonts.display(size: 17, weight: 800)
         let appearance = UINavigationBarAppearance()
         appearance.configureWithDefaultBackground()
         appearance.largeTitleTextAttributes[.font] = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: large)

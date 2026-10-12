@@ -161,10 +161,7 @@ struct SentinelleField: View {
                 .keyboardType(.URL)
                 .padding(.horizontal, SQSpace.lg)
                 .frame(minHeight: 48)
-                .background(
-                    SQColor.surfaceMuted,
-                    in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                )
+                .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             if let hint {
                 Text(hint)
                     .font(SQType.caption)

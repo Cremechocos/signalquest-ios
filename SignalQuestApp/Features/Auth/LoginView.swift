@@ -522,26 +522,16 @@ struct GuestSpeedtestReceiptsView: View {
     }
 }
 
-/// Champ « Crème & Terre cuite » : capsule 44, fond `SurfaceMuted`.
-/// Le mode OLED a besoin d'un contour car son fond de champ est noir pur.
+/// Champ Halo : capsule 44, fond tuile et filet de 1 pt (`sqFieldSurface`).
 struct SQTextFieldStyle: TextFieldStyle {
-    @Environment(\.colorScheme) private var colorScheme
-
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .font(SQType.body)
             .padding(.horizontal, SQSpace.lg)
             .padding(.vertical, SQSpace.md)
             .frame(minHeight: 44)
-            .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
-            // En OLED, surfaceMuted et le fond sont noirs purs : sans ce trait,
-            // les champs vides ou sécurisés disparaissent visuellement.
-            .overlay {
-                Capsule(style: .continuous)
-                    .strokeBorder(colorScheme == .dark && SQOledPalette.isEnabled
-                                  ? SQColor.labelTertiary : .clear, lineWidth: 1)
-                    .allowsHitTesting(false)
-            }
+            // Le fond tuile a la couleur de la page : le filet dessine le champ.
+            .sqFieldSurface(in: Capsule(style: .continuous))
             .foregroundStyle(SQColor.label)
             .tint(SQColor.brandRed)
     }

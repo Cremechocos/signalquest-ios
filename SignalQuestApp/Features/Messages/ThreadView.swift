@@ -140,7 +140,7 @@ struct ThreadView: View {
                 .padding(.horizontal, SQSpace.cardPadding)
                 .padding(.vertical, SQSpace.sm)
                 .frame(minHeight: 44)
-                .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
             Button {
                 Task { await sendReply() }
             } label: {

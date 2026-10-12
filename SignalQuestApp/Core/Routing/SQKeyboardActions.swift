@@ -145,7 +145,7 @@ struct SQCommandPalette: View {
                 }
                 .padding(.horizontal, SQSpace.lg)
                 .frame(minHeight: 44)
-                .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                .sqFieldSurface(in: Capsule(style: .continuous))
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.vertical, SQSpace.sm)
                 .background(SQColor.bg)

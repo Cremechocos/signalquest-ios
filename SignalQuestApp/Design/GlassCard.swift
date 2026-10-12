@@ -39,6 +39,13 @@ extension View {
         background(fill, in: shape)
             .overlay { shape.strokeBorder(SQOledPalette.cardStroke, lineWidth: 1).allowsHitTesting(false) }
     }
+
+    /// Champ de saisie : fond tuile et filet de 1 pt dans les quatre modes. Le fond
+    /// tuile a la couleur de la page ; sans le filet, un champ posé dessus disparaît.
+    nonisolated func sqFieldSurface<S: InsettableShape>(in shape: S) -> some View {
+        background(SQColor.surfaceMuted, in: shape)
+            .overlay { shape.strokeBorder(SQOledPalette.fieldStroke, lineWidth: 1).allowsHitTesting(false) }
+    }
 }
 
 private struct SQCardShadow: ViewModifier {

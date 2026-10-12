@@ -59,7 +59,7 @@ final class DesignTokenContrastTests: XCTestCase {
         assertMinimum(UIColor(SQColor.labelSecondary), named: "labelSecondary", atLeast: 4.5)
     }
 
-    /// Si Figtree/Bricolage n'est pas encore enregistré, le repli SF doit suivre
+    /// Si Sora n'est pas encore enregistrée, le repli SF doit suivre
     /// le style Dynamic Type. Le seul repli `.system(size:)` autorisé est celui
     /// du helper `displayFixed`, réservé aux exports bitmap déterministes.
     func testScreenFontFallbacksNeverBecomeFixedSize() throws {
@@ -92,14 +92,17 @@ final class DesignTokenContrastTests: XCTestCase {
         assertMinimum(UIColor(SQColor.labelTertiary), named: "labelTertiary", atLeast: 3.0)
     }
 
-    /// Aucun `labelTertiary` ne doit revenir sur du texte : le token n'atteint
-    /// pas 4,5:1 et ne le peut pas sans détruire la hiérarchie visuelle.
-    func testTertiaryTokenStaysBelowTextThresholdOnPurpose() {
-        let r = ratio(UIColor(SQColor.labelTertiary), on: UIColor(SQColor.surface), .light)
-        XCTAssertLessThan(
-            r, 4.5,
-            "Si labelTertiary atteint 4,5:1, il est devenu indiscernable de labelSecondary : revoir la hiérarchie"
-        )
+    /// Halo n'a pas de gris tertiaire : `labelTertiary` prend le `--h-muted` du web
+    /// (décision d'Alexandre, 12/10), comme `labelSecondary`. Un écart rouvrirait
+    /// un jeton propre à iOS.
+    func testTertiaryTokenMatchesHaloMuted() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            XCTAssertEqual(
+                luminance(UIColor(SQColor.labelTertiary), style),
+                luminance(UIColor(SQColor.labelSecondary), style),
+                accuracy: 0.0001
+            )
+        }
     }
 
     func testSemanticTokensMeetAA() {
