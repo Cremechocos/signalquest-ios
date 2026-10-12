@@ -2594,7 +2594,7 @@ final class E2EETests: XCTestCase {
         XCTAssertTrue(source.contains("acknowledgesRecoveryReplacement"))
         XCTAssertTrue(source.contains("Date().addingTimeInterval(60)"))
         XCTAssertTrue(source.contains("resetCode.count != 6"))
-        XCTAssertTrue(source.contains("validation du chiffrement sur iOS, Android et le web"))
+        XCTAssertTrue(source.contains("quand il sera disponible sur iPhone, Android et le web"))
         XCTAssertFalse(source.contains("/api/e2ee/trusted-devices"))
         XCTAssertFalse(source.contains("Tout révoquer"))
     }
