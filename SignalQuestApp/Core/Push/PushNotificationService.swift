@@ -553,7 +553,12 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
             "recipientOwnerScope": scope.ownerScopeId,
             "e2eeNotificationSessionId": scope.sessionId,
         ]
-        if let conversationId { info["conversationId"] = conversationId }
+        if let conversationId {
+            info["conversationId"] = conversationId
+            // « Marquer comme lu » seulement, comme dans l'extension.
+            info["isE2EE"] = "1"
+            content.categoryIdentifier = MessageNotificationCategory.encrypted
+        }
         content.userInfo = info
         let center = UNUserNotificationCenter.current()
         return await E2EEV2NotificationScope.publishIfCurrent(
@@ -948,6 +953,9 @@ extension PushNotificationService {
         // Répondre vaut lecture, comme dans les messageries courantes.
         if let messageId {
             try? await messages.markRead(conversationId: conversationId, lastMessageId: messageId)
+        } else if action == MessageNotificationCategory.markReadAction {
+            // Notification v2 : pas d'identifiant de message v1 à donner.
+            try? await messages.markReadToLatest(conversationId: conversationId)
         }
         await AppServicesHolder.services.refreshInboxBadge(force: true)
     }

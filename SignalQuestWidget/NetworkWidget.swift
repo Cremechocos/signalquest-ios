@@ -39,7 +39,10 @@ struct NetworkWidgetEntryView: View {
 
     private var distanceText: String? {
         guard let d = entry.glance?.nearestDistanceMeters else { return nil }
-        return d >= 1000 ? String(format: "%.1f km", d / 1000) : "\(Int(d)) m"
+        // Décimale à la langue de l'appareil : « 1,2 km » en français.
+        return d >= 1000
+            ? "\((d / 1000).formatted(.number.precision(.fractionLength(1)))) km"
+            : "\(Int(d)) m"
     }
 
     var body: some View {
@@ -48,7 +51,7 @@ struct NetworkWidgetEntryView: View {
             HStack(spacing: 5) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .foregroundStyle(brandRed)
-                Text(g?.operatorLabel ?? "Réseau")
+                Text(g?.operatorLabel ?? String(localized: "Réseau"))
                     .font(.headline)
                     .lineLimit(1)
                 if let gen = g?.generation, !gen.isEmpty {
@@ -87,19 +90,10 @@ struct NetworkWidgetEntryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .padding(14)
-        .networkWidgetBackground()
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func networkWidgetBackground() -> some View {
-        if #available(iOS 17.0, *) {
-            self.containerBackground(for: .widget) { Color(.systemBackground) }
-        } else {
-            self.background(Color(.systemBackground))
-        }
+        // Même fond crème que les autres widgets ; un appui ouvre la carte, où
+        // se trouve l'antenne affichée.
+        .sqWidgetBackground(tint: brandRed)
+        .widgetURL(SQSharedConfiguration.deepLink("map"))
     }
 }
 

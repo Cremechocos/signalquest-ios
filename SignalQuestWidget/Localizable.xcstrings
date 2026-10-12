@@ -42,6 +42,86 @@
         }
       }
     },
+    "Bon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Good"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bon"
+          }
+        }
+      }
+    },
+    "Débit des derniers tests : moyenne %lld mégabits par seconde, record %lld mégabits par seconde" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed of recent tests: average %lld megabits per second, best %lld megabits per second"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débit des derniers tests : moyenne %lld mégabits par seconde, record %lld mégabits par seconde"
+          }
+        }
+      }
+    },
+    "Exceptionnel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exceptional"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exceptionnel"
+          }
+        }
+      }
+    },
+    "Moyen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fair"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moyen"
+          }
+        }
+      }
+    },
+    "Réseau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réseau"
+          }
+        }
+      }
+    },
     "Speedtest en rafale %lld/%lld" : {
       "localizations" : {
         "fr" : {
@@ -70,6 +150,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Run a test"
+          }
+        }
+      }
+    },
+    "Très lent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Very slow"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Très lent"
           }
         }
       }
@@ -780,40 +876,6 @@
         }
       }
     },
-    "Rapide" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rapide"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fast"
-          }
-        }
-      }
-    },
-    "Correct" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Correct"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fair"
-          }
-        }
-      }
-    },
     "Lent" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -827,23 +889,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Slow"
-          }
-        }
-      }
-    },
-    "Faible" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Faible"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weak"
           }
         }
       }

@@ -103,7 +103,7 @@ final class CarPlayCoordinator {
     /// tait. Sans ça, ouvrir une fiche, revenir, en rouvrir une autre laissait la
     /// réponse la plus LENTE repeindre l'écran de la plus récente.
     private enum Screen: Hashable {
-        case here, nearby, sentinelle, detail, speedtest, poi, comparison
+        case here, nearby, sentinelle, detail, speedtest, poi, comparison, layers
     }
     private var generations: [Screen: Int] = [:]
 
@@ -149,10 +149,12 @@ final class CarPlayCoordinator {
         // posées dans `installMap`, donc jamais en mode liste — c'est-à-dire
         // jamais du tout avec la catégorie « driving task » réellement accordée.
         // Le réglage était visible dans l'app et sans le moindre effet.
-        if CarPlayAlertSettings.coverageAlertsEnabled {
-            alertObserver = services.location.addLocationObserver(scope: .session) { [weak self] location in
-                self?.evaluateCoverageAlert(at: location)
-            }
+        syncCoverageAlertObserver()
+        // Le réglage peut être activé en roulant : l'abonnement suit sa valeur.
+        alertSettingObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncCoverageAlertObserver() }
         }
 
         // L'amorçage peut n'avoir jamais eu lieu : au branchement du véhicule,
@@ -203,6 +205,10 @@ final class CarPlayCoordinator {
         speedtestTask?.cancel()
         speedtestTask = nil
         speedtestTemplate = nil
+        if let alertSettingObserver {
+            NotificationCenter.default.removeObserver(alertSettingObserver)
+            self.alertSettingObserver = nil
+        }
         if let alertObserver {
             services.location.removeLocationObserver(alertObserver)
             self.alertObserver = nil
@@ -590,6 +596,9 @@ final class CarPlayCoordinator {
             guard moved >= Self.reloadDistanceMeters else { return }
         }
         lastLoadedCenter = newCenter
+        // Un rechargement tous les 400 m : seule la zone la plus récente peut
+        // repeindre la carte, même si une réponse plus ancienne arrive après.
+        let generation = beginScreen(.layers)
 
         track { [weak self] in
             guard let self else { return }
@@ -600,7 +609,8 @@ final class CarPlayCoordinator {
                 market: MapMarketStore.initialMarketCode(),
                 operatorKey: MapMarketStore.initialOperatorKey()
             )
-            guard !Task.isCancelled, let controller = mapController else { return }
+            guard !Task.isCancelled, isCurrent(.layers, generation),
+                  let controller = mapController else { return }
             loadedLayers = loaded
             outagesById = loaded.outageSources
             plannedById = loaded.plannedSources
@@ -639,6 +649,20 @@ final class CarPlayCoordinator {
     /// valent pour tout trajet, pas seulement quand on suit un itinéraire.
     /// Séparer les deux évite aussi qu'arrêter un guidage ne coupe les alertes.
     private var alertObserver: UUID?
+    private var alertSettingObserver: NSObjectProtocol?
+
+    /// Pose ou retire l'abonnement aux positions selon le réglage des alertes.
+    private func syncCoverageAlertObserver() {
+        if CarPlayAlertSettings.coverageAlertsEnabled {
+            guard alertObserver == nil else { return }
+            alertObserver = services.location.addLocationObserver(scope: .session) { [weak self] location in
+                self?.evaluateCoverageAlert(at: location)
+            }
+        } else if let alertObserver {
+            services.location.removeLocationObserver(alertObserver)
+            self.alertObserver = nil
+        }
+    }
 
     /// Réévalue la couverture au fil du trajet et alerte si la zone traversée
     /// est mauvaise.

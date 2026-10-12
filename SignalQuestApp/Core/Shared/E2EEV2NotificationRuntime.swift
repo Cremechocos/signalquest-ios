@@ -19,6 +19,9 @@ struct E2EEV2NotificationPresentation: Equatable, Sendable {
     let title: String
     let body: String
     let privacy: E2EEV2NotificationPrivacy
+    /// Une modification ou une suppression ne sonne pas : ce n'est pas un
+    /// nouveau message.
+    var playsSound = true
 }
 
 enum E2EEV2NotificationPresentationPolicy {
@@ -67,7 +70,12 @@ enum E2EEV2NotificationPresentationPolicy {
         case .edit: fullText = String(localized: "Message chiffré modifié")
         case .delete: fullText = String(localized: "Message chiffré supprimé")
         }
-        return presentation(fullText: fullText, privacy: privacy, senderName: senderName)
+        var result = presentation(fullText: fullText, privacy: privacy, senderName: senderName)
+        switch payload.body {
+        case .edit, .delete: result.playsSound = false
+        case .text: break
+        }
+        return result
     }
 
     /// Expéditeur authentifié, contenu jamais lu (mode « expéditeur seulement »).

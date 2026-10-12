@@ -164,6 +164,9 @@ struct SpeedtestTrendEntryView: View {
             }
         }
         .frame(maxHeight: .infinity)
+        // Les barres ne disent rien à VoiceOver : un résumé chiffré les remplace.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(localized: "Débit des derniers tests : moyenne \(Int(avg.rounded())) mégabits par seconde, record \(Int(best.rounded())) mégabits par seconde"))
     }
 
     private func stat(_ label: LocalizedStringKey, _ value: Double) -> some View {

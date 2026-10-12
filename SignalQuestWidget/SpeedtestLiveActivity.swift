@@ -88,18 +88,6 @@ private struct LockScreenSpeedtestActivity: View {
     private var progress: Double { clamped(state.progress) }
     private var tint: Color { state.finished ? SpeedtestLiveStyle.success : speedColor(state.downloadMbps) }
 
-    // En mots (MES-12) : « UL / DL / Sync » ne disaient rien à un débutant.
-    private var compactPhaseLabel: LocalizedStringKey {
-        if state.finished { return "Terminé" }
-        let label = state.phaseLabel.lowercased()
-        if label.contains("ping") { return "Latence" }
-        if label.contains("upload") || label.contains("envoi") { return "Envoi" }
-        if label.contains("download") || label.contains("réception") || label.contains("reception") { return "Réception" }
-        if label.contains("sauvegarde") || label.contains("saving") || label.contains("sync") { return "Enregistrement" }
-        if state.isBurst { return "Test \(state.runIndex)/\(state.runTotal)" }
-        return "Test"
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
@@ -290,7 +278,8 @@ private struct IslandStatus: View {
     private var compactPhaseLabel: LocalizedStringKey {
         if state.finished { return "Terminé" }
         let label = state.phaseLabel.lowercased()
-        if label.contains("ping") { return "Latence" }
+        // L'app publie « Latence » / « Latency » (titre de la phase), pas « ping ».
+        if label.contains("ping") || label.contains("latence") || label.contains("latency") { return "Latence" }
         if label.contains("upload") || label.contains("envoi") { return "Envoi" }
         if label.contains("download") || label.contains("réception") || label.contains("reception") { return "Réception" }
         if label.contains("sauvegarde") || label.contains("saving") || label.contains("sync") { return "Enregistrement" }

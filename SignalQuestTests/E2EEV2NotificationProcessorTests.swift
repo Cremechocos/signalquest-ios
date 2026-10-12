@@ -924,3 +924,34 @@ final class E2EEV2NotificationProcessorTests: XCTestCase {
         return Fixture(context: context, conversation: conversation, descriptor: descriptor, data: data, now: now)
     }
 }
+
+extension E2EEV2NotificationProcessorTests {
+    func testEditAndDeleteNotificationsStaySilent() throws {
+        func presentation(_ body: E2EEV2ContentPayloadV2.Body) throws -> E2EEV2NotificationPresentation {
+            let payload = try E2EEV2ContentPayloadV2(
+                sentAtMs: 1_760_000_000_000, counter: 1, replyToRef: nil, mentions: [], body: body
+            )
+            return E2EEV2NotificationPresentationPolicy.present(payload, ephemeral: false, privacy: .full)
+        }
+        XCTAssertTrue(try presentation(.text("Salut")).playsSound)
+        XCTAssertFalse(try presentation(.edit(targetRef: "ref", text: "Salut !")).playsSound)
+        XCTAssertFalse(try presentation(.delete(targetRef: "ref")).playsSound)
+    }
+
+    func testEncryptedNotificationsOfferOnlyMarkAsRead() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let extensionSource = try String(contentsOf: repository.appendingPathComponent(
+            "SignalQuestNotificationService/NotificationService.swift"
+        ))
+        let push = try String(contentsOf: repository.appendingPathComponent(
+            "SignalQuestApp/Core/Push/PushNotificationService.swift"
+        ))
+        XCTAssertTrue(extensionSource.contains("content.categoryIdentifier = MessageNotificationCategory.encrypted"))
+        XCTAssertTrue(extensionSource.contains("if !prepared.presentation.playsSound { content.sound = nil }"))
+        XCTAssertTrue(push.contains("content.categoryIdentifier = MessageNotificationCategory.encrypted"))
+        // Sans identifiant de message v1, « Marquer comme lu » lit jusqu'au plus récent.
+        XCTAssertTrue(push.contains("try? await messages.markReadToLatest(conversationId: conversationId)"))
+    }
+}

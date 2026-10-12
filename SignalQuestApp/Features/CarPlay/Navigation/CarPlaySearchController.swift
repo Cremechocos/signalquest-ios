@@ -24,10 +24,9 @@ final class CarPlaySearchController: NSObject, CPSearchTemplateDelegate {
     private let market: () -> String?
     private let onSelect: (CLLocationCoordinate2D, String) -> Void
 
-    /// Résultats du dernier appel, indexés par identifiant d'item : `CPListItem`
-    /// ne transporte pas de charge utile, et la sélection nous rend l'item, pas
-    /// la coordonnée.
-    private var resultsByTitle: [String: (coordinate: CLLocationCoordinate2D, title: String)] = [:]
+    /// Résultats du dernier appel. Chaque `CPListItem` porte son rang dans
+    /// `userInfo` : la sélection nous rend l'item, pas la coordonnée.
+    private var results: [Result] = []
 
     /// Recherche en cours, annulée à chaque frappe : sans cela, une réponse
     /// lente à « rue » écraserait les résultats de « rue de Rivoli ».
@@ -59,7 +58,7 @@ final class CarPlaySearchController: NSObject, CPSearchTemplateDelegate {
         // Deux caractères ne discriminent rien et déclencheraient une requête à
         // chaque frappe.
         guard query.count >= 3 else {
-            resultsByTitle = [:]
+            results = []
             completionHandler([])
             return
         }
@@ -68,10 +67,13 @@ final class CarPlaySearchController: NSObject, CPSearchTemplateDelegate {
             guard let self else { return }
             let results = await search(query)
             guard !Task.isCancelled else { return }
-            resultsByTitle = Dictionary(results.map { ($0.title, ($0.coordinate, $0.title)) },
-                                        uniquingKeysWith: { first, _ in first })
-            completionHandler(results.map { result in
-                CPListItem(text: result.title, detailText: result.subtitle)
+            self.results = results
+            // Le rang du résultat, pas son titre : deux « Gare » homonymes
+            // mènent chacune à sa propre destination.
+            completionHandler(results.enumerated().map { index, result in
+                let item = CPListItem(text: result.title, detailText: result.subtitle)
+                item.userInfo = index
+                return item
             })
         }
     }
@@ -80,7 +82,8 @@ final class CarPlaySearchController: NSObject, CPSearchTemplateDelegate {
                         selectedResult item: CPListItem,
                         completionHandler: @escaping () -> Void) {
         defer { completionHandler() }
-        guard let title = item.text, let match = resultsByTitle[title] else { return }
+        guard let index = item.userInfo as? Int, results.indices.contains(index) else { return }
+        let match = results[index]
         onSelect(match.coordinate, match.title)
     }
 

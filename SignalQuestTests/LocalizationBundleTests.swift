@@ -19,8 +19,8 @@ final class LocalizationBundleTests: XCTestCase {
             XCTAssertEqual(String(localized: String.LocalizationValue(key), bundle: app,
                 locale: english), value)
         }
-        for (key, value) in ["Très bon": "Very good", "Rapide": "Fast",
-                             "Correct": "Fair", "Lent": "Slow", "Faible": "Weak"] {
+        for (key, value) in ["Très bon": "Very good", "Bon": "Good",
+                             "Moyen": "Fair", "Lent": "Slow", "Très lent": "Very slow"] {
             XCTAssertEqual(String(localized: String.LocalizationValue(key), bundle: widget,
                 locale: english), value)
         }

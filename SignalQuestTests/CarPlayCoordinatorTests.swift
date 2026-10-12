@@ -295,3 +295,23 @@ final class CarPlayCoordinatorTests: XCTestCase {
                        String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie."))
     }
 }
+
+extension CarPlayCoordinatorTests {
+    func testLayerReloadsAndSearchResultsKeepTheirIdentity() throws {
+        let carPlay = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("SignalQuestApp/Features/CarPlay")
+        let coordinator = try String(contentsOf: carPlay.appendingPathComponent("CarPlayCoordinator.swift"))
+        let search = try String(contentsOf: carPlay.appendingPathComponent("Navigation/CarPlaySearchController.swift"))
+        // Seule la zone la plus récente repeint la carte.
+        XCTAssertTrue(coordinator.contains("let generation = beginScreen(.layers)"))
+        XCTAssertTrue(coordinator.contains("isCurrent(.layers, generation)"))
+        // Le réglage des alertes est suivi pendant le trajet.
+        XCTAssertTrue(coordinator.contains("forName: UserDefaults.didChangeNotification"))
+        XCTAssertTrue(coordinator.contains("syncCoverageAlertObserver()"))
+        // Deux résultats homonymes gardent chacun leur destination.
+        XCTAssertTrue(search.contains("item.userInfo = index"))
+        XCTAssertFalse(search.contains("uniquingKeysWith"))
+    }
+}

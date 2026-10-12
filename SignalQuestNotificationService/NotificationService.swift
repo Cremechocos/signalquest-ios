@@ -184,8 +184,11 @@ final class NotificationService: UNNotificationServiceExtension, @unchecked Send
             content.userInfo["conversationId"] = prepared.conversationId
             content.userInfo["e2eeNotificationSessionId"] = prepared.sessionId
             content.userInfo["privacy"] = prepared.presentation.privacy.rawValue
+            // The encrypted category only offers "mark as read": no direct reply.
+            content.userInfo["isE2EE"] = "1"
+            content.categoryIdentifier = MessageNotificationCategory.encrypted
+            if !prepared.presentation.playsSound { content.sound = nil }
         }
-        // No legacy category/action can send a clear direct reply.
         delivery.completion(content)
     }
 }
