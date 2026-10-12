@@ -163,6 +163,8 @@ struct SentinelleFollowersCard: View {
                     } label: {
                         Label(copied ? String(localized: "Copié") : String(localized: "Copier"), systemImage: copied ? "checkmark" : "doc.on.doc")
                             .labelStyle(.iconOnly)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .tint(SQColor.labelSecondary)
 
@@ -171,6 +173,8 @@ struct SentinelleFollowersCard: View {
                     ShareLink(item: url) {
                         Label("Partager", systemImage: "square.and.arrow.up")
                             .labelStyle(.iconOnly)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .tint(SQColor.brandRed)
                 }

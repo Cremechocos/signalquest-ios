@@ -214,6 +214,9 @@ struct MapPhotoViewer: View {
             }
             .disabled(likeBusy)
             .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel("J’aime")
+            .accessibilityValue("\(likeCount)")
+            .accessibilityAddTraits(liked ? .isSelected : [])
 
             HStack(spacing: 6) {
                 Image(systemName: "bubble.left")

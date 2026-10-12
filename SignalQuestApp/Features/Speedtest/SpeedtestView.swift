@@ -765,6 +765,8 @@ struct SpeedtestView: View {
                                 step: 1
                             )
                             .tint(SQColor.brandRed)
+                            .accessibilityLabel("Durée")
+                            .accessibilityValue(String(localized: "\(durationSeconds) seconde"))
                         }
 
                         }

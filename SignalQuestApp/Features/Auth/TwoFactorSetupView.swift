@@ -98,6 +98,7 @@ struct TwoFactorSetupView: View {
                 .accessibilityHidden(true)
             Text("Double authentification")
                 .font(SQType.title)
+                .sqHeader()
                 .foregroundStyle(SQColor.label)
             if !model.needsProfileRefresh && model.phase != .sessionChanged {
                 Text("Ajoute SignalQuest à ton application d’authentification, puis saisis le code qu’elle affiche.")

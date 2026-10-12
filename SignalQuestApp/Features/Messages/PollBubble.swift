@@ -110,6 +110,7 @@ struct PollBubble: View {
                 }
                 .padding(.horizontal, SQSpace.sm + 2)
                 .padding(.vertical, SQSpace.sm)
+                .frame(minHeight: 44)
             }
             .background((mine ? SQColor.onAccent.opacity(0.10) : SQColor.surfaceMuted), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))

@@ -205,12 +205,16 @@ struct FriendsListView: View {
                                     .font(SQType.body)
                                     .foregroundStyle(SQColor.labelSecondary)
                                 Spacer()
-                                Button("Débloquer") {
+                                Button {
                                     Haptics.light()
                                     unblockTarget = user
+                                } label: {
+                                    Text("Débloquer")
+                                        .font(SQType.button)
+                                        .foregroundStyle(SQColor.accentInk)
+                                        .frame(minHeight: 44)
+                                        .contentShape(Rectangle())
                                 }
-                                .font(SQType.button)
-                                .foregroundStyle(SQColor.accentInk)
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Débloquer \(user.displayName)")
                             }
@@ -378,6 +382,7 @@ struct FriendsListView: View {
                 .foregroundStyle(accented ? SQColor.onAccent : SQColor.label)
                 .background(accented ? SQColor.brandRed : SQColor.surfaceMuted, in: Capsule(style: .continuous))
                 .padding(.vertical, SQSpace.xs)
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())

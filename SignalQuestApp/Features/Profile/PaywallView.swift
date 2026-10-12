@@ -194,6 +194,7 @@ struct PaywallView: View {
         let titleBlock = VStack(alignment: .leading, spacing: SQSpace.xs) {
             Text(tier.displayName)
                 .font(SQType.title)
+                .sqHeader()
                 .foregroundStyle(primaryText)
             Text(SubscriptionPriceCopy.priceLine(product: product))
                 .font(SQFont.display(18, .bold))

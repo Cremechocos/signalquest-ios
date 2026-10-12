@@ -214,6 +214,7 @@ struct AppLockScreen: View {
                 VStack(spacing: SQSpace.xs) {
                     Text("SignalQuest est verrouillé")
                         .font(SQType.title)
+                        .sqHeader()
                         .foregroundStyle(SQColor.label)
                         .multilineTextAlignment(.center)
                     Text(lock.canAuthenticateDeviceOwner

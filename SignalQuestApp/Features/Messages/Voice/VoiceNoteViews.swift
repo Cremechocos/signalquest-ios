@@ -156,6 +156,10 @@ struct VoiceNoteBubble: View {
                     .foregroundStyle(mine ? SQColor.brandRed : SQColor.onAccent)
                     .frame(width: 34, height: 34)
                     .background(mine ? SQColor.onAccent : SQColor.brandRed, in: Circle())
+                    // Zone tactile de 44 pt autour du rond de 34 pt, sans agrandir la bulle.
+                    .padding(5)
+                    .contentShape(Rectangle())
+                    .padding(-5)
             }
             .buttonStyle(.plain)
 

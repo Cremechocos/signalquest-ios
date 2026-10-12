@@ -717,6 +717,7 @@ struct OfflineRetryView: View {
                     .foregroundStyle(SQColor.brandOrange)
                 Text("Connexion indisponible")
                     .font(SQType.title)
+                    .sqHeader()
                     .foregroundStyle(SQColor.label)
                 Text("Impossible de joindre SignalQuest. Vérifie ta connexion puis réessaie.")
                     .font(SQType.body)
@@ -730,6 +731,8 @@ struct OfflineRetryView: View {
                 Button("Se déconnecter") { confirmLogout = true }
                     .font(SQType.body)
                     .tint(SQColor.labelSecondary)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                     // Même confirmation qu'au Profil (TRX-31).
                     .confirmationDialog("Te déconnecter ?", isPresented: $confirmLogout, titleVisibility: .visible) {
                         Button("Se déconnecter", role: .destructive) {

@@ -99,9 +99,11 @@ struct ValidationsSheet: View {
                         Label("\(entry.validations)", systemImage: "hand.thumbsup.fill")
                             .font(SQFont.body(12, .medium, relativeTo: .caption2))
                             .foregroundStyle(SQColor.success)
+                            .accessibilityLabel(Text("\(entry.validations) validation"))
                         Label("\(entry.rejections)", systemImage: "hand.thumbsdown.fill")
                             .font(SQFont.body(12, .medium, relativeTo: .caption2))
                             .foregroundStyle(SQColor.danger)
+                            .accessibilityLabel(Text("\(entry.rejections) rejet"))
                         if model.pendingVote == "\(type)-\(entry.value)" {
                             ProgressView().tint(SQColor.brandRed)
                         } else {

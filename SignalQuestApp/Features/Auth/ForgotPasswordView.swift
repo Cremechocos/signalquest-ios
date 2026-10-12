@@ -37,6 +37,7 @@ struct ForgotPasswordView: View {
                     } else {
                         Text("Réinitialiser le mot de passe")
                             .font(SQType.title)
+                            .sqHeader()
                         Text("Saisis ton adresse e-mail. Tu recevras un lien pour choisir un nouveau mot de passe.")
                             .font(SQType.body)
                             .foregroundStyle(SQColor.labelSecondary)

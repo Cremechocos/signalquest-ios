@@ -186,7 +186,7 @@ struct SpeedtestServerPicker: View {
                         }
                         .padding(.horizontal, SQSpace.md)
                         .padding(.vertical, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
                                 .fill(SQColor.surfaceMuted)
@@ -272,7 +272,6 @@ struct SpeedtestServerPicker: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(target.displayName)
-        .accessibilityValue(selected ? "sélectionné" : "non sélectionné")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -319,7 +318,7 @@ struct SpeedtestServerPicker: View {
                         }
                     }
                     .padding(.horizontal, SQSpace.md).padding(.vertical, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .background(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).fill(SQColor.surfaceMuted))
                     .contentShape(Rectangle())
                 }
@@ -447,7 +446,7 @@ struct SpeedtestServerPicker: View {
                     }
                 }
                 .padding(.horizontal, SQSpace.md).padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).fill(SQColor.surfaceMuted))
                 .contentShape(Rectangle())
             }

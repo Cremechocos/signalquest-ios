@@ -35,6 +35,7 @@ struct LocationPrimingSheet: View {
             VStack(spacing: SQSpace.sm) {
                 Text(isDenied ? "Localisation désactivée" : "Localiser ta mesure")
                     .font(SQType.title)
+                    .sqHeader()
                     .foregroundStyle(SQColor.label)
                     .multilineTextAlignment(.center)
                 Text(isDenied

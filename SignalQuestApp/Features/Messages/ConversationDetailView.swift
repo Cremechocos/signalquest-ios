@@ -524,15 +524,33 @@ struct ConversationDetailView: View {
             }
         }
         .sheet(item: $safetyNumberPeer, onDismiss: { Task { await loadV2() } }) { peer in
-            if let access = services.e2eeV2Messaging.safetyNumberAccess() {
-                NavigationStack {
-                    E2EEV2SafetyNumberView(
-                        peerUserId: peer.userId,
-                        peerName: peer.name ?? String(localized: "Ce membre"),
-                        ownUserId: access.ownUserId,
-                        ownAccountKey: access.ownAccountKey,
-                        trust: access.trust
-                    )
+            NavigationStack {
+                Group {
+                    if let access = services.e2eeV2Messaging.safetyNumberAccess() {
+                        E2EEV2SafetyNumberView(
+                            peerUserId: peer.userId,
+                            peerName: peer.name ?? String(localized: "Ce membre"),
+                            ownUserId: access.ownUserId,
+                            ownAccountKey: access.ownAccountKey,
+                            trust: access.trust
+                        )
+                    } else {
+                        // Sans accès aux clés, la feuille dit pourquoi elle est vide.
+                        Text("Le numéro de sécurité n’est pas disponible pour le moment.")
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(SQSpace.lg)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .signalQuestBackground()
+                            .navigationTitle(Text("Numéro de sécurité"))
+                            .navigationBarTitleDisplayMode(.inline)
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Fermer") { safetyNumberPeer = nil }
+                    }
                 }
             }
         }
@@ -969,6 +987,8 @@ struct ConversationDetailView: View {
             Button { onClose() } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(SQColor.labelTertiary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Fermer")
         }
@@ -1277,6 +1297,10 @@ struct ConversationDetailView: View {
                                 )
                         }
                         .sqShadowSoft()
+                        // Zone tactile de 44 pt sans changer la hauteur de la capsule.
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
+                        .padding(.vertical, -10)
                     }
                     .buttonStyle(.plain)
                     .disabled(isE2EE)
@@ -1366,6 +1390,10 @@ struct ConversationDetailView: View {
                 .background(SQColor.surface, in: Capsule())
                 .sqShadowSoft()
                 .foregroundStyle(SQColor.brandRed)
+                // Zone tactile de 44 pt sans changer la hauteur du badge.
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
+                .padding(.vertical, -11)
             }
             .buttonStyle(.plain)
         }

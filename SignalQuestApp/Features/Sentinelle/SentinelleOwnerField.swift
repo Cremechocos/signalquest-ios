@@ -63,7 +63,7 @@ struct SentinelleOwnerField: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: SQSpace.xxs) {
                         if !emoji.isEmpty {
-                            emojiCell("✕") { emoji = ""; showPalette = false }
+                            emojiCell("✕", accessibilityLabel: String(localized: "Retirer l’emoji")) { emoji = ""; showPalette = false }
                         }
                         ForEach(SentinelleOwnerLabel.emojiPalette, id: \.self) { value in
                             emojiCell(value) { emoji = value; showPalette = false }
@@ -105,6 +105,8 @@ struct SentinelleOwnerField: View {
                                     .overlay(
                                         Capsule().stroke(SQColor.separator, lineWidth: 1)
                                     )
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }
@@ -114,7 +116,7 @@ struct SentinelleOwnerField: View {
         }
     }
 
-    private func emojiCell(_ value: String, action: @escaping () -> Void) -> some View {
+    private func emojiCell(_ value: String, accessibilityLabel: String? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(value)
                 .font(.system(size: 20))
@@ -126,5 +128,6 @@ struct SentinelleOwnerField: View {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel ?? value)
     }
 }

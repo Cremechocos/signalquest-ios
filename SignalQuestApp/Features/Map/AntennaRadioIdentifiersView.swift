@@ -277,6 +277,7 @@ struct AntennaRadioIdentifiersView: View {
     private func copy(_ value: String) {
         UIPasteboard.general.string = value
         Haptics.success()
+        UIAccessibility.post(notification: .announcement, argument: String(localized: "Copié"))
         withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { copiedValue = value }
         Task {
             try? await Task.sleep(nanoseconds: 1_600_000_000)

@@ -2361,6 +2361,7 @@ struct SettingsView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(MapBackdrop.resolve(mapBackdropRaw) == option ? .isSelected : [])
                 }
             } header: {
                 Text("Fond de carte")
@@ -2731,6 +2732,7 @@ private struct DeleteAccountSheet: View {
                         .foregroundStyle(SQColor.danger)
                     Text("Supprimer ton compte")
                         .font(SQType.title)
+                        .sqHeader()
                         .foregroundStyle(SQColor.label)
 
                     if model.isDeletionPreviewLoading && model.deletionPreview == nil {

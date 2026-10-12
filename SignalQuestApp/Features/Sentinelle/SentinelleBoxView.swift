@@ -116,6 +116,7 @@ struct SentinelleBoxView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(SentinelleWording.verdict(target))
                             .font(SQType.title)
+                            .sqHeader()
                             .foregroundStyle(SQColor.label)
                             .fixedSize(horizontal: false, vertical: true)
                         if let hostname = target.hostname {
@@ -371,6 +372,8 @@ struct SentinelleBoxView: View {
                     .padding(.horizontal, SQSpace.md)
                     .padding(.vertical, SQSpace.sm)
                     .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(SQPressButtonStyle())
         }
@@ -402,17 +405,20 @@ struct SentinelleBoxView: View {
 
                 if ownerChanged(target) {
                     HStack(spacing: SQSpace.sm) {
-                        Button("Annuler") {
+                        Button {
                             ownerLabel = target.ownerLabel ?? ""
                             ownerEmoji = target.ownerEmoji ?? ""
+                        } label: {
+                            Text("Annuler")
+                                .font(SQFont.body(14))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
-                        .font(SQFont.body(14))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .padding(.vertical, SQSpace.sm)
 
                         Spacer()
 
-                        Button("Enregistrer") {
+                        Button {
                             Task {
                                 do {
                                     try await model.service.setOwner(
@@ -426,12 +432,16 @@ struct SentinelleBoxView: View {
                                 }
                                 await model.load(silently: true)
                             }
+                        } label: {
+                            Text("Enregistrer")
+                                .font(SQFont.body(14, .semibold))
+                                .foregroundStyle(SQColor.accentInk)
+                                .padding(.vertical, SQSpace.sm)
+                                .padding(.horizontal, SQSpace.md)
+                                .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
-                        .font(SQFont.body(14, .semibold))
-                        .foregroundStyle(SQColor.accentInk)
-                        .padding(.vertical, SQSpace.sm)
-                        .padding(.horizontal, SQSpace.md)
-                        .background(SQColor.accentSoft, in: Capsule(style: .continuous))
                     }
                 }
             }

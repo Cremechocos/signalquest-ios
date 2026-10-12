@@ -158,6 +158,8 @@ struct GroupSettingsView: View {
                                 } label: {
                                     Image(systemName: "ellipsis.circle")
                                         .foregroundStyle(SQColor.labelSecondary)
+                                        .frame(minWidth: 44, minHeight: 44)
+                                        .contentShape(Rectangle())
                                 }
                                 .accessibilityLabel("Options de \(participant.user.displayName)")
                             }

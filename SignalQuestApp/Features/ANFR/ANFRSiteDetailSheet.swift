@@ -80,6 +80,7 @@ struct ANFRSiteDetailSheet: View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text(site.city.isEmpty ? "Support \(site.supId)" : site.city.capitalized)
                 .font(SQType.title)
+                .sqHeader()
                 .foregroundStyle(SQColor.label)
             Text("Site ANFR")
                 .font(SQType.caption)

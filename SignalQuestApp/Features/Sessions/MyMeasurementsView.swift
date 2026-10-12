@@ -216,7 +216,7 @@ struct MyMeasurementsView: View {
         .padding(SQSpace.sm + 2)
         .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
         .padding(SQSpace.md)
-        .accessibilityHidden(true)
+        .accessibilityElement(children: .combine)
     }
 
     private func legendRow(_ color: Color, _ label: String) -> some View {

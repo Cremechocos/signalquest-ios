@@ -55,8 +55,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     private static let antennaDotSize: CGFloat = 26
     private static let otherDotSize: CGFloat = 36
     private static let badgeSize: CGFloat = 14
-    /// Rayon minimal de la vue, badges et anneau compris.
-    private static let minRadius: CGFloat = 20
+    /// Rayon minimal de la vue, badges et anneau compris : 22 pt, soit une cible
+    /// tactile de 44 pt de diamètre.
+    private static let minRadius: CGFloat = 22
 
     /// Liseré crème du marqueur, CONSTANT dans les deux modes.
     ///
@@ -85,8 +86,8 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// suit sans réglage supplémentaire, contrairement à MapLibre où le décalage
     /// est une propriété de couche appliquée au rendu.
     ///
-    /// ⚠️ Les DISQUES deviennent tangents, mais les zones tactiles (gonflées à 20 et
-    /// 22 pt par `resize`) se recouvrent encore sur une bande d'une dizaine de points
+    /// ⚠️ Les DISQUES deviennent tangents, mais les zones tactiles (gonflées à 22 pt
+    /// par `resize`) se recouvrent encore sur une bande d'une dizaine de points
     /// entre les deux ; c'est la vue au-dessus qui y gagne, et MapKit n'ordonne pas
     /// deux annotations de même coordonnée. Taper ce qu'on VOIT reste juste : chaque
     /// centre visible est hors de la zone de l'autre. Les rendre disjointes
@@ -158,7 +159,19 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         return hypot(point.x - center.x, point.y - center.y) <= hitRadius
     }
 
+    /// Dernier contenu appliqué, pour redessiner les badges (images mises en cache
+    /// par style d'interface) quand le thème bascule sans resynchronisation.
+    private var appliedPayload: MapAnnotationPayload?
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard let payload = appliedPayload,
+              traitCollection.userInterfaceStyle != previousTraitCollection?.userInterfaceStyle else { return }
+        apply(payload)
+    }
+
     func apply(_ payload: MapAnnotationPayload) {
+        appliedPayload = payload
         applyAccessibility(for: payload)
         let color = UIColor(payload.markerColor)
         if let count = payload.clusterCount {
@@ -537,7 +550,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         let offset = distance * CGFloat(2).squareRoot() / 2
         let center = CGPoint(x: bounds.midX, y: bounds.midY)
         if showsCheck {
-            checkBadge.image = Self.checkBadgeImage(size: badge)
+            checkBadge.image = Self.checkBadgeImage(size: badge, traits: traitCollection)
             checkBadge.frame = CGRect(
                 x: center.x + offset - badge / 2,
                 y: center.y - offset - badge / 2,
@@ -546,7 +559,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             )
         }
         if showsPhoto {
-            photoBadge.image = Self.photoBadgeImage(size: badge)
+            photoBadge.image = Self.photoBadgeImage(size: badge, traits: traitCollection)
             photoBadge.frame = CGRect(
                 x: center.x - offset - badge / 2,
                 y: center.y + offset - badge / 2,
@@ -558,7 +571,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             // En haut à GAUCHE : les deux autres diagonales sont prises (coche eNB
             // en haut à droite, photos en bas à gauche), et le haut se remarque plus
             // que le bas — ce qui convient à un incident en cours.
-            outageBadge.image = Self.outageBadgeImage(size: badge, severity: outageMark.severity)
+            outageBadge.image = Self.outageBadgeImage(size: badge, severity: outageMark.severity, traits: traitCollection)
             outageBadge.frame = CGRect(
                 x: center.x - offset - badge / 2,
                 y: center.y - offset - badge / 2,
@@ -570,7 +583,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             // En bas à DROITE : la dernière diagonale libre, et la seule qui laisse les deux
             // badges de panne coexister sans se recouvrir — ce qui arrive précisément dans le cas
             // le plus intéressant, quand l'opérateur reconnaît ce que la communauté a signalé.
-            operatorBadge.image = Self.operatorBadgeImage(size: badge, issueType: incidentMark.issueType)
+            operatorBadge.image = Self.operatorBadgeImage(size: badge, issueType: incidentMark.issueType, traits: traitCollection)
             operatorBadge.frame = CGRect(
                 x: center.x + offset - badge / 2,
                 y: center.y + offset - badge / 2,
@@ -639,13 +652,17 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
 
     /// `apply(_:)` est appelé pour CHAQUE annotation à chaque resynchronisation de
     /// couche : rendre ces images à la volée coûterait un `UIGraphicsImageRenderer`
-    /// par marqueur et par rendu. Elles ne dépendent que de leur taille.
+    /// par marqueur et par rendu. Elles dépendent de leur taille et du style
+    /// d'interface : les couleurs dynamiques (`SQColor.success`…) sont résolues au
+    /// rendu, donc une image gardée sous un thème ne vaut pas pour l'autre.
     private static var imageCache: [String: UIImage] = [:]
 
-    private static func cachedImage(_ key: String, _ make: () -> UIImage) -> UIImage {
-        if let hit = imageCache[key] { return hit }
-        let image = make()
-        imageCache[key] = image
+    private static func cachedImage(_ key: String, traits: UITraitCollection, _ make: () -> UIImage) -> UIImage {
+        let styledKey = "\(key)-\(traits.userInterfaceStyle.rawValue)"
+        if let hit = imageCache[styledKey] { return hit }
+        var image = UIImage()
+        traits.performAsCurrent { image = make() }
+        imageCache[styledKey] = image
         return image
     }
 
@@ -715,10 +732,10 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// Toujours pleine, même pour une panne non confirmée : à 14 pt, un disque évidé
     /// n'est plus qu'un anneau illisible. La nuance signalée / confirmée se lit sur
     /// le marqueur de plein droit et dans la feuille, où il y a la place de le dire.
-    private static func outageBadgeImage(size: CGFloat, severity: OutageSeverity) -> UIImage {
-        let fill = UIColor(OutageTint.of(severity))
-        return cachedImage("outage-\(severity.rawValue)-\(Int(size.rounded()))") {
-            badgeImage(
+    private static func outageBadgeImage(size: CGFloat, severity: OutageSeverity, traits: UITraitCollection) -> UIImage {
+        cachedImage("outage-\(severity.rawValue)-\(Int(size.rounded()))", traits: traits) {
+            let fill = UIColor(OutageTint.of(severity))
+            return badgeImage(
                 size: size,
                 fill: fill,
                 symbol: "exclamationmark",
@@ -734,9 +751,9 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
     /// établir : la couleur dit la gravité, la forme dit qui l'affirme. Sans glyphe à l'intérieur
     /// — à cette taille, un pictogramme dans un triangle n'est plus qu'une tache, alors que la
     /// silhouette, elle, reste lisible.
-    private static func operatorBadgeImage(size: CGFloat, issueType: String) -> UIImage {
-        let fill = UIColor(OperatorIncidentCard.tint(for: issueType))
-        return cachedImage("operator-incident-\(issueType)-\(Int(size.rounded()))") {
+    private static func operatorBadgeImage(size: CGFloat, issueType: String, traits: UITraitCollection) -> UIImage {
+        cachedImage("operator-incident-\(issueType)-\(Int(size.rounded()))", traits: traits) {
+            let fill = UIColor(OperatorIncidentCard.tint(for: issueType))
             let renderer = UIGraphicsImageRenderer(size: CGSize(width: size, height: size))
             return renderer.image { context in
                 let cg = context.cgContext
@@ -763,8 +780,8 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         }
     }
 
-    private static func checkBadgeImage(size: CGFloat) -> UIImage {
-        cachedImage("check-\(Int(size.rounded()))") {
+    private static func checkBadgeImage(size: CGFloat, traits: UITraitCollection) -> UIImage {
+        cachedImage("check-\(Int(size.rounded()))", traits: traits) {
             badgeImage(
                 size: size,
                 fill: UIColor(SQColor.success),
@@ -774,8 +791,8 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         }
     }
 
-    private static func photoBadgeImage(size: CGFloat) -> UIImage {
-        cachedImage("photo-\(Int(size.rounded()))") {
+    private static func photoBadgeImage(size: CGFloat, traits: UITraitCollection) -> UIImage {
+        cachedImage("photo-\(Int(size.rounded()))", traits: traits) {
             badgeImage(
                 size: size,
                 fill: outlineColor,

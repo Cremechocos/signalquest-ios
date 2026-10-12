@@ -120,19 +120,31 @@ struct SentinelleFollowedCard: View {
 
                 if confirming {
                     HStack(spacing: SQSpace.sm) {
-                        Button("Annuler") { confirming = false }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(SQColor.labelSecondary)
-                        Button("Ne plus suivre") { confirming = false; onUnfollow() }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(SQColor.danger)
+                        Button { confirming = false } label: {
+                            Text("Annuler")
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        Button { confirming = false; onUnfollow() } label: {
+                            Text("Ne plus suivre")
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(SQColor.danger)
                     }
                     .font(SQFont.body(14))
                 } else {
-                    Button("Ne plus suivre") { confirming = true }
-                        .buttonStyle(.plain)
-                        .font(SQFont.body(14))
-                        .foregroundStyle(SQColor.labelSecondary)
+                    Button { confirming = true } label: {
+                        Text("Ne plus suivre")
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .font(SQFont.body(14))
+                    .foregroundStyle(SQColor.labelSecondary)
                 }
             }
         }

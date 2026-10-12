@@ -27,6 +27,7 @@ struct SignupView: View {
                 VStack(alignment: .leading, spacing: SQSpace.md + 2) {
                     Text("Créer un compte")
                         .font(SQType.title)
+                        .sqHeader()
                         .foregroundStyle(SQColor.label)
 
                     VStack(alignment: .leading, spacing: SQSpace.xs) {

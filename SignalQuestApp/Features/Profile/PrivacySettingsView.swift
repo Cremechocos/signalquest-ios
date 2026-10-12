@@ -426,6 +426,7 @@ private struct LiveLocationDisclosureSheet: View {
                             .foregroundStyle(SQColor.brandRed)
                         Text("Partager ta position en direct")
                             .font(SQType.title)
+                            .sqHeader()
                             .foregroundStyle(SQColor.label)
                             .fixedSize(horizontal: false, vertical: true)
                         Text("Voici ce que tes amis verront une fois ce partage activé.")

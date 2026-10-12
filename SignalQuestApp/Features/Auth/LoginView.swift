@@ -74,6 +74,7 @@ struct LoginView: View {
                     VStack(alignment: .leading, spacing: SQSpace.lg) {
                         Text(isTwoFactor ? "Validation 2FA" : "Connexion")
                             .font(SQType.title)
+                            .sqHeader()
                             .foregroundStyle(SQColor.label)
 
                         if isTwoFactor {
@@ -107,7 +108,8 @@ struct LoginView: View {
                             Button("Annuler") { session.cancelTwoFactor() }
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.brandRed)
-                                .frame(maxWidth: .infinity)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .contentShape(Rectangle())
                                 .accessibilityIdentifier("login.twoFactor.cancel")
                         } else {
                             VStack(alignment: .leading, spacing: SQSpace.xs) {
@@ -303,6 +305,7 @@ struct LoginView: View {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     Text("Créer un compte")
                         .font(SQType.title)
+                        .sqHeader()
                         .foregroundStyle(SQColor.label)
                     Toggle(isOn: $acceptedAppleTerms) {
                         Text("J’accepte les conditions d’utilisation et la politique de confidentialité.")

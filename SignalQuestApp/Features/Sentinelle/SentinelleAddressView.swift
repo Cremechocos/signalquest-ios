@@ -141,6 +141,7 @@ struct SentinelleAddressView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(SentinelleWording.addressVerdict(target, address, state))
                             .font(SQType.title)
+                            .sqHeader()
                             .foregroundStyle(SQColor.label)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(address.address)
@@ -318,6 +319,7 @@ struct SentinelleAddressView: View {
                         .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, SQSpace.sm + 2)
+                        .frame(minHeight: 44)
                         .background(
                             isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(Color.clear),
                             in: Capsule(style: .continuous)

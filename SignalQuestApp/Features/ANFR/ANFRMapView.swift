@@ -9,6 +9,9 @@ final class ANFRMapViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var lastUpdate: String?
+    /// Vrai une fois un premier chargement terminé : avant, une liste vide veut
+    /// dire « pas encore de données », pas « aucun site pour ces filtres ».
+    @Published private(set) var hasLoadedSnapshot = false
 
     @Published var operatorFilters: Set<ANFROperator> = Set(ANFROperator.allCases) { didSet { recomputeFilteredSites() } }
     @Published var selectedModTypes: Set<ANFRModType> = Set(ANFRModType.allCases) { didSet { recomputeFilteredSites() } }
@@ -46,6 +49,7 @@ final class ANFRMapViewModel: ObservableObject {
             availableDates = ANFRDemoData.archiveDates.dates
             currentSnapshotDate = ANFRDemoData.archiveDates.current
             errorMessage = nil
+            hasLoadedSnapshot = true
             return
         }
         #endif
@@ -59,6 +63,7 @@ final class ANFRMapViewModel: ObservableObject {
         if AppEnvironment.usesDemoData {
             sites = ANFRDemoData.mapSnapshot.sites
             lastUpdate = ANFRDemoData.mapSnapshot.lastUpdate
+            hasLoadedSnapshot = true
             return
         }
         #endif
@@ -69,6 +74,7 @@ final class ANFRMapViewModel: ObservableObject {
             let snapshot = try await service.mapSnapshot(date: selectedDate)
             sites = snapshot.sites
             lastUpdate = snapshot.lastUpdate
+            hasLoadedSnapshot = true
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
@@ -80,10 +86,18 @@ final class ANFRMapViewModel: ObservableObject {
         currentSnapshotDate = meta.current
     }
 
+    /// « Réessayer » : relit le relevé ET les dates d'archive, que le premier
+    /// chargement a pu manquer.
+    func reload() async {
+        await loadSnapshot()
+        if availableDates.isEmpty { await loadArchiveDates() }
+    }
+
     func selectDate(_ date: String?) async {
         guard date != selectedDate else { return }
         selectedDate = date
         sites = []
+        hasLoadedSnapshot = false
         await loadSnapshot()
     }
 
@@ -103,7 +117,7 @@ final class ANFRMapViewModel: ObservableObject {
 
     var dateLabel: String {
         guard let raw = selectedDate ?? currentSnapshotDate,
-              let date = ANFRDateParser.date(from: raw) else { return lastUpdate ?? "Dernier relevé" }
+              let date = ANFRDateParser.date(from: raw) else { return lastUpdate ?? String(localized: "Dernier relevé") }
         return date.formatted(.dateTime.day().month(.abbreviated).year())
     }
 }
@@ -133,17 +147,6 @@ struct ANFRMapView: View {
         }
         .navigationTitle("Carte ANFR")
         .toolbarTitleInlineCompat()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Haptics.light()
-                    showDatePicker = true
-                } label: {
-                    Image(systemName: "calendar")
-                        .foregroundStyle(SQColor.brandRed)
-                }
-            }
-        }
         .sheet(item: $selectedSite) { site in
             ANFRSiteDetailSheet(site: site, service: services.anfr)
         }
@@ -186,7 +189,7 @@ struct ANFRMapView: View {
             if model.isLoading {
                 loadingPill
                     .padding(.bottom, SQSpace.lg)
-            } else if model.filteredSites.isEmpty, model.errorMessage == nil {
+            } else if model.hasLoadedSnapshot, model.filteredSites.isEmpty, model.errorMessage == nil {
                 emptyPill
                     .padding(.bottom, SQSpace.lg)
             }
@@ -229,6 +232,7 @@ struct ANFRMapView: View {
                 .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
             .buttonStyle(SQPressButtonStyle())
+            .accessibilityHint("Choisir une date")
 
             Spacer()
 
@@ -245,6 +249,8 @@ struct ANFRMapView: View {
             .padding(.horizontal, SQSpace.md - 1)
             .frame(height: 48)
             .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("\(model.filteredSites.count) site visible"))
 
             // Filter button
             Button {
@@ -268,6 +274,8 @@ struct ANFRMapView: View {
                 }
             }
             .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel("Filtres de la carte")
+            .accessibilityValue(activeFilterCount > 0 ? Text("Filtres actifs : \(activeFilterCount)") : Text(verbatim: ""))
         }
         .padding(SQSpace.xs + 1)
         .sqCardBackground()
@@ -336,7 +344,7 @@ struct ANFRMapView: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
             Button {
-                Task { await model.loadSnapshot() }
+                Task { await model.reload() }
             } label: {
                 Label("Réessayer", systemImage: "arrow.clockwise")
                     .font(SQFont.body(13, .semibold))

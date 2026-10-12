@@ -774,7 +774,7 @@ private struct LeaderboardTabSwitcher: View {
                     }
                     .padding(.horizontal, SQSpace.md)
                     .padding(.vertical, SQSpace.sm)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
                     .foregroundStyle(isOn ? SQColor.onAccent : SQColor.labelSecondary)
                     .background {
                         if isOn {
@@ -820,6 +820,7 @@ private struct LeaderboardMenuPill<Items: View>: View {
             }
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm)
+            .frame(minHeight: 44)
             .background(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowSoft()
             .contentShape(Capsule(style: .continuous))
@@ -1043,16 +1044,21 @@ private struct PointsRowMeta: View {
     let level: Int?
     let stats: PointsLeaderboardStats?
 
-    private var counters: [(icon: String, count: Int)] {
+    // `label` : phrase lue par VoiceOver (« 320 validations ») — les icônes seules
+    // ne disent pas à quoi se rapporte le chiffre.
+    private var counters: [(icon: String, count: Int, label: String)] {
         guard let stats else { return [] }
-        return [
-            ("checkmark.seal.fill", stats.validations),
-            ("camera.fill", stats.photos),
-            ("speedometer", stats.speedtests)
-        ].compactMap { icon, value -> (icon: String, count: Int)? in
-            guard let value, value > 0 else { return nil }
-            return (icon, value)
+        var result: [(icon: String, count: Int, label: String)] = []
+        if let value = stats.validations, value > 0 {
+            result.append(("checkmark.seal.fill", value, String(localized: "\(value) validation")))
         }
+        if let value = stats.photos, value > 0 {
+            result.append(("camera.fill", value, String(localized: "\(value) photo")))
+        }
+        if let value = stats.speedtests, value > 0 {
+            result.append(("speedometer", value, String(localized: "\(value) speedtest")))
+        }
+        return result
     }
 
     var body: some View {
@@ -1065,11 +1071,11 @@ private struct PointsRowMeta: View {
         }
     }
 
-    private func line(_ counters: [(icon: String, count: Int)]) -> some View {
+    private func line(_ counters: [(icon: String, count: Int, label: String)]) -> some View {
         HStack(spacing: SQSpace.sm) {
             if let level { LevelPill(level: level) }
             ForEach(Array(counters.enumerated()), id: \.offset) { _, counter in
-                statCount(icon: counter.icon, count: counter.count)
+                statCount(icon: counter.icon, count: counter.count, label: counter.label)
             }
             // Sans ce ressort, l'`HStack` centrerait la ligne dans la largeur que
             // lui propose la rangée au lieu de la coller à gauche du nom.
@@ -1077,7 +1083,7 @@ private struct PointsRowMeta: View {
         }
     }
 
-    private func statCount(icon: String, count: Int) -> some View {
+    private func statCount(icon: String, count: Int, label: String) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
                 .font(.system(size: 10, weight: .semibold))
@@ -1088,6 +1094,8 @@ private struct PointsRowMeta: View {
         }
         .foregroundStyle(SQColor.labelSecondary)
         .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
     }
 }
 

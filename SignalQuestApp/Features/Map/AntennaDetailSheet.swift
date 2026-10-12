@@ -1465,7 +1465,7 @@ private struct AntennaDisclosureSection<Content: View>: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(SQPressButtonStyle())
-            .accessibilityAddTraits(isExpanded ? .isSelected : [])
+            .accessibilityValue(isExpanded ? String(localized: "Développé") : String(localized: "Réduit"))
             .accessibilityHint(isExpanded ? "Toucher pour replier" : "Toucher pour déplier")
             if isExpanded {
                 content()
@@ -1639,7 +1639,7 @@ private struct AntennaPhotoViewer: View {
                         Image(systemName: "xmark")
                             .font(.headline.weight(.bold))
                             .foregroundStyle(.white)
-                            .frame(width: 40, height: 40)
+                            .frame(width: 44, height: 44)
                             .background(.white.opacity(0.14), in: Circle())
                     }
                     .accessibilityLabel("Fermer")

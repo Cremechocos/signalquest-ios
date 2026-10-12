@@ -261,7 +261,8 @@ struct SignalQuestHomeView: View {
                     showQualityDetail = true
                 } label: { networkSummaryCard }
                 .buttonStyle(SQPressButtonStyle())
-                .accessibilityLabel("\(networkTitle). \(networkSubtitle)")
+                // Le verdict de la pastille (« Bon ») fait partie de ce que la carte dit.
+                .accessibilityLabel("\(networkTitle). \(networkSubtitle)" + (networkBadge.map { ". \($0)" } ?? ""))
                 .accessibilityHint("Comprendre d'où vient ce verdict")
             } else {
                 networkSummaryCard
@@ -694,7 +695,7 @@ struct SignalQuestHomeView: View {
         }
         .buttonStyle(.plain)
         .disabled(userLocation == nil)
-        .accessibilityLabel(Text(verbatim: "\(caption) : \(value)"))
+        .accessibilityLabel(Text("\(caption) : \(value)"))
         .accessibilityHint(Text("Compare les opérateurs autour de toi"))
         .overlay(alignment: .topTrailing) {
             if let term {
@@ -797,7 +798,7 @@ struct SignalQuestHomeView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Mesure communautaire : \(Int(measure.downloadMbps)) mégabits. \(nearbyContext(for: measure)). Ouvre la carte.")
+        .accessibilityLabel("Mesure communautaire : \(SQUnits.throughput(mbps: measure.downloadMbps)). \(nearbyContext(for: measure)). Ouvre la carte.")
     }
 
     private static func techShortLabel(_ tech: String?) -> String? { TechAccent.shortLabel(for: tech) }
@@ -900,7 +901,7 @@ struct SignalQuestHomeView: View {
                 .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
             }
             .buttonStyle(SQPressButtonStyle())
-            .accessibilityLabel("Dernière mesure : \(Int(measurement.downloadMbps)) mégabits par seconde. Ouvre le Speedtest.")
+            .accessibilityLabel("Dernière mesure : \(SQUnits.throughput(mbps: measurement.downloadMbps)). Ouvre le Speedtest.")
             .accessibilityIdentifier("home.latestMeasurement")
         } else {
             EmptyStateView(

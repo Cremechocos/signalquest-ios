@@ -1537,7 +1537,7 @@ struct AntennaSitePickerSheet: View {
                 VStack(spacing: SQSpace.sm) {
                     HStack(spacing: SQSpace.sm) {
                         if isLoading { ProgressView().tint(SQColor.brandRed) }
-                        Text(sites.isEmpty ? String(localized: "Déplace la carte pour charger") : String(localized: "\(sites.count) sites visibles"))
+                        Text(sites.isEmpty ? String(localized: "Déplace la carte pour charger") : String(localized: "\(sites.count) site visible"))
                             .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                             .foregroundStyle(SQColor.label)
                     }
@@ -1587,6 +1587,7 @@ struct AntennaSitePickerSheet: View {
                     } label: {
                         Image(systemName: "location.fill").foregroundStyle(SQColor.brandRed)
                     }
+                    .accessibilityLabel("Recentrer sur ma position")
                 }
             }
             // Ne PAS déclencher le prompt système à l'apparition (hors contexte) :

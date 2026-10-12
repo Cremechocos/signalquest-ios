@@ -204,15 +204,19 @@ struct SentinelleDetectedAddress: View {
                         .minimumScaleFactor(0.7)
                 }
                 Spacer(minLength: SQSpace.sm)
-                Button("Utiliser") {
+                Button {
                     Haptics.selection()
                     onUse()
+                } label: {
+                    Text("Utiliser")
+                        .font(SQFont.body(13, .semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .padding(.horizontal, SQSpace.md)
+                        .padding(.vertical, SQSpace.sm)
+                        .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
-                .font(SQFont.body(13, .semibold))
-                .foregroundStyle(SQColor.accentInk)
-                .padding(.horizontal, SQSpace.md)
-                .padding(.vertical, SQSpace.sm)
-                .background(SQColor.accentSoft, in: Capsule(style: .continuous))
                 .buttonStyle(SQPressButtonStyle())
             }
 
@@ -265,6 +269,7 @@ struct SentinelleSheetShell<Content: View>: View {
                 SQSheetHandle()
                 Text(title)
                     .font(SQType.title)
+                    .sqHeader()
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)

@@ -393,6 +393,9 @@ struct AntennaReportThreadView: View {
                         .font(.system(size: 18))
                         .foregroundStyle(.white, .black.opacity(0.5))
                         .padding(2)
+                        // Pastille visuelle inchangée dans le coin ; zone tactile de 44 pt.
+                        .frame(width: 44, height: 44, alignment: .topTrailing)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Retirer la photo")
             }

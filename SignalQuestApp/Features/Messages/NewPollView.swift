@@ -80,6 +80,8 @@ struct NewPollView: View {
                                     Label("Ajouter une option", systemImage: "plus.circle")
                                         .font(SQType.caption.weight(.semibold))
                                         .foregroundStyle(SQColor.accentInk)
+                                        .frame(minHeight: 44)
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)

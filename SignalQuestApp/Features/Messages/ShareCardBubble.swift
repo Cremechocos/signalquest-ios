@@ -230,7 +230,10 @@ struct SharedPostCardBubble: View {
                     }
                     .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
                     .frame(minHeight: 28)
+                    // Zone tactile de 44 pt sans agrandir la rangée.
+                    .padding(.vertical, 8)
                     .contentShape(Rectangle())
+                    .padding(.vertical, -8)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Voir la publication")
@@ -502,7 +505,10 @@ private struct ShareCardOpenButton: View {
                 }
                 .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
                 .frame(minHeight: 28)
+                // Zone tactile de 44 pt sans agrandir la rangée.
+                .padding(.vertical, 8)
                 .contentShape(Rectangle())
+                .padding(.vertical, -8)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Ouvrir le partage")
