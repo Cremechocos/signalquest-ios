@@ -65340,6 +65340,56 @@
           }
         }
       }
+    },
+    "Sites" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites"
+          }
+        }
+      }
+    },
+    "Lieux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Places"
+          }
+        }
+      }
+    },
+    "Vérifie ta connexion, puis réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check your connection, then try again."
+          }
+        }
+      }
+    },
+    "Cherche un numéro de support ANFR, une adresse ou une commune." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search for an ANFR support number, an address or a town."
+          }
+        }
+      }
+    },
+    "Fermer la recherche" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close search"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -2139,6 +2139,21 @@ struct MapExplorerView: View {
     private var controlsLayer: some View {
         GeometryReader { proxy in
             ZStack {
+                // La pile se dimensionne selon les contrôles : aucun décalage
+                // fixe ne peut faire chevaucher une grande police et l'opérateur.
+                mapBottomControls
+
+                // Pendant la recherche, la carte s'estompe derrière les résultats ;
+                // la toucher referme la recherche.
+                if searchIsActive {
+                    SQColor.bg.opacity(0.55)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture { dismissSearch() }
+                        .accessibilityHidden(true)
+                        .transition(.opacity)
+                }
+
                 VStack(spacing: SQSpace.sm2) {
                     mapTopControlBar
                         .padding(.horizontal, SQSpace.md)
@@ -2152,9 +2167,12 @@ struct MapExplorerView: View {
                     // (résultats, ou message « aucun résultat »/erreur).
                     // Retours à la ligne compris : le champ multiligne en accepte, et une
                     // requête faite d'un seul retour ouvrait le panneau sur « Aucun résultat ».
+                    // Rien pendant le premier chargement : le spinner du champ suffit.
                     if !model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        searchSuggestions
-                            .padding(.horizontal, SQSpace.md)
+                        if !(model.searchResults.isEmpty && model.isSearching) {
+                            searchSuggestions
+                                .padding(.horizontal, SQSpace.md)
+                        }
                     } else if searchFieldFocused, !recentSearchResults.isEmpty {
                         recentsPanel
                             .padding(.horizontal, SQSpace.md)
@@ -2163,12 +2181,14 @@ struct MapExplorerView: View {
                 .padding(.top, SQSpace.sm)
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                // La pile se dimensionne selon les contrôles : aucun décalage
-                // fixe ne peut faire chevaucher une grande police et l'opérateur.
-                mapBottomControls
             }
+            .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: searchIsActive)
         }
+    }
+
+    /// Champ en saisie, ou requête en cours : les résultats prennent le devant.
+    private var searchIsActive: Bool {
+        searchFieldFocused || !model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var effectiveFriendFilterID: String? {
@@ -2398,7 +2418,12 @@ struct MapExplorerView: View {
     private var mapTopControlBar: some View {
         HStack(spacing: SQSpace.sm) {
             mapSearchField
-            filterButton
+            // Pendant la recherche, le champ prend toute la largeur ; sa croix
+            // ramène à la carte.
+            if !searchIsActive {
+                filterButton
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
         }
     }
 
@@ -2462,11 +2487,16 @@ struct MapExplorerView: View {
                         model.scheduleSearch()
                     }
             }
-            if !model.searchQuery.isEmpty || sightOrigin != .device {
+            if searchIsActive || sightOrigin != .device {
                 Button {
+                    let closesSearch = searchIsActive
                     model.searchQuery = ""
                     model.searchResults = []
                     clearSearchPin()
+                    if closesSearch {
+                        searchFieldFocused = false
+                        dismissSearch()
+                    }
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(SQColor.labelTertiary)
@@ -2474,12 +2504,12 @@ struct MapExplorerView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Effacer la recherche")
+                .accessibilityLabel(searchIsActive ? "Fermer la recherche" : "Effacer la recherche")
                 .accessibilityIdentifier("map.search.clear")
             }
         }
         .padding(.leading, SQSpace.md2)
-        .padding(.trailing, model.searchQuery.isEmpty && sightOrigin == .device ? SQSpace.md2 : 0)
+        .padding(.trailing, !searchIsActive && sightOrigin == .device ? SQSpace.md2 : 0)
         .frame(minHeight: 46)
         .frame(maxWidth: .infinity)
         .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
@@ -2784,26 +2814,69 @@ struct MapExplorerView: View {
         }
     }
 
+    /// Résultats dans une seule carte : les sites, puis les lieux.
     private var searchSuggestions: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.xs2) {
-                if model.searchResults.isEmpty {
-                    searchStatusRow
-                } else {
-                    ForEach(model.searchResults) { result in
-                        Button { selectSearchResult(result) } label: {
-                            searchResultRow(result)
-                        }
-                        .accessibilityIdentifier(searchResultIdentifier(result))
-                        .buttonStyle(SQPressButtonStyle())
-                        .foregroundStyle(SQColor.label)
-                    }
+        let sites = model.searchResults.filter { if case .antenna = $0 { return true } else { return false } }
+        let places = model.searchResults.filter { if case .place = $0 { return true } else { return false } }
+        return searchCard {
+            if model.searchResults.isEmpty {
+                searchStatusRow
+            } else {
+                if !sites.isEmpty {
+                    searchSection("Sites", count: sites.count, results: sites) { selectSearchResult($0) }
+                }
+                if !sites.isEmpty, !places.isEmpty {
+                    Divider().overlay(SQColor.separator).padding(.vertical, SQSpace.xs)
+                }
+                if !places.isEmpty {
+                    searchSection("Lieux", count: nil, results: places) { selectSearchResult($0) }
                 }
             }
-            .padding(.horizontal, SQSpace.xs)
-            .padding(.top, SQSpace.xs)
         }
-        .frame(maxHeight: 240)
+    }
+
+    /// Carte blanche à la taille du contenu ; elle défile seulement quand
+    /// la liste dépasse la place laissée par le clavier.
+    private func searchCard<Content: View>(@ViewBuilder _ content: @escaping () -> Content) -> some View {
+        let body = VStack(alignment: .leading, spacing: 0) { content() }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.xs)
+        // Le fond se pose dans chaque variante : `ViewThatFits` prend la
+        // hauteur proposée, la carte doit épouser ses lignes.
+        return ViewThatFits(in: .vertical) {
+            body.modifier(SearchCardBackground())
+            ScrollView { body }.frame(maxHeight: 420).modifier(SearchCardBackground())
+        }
+        .frame(maxHeight: 420, alignment: .top)
+    }
+
+    private struct SearchCardBackground: ViewModifier {
+        func body(content: Content) -> some View {
+            content
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .sqShadowCard()
+        }
+    }
+
+    @ViewBuilder
+    private func searchSection(_ title: LocalizedStringKey, count: Int?, results: [MapSearchResult],
+                               action: @escaping (MapSearchResult) -> Void) -> some View {
+        HStack {
+            Text(title).sqKicker().accessibilityAddTraits(.isHeader)
+            Spacer()
+            if let count {
+                Text("\(count)").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.top, SQSpace.sm)
+        .padding(.bottom, SQSpace.xxs)
+        ForEach(results) { result in
+            Button { action(result) } label: { searchResultRow(result) }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityLabel(searchResultAccessibilityLabel(result))
+                .accessibilityIdentifier(searchResultIdentifier(result))
+        }
     }
 
     /// Sites et lieux consultés récemment. Les sites du pays affiché
@@ -2823,45 +2896,31 @@ struct MapExplorerView: View {
     }
 
     private var recentsPanel: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.xs2) {
-                HStack(spacing: SQSpace.sm) {
-                    Text("Récents")
-                        .font(SQFont.body(14, .semibold))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    Button {
-                        Haptics.light()
-                        RecentlyViewedStore.clear([.site, .place])
-                    } label: {
-                        Text("Effacer")
-                            .font(SQFont.body(14, .semibold))
-                            .foregroundStyle(SQColor.brandRed)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(SQPressButtonStyle())
-                    .accessibilityLabel("Effacer les récents")
-                    .accessibilityIdentifier("map.recents.clear")
+        searchCard {
+            HStack(spacing: SQSpace.sm) {
+                Text("Récents").sqKicker().accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button {
+                    Haptics.light()
+                    RecentlyViewedStore.clear([.site, .place])
+                } label: {
+                    Text("Effacer")
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(SQColor.ink2)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
-                .padding(.leading, SQSpace.md2)
-                .padding(.trailing, SQSpace.sm)
-                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .sqShadowSoft()
-                ForEach(recentSearchResults) { result in
-                    Button { openRecent(result) } label: {
-                        searchResultRow(result)
-                    }
-                    .accessibilityIdentifier("map.recent.\(result.id)")
-                    .buttonStyle(SQPressButtonStyle())
-                    .foregroundStyle(SQColor.label)
-                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityLabel("Effacer les récents")
+                .accessibilityIdentifier("map.recents.clear")
             }
-            .padding(.horizontal, SQSpace.xs)
-            .padding(.top, SQSpace.xs)
+            ForEach(recentSearchResults) { result in
+                Button { openRecent(result) } label: { searchResultRow(result) }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityLabel(searchResultAccessibilityLabel(result))
+                    .accessibilityIdentifier("map.recent.\(result.id)")
+            }
         }
-        .frame(maxHeight: 280)
     }
 
     private func focusSearchIfRequested() {
@@ -2881,27 +2940,32 @@ struct MapExplorerView: View {
         }
     }
 
-    /// Rangée « aucun résultat » / « recherche indisponible » (rien pendant la
-    /// recherche : le spinner de la barre suffit). Distingue vide d'erreur.
+    /// État « aucun résultat » / « recherche indisponible » (rien pendant la
+    /// recherche : le spinner du champ suffit). Distingue vide d'erreur.
     @ViewBuilder
     private var searchStatusRow: some View {
         if !model.isSearching {
-            HStack(spacing: SQSpace.sm) {
+            VStack(spacing: SQSpace.xs) {
                 Image(systemName: model.searchFailed ? "exclamationmark.triangle" : "magnifyingglass")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(SQColor.ink2)
+                    .frame(width: 46, height: 46)
+                    .background(SQColor.chip, in: Circle())
+                    .accessibilityHidden(true)
                 Text(model.searchFailed ? "Recherche indisponible" : "Aucun résultat")
-                    .font(SQFont.body(14, .medium))
+                    .font(SQType.stateTitle)
+                    .foregroundStyle(SQColor.label)
+                Text(model.searchFailed
+                     ? "Vérifie ta connexion, puis réessaie."
+                     : "Cherche un numéro de support ANFR, une adresse ou une commune.")
+                    .font(SQType.subhead(.regular))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer()
             }
-            .padding(.horizontal, SQSpace.md2)
-            .padding(.vertical, SQSpace.sm2)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .sqShadowSoft()
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, SQSpace.md)
+            .accessibilityElement(children: .combine)
         }
     }
 
@@ -2914,31 +2978,109 @@ struct MapExplorerView: View {
     }
 
     private func searchResultRow(_ result: MapSearchResult) -> some View {
-        HStack(spacing: SQSpace.sm) {
-            switch result {
-            case .antenna(let site):
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                // L'adresse d'abord, le numéro ensuite : « 37199 40 av leclerc
-                // 69007 » accolait les deux sur une ligne (UI-10).
-                searchResultText(
-                    title: site.address ?? String(localized: "Site \(site.siteId ?? site.id)"),
-                    subtitle: antennaSearchSubtitle(site)
-                )
-            case .place(let place):
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                searchResultText(title: place.name, subtitle: place.subtitle)
+        HStack(spacing: SQSpace.sm2) {
+            Image(systemName: {
+                if case .antenna = result { return "antenna.radiowaves.left.and.right" }
+                return "mappin.and.ellipse"
+            }())
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(SQColor.ink2)
+                .frame(width: 38, height: 38)
+                .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                switch result {
+                case .antenna(let site):
+                    // L'adresse d'abord, le numéro ensuite : « 37199 40 av leclerc
+                    // 69007 » accolait les deux sur une ligne (UI-10).
+                    Text(site.address ?? String(localized: "Site \(site.siteId ?? site.id)"))
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(2)
+                    antennaSearchDetails(site)
+                case .place(let place):
+                    Text(place.name)
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(2)
+                    if let subtitle = place.subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
+                }
             }
-            Spacer()
+            Spacer(minLength: SQSpace.xs)
+            if let distance = searchDistance(result) {
+                Text(distance)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .monospacedDigit()
+            }
         }
-        .padding(.horizontal, SQSpace.md2)
-        .padding(.vertical, SQSpace.sm2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .sqShadowSoft()
+        .padding(.vertical, SQSpace.sm)
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    /// N° de support, couleurs des opérateurs et technologies : on reconnaît
+    /// le bon site avant de l'ouvrir.
+    private func antennaSearchDetails(_ site: AntennaSite) -> some View {
+        var seen = Set<String>()
+        let operators = site.operators.filter { seen.insert($0.uppercased()).inserted }
+        let technologies = Array(Set(site.technologies.map { $0.uppercased() })).sorted(by: >).prefix(3)
+        return HStack(spacing: 6) {
+            if let number = site.siteId, !number.isEmpty, site.address != nil {
+                Text(number)
+                    .font(SQType.caption(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            if !operators.isEmpty {
+                HStack(spacing: 3) {
+                    ForEach(operators.prefix(4), id: \.self) { key in
+                        Circle().fill(model.operatorAccent(key)).frame(width: 8, height: 8)
+                    }
+                }
+            }
+            ForEach(Array(technologies), id: \.self) { tech in
+                MapTechTag(technology: tech, label: tech)
+            }
+        }
+        .lineLimit(1)
+    }
+
+    private static let searchDistanceFormatter: MKDistanceFormatter = {
+        let formatter = MKDistanceFormatter()
+        formatter.unitStyle = .abbreviated
+        return formatter
+    }()
+
+    /// Distance depuis la dernière position connue, si elle est récente.
+    private func searchDistance(_ result: MapSearchResult) -> String? {
+        guard let here = services.location.cachedLocation() else { return nil }
+        let target: CLLocation
+        switch result {
+        case .antenna(let site):
+            guard site.hasValidCoordinate, let lat = site.latitude, let lng = site.longitude else { return nil }
+            target = CLLocation(latitude: lat, longitude: lng)
+        case .place(let place):
+            target = CLLocation(latitude: place.latitude, longitude: place.longitude)
+        }
+        return Self.searchDistanceFormatter.string(fromDistance: here.distance(from: target))
+    }
+
+    private func searchResultAccessibilityLabel(_ result: MapSearchResult) -> String {
+        var parts: [String]
+        switch result {
+        case .antenna(let site):
+            parts = [site.address ?? String(localized: "Site \(site.siteId ?? site.id)"), antennaSearchSubtitle(site)]
+            parts.append(contentsOf: Array(Set(site.technologies.map { $0.uppercased() })).sorted(by: >))
+        case .place(let place):
+            parts = [place.name, place.subtitle ?? ""]
+        }
+        if let distance = searchDistance(result) { parts.append(distance) }
+        return parts.filter { !$0.isEmpty }.joined(separator: ", ")
     }
 
     /// Opérateurs du marché affiché, dans la couleur exacte de leurs marqueurs.
@@ -2946,20 +3088,6 @@ struct MapExplorerView: View {
         (model.currentMarketEntry?.operators ?? [])
             .filter { $0.key.uppercased() != "ALL" }
             .map { MapAntennaLegendOperator(key: $0.key, label: $0.label, color: model.operatorAccent($0.key)) }
-    }
-
-    private func searchResultText(title: String, subtitle: String?) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title)
-                .font(SQFont.body(14, .semibold))
-                .lineLimit(2)
-            if let subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(SQFont.body(13))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(2)
-            }
-        }
     }
 
     /// « Orange · Free · site n° 37199 ». Le numéro n'apparaît que s'il vient du

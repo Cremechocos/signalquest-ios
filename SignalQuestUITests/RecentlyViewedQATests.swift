@@ -104,7 +104,8 @@ final class RecentlyViewedQATests: XCTestCase {
         XCTAssertTrue(clearSearch.waitForNonExistence(timeout: 5))
 
         input.tap()
-        XCTAssertTrue(app.staticTexts[header].waitForExistence(timeout: 5), "Section « \(header) » absente")
+        // Les titres de section de la carte sont en petites capitales, y compris pour l'accessibilité.
+        XCTAssertTrue(app.staticTexts[header.uppercased()].waitForExistence(timeout: 5), "Section « \(header) » absente")
         let recent = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "map.recent.place-")).firstMatch
         XCTAssertTrue(recent.waitForExistence(timeout: 5), "Le lieu choisi manque aux récents")
         XCTAssertEqual(clear.label, clearRecents)
