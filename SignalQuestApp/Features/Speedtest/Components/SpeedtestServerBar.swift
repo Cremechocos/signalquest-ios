@@ -35,7 +35,7 @@ struct SpeedtestServerBar: View {
         }
         .padding(.vertical, 7)
         .padding(.horizontal, SQSpace.md + 2)
-        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
         .sqShadowSoft()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Réseau : \(label)")

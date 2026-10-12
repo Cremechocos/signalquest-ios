@@ -30,6 +30,15 @@ extension View {
             .overlay { shape.strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
             .modifier(SQCardShadow(elevation: elevation))
     }
+
+    /// Fond plein posé directement (tuile, chip, pastille, bouton), sans ombre.
+    /// En « Noir intense », `surface` et `surfaceMuted` sont noirs comme le fond :
+    /// même liseré que `sqCardBackground`, sinon la forme disparaît. Hors OLED,
+    /// identique à `background(fill, in: shape)`.
+    nonisolated func sqSurface<S: InsettableShape>(_ fill: Color = SQColor.surface, in shape: S) -> some View {
+        background(fill, in: shape)
+            .overlay { shape.strokeBorder(SQOledPalette.cardStroke, lineWidth: 1).allowsHitTesting(false) }
+    }
 }
 
 private struct SQCardShadow: ViewModifier {

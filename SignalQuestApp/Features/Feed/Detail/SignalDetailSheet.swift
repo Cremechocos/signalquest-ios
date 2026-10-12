@@ -84,7 +84,7 @@ struct SignalDetailSheet: View {
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(SQColor.label)
                             .frame(width: 34, height: 34)
-                            .background(SQColor.surfaceMuted, in: Circle())
+                            .sqSurface(SQColor.surfaceMuted, in: Circle())
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }

@@ -221,6 +221,7 @@ struct MyIdentificationsView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .sqReadableWidth()
         .background(SQColor.bg.ignoresSafeArea())
         .navigationTitle("Mes identifications")
         .toolbarTitleInlineCompat()
@@ -293,20 +294,24 @@ private struct IdentificationNodeRow: View {
     let group: IdentifiedNodeGroup
     let isWithdrawing: Bool
 
+    @Environment(\.colorScheme) private var colorScheme
+
     private var is5G: Bool { group.kind == .gnb }
+    /// Couleur de génération de la DA (la même que la carte et les fiches).
+    private var generationColor: Color { SQBrand.techColor(is5G ? "5G" : "4G") }
 
     var body: some View {
         HStack(spacing: SQSpace.md) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(is5G ? SQColor.brandOrange : SQColor.brandBlue)
+                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                    .fill(generationColor)
                 Text(is5G ? "5G" : "4G")
                     .font(SQFont.display(12, .bold))
-                    .foregroundStyle(SQColor.onAccent)
+                    .foregroundStyle(SQBrand.operatorBadgeForeground(for: generationColor, colorScheme: colorScheme))
             }
             .frame(width: 44, height: 44)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
                 HStack(spacing: SQSpace.sm) {
                     Text(group.title)
                         .font(SQFont.body(14, .semibold))
@@ -316,7 +321,7 @@ private struct IdentificationNodeRow: View {
                     if group.conflict {
                         Text("conflit")
                             .font(SQType.micro)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .padding(.horizontal, SQSpace.xs + 2).padding(.vertical, SQSpace.xxs)
                             .background(SQColor.warningSoft, in: Capsule(style: .continuous))
                             .foregroundStyle(SQColor.warning)
                     }
@@ -340,7 +345,7 @@ private struct IdentificationNodeRow: View {
             if isWithdrawing { ProgressView() }
             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelTertiary)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, SQSpace.xs)
     }
 }
 
@@ -354,8 +359,8 @@ private struct IdentificationCellRow: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(SQColor.brandRed)
                 .frame(width: 36, height: 36)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
+                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text(cell.label)
                     .font(SQFont.body(14, .semibold))
                     .monospacedDigit()
@@ -376,7 +381,7 @@ private struct IdentificationCellRow: View {
             if isWithdrawing { ProgressView() }
             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelTertiary)
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, SQSpace.xs)
     }
 }
 
@@ -390,6 +395,7 @@ private struct IdentificationDetailSheet: View {
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var confirmingWithdraw = false
     @State private var confirmingDelete = false
     @State private var showRemap = false
@@ -398,6 +404,8 @@ private struct IdentificationDetailSheet: View {
     @State private var adoptError: String?
 
     private var is5G: Bool { item.kind == .gnb || item.techLabel == "5G" }
+    /// Couleur de génération de la DA (la même que la carte et les fiches).
+    private var generationColor: Color { SQBrand.techColor(is5G ? "5G" : "4G") }
     /// Ré-attribution de site : seulement pour les nœuds eNB/gNB.
     private var canRemapSite: Bool { (item.kind == .enb || item.kind == .gnb) && (item.enb != nil || item.gnb != nil) }
     /// Correction de secteur : pour les cellules (PCI/CellID).
@@ -456,7 +464,7 @@ private struct IdentificationDetailSheet: View {
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.warning)
             if let consensusId = item.conflictSiteId {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
                     Text("Site communautaire (consensus)")
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -550,8 +558,8 @@ private struct IdentificationDetailSheet: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(SQColor.brandRed)
                     .frame(width: 36, height: 36)
-                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                VStack(alignment: .leading, spacing: 1) {
+                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                VStack(alignment: .leading, spacing: SQSpace.xxs) {
                     Text(LocalizedStringKey(title)).font(SQFont.body(15.5, .medium)).foregroundStyle(SQColor.label)
                     Text(LocalizedStringKey(subtitle)).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
                 }
@@ -568,12 +576,13 @@ private struct IdentificationDetailSheet: View {
     private var header: some View {
         HStack(spacing: SQSpace.md) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(is5G ? SQColor.brandOrange : SQColor.brandBlue)
-                Text(item.techLabel).font(SQFont.display(14, .bold)).foregroundStyle(SQColor.onAccent)
+                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                    .fill(generationColor)
+                Text(item.techLabel).font(SQFont.display(14, .bold))
+                    .foregroundStyle(SQBrand.operatorBadgeForeground(for: generationColor, colorScheme: colorScheme))
             }
             .frame(width: 52, height: 52)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
                 Text(item.operatorName ?? String(localized: "Opérateur inconnu"))
                     .font(SQFont.display(20, .bold))
                     .foregroundStyle(SQColor.label)

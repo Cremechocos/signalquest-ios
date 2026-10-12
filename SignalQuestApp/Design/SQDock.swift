@@ -72,21 +72,20 @@ struct SQDock: View {
                         .frame(height: 22)
                     if badge > 0 {
                         Text(verbatim: badge > 99 ? "99+" : "\(badge)")
-                            // `bodyFixed` ne suit PAS Dynamic Type. Sur un
-                            // badge de 9 pt, c'est illisible en basse vision.
-                            .font(SQFont.body(9, .bold))
+                            // Police relative au texte : le badge suit Dynamic
+                            // Type, avec 12 pt au minimum.
+                            .font(SQType.micro)
                             .foregroundStyle(SQColor.onAccent)
                             .padding(.horizontal, 4)
-                            .frame(minWidth: 15, minHeight: 15)
+                            .frame(minWidth: 17, minHeight: 17)
                             .background(SQColor.brandRed, in: Capsule(style: .continuous))
-                            .offset(x: 11, y: -5)
+                            .offset(x: 12, y: -7)
                     }
                 }
                 Text(item.label)
-                    // Idem : les libellés du dock — navigation PRINCIPALE de
-                    // l'app — étaient figés à 9,5 pt quelle que soit la taille
-                    // de texte choisie par l'utilisateur.
-                    .font(SQFont.body(9.5, .semibold))
+                    // Libellés de la navigation PRINCIPALE : 12 pt au minimum,
+                    // à la taille de texte choisie par l'utilisateur.
+                    .font(SQType.micro)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -105,7 +104,7 @@ struct SQDock: View {
         }
         .buttonStyle(SQDockPressStyle())
         // Large Content Viewer : appui long = HUD agrandi de l'onglet, seul moyen
-        // de lire les libellés du dock (9,5 pt fixes) aux grandes tailles Dynamic
+        // de lire les libellés du dock aux grandes tailles Dynamic
         // Type pour les malvoyants non-VoiceOver (A11Y-09).
         .accessibilityShowsLargeContentViewer {
             Label(item.label, systemImage: item.icon)

@@ -2489,8 +2489,8 @@ struct MapExplorerView: View {
                     .background { sqMapGlassBackground(Circle()) }
                 if activeFilterCount > 0 && !dynamicTypeSize.isAccessibilitySize {
                     Text("\(activeFilterCount)")
-                        .font(SQFont.body(10, .bold))
-                        .frame(minWidth: 17, minHeight: 17)
+                        .font(SQFont.body(12, .bold, relativeTo: .caption2))
+                        .frame(minWidth: 18, minHeight: 18)
                         .background(SQColor.brandRed, in: Circle())
                         .foregroundStyle(SQColor.onAccent)
                         .offset(x: 4, y: -4)
@@ -2539,7 +2539,7 @@ struct MapExplorerView: View {
             .padding(.horizontal, SQSpace.md)
             .frame(minHeight: 44)
             .foregroundStyle(SQColor.label)
-            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowCard()
         }
         .accessibilityLabel("Opérateur affiché : \(model.operatorShortLabel(model.operatorFilter))")
@@ -2609,7 +2609,7 @@ struct MapExplorerView: View {
             .foregroundStyle(SQColor.label)
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm + 1)
-            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowCard()
             .padding(.horizontal, SQSpace.lg)
         }
@@ -2666,7 +2666,7 @@ struct MapExplorerView: View {
                 .foregroundStyle(tint)
             Text(text)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.primary)
+                .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("map.status.text")
         }

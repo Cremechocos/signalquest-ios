@@ -45,7 +45,7 @@ struct SentinelleFollowersCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SQSpace.md)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         } else {
             Color.clear.frame(height: 0).task { await load() }
         }
@@ -116,7 +116,7 @@ struct SentinelleFollowersCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.md)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private var isShared: Bool { shared ?? (target.isPublic == true) }

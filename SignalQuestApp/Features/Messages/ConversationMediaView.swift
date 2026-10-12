@@ -130,7 +130,7 @@ struct ConversationMediaView: View {
                         RemoteVoiceNoteBubble(attachment: entry.attachment, remoteURL: entry.url, mine: false)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(SQSpace.sm)
-                            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                             .accessibilityIdentifier("conversationMedia.voice")
                     } else {
                         fileRow(entry)
@@ -165,7 +165,7 @@ struct ConversationMediaView: View {
             }
             .padding(SQSpace.md)
             .frame(minHeight: 44)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

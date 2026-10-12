@@ -22,7 +22,7 @@ struct ReactionPicker: View {
                     Text(emoji)
                         .font(.title2)
                         .padding(SQSpace.sm + 2)
-                        .background(SQColor.surfaceMuted, in: Circle())
+                        .sqSurface(SQColor.surfaceMuted, in: Circle())
                 }
                 .buttonStyle(SQPressButtonStyle())
                 .accessibilityLabel("Réagir avec \(emoji)")
@@ -33,7 +33,7 @@ struct ReactionPicker: View {
             }
         }
         .padding(SQSpace.sm)
-        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
         .sqShadowDock()
         .onAppear { appeared = true }
     }

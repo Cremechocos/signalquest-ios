@@ -133,7 +133,7 @@ struct ANFRSiteDetailSheet: View {
                 }
                 .padding(.vertical, SQSpace.sm)
                 .padding(.horizontal, SQSpace.md)
-                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
             if site.antennas.isEmpty {
                 Text("Aucune antenne au relevé courant.")

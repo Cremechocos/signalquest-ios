@@ -102,8 +102,7 @@ struct MapPhotoViewer: View {
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .background(SQColor.surfaceGlass, in: Circle())
+                    .background { sqMapGlassBackground(Circle()) }
                     .sqShadowSoft()
             }
             .accessibilityLabel("Fermer")
@@ -118,8 +117,7 @@ struct MapPhotoViewer: View {
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(SQColor.label)
                         .frame(width: 44, height: 44)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .background(SQColor.surfaceGlass, in: Circle())
+                        .background { sqMapGlassBackground(Circle()) }
                         .sqShadowSoft()
                 }
                 .accessibilityLabel("Plus d'options")
@@ -146,8 +144,7 @@ struct MapPhotoViewer: View {
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial)
-        .background(SQColor.surfaceGlass)
+        .background(SQColor.surface)
         .clipShape(.rect(topLeadingRadius: SQRadius.xl, topTrailingRadius: SQRadius.xl))
         .offset(y: appeared ? 0 : 40)
         .opacity(appeared ? 1 : 0)
@@ -304,7 +301,7 @@ struct MapPhotoViewer: View {
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm)
                 .frame(minHeight: 44)
-                .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
 
             Button {
                 Task { await sendComment() }

@@ -472,7 +472,7 @@ struct ComposerSheet: View {
                 .tint(SQColor.brandRed)
         }
         .padding(SQSpace.md)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     /// Suggestions de mention. Liste courte et scrollable horizontalement : sous
@@ -494,7 +494,7 @@ struct ComposerSheet: View {
                         }
                         .padding(.horizontal, SQSpace.sm + 2)
                         .padding(.vertical, SQSpace.xs + 2)
-                        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
                     }
@@ -689,7 +689,7 @@ struct ComposerSheet: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(SQColor.brandRed)
                     .frame(width: 44, height: 44)
-                    .background(SQColor.surface, in: Circle())
+                    .sqSurface(SQColor.surface, in: Circle())
                     .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .sqShadowSoft()
             }
@@ -720,7 +720,7 @@ struct ComposerSheet: View {
                         }
                     }
                     .frame(width: 44, height: 44)
-                    .background(SQColor.surface, in: Circle())
+                    .sqSurface(SQColor.surface, in: Circle())
                     .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .sqShadowSoft()
                 }
@@ -749,7 +749,7 @@ struct ComposerSheet: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, 10)
-                .background(SQColor.surface, in: Capsule(style: .continuous))
+                .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                 .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                 .sqShadowSoft()
             }
@@ -827,7 +827,7 @@ struct ComposerSheet: View {
                             .foregroundStyle(SQColor.accentInk)
                             .padding(.horizontal, SQSpace.md)
                             .padding(.vertical, SQSpace.sm)
-                            .background(SQColor.surface, in: Capsule(style: .continuous))
+                            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                             .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                             .sqShadowSoft()
                     }

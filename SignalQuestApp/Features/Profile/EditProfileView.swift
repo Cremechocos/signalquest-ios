@@ -62,7 +62,7 @@ struct EditProfileView: View {
                             }
                             .padding(SQSpace.md)
                             .frame(minHeight: 44)
-                            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         }
                         .buttonStyle(.plain)
                         TextField("Bio", text: $bio, axis: .vertical)

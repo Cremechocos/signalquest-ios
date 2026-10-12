@@ -100,6 +100,7 @@ struct PaywallView: View {
             }
             .padding(SQSpace.lg)
             .padding(.bottom, SQSpace.huge)
+            .sqReadableWidth()
         }
         .signalQuestBackground()
         .navigationTitle("Abonnements")

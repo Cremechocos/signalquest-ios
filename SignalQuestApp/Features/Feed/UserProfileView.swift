@@ -470,7 +470,7 @@ struct UserProfileView: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(SQColor.label)
                 .frame(width: 44, height: 44)
-                .background(SQColor.surface, in: Circle())
+                .sqSurface(SQColor.surface, in: Circle())
                 .sqShadowSoft()
                 .contentShape(Circle())
         }

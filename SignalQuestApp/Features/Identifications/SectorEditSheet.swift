@@ -140,7 +140,7 @@ struct SectorEditSheet: View {
                         SelectableSectorRadar(
                             azimuths: model.azimuths,
                             selectedIndex: $model.selectedIndex,
-                            color: model.item.kind == .gnb ? SQColor.brandOrange : SQColor.brandBlue,
+                            color: SQBrand.techColor(model.item.kind == .gnb ? "5G" : "4G"),
                             displayNumber: { model.sectorLabel(forIndex: $0) }
                         )
                         .frame(height: 280)
@@ -163,7 +163,7 @@ struct SectorEditSheet: View {
                             .foregroundStyle(SQColor.label)
                             .padding(SQSpace.md)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     }
                     if let error = model.errorMessage, !model.azimuths.isEmpty {
                         Label(error, systemImage: "exclamationmark.triangle")

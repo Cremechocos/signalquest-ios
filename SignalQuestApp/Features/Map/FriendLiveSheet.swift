@@ -91,12 +91,12 @@ struct FriendLiveSheet: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(SQSpace.md)
-                    .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                 }
             }
         }
         .padding(SQSpace.lg)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .shadow(color: SQColor.shadowCard, radius: 10, x: 0, y: 4)
     }
 
@@ -149,7 +149,7 @@ struct FriendLiveSheet: View {
         .foregroundStyle(SQColor.labelSecondary)
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
-        .background(SQColor.surface, in: Capsule())
+        .sqSurface(SQColor.surface, in: Capsule())
         .shadow(color: SQColor.shadowSoft, radius: 6, x: 0, y: 2)
     }
 

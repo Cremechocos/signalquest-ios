@@ -283,7 +283,7 @@ struct ANFRStatsView: View {
             }
         }
         .padding(3)
-        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
 
     private func toggleSegment(title: String, active: Bool, action: @escaping () -> Void) -> some View {
@@ -605,7 +605,7 @@ struct ANFRStatsView: View {
                     }
                     .padding(.vertical, SQSpace.sm)
                     .padding(.horizontal, SQSpace.md)
-                    .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                 }
             }
         }

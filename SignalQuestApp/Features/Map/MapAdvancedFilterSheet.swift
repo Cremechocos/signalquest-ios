@@ -56,23 +56,23 @@ struct MapAdvancedFilterSheet: View {
     }
     private var columns: [GridItem] {
         dynamicTypeSize.isAccessibilitySize ? [GridItem(.flexible())]
-            : [GridItem(.adaptive(minimum: 140), spacing: 8)]
+            : [GridItem(.adaptive(minimum: 140), spacing: SQSpace.sm)]
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: SQSpace.xxl) {
                     Text("Choisis ce que tu veux voir.")
                         .font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
                     countrySection
                     operatorSection
                     layerSection
                     DisclosureGroup(isExpanded: $expertsExpanded) {
-                        expertSections.padding(.top, 20)
+                        expertSections.padding(.top, SQSpace.xl)
                     } label: {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
                             Text("Réglages experts").font(SQType.heading).foregroundStyle(SQColor.label)
                             Text(expertSummary).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -87,7 +87,7 @@ struct MapAdvancedFilterSheet: View {
                             .accessibilityIdentifier("map.filters.adjustment")
                     }
                 }
-                .padding(20)
+                .padding(SQSpace.xl)
             }
             .accessibilityIdentifier("map.filters.content")
             footer
@@ -170,7 +170,7 @@ struct MapAdvancedFilterSheet: View {
 
     private var layerSection: some View {
         section("Couches") {
-            LazyVGrid(columns: columns, spacing: 8) {
+            LazyVGrid(columns: columns, spacing: SQSpace.sm) {
                 ForEach(layerOptions, id: \.0.rawValue) { kind, title, icon in
                     layerChip(kind, title: title, icon: icon, unavailable:
                         (kind == .coverage && draft.operatorName.uppercased() == "ALL")
@@ -197,7 +197,7 @@ struct MapAdvancedFilterSheet: View {
     @ViewBuilder
     private var anfrSection: some View {
         if let onOpenANFR {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
                 HStack(spacing: SQSpace.xs) {
                     Text("Données ANFR").font(SQType.heading).foregroundStyle(SQColor.label)
                     SQInfoButton(term: .anfr)
@@ -208,8 +208,8 @@ struct MapAdvancedFilterSheet: View {
                 // Pas de grille paresseuse : deux boutons, toujours présents dans
                 // l'arbre d'accessibilité, même avant d'avoir défilé jusqu'à eux.
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) { anfrChips(onOpenANFR) }
-                    VStack(alignment: .leading, spacing: 8) { anfrChips(onOpenANFR) }
+                    HStack(spacing: SQSpace.sm) { anfrChips(onOpenANFR) }
+                    VStack(alignment: .leading, spacing: SQSpace.sm) { anfrChips(onOpenANFR) }
                 }
             }
         }
@@ -230,9 +230,9 @@ struct MapAdvancedFilterSheet: View {
     }
 
     private var expertSections: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: SQSpace.xxl) {
             section("Générations") {
-                LazyVGrid(columns: columns, spacing: 8) {
+                LazyVGrid(columns: columns, spacing: SQSpace.sm) {
                     chip("Toutes", icon: "sparkles", active: draft.technologies.isEmpty) { draft.technologies.removeAll() }
                     ForEach(MapFilterCatalog.technologies(forMarket: catalogMarket), id: \.value) { technology in
                         chip(technology.label, icon: "cellularbars", active: draft.technologies.contains(technology.value)) {
@@ -242,7 +242,7 @@ struct MapAdvancedFilterSheet: View {
                 }
             }
             section("Bandes et fréquences") {
-                LazyVGrid(columns: columns, spacing: 8) {
+                LazyVGrid(columns: columns, spacing: SQSpace.sm) {
                     ForEach(MapFilterCatalog.bands(forMarket: catalogMarket), id: \.band) { band in
                         chip(band.label, icon: "waveform", active: draft.bands.contains(band.band)) {
                             toggle(band.band, in: &draft.bands)
@@ -269,7 +269,7 @@ struct MapAdvancedFilterSheet: View {
             let sharing = MapFilterCatalog.sharing(forMarket: catalogMarket)
             if !sharing.isEmpty {
                 section("Mutualisation") {
-                    LazyVGrid(columns: columns, spacing: 8) {
+                    LazyVGrid(columns: columns, spacing: SQSpace.sm) {
                         ForEach(sharing, id: \.value) { option in
                             chip(option.label, icon: option.icon, active: draft.sharing.contains(option.value)) {
                                 toggle(option.value, in: &draft.sharing)
@@ -279,7 +279,7 @@ struct MapAdvancedFilterSheet: View {
                 }
             }
             section("Azimuts") {
-                LazyVGrid(columns: columns, spacing: 8) {
+                LazyVGrid(columns: columns, spacing: SQSpace.sm) {
                     ForEach(AzimuthStyle.allCases, id: \.self) { style in
                         chip(style.label, icon: style.icon, active: draft.azimuthStyle == style) { draft.azimuthStyle = style }
                             .accessibilityIdentifier("map.filters.azimuth.\(style.rawValue)")
@@ -299,7 +299,7 @@ struct MapAdvancedFilterSheet: View {
             }
             if plannedAvailable && draft.layers.contains(.planned) {
                 section("Statut prévisionnel") {
-                    LazyVGrid(columns: columns, spacing: 8) {
+                    LazyVGrid(columns: columns, spacing: SQSpace.sm) {
                         ForEach(PlannedActivationStatus.allCases, id: \.self) { status in
                             chip(MapExplorerView.plannedStatusLabel(status), icon: MapExplorerView.plannedStatusGlyph(status), active: draft.plannedStatuses.contains(status)) {
                                 toggle(status, in: &draft.plannedStatuses)
@@ -312,7 +312,7 @@ struct MapAdvancedFilterSheet: View {
     }
 
     private var footer: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: SQSpace.md) {
             if let applyError {
                 Text(applyError).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                     .fixedSize(horizontal: false, vertical: true)
@@ -321,7 +321,7 @@ struct MapAdvancedFilterSheet: View {
                 Text(draft == baseline ? String(localized: "Filtres actuels") : String(localized: "Modifications à appliquer"))
                     .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 12)
+                Spacer(minLength: SQSpace.md)
                 Button { resetDraft() } label: {
                     Text("Réinitialiser")
                         .font(SQType.subhead).foregroundStyle(SQColor.accentInk)
@@ -337,7 +337,7 @@ struct MapAdvancedFilterSheet: View {
             .disabled(selectedEntry == nil)
             .accessibilityIdentifier("map.filters.done")
         }
-        .padding(.horizontal, 20).padding(.vertical, 12)
+        .padding(.horizontal, SQSpace.xl).padding(.vertical, SQSpace.md)
         .background(SQColor.surface)
         .overlay(alignment: .top) { Rectangle().fill(SQColor.separator).frame(height: 0.5) }
     }
@@ -371,7 +371,7 @@ struct MapAdvancedFilterSheet: View {
         }.accessibilityIdentifier("map.layer.\(kind.rawValue)")
     }
     private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
             Text(title).font(SQType.heading).foregroundStyle(SQColor.label)
                 .accessibilityAddTraits(.isHeader)
             content()
@@ -384,35 +384,35 @@ struct MapAdvancedFilterSheet: View {
     }
     private func chip(_ title: String, icon: String, active: Bool, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button { Haptics.selection(); action() } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: SQSpace.sm) {
                 Image(systemName: active ? "checkmark" : icon).frame(width: 16)
                 Text(LocalizedStringKey(title)).fixedSize(horizontal: false, vertical: true)
             }
             .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
             .frame(maxWidth: .infinity, minHeight: 44)
-            .padding(.horizontal, 12).padding(.vertical, 4)
+            .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.xs)
             .foregroundStyle(disabled ? SQColor.labelSecondary : active ? SQColor.accentInk : SQColor.label)
-            .background(active ? SQColor.accentSoft : SQColor.surfaceMuted, in: Capsule())
-            .overlay { if active { Capsule().strokeBorder(SQColor.accent, lineWidth: 1) } }
+            // Sélection = remplissage, sans contour (le liseré OLED est transparent hors « Noir intense »).
+            .sqSurface(active ? SQColor.accentSoft : SQColor.surfaceMuted, in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(SQPressButtonStyle()).disabled(disabled)
         .accessibilityAddTraits(active ? .isSelected : [])
     }
     private func menuLabel(title: String, symbol: String, accessory: String? = nil) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SQSpace.sm + 2) {
             if let accessory { Text(accessory).accessibilityHidden(true) }
             else { Image(systemName: symbol).foregroundStyle(SQColor.accentInk).accessibilityHidden(true) }
             Text(title).font(SQType.body).foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 8)
+            Spacer(minLength: SQSpace.sm)
             Image(systemName: "chevron.up.chevron.down").foregroundStyle(SQColor.labelSecondary)
         }
-        .padding(.horizontal, 14).padding(.vertical, 8).frame(minHeight: 48)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, SQSpace.md + 2).padding(.vertical, SQSpace.sm).frame(minHeight: 48)
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md))
     }
     private func periodPicker(_ title: LocalizedStringKey, selection: Binding<Int>, identifier: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text(title).font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
             Menu {
                 ForEach([0, 7, 30, 90], id: \.self) { days in
@@ -465,9 +465,9 @@ private struct MapExpertDisclosureStyle: DisclosureGroupStyle {
                     configuration.isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: 12) {
+                HStack(spacing: SQSpace.md) {
                     configuration.label
-                    Spacer(minLength: 8)
+                    Spacer(minLength: SQSpace.sm)
                     Image(systemName: configuration.isExpanded ? "chevron.down" : "chevron.right")
                         .foregroundStyle(SQColor.accentInk)
                 }

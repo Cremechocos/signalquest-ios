@@ -176,6 +176,6 @@ private extension View {
             .padding(.horizontal, SQSpace.lg)
             .padding(.vertical, SQSpace.sm + 2)
             .frame(minHeight: 44)
-            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }
 }

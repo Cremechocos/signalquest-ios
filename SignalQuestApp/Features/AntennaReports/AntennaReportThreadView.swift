@@ -344,7 +344,7 @@ struct AntennaReportThreadView: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(SQColor.brandRed)
                         .frame(width: 44, height: 44)
-                        .background(SQColor.surfaceMuted, in: Circle())
+                        .sqSurface(SQColor.surfaceMuted, in: Circle())
                 }
                 .disabled(model.pendingImages.count >= AntennaReportThreadViewModel.maxImages)
                 .accessibilityLabel("Ajouter des photos")
@@ -356,7 +356,7 @@ struct AntennaReportThreadView: View {
                     .padding(.horizontal, SQSpace.lg)
                     .padding(.vertical, SQSpace.sm + 2)
                     .frame(minHeight: 44)
-                    .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
+                    .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
 
                 Button {
                     Task { await model.send() }
@@ -626,7 +626,7 @@ struct AntennaReportHeaderCard: View {
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(SQSpace.sm)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                    .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
             }
         }
         .padding(SQSpace.lg)

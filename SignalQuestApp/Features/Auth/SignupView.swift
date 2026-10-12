@@ -130,7 +130,7 @@ struct SignupView: View {
                 } onCompletion: { result in
                     handleAppleSignIn(result)
                 }
-                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
                 .frame(height: 56)
                 .clipShape(Capsule(style: .continuous))
                 // Même exigence contractuelle que le formulaire e-mail : sans

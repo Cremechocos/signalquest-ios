@@ -719,7 +719,7 @@ struct ConversationDetailView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 38, height: 38)
-                    .background(SQColor.surface, in: Circle())
+                    .sqSurface(SQColor.surface, in: Circle())
                     .sqShadowSoft()
             }
             .buttonStyle(.plain)
@@ -1387,7 +1387,7 @@ struct ConversationDetailView: View {
                 }
                 .padding(.horizontal, SQSpace.sm)
                 .padding(.vertical, 4)
-                .background(SQColor.surface, in: Capsule())
+                .sqSurface(SQColor.surface, in: Capsule())
                 .sqShadowSoft()
                 .foregroundStyle(SQColor.brandRed)
                 // Zone tactile de 44 pt sans changer la hauteur du badge.
@@ -3174,11 +3174,7 @@ private struct LiveShareConversationBar: View {
                 }
             }
             .padding(SQSpace.sm + 2)
-            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                    .stroke(SQColor.separator, lineWidth: 1)
-            }
+            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         }
     }
 
@@ -3370,11 +3366,7 @@ private struct LiveShareManagementSheet: View {
                         .disabled(!canSubmit)
                     }
                     .padding(SQSpace.md)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                            .stroke(SQColor.separator, lineWidth: 1)
-                    }
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
 
                     if let error = coordinator.errorMessage {
                         Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -3537,11 +3529,7 @@ private struct LiveShareSessionCard: View {
             }
         }
         .padding(SQSpace.md)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                .stroke(SQColor.separator, lineWidth: 1)
-        }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private func statusText(at now: Date) -> String {

@@ -65,7 +65,7 @@ struct E2EEUnlockSheet: View {
                             .padding(.horizontal, SQSpace.lg)
                             .padding(.vertical, SQSpace.sm + 2)
                             .frame(minHeight: 44)
-                            .background(SQColor.surfaceMuted, in: Capsule())
+                            .sqSurface(SQColor.surfaceMuted, in: Capsule())
                             .focused($passwordFocused)
                             .submitLabel(needsCreation ? .next : .go)
                             .onSubmit {
@@ -80,7 +80,7 @@ struct E2EEUnlockSheet: View {
                                 .padding(.horizontal, SQSpace.lg)
                                 .padding(.vertical, SQSpace.sm + 2)
                                 .frame(minHeight: 44)
-                                .background(SQColor.surfaceMuted, in: Capsule())
+                                .sqSurface(SQColor.surfaceMuted, in: Capsule())
                                 .focused($confirmationFocused)
                                 .submitLabel(.done)
                                 .onSubmit { if canSubmit { Task { await unlockOrCreate() } } }

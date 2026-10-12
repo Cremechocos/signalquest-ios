@@ -519,18 +519,18 @@ struct RootView: View {
         .fullScreenCover(isPresented: $callManager.showCallScreen) {
             CallScreen(callManager: callManager)
         }
+        // Les bandeaux du haut partagent un même conteneur : chacun se place sous
+        // la hauteur réelle du précédent (Dynamic Type compris), sans se superposer.
         .overlay(alignment: .top) {
-            OfflineBanner(isVisible: !networkPath.isOnline)
-        }
-        // Écran d'appel réduit : on y revient par ce bandeau (SOC-13).
-        .overlay(alignment: .top) {
-            ActiveCallBanner(callManager: callManager)
-                .padding(.top, networkPath.isOnline ? SQSpace.xs : 52)
-                .sqAnimation(SQMotion.smooth, value: callManager.showCallScreen)
-        }
-        .overlay(alignment: .top) {
-            SQInAppNotificationHost()
-                .padding(.top, networkPath.isOnline ? SQSpace.sm : 52)
+            VStack(spacing: 0) {
+                OfflineBanner(isVisible: !networkPath.isOnline)
+                // Écran d'appel réduit : on y revient par ce bandeau (SOC-13).
+                ActiveCallBanner(callManager: callManager)
+                    .padding(.top, SQSpace.xs)
+                    .sqAnimation(SQMotion.smooth, value: callManager.showCallScreen)
+                SQInAppNotificationHost()
+                    .padding(.top, SQSpace.sm)
+            }
         }
         // La fenêtre de protection couvre aussi les feuilles présentées, tout
         // en conservant leurs tâches et les mesures déjà en cours.
@@ -675,8 +675,8 @@ struct OfflineBanner: View {
                         .font(.system(size: 13, weight: .bold))
                     Text("Hors ligne — certaines actions sont indisponibles")
                         .font(SQFont.archivo(13, .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 // Bouton encre du design system : nuit en clair, crème en sombre.
                 .foregroundStyle(SQColor.onInk)

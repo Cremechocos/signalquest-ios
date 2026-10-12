@@ -254,7 +254,7 @@ struct DriveTestPreflightSheet: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 

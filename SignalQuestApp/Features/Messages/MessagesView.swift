@@ -544,7 +544,7 @@ struct MessagesView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 40, height: 40)
-                    .background(SQColor.surface, in: Circle())
+                    .sqSurface(SQColor.surface, in: Circle())
                     .sqShadowSoft()
             }
             .buttonStyle(.plain)
@@ -565,7 +565,7 @@ struct MessagesView: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 40, height: 40)
-                    .background(SQColor.surface, in: Circle())
+                    .sqSurface(SQColor.surface, in: Circle())
                     .sqShadowSoft()
             }
             .buttonStyle(.plain)
@@ -857,7 +857,7 @@ private struct NewConversationSheet: View {
                                     Text(user.displayName)
                                     if let subtitle = user.publicSubtitle {
                                         Text(verbatim: subtitle)
-                                            .font(.caption)
+                                            .font(SQType.caption)
                                             .foregroundStyle(SQColor.labelSecondary)
                                     }
                                 }

@@ -429,7 +429,7 @@ struct E2EEV2ActivationScreen: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(SQSpace.lg)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
 
                     content
 
@@ -442,6 +442,7 @@ struct E2EEV2ActivationScreen: View {
                 }
                 .padding(.horizontal, SQSpace.xl)
                 .padding(.vertical, SQSpace.lg)
+                .sqReadableWidth()
             }
             .background(SQColor.bg.ignoresSafeArea())
             .toolbar {
@@ -516,7 +517,7 @@ struct E2EEV2ActivationScreen: View {
                     .textContentType(.oneTimeCode)
                     .font(.system(.title2, design: .monospaced, weight: .semibold))
                     .padding(SQSpace.md)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     .onChangeCompat(of: code) { _, value in code = String(value.filter(\.isNumber).prefix(6)) }
                     .accessibilityIdentifier("e2ee-v2-activation-code")
                 GradientButton(String(localized: "Valider"), systemImage: "checkmark.shield.fill", isBusy: model.isActing, style: .primary) {
@@ -557,7 +558,7 @@ struct E2EEV2ActivationScreen: View {
                     .scaledToFit()
                     .frame(maxWidth: 260)
                     .padding(SQSpace.md)
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     .frame(maxWidth: .infinity)
                     .accessibilityLabel("QR temporaire d’approbation SignalQuest")
                 Label("En attente de l’approbation…", systemImage: "hourglass")
@@ -930,7 +931,7 @@ struct E2EEV2TrustedDevicesView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(SQColor.brandRed)
                 .frame(width: 40, height: 40)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
@@ -953,7 +954,7 @@ struct E2EEV2TrustedDevicesView: View {
                     }
                 }
                 Text(statusLabel(device.status))
-                    .font(.caption.bold())
+                    .font(SQFont.body(12, .bold, relativeTo: .caption))
                     .foregroundStyle(statusColor(device.status))
                 Text("Ajouté \(formattedDate(device.createdAt)) · vu \(formattedDate(device.lastSeenAt))")
                     .font(SQType.caption)
@@ -1019,7 +1020,7 @@ struct E2EEV2TrustedDevicesView: View {
                         .scaledToFit()
                         .frame(maxWidth: 240)
                         .padding(SQSpace.md)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         .accessibilityLabel("QR temporaire d’approbation SignalQuest")
                     Text("Si la caméra n’est pas disponible, copie le contenu du QR depuis l’autre appareil.")
                         .font(SQType.caption)
@@ -2210,7 +2211,7 @@ struct SettingsView: View {
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 }
                 if let appleError {
-                    Text(appleError).font(.caption).foregroundStyle(SQColor.dangerInk)
+                    Text(appleError).font(SQFont.body(12, relativeTo: .caption)).foregroundStyle(SQColor.dangerInk)
                 }
             } header: {
                 Text("Compte Apple")
@@ -2314,7 +2315,7 @@ struct SettingsView: View {
                 }
                 .tint(SQColor.brandRed)
                 Text("Renforce le contraste, la graisse des textes et la taille des contrôles pour une lecture plus fiable en extérieur.")
-                    .font(.footnote)
+                    .font(SQFont.body(13, relativeTo: .footnote))
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("settings.help.fieldMode")
@@ -2323,7 +2324,7 @@ struct SettingsView: View {
                 }
                 .tint(SQColor.brandRed)
                 Text("En thème sombre, les fonds passent au noir pur. Sur un écran OLED, un pixel noir est éteint : l'affichage consomme moins. Sans effet en thème clair.")
-                    .font(.footnote)
+                    .font(SQFont.body(13, relativeTo: .footnote))
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("settings.help.oled")
@@ -2343,7 +2344,7 @@ struct SettingsView: View {
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(SQColor.brandRed)
                                 .frame(width: 36, height: 36)
-                                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(option.label).foregroundStyle(SQColor.label)
                                 Text(option.subtitle)
@@ -2353,7 +2354,7 @@ struct SettingsView: View {
                             Spacer()
                             if MapBackdrop.resolve(mapBackdropRaw) == option {
                                 Image(systemName: "checkmark")
-                                    .font(.body.weight(.bold))
+                                    .font(SQFont.body(17, .bold, relativeTo: .body))
                                     .foregroundStyle(SQColor.brandRed)
                                     .transition(.scale.combined(with: .opacity))
                             }
@@ -2543,7 +2544,7 @@ struct SettingsView: View {
     }
 
     /// Rangée de réglage (DA Crème) : pastille d'icône 36 pt `accentSoft`
-    /// (icône brique) + libellé Figtree Medium 15,5. Aucune bordure.
+    /// (icône brique) + libellé Figtree Medium 17. Aucune bordure.
     private func settingsLabel(_ title: String, systemImage: String,
                                localizedTitle: LocalizedStringKey? = nil) -> some View {
         HStack(spacing: SQSpace.md) {
@@ -2551,10 +2552,10 @@ struct SettingsView: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(SQColor.accentInk)
                 .frame(width: 36, height: 36)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 .accessibilityHidden(true)
             Text(localizedTitle ?? LocalizedStringKey(title))
-                .font(.body.weight(.medium))
+                .font(SQFont.body(17, .medium, relativeTo: .body))
                 .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("settings.label.\(title)")
@@ -2772,7 +2773,7 @@ private struct DeleteAccountSheet: View {
                                 .foregroundStyle(SQColor.label)
                                 .padding(.horizontal, SQSpace.xl)
                                 .frame(minHeight: 44)
-                                .background(SQColor.surface, in: Capsule(style: .continuous))
+                                .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                                 .sqShadowSoft()
                         }
                         .buttonStyle(SQPressButtonStyle())
@@ -2848,7 +2849,7 @@ private struct DeleteAccountSheet: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     @ViewBuilder

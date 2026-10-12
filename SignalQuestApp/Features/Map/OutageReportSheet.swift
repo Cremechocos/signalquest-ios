@@ -380,7 +380,7 @@ struct OutageReportSheet: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     private func severityOption(

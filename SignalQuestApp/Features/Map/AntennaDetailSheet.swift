@@ -940,7 +940,7 @@ struct AntennaDetailSheet: View {
                         .foregroundStyle(SQColor.label)
                         .padding(.horizontal, SQSpace.sm)
                         .padding(.vertical, SQSpace.xs)
-                        .background(SQColor.surface, in: Capsule(style: .continuous))
+                        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                         .padding(SQSpace.sm)
                         .accessibilityLabel(sightOrigin.label + ". " + SQUnits.distance(meters: distance))
                 }
@@ -1401,7 +1401,7 @@ struct AntennaDetailSheet: View {
         }
         .padding(.vertical, SQSpace.sm - 1)
         .padding(.horizontal, SQSpace.sm + 2)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
     }
 }
 

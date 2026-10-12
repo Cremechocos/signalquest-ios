@@ -103,7 +103,7 @@ struct MessageComposerBar: View {
             .foregroundStyle(SQColor.brandRed)
         }
         .padding(SQSpace.md)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .padding(.horizontal, SQSpace.md)
     }
 
@@ -143,7 +143,7 @@ struct MessageComposerBar: View {
                 Image(systemName: "plus")
                     .font(.system(size: 15, weight: .medium))
                     .frame(width: 36, height: 36)
-                    .background(SQColor.surfaceMuted, in: Circle())
+                    .sqSurface(SQColor.surfaceMuted, in: Circle())
                     .foregroundStyle(SQColor.label)
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
@@ -156,7 +156,7 @@ struct MessageComposerBar: View {
                     Image(systemName: "paperclip")
                         .font(.system(size: 15, weight: .medium))
                         .frame(width: 36, height: 36)
-                        .background(SQColor.surfaceMuted, in: Circle())
+                        .sqSurface(SQColor.surfaceMuted, in: Circle())
                         .foregroundStyle(SQColor.label)
                         .frame(width: 44, height: 44)
                         .contentShape(Circle())
@@ -194,7 +194,7 @@ struct MessageComposerBar: View {
                     Image(systemName: "mic.fill")
                         .font(.system(size: 17, weight: .semibold))
                         .frame(width: 44, height: 44)
-                        .background(SQColor.surfaceMuted, in: Circle())
+                        .sqSurface(SQColor.surfaceMuted, in: Circle())
                         .foregroundStyle(SQColor.brandRed)
                 }
                 .disabled(!canSend)
@@ -248,7 +248,7 @@ struct MessageComposerBar: View {
                         }
                         .padding(.horizontal, SQSpace.md)
                         .frame(minHeight: 44)
-                        .background(SQColor.surfaceMuted, in: Capsule())
+                        .sqSurface(SQColor.surfaceMuted, in: Capsule())
                         .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)

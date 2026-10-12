@@ -130,7 +130,7 @@ struct MyMeasurementsView: View {
                     }
                     .foregroundStyle(SQColor.dangerInk)
                     .padding(SQSpace.sm)
-                    .background(SQColor.surface, in: Capsule())
+                    .sqSurface(SQColor.surface, in: Capsule())
                     .overlay { Capsule().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                     .accessibilityIdentifier("measurements.loadError")
                 }
@@ -175,7 +175,7 @@ struct MyMeasurementsView: View {
         }
         .foregroundStyle(SQColor.label)
         .padding(.horizontal, SQSpace.xs)
-        .background(SQColor.surface, in: Capsule())
+        .sqSurface(SQColor.surface, in: Capsule())
         .overlay { Capsule().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
         .sqShadowSoft()
         .buttonStyle(SQPressButtonStyle())

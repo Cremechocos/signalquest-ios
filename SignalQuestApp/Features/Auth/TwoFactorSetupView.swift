@@ -131,13 +131,9 @@ struct TwoFactorSetupView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .privacySensitive()
                 .accessibilityIdentifier("two-factor.setup.secret")
-            Button { copySecret(setup.secret) } label: {
-                Label("Copier le secret", systemImage: "doc.on.doc")
-                    .font(SQType.button)
-                    .frame(minHeight: 44)
+            GradientButton(String(localized: "Copier le secret"), systemImage: "doc.on.doc", style: .secondary) {
+                copySecret(setup.secret)
             }
-            .buttonStyle(.bordered)
-            .tint(SQColor.accent)
             .disabled(model.phase == .confirming)
             Text("Secret sensible — copie effacée du presse-papier après 1 min.")
                 .font(SQType.caption)

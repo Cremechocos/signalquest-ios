@@ -33,7 +33,7 @@ struct SentinelleOwnerField: View {
                         .font(.system(size: emoji.isEmpty ? 15 : 21))
                         .foregroundStyle(emoji.isEmpty ? SQColor.labelSecondary : SQColor.label)
                         .frame(width: 52, height: 44)
-                        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm))
+                        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm))
                         .overlay(
                             RoundedRectangle(cornerRadius: SQRadius.sm)
                                 .stroke(SQColor.separator, lineWidth: 1)
@@ -47,7 +47,7 @@ struct SentinelleOwnerField: View {
                     .font(SQFont.body(15))
                     .padding(.horizontal, SQSpace.sm)
                     .frame(height: 44)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm))
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm))
                     .overlay(
                         RoundedRectangle(cornerRadius: SQRadius.sm)
                             .stroke(SQColor.separator, lineWidth: 1)
@@ -121,7 +121,7 @@ struct SentinelleOwnerField: View {
             Text(value)
                 .font(.system(size: 20))
                 .frame(width: 44, height: 44)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm))
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm))
                 .overlay(
                     RoundedRectangle(cornerRadius: SQRadius.sm)
                         .stroke(SQColor.separator, lineWidth: 1)

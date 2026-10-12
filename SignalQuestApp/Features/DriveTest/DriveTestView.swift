@@ -1561,7 +1561,7 @@ struct DriveTestView: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(SQColor.label)
                 .frame(width: 36, height: 36)
-                .background(SQColor.surfaceMuted, in: Circle())
+                .sqSurface(SQColor.surfaceMuted, in: Circle())
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -1647,7 +1647,7 @@ struct DriveTestView: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("drivetest.lastTrip")
     }
@@ -1685,7 +1685,7 @@ struct DriveTestView: View {
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.xs + 3)
         .frame(maxWidth: .infinity)
-        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Progression de la session")
         .accessibilityValue(
@@ -1749,7 +1749,7 @@ struct DriveTestView: View {
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.xs + 3)
         .frame(maxWidth: .infinity)
-        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
 
     private var sectorBanner: some View {
@@ -1813,7 +1813,7 @@ struct DriveTestView: View {
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.xs + 4)
         .frame(maxWidth: .infinity)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Opérateur détecté")
         .accessibilityValue(model.displayedOperatorLabel.map { [$0, operatorRowSubtitle].compactMap { $0 }.joined(separator: ", ") } ?? operatorRowTitle)
@@ -1871,7 +1871,7 @@ struct DriveTestView: View {
                 stat(label: "Envoi", value: throughputValue(model.liveUpload), unit: SQUnits.throughputUnit(mbps: model.liveUpload))
             }
             .padding(.vertical, SQSpace.sm)
-            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             if let summary = model.summary, summary.count > 0 {
                 Text(verbatim: [
                     String(localized: "\(summary.count) test"),

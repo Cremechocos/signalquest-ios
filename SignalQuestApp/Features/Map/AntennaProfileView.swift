@@ -54,7 +54,7 @@ struct AntennaProfileView: View {
                             .foregroundStyle(SQColor.labelSecondary)
                     }
                     chart
-                        .frame(height: 330)
+                        .frame(height: 340)
                         .frame(maxWidth: .infinity)
                         // Padding horizontal resserré : le graphe est déjà borné
                         // par ses propres marges internes, et deux niveaux de
@@ -111,11 +111,11 @@ struct AntennaProfileView: View {
             // l'extrémité du trajet. Ses hauteurs ne sont plus cotées ici : elles
             // figurent déjà dans les tuiles sous le graphe, et les cotes prenaient
             // une bande de largeur au détriment du profil lui-même.
-            let leftInset: CGFloat = 40
+            let leftInset: CGFloat = 48
             let rightInset: CGFloat = 26
             // Les deux étiquettes d'extrémité (nom puis altitude) et la ligne
             // d'échelle se superposaient : chacune a maintenant sa ligne.
-            let bottomInset: CGFloat = 44
+            let bottomInset: CGFloat = 54
             let topInset: CGFloat = 6
             let plotWidth = size.width - leftInset - rightInset
             let plotHeight = size.height - bottomInset - topInset
@@ -208,9 +208,9 @@ struct AntennaProfileView: View {
 
             context.draw(
                 Text("\(SQUnits.distance(meters: total)) · échelle verticale non proportionnelle")
-                    .font(SQFont.archivo(9, .semibold))
+                    .font(SQType.micro)
                     .foregroundColor(SQColor.labelSecondary),
-                at: CGPoint(x: size.width / 2, y: size.height - 5)
+                at: CGPoint(x: size.width / 2, y: size.height - 7)
             )
         }
         .accessibilityLabel(accessibilitySummary)
@@ -237,7 +237,7 @@ struct AntennaProfileView: View {
             context.stroke(line, with: .color(SQColor.separator.opacity(0.5)), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
             context.draw(
                 Text("\(Int(value.rounded())) m")
-                    .font(SQFont.archivo(9, .semibold))
+                    .font(SQType.micro)
                     .foregroundColor(SQColor.labelSecondary),
                 at: CGPoint(x: leftInset - 6, y: lineY),
                 anchor: .trailing
@@ -308,12 +308,12 @@ struct AntennaProfileView: View {
         context.stroke(body, with: .color(SQColor.label), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
 
         context.draw(
-            Text(isSearchedAddress ? String(localized: "adresse") : String(localized: "toi")).font(SQFont.archivo(9.5, .bold)).foregroundColor(SQColor.label),
-            at: CGPoint(x: x + 2, y: bottom + 11)
+            Text(isSearchedAddress ? String(localized: "adresse") : String(localized: "toi")).font(SQFont.archivo(12, .bold, relativeTo: .caption2)).foregroundColor(SQColor.label),
+            at: CGPoint(x: x + 2, y: bottom + 10)
         )
         context.draw(
-            Text("\(Int(altitude.rounded())) m").font(SQFont.archivo(9, .semibold)).foregroundColor(SQColor.labelSecondary),
-            at: CGPoint(x: x + 2, y: bottom + 24)
+            Text("\(Int(altitude.rounded())) m").font(SQType.micro).foregroundColor(SQColor.labelSecondary),
+            at: CGPoint(x: x + 2, y: bottom + 25)
         )
     }
 
@@ -356,13 +356,13 @@ struct AntennaProfileView: View {
 
         context.draw(
             Text(supportLabel ?? AntennaSupportSilhouette.fallbackLabel(for: family))
-                .font(SQFont.archivo(9, .bold))
+                .font(SQFont.archivo(12, .bold, relativeTo: .caption2))
                 .foregroundColor(SQColor.label),
-            at: CGPoint(x: x + 4, y: bottom + 11), anchor: .trailing
+            at: CGPoint(x: x + 4, y: bottom + 10), anchor: .trailing
         )
         context.draw(
-            Text("\(Int(altitude.rounded())) m").font(SQFont.archivo(9, .semibold)).foregroundColor(SQColor.labelSecondary),
-            at: CGPoint(x: x + 4, y: bottom + 24), anchor: .trailing
+            Text("\(Int(altitude.rounded())) m").font(SQType.micro).foregroundColor(SQColor.labelSecondary),
+            at: CGPoint(x: x + 4, y: bottom + 25), anchor: .trailing
         )
     }
 

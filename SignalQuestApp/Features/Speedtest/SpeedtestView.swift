@@ -425,7 +425,7 @@ struct SpeedtestView: View {
                 .accessibilityIdentifier("speedtest.driveTest.label")
                 .padding(.horizontal, SQSpace.md)
                 .frame(minHeight: 44)
-                .background(SQColor.surface, in: Capsule(style: .continuous))
+                .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                 .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                 .sqShadowSoft()
         }
@@ -439,7 +439,7 @@ struct SpeedtestView: View {
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(SQColor.label)
                 .frame(width: 44, height: 44)
-                .background(SQColor.surface, in: Circle())
+                .sqSurface(SQColor.surface, in: Circle())
                 .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
                 .sqShadowSoft()
         }
@@ -510,7 +510,7 @@ struct SpeedtestView: View {
                 .tint(SQColor.brandRed)
         }
         .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
-        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
         .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
         .sqShadowSoft()
     }

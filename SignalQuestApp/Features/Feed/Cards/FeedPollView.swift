@@ -37,7 +37,7 @@ struct FeedPollView: View {
             .foregroundStyle(SQColor.labelSecondary)
         }
         .padding(SQSpace.md)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     @ViewBuilder
@@ -84,7 +84,7 @@ struct FeedPollView: View {
                 .padding(.vertical, SQSpace.sm + 1)
             }
             .frame(minHeight: 44)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(!poll.isOpen)

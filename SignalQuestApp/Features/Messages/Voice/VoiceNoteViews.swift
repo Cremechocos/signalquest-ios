@@ -70,7 +70,7 @@ struct VoiceNoteRecordingBar: View {
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
-        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
         // Un enregistrement en cours DOIT être annoncé : sans cela, un
         // utilisateur de VoiceOver ne saurait pas que le micro est ouvert.
         .accessibilityElement(children: .contain)
@@ -131,7 +131,7 @@ struct VoiceNoteDraftBar: View {
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .padding(.horizontal, SQSpace.md)
     }
 }

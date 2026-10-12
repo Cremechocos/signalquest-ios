@@ -460,7 +460,7 @@ struct GroupSettingsView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(SQColor.label)
                         .padding(5)
-                        .background(SQColor.surface, in: Circle())
+                        .sqSurface(SQColor.surface, in: Circle())
                         .sqShadowSoft()
                         .accessibilityHidden(true)
                 }

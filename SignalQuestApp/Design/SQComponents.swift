@@ -470,7 +470,7 @@ struct LeaderboardPodium: View {
                                 .font(SQFont.display(isFirst ? 24 : 20, .bold))
                                 .foregroundStyle(isFirst ? SQColor.onAccent : SQColor.label)
                             Text("\(Int(entry.value)) \(entry.unit)")
-                                .font(SQFont.body(11))
+                                .font(SQType.micro)
                                 .foregroundStyle(isFirst ? SQColor.onAccent : SQColor.labelSecondary)
                         }
                     )

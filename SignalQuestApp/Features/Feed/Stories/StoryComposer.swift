@@ -236,7 +236,7 @@ struct StoryComposer: View {
                         .padding(.horizontal, SQSpace.lg)
                         .padding(.vertical, SQSpace.sm + 2)
                         .frame(minHeight: 44)
-                        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
+                        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
 
                     audienceSection
                     hideSection
@@ -312,7 +312,7 @@ struct StoryComposer: View {
             .tint(SQColor.brandRed)
         }
         .padding(SQSpace.md)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private var audienceSection: some View {

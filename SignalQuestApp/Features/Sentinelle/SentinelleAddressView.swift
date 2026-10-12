@@ -331,7 +331,7 @@ struct SentinelleAddressView: View {
             }
         }
         .padding(3)
-        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
 
     @ViewBuilder
@@ -572,7 +572,7 @@ struct SentinelleAddressView: View {
         .padding(.vertical, SQSpace.sm)
         .padding(.horizontal, SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 

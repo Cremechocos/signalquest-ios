@@ -159,13 +159,12 @@ struct SignalQuestHomeView: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 44, height: 44)
-                    .background(SQColor.surface, in: Circle())
+                    .sqSurface(SQColor.surface, in: Circle())
                     .sqShadowSoft()
                     .overlay(alignment: .topTrailing) {
                         if services.unreadNotifications > 0 {
                             Text(services.unreadNotifications > 99 ? "99+" : "\(services.unreadNotifications)")
-                                .font(SQFont.body(11, relativeTo: .caption))
-                                .fontWeight(.bold)
+                                .font(SQFont.body(12, .bold, relativeTo: .caption2))
                                 .foregroundStyle(SQColor.onAccent)
                                 .padding(.horizontal, 4)
                                 .frame(minWidth: 18, minHeight: 18)
@@ -287,13 +286,13 @@ struct SignalQuestHomeView: View {
                 .background(networkTintSoft, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
                 Text(LocalizedStringKey(networkTitle))
-                    .font(.headline.weight(.semibold))
+                    .font(SQType.heading)
                     .foregroundStyle(SQColor.label)
                     .accessibilityIdentifier("home.network.title")
                 Text(LocalizedStringKey(networkSubtitle))
-                    .font(.subheadline)
+                    .font(SQType.subhead)
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
             Spacer(minLength: SQSpace.sm)
             if let networkBadge {
@@ -464,18 +463,19 @@ struct SignalQuestHomeView: View {
                             in: Circle()
                         )
                     if badgeCount > 0 {
-                        Text("\(min(badgeCount, 99))")
-                            .font(SQFont.body(11, .bold))
+                        Text(badgeCount > 99 ? "99+" : "\(badgeCount)")
+                            .font(SQFont.body(12, .bold, relativeTo: .caption2))
                             .foregroundStyle(SQColor.onAccent)
+                            .padding(.horizontal, 4)
                             .frame(minWidth: 18, minHeight: 18)
-                            .background(SQColor.brandRed, in: Circle())
+                            .background(SQColor.brandRed, in: Capsule())
                             .offset(x: 6, y: -4)
                     }
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LocalizedStringKey(title))
                         .font(SQFont.body(16, .bold, relativeTo: .headline))
-                        .foregroundStyle(accented ? SQColor.onAccent : Color.primary)
+                        .foregroundStyle(accented ? SQColor.onAccent : SQColor.label)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                         .minimumScaleFactor(0.85)
                         .accessibilityIdentifier("home.action.title.\(identifier)")
@@ -485,7 +485,7 @@ struct SignalQuestHomeView: View {
                         // `onAccent` n'atteint qu'à α ≈ 0,92 — indiscernable du
                         // plein. La hiérarchie tient déjà par la taille (16,5
                         // semi-gras contre 12,5 normal).
-                        .foregroundStyle(accented ? SQColor.onAccent : Color.primary)
+                        .foregroundStyle(accented ? SQColor.onAccent : SQColor.label)
                         // Trois lignes : en texte XXL, « Signalées par la communauté »
                         // se coupait (tour du 30/09).
                         .lineLimit(3)
@@ -741,7 +741,7 @@ struct SignalQuestHomeView: View {
         .padding(.top, SQSpace.lg + 2)
         .padding(.bottom, SQSpace.sm + 2)
         .padding(.horizontal, SQSpace.xs)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     /// Une mesure communautaire proche : techno teintée, débit, contexte, distance.
@@ -884,7 +884,7 @@ struct SignalQuestHomeView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .foregroundStyle(SQColor.label)
-                            .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                            .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
                     }
                     if let tech = measurement.technology {
                         Text(tech)

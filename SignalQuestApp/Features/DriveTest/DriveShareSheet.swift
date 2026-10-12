@@ -127,7 +127,7 @@ struct DriveShareSheet: View {
                     .font(SQFont.body(15))
                     .tint(SQColor.brandRed)
                     .padding(.horizontal, SQSpace.md)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
 
                     Text("Le tracé est dessiné sans fond de carte. Retirer le départ et l’arrivée enlève 500 m à chaque bout.")
                         .font(SQType.caption)

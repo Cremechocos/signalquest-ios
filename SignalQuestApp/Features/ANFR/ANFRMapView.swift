@@ -229,7 +229,7 @@ struct ANFRMapView: View {
                 }
                 .padding(.horizontal, SQSpace.md - 2)
                 .frame(height: 48)
-                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityHint("Choisir une date")
@@ -261,7 +261,7 @@ struct ANFRMapView: View {
                     Image(systemName: "line.3.horizontal.decrease")
                         .font(.system(size: 17, weight: .semibold))
                         .frame(width: 48, height: 48)
-                        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                         .foregroundStyle(SQColor.label)
                     if activeFilterCount > 0 {
                         Text("\(activeFilterCount)")
@@ -322,7 +322,7 @@ struct ANFRMapView: View {
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm + 1)
-        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
         .sqShadowCard()
     }
 
@@ -332,7 +332,7 @@ struct ANFRMapView: View {
             .foregroundStyle(SQColor.labelSecondary)
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm + 1)
-            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowCard()
     }
 
@@ -354,7 +354,7 @@ struct ANFRMapView: View {
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm + 1)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .frame(maxWidth: 320)
         .sqShadowCard()
     }

@@ -102,7 +102,7 @@ struct AntennaSectorGridView: View {
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                    .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             }
         }
     }
@@ -116,7 +116,7 @@ struct AntennaSectorGridView: View {
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                    .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             }
         }
     }

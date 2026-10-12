@@ -236,7 +236,7 @@ struct LeaderboardsView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 40, height: 40)
-                    .background(SQColor.surface, in: Circle())
+                    .sqSurface(SQColor.surface, in: Circle())
                     .sqShadowSoft()
                     // Cible de 44 pt sans grossir le rond de la maquette.
                     .padding(2)
@@ -699,7 +699,7 @@ private struct LeaderboardHeroCard: View {
         }
         .padding(.horizontal, SQSpace.sm + 2)
         .padding(.vertical, 5)
-        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
     }
 
     private func animateIn() {
@@ -791,7 +791,7 @@ private struct LeaderboardTabSwitcher: View {
             }
         }
         .padding(3)
-        .background(SQColor.surface, in: Capsule(style: .continuous))
+        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
         .sqShadowSoft()
     }
 }
@@ -821,7 +821,7 @@ private struct LeaderboardMenuPill<Items: View>: View {
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.sm)
             .frame(minHeight: 44)
-            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowSoft()
             .contentShape(Capsule(style: .continuous))
         }

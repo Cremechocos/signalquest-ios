@@ -321,7 +321,7 @@ struct AntennaSightCard: View {
                     value: isRefreshing
                 )
                 .frame(width: 34, height: 34)
-                .background(SQColor.surfaceMuted, in: Circle())
+                .sqSurface(SQColor.surfaceMuted, in: Circle())
                 .padding(5)
                 .contentShape(Circle())
         }

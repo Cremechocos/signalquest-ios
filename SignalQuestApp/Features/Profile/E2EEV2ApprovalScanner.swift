@@ -42,7 +42,7 @@ struct E2EEV2ApprovalScannerView: View {
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(SQSpace.md)
-                            .background(SQColor.surface, in: Capsule(style: .continuous))
+                            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                             .padding(SQSpace.lg)
                     }
                 case .denied:

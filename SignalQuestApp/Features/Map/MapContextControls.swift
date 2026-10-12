@@ -112,7 +112,7 @@ private struct MapAntennaKeyControl: View {
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.xs)
             .frame(minHeight: 44)
-            .background(SQColor.surface, in: Capsule())
+            .sqSurface(SQColor.surface, in: Capsule())
             .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())
@@ -218,7 +218,7 @@ private struct MapCoverageKeyControl: View {
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.xs)
             .frame(minHeight: 44)
-            .background(SQColor.surface, in: Capsule())
+            .sqSurface(SQColor.surface, in: Capsule())
             .sqShadowSoft()
             .animation(SQMotion.resolve(SQMotion.fast, reduceMotion), value: byGeneration)
         }
@@ -378,7 +378,7 @@ private struct MapDisplayLimitControl: View {
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.xs)
             .frame(minHeight: 44)
-            .background(SQColor.surface, in: Capsule())
+            .sqSurface(SQColor.surface, in: Capsule())
             .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())

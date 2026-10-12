@@ -57,6 +57,27 @@ protocol NearbyNetworkQualityServicing: Sendable {
         longitude: Double,
         maxAge: TimeInterval?
     ) async -> [OperatorMetricStat]
+
+    /// Même classement, mais une panne réseau est propagée au lieu d'être
+    /// confondue avec une zone sans mesures (la feuille « Autour de toi » les
+    /// distingue). Par défaut, repli sur `operatorRanking`.
+    func loadOperatorRanking(
+        metric: NearbyOperatorMetric,
+        latitude: Double,
+        longitude: Double,
+        maxAge: TimeInterval?
+    ) async throws -> [OperatorMetricStat]
+}
+
+extension NearbyNetworkQualityServicing {
+    func loadOperatorRanking(
+        metric: NearbyOperatorMetric,
+        latitude: Double,
+        longitude: Double,
+        maxAge: TimeInterval?
+    ) async throws -> [OperatorMetricStat] {
+        await operatorRanking(metric: metric, latitude: latitude, longitude: longitude, maxAge: maxAge)
+    }
 }
 
 final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
@@ -164,6 +185,17 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
         longitude: Double,
         maxAge: TimeInterval?
     ) async -> [OperatorMetricStat] {
+        (try? await loadOperatorRanking(
+            metric: metric, latitude: latitude, longitude: longitude, maxAge: maxAge
+        )) ?? []
+    }
+
+    func loadOperatorRanking(
+        metric: NearbyOperatorMetric,
+        latitude: Double,
+        longitude: Double,
+        maxAge: TimeInterval?
+    ) async throws -> [OperatorMetricStat] {
         guard let market = await markets.marketForLocation(latitude: latitude, longitude: longitude) else { return [] }
         let bounds = MapBounds(
             north: latitude + Self.halfSpanLat,
@@ -177,10 +209,10 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
             // Un seul appel « tous opérateurs » : les speedtests portent l'opérateur,
             // on regroupe côté client.
             let center = CLLocation(latitude: latitude, longitude: longitude)
-            let markers = ((try? await map.speedtestTiles(
+            let markers = try await map.speedtestTiles(
                 bounds: bounds, zoom: Self.tileZoom, market: market.code,
                 operatorName: "ALL", days: 0, bands: [], maxAge: maxAge
-            )) ?? [])
+            )
                 .flatMap(\.markers)
                 .filter { center.distance(from: CLLocation(latitude: $0.lat, longitude: $0.lng)) <= Self.radiusMeters }
 
@@ -211,34 +243,52 @@ final class NearbyNetworkQualityService: NearbyNetworkQualityServicing {
             let marketCode = market.code
             let lat = latitude
             let lng = longitude
-            let stats = await withTaskGroup(of: OperatorMetricStat?.self) { group in
+            let outcomes = await withTaskGroup(of: Result<OperatorMetricStat?, Error>.self) { group in
                 for op in market.selectableOperators {
                     let key = op.key
                     let label = op.shortLabel.isEmpty ? op.label : op.shortLabel
                     group.addTask { [map] in
-                        let points = ((try? await map.coverageTiles(
-                            bounds: bounds, zoom: Self.tileZoom, market: marketCode,
-                            operatorName: key, days: 0, bands: [], maxAge: maxAge
-                        )) ?? [])
-                            .flatMap(\.points)
+                        let tiles: [AndroidCoverageTileResponse]
+                        do {
+                            tiles = try await map.coverageTiles(
+                                bounds: bounds, zoom: Self.tileZoom, market: marketCode,
+                                operatorName: key, days: 0, bands: [], maxAge: maxAge
+                            )
+                        } catch {
+                            return .failure(error)
+                        }
+                        let points = tiles.flatMap(\.points)
                         let origin = CLLocation(latitude: lat, longitude: lng)
                         let rsrps = points
                             .filter { origin.distance(from: CLLocation(latitude: $0.lat, longitude: $0.lng)) <= Self.radiusMeters }
                             .compactMap(\.rsrp)
                             .filter { $0 <= -44 && $0 >= -140 }
-                        guard let median = Self.median(rsrps, minCount: Self.minSamplesPerMetric) else { return nil }
-                        return OperatorMetricStat(
+                        guard let median = Self.median(rsrps, minCount: Self.minSamplesPerMetric) else { return .success(nil) }
+                        return .success(OperatorMetricStat(
                             operatorName: label, value: Int(median.rounded()),
                             sampleCount: rsrps.count, detail: nil
-                        )
+                        ))
                     }
                 }
-                var result: [OperatorMetricStat] = []
-                for await stat in group {
-                    if let stat { result.append(stat) }
-                }
+                var result: [Result<OperatorMetricStat?, Error>] = []
+                for await outcome in group { result.append(outcome) }
                 return result
             }
+            var stats: [OperatorMetricStat] = []
+            var firstError: Error?
+            var hadResponse = false
+            for outcome in outcomes {
+                switch outcome {
+                case .success(let stat):
+                    hadResponse = true
+                    if let stat { stats.append(stat) }
+                case .failure(let error):
+                    firstError = firstError ?? error
+                }
+            }
+            // Panne seulement si TOUS les appels ont échoué : un opérateur isolé en
+            // erreur ne doit pas masquer le classement des autres.
+            if !hadResponse, let firstError { throw firstError }
             return stats.sorted { $0.value != $1.value ? $0.value > $1.value : $0.sampleCount > $1.sampleCount }
         }
     }

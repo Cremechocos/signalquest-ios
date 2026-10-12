@@ -42,6 +42,7 @@ struct ScheduledMessagesView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .sqReadableWidth()
             }
         }
         // Échec d'une suppression sur une liste remplie : dit près de la liste.

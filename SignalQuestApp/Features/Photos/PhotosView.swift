@@ -1067,7 +1067,7 @@ struct PhotoDetailView: View {
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.vertical, SQSpace.sm + 2)
                 .frame(minHeight: 44)
-                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
+                .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
                 .focused($commentFocused)
             Button {
                 onSend()
@@ -1177,7 +1177,7 @@ struct PhotoUploadView: View {
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 56)
                         .foregroundStyle(SQColor.label)
-                        .background(SQColor.surface, in: Capsule(style: .continuous))
+                        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                         .sqShadowSoft()
                     }
                     .buttonStyle(SQPressButtonStyle())
@@ -1263,7 +1263,7 @@ struct PhotoUploadView: View {
                             .tint(SQColor.brandRed)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(SQSpace.md)
-                            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                             .accessibilityHint("Choisis l'opérateur réellement concerné par la photo")
                         }
                     } else if let networkOperator = availableOperators.first {
@@ -1277,7 +1277,7 @@ struct PhotoUploadView: View {
                         .foregroundStyle(SQColor.label)
                         .lineLimit(2...5)
                         .padding(SQSpace.md + 2)
-                        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
 
                     GradientButton("Uploader", systemImage: "arrow.up.circle", isBusy: isUploading) {
                         guard let original = imageData, let site = selectedSite else { return }
@@ -1557,7 +1557,7 @@ struct AntennaSitePickerSheet: View {
                     }
                     .padding(.horizontal, SQSpace.lg - 2)
                     .padding(.vertical, SQSpace.sm + 2)
-                    .background(SQColor.surface, in: Capsule(style: .continuous))
+                    .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                     .sqShadowSoft()
 
                     if let marketLabel {
@@ -1566,7 +1566,7 @@ struct AntennaSitePickerSheet: View {
                             .foregroundStyle(SQColor.labelSecondary)
                             .padding(.horizontal, SQSpace.md)
                             .padding(.vertical, SQSpace.xs)
-                            .background(SQColor.surface, in: Capsule(style: .continuous))
+                            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                     }
 
                     if let errorMessage {

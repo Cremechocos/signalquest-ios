@@ -338,7 +338,7 @@ struct SentinelleFamilyChart: View {
                     let sample = Self.nearest(in: familySeries, to: readAt)
                     HStack(spacing: SQSpace.xs) {
                         Text(family.label)
-                            .font(SQFont.body(11))
+                            .font(SQFont.body(12, relativeTo: .caption2))
                             .foregroundStyle(SQColor.labelSecondary)
                         // Une famille muette à cet instant affiche un tiret, et
                         // non la valeur voisine : c'est précisément le trou qu'on
@@ -351,7 +351,7 @@ struct SentinelleFamilyChart: View {
                 }
                 Spacer()
                 Text(readAt.formatted(date: .omitted, time: .shortened))
-                    .font(SQFont.body(11))
+                    .font(SQFont.body(12, relativeTo: .caption2))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.labelSecondary)
             }

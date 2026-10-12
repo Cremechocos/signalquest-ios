@@ -48,7 +48,7 @@ struct ChooseHandleSheet: View {
                     }
                     .padding(.horizontal, SQSpace.lg)
                     .frame(minHeight: 48)
-                    .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                    .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
                     .sqFadeUp()
 
                     Text(message.isEmpty

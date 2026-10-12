@@ -228,6 +228,7 @@ struct PrivacySettingsView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Confidentialité")
         .navigationBarTitleDisplayMode(.inline)
@@ -419,8 +420,8 @@ private struct LiveLocationDisclosureSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: SQSpace.xl + 2) {
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
                         Image(systemName: "location.fill.viewfinder")
                             .font(.system(size: 30, weight: .semibold))
                             .foregroundStyle(SQColor.brandRed)
@@ -435,7 +436,7 @@ private struct LiveLocationDisclosureSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: SQSpace.lg) {
                         disclosureRow(
                             icon: "mappin.and.ellipse",
                             title: "Ta position et ton cap",
@@ -458,23 +459,13 @@ private struct LiveLocationDisclosureSheet: View {
                         )
                     }
                 }
-                .padding(24)
+                .padding(SQSpace.xxl)
             }
 
-            VStack(spacing: 10) {
-                Button {
+            VStack(spacing: SQSpace.sm + 2) {
+                GradientButton(String(localized: "Activer le partage"), style: .accent) {
                     onConfirm()
                     dismiss()
-                } label: {
-                    Text("Activer le partage")
-                        .font(SQType.button)
-                        .foregroundStyle(SQColor.onAccent)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            SQColor.brandRed,
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        )
                 }
                 Button {
                     onCancel()
@@ -484,27 +475,27 @@ private struct LiveLocationDisclosureSheet: View {
                         .font(SQType.button)
                         .foregroundStyle(SQColor.labelSecondary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, SQSpace.md)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 8)
-            .padding(.bottom, 20)
+            .padding(.horizontal, SQSpace.xxl)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.xl)
         }
         .signalQuestBackground()
     }
 
     private func disclosureRow(icon: String, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: SQSpace.md) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(SQColor.brandRed)
                 .frame(width: 30, height: 30)
                 .background(
                     SQColor.accentSoft,
-                    in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
                 )
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
                 Text(LocalizedStringKey(title))
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.label)

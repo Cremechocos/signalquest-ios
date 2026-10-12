@@ -490,7 +490,7 @@ struct RadioLogsView: View {
                 .foregroundStyle(SQColor.label)
                 .padding(.horizontal, SQSpace.md)
                 .frame(minHeight: 44)
-                .background(SQColor.surface, in: Capsule())
+                .sqSurface(SQColor.surface, in: Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)

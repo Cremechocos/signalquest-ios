@@ -408,7 +408,7 @@ struct ANFRBandsView: View {
                     .foregroundStyle(SQColor.label)
                     .padding(.horizontal, SQSpace.sm + 2)
                     .padding(.vertical, SQSpace.xs + 1)
-                    .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                    .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             }
         }
     }
@@ -448,7 +448,7 @@ struct ANFRBandsView: View {
         .padding(.vertical, SQSpace.sm)
         .padding(.horizontal, SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(([row.band.localizedLabel(),
                               String(localized: "\(ANFRBandsFormat.sites(row.summary.latest.operational)) sites en service")] + trend)

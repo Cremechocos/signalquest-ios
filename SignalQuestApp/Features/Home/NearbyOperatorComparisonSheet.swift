@@ -15,6 +15,7 @@ struct NearbyOperatorComparisonSheet: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var stats: [OperatorMetricStat] = []
     @State private var loaded = false
+    @State private var loadFailed = false
     @State private var animate = false
 
     private var maxValue: Int { max(stats.map(\.value).max() ?? 1, 1) }
@@ -27,6 +28,12 @@ struct NearbyOperatorComparisonSheet: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.top, SQSpace.xxl)
+                } else if loadFailed {
+                    ErrorStateView(title: "Chargement impossible", message: "Impossible de charger les mesures. Réessaie.") {
+                        loaded = false
+                        Task { await load() }
+                    }
+                    .padding(SQSpace.lg)
                 } else if stats.isEmpty {
                     EmptyStateView(
                         title: "Pas encore de comparaison",
@@ -68,9 +75,16 @@ struct NearbyOperatorComparisonSheet: View {
     }
 
     private func load() async {
-        stats = await services.nearbyQuality.operatorRanking(
-            metric: metric, latitude: latitude, longitude: longitude, maxAge: 90
-        )
+        do {
+            // Une panne réseau n'est pas une zone sans mesures : elle a son état.
+            stats = try await services.nearbyQuality.loadOperatorRanking(
+                metric: metric, latitude: latitude, longitude: longitude, maxAge: 90
+            )
+            loadFailed = false
+        } catch {
+            guard !Task.isCancelled else { return }
+            loadFailed = true
+        }
         loaded = true
         withAnimation(SQMotion.resolve(.easeOut(duration: 0.55), reduceMotion)) { animate = true }
     }
@@ -112,11 +126,11 @@ struct NearbyOperatorComparisonSheet: View {
                 }
                 Spacer(minLength: SQSpace.sm)
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text("\(stat.value)")
+                    Text(verbatim: valueText(stat))
                         .font(SQFont.display(20, .bold))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
-                    Text(metric.unit).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
+                    Text(verbatim: unitText(stat)).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
                 }
             }
             GeometryReader { geo in
@@ -136,12 +150,30 @@ struct NearbyOperatorComparisonSheet: View {
             (isLeader ? color.opacity(0.08) : SQColor.surface),
             in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
         )
+        // Fond seul (règle No-Border) : le liseré n'existe qu'en « Noir intense »,
+        // où rien d'autre ne détache la carte du fond.
         .overlay(
             RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                .stroke(isLeader ? color.opacity(0.35) : SQColor.separator, lineWidth: isLeader ? 1.5 : 1)
+                .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(rank). \(stat.operatorName), \(stat.value) \(metric.unit), \(measurementCountText(stat.sampleCount)).")
+        .accessibilityLabel("\(rank). \(stat.operatorName), \(valueText(stat)) \(unitText(stat)), \(measurementCountText(stat.sampleCount)).")
+    }
+
+    /// Le débit suit les unités de l'app (« Mbit/s » / « Mbps ») comme l'Accueil ;
+    /// le signal reste en dBm.
+    private func valueText(_ stat: OperatorMetricStat) -> String {
+        switch metric {
+        case .download: return SQUnits.throughputValue(mbps: Double(stat.value))
+        case .signal: return "\(stat.value)"
+        }
+    }
+
+    private func unitText(_ stat: OperatorMetricStat) -> String {
+        switch metric {
+        case .download: return SQUnits.throughputUnit(mbps: Double(stat.value))
+        case .signal: return metric.unit
+        }
     }
 
     private var footer: some View {

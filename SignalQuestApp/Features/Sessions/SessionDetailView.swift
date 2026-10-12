@@ -375,7 +375,7 @@ struct SessionDetailView: View {
                     }
                     .foregroundStyle(SQColor.label)
                     .padding(.horizontal, SQSpace.md).padding(.vertical, 7)
-                    .background(SQColor.surface, in: Capsule(style: .continuous))
+                    .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                     .sqShadowSoft()
                 }
                 ForEach(model.session.technologies, id: \.self) { tech in

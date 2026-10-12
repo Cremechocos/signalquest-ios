@@ -76,7 +76,7 @@ struct AntennaRadioIdentifiersView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SQSpace.sm + 2)
-            .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
@@ -140,7 +140,7 @@ struct AntennaRadioIdentifiersView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.md)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     /// Une cellule : son identité en tête, ses caractéristiques radio en dessous.
@@ -181,7 +181,7 @@ struct AntennaRadioIdentifiersView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SQSpace.sm)
-            .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
@@ -199,7 +199,7 @@ struct AntennaRadioIdentifiersView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.md)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     // MARK: Regroupement

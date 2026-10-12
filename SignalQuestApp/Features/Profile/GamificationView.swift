@@ -380,7 +380,7 @@ struct GamificationView: View {
                         }
                     }
                     .frame(width: 36, height: 36)
-                    .background(SQColor.surfaceMuted, in: Circle())
+                    .sqSurface(SQColor.surfaceMuted, in: Circle())
                     .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(badge.title ?? String(localized: "Badge"))

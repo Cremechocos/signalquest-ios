@@ -48,7 +48,7 @@ struct AntennaGlossaryIllustrationView: View {
         .frame(height: illustration.preferredHeight)
         .frame(maxWidth: .infinity)
         .padding(SQSpace.md)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .accessibilityLabel(illustration.accessibilityLabel)
     }
 

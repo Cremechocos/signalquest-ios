@@ -126,7 +126,7 @@ struct NearbyNetworkQualityDetailSheet: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 38, height: 38)
-                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(LocalizedStringKey(title)).font(SQFont.body(15, .semibold)).foregroundStyle(SQColor.label)

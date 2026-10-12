@@ -1082,7 +1082,7 @@ struct FeedView: View {
                 .padding(.horizontal, SQSpace.md)
                 .frame(minHeight: 48)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(SQColor.surface,
+                .sqSurface(SQColor.surface,
                             in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
             .buttonStyle(SQPressButtonStyle())
@@ -1238,7 +1238,7 @@ struct FeedView: View {
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(SQColor.label)
                 .frame(width: 44, height: 44)
-                .background(SQColor.surface, in: Circle())
+                .sqSurface(SQColor.surface, in: Circle())
                 .sqShadowSoft()
         }
         .accessibilityLabel("Plus")
@@ -1269,7 +1269,7 @@ struct FeedView: View {
                     .accessibilityIdentifier("community.header.action.\(identifier).label")
                 if badgeCount > 0 {
                     Text("\(min(badgeCount, 99))")
-                        .font(SQFont.body(10, .bold, relativeTo: .caption2))
+                        .font(SQFont.body(12, .bold, relativeTo: .caption2))
                         .foregroundStyle(SQColor.onAccent)
                         .frame(minWidth: 18, minHeight: 18)
                         .background(SQColor.brandRed, in: Circle())
@@ -1278,7 +1278,7 @@ struct FeedView: View {
             .foregroundStyle(SQColor.label)
             .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.horizontal, SQSpace.md)
-            .background(SQColor.surface, in: Capsule(style: .continuous))
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowSoft()
         }
         .buttonStyle(SQPressButtonStyle())

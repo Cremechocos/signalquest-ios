@@ -600,16 +600,16 @@ struct ProfileView: View {
         HStack(alignment: .top, spacing: SQSpace.md + 1) {
             Image(systemName: "iphone.gen3.radiowaves.left.and.right")
                 .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(Color.primary)
+                .foregroundStyle(SQColor.label)
                 .frame(width: 36, height: 36)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 Text("Avec l’app Android")
-                    .font(.body.weight(.medium))
+                    .font(SQFont.body(17, .medium, relativeTo: .body))
                     .foregroundStyle(SQColor.label)
                 Text("Elle enregistre tes trajets, tient un journal des antennes captées et aide à les identifier. Ces écrans apparaissent ici dès qu’elle a envoyé des données.")
-                    .font(.footnote)
+                    .font(SQFont.body(13, relativeTo: .footnote))
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -695,7 +695,7 @@ struct ProfileView: View {
                     .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(SQColor.accentInk)
                     .frame(width: 40, height: 40)
-                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     .accessibilityHidden(true)
                 Text(LocalizedStringKey(title))
                     .font(SQFont.body(12.5, .semibold))
@@ -729,20 +729,20 @@ struct ProfileView: View {
             if !dynamicTypeSize.isAccessibilitySize {
                 Image(systemName: icon)
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(SQColor.label)
                     .frame(width: 36, height: 36)
-                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                     .accessibilityHidden(true)
             }
             Text(LocalizedStringKey(title))
-                .font(.body.weight(.medium))
-                .foregroundStyle(Color.primary)
+                .font(SQFont.body(17, .medium, relativeTo: .body))
+                .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("profile.menu.title")
             Spacer()
             Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Color.primary)
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .foregroundStyle(SQColor.label)
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, SQSpace.lg)
@@ -842,30 +842,17 @@ private struct EmailVerificationCard: View {
                 .foregroundStyle(SQColor.label)
                 .textSelection(.enabled)
 
-            Button {
+            GradientButton(String(localized: "Renvoyer le lien"), isBusy: isSending, style: .accent) {
                 Task { await resend() }
-            } label: {
-                Group {
-                    if isSending { ProgressView() } else { Text("Renvoyer le lien") }
-                }
-                .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
-            .tint(SQColor.brandRed)
-            .foregroundStyle(SQColor.onAccent)
             .disabled(isSending || isRefreshing)
             .accessibilityIdentifier("profile.emailVerification.resend")
 
-            Button { Task { await refresh() } } label: {
-                Text("J’ai confirmé")
-                    .frame(maxWidth: .infinity, minHeight: 44)
+            GradientButton(String(localized: "J’ai confirmé"), style: .secondary) {
+                Task { await refresh() }
             }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-                .tint(SQColor.brandRed)
-                .disabled(isSending || isRefreshing)
-                .accessibilityIdentifier("profile.emailVerification.refresh")
+            .disabled(isSending || isRefreshing)
+            .accessibilityIdentifier("profile.emailVerification.refresh")
 
             if let feedback {
                 Text(feedback)

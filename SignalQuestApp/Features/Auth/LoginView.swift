@@ -163,7 +163,7 @@ struct LoginView: View {
                         } onCompletion: { result in
                             handleAppleSignIn(result)
                         }
-                        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                        .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
                         .frame(height: 56)
                         .clipShape(Capsule(style: .continuous))
                         .accessibilityLabel("Continuer avec Apple")
@@ -530,7 +530,7 @@ struct SQTextFieldStyle: TextFieldStyle {
             .padding(.horizontal, SQSpace.lg)
             .padding(.vertical, SQSpace.md)
             .frame(minHeight: 44)
-            .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+            .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             // En OLED, surfaceMuted et le fond sont noirs purs : sans ce trait,
             // les champs vides ou sécurisés disparaissent visuellement.
             .overlay {

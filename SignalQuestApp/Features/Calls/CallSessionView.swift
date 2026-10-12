@@ -73,7 +73,7 @@ struct CallScreen: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(SQColor.label)
                         .frame(width: 44, height: 44)
-                        .background(SQColor.surface, in: Circle())
+                        .sqSurface(SQColor.surface, in: Circle())
                 }
                 .buttonStyle(SQPressButtonStyle())
                 .accessibilityLabel("Réduire l’appel")
@@ -247,7 +247,7 @@ struct CallScreen: View {
 #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .accessibilityElement(children: .contain)
 #else
@@ -464,7 +464,7 @@ struct PeerNetworkCard: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .accessibilityIdentifier("call.peerNetwork")
     }
 

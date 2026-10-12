@@ -217,7 +217,7 @@ struct E2EEV2AccountKeyContent: View {
             .foregroundStyle(SQColor.labelSecondary)
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.xs + 2)
-            .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+            .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
             .accessibilityIdentifier("accountKey.status.unverified")
         }
     }

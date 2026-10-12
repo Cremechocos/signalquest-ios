@@ -403,11 +403,11 @@ struct SharedPostEmbedBubble: View {
             // L'embed est la bulle : carte crème autonome, rayon 22.
             content()
                 .padding(SQSpace.md + 2)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         } else if mine {
             content()
                 .padding(SQSpace.md)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         } else {
             content()
         }
@@ -442,7 +442,7 @@ struct SharedPostEmbedBubble: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, SQSpace.sm + 2)
         .padding(.vertical, SQSpace.sm)
-        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
