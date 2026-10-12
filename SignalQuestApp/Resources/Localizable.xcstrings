@@ -65800,6 +65800,66 @@
           }
         }
       }
+    },
+    "Glisser pour retirer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swipe to remove"
+          }
+        }
+      }
+    },
+    "Touche l’étoile d’une fiche antenne pour en suivre une autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the star on an antenna sheet to follow another one."
+          }
+        }
+      }
+    },
+    "Indisponible hors connexion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable offline"
+          }
+        }
+      }
+    },
+    "Notifications activées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications on"
+          }
+        }
+      }
+    },
+    "Notifications désactivées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications off"
+          }
+        }
+      }
+    },
+    "Ouvrir la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the map"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 /// Les antennes suivies.
 ///
@@ -8,6 +9,8 @@ import SwiftUI
 struct FavoriteAntennasView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var networkPath: NetworkPathMonitor
+    @EnvironmentObject private var router: AppRouter
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var favorites: FavoriteAntennasService
     /// Registre des marchés, pour écrire « Orange » et « France » au lieu de « ORANGE » et « FR ».
     @State private var registry: MarketRegistryPayload?
@@ -17,82 +20,48 @@ struct FavoriteAntennasView: View {
     var body: some View {
         List {
             Section {
-                if favorites.hasLoaded {
-                Toggle(
-                    "Me prévenir en cas de panne",
-                    isOn: Binding(
-                        get: { favorites.notifyOnIssues },
-                        set: { newValue in
-                            guard let scope = favorites.captureActionScope() else { return }
-                            Task { await favorites.setNotifyOnIssues(newValue, matching: scope) }
-                            // Une alerte sans notifications n'arrive jamais (TRX-01).
-                            if newValue {
-                                Task { await services.notificationPriming.considerPriming(after: .antennaAlert) }
-                            }
-                        }
-                    )
-                )
-                .tint(SQColor.brandRed)
-                } else {
-                    // En très grand texte, l'état passe sous l'intitulé plutôt
-                    // que de le couper.
-                    ViewThatFits(in: .horizontal) {
-                        HStack {
-                            Text("Me prévenir en cas de panne")
-                            Spacer()
-                            notifyUnavailableState
-                        }
-                        VStack(alignment: .leading, spacing: SQSpace.xs) {
-                            Text("Me prévenir en cas de panne")
-                            notifyUnavailableState
-                        }
-                    }
-                }
-            } footer: {
-                Text("Les antennes suivies sont les seules pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme.")
+                header
+                    .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.md, trailing: 0))
+                    .listRowBackground(Color.clear)
+                notifyCard
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
             }
-            .listRowBackground(SQColor.surface)
+            .listRowSeparator(.hidden)
 
             if favorites.pendingCount > 0 || favorites.errorMessage != nil {
                 Section {
-                    if favorites.pendingCount > 0 {
-                        Label {
-                            if favorites.pendingCount == 1 { Text("Une modification en attente de synchronisation") }
-                            else { Text("\(favorites.pendingCount) modifications en attente de synchronisation") }
-                        } icon: { Image(systemName: "arrow.triangle.2.circlepath") }
-                        .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-                    }
-                    if let error = favorites.errorMessage {
-                        Text(error).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
-                    }
-                    Button("Réessayer la synchronisation") { Task { await favorites.load() } }
-                        .disabled(favorites.isSynchronizing || favorites.isLoading)
-                } footer: {
-                    Text("Les changements en attente restent sur cet appareil. Ils ne sont confirmés sur le compte qu’après synchronisation.")
+                    pendingNotice
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                 }
-                .listRowBackground(SQColor.surface)
             }
 
             if favorites.favorites.isEmpty {
                 Section {
-                    if favorites.hasLoaded { emptyState }
-                    else if favorites.isLoading { ProgressView("Chargement des antennes suivies…") }
-                    else {
-                        // Même carte d'erreur que les autres listes, avec de quoi réessayer.
-                        ErrorStateView(
-                            title: "Antennes suivies indisponibles",
-                            message: favorites.errorMessage ?? String(localized: "La liste n’a pas pu être chargée. Vérifie ta connexion.")
-                        ) {
-                            Task { await favorites.load() }
+                    Group {
+                        if favorites.hasLoaded { emptyState }
+                        else if favorites.isLoading {
+                            ProgressView("Chargement des antennes suivies…").frame(maxWidth: .infinity)
+                        } else {
+                            // L'état hors ligne commun, qui se recharge seul au retour du réseau.
+                            ErrorStateView(
+                                title: "Antennes suivies indisponibles",
+                                message: favorites.errorMessage ?? String(localized: "La liste n’a pas pu être chargée. Vérifie ta connexion.")
+                            ) {
+                                Task { await favorites.load() }
+                            }
                         }
-                        .listRowInsets(EdgeInsets())
                     }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
-                .listRowBackground(favorites.hasLoaded || favorites.isLoading ? SQColor.surface : Color.clear)
             } else {
-                Section("Antennes suivies") {
+                Section {
                     ForEach(favorites.favorites) { favorite in
                         row(favorite)
+                            .listRowBackground(SQColor.surface)
+                            .listRowSeparatorTint(SQColor.separator)
                     }
                     .onDelete { offsets in
                         let current = favorites.favorites
@@ -100,14 +69,33 @@ struct FavoriteAntennasView: View {
                         guard let scope = favorites.captureActionScope() else { return }
                         Task { for item in removed { await favorites.remove(item, matching: scope) } }
                     }
+                } header: {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("\(favorites.favorites.count) antennes").sqKicker()
+                        Spacer(minLength: SQSpace.sm)
+                        Text("Glisser pour retirer")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    .textCase(nil)
+                } footer: {
+                    Text("Touche l’étoile d’une fiche antenne pour en suivre une autre.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, SQSpace.xs)
                 }
-                .listRowBackground(SQColor.surface)
             }
         }
+        .listStyle(.insetGrouped)
+        .modifier(CompactListMargins())
         .scrollContentBackground(.hidden)
-        .background(SQColor.bg)
+        .background(SQColor.bg.ignoresSafeArea())
         .navigationTitle("Antennes suivies")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .task { await favorites.load() }
         .task { registry = await services.markets.registry() }
         .refreshable { await favorites.load() }
@@ -116,16 +104,103 @@ struct FavoriteAntennasView: View {
         }
     }
 
-    private var emptyState: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Aucune antenne suivie")
-                .font(SQFont.body(15, .semibold))
-                .foregroundStyle(SQColor.label)
-            Text("Ouvre la fiche d'une antenne sur la carte et touche l'étoile. Tu recevras une alerte dès qu'un problème y est signalé.")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
+    /// Grand titre et explication en tête : un favori n'est pas un marque-page,
+    /// c'est une demande d'alerte.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "favorites.back") { dismiss() }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Antennes suivies")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                Text("Les antennes suivies sont les seules pour lesquelles tu reçois une alerte dès le premier signalement, sans attendre que la communauté confirme.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(.vertical, SQSpace.xs)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// L'interrupteur et son état. Tant que la liste n'est pas chargée, il est
+    /// grisé et dit pourquoi, au lieu d'un « Indisponible » sans motif.
+    private var notifyCard: some View {
+        HStack(spacing: SQSpace.sm2) {
+            SQIconPastille(systemImage: "exclamationmark.triangle", size: 38, tint: SQColor.accentInk, fill: SQColor.accentSoft,
+                           font: SQFont.body(17, .semibold, relativeTo: .body))
+            Toggle(isOn: Binding(
+                get: { favorites.notifyOnIssues },
+                set: { newValue in
+                    guard let scope = favorites.captureActionScope() else { return }
+                    Task { await favorites.setNotifyOnIssues(newValue, matching: scope) }
+                    // Une alerte sans notifications n'arrive jamais (TRX-01).
+                    if newValue {
+                        Task { await services.notificationPriming.considerPriming(after: .antennaAlert) }
+                    }
+                }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Me prévenir en cas de panne")
+                        .font(SQType.callout(.bold))
+                        .foregroundStyle(SQColor.label)
+                    Text(notifyState)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .tint(SQColor.brandRed)
+            .disabled(!favorites.hasLoaded)
+        }
+        .padding(SQSpace.md)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    private var notifyState: String {
+        if !favorites.hasLoaded {
+            return favorites.isLoading
+                ? String(localized: "Chargement…")
+                : String(localized: "Indisponible hors connexion")
+        }
+        return favorites.notifyOnIssues
+            ? String(localized: "Notifications activées")
+            : String(localized: "Notifications désactivées")
+    }
+
+    /// Modifications en attente : une notice ambre, avec de quoi réessayer.
+    private var pendingNotice: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            SQNotice(
+                message: favorites.errorMessage
+                    ?? String(localized: "Les changements en attente restent sur cet appareil. Ils ne sont confirmés sur le compte qu’après synchronisation."),
+                title: favorites.pendingCount == 0 ? nil
+                    : favorites.pendingCount == 1
+                        ? String(localized: "Une modification en attente de synchronisation")
+                        : String(localized: "\(favorites.pendingCount) modifications en attente de synchronisation"),
+                systemImage: "arrow.triangle.2.circlepath",
+                tone: .warning
+            )
+            GradientButton("Réessayer", systemImage: "arrow.clockwise", style: .secondary) {
+                Task { await favorites.load() }
+            }
+            .disabled(favorites.isSynchronizing || favorites.isLoading)
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: SQSpace.md) {
+            EmptyStateView(
+                title: "Aucune antenne suivie",
+                message: "Ouvre la fiche d'une antenne sur la carte et touche l'étoile. Tu recevras une alerte dès qu'un problème y est signalé.",
+                systemImage: "star"
+            )
+            GradientButton("Ouvrir la carte", systemImage: "map", style: .secondary) {
+                router.selectedTab = .map
+            }
+            .fixedSize()
+        }
+        .padding(.vertical, SQSpace.lg)
     }
 
     @ViewBuilder
@@ -137,12 +212,6 @@ struct FavoriteAntennasView: View {
         }
     }
 
-    @ViewBuilder
-    private var notifyUnavailableState: some View {
-        if favorites.isLoading { SQSpinner() }
-        else { Text("Indisponible").foregroundStyle(SQColor.labelSecondary) }
-    }
-
     /// Nom du pays dans la langue de l'app ; le code brut tant que le registre n'a pas répondu.
     private func marketName(_ market: String) -> String {
         let entry = registry?.market(forCode: market)
@@ -150,33 +219,58 @@ struct FavoriteAntennasView: View {
         return Locale.current.localizedString(forRegionCode: code) ?? entry?.label ?? market
     }
 
+    /// La couleur de l'opérateur, le nom, puis l'opérateur, le pays et la
+    /// distance : la liste sert de tableau de bord, pas seulement de noms.
     private func rowContent(_ favorite: FavoriteAntenna) -> some View {
-        HStack(spacing: SQSpace.sm) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(favorite.displayName)
-                        .font(SQFont.body(14.5, .semibold))
-                        .foregroundStyle(SQColor.label)
-                    HStack(spacing: SQSpace.xs) {
-                        if let op = favorite.operator, !op.isEmpty {
-                            Text(MarketRegistryEntry.operatorLabel(op, in: registry?.market(forCode: favorite.market)))
-                        }
-                        Text(marketName(favorite.market))
-                    }
+        let operatorName = favorite.operator.flatMap { $0.isEmpty ? nil : $0 }
+            .map { MarketRegistryEntry.operatorLabel($0, in: registry?.market(forCode: favorite.market)) }
+        return HStack(spacing: SQSpace.sm) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(SQBrand.operatorColor(operatorName))
+                .frame(width: 4, height: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(favorite.displayName)
+                    .font(SQType.callout(.bold))
+                    .foregroundStyle(SQColor.label)
+                Text(([operatorName, marketName(favorite.market), distanceLabel(favorite)].compactMap { $0 })
+                    .joined(separator: " · "))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
-                }
-                Spacer(minLength: 0)
-                if favorites.isPending(siteId: favorite.siteId, market: favorite.market) {
-                    Image(systemName: "clock").accessibilityLabel("Synchronisation en attente")
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-                if onOpenSite != nil {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(SQColor.labelTertiary)
-                }
             }
-            .frame(minHeight: 44)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if favorites.isPending(siteId: favorite.siteId, market: favorite.market) {
+                Image(systemName: "clock").accessibilityLabel("Synchronisation en attente")
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            if onOpenSite != nil {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+            }
+        }
+        .frame(minHeight: 48)
+        .contentShape(Rectangle())
+    }
+
+    private func distanceLabel(_ favorite: FavoriteAntenna) -> String? {
+        guard let latitude = favorite.latitude, let longitude = favorite.longitude,
+              let here = services.location.cachedLocation() else { return nil }
+        return SQUnits.distance(meters: here.distance(from: CLLocation(latitude: latitude, longitude: longitude)))
+    }
+}
+
+/// Marges d'une liste groupée sous un en-tête maison : sans elles, la liste
+/// laisse une cinquantaine de points vides sous la barre d'état. Disponible à
+/// partir d'iOS 17 ; iOS 16 garde les marges du système.
+private struct CompactListMargins: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content
+                .contentMargins(.top, SQSpace.sm, for: .scrollContent)
+                .listSectionSpacing(SQSpace.lg)
+        } else {
+            content
+        }
     }
 }
 
