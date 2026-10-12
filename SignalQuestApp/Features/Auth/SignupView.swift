@@ -14,100 +14,105 @@ struct SignupView: View {
     @State private var email = ""
     @State private var name = ""
     @State private var password = ""
-    @State private var passwordConfirm = ""
     @State private var acceptedTerms = false
     @State private var appeared = false
+    @State private var pendingAppleConsent: PendingAppleConsent?
+    @FocusState private var focus: Field?
+
+    private enum Field { case name, email, password }
+
+    private struct PendingAppleConsent: Identifiable {
+        let id = UUID()
+        let identityToken: String
+        let fullName: String?
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.xl + 2) {
-                header
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack {
+                    Spacer(minLength: 0)
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "auth.signup.close") { dismiss() }
+                }
+                AuthHeader(title: String(localized: "Créer un compte"),
+                           message: String(localized: "Gratuit. Tes mesures et tes points te suivent, sur iPhone comme sur Android."),
+                           showsLogo: false)
                     .sqAuthAppear(appeared)
 
-                VStack(alignment: .leading, spacing: SQSpace.md2) {
-                    Text("Créer un compte")
-                        .font(SQType.title)
-                        .sqHeader()
-                        .foregroundStyle(SQColor.label)
-
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        SQFormFieldLabel("Nom affiché")
-                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Ex. Alex Martin"))
-                            .textContentType(.name)
-                            .textFieldStyle(SQTextFieldStyle())
-                            .accessibilityLabel("Nom affiché")
-                            .accessibilityIdentifier("auth.signup.name")
+                Group {
+                    // Toujours actif : un nouveau compte Apple passe par « Une dernière
+                    // étape », qui demande le consentement (UXP-12).
+                    SignInWithAppleButton(.signUp) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in
+                        handleAppleSignIn(result)
                     }
+                    .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
+                    .frame(height: 50)
+                    .clipShape(Capsule(style: .continuous))
+                    .disabled(session.isBusy || submissionID != nil || challenge.isBusy)
+                    .accessibilityLabel("S’inscrire avec Apple")
 
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        SQFormFieldLabel("Email")
-                        TextField("Email", text: $email, prompt: SQFormPrompt.text("nom@exemple.fr"))
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.emailAddress)
-                            .textContentType(.username)
-                            .autocorrectionDisabled()
-                            .textFieldStyle(SQTextFieldStyle())
-                            .accessibilityLabel("Email")
-                            .accessibilityIdentifier("auth.signup.email")
+                    AuthOrDivider()
+
+                    AuthFieldGroup {
+                        AuthFieldRow("Nom affiché", isFocused: focus == .name) {
+                            TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Ex. Alex Martin"))
+                                .textContentType(.name)
+                                .submitLabel(.next)
+                                .focused($focus, equals: .name)
+                                .onSubmit { focus = .email }
+                                .accessibilityLabel("Nom affiché")
+                                .accessibilityIdentifier("auth.signup.name")
+                        } onTap: { focus = .name }
+                        AuthFieldDivider()
+                        AuthFieldRow("Email", isFocused: focus == .email) {
+                            TextField("Email", text: $email, prompt: SQFormPrompt.text("nom@exemple.fr"))
+                                .textInputAutocapitalization(.never)
+                                .keyboardType(.emailAddress)
+                                .textContentType(.username)
+                                .autocorrectionDisabled()
+                                .submitLabel(.next)
+                                .focused($focus, equals: .email)
+                                .onSubmit { focus = .password }
+                                .accessibilityLabel("Email")
+                                .accessibilityIdentifier("auth.signup.email")
+                        } onTap: { focus = .email }
+                        // L'erreur du serveur porte presque toujours sur l'adresse :
+                        // elle s'affiche juste sous ce champ.
                         if let error = challengeError ?? session.errorMessage {
                             Label(error, systemImage: "exclamationmark.triangle")
-                                .accessibilityIdentifier("auth.signup.error")
-                                .font(.footnote)
+                                .font(SQType.caption)
                                 .foregroundStyle(SQColor.dangerInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, SQSpace.md2)
+                                .padding(.bottom, SQSpace.sm2)
+                                .accessibilityIdentifier("auth.signup.error")
                         }
+                        AuthFieldDivider()
+                        AuthFieldRow("Mot de passe", isFocused: focus == .password) {
+                            AuthPasswordInput(label: "Mot de passe", text: $password, contentType: .newPassword,
+                                              identifier: "auth.signup.password")
+                                .submitLabel(.done)
+                                .focused($focus, equals: .password)
+                        } onTap: { focus = .password }
                     }
 
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        SQFormFieldLabel("Mot de passe (min. 8 caractères)")
-                        SecureField("Mot de passe (min. 8 caractères)", text: $password,
-                                    prompt: Text(verbatim: ""))
-                            .textContentType(.newPassword)
-                            .autocorrectionDisabled()
-                            .textFieldStyle(SQTextFieldStyle())
-                            .accessibilityLabel("Mot de passe (min. 8 caractères)")
-                            .accessibilityIdentifier("auth.signup.password")
-                        if challengeError == nil && session.errorMessage == nil,
-                           password.count < 8, let info = passwordIssue {
-                            Label(info, systemImage: "info.circle")
-                                .font(.footnote)
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
+                    Label {
+                        Text("8 caractères minimum")
+                    } icon: {
+                        Image(systemName: password.count >= 8 ? "checkmark" : "info.circle")
                     }
+                    .font(SQType.caption(password.count >= 8 ? .semibold : .regular))
+                    .foregroundStyle(password.count >= 8 ? SQColor.success : SQColor.labelSecondary)
+                    .padding(.leading, SQSpace.xs)
+                    .padding(.top, -SQSpace.sm)
+                    .accessibilityIdentifier("auth.signup.passwordRule")
 
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        SQFormFieldLabel("Confirmer le mot de passe")
-                        SecureField("Confirmer le mot de passe", text: $passwordConfirm,
-                                    prompt: Text(verbatim: ""))
-                            .textContentType(.newPassword)
-                            .autocorrectionDisabled()
-                            .textFieldStyle(SQTextFieldStyle())
-                            .accessibilityLabel("Confirmer le mot de passe")
-                            .accessibilityIdentifier("auth.signup.confirmation")
-                        if challengeError == nil && session.errorMessage == nil,
-                           password.count >= 8, let info = passwordIssue {
-                            Label(info, systemImage: "info.circle")
-                                .font(.footnote)
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
-                    }
+                    AuthConsentCheckbox(isOn: $acceptedTerms, identifier: "auth.signup.terms")
 
-                    Toggle(isOn: $acceptedTerms) {
-                        Text("J’accepte les conditions d’utilisation et la politique de confidentialité.")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    .tint(SQColor.brandRed)
-                    .accessibilityIdentifier("auth.signup.terms")
-
-                    HStack(spacing: SQSpace.md) {
-                        Link("Conditions d’utilisation", destination: Self.termsURL)
-                        Text("·").foregroundStyle(SQColor.labelSecondary)
-                        Link("Politique de confidentialité", destination: Self.privacyURL)
-                    }
-                    .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
-                    .tint(SQColor.brandRed)
-
-                    GradientButton("Créer mon compte", systemImage: "person.crop.circle.badge.plus", isBusy: session.isBusy || submissionID != nil) {
+                    GradientButton("Créer mon compte", isBusy: session.isBusy || submissionID != nil) {
                         // `canSubmit` exige déjà `acceptedTerms` : on transmet
                         // la valeur réelle plutôt qu'un `true` littéral, pour
                         // qu'un futur contournement de la validation n'aboutisse
@@ -116,54 +121,52 @@ struct SignupView: View {
                     }
                     .disabled(!canSubmit)
                     .accessibilityIdentifier("auth.signup.submit")
+
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: SQSpace.xs) { loginQuestion; loginButton }
+                        VStack(spacing: 0) { loginQuestion; loginButton }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(SQSpace.xl)
-                .sqSoftCard()
                 .sqAuthAppear(appeared, delay: 0.08)
-
-                HStack(spacing: SQSpace.md) {
-                    Rectangle().fill(SQColor.separator).frame(height: 1)
-                    Text("ou").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-                    Rectangle().fill(SQColor.separator).frame(height: 1)
-                }
-                .sqAuthAppear(appeared, delay: 0.1)
-
-                SignInWithAppleButton(.signUp) { request in
-                    request.requestedScopes = [.fullName, .email]
-                } onCompletion: { result in
-                    handleAppleSignIn(result)
-                }
-                .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
-                .frame(height: 56)
-                .clipShape(Capsule(style: .continuous))
-                // Même exigence contractuelle que le formulaire e-mail : sans
-                // acceptation des CGU, on ne crée pas de compte (UXP-12).
-                .disabled(!acceptedTerms || session.isBusy || submissionID != nil || challenge.isBusy)
-                .opacity(acceptedTerms ? 1 : 0.5)
-                .accessibilityLabel("S’inscrire avec Apple")
-                .accessibilityHint(acceptedTerms ? "" : "Accepte d’abord les conditions d’utilisation")
-                .sqAuthAppear(appeared, delay: 0.12)
-
-                Button("J’ai déjà un compte") { dismiss() }
-                    .buttonStyle(.plain)
-                    .font(SQFont.archivo(15, .semibold, relativeTo: .subheadline))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .contentShape(Rectangle())
-                    .sqAuthAppear(appeared, delay: 0.14)
             }
-            .padding(SQSpace.xl)
-            .frame(maxWidth: 600)
+            .padding(.horizontal, SQSpace.xl)
+            .padding(.vertical, SQSpace.lg)
+            .frame(maxWidth: 520)
             .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(.interactively)
         .signalQuestHeroBackground()
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear { appeared = true }
         .mobileChallenge(using: challenge)
         .onDisappear { cancelSubmission() }
         .onChangeCompat(of: session.state) { _, state in
             guard case .loggedOut = state else { cancelSubmission(); return }
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $pendingAppleConsent) { credential in
+            AppleTermsConsentSheet(identityToken: credential.identityToken, fullName: credential.fullName) {
+                pendingAppleConsent = nil
+            }
+        }
+    }
+
+    private var loginQuestion: some View {
+        Text("Déjà un compte ?")
+            .font(SQType.callout)
+            .foregroundStyle(SQColor.ink2)
+    }
+
+    private var loginButton: some View {
+        Button { dismiss() } label: {
+            Text("Se connecter")
+                .font(SQType.callout(.bold))
+                .foregroundStyle(SQColor.accentInk)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("auth.signup.login")
     }
 
     private func submit() {
@@ -212,11 +215,15 @@ struct SignupView: View {
                 .compactMap { $0 }
                 .joined(separator: " ")
             Task {
-                await session.signInWithApple(
+                let outcome = await session.signInWithApple(
                     identityToken: identityToken,
                     fullName: fullName.isEmpty ? nil : fullName,
                     acceptedTerms: acceptedTerms
                 )
+                if case .requiresTerms = outcome {
+                    pendingAppleConsent = PendingAppleConsent(identityToken: identityToken,
+                                                              fullName: fullName.isEmpty ? nil : fullName)
+                }
             }
         case .failure(let error):
             if (error as? ASAuthorizationError)?.code == .canceled { return }
@@ -224,37 +231,11 @@ struct SignupView: View {
         }
     }
 
-    // URLs légales centralisées et vérifiées dans AppConfig (/terms, /privacy).
-    private static var termsURL: URL { AppConfig.current.termsURL }
-    private static var privacyURL: URL { AppConfig.current.privacyURL }
-
-    private var passwordIssue: String? {
-        if password.isEmpty { return nil }
-        if password.count < 8 { return String(localized: "Le mot de passe doit faire au moins 8 caractères.") }
-        if passwordConfirm.isEmpty { return nil }
-        if password != passwordConfirm { return String(localized: "Les deux mots de passe ne correspondent pas.") }
-        return nil
-    }
-
     private var canSubmit: Bool {
         !trimmedEmail.isEmpty &&
         !trimmedName.isEmpty &&
         password.count >= 8 &&
-        password == passwordConfirm &&
         acceptedTerms &&
         !session.isBusy && submissionID == nil && !challenge.isBusy
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            SQIconPastille(systemImage: "person.badge.plus", size: 46, font: Font.title3.weight(.semibold))
-            Text("Rejoins SignalQuest")
-                .font(SQType.display)
-                .foregroundStyle(SQColor.label)
-            Text("Rejoins la communauté et aide à mieux connaître les réseaux mobiles. Les données d’antennes et de couverture varient selon les pays.")
-                .font(SQType.body)
-                .foregroundStyle(SQColor.labelSecondary)
-        }
-        .padding(.top, SQSpace.xxxl + SQSpace.xs)
     }
 }

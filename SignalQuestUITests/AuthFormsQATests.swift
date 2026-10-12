@@ -105,11 +105,10 @@ final class AuthFormsQATests: XCTestCase {
         try fill(app.textFields["auth.signup.name"], "Synthetic QA", in: app)
         try fill(app.textFields["auth.signup.email"], "signup@example.invalid", in: app)
         try fill(app.secureTextFields["auth.signup.password"], "Synthetic-Only-2026!", in: app)
-        try fill(app.secureTextFields["auth.signup.confirmation"], "Synthetic-Only-2026!", in: app)
         let submit = app.buttons["auth.signup.submit"]
         try reveal(submit, in: app)
         XCTAssertFalse(submit.isEnabled, "Consent must still be required")
-        try tap(app.switches["auth.signup.terms"], in: app)
+        try tap(app.buttons["auth.signup.terms"], in: app)
         try tap(submit, in: app)
         let signupError = app.descendants(matching: .any)["auth.signup.error"].firstMatch
         XCTAssertTrue(signupError.waitForExistence(timeout: 20))
@@ -124,7 +123,7 @@ final class AuthFormsQATests: XCTestCase {
         XCTAssertFalse(first.tokenInURL)
         XCTAssertEqual(app.textFields["auth.signup.name"].value as? String, "Synthetic QA")
         XCTAssertEqual(app.textFields["auth.signup.email"].value as? String, "signup@example.invalid")
-        XCTAssertTrue(submit.isEnabled, "Matching passwords and consent must remain valid after rejection")
+        XCTAssertTrue(submit.isEnabled, "Password and consent must remain valid after rejection")
         capture("auth-signup-\(locale)-error-preserved")
         try tap(submit, in: app)
         let error = app.descendants(matching: .any)["auth.signup.error"].firstMatch

@@ -67280,6 +67280,176 @@
           }
         }
       }
+    },
+    "Afficher le mot de passe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show password"
+          }
+        }
+      }
+    },
+    "Masquer le mot de passe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide password"
+          }
+        }
+      }
+    },
+    "Aucun compte SignalQuest n’est encore lié à cet identifiant Apple. Pour le créer, accepte les conditions." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No SignalQuest account is linked to this Apple ID yet. To create one, accept the terms."
+          }
+        }
+      }
+    },
+    "Avec ton identifiant Apple" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With your Apple ID"
+          }
+        }
+      }
+    },
+    "Cochée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checked"
+          }
+        }
+      }
+    },
+    "Non cochée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unchecked"
+          }
+        }
+      }
+    },
+    "Pas encore de compte ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No account yet?"
+          }
+        }
+      }
+    },
+    "Retrouve tes mesures, tes amis et tes points." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get back your measurements, friends and points."
+          }
+        }
+      }
+    },
+    "Une dernière étape" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One last step"
+          }
+        }
+      }
+    },
+    "conditions d’utilisation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "terms of use"
+          }
+        }
+      }
+    },
+    "politique de confidentialité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "privacy policy"
+          }
+        }
+      }
+    },
+    "ou avec ton e-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "or with your email"
+          }
+        }
+      }
+    },
+    "8 caractères minimum" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At least 8 characters"
+          }
+        }
+      }
+    },
+    "Déjà un compte ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already have an account?"
+          }
+        }
+      }
+    },
+    "Gratuit. Tes mesures et tes points te suivent, sur iPhone comme sur Android." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Free. Your measurements and points follow you, on iPhone and Android alike."
+          }
+        }
+      }
+    },
+    "Indique ton e-mail : tu recevras un lien pour en choisir un nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter your email: you’ll get a link to choose a new one."
+          }
+        }
+      }
+    },
+    "Si un compte correspond à %@, un lien t’a été envoyé. Il ouvre l’app pour choisir ton nouveau mot de passe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If an account matches %@, a link has been sent. It opens the app so you can choose your new password."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
