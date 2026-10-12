@@ -285,6 +285,11 @@ struct OutageReportSheet: View {
                 )
                 .lineLimit(3...6)
                 .font(SQType.body)
+                // Bloque la saisie à 500 : le serveur refuse au-delà, et le compteur
+                // ne doit jamais afficher « 620 / 500 ».
+                .onChangeCompat(of: draft.comment) { _, newValue in
+                    if newValue.count > 500 { draft.comment = String(newValue.prefix(500)) }
+                }
                 Text("\(draft.comment.count) / 500")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

@@ -8,6 +8,7 @@ struct ReportSheet: View {
     private let allowsComment: Bool
     private let submit: @MainActor (ReportReason, String?) async throws -> Void
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @State private var reason: ReportReason
     @State private var note: String = ""
     @State private var isBusy = false
@@ -66,7 +67,7 @@ struct ReportSheet: View {
                 if let error {
                     Section {
                         Text(error)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                             .accessibilityIdentifier("report.error")
                     }
                 }
@@ -76,7 +77,7 @@ struct ReportSheet: View {
                     } label: {
                         HStack {
                             if isBusy {
-                                ProgressView().tint(SQColor.danger)
+                                ProgressView().tint(SQColor.dangerInk)
                             } else {
                                 Text("Envoyer le signalement")
                                     .font(SQType.button)
@@ -111,6 +112,11 @@ struct ReportSheet: View {
             try await submit(reason, allowsComment && !comment.isEmpty ? note : nil)
             Haptics.success()
             dismiss()
+            // La feuille se ferme : sans ce message, rien ne dit que le signalement est parti.
+            inAppNotifications.show(SQInAppNotificationItem(
+                body: String(localized: "Signalement envoyé. Merci, nous allons l'examiner."),
+                variant: .success
+            ))
         } catch {
             self.error = error.userFacingMessage
             Haptics.error()

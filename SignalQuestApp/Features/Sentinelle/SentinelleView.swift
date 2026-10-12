@@ -375,11 +375,16 @@ struct SentinelleView: View {
                     .tint(SQColor.labelSecondary)
                 }
             }
-            if canCreate {
+            if canAttemptCreate {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         Haptics.light()
-                        showCreate = true
+                        if model.quota?.isFull == true {
+                            // Le « + » ne disparaît pas sans rien dire : on explique pourquoi.
+                            model.actionError = String(localized: "Tu as atteint le nombre maximal de connexions surveillées. Retire-en une pour en ajouter une autre.")
+                        } else {
+                            showCreate = true
+                        }
                     } label: {
                         Label("Ajouter une connexion", systemImage: "plus")
                     }
@@ -405,15 +410,6 @@ struct SentinelleView: View {
                 guard !Task.isCancelled else { break }
                 await model.load(silently: true)
             }
-        }
-        // Forme à un paramètre : l'app est déployée en deçà d'iOS 17, où la
-        // variante `onChange(of:initial:_:)` n'existe pas encore.
-        .onChange(of: scenePhase) { phase in
-            // Au retour au premier plan, l'écran peut afficher un état vieux de
-            // plusieurs heures : on rattrape immédiatement plutôt que d'attendre
-            // la fin du cycle en cours.
-            guard phase == .active, !model.isLoading else { return }
-            Task { await model.load(silently: true) }
         }
         .sheet(isPresented: $showSettings) {
             SentinelleAlertSettingsSheet(service: model.service)
@@ -486,8 +482,8 @@ struct SentinelleView: View {
         rootTarget?.label ?? String(localized: "Sentinelle")
     }
 
-    private var canCreate: Bool {
-        !model.accessDenied && !model.isLoading && model.quota?.isFull != true
+    private var canAttemptCreate: Bool {
+        !model.accessDenied && !model.isLoading
     }
 
     private var boxList: some View {
@@ -511,7 +507,11 @@ struct SentinelleView: View {
                         }
                         .pickerStyle(.segmented)
                         Picker("Trier", selection: $sort) {
-                            ForEach(SentinelleListOrder.Sort.allCases) { Text($0.label).tag($0) }
+                            // La disponibilité n'est connue que des connexions suivies :
+                            // sans elles, l'option ne trierait rien.
+                            ForEach(SentinelleListOrder.Sort.allCases.filter { $0 != .uptime || !model.following.isEmpty }) {
+                                Text($0.label).tag($0)
+                            }
                         }
                         .pickerStyle(.segmented)
                     }
@@ -588,6 +588,9 @@ struct SentinelleView: View {
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.huge)
             .sqReadableWidth()
+        }
+        .onChange(of: model.following.isEmpty) { empty in
+            if empty, sort == .uptime { sort = .state }
         }
     }
 

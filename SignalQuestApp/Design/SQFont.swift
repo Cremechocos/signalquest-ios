@@ -128,12 +128,6 @@ enum SQFont {
         return .custom(figtreeName(weight), size: size, relativeTo: style)
     }
 
-    /// Variante corps à taille strictement fixe (rendus déterministes).
-    static func bodyFixed(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        guard figtreeAvailable else { return .system(size: size, weight: weight) }
-        return .custom(figtreeName(weight), fixedSize: size)
-    }
-
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle) -> Font {
         let weight = legible(weight)
         guard figtreeAvailable else { return systemFallback(relativeTo: style, weight: weight) }

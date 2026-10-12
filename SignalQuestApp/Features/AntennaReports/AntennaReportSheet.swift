@@ -24,6 +24,8 @@ struct AntennaReportSheet: View {
     @State private var isBusy = false
     @State private var error: String?
     @State private var duplicateMessage: String?
+    /// Identité de cette feuille pour l'idempotence : stable d'un envoi à l'autre.
+    @State private var submissionID = UUID()
 
     init(
         siteId: String,
@@ -46,6 +48,11 @@ struct AntennaReportSheet: View {
     }
 
     private var isLeaderReport: Bool { reportType == .incorrectLeader && leaderReport != nil }
+
+    /// « Autre problème » n'a aucun champ qui le décrive : la précision est le seul contenu.
+    private var needsReason: Bool {
+        reportType == .other && reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -122,9 +129,15 @@ struct AntennaReportSheet: View {
                     .listRowBackground(SQColor.surface)
                 }
 
-                Section("Précisions (optionnel)") {
+                Section {
                     TextField("Décris ce qui ne va pas", text: $reason, axis: .vertical)
                         .lineLimit(3...6)
+                } header: {
+                    if reportType == .other {
+                        Text("Précisions (obligatoire)")
+                    } else {
+                        Text("Précisions (optionnel)")
+                    }
                 }
                 .foregroundStyle(SQColor.label)
                 .listRowBackground(SQColor.surface)
@@ -158,7 +171,7 @@ struct AntennaReportSheet: View {
                         .frame(maxWidth: .infinity)
                         .foregroundStyle(SQColor.accentInk)
                     }
-                    .disabled(isBusy || (isLeaderReport && suggestedLeader == nil))
+                    .disabled(isBusy || needsReason || (isLeaderReport && suggestedLeader == nil))
                     .listRowBackground(SQColor.accentSoft)
                 }
             }
@@ -189,7 +202,8 @@ struct AntennaReportSheet: View {
                 currentValue: isLeaderReport ? leaderReport?.currentLeader : currentValue,
                 suggestedValue: isLeaderReport ? suggestedLeader : suggestedValue,
                 reason: reason,
-                sector: sector
+                sector: sector,
+                submissionID: submissionID
             )
             Haptics.success()
             if result.duplicate == true {

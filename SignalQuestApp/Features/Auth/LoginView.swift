@@ -87,6 +87,7 @@ struct LoginView: View {
                                 TextField("Code à 6 chiffres", text: $code,
                                           prompt: SQFormPrompt.text("123 456"))
                                     .textContentType(.oneTimeCode)
+                                    .autocorrectionDisabled()
                                     .keyboardType(.numberPad)
                                     .font(SQFont.display(28, .bold))
                                     .multilineTextAlignment(.center)
@@ -127,6 +128,7 @@ struct LoginView: View {
                                     .textInputAutocapitalization(.never)
                                     .keyboardType(.emailAddress)
                                     .textContentType(.username)
+                                    .autocorrectionDisabled()
                                     .textFieldStyle(SQTextFieldStyle())
                                     .accessibilityLabel("Email")
                             }
@@ -135,6 +137,7 @@ struct LoginView: View {
                                 SecureField("Mot de passe", text: $password,
                                             prompt: Text(verbatim: ""))
                                     .textContentType(.password)
+                                    .autocorrectionDisabled()
                                     .textFieldStyle(SQTextFieldStyle())
                                     .accessibilityLabel("Mot de passe")
                             }
@@ -541,7 +544,6 @@ struct SQTextFieldStyle: TextFieldStyle {
             }
             .foregroundStyle(SQColor.label)
             .tint(SQColor.brandRed)
-            .autocorrectionDisabled()
     }
 }
 

@@ -257,6 +257,9 @@ struct SentinelleLatencyChart: View {
 struct SentinelleFamilyChart: View {
     let points: [SentinelleSeriesPoint]
     let window: SentinelleWindow
+    /// Hauteur du graphe seul : la ligne de lecture (déjà espacée par son propre
+    /// padding) s'ajoute en dessous, sans écraser le tracé.
+    let height: CGFloat
 
     /// Instant lu sous le doigt. Il vaut pour les DEUX familles à la fois :
     /// l'intérêt de ce graphe est justement de les comparer au même moment,
@@ -272,62 +275,65 @@ struct SentinelleFamilyChart: View {
         let series = SentinelleFamily.allCases.map { ($0, SentinelleLatencySeries(points: points, family: $0)) }
         let values = series.flatMap { $0.1.values }
 
-        Chart {
-            ForEach(series, id: \.0) { family, family_series in
-                ForEach(family_series.samples) { sample in
-                    LineMark(
-                        x: .value("Instant", sample.at),
-                        y: .value("Latence", sample.rttMs),
-                        series: .value("Série", "\(family.rawValue)-\(sample.segment)")
-                    )
-                    .foregroundStyle(by: .value("Famille", family.label))
-                    .lineStyle(StrokeStyle(
-                        lineWidth: 2.2,
-                        lineCap: .round,
-                        lineJoin: .round,
-                        dash: family == .v6 ? [5, 4] : []
-                    ))
-                    .interpolationMethod(.monotone)
+        VStack(alignment: .leading, spacing: 0) {
+            Chart {
+                ForEach(series, id: \.0) { family, family_series in
+                    ForEach(family_series.samples) { sample in
+                        LineMark(
+                            x: .value("Instant", sample.at),
+                            y: .value("Latence", sample.rttMs),
+                            series: .value("Série", "\(family.rawValue)-\(sample.segment)")
+                        )
+                        .foregroundStyle(by: .value("Famille", family.label))
+                        .lineStyle(StrokeStyle(
+                            lineWidth: 2.2,
+                            lineCap: .round,
+                            lineJoin: .round,
+                            dash: family == .v6 ? [5, 4] : []
+                        ))
+                        .interpolationMethod(.monotone)
+                    }
                 }
             }
-        }
-        .chartForegroundStyleScale([
-            SentinelleFamily.v4.label: Self.colors[.v4] ?? SQColor.brandRed,
-            SentinelleFamily.v6.label: Self.colors[.v6] ?? SQColor.label,
-        ])
-        .chartLegend(.hidden)
-        .chartYScale(domain: 0...SentinelleChartScale.upperBound(values))
-        .chartYAxis { SentinelleChartAxes.latency }
-        .chartXAxis { SentinelleChartAxes.time(window) }
-        .chartPlotStyle { plot in plot.background(Color.clear) }
-        .chartOverlay { proxy in
-            GeometryReader { geometry in
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in scrub(to: value.location.x, proxy, geometry, series) }
-                            .onEnded { _ in readAt = nil }
-                    )
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(summary(series))
-        .accessibilityRepresentation {
-            VStack(alignment: .leading) {
-                Text(summary(series))
-                    .accessibilityAddTraits(.isHeader)
-                ForEach(accessibilitySamples(series)) { sample in
-                    Text("\(sample.family?.label ?? "Réseau"), \(sample.at.formatted(date: .abbreviated, time: .shortened)) : \(SentinelleWording.ms(sample.rttMs))")
+            .chartForegroundStyleScale([
+                SentinelleFamily.v4.label: Self.colors[.v4] ?? SQColor.brandRed,
+                SentinelleFamily.v6.label: Self.colors[.v6] ?? SQColor.label,
+            ])
+            .chartLegend(.hidden)
+            .chartYScale(domain: 0...SentinelleChartScale.upperBound(values))
+            .chartYAxis { SentinelleChartAxes.latency }
+            .chartXAxis { SentinelleChartAxes.time(window) }
+            .chartPlotStyle { plot in plot.background(Color.clear) }
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    Rectangle()
+                        .fill(Color.clear)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in scrub(to: value.location.x, proxy, geometry, series) }
+                                .onEnded { _ in readAt = nil }
+                        )
                 }
             }
-        }
+            .frame(height: height)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(summary(series))
+            .accessibilityRepresentation {
+                VStack(alignment: .leading) {
+                    Text(summary(series))
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(accessibilitySamples(series)) { sample in
+                        Text("\(sample.family?.label ?? "Réseau"), \(sample.at.formatted(date: .abbreviated, time: .shortened)) : \(SentinelleWording.ms(sample.rttMs))")
+                    }
+                }
+            }
 
-        // Les valeurs des deux piles à l'instant lu, côte à côte. C'est la
-        // raison d'être de ce graphe : voir l'écart au MÊME moment, pas deux
-        // chiffres relevés à deux instants différents.
-        readings(series)
+            // Les valeurs des deux piles à l'instant lu, côte à côte. C'est la
+            // raison d'être de ce graphe : voir l'écart au MÊME moment, pas deux
+            // chiffres relevés à deux instants différents.
+            readings(series)
+        }
     }
 
     @ViewBuilder

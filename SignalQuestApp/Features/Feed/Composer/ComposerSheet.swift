@@ -792,7 +792,7 @@ struct ComposerSheet: View {
                 if isClose {
                     Text("\(limit - charCount)")
                         .font(SQFont.body(12, .semibold))
-                        .foregroundStyle(isOver ? SQColor.danger : SQColor.warning)
+                        .foregroundStyle(isOver ? SQColor.dangerInk : SQColor.warning)
                         .contentTransition(.numericText())
                 }
 
@@ -946,8 +946,7 @@ struct PostPreviewCard: View {
                         CardMetricTile(
                             label: "Réception",
                             value: SignalFormatters.speed(down),
-                            highlight: true,
-                            accent: SQColor.brandRed
+                            highlight: true
                         )
                     }
                     if let ping = speedtest.ping {

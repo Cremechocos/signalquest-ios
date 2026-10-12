@@ -136,6 +136,9 @@ final class DriveTestViewModel: ObservableObject {
     /// seulement, jamais écrit sur le disque avec le résumé.
     @Published private(set) var lastSessionTrace: DriveShareTrace?
     private var sessionStartedAt: Date?
+    /// Un VPN a été vu à un moment de la session : le bilan ne doit pas dépendre
+    /// de l'état au moment de l'arrêt.
+    private var vpnSeenDuringSession = false
 
     /// Opérateurs du marché courant : alimente la palette de couleurs des marqueurs.
     @Published private(set) var availableOperators: [MarketRegistryOperator] = []
@@ -408,7 +411,8 @@ final class DriveTestViewModel: ObservableObject {
         // Une nouvelle session doit re-détecter l'accès : même SIM, réseau visité
         // ou VPN peuvent avoir changé pendant que l'écran était fermé.
         operatorNetworkContext = nil
-        observeOperatorContext(connection: services.networkPath.status.connection, viaVPN: VPNDetector.isActive())
+        vpnSeenDuringSession = VPNDetector.isActive()
+        observeOperatorContext(connection: services.networkPath.status.connection, viaVPN: vpnSeenDuringSession)
         accumulator = ContinuousSessionAccumulator()
         summary = nil
         testCount = 0
@@ -998,7 +1002,7 @@ final class DriveTestViewModel: ObservableObject {
     private func makeSessionRecap() -> SessionRecap {
         SessionRecap(endedAt: Date(), distanceMeters: distanceMeters, testCount: accumulator.count,
                      bytes: sessionBytes, stoppedByDataCap: stoppedByDataCap,
-                     vpnActive: !stoppedByDataCap && VPNDetector.isActive(),
+                     vpnActive: !stoppedByDataCap && (vpnSeenDuringSession || VPNDetector.isActive()),
                      startedAt: sessionStartedAt,
                      averageDownloadMbps: accumulator.count > 0 ? summary?.avgDownload : nil,
                      maxDownloadMbps: accumulator.count > 0 ? summary?.maxDownload : nil,
@@ -1066,6 +1070,7 @@ final class DriveTestViewModel: ObservableObject {
         services.networkPath.refreshNow()
         let status = services.networkPath.status
         isVPNActive = VPNDetector.isActive()
+        if isVPNActive { vpnSeenDuringSession = true }
         if observeOperatorContext(connection: status.connection, viaVPN: isVPNActive) {
             Task { await resolveSimOperatorIfNeeded() }
         }

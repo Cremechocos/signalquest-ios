@@ -2892,6 +2892,7 @@ private struct DeleteAccountSheet: View {
         VStack(spacing: SQSpace.md) {
             SecureField("Mot de passe", text: $password)
                 .textContentType(.password)
+                .autocorrectionDisabled()
                 .textFieldStyle(SQTextFieldStyle())
             destructiveButton(disabled: password.isEmpty) {
                 await delete(using: .password(password))
@@ -2926,6 +2927,7 @@ private struct DeleteAccountSheet: View {
             TextField("Code à 6 chiffres", text: $emailCode)
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
+                .autocorrectionDisabled()
                 .textFieldStyle(SQTextFieldStyle())
                 .onChangeCompat(of: emailCode) { _, value in
                     emailCode = String(value.filter(\.isNumber).prefix(6))

@@ -162,22 +162,26 @@ struct MyIdentificationsView: View {
             } else {
                 ForEach(model.filteredGroups) { group in
                     Section {
-                        Button {
-                            selected = group.representative
-                        } label: {
-                            IdentificationNodeRow(group: group, isWithdrawing: model.withdrawingId == group.representative.id)
-                        }
-                            .buttonStyle(.plain)
-                            .listRowBackground(SQColor.surface)
-                            .contentShape(Rectangle())
-                            .accessibilityHint("Ouvre le détail de cette identification")
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    pendingWithdraw = group.representative
-                                } label: {
-                                    Label("Retirer", systemImage: "trash")
-                                }
+                        // Sans nœud, aucune ligne ne représente le groupe : seules ses
+                        // cellules s'ouvrent et se retirent.
+                        if group.kind != .unassigned {
+                            Button {
+                                selected = group.representative
+                            } label: {
+                                IdentificationNodeRow(group: group, isWithdrawing: model.withdrawingId == group.representative.id)
                             }
+                                .buttonStyle(.plain)
+                                .listRowBackground(SQColor.surface)
+                                .contentShape(Rectangle())
+                                .accessibilityHint("Ouvre le détail de cette identification")
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        pendingWithdraw = group.representative
+                                    } label: {
+                                        Label("Retirer", systemImage: "trash")
+                                    }
+                                }
+                        }
 
                         ForEach(group.cells) { cell in
                             Button {

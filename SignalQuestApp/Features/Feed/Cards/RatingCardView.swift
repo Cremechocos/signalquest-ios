@@ -53,7 +53,7 @@ struct RatingCardView: View {
                 LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
                     CardMetricTile(label: identifierTileLabel, value: signal?.identifierValue ?? signal?.cellId ?? "—", highlight: true)
                     CardMetricTile(label: "Bande", value: signal?.band ?? "—")
-                    CardMetricTile(label: "RSRP", value: signal?.rsrp.map { "\(Int($0))" } ?? "—")
+                    CardMetricTile(label: "RSRP", value: SignalFormatters.dbm(signal?.rsrp))
                 }
 
                 if let footer = footer {

@@ -11,6 +11,11 @@ struct PostDetailView: View {
     @State private var showCommentsSheet = false
     @State private var showReportSheet = false
     @State private var showShareSheet = false
+    /// Publication ouverte dans le composer (auteur uniquement).
+    @State private var editingPost: UnifiedSocialFeedItem?
+    @State private var confirmsDeletion = false
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @StateObject private var actions: PostDetailActions
     /// Auteur dont on pousse le profil public.
     @State private var profileAuthor: SocialFeedAuthor?
@@ -84,6 +89,19 @@ struct PostDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    // Réservé à l'auteur, comme dans le fil : le serveur revérifie.
+                    if actions.item.canManage {
+                        Button { editingPost = actions.item } label: {
+                            Label("Modifier", systemImage: "pencil")
+                        }
+                        Button { Task { await togglePin() } } label: {
+                            Label(actions.item.isPinned ? "Désépingler" : "Épingler",
+                                  systemImage: actions.item.isPinned ? "pin.slash" : "pin")
+                        }
+                        Button(role: .destructive) { confirmsDeletion = true } label: {
+                            Label("Supprimer", systemImage: "trash")
+                        }
+                    }
                     Button(role: .destructive) { showReportSheet = true } label: {
                         Label("Signaler", systemImage: "flag")
                     }
@@ -112,7 +130,7 @@ struct PostDetailView: View {
                                       showShareSheet = true
                                   }
                               },
-                              onMute: { Task { try? await feedService.muteNotifications(postId: actions.item.id) } },
+                              onMute: { Task { await toggleMute() } },
                               onReport: {
                                   showSignalSheet = false
                                   Task { @MainActor in
@@ -132,19 +150,93 @@ struct PostDetailView: View {
                 service: commentsService,
                 postId: actions.item.backendPostId,
                 profileService: feedService,
-                reports: reportsService
+                reports: reportsService,
+                // Le compteur du bouton « Voir tous les commentaires » suit les nouveaux commentaires.
+                onCommentPosted: { actions.update { $0.commentsCount += 1 } }
             )
         }
         .sheet(isPresented: $showShareSheet) {
-            PostShareSheet(post: actions.item, messagesService: messagesService) { conversation in
-                await actions.share(to: conversation.id)
-            }
+            PostShareSheet(
+                post: actions.item,
+                messagesService: messagesService,
+                onShare: { conversation in await actions.share(to: conversation.id) },
+                onShared: { messageId, conversation in presentShareUndo(messageId: messageId, conversation: conversation) }
+            )
+        }
+        .sheet(item: $editingPost) { post in
+            ComposerSheet(service: feedService, editing: post)
+                .onDisappear { Task { await reloadAfterEdit() } }
+        }
+        .confirmationDialog(
+            "Supprimer cette publication ?",
+            isPresented: $confirmsDeletion,
+            titleVisibility: .visible
+        ) {
+            Button("Supprimer", role: .destructive) { Task { await deletePost() } }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Cette action est irréversible.")
         }
         .sheet(isPresented: $showReportSheet) {
             ReportSheet(target: .post(actions.item.backendPostId), service: reportsService)
         }
         .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(userId: author.id, prefill: author, service: feedService)
+        }
+    }
+
+    /// Épingle ou détache. Le serveur n'en garde qu'un par auteur : le fil se
+    /// recharge à la fermeture du détail, il corrige l'autre publication.
+    private func togglePin() async {
+        let willPin = !actions.item.isPinned
+        do {
+            try await feedService.setPinned(postId: actions.item.id, pinned: willPin)
+            actions.update { $0.pinnedAt = willPin ? Date() : nil }
+        } catch {
+            if !error.isCancellation { actions.fail(error) }
+        }
+    }
+
+    private func deletePost() async {
+        do {
+            try await feedService.deletePost(postId: actions.item.id)
+            Haptics.success()
+            dismiss()
+        } catch {
+            if !error.isCancellation { actions.fail(error) }
+        }
+    }
+
+    private func toggleMute() async {
+        do {
+            _ = try await feedService.muteNotifications(postId: actions.item.id)
+            actions.update { $0.notificationsMutedByMe = !($0.notificationsMutedByMe ?? false) }
+        } catch {
+            if !error.isCancellation { actions.fail(error) }
+        }
+    }
+
+    /// Relit la publication après l'éditeur : le texte modifié remplace l'ancien.
+    private func reloadAfterEdit() async {
+        guard let fresh = try? await feedService.post(id: actions.item.id) else { return }
+        actions.update { $0 = fresh }
+    }
+
+    /// Même proposition d'annulation que dans le fil, juste après un partage.
+    private func presentShareUndo(messageId: String, conversation: MessageConversation) {
+        let title = conversation.displayTitle.isEmpty ? String(localized: "la conversation") : conversation.displayTitle
+        inAppNotifications.showUndo(
+            body: String(localized: "Partagé vers \(title)"),
+            actionLabel: String(localized: "Annuler")
+        ) {
+            Task {
+                do {
+                    try await messagesService.deleteMessage(messageId: messageId, forEveryone: true)
+                    Haptics.success()
+                } catch {
+                    inAppNotifications.showError(String(localized: "Impossible d’annuler le partage. Réessaie."))
+                }
+            }
         }
     }
 
@@ -226,6 +318,20 @@ final class PostDetailActions: ObservableObject {
             errorMessage = String(localized: "Une erreur est survenue. Réessaie.")
             Haptics.error()
         }
+    }
+
+    /// Applique un changement local confirmé (épinglage, commentaire, relecture) et prévient le fil d'origine.
+    func update(_ change: (inout UnifiedSocialFeedItem) -> Void) {
+        var copy = item
+        change(&copy)
+        item = copy
+        onItemChanged(copy)
+    }
+
+    /// Remonte l'échec d'une action menée hors de `mutate`.
+    func fail(_ error: Error) {
+        errorMessage = error.userFacingMessage
+        Haptics.error()
     }
 
     /// Sondage relu après un vote : la carte et le fil d'origine suivent.

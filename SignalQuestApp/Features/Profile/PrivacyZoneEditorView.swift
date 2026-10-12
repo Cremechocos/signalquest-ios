@@ -119,7 +119,7 @@ struct PrivacyZoneEditorView: View {
                     .listRowBackground(SQColor.surface)
                 }
                 Section {
-                    PrivacyZoneMapPicker(draft: draft) { coordinate in
+                    PrivacyZoneMapPicker(draft: draft, fallbackCenter: location.lastLocation?.coordinate) { coordinate in
                         invalidateLocationRequest()
                         draft.select(latitude: coordinate.latitude, longitude: coordinate.longitude)
                     }
@@ -245,6 +245,9 @@ struct PrivacyZoneEditorView: View {
 /// MKMapView garantit le cercle et la sélection précise dès iOS 16.
 private struct PrivacyZoneMapPicker: UIViewRepresentable {
     let draft: PrivacyZoneDraft
+    /// Position connue, pour ouvrir la carte près de l'utilisateur plutôt que
+    /// sur le monde entier tant qu'aucun centre n'est choisi.
+    let fallbackCenter: CLLocationCoordinate2D?
     let onPick: (CLLocationCoordinate2D) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
@@ -270,8 +273,13 @@ private struct PrivacyZoneMapPicker: UIViewRepresentable {
               draft.radius.isFinite, draft.radius > 0 else {
             map.removeAnnotations(map.annotations); map.removeOverlays(map.overlays)
             context.coordinator.geometry = nil
+            if !context.coordinator.hasCentered, let center = fallbackCenter, CLLocationCoordinate2DIsValid(center) {
+                context.coordinator.hasCentered = true
+                map.setRegion(MKCoordinateRegion(center: center, latitudinalMeters: 4000, longitudinalMeters: 4000), animated: false)
+            }
             return
         }
+        context.coordinator.hasCentered = true
         let geometry = [lat, lon, draft.radius]
         guard context.coordinator.geometry != geometry else { return }
         context.coordinator.geometry = geometry
@@ -288,6 +296,7 @@ private struct PrivacyZoneMapPicker: UIViewRepresentable {
     final class Coordinator: NSObject, MKMapViewDelegate {
         var onPick: (CLLocationCoordinate2D) -> Void
         var geometry: [Double]?
+        var hasCentered = false
         init(onPick: @escaping (CLLocationCoordinate2D) -> Void) { self.onPick = onPick }
         @objc func pick(_ gesture: UITapGestureRecognizer) {
             guard let map = gesture.view as? MKMapView, gesture.state == .ended else { return }

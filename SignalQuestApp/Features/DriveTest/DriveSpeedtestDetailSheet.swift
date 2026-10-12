@@ -215,7 +215,7 @@ struct DriveSpeedtestDetailSheet: View {
         return MarketRegistryEntry.operatorLabel(key, in: marketEntry)
     }
     private var connectionText: String {
-        (result.wifiSSID?.isEmpty == false) ? "Wi-Fi" : String(localized: "Cellulaire")
+        result.networkDisplayName
     }
     private var serverText: String {
         if let dl = result.downloadServerName, let s = result.serverName, dl != s { return "\(s) · \(dl)" }

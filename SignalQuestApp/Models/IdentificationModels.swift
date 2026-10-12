@@ -107,6 +107,8 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
 enum IdentifiedNodeKind: String, Equatable {
     case enb = "eNB"
     case gnb = "gNB"
+    /// Lignes sans eNB ni gNB : regroupées à part pour rester visibles et retirables.
+    case unassigned = ""
 }
 
 struct IdentifiedCell: Identifiable, Equatable {
@@ -135,7 +137,9 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
     let sectorsUnion: [Int]
     let conflict: Bool
 
-    var title: String { "\(kind.rawValue) \(nodeValue)" }
+    var title: String {
+        kind == .unassigned ? String(localized: "Cellules sans nœud") : "\(kind.rawValue) \(nodeValue)"
+    }
     var subtitle: String {
         let count = cells.count
         let cellPart = count == 0 ? String(localized: "aucune cellule") : "\(count) PCI/CI"
@@ -155,7 +159,7 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
 
         var values: [String: Acc] = [:]
         for item in items {
-            let node: (IdentifiedNodeKind, String)?
+            let node: (IdentifiedNodeKind, String)
             if item.techLabel.uppercased().contains("5G"), let gnb = item.gnb?.nilIfBlank {
                 node = (.gnb, gnb)
             } else if let enb = item.enb?.nilIfBlank {
@@ -163,9 +167,9 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
             } else if let gnb = item.gnb?.nilIfBlank {
                 node = (.gnb, gnb)
             } else {
-                node = nil
+                node = (.unassigned, "")
             }
-            guard let (kind, nodeValue) = node else { continue }
+            let (kind, nodeValue) = node
             let key = "\(kind.rawValue):\(nodeValue)"
             var acc = values[key] ?? Acc(kind: kind, nodeValue: nodeValue, representative: item)
             // La ligne du NŒUD (eNB/gNB) représente le groupe dès qu'elle existe :
@@ -182,8 +186,11 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
             acc.validations = max(acc.validations, item.validations)
             acc.sectors.formUnion(item.sectors)
             acc.conflict = acc.conflict || item.conflict
-            if item.kind == .pci || item.kind == .cellid || item.pciValue != nil || item.ci != nil || item.cellId != nil {
-                let cellId = item.ci.map { "ci:\($0)" }
+            if kind == .unassigned || item.kind == .pci || item.kind == .cellid || item.pciValue != nil || item.ci != nil || item.cellId != nil {
+                // Sans nœud commun, deux cellules de même PCI peuvent venir de sites
+                // différents : la ligne elle-même les distingue.
+                let cellId = kind == .unassigned ? item.id
+                    : item.ci.map { "ci:\($0)" }
                     ?? item.pciValue.map { "pci:\($0)" }
                     ?? item.cellId.map { "cell:\($0)" }
                     ?? item.id
@@ -215,7 +222,9 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
             )
         }
         .sorted {
-            ($0.representative.lastValidated ?? $0.representative.createdAt ?? .distantPast) >
+            // Les cellules sans nœud ferment la liste.
+            if ($0.kind == .unassigned) != ($1.kind == .unassigned) { return $1.kind == .unassigned }
+            return ($0.representative.lastValidated ?? $0.representative.createdAt ?? .distantPast) >
             ($1.representative.lastValidated ?? $1.representative.createdAt ?? .distantPast)
         }
     }

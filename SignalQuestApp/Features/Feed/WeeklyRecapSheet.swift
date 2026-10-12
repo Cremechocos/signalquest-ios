@@ -8,6 +8,8 @@ import SwiftUI
 /// hors contexte, marque comprise.
 struct WeeklyRecapSheet: View {
     let service: SocialFeedServicing
+    /// Appelé quand une nouvelle story vient d'être créée, pour que le fil l'affiche.
+    var onPublished: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
 
     @State private var stats: WeeklyRecapStats?
@@ -115,6 +117,7 @@ struct WeeklyRecapSheet: View {
             publishNotice = response.alreadyExisted == true
                 ? "Ton bilan de la semaine est déjà en story."
                 : "Bilan publié en story."
+            if response.alreadyExisted != true { onPublished() }
         } catch {
             if !error.isCancellation { publishNotice = error.userFacingMessage }
         }

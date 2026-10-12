@@ -52,3 +52,19 @@ final class MapFilterStoreTests: XCTestCase {
         XCTAssertEqual(MapFilterStore.lastFilters(), [.antenna, .coverage])
     }
 }
+
+extension MapFilterStoreTests {
+    /// Validations et sessions n'ont plus d'interrupteur : une sélection ancienne qui
+    /// les contient est relue sans elles, le reste du décodage est intact.
+    func testLegacyValidationAndSessionLayersAreDropped() {
+        UserDefaults.standard.set(
+            [MapDisplayItem.Kind.antenna, .validation, .session, .coverage].map(\.rawValue),
+            forKey: MapFilterStore.key
+        )
+        let filters = MapFilterStore.lastFilters()
+        XCTAssertEqual(filters?.contains(.antenna), true)
+        XCTAssertEqual(filters?.contains(.coverage), true)
+        XCTAssertEqual(filters?.contains(.validation), false)
+        XCTAssertEqual(filters?.contains(.session), false)
+    }
+}

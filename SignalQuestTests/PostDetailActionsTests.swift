@@ -152,3 +152,22 @@ final class PostDeepLinkTests: XCTestCase {
         XCTAssertTrue(router.hasPendingContentRoute)
     }
 }
+
+extension PostDetailActionsTests {
+    /// Une réaction 🔥 ne dit rien du ❤️ : l'état se lit emoji par emoji.
+    func testReactionStateIsReadPerEmoji() throws {
+        let data = Data(#"{"id":"post-1","kind":"post","author":{"id":"author","name":"Camille"},"text":"Signal","reactions":[{"emoji":"🔥","count":2,"reactedByMe":true},{"emoji":"❤️","count":1,"reactedByMe":false}]}"#.utf8)
+        let reacted = try JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: data)
+        XCTAssertTrue(reacted.hasReacted(with: "🔥"))
+        XCTAssertFalse(reacted.hasReacted(with: "❤️"))
+        XCTAssertFalse(reacted.hasReacted(with: "👏"))
+    }
+
+    /// Sans ligne ❤️ dans les réactions, `likedByMe` fait foi pour le ❤️ seulement.
+    func testHeartFallsBackOnLikedByMe() throws {
+        var liked = try item()
+        liked.likedByMe = true
+        XCTAssertTrue(liked.hasReacted(with: "❤️"))
+        XCTAssertFalse(liked.hasReacted(with: "🔥"))
+    }
+}

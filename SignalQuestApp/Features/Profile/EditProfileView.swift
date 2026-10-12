@@ -117,7 +117,12 @@ struct EditProfileView: View {
                 }
             }
             .sheet(isPresented: $showHandleSheet) {
-                ChooseHandleSheet(onSuccess: { newHandle in currentHandle = newHandle })
+                // Le @pseudo est déjà enregistré côté serveur : l'en-tête du profil
+                // le relit sans attendre « Enregistrer » (qui peut ne jamais venir).
+                ChooseHandleSheet(onSuccess: { newHandle in
+                    currentHandle = newHandle
+                    Task { await session.refreshUser() }
+                })
             }
             .task { await loadProfileBio() }
         }

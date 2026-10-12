@@ -57,6 +57,12 @@ struct SentinelleAlertSettingsSheet: View {
     /// plancher que la sonde sait tenir, sa boucle tournant toutes les 5 s.
     private static let thresholds = [5, 30, 120, 300, 900]
 
+    /// La valeur réglée ailleurs (le web ou Android en proposent d'autres, 60 s
+    /// par exemple) reste affichée dans la liste au lieu de laisser le sélecteur vide.
+    static func thresholdOptions(including current: Int) -> [Int] {
+        thresholds.contains(current) ? thresholds : (thresholds + [current]).sorted()
+    }
+
     @ViewBuilder
     private func form(_ current: SentinellePreferences) -> some View {
         Form {
@@ -93,7 +99,7 @@ struct SentinelleAlertSettingsSheet: View {
                         get: { current.downThresholdSec },
                         set: { value in save(SentinellePreferencesPatch(downThresholdSec: value)) }
                     )) {
-                        ForEach(Self.thresholds, id: \.self) { seconds in
+                        ForEach(Self.thresholdOptions(including: current.downThresholdSec), id: \.self) { seconds in
                             Text(formatSeconds(seconds)).tag(seconds)
                         }
                     }
@@ -128,7 +134,7 @@ struct SentinelleAlertSettingsSheet: View {
                        ? "Retirer le webhook" : "Enregistrer") {
                     let value = webhookDraft.trimmingCharacters(in: .whitespaces)
                     guard value.isEmpty || Self.validWebhookURL(value) else {
-                        validationError = String(localized: "Adresse de webhook invalide. Utilise une URL http(s) complète.")
+                        validationError = String(localized: "Adresse de webhook invalide. Utilise une URL https:// complète.")
                         return
                     }
                     verdict = nil
@@ -225,7 +231,7 @@ struct SentinelleAlertSettingsSheet: View {
         guard value.count <= 500, !value.contains(where: { $0.isWhitespace }),
               let components = URLComponents(string: value),
               let scheme = components.scheme?.lowercased(),
-              scheme == "https" || scheme == "http",
+              scheme == "https",
               let host = components.host, !host.isEmpty else { return false }
         return true
     }

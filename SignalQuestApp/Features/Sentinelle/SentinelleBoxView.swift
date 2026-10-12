@@ -174,8 +174,7 @@ struct SentinelleBoxView: View {
                 SentinelleLatencySeries(points: comparisonPoints, family: $0)
             }
             if series.contains(where: { $0.samples.count >= 2 }) {
-                SentinelleFamilyChart(points: comparisonPoints, window: window)
-                    .frame(height: 150)
+                SentinelleFamilyChart(points: comparisonPoints, window: window, height: 150)
                 HStack(spacing: SQSpace.lg) {
                     ForEach(SentinelleFamily.allCases) { family in
                         SentinelleFamilyChart.legend(for: family)

@@ -8,6 +8,8 @@ struct SpeedtestServerBar: View {
     let network: String
     /// Serveur de download/ping actif (CDN AWS CloudFront par défaut).
     let server: String
+    /// Connexion disponible : le point est vert en ligne, rouge hors ligne.
+    var isOnline: Bool = true
 
     /// « 5G NSA · Orange · CloudFront Paris » ou « Wi‑Fi · SFR · Lyon BBR » :
     /// le lien réellement utilisé est toujours annoncé avant son fournisseur.
@@ -24,7 +26,7 @@ struct SpeedtestServerBar: View {
     var body: some View {
         HStack(spacing: 7) {
             Circle()
-                .fill(SQColor.success)
+                .fill(isOnline ? SQColor.success : SQColor.danger)
                 .frame(width: 7, height: 7)
                 .accessibilityHidden(true)
             Text(LocalizedStringKey(label))

@@ -195,7 +195,7 @@ struct OnboardingView: View {
                     choices
                 } else {
                     if reservingChoices { choices.hidden() }
-                    OnboardingCTA(isLastPage: false) { goTo(page + 1) }
+                    OnboardingCTA { goTo(page + 1) }
                 }
             }
         }
@@ -289,7 +289,6 @@ private enum OnboardingCopy: String {
     case continueAsGuest = "Continuer sans compte"
     case skip = "Passer"
     case next = "Suivant"
-    case start = "Commencer"
     case stepFormat = "Étape %lld sur %lld"
 
     func localized(_ locale: Locale, bundle: Bundle = .main) -> String {
@@ -762,34 +761,22 @@ private struct OnboardingPageIndicator: View {
 // MARK: - CTA
 
 /// Bouton principal du pager. Même capsule et même hauteur que `GradientButton`,
-/// en brique, mais le libellé « Suivant » ↔ « Commencer » change via une vraie
-/// transition — l'ancien morphing dans la transaction du TabView superposait
-/// les deux textes en un état illisible.
+/// en brique. Il n'existe que sur les pages d'introduction : la dernière page
+/// porte ses trois choix à la place.
 private struct OnboardingCTA: View {
     @Environment(\.locale) private var locale
-    let isLastPage: Bool
     let action: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button {
             Haptics.medium()
             action()
         } label: {
-            ZStack {
-                if isLastPage {
-                    label(.start, systemImage: "arrow.right.circle.fill")
-                        .transition(labelTransition(entering: true))
-                } else {
-                    label(.next, systemImage: "arrow.right")
-                        .transition(labelTransition(entering: false))
-                }
-            }
-            .animation(reduceMotion ? .easeOut(duration: 0.15) : SQMotion.snappy, value: isLastPage)
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: SQSpace.primaryActionHeight)
-            .foregroundStyle(SQColor.onAccent)
-            .background(SQColor.brandRed, in: Capsule(style: .continuous))
+            label(.next, systemImage: "arrow.right")
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: SQSpace.primaryActionHeight)
+                .foregroundStyle(SQColor.onAccent)
+                .background(SQColor.brandRed, in: Capsule(style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
     }
@@ -802,11 +789,5 @@ private struct OnboardingCTA: View {
                 .font(SQType.button)
                 .lineLimit(1)
         }
-    }
-
-    private func labelTransition(entering: Bool) -> AnyTransition {
-        reduceMotion
-            ? .opacity
-            : .opacity.combined(with: .offset(y: entering ? 10 : -10))
     }
 }

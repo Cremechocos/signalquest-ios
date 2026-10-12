@@ -252,8 +252,10 @@ final class FeedViewModel: ObservableObject {
         Task {
             await applyLocalToggle(itemId: item.id) { current in
                 var copy = current
-                copy.likedByMe.toggle()
-                copy.reactions = updatedReactions(current.reactions, emoji: emoji, selected: copy.likedByMe)
+                // État propre à chaque emoji : `likedByMe` ne suit que le ❤️.
+                let selected = !current.hasReacted(with: emoji)
+                if emoji == "❤️" { copy.likedByMe = selected }
+                copy.reactions = updatedReactions(current.reactions, emoji: emoji, selected: selected)
                 return copy
             }
         }
@@ -524,6 +526,7 @@ struct FeedView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
+    @EnvironmentObject private var session: AuthSessionViewModel
 
     @State private var presentedSheet: FeedSheet?
     /// Post en attente de confirmation de suppression. La suppression est
@@ -562,14 +565,12 @@ struct FeedView: View {
         case comments(UnifiedSocialFeedItem)
         case report(UnifiedSocialFeedItem)
         case share(UnifiedSocialFeedItem)
-        case stories
         var id: String {
             switch self {
             case .detail(let i): return "detail-\(i.id)"
             case .comments(let i): return "comments-\(i.id)"
             case .report(let i): return "report-\(i.id)"
             case .share(let i): return "share-\(i.id)"
-            case .stories: return "stories"
             }
         }
     }
@@ -615,7 +616,7 @@ struct FeedView: View {
                     if let stories = visibleStories {
                         StoriesBar(
                             stories: stories,
-                            currentUser: nil,
+                            currentUser: currentUser,
                             onCompose: { showStoryComposer = true },
                             onSelect: { story in
                                 if let idx = stories.firstIndex(where: { $0.id == story.id }) {
@@ -790,7 +791,7 @@ struct FeedView: View {
                 .onDisappear { Task { await model.load() } }
         }
         .sheet(isPresented: $showRecap) {
-            WeeklyRecapSheet(service: services.feed)
+            WeeklyRecapSheet(service: services.feed, onPublished: { Task { await model.load() } })
         }
         .confirmationDialog(
             "Supprimer cette publication ?",
@@ -857,8 +858,6 @@ struct FeedView: View {
                         presentShareUndo(messageId: messageId, conversation: conversation)
                     }
                 )
-            case .stories:
-                EmptyView()
             }
         }
         .fullScreenCover(item: Binding(
@@ -910,6 +909,12 @@ struct FeedView: View {
         .onReceive(NotificationCenter.default.publisher(for: HiddenStoryAuthorsStore.didChange)) { _ in
             hiddenStoryAuthorIds = HiddenStoryAuthorsStore.hiddenIds()
         }
+    }
+
+    /// Compte connecté, pour l'initiale de la bulle « Ta story ».
+    private var currentUser: AuthUser? {
+        if case .authenticated(let user) = session.state { return user }
+        return nil
     }
 
     /// Stories du fil, sans celles des membres masqués sur cet appareil.
@@ -1322,7 +1327,7 @@ struct FeedView: View {
             onShare: { presentedSheet = .share(item) },
             onAuthorTap: { profileAuthor = item.author },
             onReact: { emoji in
-                if !item.likedByMe { recordSignal("like", for: item) }
+                if !item.hasReacted(with: emoji) { recordSignal("like", for: item) }
                 model.react(item, emoji: emoji)
             },
             onPollVote: { option in model.votePoll(item, option: option) }
@@ -1449,7 +1454,6 @@ struct FeedView: View {
         // Le rail déborde volontairement des marges de l'écran, comme celui des
         // stories : la première capsule reste alignée à 20 pt.
         .padding(.horizontal, -SQSpace.xl)
-        .accessibilityLabel("Filtres du fil")
     }
 
     private var hashtags: some View {
@@ -1519,6 +1523,10 @@ struct PostShareSheet: View {
                 Section("Partager vers") {
                     if isLoading {
                         ProgressView()
+                    } else if conversations.isEmpty, errorMessage == nil {
+                        Text("Aucune conversation active")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
                     ForEach(conversations) { conversation in
                         // Le partage de publication est inséré en CLAIR (aperçu texte,
@@ -1557,7 +1565,7 @@ struct PostShareSheet: View {
                 if let errorMessage {
                     Section {
                         Text(errorMessage)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                             .accessibilityIdentifier("post.share.error")
                         if conversations.isEmpty {
                             Button("Réessayer") { Task { await load() } }

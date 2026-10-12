@@ -213,26 +213,26 @@ struct SignalDetailSheet: View {
         switch kind {
         case "speedtest":
             let detail = speedtestDetail
-            tiles.append(.init(label: "Réception", value: SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg ?? signal.downloadMbps), highlight: true, accent: accent))
+            tiles.append(.init(label: "Réception", value: SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg ?? signal.downloadMbps), highlight: true))
             tiles.append(.init(label: "Envoi", value: SignalFormatters.speed(detail?.uploadAvg ?? signal.uploadMbps)))
             tiles.append(.init(label: "Latence min", value: SignalFormatters.ms(detail?.pingMin ?? detail?.ping ?? signal.pingMs)))
             tiles.append(.init(label: "Gigue", value: SignalFormatters.ms(detail?.jitter ?? signal.jitterMs)))
         case "validation":
-            tiles.append(.init(label: "Identifiant", value: signal.identifierValue ?? "—", highlight: true, accent: accent))
+            tiles.append(.init(label: "Identifiant", value: signal.identifierValue ?? "—", highlight: true))
             tiles.append(.init(label: "Type", value: signal.identifierType?.uppercased() ?? "—"))
             tiles.append(.init(label: "PCI", value: signal.pci.map(String.init) ?? "—"))
             tiles.append(.init(label: "Cell", value: signal.cellId ?? "—"))
             tiles.append(.init(label: "Bande", value: signal.band ?? "—"))
             tiles.append(.init(label: "Fréquence", value: signal.frequency ?? "—"))
         case "coverage", "session", "drive_test":
-            tiles.append(.init(label: "Distance", value: SignalFormatters.meters(signal.distanceMeters), highlight: true, accent: accent))
+            tiles.append(.init(label: "Distance", value: SignalFormatters.meters(signal.distanceMeters), highlight: true))
             tiles.append(.init(label: "Durée", value: SignalFormatters.duration(signal.durationSeconds)))
             tiles.append(.init(label: "Points", value: signal.pointsCount.map(String.init) ?? "—"))
             tiles.append(.init(label: "Signal moy.", value: SignalFormatters.dbm(signal.averageSignalDbm)))
             tiles.append(.init(label: "Min / Max", value: rangeText(signal: signal)))
             tiles.append(.init(label: "Techs", value: signal.detectedTechs.prefix(3).joined(separator: " / ").nonEmptyOrDash))
         default:
-            tiles.append(.init(label: "RSRP", value: SignalFormatters.dbm(signal.rsrp), highlight: true, accent: accent))
+            tiles.append(.init(label: "RSRP", value: SignalFormatters.dbm(signal.rsrp), highlight: true))
             tiles.append(.init(label: "RSRQ", value: SignalFormatters.db(signal.rsrq)))
             tiles.append(.init(label: "SINR", value: SignalFormatters.db(signal.sinr)))
             tiles.append(.init(label: "Bande", value: signal.band ?? "—"))
@@ -301,7 +301,7 @@ struct SignalDetailSheet: View {
         if let detailError {
             Label(detailError, systemImage: "exclamationmark.triangle")
                 .font(SQType.caption)
-                .foregroundStyle(SQColor.danger)
+                .foregroundStyle(SQColor.dangerInk)
                 .padding(SQSpace.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .sqEditorialCard()

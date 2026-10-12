@@ -77,6 +77,7 @@ struct RadioLogsView: View {
         .toolbar { toolbarContent }
         .refreshable { await model.refresh() }
         .task { await model.onAppear() }
+        .onDisappear { model.stopScan() }
         .sheet(isPresented: $showsPremiumPaywall, onDismiss: {
             // Un achat abouti change le droit côté serveur : resynchroniser.
             Task { await model.refresh() }

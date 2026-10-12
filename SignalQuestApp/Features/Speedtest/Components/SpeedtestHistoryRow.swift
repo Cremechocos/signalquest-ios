@@ -7,11 +7,11 @@ struct SpeedtestHistoryRow: View {
         HStack(spacing: SQSpace.md) {
             ZStack {
                 Circle()
-                    .fill(SQColor.successSoft)
+                    .fill(SQColor.fill)
                     .frame(width: 40, height: 40)
-                Image(systemName: "checkmark")
+                Image(systemName: networkSymbol)
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(SQColor.success)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
             .accessibilityHidden(true)
 
@@ -38,6 +38,17 @@ struct SpeedtestHistoryRow: View {
         .padding(.vertical, SQSpace.md + 3)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    /// Pictogramme du réseau mesuré : l'historique ne porte pas l'état d'envoi
+    /// d'un test, une coche de succès affirmerait donc plus que ce que l'on sait.
+    private var networkSymbol: String {
+        switch result.connectionType {
+        case .wifi: return "wifi"
+        case .cellular: return "cellularbars"
+        case .wired: return "cable.connector"
+        case .other: return "network"
+        }
     }
 
     /// « 10 juil. · 388 Mbit/s · 21 ms » (« Mbps » en anglais).

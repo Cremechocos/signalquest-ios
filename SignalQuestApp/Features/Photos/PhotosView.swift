@@ -15,6 +15,8 @@ final class PhotosViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isLoadingMore = false
     @Published var hasMore = false
+    /// Total annoncé par le serveur pour le filtre courant ; `nil` s'il ne le donne pas.
+    @Published var totalCount: Int?
     @Published var errorMessage: String?
     /// Échec d'une action lancée depuis la fiche d'une photo (like, réseau) :
     /// affiché dans la fiche, pas en « Photos indisponibles » derrière elle
@@ -71,6 +73,7 @@ final class PhotosViewModel: ObservableObject {
         if AppEnvironment.usesDemoData {
             photos = Photo.demoList
             hasMore = false
+            totalCount = nil
             errorMessage = nil
             retryPagination = false
             return
@@ -82,6 +85,7 @@ final class PhotosViewModel: ObservableObject {
             guard galleryRequest == request, !Task.isCancelled else { return }
             photos = response.photos
             page = 1
+            totalCount = response.meta?.total
             hasMore = response.meta?.hasMore ?? (response.photos.count >= pageSize)
             errorMessage = nil
             retryPagination = false
@@ -108,6 +112,7 @@ final class PhotosViewModel: ObservableObject {
             var known = Set(photos.map(\.id))
             photos.append(contentsOf: response.photos.filter { known.insert($0.id).inserted })
             page += 1
+            totalCount = response.meta?.total ?? totalCount
             hasMore = response.meta?.hasMore ?? (response.photos.count >= pageSize)
             errorMessage = nil
             retryPagination = false
@@ -443,9 +448,19 @@ struct PhotosView: View {
         }
         if !model.photos.isEmpty {
             HStack {
-                Text("\(model.photos.count) photos")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                // Le total serveur quand il existe ; sinon, tant que d'autres pages restent,
+                // le nombre de photos chargées plutôt qu'un total qu'on ne connaît pas.
+                Group {
+                    if let total = model.totalCount, total >= model.photos.count {
+                        Text("\(total) photos")
+                    } else if model.hasMore {
+                        Text("\(model.photos.count) photos chargées")
+                    } else {
+                        Text("\(model.photos.count) photos")
+                    }
+                }
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
                 Spacer()
             }
         }
@@ -1309,7 +1324,7 @@ struct PhotoUploadView: View {
                     if let uploadError {
                         Label(uploadError, systemImage: "exclamationmark.triangle")
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
                 }
                 .padding(SQSpace.lg)

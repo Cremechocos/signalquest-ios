@@ -7,6 +7,13 @@ final class ZoneAlertSettingsModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let service: ZoneAlertService
+    /// Dernier état confirmé par le serveur : base du retour arrière.
+    private var confirmed: ZoneAlertSettings?
+    /// Les envois partent l'un après l'autre, dans l'ordre des gestes.
+    private var sendChain: Task<Void, Never>?
+    private var latestToken: [String: Int] = [:]
+    private var tokenCounter = 0
+    private var pendingCount = 0
 
     init(service: ZoneAlertService) {
         self.service = service
@@ -17,6 +24,7 @@ final class ZoneAlertSettingsModel: ObservableObject {
         defer { isLoading = false }
         do {
             settings = try await service.settings()
+            confirmed = settings
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }
@@ -24,18 +32,55 @@ final class ZoneAlertSettingsModel: ObservableObject {
     }
 
     /// Enregistré au geste, comme les autres notifications : le réglage change
-    /// tout de suite et revient si le serveur refuse.
+    /// tout de suite et revient si le serveur refuse. Pour une même clé (pas
+    /// rapides du stepper), seule la dernière valeur est envoyée.
     func apply(_ change: ZoneAlertChange) async {
         guard let current = settings else { return }
         var optimistic = current
         optimistic.preferences = change.applied(to: current.preferences)
         settings = optimistic
+        if confirmed == nil { confirmed = current }
+        tokenCounter += 1
+        let token = tokenCounter
+        let key = change.serverKey
+        latestToken[key] = token
+        pendingCount += 1
+        let previous = sendChain
+        let task = Task { [weak self] in
+            await previous?.value
+            await self?.send(change, key: key, token: token)
+        }
+        sendChain = task
+        await task.value
+    }
+
+    private func send(_ change: ZoneAlertChange, key: String, token: Int) async {
+        defer { pendingCount -= 1 }
+        // Une valeur plus récente pour la même clé attend : celle-ci est périmée.
+        guard latestToken[key] == token, let base = confirmed else { return }
+        let isLast = pendingCount == 1
         do {
-            settings = try await service.apply(change, to: current)
+            let result = try await service.apply(change, to: base)
+            confirmed = result
+            if isLast { settings = result }
             errorMessage = nil
         } catch {
-            settings = current
+            if isLast { settings = confirmed }
             if !error.isCancellation { errorMessage = error.userFacingMessage }
+        }
+    }
+}
+
+private extension ZoneAlertChange {
+    /// Clé serveur visée : deux changements de même clé s'écrasent.
+    var serverKey: String {
+        switch self {
+        case .notifyAntennaDown: return "notifyAntennaDown"
+        case .notifyDegraded: return "notifyDegraded"
+        case .radius: return "radius"
+        case .maxPerDay: return "maxPerDay"
+        case .watchedOperators: return "watchedOperators"
+        case .quietHours, .quietHoursOff: return "quietHours"
         }
     }
 }

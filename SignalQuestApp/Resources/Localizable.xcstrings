@@ -795,6 +795,47 @@
         }
       }
     },
+    "%lld photos chargées" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photo loaded"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photos loaded"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photo chargée"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photos chargées"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld prévisionnels" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1305,6 +1346,38 @@
         }
       }
     },
+    "Actualisation impossible. Vérifie ta connexion puis réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't refresh. Check your connection and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualisation impossible. Vérifie ta connexion puis réessaie."
+          }
+        }
+      }
+    },
+    "Adresse de webhook invalide. Utilise une URL https:// complète." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid webhook address. Enter a full https:// URL."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adresse de webhook invalide. Utilise une URL https:// complète."
+          }
+        }
+      }
+    },
     "Adresse ou nom d’hôte" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1630,6 +1703,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qui aide à le reconnaître"
+          }
+        }
+      }
+    },
+    "Cellules sans nœud" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cells without a node"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cellules sans nœud"
           }
         }
       }
@@ -2198,6 +2287,22 @@
         }
       }
     },
+    "Identifications en conflit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifications in conflict"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifications en conflit"
+          }
+        }
+      }
+    },
     "Identifier %lld site à la suite" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2252,6 +2357,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identifier ici"
+          }
+        }
+      }
+    },
+    "Il ne verra plus l’état de cette connexion." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "They will no longer see the status of this connection."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ne verra plus l’état de cette connexion."
           }
         }
       }
@@ -2643,6 +2764,22 @@
         }
       }
     },
+    "Le Mode données faibles est activé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low Data Mode is on."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Mode données faibles est activé."
+          }
+        }
+      }
+    },
     "Le bundle de récupération actif est indisponible." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2941,6 +3078,54 @@
         }
       }
     },
+    "Mesure de latence" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latency measurement"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesure de latence"
+          }
+        }
+      }
+    },
+    "Mise à jour recommandée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update recommended"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise à jour recommandée"
+          }
+        }
+      }
+    },
+    "Missions à réclamer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missions to claim"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missions à réclamer"
+          }
+        }
+      }
+    },
     "Mon association" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3108,6 +3293,22 @@
         }
       }
     },
+    "Personne pour l’instant. Partage le lien pour qu’un proche puisse suivre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No one yet. Share the link so a loved one can follow."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personne pour l’instant. Partage le lien pour qu’un proche puisse suivre."
+          }
+        }
+      }
+    },
     "Photos de mes amis seulement" : {
       "localizations" : {
         "en" : {
@@ -3120,6 +3321,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photos de mes amis seulement"
+          }
+        }
+      }
+    },
+    "Photos en vérification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos under review"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos en vérification"
           }
         }
       }
@@ -3173,6 +3390,22 @@
         }
       }
     },
+    "Protocole de latence" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latency protocol"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protocole de latence"
+          }
+        }
+      }
+    },
     "Précision GPS médiane" : {
       "localizations" : {
         "en" : {
@@ -3185,6 +3418,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Précision GPS médiane"
+          }
+        }
+      }
+    },
+    "Précisions (obligatoire)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details (required)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Précisions (obligatoire)"
           }
         }
       }
@@ -3333,6 +3582,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Restauration terminée : %lld clé(s) restaurée(s), %lld indisponible(s)."
+          }
+        }
+      }
+    },
+    "Retirer cet abonné ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove this follower?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer cet abonné ?"
           }
         }
       }
@@ -3567,6 +3832,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Signal %@ / %@"
+          }
+        }
+      }
+    },
+    "Signalement envoyé. Merci, nous allons l'examiner." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report sent. Thank you, we'll review it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement envoyé. Merci, nous allons l'examiner."
           }
         }
       }
@@ -3833,6 +4114,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trier par"
+          }
+        }
+      }
+    },
+    "Tu as atteint le nombre maximal de connexions surveillées. Retire-en une pour en ajouter une autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have reached the maximum number of monitored connections. Remove one to add another."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as atteint le nombre maximal de connexions surveillées. Retire-en une pour en ajouter une autre."
           }
         }
       }
@@ -12804,22 +13101,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adresse"
-          }
-        }
-      }
-    },
-    "Adresse de webhook invalide. Utilise une URL http(s) complète." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Invalid webhook address. Enter a full http(s) URL."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adresse de webhook invalide. Utilise une URL http(s) complète."
           }
         }
       }
@@ -22140,23 +22421,6 @@
         }
       }
     },
-    "Commencer" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Get started"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Commencer"
-          }
-        }
-      }
-    },
     "Commencer la surveillance" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -29201,22 +29465,6 @@
         }
       }
     },
-    "Filtres du fil" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Feed filters"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filtres du fil"
-          }
-        }
-      }
-    },
     "Fin" : {
       "localizations" : {
         "en" : {
@@ -30427,22 +30675,6 @@
         }
       }
     },
-    "Identifications en conflit : %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identifications in conflict: %lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identifications en conflit : %lld"
-          }
-        }
-      }
-    },
     "Identifie une antenne depuis une session ou la carte. Tes identifications — y compris depuis Android — apparaîtront ici." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -30959,22 +31191,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de créer le reçu de suppression local. Le speedtest invité n’a pas été envoyé. Réessaie."
-          }
-        }
-      }
-    },
-    "Impossible de créer l’aperçu." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unable to create the preview."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de créer l’aperçu."
           }
         }
       }
@@ -33671,22 +33887,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le Drive Test s'est arrêté à %@ de données. Tu peux relever le plafond dans les réglages du test."
-          }
-        }
-      }
-    },
-    "Le Mode données réduites est activé." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Low Data Mode is on."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le Mode données réduites est activé."
           }
         }
       }
@@ -38317,22 +38517,6 @@
         }
       }
     },
-    "Missions à réclamer : %lld (+%lld pts)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Missions to claim: %lld (+%lld pts)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Missions à réclamer : %lld (+%lld pts)"
-          }
-        }
-      }
-    },
     "Mode Drive Test" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -41603,22 +41787,6 @@
         }
       }
     },
-    "Photos en cours de vérification : %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Photos being reviewed: %lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Photos en cours de vérification : %lld"
-          }
-        }
-      }
-    },
     "Plateforme différente de celle affichée, approbation refusée." : {
       "localizations" : {
         "en" : {
@@ -42949,22 +43117,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Personne pour l'instant"
-          }
-        }
-      }
-    },
-    "Personne pour l’instant. Partagez le lien pour qu’un proche puisse suivre." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nobody yet. Share the link so someone you know can follow it."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Personne pour l’instant. Partagez le lien pour qu’un proche puisse suivre."
           }
         }
       }
@@ -44519,23 +44671,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Preuve"
-          }
-        }
-      }
-    },
-    "Prev." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plan."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prev."
           }
         }
       }
@@ -61774,22 +61909,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "mesures de débit"
-          }
-        }
-      }
-    },
-    "mesurée en %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "measured over %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "mesurée en %@"
           }
         }
       }

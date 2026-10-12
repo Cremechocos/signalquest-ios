@@ -48,6 +48,7 @@ struct ForgotPasswordView: View {
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.emailAddress)
                                 .textContentType(.username)
+                                .autocorrectionDisabled()
                                 .textFieldStyle(SQTextFieldStyle())
                                 .accessibilityLabel("Email")
                                 .accessibilityIdentifier("auth.recovery.email")

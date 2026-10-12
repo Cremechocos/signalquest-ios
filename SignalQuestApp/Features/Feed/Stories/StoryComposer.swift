@@ -115,11 +115,14 @@ final class StoryComposerViewModel: ObservableObject {
         catch { if !error.isCancellation { errorMessage = error.userFacingMessage } }
     }
 
+    /// Un texte, une photo ou un relevé réseau suffit à faire une story, comme côté serveur.
+    var canPublish: Bool {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil || pickedImageData != nil || attachRadio
+    }
+
     func publish() async {
         let caption = text.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        // Un relevé réseau seul fait une story, comme côté serveur : l'appui ne
-        // faisait rien (SOC-34).
-        guard caption != nil || pickedImageData != nil || attachRadio else { return }
+        guard canPublish else { return }
         isSending = true
         errorMessage = nil
         defer { isSending = false }
@@ -247,7 +250,7 @@ struct StoryComposer: View {
                     if let error = model.errorMessage {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .font(.footnote)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
 
                     GradientButton("Publier", systemImage: "paperplane.fill", isBusy: model.isSending) {
@@ -259,6 +262,8 @@ struct StoryComposer: View {
                             }
                         }
                     }
+                    // Story vide : le bouton est grisé plutôt que sans effet.
+                    .disabled(!model.canPublish)
                 }
                 .padding(SQSpace.xl)
             }

@@ -14,7 +14,8 @@ protocol AntennaReportsServicing: Sendable {
         currentValue: String?,
         suggestedValue: String?,
         reason: String?,
-        sector: Int?
+        sector: Int?,
+        submissionID: UUID
     ) async throws -> AntennaReportSubmissionResult
 
     func myReports() async throws -> [AntennaReport]
@@ -35,7 +36,8 @@ final class AntennaReportsService: AntennaReportsServicing {
         currentValue: String?,
         suggestedValue: String?,
         reason: String?,
-        sector: Int?
+        sector: Int?,
+        submissionID: UUID
     ) async throws -> AntennaReportSubmissionResult {
         let body = AntennaReportSubmission(
             siteId: siteId,
@@ -45,12 +47,14 @@ final class AntennaReportsService: AntennaReportsServicing {
             reason: reason.nonBlank,
             sector: sector
         )
-        // Clé d'idempotence : un double-tap « Envoyer » ne crée pas deux signalements
-        // (le backend renvoie alors le même résultat, `duplicate` géré côté serveur).
+        // Clé d'idempotence : `submissionID` est créé une fois à l'ouverture de la
+        // feuille, donc un double-tap « Envoyer » ou un renvoi après une réponse
+        // perdue ne crée pas deux signalements (le backend renvoie alors le même
+        // résultat, `duplicate` géré côté serveur).
         return try await api.requestJSON(
             "/api/antennas/reports",
             body: body,
-            idempotencyKey: "antenna-report-\(siteId)-\(reportType.rawValue)-\(UUID().uuidString)"
+            idempotencyKey: "antenna-report-\(siteId)-\(reportType.rawValue)-\(submissionID.uuidString)"
         )
     }
 

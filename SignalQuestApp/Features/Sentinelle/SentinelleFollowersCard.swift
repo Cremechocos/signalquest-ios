@@ -22,6 +22,8 @@ struct SentinelleFollowersCard: View {
     @State private var loadFailure: String?
     /// Échec d'un partage ou d'un retrait, dit dans la carte.
     @State private var actionFailure: String?
+    /// Abonné dont le retrait attend une confirmation.
+    @State private var followerToRevoke: SentinelleFollower?
 
     var body: some View {
         // Tant que la liste n'est pas arrivée, on n'affiche RIEN plutôt qu'une
@@ -75,7 +77,7 @@ struct SentinelleFollowersCard: View {
 
             if active.isEmpty {
                 Text(target.isPublic == true
-                     ? String(localized: "Personne pour l’instant. Partagez le lien pour qu’un proche puisse suivre.")
+                     ? String(localized: "Personne pour l’instant. Partage le lien pour qu’un proche puisse suivre.")
                      : String(localized: "Personne. Le partage est désactivé."))
                     .font(SQFont.body(13))
                     .foregroundStyle(SQColor.label)
@@ -93,7 +95,7 @@ struct SentinelleFollowersCard: View {
                         }
                         Spacer()
                         Button(busy == follower.userId ? String(localized: "Retrait…") : String(localized: "Retirer")) {
-                            Task { await revoke(follower.userId) }
+                            followerToRevoke = follower
                         }
                         .font(SQFont.body(13, .medium))
                         .tint(SQColor.brandRed)
@@ -117,6 +119,21 @@ struct SentinelleFollowersCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(SQSpace.md)
         .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .confirmationDialog(
+            "Retirer cet abonné ?",
+            isPresented: Binding(
+                get: { followerToRevoke != nil },
+                set: { if !$0 { followerToRevoke = nil } }
+            ),
+            presenting: followerToRevoke
+        ) { follower in
+            Button("Retirer", role: .destructive) {
+                Task { await revoke(follower.userId) }
+            }
+            Button("Annuler", role: .cancel) { followerToRevoke = nil }
+        } message: { _ in
+            Text("Il ne verra plus l’état de cette connexion.")
+        }
     }
 
     private var isShared: Bool { shared ?? (target.isPublic == true) }
@@ -212,7 +229,7 @@ struct SentinelleFollowersCard: View {
 
     private var shareURL: URL? {
         guard let value = slug ?? target.publicSlug else { return nil }
-        return URL(string: "https://signalquest.fr/sentinelle/p/\(value)")
+        return AppConfig.current.appBaseURL.appendingPathComponent("sentinelle/p/\(value)")
     }
 
     private func setSharing(_ changes: SentinelleSharingPatch) async {

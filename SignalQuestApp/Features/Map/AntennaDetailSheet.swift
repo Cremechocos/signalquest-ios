@@ -109,6 +109,7 @@ struct AntennaDetailSheet: View {
     @StateObject private var model: AntennaDetailViewModel
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var viewerPhoto: AntennaPhotoSummary?
     @State private var photoPickerItem: PhotosPickerItem?
     /// L'image est conservée quelques instants le temps de choisir sa facette
@@ -580,7 +581,13 @@ struct AntennaDetailSheet: View {
 
     /// Couleur de l'opérateur affiché (utilisée par l'éventail d'azimuts).
     private var operatorColor: Color {
-        SQBrand.operatorColor(selectedOperator)
+        registryColor(selectedOperator)
+    }
+
+    /// Couleur du registre du marché, comme les marqueurs de la carte ; la palette
+    /// `SQBrand` ne sert que tant que le registre n'a pas répondu.
+    private func registryColor(_ key: String) -> Color {
+        marketEntry?.operatorColor(forKey: key) ?? SQBrand.operatorColor(key)
     }
 
     private var header: some View {
@@ -989,7 +996,7 @@ struct AntennaDetailSheet: View {
     /// en capsule teintée douce, texte à l'encre et couleur portée par un point. Sur un site mono-opérateur, simple tag éditorial.
     @ViewBuilder
     private func operatorTag(_ op: String) -> some View {
-        let color = SQBrand.operatorColor(op)
+        let color = registryColor(op)
         let isSwitchable = site.operators.count > 1
         let isActive = op == selectedOperator
         if isSwitchable {
@@ -1013,7 +1020,7 @@ struct AntennaDetailSheet: View {
                 }
                 .padding(.horizontal, SQSpace.sm + 2)
                 .padding(.vertical, SQSpace.xs + 1)
-                .foregroundStyle(isActive ? SQBrand.operatorBadgeForeground(op) : SQColor.label)
+                .foregroundStyle(isActive ? SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme) : SQColor.label)
                 .background(
                     isActive ? color : color.opacity(0.13),
                     in: Capsule(style: .continuous)

@@ -40,8 +40,8 @@ enum SignalFormatters {
 
     static func count(_ value: Int?) -> String {
         guard let value else { return "—" }
-        if value >= 10_000 { return String(format: "%.1fk", Double(value) / 1000) }
-        if value >= 1_000 { return String(format: "%.1fk", Double(value) / 1000) }
+        // Abréviation selon la langue (« 1,2 k » en français, « 1.2K » en anglais).
+        if value >= 1_000 { return value.formatted(.number.notation(.compactName)) }
         return "\(value)"
     }
 
@@ -153,33 +153,31 @@ struct SQEditorialTag: View {
 
 /// Tuile « libellé / valeur » des cartes du fil et des fiches, aux jetons de
 /// la tuile partagée (`SQMetricTile`, TRX-11) : fond `surfaceMuted` rayon 14,
-/// libellé Figtree 12,5 à l'encre, valeur Figtree Bold 17, en brique
+/// libellé Figtree 12,5 en `labelSecondary`, valeur Figtree Bold 17, en brique
 /// (`accentInk`) si `highlight`. Libellé et valeur passent à la ligne plutôt
 /// que de se tronquer à Dynamic Type élevé.
 struct CardMetricTile: View {
     let label: String
     let value: String
+    /// Surligne la valeur en brique (`accentInk`) : une couleur de qualité ne
+    /// tient pas 4,5:1 sur la tuile, comme dans `SQMetricTile`.
     var highlight: Bool = false
-    /// Ignoré : une couleur de qualité ne tient pas 4,5:1 sur la tuile ; le
-    /// surlignage passe par `accentInk`, comme dans `SQMetricTile`.
-    var accent: Color = SQColor.brandRed
-    /// Une valeur COMPOSÉE peut demander deux lignes — « Internet, Voix · 4G, 5G » sur la carte de
-    /// panne. Défaut à 1 : une mesure (« 240 Mbps ») tient sur une ligne, et l'autoriser à passer
-    /// à la ligne désalignerait les tuiles voisines de la grille.
-    var valueLineLimit: Int = 1
+    /// Nombre de lignes max de la valeur. Deux par défaut : une valeur COMPOSÉE peut en demander
+    /// davantage — « Internet, Voix · 4G, 5G » sur la carte de panne en prend trois.
+    var valueLineLimit: Int = 2
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(LocalizedStringKey(label))
                 .font(SQFont.body(12.5, .medium, relativeTo: .footnote))
-                .foregroundStyle(SQColor.label)
+                .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("feed.metric.label")
             Text(value)
                 .font(SQFont.archivo(17, .bold, relativeTo: .headline))
                 .foregroundStyle(highlight ? SQColor.accentInk : SQColor.label)
-                .lineLimit(max(2, valueLineLimit))
+                .lineLimit(valueLineLimit)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("feed.metric.value")
         }
@@ -299,6 +297,15 @@ struct CardHeader: View {
     }
 }
 
+extension UnifiedSocialFeedItem {
+    /// L'utilisateur a-t-il déjà réagi avec CET emoji ? Le ❤️ retombe sur `likedByMe`
+    /// quand la liste de réactions ne le porte pas.
+    func hasReacted(with emoji: String) -> Bool {
+        if let reacted = reactions.first(where: { $0.emoji == emoji })?.reactedByMe { return reacted }
+        return emoji == "❤️" && likedByMe
+    }
+}
+
 /// Bottom toolbar with the reaction / repost / comment / share controls.
 struct CardActionsBar: View {
     let item: UnifiedSocialFeedItem
@@ -397,6 +404,15 @@ struct CardActionsBar: View {
         .accessibilityAddTraits(item.likedByMe ? [.isButton, .isSelected] : .isButton)
         .accessibilityHint(onReact == nil ? "" : "Appui long pour choisir une réaction")
         .accessibilityAction { onLike() }
+        // Le sélecteur d'emojis se déclenche à l'appui long, introuvable au lecteur
+        // d'écran : chaque réaction devient une action nommée (le ❤️ reste l'action par défaut).
+        .accessibilityActions {
+            if let onReact {
+                ForEach(Array(ReactionPicker.defaultEmojis.dropFirst()), id: \.self) { emoji in
+                    Button(String(localized: "Réagir avec \(emoji)")) { onReact(emoji) }
+                }
+            }
+        }
     }
 
     private func dismissPicker() {

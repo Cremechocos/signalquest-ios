@@ -45,6 +45,7 @@ struct SignupView: View {
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
                             .textContentType(.username)
+                            .autocorrectionDisabled()
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Email")
                             .accessibilityIdentifier("auth.signup.email")
@@ -61,6 +62,7 @@ struct SignupView: View {
                         SecureField("Mot de passe (min. 8 caractères)", text: $password,
                                     prompt: Text(verbatim: ""))
                             .textContentType(.newPassword)
+                            .autocorrectionDisabled()
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Mot de passe (min. 8 caractères)")
                             .accessibilityIdentifier("auth.signup.password")
@@ -77,6 +79,7 @@ struct SignupView: View {
                         SecureField("Confirmer le mot de passe", text: $passwordConfirm,
                                     prompt: Text(verbatim: ""))
                             .textContentType(.newPassword)
+                            .autocorrectionDisabled()
                             .textFieldStyle(SQTextFieldStyle())
                             .accessibilityLabel("Confirmer le mot de passe")
                             .accessibilityIdentifier("auth.signup.confirmation")

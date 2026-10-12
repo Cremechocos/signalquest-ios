@@ -9,6 +9,8 @@ struct FavoriteAntennasView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var networkPath: NetworkPathMonitor
     @ObservedObject var favorites: FavoriteAntennasService
+    /// Registre des marchés, pour écrire « Orange » et « France » au lieu de « ORANGE » et « FR ».
+    @State private var registry: MarketRegistryPayload?
     /// Ouvre la fiche du site depuis la liste. `nil` quand l'écran est présenté hors carte.
     var onOpenSite: ((FavoriteAntenna) -> Void)?
 
@@ -107,6 +109,7 @@ struct FavoriteAntennasView: View {
         .navigationTitle("Antennes suivies")
         .navigationBarTitleDisplayMode(.inline)
         .task { await favorites.load() }
+        .task { registry = await services.markets.registry() }
         .refreshable { await favorites.load() }
         .onChangeCompat(of: networkPath.isOnline) { _, online in
             if online { Task { await favorites.load() } }
@@ -140,6 +143,13 @@ struct FavoriteAntennasView: View {
         else { Text("Indisponible").foregroundStyle(SQColor.labelSecondary) }
     }
 
+    /// Nom du pays dans la langue de l'app ; le code brut tant que le registre n'a pas répondu.
+    private func marketName(_ market: String) -> String {
+        let entry = registry?.market(forCode: market)
+        let code = (entry?.countryCode ?? market).trimmingCharacters(in: .whitespaces).uppercased()
+        return Locale.current.localizedString(forRegionCode: code) ?? entry?.label ?? market
+    }
+
     private func rowContent(_ favorite: FavoriteAntenna) -> some View {
         HStack(spacing: SQSpace.sm) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -148,9 +158,9 @@ struct FavoriteAntennasView: View {
                         .foregroundStyle(SQColor.label)
                     HStack(spacing: SQSpace.xs) {
                         if let op = favorite.operator, !op.isEmpty {
-                            Text(op)
+                            Text(MarketRegistryEntry.operatorLabel(op, in: registry?.market(forCode: favorite.market)))
                         }
-                        Text(favorite.market)
+                        Text(marketName(favorite.market))
                     }
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

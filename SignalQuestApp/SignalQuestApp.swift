@@ -182,6 +182,7 @@ struct AppRootView: View {
                 canPresent: canPresentPasswordReset, mustDismiss: mustDismissPasswordReset,
                 session: session, locale: locale, onClose: closePasswordReset, onSuccess: completePasswordReset))
             .onAppear {
+                appLock.signOut = { [weak session] in await session?.logout() }
                 if AppEnvironment.showsPasswordResetQA, passwordResetRoute == nil {
                     passwordResetRoute = PasswordResetRoute(request: PasswordResetRequest(token: "qa-layout-only"))
                 }
@@ -510,8 +511,9 @@ struct RootView: View {
                     LoginView(onContinueAsGuest: { enterGuestApplication() })
                 case .offline:
                     OfflineRetryView()
-                case .authenticated(let user):
-                    MainTabView(user: user)
+                case .authenticated:
+                    // Déjà pris par `isAuthenticated` plus haut.
+                    EmptyView()
                 }
             }
         }

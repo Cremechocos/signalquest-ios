@@ -202,9 +202,9 @@ private struct SentinelleAccessService: SentinelleServicing {
 
 @MainActor
 final class SentinelleAlertSettingsTests: XCTestCase {
-    func testWebhookAddressRequiresAnHttpUrlWithinServerLimit() {
+    func testWebhookAddressRequiresAnHttpsUrlWithinServerLimit() {
         XCTAssertTrue(SentinelleAlertSettingsSheet.validWebhookURL("https://example.org/hook"))
-        XCTAssertTrue(SentinelleAlertSettingsSheet.validWebhookURL("http://example.org/hook"))
+        XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("http://example.org/hook"))
         XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("example.org/hook"))
         XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("ftp://example.org/hook"))
         XCTAssertFalse(SentinelleAlertSettingsSheet.validWebhookURL("https://example.org/bad path"))

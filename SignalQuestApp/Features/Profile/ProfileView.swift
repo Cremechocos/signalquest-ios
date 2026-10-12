@@ -32,7 +32,9 @@ struct ProfileView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var versionPolicy: VersionPolicyService
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.openURL) private var openURL
     let user: AuthUser
     /// Écrans nourris par l'app Android, montrés seulement avec des données.
     @StateObject private var androidPresence: AndroidDataPresence
@@ -79,7 +81,9 @@ struct ProfileView: View {
                     statsCard(stats)
                         .sqFadeUp()
                 } else if let statsError {
-                    ErrorStateView(title: "Stats indisponibles", message: statsError)
+                    ErrorStateView(title: "Stats indisponibles", message: statsError) {
+                        Task { await loadStats() }
+                    }
                         .sqFadeUp()
                 }
 
@@ -566,6 +570,17 @@ struct ProfileView: View {
             }
 
             menuSection("Compte") {
+                // Mise à jour facultative : une rangée discrète, sans bloquer l'app.
+                if case .updateRecommended(_, let storeURL) = versionPolicy.state,
+                   let updateURL = ForcedUpdateView.resolvedUpdateURL(storeURL: storeURL) {
+                    Button { openURL(updateURL) } label: {
+                        menuRow(title: "Mise à jour recommandée", icon: "arrow.down.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(.isLink)
+                    .accessibilityIdentifier("profile.updateRecommended")
+                    menuSeparator
+                }
                 NavigationLink {
                     PaywallView(store: services.entitlements, entryPoint: .profile)
                 } label: {
@@ -722,7 +737,9 @@ struct ProfileView: View {
             .accessibilityHidden(true)
     }
 
-    private func menuRow(title: String, icon: String) -> some View {
+    /// `subtitle` : précision sous le titre ; `badge` : compteur en pastille à
+    /// droite, pour que le titre ne porte jamais le chiffre sur une 2e ligne.
+    private func menuRow(title: String, icon: String, subtitle: String? = nil, badge: String? = nil) -> some View {
         HStack(spacing: SQSpace.md + 1) {
             // En très grand texte, l'icône cède sa place au titre : « Sentinelle »
             // se coupait en « Senti-/nelle » (tour AX5, 30/09).
@@ -734,12 +751,31 @@ struct ProfileView: View {
                     .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                     .accessibilityHidden(true)
             }
-            Text(LocalizedStringKey(title))
-                .font(SQFont.body(17, .medium, relativeTo: .body))
-                .foregroundStyle(SQColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("profile.menu.title")
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                Text(LocalizedStringKey(title))
+                    .font(SQFont.body(17, .medium, relativeTo: .body))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("profile.menu.title")
+                if let subtitle {
+                    Text(verbatim: subtitle)
+                        .font(SQFont.body(13, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("profile.menu.subtitle")
+                }
+            }
             Spacer()
+            if let badge {
+                Text(verbatim: badge)
+                    .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.accentInk)
+                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.vertical, SQSpace.xs)
+                    .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+                    .accessibilityIdentifier("profile.menu.badge")
+            }
             Image(systemName: "chevron.right")
                 .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                 .foregroundStyle(SQColor.label)
@@ -758,21 +794,22 @@ struct ProfileView: View {
             NavigationLink {
                 GamificationView(service: services.gamification)
             } label: {
-                menuRow(title: String(localized: "Missions à réclamer : \(count) (+\(rewardXp) pts)"), icon: "gift.fill")
+                menuRow(title: "Missions à réclamer", icon: "gift.fill",
+                        subtitle: String(localized: "+\(rewardXp) pts"), badge: count.formatted())
             }
             .accessibilityIdentifier("profile.todo.missions")
         case .photosInReview(let count):
             NavigationLink {
                 PhotosView(service: services.photos, initialFilter: .pending)
             } label: {
-                menuRow(title: String(localized: "Photos en cours de vérification : \(count)"), icon: "hourglass")
+                menuRow(title: "Photos en vérification", icon: "hourglass", badge: count.formatted())
             }
             .accessibilityIdentifier("profile.todo.photos")
         case .identificationConflicts(let count):
             NavigationLink {
                 MyIdentificationsView(service: services.identify)
             } label: {
-                menuRow(title: String(localized: "Identifications en conflit : \(count)"), icon: "exclamationmark.triangle")
+                menuRow(title: "Identifications en conflit", icon: "exclamationmark.triangle", badge: count.formatted())
             }
             .accessibilityIdentifier("profile.todo.identifications")
         }
@@ -902,7 +939,21 @@ private struct EmailVerificationCard: View {
         guard !isRefreshing, isCurrentAccount else { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        await session.refreshUser()
+        // `refreshUser()` avale l'échec : on appelle la variante qui le remonte,
+        // pour ne pas répondre « encore en attente » faute de réseau.
+        let auth = services.auth
+        let account = LocalAccountScope.sessionSnapshot()
+        let generation = auth.credentialSessionID()
+        do {
+            try await session.refreshUser(expectedUserID: userID, isCurrent: {
+                LocalAccountScope.sessionSnapshot() == account && auth.credentialSessionID() == generation
+            }, fetchUser: { try await auth.me() })
+        } catch {
+            guard !error.isCancellation, isCurrentAccount else { return }
+            feedback = String(localized: "Actualisation impossible. Vérifie ta connexion puis réessaie.")
+            feedbackIsError = true
+            return
+        }
         guard isCurrentAccount else { return }
         feedback = String(localized: "Confirmation encore en attente. Ouvre le lien reçu puis actualise.")
         feedbackIsError = false

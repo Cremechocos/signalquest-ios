@@ -110,8 +110,10 @@ final class UserProfileViewModel: ObservableObject {
         let previous = item
         updateItem(id: item.id) { current in
             var copy = current
-            copy.likedByMe.toggle()
-            copy.reactions = Self.updatedReactions(current.reactions, emoji: emoji, selected: copy.likedByMe)
+            // État propre à chaque emoji : `likedByMe` ne suit que le ❤️.
+            let selected = !current.hasReacted(with: emoji)
+            if emoji == "❤️" { copy.likedByMe = selected }
+            copy.reactions = Self.updatedReactions(current.reactions, emoji: emoji, selected: selected)
             return copy
         }
         guard !AppEnvironment.usesDemoData else { Haptics.light(); return }

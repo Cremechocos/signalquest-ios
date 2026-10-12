@@ -20,10 +20,19 @@ extension View {
 struct MobileChallengeSheet: View {
     let attempt: MobileChallengeAttempt
     let onCompletion: (Result<MobileChallengeProof, MobileChallengeError>) -> Void
+    /// Tant que la page n'est pas chargée, la feuille serait blanche.
+    @State private var isLoading = true
 
     var body: some View {
         NavigationStack {
-            MobileChallengeWebView(attempt: attempt, onCompletion: onCompletion)
+            MobileChallengeWebView(attempt: attempt, onCompletion: onCompletion, onLoaded: { isLoading = false })
+                .overlay {
+                    if isLoading {
+                        ProgressView()
+                            .allowsHitTesting(false)
+                            .accessibilityIdentifier("auth.challenge.loading")
+                    }
+                }
                 .navigationTitle("Vérification")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -40,8 +49,9 @@ struct MobileChallengeSheet: View {
 struct MobileChallengeWebView: UIViewRepresentable {
     let attempt: MobileChallengeAttempt
     let onCompletion: (Result<MobileChallengeProof, MobileChallengeError>) -> Void
+    var onLoaded: () -> Void = {}
 
-    func makeCoordinator() -> Coordinator { Coordinator(attempt: attempt, onCompletion: onCompletion) }
+    func makeCoordinator() -> Coordinator { Coordinator(attempt: attempt, onCompletion: onCompletion, onLoaded: onLoaded) }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -67,15 +77,18 @@ struct MobileChallengeWebView: UIViewRepresentable {
         private enum Configuration: String { case enabled, disabled }
         private let attempt: MobileChallengeAttempt
         private let onCompletion: (Result<MobileChallengeProof, MobileChallengeError>) -> Void
+        private let onLoaded: () -> Void
         private weak var webView: WKWebView?
         private var configuration: Configuration?
         private var finished = false
         private var timeout: Task<Void, Never>?
 
         init(attempt: MobileChallengeAttempt,
-             onCompletion: @escaping (Result<MobileChallengeProof, MobileChallengeError>) -> Void) {
+             onCompletion: @escaping (Result<MobileChallengeProof, MobileChallengeError>) -> Void,
+             onLoaded: @escaping () -> Void = {}) {
             self.attempt = attempt
             self.onCompletion = onCompletion
+            self.onLoaded = onLoaded
         }
 
         func start(_ webView: WKWebView) {
@@ -130,6 +143,7 @@ struct MobileChallengeWebView: UIViewRepresentable {
                   let configuration, let payload = MobileChallengeMessage.decode(message.body, for: attempt) else { return }
             switch payload.event {
             case .ready:
+                onLoaded()
                 armTimeout(seconds: 240)
             case .token:
                 guard configuration == .enabled, let token = payload.token else {
@@ -147,6 +161,8 @@ struct MobileChallengeWebView: UIViewRepresentable {
                 finish(.failure(.unavailable))
             }
         }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { onLoaded() }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             finish(.failure(.unavailable))

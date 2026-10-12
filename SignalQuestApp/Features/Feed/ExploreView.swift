@@ -18,7 +18,6 @@ final class ExploreViewModel: ObservableObject {
     @Published var searchResults: [SocialUserSearchResult] = []
     /// Publications correspondant à la recherche — jusqu'ici jamais peuplées.
     @Published var searchPosts: [UnifiedSocialFeedItem] = []
-    @Published var searchHashtags: [TrendingHashtag] = []
     /// Lieux et antennes trouvés en même temps (plan 3, vague 2) : la même
     /// recherche mène aussi à la carte.
     @Published var searchPlaces: [PlaceResult] = []
@@ -45,7 +44,6 @@ final class ExploreViewModel: ObservableObject {
     // (surcharge locale par-dessus author.isFollowing).
     @Published var followOverrides: [String: Bool] = [:]
     @Published var followBusyIds: Set<String> = []
-    @Published var followPopTick = 0
 
     private let service: SocialFeedServicing
     private var searchTask: Task<Void, Never>?
@@ -154,7 +152,6 @@ final class ExploreViewModel: ObservableObject {
         searchError = nil
         if AppEnvironment.usesDemoData {
             searchPosts = []
-            searchHashtags = []
             searchResults = Self.demoSearchResults.filter {
                 $0.displayName.localizedCaseInsensitiveContains(query) ||
                 ($0.handle?.localizedCaseInsensitiveContains(query) ?? false)
@@ -174,7 +171,6 @@ final class ExploreViewModel: ObservableObject {
             let result = try await service.explore(query: query)
             searchResults = result.peopleAsSearchResults
             searchPosts = result.posts
-            searchHashtags = result.hashtags
         } catch {
             // Une frappe rapide annule la recherche précédente : URLSession lève
             // alors `URLError(.cancelled)` ou `APIError.cancelled`, pas
@@ -296,7 +292,6 @@ final class ExploreViewModel: ObservableObject {
 
     func toggleFollow(_ author: SocialFeedAuthor) {
         guard !followBusyIds.contains(author.id) else { return }
-        followPopTick += 1
         Haptics.medium()
         let wasFollowed = isFollowed(author)
         // Bascule optimiste, corrigée par la réponse serveur.
@@ -896,7 +891,7 @@ struct ExploreView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .sqLikePop(trigger: model.followPopTick)
+            .sqLikePop(trigger: followed)
             .disabled(model.followBusyIds.contains(author.id))
         }
         .padding(SQSpace.md)

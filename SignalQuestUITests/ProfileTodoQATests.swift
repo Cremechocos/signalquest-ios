@@ -5,11 +5,11 @@ import XCTest
 @MainActor
 final class ProfileTodoQATests: XCTestCase {
     func testTodosLeadToWhereTheyAreSettled() {
-        run(locale: "fr", profile: "Profil", missions: "Missions à réclamer : 2 (+150 pts)", rewards: "Récompenses")
+        run(locale: "fr", profile: "Profil", missions: "Missions à réclamer", rewards: "Récompenses")
     }
 
     func testEnglishTodosLeadToWhereTheyAreSettled() {
-        run(locale: "en", profile: "Profile", missions: "Missions to claim: 2 (+150 pts)", rewards: "Rewards")
+        run(locale: "en", profile: "Profile", missions: "Missions to claim", rewards: "Rewards")
     }
 
     private func run(locale: String, profile: String, missions: String, rewards: String) {
@@ -25,6 +25,7 @@ final class ProfileTodoQATests: XCTestCase {
         let missionsLink = app.buttons["profile.todo.missions"].firstMatch
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(missionsLink, in: app), "Ligne des missions absente")
         XCTAssertTrue(app.staticTexts[missions].exists, "Libellé attendu : \(missions)")
+        XCTAssertTrue(app.staticTexts["+150 pts"].exists, "Gain attendu : +150 pts")
         XCTAssertTrue(app.buttons["profile.todo.photos"].exists, "Photo en cours de vérification absente")
         XCTAssertFalse(app.buttons["profile.todo.identifications"].exists, "Aucun conflit dans la démo")
         let screenshot = XCTAttachment(screenshot: app.screenshot())

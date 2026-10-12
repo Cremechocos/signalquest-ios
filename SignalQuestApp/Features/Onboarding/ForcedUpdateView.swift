@@ -20,12 +20,15 @@ struct ForcedUpdateView: View {
     /// Le lien du serveur est facultatif : sans repli, l'écran bloquant
     /// n'avait aucun bouton (AF-PROF-08). Un build TestFlight se met à jour
     /// dans TestFlight, un build App Store dans l'App Store.
-    private var updateURL: URL? {
+    private var updateURL: URL? { Self.resolvedUpdateURL(storeURL: storeURL) }
+
+    /// Partagé avec la rangée « Mise à jour recommandée » du Profil.
+    static func resolvedUpdateURL(storeURL: URL?) -> URL? {
         if let storeURL { return storeURL }
         let isTestFlight = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
         return URL(string: isTestFlight
-            ? "itms-beta://beta.itunes.apple.com/v1/app/\(Self.appStoreID)"
-            : "itms-apps://apps.apple.com/app/id\(Self.appStoreID)")
+            ? "itms-beta://beta.itunes.apple.com/v1/app/\(appStoreID)"
+            : "itms-apps://apps.apple.com/app/id\(appStoreID)")
     }
 
     /// Le message du serveur n'existe qu'en français : ailleurs, le texte traduit.

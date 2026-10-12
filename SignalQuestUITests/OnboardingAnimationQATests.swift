@@ -331,7 +331,7 @@ final class OnboardingAnimationQATests: XCTestCase {
         next.tap()                   // → slide 2
         print("QA_TAP_TO_SLIDE2")
         sleep(3)
-        next.tap()                   // → slide 3 (le bouton devient « Commencer »)
+        next.tap()                   // → slide 3 (les trois choix remplacent le bouton)
         print("QA_TAP_TO_SLIDE3")
         sleep(4)
 

@@ -53,7 +53,6 @@ final class RadioLogsViewModel: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var syncReceived = 0
     @Published private(set) var isScanning = false
-    @Published private(set) var readOnly = false
     @Published var errorMessage: String?
     @Published var premiumMessage: String?
     @Published var toast: String?
@@ -89,7 +88,6 @@ final class RadioLogsViewModel: ObservableObject {
     private let service: RadioLogsServicing
     private let antennas: AntennasServicing
     private let networkPath: NetworkPathMonitor
-    private var syncTask: Task<Void, Never>?
     private var scanTask: Task<Void, Never>?
     private var nameTasks: Set<String> = []
 
@@ -100,7 +98,6 @@ final class RadioLogsViewModel: ObservableObject {
     }
 
     deinit {
-        syncTask?.cancel()
         scanTask?.cancel()
     }
 
@@ -293,7 +290,6 @@ final class RadioLogsViewModel: ObservableObject {
             logCount = progress.snapshot.entries.count
             lastSyncedAt = progress.snapshot.lastSyncedAt
             syncReceived = progress.received
-            readOnly = progress.readOnly
             sites = builtSites
             rebuild()
             switch progress.failure {
@@ -343,14 +339,17 @@ final class RadioLogsViewModel: ObservableObject {
     private func startScan(of pending: [RadioLogSite]) {
         guard !pending.isEmpty else { return }
         isScanning = true
+        // Le flux est créé hors de la tâche et `self` est ré-obtenu à chaque
+        // fenêtre : un `guard let self` en tête retiendrait le modèle pendant
+        // tout le balayage, même une fois l'écran fermé.
+        let stream = service.scanStream(sites: pending)
         scanTask = Task { [weak self] in
-            guard let self else { return }
-            for await resolved in self.service.scanStream(sites: pending) {
-                if Task.isCancelled { break }
+            for await resolved in stream {
+                guard let self, !Task.isCancelled else { break }
                 self.states.merge(resolved) { _, new in new }
                 self.rebuild()
             }
-            self.isScanning = false
+            self?.isScanning = false
         }
     }
 

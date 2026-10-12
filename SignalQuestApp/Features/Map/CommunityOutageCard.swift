@@ -300,7 +300,7 @@ struct CommunityOutageCard: View {
         let tint = OutageTint.of(outage.severity)
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(alignment: .top, spacing: SQSpace.sm) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: "exclamationmark.circle.fill")
                     .font(.subheadline.weight(.semibold))
                     // L'encre, pas la teinte : le pictogramme est posé sur le conteneur de sa
                     // PROPRE couleur, où la teinte de base tombe à 2,2:1 en apparence sombre —

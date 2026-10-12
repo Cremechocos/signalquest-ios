@@ -114,7 +114,6 @@ struct MyMeasurementsView: View {
         .navigationTitle(mapTitle)
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
-        .refreshable { await model.load() }
         .overlay(alignment: .top) {
             VStack(spacing: SQSpace.sm) {
                 if model.hasLoaded, (model.totalSessions ?? model.sessionCount) > 0 {

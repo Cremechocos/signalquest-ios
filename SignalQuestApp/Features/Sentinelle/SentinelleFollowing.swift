@@ -81,8 +81,7 @@ struct SentinelleFollowedCard: View {
                         // Le graphe porte SON propre geste de lecture au doigt.
                         // Il ne doit donc pas hériter du tap de la carte, qui
                         // refermerait le détail au moindre glissement.
-                        SentinelleFamilyChart(points: points, window: window)
-                            .frame(height: 120)
+                        SentinelleFamilyChart(points: points, window: window, height: 120)
                     }
 
                     HStack(spacing: SQSpace.md) {
@@ -162,7 +161,6 @@ struct SentinelleFollowedCard: View {
         VStack(alignment: .leading, spacing: 1) {
             Text(LocalizedStringKey(label))
                 .font(SQFont.body(12, .semibold, relativeTo: .caption2))
-                .textCase(.uppercase)
                 .foregroundStyle(SQColor.labelSecondary)
             Text(value ?? "—")
                 .font(.system(.body, design: .monospaced))

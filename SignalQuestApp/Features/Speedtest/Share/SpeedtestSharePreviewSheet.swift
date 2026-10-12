@@ -14,8 +14,6 @@ struct SpeedtestSharePreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var options = SpeedtestShareOptions()
     @State private var renderedPreview: RenderedPreview?
-    @State private var renderFailedFor: SpeedtestShareOptions?
-    @State private var renderAttempt = 0
     @State private var isPreparingShare = false
     @State private var shareError = false
     @State private var sharePayload: PreviewSharePayload?
@@ -26,12 +24,8 @@ struct SpeedtestSharePreviewSheet: View {
         return renderedPreview?.image
     }
 
-    private var renderingFailed: Bool {
-        renderFailedFor == options
-    }
-
     private var renderRequest: RenderRequest {
-        RenderRequest(options: options, attempt: renderAttempt)
+        RenderRequest(options: options)
     }
 
     var body: some View {
@@ -145,22 +139,6 @@ struct SpeedtestSharePreviewSheet: View {
                     .scaledToFit()
                     .accessibilityLabel("Aperçu de l’image Speedtest à partager")
                     .accessibilityIdentifier("speedtest.share.preview.image")
-            } else if renderingFailed {
-                VStack(spacing: SQSpace.sm) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.title2)
-                        .foregroundStyle(SQColor.warning)
-                        .accessibilityHidden(true)
-                    Text("Impossible de créer l’aperçu.")
-                        .font(SQType.callout)
-                        .foregroundStyle(SQColor.label)
-                    Button("Réessayer") {
-                        renderAttempt += 1
-                    }
-                    .font(SQType.button)
-                    .frame(minHeight: 44)
-                }
-                .accessibilityElement(children: .combine)
             } else {
                 ProgressView("Création de l’aperçu")
                     .tint(SQColor.brandRed)
@@ -212,7 +190,7 @@ struct SpeedtestSharePreviewSheet: View {
                 style: .primary,
                 action: prepareSystemShare
             )
-            .disabled(currentImage == nil || renderingFailed)
+            .disabled(currentImage == nil)
             .accessibilityHint("Ouvre la feuille de partage avec l’image affichée.")
 
             if shareError {
@@ -246,7 +224,6 @@ struct SpeedtestSharePreviewSheet: View {
     @MainActor
     private func renderPreview(for request: RenderRequest) async {
         renderedPreview = nil
-        renderFailedFor = nil
         shareError = false
         do {
             // Un changement rapide de plusieurs interrupteurs ne doit pas lancer
@@ -261,10 +238,9 @@ struct SpeedtestSharePreviewSheet: View {
             )
             try Task.checkCancellation()
             renderedPreview = RenderedPreview(options: request.options, image: image)
-        } catch is CancellationError {
-            return
         } catch {
-            renderFailedFor = request.options
+            // Seule l'annulation (changement d'option) peut interrompre le rendu.
+            return
         }
     }
 
@@ -300,7 +276,6 @@ struct SpeedtestSharePreviewSheet: View {
 
 private struct RenderRequest: Hashable {
     let options: SpeedtestShareOptions
-    let attempt: Int
 }
 
 private struct RenderedPreview {

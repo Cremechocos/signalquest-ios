@@ -4,6 +4,8 @@ import SwiftUI
 final class AntennaReportsListViewModel: ObservableObject {
     @Published var reports: [AntennaReport] = []
     @Published var isLoading = false
+    /// Un premier chargement a abouti ou échoué : avant, la liste n'est ni vide ni remplie.
+    @Published private(set) var hasLoaded = false
     @Published var errorMessage: String?
 
     private let service: AntennaReportsServicing
@@ -12,7 +14,10 @@ final class AntennaReportsListViewModel: ObservableObject {
     func load() async {
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoaded = true
+        }
         do {
             reports = try await service.myReports()
                 .sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
@@ -44,6 +49,15 @@ struct AntennaReportsListView: View {
                     .listRowBackground(Color.clear)
                     // Marges de page : sans elles la carte touchait les deux bords.
                     .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.lg, bottom: SQSpace.sm, trailing: SQSpace.lg))
+                }
+            } else if !model.hasLoaded, model.reports.isEmpty {
+                Section {
+                    ProgressView()
+                        .tint(SQColor.brandRed)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, SQSpace.xl)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
             } else if !model.isLoading, model.reports.isEmpty {
                 Section {

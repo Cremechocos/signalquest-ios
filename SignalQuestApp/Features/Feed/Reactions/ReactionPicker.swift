@@ -4,7 +4,10 @@ struct ReactionPicker: View {
     let emojis: [String]
     var onPick: (String) -> Void
 
-    init(emojis: [String] = ["❤️", "🔥", "👏", "🚀", "⚡", "📡"], onPick: @escaping (String) -> Void) {
+    /// Réactions proposées par défaut ; le ❤️ vient en premier (c'est le « J'aime »).
+    static let defaultEmojis = ["❤️", "🔥", "👏", "🚀", "⚡", "📡"]
+
+    init(emojis: [String] = ReactionPicker.defaultEmojis, onPick: @escaping (String) -> Void) {
         self.emojis = emojis
         self.onPick = onPick
     }

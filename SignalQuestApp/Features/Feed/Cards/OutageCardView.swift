@@ -176,8 +176,7 @@ struct OutageCardView: View {
                     CardMetricTile(
                         label: String(localized: "Opérateur"),
                         value: string("operator") ?? string("operatorKey") ?? "—",
-                        highlight: true,
-                        accent: ink
+                        highlight: true
                     )
                     if let siteCode {
                         CardMetricTile(label: siteCode.label, value: siteCode.value)

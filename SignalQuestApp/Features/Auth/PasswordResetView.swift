@@ -81,6 +81,7 @@ private struct PasswordResetForm: View {
                     SecureField("Nouveau mot de passe", text: $password,
                                 prompt: Text(verbatim: ""))
                         .textContentType(.newPassword)
+                        .autocorrectionDisabled()
                         .textFieldStyle(SQTextFieldStyle())
                         .accessibilityLabel("Nouveau mot de passe")
                         .accessibilityIdentifier("auth.reset.password")
@@ -95,6 +96,7 @@ private struct PasswordResetForm: View {
                     SecureField("Confirmer le mot de passe", text: $confirmation,
                                 prompt: Text(verbatim: ""))
                         .textContentType(.newPassword)
+                        .autocorrectionDisabled()
                         .textFieldStyle(SQTextFieldStyle())
                         .accessibilityLabel("Confirmer le mot de passe")
                         .accessibilityIdentifier("auth.reset.confirmation")

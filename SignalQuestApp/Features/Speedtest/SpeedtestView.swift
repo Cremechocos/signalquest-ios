@@ -48,6 +48,9 @@ struct SpeedtestView: View {
     /// Progression d'une rafale (test courant, total) — nil hors rafale.
     @State private var burstProgress: (index: Int, total: Int)?
     @State private var burstSummary: SpeedtestBurstSummary?
+    /// Résultats déjà mesurés de la rafale en cours : `stop()` s'en sert pour
+    /// afficher le bilan partiel (la tâche annulée ne le publie plus).
+    @State private var burstResults: [SpeedtestRunResult] = []
     /// La feuille « localisation désactivée » ne s'affiche qu'une fois par
     /// lancement de l'app (MES-09).
     @MainActor private static var deniedLocationSheetShown = false
@@ -402,7 +405,8 @@ struct SpeedtestView: View {
                 network: result?.networkDisplayName ?? currentNetworkStatus.displayName,
                 // Serveur de download/ping ACTIF. On n'affiche plus le VPS de
                 // mesure : l'opérateur prend sa place dans le bandeau.
-                server: result?.downloadServerName ?? (isRunning ? liveProgress.serverName : nil) ?? downloadTarget.displayName
+                server: result?.downloadServerName ?? (isRunning ? liveProgress.serverName : nil) ?? downloadTarget.displayName,
+                isOnline: services.networkPath.isOnline
             )
             if isRunning, let notice = liveProgress.notice {
                 Label(notice, systemImage: "arrow.triangle.swap")
@@ -469,7 +473,7 @@ struct SpeedtestView: View {
     private var dataWarningMessage: String {
         var parts: [String] = []
         if services.networkPath.status.isConstrained {
-            parts.append(String(localized: "Le Mode données réduites est activé."))
+            parts.append(String(localized: "Le Mode données faibles est activé."))
         }
         parts.append(burstCount > 1
             ? String(localized: "Chaque test peut consommer plusieurs centaines de Mo en 4G ou en 5G, et une rafale en enchaîne \(burstCount).")
@@ -1003,7 +1007,7 @@ struct SpeedtestView: View {
             runErrorMessage = SpeedtestBusyError.alreadyRunning.errorDescription
             return
         }
-        // Réseau mobile ou Mode données réduites : un test peut consommer
+        // Réseau mobile ou Mode données faibles : un test peut consommer
         // plusieurs centaines de Mo. On prévient une fois par lancement (MES-08).
         let status = services.networkPath.status
         if !AppEnvironment.runsSpeedtestQA, !Self.dataWarningAccepted,
@@ -1236,8 +1240,8 @@ struct SpeedtestView: View {
         liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName, runIndex: 1, runTotal: total)
         let sessionID = UUID()
         runSessionID = sessionID
+        burstResults = []
         runTask = Task {
-            var results: [SpeedtestRunResult] = []
             var truncatedAt: Int?
             loop: for index in 1...total {
                 guard !Task.isCancelled, runSessionID == sessionID else { return }
@@ -1253,7 +1257,7 @@ struct SpeedtestView: View {
                         sessionID: sessionID
                     )
                     guard runSessionID == sessionID else { return }
-                    results.append(measured)
+                    burstResults.append(measured)
                 } catch is CancellationError {
                     guard runSessionID == sessionID else { return }
                     truncatedAt = max(0, index - 1)
@@ -1284,9 +1288,9 @@ struct SpeedtestView: View {
                 }
             }
             guard runSessionID == sessionID else { return }
-            let summary = SpeedtestBurstSummary(results: results, truncatedAt: truncatedAt)
+            let summary = SpeedtestBurstSummary(results: burstResults, truncatedAt: truncatedAt)
             if Task.isCancelled {
-                if !results.isEmpty { burstSummary = summary }
+                if !burstResults.isEmpty { burstSummary = summary }
                 liveActivity.cancel()
                 handleCancellation()
             } else {
@@ -1333,6 +1337,14 @@ struct SpeedtestView: View {
     }
 
     private func stop() {
+        // Bilan partiel d'une rafale arrêtée : la tâche annulée ne peut plus le
+        // publier une fois la session remise à zéro, on le construit donc ici.
+        if let burstProgress, !burstResults.isEmpty {
+            burstSummary = SpeedtestBurstSummary(
+                results: burstResults,
+                truncatedAt: max(0, burstProgress.index - 1)
+            )
+        }
         runSessionID = nil
         runTask?.cancel()
         runTask = nil

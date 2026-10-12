@@ -1723,7 +1723,12 @@ struct MapExplorerView: View {
             PlannedDetailSheet(site: site, operatorLabel: model.operatorLabel(site.operator ?? "ALL"), operatorAccent: model.operatorAccent(site.operator ?? "ALL"))
         }
         .sheet(item: $selectedFriend) { friend in
-            FriendLiveSheet(friend: friend, userLocation: services.location.cachedLocation())
+            // L'ami vivant relu par son identifiant : la valeur du tap resterait figée
+            // alors que présence, position et radio évoluent avec le flux temps réel.
+            FriendLiveSheet(
+                friend: model.liveFriends.first(where: { $0.id == friend.id }) ?? friend,
+                userLocation: services.location.cachedLocation()
+            )
                 .presentationDetents([.medium, .large])
                 .presentationBackgroundCompat(SQColor.bg)
         }
@@ -2258,7 +2263,7 @@ struct MapExplorerView: View {
                !error.isEmpty {
                 Text(error)
                     .font(SQFont.archivo(12, .regular))
-                    .foregroundStyle(SQColor.danger)
+                    .foregroundStyle(SQColor.dangerInk)
                     .lineLimit(2)
             }
         }
@@ -4153,8 +4158,7 @@ struct MapExplorerView: View {
         // Ne restent ici que validations / sessions du snapshot. Les amis passent
         // par `friendPayloads` (rendu « Find My » riche, alimenté par le flux live).
         let socialFilters = filters.subtracting([.speedtest, .coverage, .antenna, .photo, .planned, .outage, .friend])
-        let items = model.snapshot.displayItems(include: socialFilters)
-        return items.filter(matches(filterItem:))
+        return model.snapshot.displayItems(include: socialFilters)
     }
 
     /// Amis géolocalisés de la couche « Amis », rendus en marqueur avatar « Find
@@ -4198,16 +4202,6 @@ struct MapExplorerView: View {
                 friend: info
             )
         }
-    }
-
-    /// Le filtrage opérateur/techno est désormais SERVEUR (paramètre `operator`
-    /// des endpoints tuiles + prévisionnels/pannes). On ne refiltre plus côté
-    /// client par sous-chaîne de texte — c'est ce qui masquait à tort des couches
-    /// dont la clé opérateur ne figure pas dans le libellé (photos, amis, sessions,
-    /// marchés hors-FR). On laisse passer : ces couches sociales sont propres aux
-    /// amis et restent volontairement tolérantes (politique identique à Android).
-    private func matches(filterItem _: MapDisplayItem) -> Bool {
-        true
     }
 
     private func selectAnnotation(_ annotation: MapAnnotationPayload) {
@@ -4305,18 +4299,6 @@ struct MapExplorerView: View {
             sightOrigin: sightOrigin,
             onIsolateCoverage: { focus in isolateCoverage(focus) }
         )
-    }
-
-    private func annotation(for kind: MapDisplayItem.Kind) -> some View {
-        ZStack {
-            Circle()
-                .fill(color(for: kind).opacity(0.92))
-                .frame(width: 38, height: 38)
-                .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
-            Image(systemName: icon(for: kind))
-                .font(.caption.weight(.bold))
-                .foregroundStyle(SQColor.label)
-        }
     }
 
     private func requestCamera(region: MKCoordinateRegion) {
@@ -4423,40 +4405,6 @@ struct MapExplorerView: View {
     private static func isSameSpot(_ a: AndroidCommunitySiteMarker, _ b: AndroidCommunitySiteMarker) -> Bool {
         CLLocation(latitude: a.lat, longitude: a.lng)
             .distance(from: CLLocation(latitude: b.lat, longitude: b.lng)) <= 150
-    }
-
-    private func icon(for kind: MapDisplayItem.Kind) -> String {
-        switch kind {
-        case .friend: return "person.fill"
-        case .photo: return "camera.fill"
-        case .validation: return "checkmark.seal.fill"
-        case .session: return "figure.walk"
-        case .coverage: return "dot.radiowaves.left.and.right"
-        case .speedtest: return "speedometer"
-        case .outage: return "exclamationmark.triangle.fill"
-        case .communityOutage: return "exclamationmark.circle.fill"
-        case .planned: return "calendar.badge.clock"
-        case .antenna: return "antenna.radiowaves.left.and.right"
-        case .communitySite: return "dot.radiowaves.up.forward"
-        case .customSite: return "mappin.and.ellipse"
-        }
-    }
-
-    private func color(for kind: MapDisplayItem.Kind) -> Color {
-        switch kind {
-        case .speedtest: return SQColor.brandGreen
-        case .photo: return SQColor.brandPink
-        case .friend: return SQColor.brandBlue
-        case .coverage: return SQColor.brandOrange
-        case .validation: return SQColor.brandGreen
-        case .outage: return .red
-        case .communityOutage: return OutageTint.down
-        case .planned: return SQColor.brandBlue
-        case .antenna: return SQColor.brandBlue
-        case .session: return SQColor.brandOrange
-        case .communitySite: return SQColor.brandPink
-        case .customSite: return SQColor.brandPink
-        }
     }
 
     /// Country/region-level default camera per supported market. The map engine

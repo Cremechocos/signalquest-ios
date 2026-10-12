@@ -60,8 +60,8 @@ final class DesignTokenContrastTests: XCTestCase {
     }
 
     /// Si Figtree/Bricolage n'est pas encore enregistré, le repli SF doit suivre
-    /// le style Dynamic Type. Les deux seuls replis `.system(size:)` autorisés
-    /// sont ceux des helpers `*Fixed`, réservés aux exports bitmap déterministes.
+    /// le style Dynamic Type. Le seul repli `.system(size:)` autorisé est celui
+    /// du helper `displayFixed`, réservé aux exports bitmap déterministes.
     func testScreenFontFallbacksNeverBecomeFixedSize() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -72,12 +72,12 @@ final class DesignTokenContrastTests: XCTestCase {
         let lines = source.components(separatedBy: .newlines)
         let fixedSystemLines = lines.indices.filter { lines[$0].contains("return .system(size:") }
 
-        XCTAssertEqual(fixedSystemLines.count, 2, "Un repli écran à taille fixe a été réintroduit")
+        XCTAssertEqual(fixedSystemLines.count, 1, "Un repli écran à taille fixe a été réintroduit")
         for index in fixedSystemLines {
             let context = lines[max(0, index - 8)...index].joined(separator: "\n")
             XCTAssertTrue(
-                context.contains("displayFixed") || context.contains("bodyFixed"),
-                "`.system(size:)` n'est permis que dans displayFixed/bodyFixed (ligne \(index + 1))"
+                context.contains("displayFixed"),
+                "`.system(size:)` n'est permis que dans displayFixed (ligne \(index + 1))"
             )
         }
         XCTAssertTrue(source.contains(".system(style, design: design, weight: weight)"))

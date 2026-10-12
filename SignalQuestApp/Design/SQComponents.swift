@@ -166,52 +166,6 @@ struct SignalBarsView: View {
     }
 }
 
-struct MapFilterBar: View {
-    @Binding var filters: Set<MapDisplayItem.Kind>
-
-    private let values: [(MapDisplayItem.Kind, String, String)] = [
-        (.antenna, String(localized: "Antennes"), "antenna.radiowaves.left.and.right"),
-        (.speedtest, String(localized: "Speedtests"), "speedometer"),
-        (.photo, String(localized: "Photos"), "photo"),
-        (.friend, String(localized: "Amis"), "person.2"),
-        (.coverage, String(localized: "Couverture"), "dot.radiowaves.left.and.right"),
-        (.outage, String(localized: "Pannes"), "exclamationmark.triangle"),
-        (.planned, String(localized: "Prev."), "calendar.badge.clock")
-    ]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm) {
-                ForEach(values, id: \.0.rawValue) { kind, title, icon in
-                    let isOn = filters.contains(kind)
-                    Button {
-                        Haptics.light()
-                        if isOn {
-                            filters.remove(kind)
-                        } else {
-                            filters.insert(kind)
-                        }
-                    } label: {
-                        // Chips carte : capsules casse normale sans icônes ;
-                        // actif = brique pleine, inactif = surface glass + ombre repos.
-                        Text(LocalizedStringKey(title))
-                            .font(SQFont.body(12, .semibold))
-                            .padding(.horizontal, SQSpace.md + 1)
-                            .padding(.vertical, SQSpace.sm)
-                            .background(isOn ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surfaceGlass), in: Capsule(style: .continuous))
-                            .foregroundStyle(isOn ? SQColor.onAccent : SQColor.label)
-                            .sqShadowSoft()
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(LocalizedStringKey(title))
-                    .accessibilityAddTraits(isOn ? .isSelected : [])
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-}
-
 struct MapItemSheet: View {
     let item: MapDisplayItem
     @EnvironmentObject private var services: AppServices
@@ -264,7 +218,7 @@ struct MapItemSheet: View {
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
                 // Vocabulaire du lexique (MES-24) : plus de « DL/UL » ni de « Ping ».
-                CardMetricTile(label: "Réception moy.", value: SignalFormatters.speed(downloadAverage), highlight: true, accent: speedColor(downloadAverage))
+                CardMetricTile(label: "Réception moy.", value: SignalFormatters.speed(downloadAverage), highlight: true)
                 CardMetricTile(label: "Réception max", value: SignalFormatters.speed(downloadMax))
                 CardMetricTile(label: "Envoi moy.", value: SignalFormatters.speed(uploadAverage))
                 CardMetricTile(label: "Envoi max", value: SignalFormatters.speed(uploadMax))
@@ -316,7 +270,7 @@ struct MapItemSheet: View {
                 TechBadge(text: kindLabel, color: SQColor.brandGreen)
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                CardMetricTile(label: "RSRP", value: SignalFormatters.dbm(rsrp), highlight: true, accent: coverageColor(rsrp))
+                CardMetricTile(label: "RSRP", value: SignalFormatters.dbm(rsrp), highlight: true)
                 CardMetricTile(label: "RSRQ", value: SignalFormatters.db(details?.rsrq))
                 CardMetricTile(label: "SNR", value: SignalFormatters.db(details?.snr))
                 CardMetricTile(label: "Points", value: SignalFormatters.count(details?.clusterCount ?? details?.sampleCount))

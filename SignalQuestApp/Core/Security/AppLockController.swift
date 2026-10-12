@@ -48,6 +48,10 @@ final class AppLockController: ObservableObject {
         }
     }
 
+    /// Déconnexion proposée quand l'appareil n'a plus de code : sans elle,
+    /// l'écran de verrouillage n'aurait aucune issue. Posée par la racine.
+    var signOut: (() async -> Void)?
+
     private let settings: () -> Settings
     private let now: () -> TimeInterval
     private let authenticate: @MainActor (String, Bool) async -> Bool
@@ -199,6 +203,7 @@ final class AppLockController: ObservableObject {
 struct AppLockScreen: View {
     @ObservedObject var lock: AppLockController
     @State private var didAutoPrompt = false
+    @State private var isSigningOut = false
 
     var body: some View {
         ZStack {
@@ -236,6 +241,20 @@ struct AppLockScreen: View {
                 }
                 .disabled(!lock.canAuthenticateDeviceOwner || lock.isAuthenticating || lock.isInBackground)
                 .padding(.horizontal, SQSpace.xxl)
+                if !lock.canAuthenticateDeviceOwner, let signOut = lock.signOut {
+                    GradientButton("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right",
+                                   isBusy: isSigningOut, style: .secondary) {
+                        guard !isSigningOut else { return }
+                        isSigningOut = true
+                        Task {
+                            await signOut()
+                            isSigningOut = false
+                        }
+                    }
+                    .disabled(isSigningOut || lock.isInBackground)
+                    .padding(.horizontal, SQSpace.xxl)
+                    .accessibilityIdentifier("app-lock.signOut")
+                }
             }
             .padding(SQSpace.xxl)
         }

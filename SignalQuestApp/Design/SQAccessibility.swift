@@ -45,13 +45,4 @@ extension View {
     func sqHeader() -> some View {
         accessibilityAddTraits(.isHeader)
     }
-
-    /// Remonte un élément dans l'ordre de balayage.
-    ///
-    /// À utiliser là où l'ordre visuel ne suit pas l'ordre d'importance : sur
-    /// l'Accueil le héros doit précéder les statistiques, sur le speedtest le
-    /// résultat doit précéder l'historique.
-    func sqReadFirst(_ priority: Double = 1) -> some View {
-        accessibilitySortPriority(priority)
-    }
 }

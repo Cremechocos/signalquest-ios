@@ -345,7 +345,10 @@ struct SessionDetailView: View {
             ) {
                 statTile("Points", s.totalPoints.map { "\($0)" } ?? "—", "mappin.and.ellipse")
                 statTile("Distance", s.distanceKm.map(Self.formatKm) ?? "—", "ruler")
-                statTile("RSRP moyen", s.avgRsrpLabel ?? "—", "antenna.radiowaves.left.and.right")
+                // iOS ne lit pas le RSRP : la tuile n'apparaît que si la session en porte un.
+                if let rsrp = s.avgRsrpLabel {
+                    statTile("RSRP moyen", rsrp, "antenna.radiowaves.left.and.right")
+                }
                 statTile(s.isDriveTest ? "Durée" : "Date",
                          s.isDriveTest ? (s.durationLabel ?? "—")
                                        : (s.startTime.map { $0.formatted(.dateTime.day().month().year()) } ?? "—"),

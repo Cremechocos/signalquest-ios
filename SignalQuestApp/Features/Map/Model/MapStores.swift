@@ -165,6 +165,10 @@ enum MapFilterStore {
     static func lastFilters() -> Set<MapDisplayItem.Kind>? {
         guard let raw = UserDefaults.standard.array(forKey: key) as? [String] else { return nil }
         var filters = Set(raw.compactMap(MapDisplayItem.Kind.init(rawValue:)))
+        // Validations et sessions n'ont plus d'interrupteur dans la feuille de
+        // filtres : une sélection ancienne qui les contient ne doit pas déclencher
+        // le chargement du snapshot complet, sans moyen de le couper.
+        filters.subtract([.validation, .session])
         if !UserDefaults.standard.bool(forKey: customSiteMigrationKey) {
             UserDefaults.standard.set(true, forKey: customSiteMigrationKey)
             filters.insert(.customSite)

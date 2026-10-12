@@ -1,11 +1,11 @@
 import SwiftUI
 
 /// Dock de navigation flottant « Crème & Terre cuite ». Remplace la tab bar
-/// système sur TOUTES les versions d'iOS : la barre native iOS 26 flotte
-/// collée à l'indicateur home (~21 pt du bord physique, sans réglage
-/// possible) ; le dock est posé 8 pt AU-DESSUS de la safe area (~42 pt du
-/// bord), jamais sur l'indicateur. Matériau : vrai Liquid Glass
-/// (`glassEffect`) sur iOS 26+, capsule crème translucide + blur avant.
+/// système avant iOS 26 (dès iOS 26, la tab bar Liquid Glass native prend le
+/// relais ; le dock reste forçable pour la QA). Il est posé 8 pt AU-DESSUS de
+/// la safe area (~42 pt du bord), jamais sur l'indicateur home. Matériau :
+/// capsule crème translucide + blur avant iOS 26, `UIGlassEffect` quand le
+/// dock est forcé sur iOS 26+, capsule opaque avec « Réduire la transparence ».
 /// Item actif = pilule teintée brique ; inactifs = bruns discrets.
 /// `minimized` rétracte le dock en pastille (icône de l'onglet actif),
 /// piloté au scroll par `sqDockAutoMinimize`.

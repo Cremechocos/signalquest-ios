@@ -263,15 +263,26 @@ struct SentinelleSheetShell<Content: View>: View {
     let subtitle: String
     @ViewBuilder var content: () -> Content
 
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
                 SQSheetHandle()
-                Text(title)
-                    .font(SQType.title)
-                    .sqHeader()
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
+                // Ces feuilles s'ouvrent aussi depuis un lien : le bouton évite de
+                // dépendre du seul geste de glissement pour les refermer.
+                HStack(alignment: .top, spacing: SQSpace.sm) {
+                    Text(title)
+                        .font(SQType.title)
+                        .sqHeader()
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: SQSpace.sm)
+                    Button("Fermer") { dismiss() }
+                        .font(SQFont.body(15, .medium))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(minHeight: 44)
+                }
                 Text(subtitle)
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

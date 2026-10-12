@@ -358,11 +358,11 @@ struct SpeedtestDetailContent: View {
                 metaRow("Latence moyenne", "\(Self.msText(average)) ms", icon: "timer")
             }
             if result.methodologyVersion == nil {
-                metaRow("Latence", String(localized: "Valeur historique"), icon: "clock")
+                metaRow("Mesure de latence", String(localized: "Valeur historique"), icon: "clock")
             }
             if let proto = result.pingProtocol?.trimmedNonEmptyDetail {
                 Divider().overlay(SQColor.separator)
-                metaRow("Latence", String(localized: "mesurée en \(proto)"), icon: "timer")
+                metaRow("Protocole de latence", proto, icon: "timer")
             }
         }
         .sqCardBackground(cornerRadius: SQRadius.lg, elevation: .rest)

@@ -93,7 +93,10 @@ final class SectorEditViewModel: ObservableObject {
                 infoMessage = derived.isEmpty
                     ? String(localized: "En France, le secteur est déterminé automatiquement à partir du PCI.")
                     : String(localized: "En France, le secteur est déterminé automatiquement à partir du PCI : secteur \(derived).")
-                if let d = result.sectors.first, d >= 1, d <= azimuths.count { self.selectedIndex = d - 1 }
+                if let d = result.sectors.first,
+                   let index = SectorNumbering.index(forStoredValue: d, azimuthCount: azimuths.count, operatorName: item.operatorName) {
+                    self.selectedIndex = index
+                }
                 Haptics.warning()
             } else {
                 errorMessage = String(localized: "Le secteur n'a pas pu être enregistré.")
@@ -352,5 +355,10 @@ struct ContentUnavailableCompat: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, SQSpace.xl)
+        // Lu d'un bloc, comme `EmptyStateView` : titre puis explication.
+        .sqCard(
+            label: NSLocalizedString(title, comment: ""),
+            value: NSLocalizedString(message, comment: "")
+        )
     }
 }
