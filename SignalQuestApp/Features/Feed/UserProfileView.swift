@@ -810,9 +810,8 @@ struct UserProfileView: View {
         }
     }
 
-    /// Ouvre la conversation directe. Le serveur DÉDUPLIQUE : pour deux
-    /// participants sans titre, il renvoie la conversation existante
-    /// (`reused: true`) au lieu d'en créer une seconde.
+    /// Ouvre la conversation directe. Le serveur DÉDUPLIQUE : il renvoie le
+    /// tête-à-tête existant au lieu d'en créer un second.
     private func openConversation() async {
         guard !isOpeningConversation else { return }
         isOpeningConversation = true
@@ -822,12 +821,8 @@ struct UserProfileView: View {
             return
         }
         do {
-            let created = try await services.messages.createConversation(
-                participantIds: [model.userId],
-                title: nil,
-                e2ee: true
-            )
-            router.route(toConversation: created.conversationId)
+            let conversationId = try await services.openDirectConversation(with: model.userId)
+            router.route(toConversation: conversationId)
         } catch {
             // Erreur PROPRE à l'ouverture : passer par `model.errorMessage`
             // afficherait « Profil indisponible » avec un bouton qui recharge

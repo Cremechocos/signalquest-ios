@@ -947,3 +947,33 @@ final class ConversationLiveShareCoordinator: ObservableObject {
         lastPublishedAt = nil
     }
 }
+
+extension AppServices {
+    /// Ouvre le tête-à-tête chiffré avec `userId` depuis un profil ou la carte,
+    /// comme la messagerie : en v2 quand cet appareil et le serveur le permettent
+    /// (clé tirée par l'appareil), sinon en v1. Le serveur renvoie l'existant,
+    /// v1 ou v2, au lieu d'en créer un second (E2E-01).
+    func openDirectConversation(with userId: String) async throws -> String {
+        if e2eeV2Messaging.writesEnabled,
+           let session = LocalAccountScope.sessionSnapshot(),
+           !e2eeV2Messaging.lacksV2Readiness(session) {
+            switch await e2eeV2Messaging.create(
+                participantIds: [userId], isGroup: false, title: nil, excludesWeb: false
+            ) {
+            case .created(let conversationId, _):
+                return conversationId
+            case .failure(let failure) where failure.message == "e2ee-v2-capability-missing"
+                || failure.kind == .activationBlocked:
+                break
+            case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":
+                if case .string(let existing)? = failure.details?["conversationId"] { return existing }
+                throw E2EEV2MessagingError(String(localized: "La conversation chiffrée n’a pas pu être créée."))
+            case .failure(let failure):
+                throw E2EEV2MessagingError(failure.kind == .retryable
+                    ? String(localized: "Connexion instable. Réessaie.")
+                    : String(localized: "La conversation chiffrée n’a pas pu être créée."))
+            }
+        }
+        return try await messages.createConversation(participantIds: [userId], title: nil, e2ee: true).conversationId
+    }
+}

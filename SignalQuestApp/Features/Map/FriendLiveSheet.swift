@@ -227,17 +227,15 @@ struct FriendLiveSheet: View {
         openingConversation = true
         openError = nil
         defer { openingConversation = false }
-        let response: CreateConversationResponse
+        let conversationId: String
         do {
-            response = try await services.messages.createConversation(
-                participantIds: [friend.id], title: nil, e2ee: true
-            )
+            conversationId = try await services.openDirectConversation(with: friend.id)
         } catch {
             if !error.isCancellation { openError = error.userFacingMessage }
             return
         }
         dismiss()
-        router.route(toConversation: response.conversationId)
+        router.route(toConversation: conversationId)
     }
 
     // MARK: Présence

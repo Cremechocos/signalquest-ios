@@ -124,7 +124,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
             }
         case .failed(let failure):
             devices = []
-            errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible de charger le registre E2EE v2."))
+            errorMessage = Self.message(for: failure, fallback: String(localized: "Impossible de charger la liste des appareils."))
         }
     }
 
@@ -268,7 +268,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         switch await lifecycle.approve(detail, comparedQR: qr) {
         case .success:
             resetApproval()
-            confirmationMessage = String(localized: "Appareil approuvé. La rotation de clés requise a été enregistrée.")
+            confirmationMessage = String(localized: "Appareil approuvé. Les clés des conversations concernées seront renouvelées.")
             await load()
         case .failed(let failure):
             approvalErrorMessage = Self.approvalFailureMessage(failure)
@@ -285,7 +285,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         case "E2EE_IDENTITY_STATE_REPAIR_REQUIRED":
             return String(localized: "Le chiffrement de ce compte doit être réinitialisé avant d’approuver un appareil.")
         default:
-            return String(localized: "Impossible d’approuver cet appareil. Actualisez puis réessayez.")
+            return String(localized: "Impossible d’approuver cet appareil. Actualise puis réessaie.")
         }
     }
 
@@ -341,7 +341,7 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         case .retryable:
             return String(localized: "Le service est temporairement indisponible. Réessaie.")
         case .activationBlocked:
-            return String(localized: "La gestion E2EE v2 reste verrouillée jusqu’à la fin de la revue de sécurité.")
+            return String(localized: "Le chiffrement des appareils n’est pas encore disponible sur ce compte.")
         case .permanent, .localState:
             return fallback
         }
@@ -632,7 +632,7 @@ struct E2EEV2TrustedDevicesView: View {
                 if model.needsPreparation && !model.isLoading {
                     Label(model.hasLocalIdentity
                           ? String(localized: "Cet appareil n’est pas encore enregistré pour le chiffrement de bout en bout.")
-                          : String(localized: "Cet appareil n’a pas encore d’identité locale E2EE v2."),
+                          : String(localized: "Cet appareil n’est pas encore prêt pour le chiffrement de bout en bout."),
                           systemImage: "iphone.gen3.badge.play")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -645,18 +645,18 @@ struct E2EEV2TrustedDevicesView: View {
                     .disabled(model.isActing)
                 } else if !model.activationEnabled {
                     Label {
-                        Text("Le registre v2 est consultable, mais aucun message n’est présenté comme E2EE v2 avant la validation du chiffrement sur iOS, Android et le web.")
+                        Text("Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web.")
                             .font(SQType.body)
                     } icon: {
                         Image(systemName: "lock.trianglebadge.exclamationmark")
                             .foregroundStyle(SQColor.warning)
                     }
                 } else {
-                    Label("Le chiffrement E2EE v2 est activé pour ce compte.", systemImage: "lock.shield.fill")
+                    Label("Le chiffrement de bout en bout est activé pour ce compte.", systemImage: "lock.shield.fill")
                         .foregroundStyle(SQColor.success)
                 }
                 if let generation = model.identityGeneration {
-                    Text("Identité du compte · génération \(generation)")
+                    Text("Clé du compte · version \(generation)")
                         .font(.caption.monospaced())
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -747,7 +747,7 @@ struct E2EEV2TrustedDevicesView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                     if let approval = model.generatedApproval {
                         generatedApprovalView(approval)
-                        Button("Choisir une autre méthode") {
+                        Button("Annuler cette demande") {
                             model.resetApproval()
                         }
                         .frame(minHeight: 48)
@@ -911,7 +911,7 @@ struct E2EEV2TrustedDevicesView: View {
         } message: {
             Text("Cette identité ne pourra pas être réactivée. Les conversations concernées devront renouveler leurs clés.")
         }
-        .alert("Appareils E2EE v2", isPresented: Binding(
+        .alert("Appareils", isPresented: Binding(
             get: { model.confirmationMessage != nil },
             set: { if !$0 { model.confirmationMessage = nil } }
         )) {
@@ -1006,7 +1006,7 @@ struct E2EEV2TrustedDevicesView: View {
                         .textSelection(.enabled)
                         .accessibilityLabel("Code de proximité \(code.map(String.init).joined(separator: " "))")
                 } else {
-                    Label("Code indisponible. Créez une nouvelle demande.", systemImage: "exclamationmark.triangle.fill")
+                    Label("Code indisponible. Crée une nouvelle demande.", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(SQColor.danger)
                 }
             case .qr:
@@ -1021,11 +1021,11 @@ struct E2EEV2TrustedDevicesView: View {
                         .padding(SQSpace.md)
                         .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .accessibilityLabel("QR temporaire d’approbation SignalQuest")
-                    Text("Si la caméra n’est pas disponible, copiez le contenu du QR depuis l’autre appareil.")
+                    Text("Si la caméra n’est pas disponible, copie le contenu du QR depuis l’autre appareil.")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 } else {
-                    Label("QR indisponible. Créez une nouvelle demande.", systemImage: "exclamationmark.triangle.fill")
+                    Label("QR indisponible. Crée une nouvelle demande.", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(SQColor.danger)
                 }
             }
@@ -1061,10 +1061,10 @@ struct E2EEV2TrustedDevicesView: View {
             Text("Clé de signature · \(detail.pendingDevice.signingKeyFingerprint)")
                 .font(.caption.monospaced())
                 .textSelection(.enabled)
-            Text("Comparez cette empreinte sur le nouvel appareil avant d’approuver.")
+            Text("Compare cette empreinte sur le nouvel appareil avant d’approuver.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.warning)
-            Text("Demande \(detail.approval.method.rawValue) · expire \(formattedExpiry(detail.approval.expiresAt))")
+            Text("Demande \(methodLabel(detail.approval.method)) · expire \(formattedExpiry(detail.approval.expiresAt))")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
             if detail.pendingDevice.descriptor.platform == "web" {
@@ -1089,6 +1089,14 @@ struct E2EEV2TrustedDevicesView: View {
 
     private func qrCode(for value: String) -> UIImage? {
         E2EEV2ActivationScreen.qrImage(value)
+    }
+
+    private func methodLabel(_ method: E2EEV2ApprovalMethod) -> String {
+        switch method {
+        case .push: return String(localized: "par notification")
+        case .qr: return String(localized: "par QR")
+        case .proximityCode: return String(localized: "par code")
+        }
     }
 
     private func formattedExpiry(_ value: String) -> String {
@@ -1301,7 +1309,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
     func restoreWithRecoveryKey() async {
         guard activationEnabled, !isBusy, var key = Self.strictRecoveryKey(recoveryInput) else {
             if !recoveryInput.isEmpty {
-                errorMessage = String(localized: "Clé invalide : saisissez la clé Base64 complète de 256 bits.")
+                errorMessage = String(localized: "Clé invalide : saisis la clé de récupération complète.")
             }
             return
         }
@@ -2169,7 +2177,7 @@ struct SettingsView: View {
                     }
                 }
                 NavigationLink {
-                    ChangePasswordView()
+                    ChangePasswordView(appleLinked: appleLinked)
                 } label: { settingsLabel("Changer le mot de passe", systemImage: "key.fill") }
                 // Masqué tant que la v2 dort : l'écran créait une identité locale
                 // pour un chiffrement qui ne peut encore ni envoyer ni lire (E2E-03).
@@ -2590,6 +2598,9 @@ struct SettingsView: View {
 }
 
 struct ChangePasswordView: View {
+    /// Un compte créé avec Apple n'a pas de mot de passe connu de son titulaire :
+    /// l'écran dit comment en choisir un plutôt que d'exiger l'actuel (AF-PROF-05).
+    var appleLinked = false
     @EnvironmentObject private var services: AppServices
     @State private var current = ""
     @State private var newValue = ""
@@ -2600,6 +2611,17 @@ struct ChangePasswordView: View {
 
     var body: some View {
         Form {
+            if appleLinked {
+                Section {
+                    Label("Compte créé avec Apple ? Il n’a pas de mot de passe que tu connais. Pour en choisir un, déconnecte-toi puis touche « Mot de passe oublié ? » sur l’écran de connexion.",
+                          systemImage: "applelogo")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("settings.password.appleHint")
+                }
+                .listRowBackground(SQColor.surface)
+            }
             Section("Mot de passe actuel") {
                 SecureField("Mot de passe", text: $current)
                     .textContentType(.password)

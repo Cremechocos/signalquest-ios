@@ -4,6 +4,12 @@ import Combine
 
 @MainActor
 final class FeedContextTests: XCTestCase {
+    func testNetworkPulseSendsRoundedCoordinates() {
+        XCTAssertEqual(SocialFeedService.pulseCoordinate(48.8566142), "48.857")
+        XCTAssertEqual(SocialFeedService.pulseCoordinate(-1.5536217), "-1.554")
+        XCTAssertEqual(SocialFeedService.pulseCoordinate(2), "2.000")
+    }
+
     func testDetailReceiptSurvivesOlderInFlightReload() async throws {
         let gate = FeedFixtureGate<SocialFeedPage>(), calls = FeedCallCount()
         let started = expectation(description: "old GET started")

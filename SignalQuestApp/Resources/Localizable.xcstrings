@@ -795,6 +795,22 @@
         }
       }
     },
+    "Annuler cette demande" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel this request"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler cette demande"
+          }
+        }
+      }
+    },
     "Appareil %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -825,6 +841,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appareil approuvé. La rotation de clés requise a été enregistrée."
+          }
+        }
+      }
+    },
+    "Appareil approuvé. Les clés des conversations concernées seront renouvelées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device approved. Keys of the affected conversations will be renewed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil approuvé. Les clés des conversations concernées seront renouvelées."
           }
         }
       }
@@ -963,6 +995,22 @@
         }
       }
     },
+    "Cet appareil n’est pas encore prêt pour le chiffrement de bout en bout." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device is not ready for end-to-end encryption yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’est pas encore prêt pour le chiffrement de bout en bout."
+          }
+        }
+      }
+    },
     "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications »." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1064,6 +1112,38 @@
         }
       }
     },
+    "Clé du compte · version %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account key · version %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé du compte · version %lld"
+          }
+        }
+      }
+    },
+    "Clé invalide : saisis la clé de récupération complète." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid key: enter the full recovery key."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clé invalide : saisis la clé de récupération complète."
+          }
+        }
+      }
+    },
     "Code e-mail" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1081,6 +1161,22 @@
         }
       }
     },
+    "Code indisponible. Crée une nouvelle demande." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code unavailable. Create a new request."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code indisponible. Crée une nouvelle demande."
+          }
+        }
+      }
+    },
     "Comment la ligne évolue" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1094,6 +1190,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Comment la ligne évolue"
+          }
+        }
+      }
+    },
+    "Compare cette empreinte sur le nouvel appareil avant d’approuver." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare this fingerprint on the new device before approving."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare cette empreinte sur le nouvel appareil avant d’approuver."
           }
         }
       }
@@ -1400,6 +1512,22 @@
         }
       }
     },
+    "Impossible de charger la liste des appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device list could not be loaded."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger la liste des appareils."
+          }
+        }
+      }
+    },
     "Impossible de charger le registre E2EE v2." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1515,6 +1643,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible d’approuver cet appareil avec cette clé."
+          }
+        }
+      }
+    },
+    "Impossible d’approuver cet appareil. Actualise puis réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device could not be approved. Refresh and try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’approuver cet appareil. Actualise puis réessaie."
           }
         }
       }
@@ -1735,6 +1879,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le bundle de récupération actif est indisponible."
+          }
+        }
+      }
+    },
+    "Le chiffrement de bout en bout est activé pour ce compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End-to-end encryption is on for this account."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement de bout en bout est activé pour ce compte."
+          }
+        }
+      }
+    },
+    "Le chiffrement des appareils n’est pas encore disponible sur ce compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device encryption is not available on this account yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement des appareils n’est pas encore disponible sur ce compte."
           }
         }
       }
@@ -2076,6 +2252,22 @@
         }
       }
     },
+    "QR indisponible. Crée une nouvelle demande." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR code unavailable. Create a new request."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR indisponible. Crée une nouvelle demande."
+          }
+        }
+      }
+    },
     "RSRP moyen" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2296,6 +2488,22 @@
         }
       }
     },
+    "Si la caméra n’est pas disponible, copie le contenu du QR depuis l’autre appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If the camera is not available, copy the QR code contents from the other device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si la caméra n’est pas disponible, copie le contenu du QR depuis l’autre appareil."
+          }
+        }
+      }
+    },
     "Signal %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2426,6 +2634,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suivre cette connexion"
+          }
+        }
+      }
+    },
+    "Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your devices are listed here. The new end-to-end encryption will turn on once it is available on iPhone, Android and the web."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web."
           }
         }
       }
@@ -2951,6 +3175,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "moyenne récente"
+          }
+        }
+      }
+    },
+    "par QR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "by QR code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "par QR"
+          }
+        }
+      }
+    },
+    "par code" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "by code"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "par code"
+          }
+        }
+      }
+    },
+    "par notification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "by notification"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "par notification"
           }
         }
       }
@@ -21286,6 +21558,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Compte créé mais session non initialisée"
+          }
+        }
+      }
+    },
+    "Compte créé avec Apple ? Il n’a pas de mot de passe que tu connais. Pour en choisir un, déconnecte-toi puis touche « Mot de passe oublié ? » sur l’écran de connexion." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Created your account with Apple? It has no password you know. To choose one, sign out, then tap “Forgot your password?” on the sign-in screen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte créé avec Apple ? Il n’a pas de mot de passe que tu connais. Pour en choisir un, déconnecte-toi puis touche « Mot de passe oublié ? » sur l’écran de connexion."
           }
         }
       }

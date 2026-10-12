@@ -580,12 +580,18 @@ final class SocialFeedService: SocialFeedServicing {
         return response.messageId
     }
 
+    /// Trois décimales (~110 m) suffisent pour un pouls sur 3 km : la position exacte
+    /// n'a pas à figurer dans l'URL, que proxys et serveurs journalisent (AF-FIL-25).
+    static func pulseCoordinate(_ value: Double) -> String {
+        String(format: "%.3f", value)
+    }
+
     /// `radiusMeters` nil/≤0 → le backend applique 3 km par défaut. Un radius > 0
     /// est transmis tel quel (le zod backend rejette 0, on ne l'envoie donc jamais).
     func networkPulse(latitude: Double, longitude: Double, radiusMeters: Int? = nil) async throws -> NetworkPulse {
         var query = [
-            URLQueryItem(name: "lat", value: String(latitude)),
-            URLQueryItem(name: "lng", value: String(longitude))
+            URLQueryItem(name: "lat", value: Self.pulseCoordinate(latitude)),
+            URLQueryItem(name: "lng", value: Self.pulseCoordinate(longitude))
         ]
         if let radiusMeters, radiusMeters > 0 {
             query.append(URLQueryItem(name: "radius", value: String(radiusMeters)))
