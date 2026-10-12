@@ -275,17 +275,19 @@ final class PhotosViewModel: ObservableObject {
         }
     }
 
-    func upload(data: Data, siteId: String, description: String, operatorName: String?, exifMetadata: String?) async -> Bool {
+    /// Renvoie `nil` si l'envoi a réussi, sinon le message à afficher dans la feuille
+    /// (session expirée, fichier trop gros, trop de requêtes… ne sont pas la même panne).
+    func upload(data: Data, siteId: String, description: String, operatorName: String?, exifMetadata: String?) async -> String? {
         do {
             let photo = try await service.uploadPhoto(
                 data: data, siteId: siteId, description: description,
                 anfrCode: nil, operatorName: operatorName, exifMetadata: exifMetadata
             )
             photos.insert(photo, at: 0)
-            return true
+            return nil
         } catch {
             // La feuille d'envoi affiche l'échec elle-même.
-            return false
+            return error.isCancellation ? String(localized: "Échec de l'envoi. Réessaie.") : error.userFacingMessage
         }
     }
 
@@ -1107,9 +1109,10 @@ struct PhotoDetailView: View {
 struct PhotoUploadView: View {
     let antennas: AntennasServicing
     let markets: MarketRegistryServicing
-    /// Renvoie `true` si l'upload a réussi (la feuille se ferme alors). Le dernier
-    /// paramètre est le JSON `exifMetadata` extrait de l'original.
-    var onUpload: (Data, String, String, String?, String?) async -> Bool
+    /// Renvoie `nil` si l'upload a réussi (la feuille se ferme alors), sinon le
+    /// message d'échec à afficher. Le dernier paramètre est le JSON `exifMetadata`
+    /// extrait de l'original.
+    var onUpload: (Data, String, String, String?, String?) async -> String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var pickerItem: PhotosPickerItem?
@@ -1180,9 +1183,20 @@ struct PhotoUploadView: View {
                     .buttonStyle(SQPressButtonStyle())
                     .onChangeCompat(of: pickerItem) { _, newItem in
                         Task {
+                            guard let newItem else { return }
                             // Aperçu décodé réduit ; l'envoi garde l'original (SOC-36).
-                            guard let data = try? await newItem?.loadTransferable(type: Data.self),
-                                  let loaded = ImagePipeline.downsample(data: data, maxPixel: 1600) else { return }
+                            let data: Data?
+                            do {
+                                data = try await newItem.loadTransferable(type: Data.self)
+                            } catch {
+                                if !error.isCancellation { uploadError = error.userFacingMessage }
+                                return
+                            }
+                            guard let data, let loaded = ImagePipeline.downsample(data: data, maxPixel: 1600) else {
+                                uploadError = String(localized: "Image illisible.")
+                                return
+                            }
+                            uploadError = nil
                             imageData = data
                             image = loaded
                             blurRegions = []
@@ -1284,9 +1298,9 @@ struct PhotoUploadView: View {
                             // pas. Le serveur conserve alors l'attribution vide ;
                             // seul un support réellement mutualisé impose le choix.
                             let networkOperator = selectedOperator ?? availableOperators.first
-                            let ok = await onUpload(prepared.jpeg, site.siteId ?? site.id, description, networkOperator, prepared.exifJSON)
+                            let failure = await onUpload(prepared.jpeg, site.siteId ?? site.id, description, networkOperator, prepared.exifJSON)
                             isUploading = false
-                            if ok { dismiss() } else { uploadError = String(localized: "Échec de l'envoi. Réessaie.") }
+                            if let failure { uploadError = failure } else { dismiss() }
                         }
                     }
                     .disabled(uploadDisabled)

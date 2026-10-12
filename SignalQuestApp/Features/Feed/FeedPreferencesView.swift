@@ -7,11 +7,17 @@ import SwiftUI
 /// Les suivis sont un second appel, lancé en parallèle.
 struct FeedPreferencesView: View {
     let service: SocialFeedServicing
+    /// Appelé au retour si un masquage ou un suivi a changé : le fil affiché
+    /// doit refléter les nouvelles préférences sans attendre un tirer-pour-rafraîchir.
+    var onChange: () -> Void = {}
 
     @State private var followed: [FollowedHashtag] = []
     @State private var mutes = SocialMutes()
     @State private var isLoading = true
     @State private var errorMessage: String?
+    /// Vrai si le chargement a échoué : l'écran vide ressemblerait sinon à « rien de suivi ».
+    @State private var loadFailed = false
+    @State private var didChange = false
     @State private var newMutedTag = ""
     @State private var newMutedWord = ""
     /// Stories masquées : préférence locale à cet appareil (pas de route serveur).
@@ -24,6 +30,13 @@ struct FeedPreferencesView: View {
                     Text(LocalizedStringKey(errorMessage))
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.dangerInk)
+                    if loadFailed {
+                        Button("Réessayer") { Task { await load() } }
+                            .font(SQFont.body(13, .semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .disabled(isLoading)
+                    }
                 }
             }
 
@@ -119,6 +132,7 @@ struct FeedPreferencesView: View {
             if isLoading { ProgressView().tint(SQColor.brandRed) }
         }
         .task { await load() }
+        .onDisappear { if didChange { didChange = false; onChange() } }
         .onReceive(NotificationCenter.default.publisher(for: HiddenStoryAuthorsStore.didChange)) { _ in
             hiddenStoryAuthors = HiddenStoryAuthorsStore.entries()
         }
@@ -143,10 +157,35 @@ struct FeedPreferencesView: View {
         defer { isLoading = false }
         // Les deux appels en PARALLÈLE, et surtout indépendants : un échec des
         // suivis ne doit pas vider la liste des masquages, et réciproquement.
-        async let follows = try? await service.followedHashtags()
-        async let inventory = try? await service.mutes()
-        followed = await follows ?? []
-        mutes = await inventory ?? SocialMutes()
+        async let followsError = loadFollowed()
+        async let mutesError = loadMutes()
+        let failure = [await followsError, await mutesError].compactMap { $0 }.first
+        if let failure {
+            guard !failure.isCancellation else { return }
+            errorMessage = failure.userFacingMessage
+            loadFailed = true
+        } else if loadFailed {
+            errorMessage = nil
+            loadFailed = false
+        }
+    }
+
+    private func loadFollowed() async -> Error? {
+        do {
+            followed = try await service.followedHashtags()
+            return nil
+        } catch {
+            return error
+        }
+    }
+
+    private func loadMutes() async -> Error? {
+        do {
+            mutes = try await service.mutes()
+            return nil
+        } catch {
+            return error
+        }
     }
 
     // MARK: Actions
@@ -197,6 +236,8 @@ struct FeedPreferencesView: View {
             do {
                 try await operation()
                 errorMessage = nil
+                loadFailed = false
+                didChange = true
             } catch {
                 guard !error.isCancellation else { return }
                 errorMessage = error.userFacingMessage

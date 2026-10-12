@@ -32,7 +32,7 @@ enum CarPlayMapTemplateBuilder {
         // que « Ici » : que vaut le réseau à cet endroit.
         template.leadingNavigationBarButtons = [
             CPBarButton(title: String(localized: "Ici")) { _ in actions.showHere() },
-            CPBarButton(title: String(localized: "Test")) { _ in actions.showSpeedtest() },
+            CPBarButton(title: String(localized: "Speedtest")) { _ in actions.showSpeedtest() },
         ]
         template.trailingNavigationBarButtons = trailingButtons(isGuiding: false, actions: actions)
         // Les boutons de panoramique n'apparaissent que sur les véhicules à

@@ -766,6 +766,7 @@ final class AuthSessionViewModel: ObservableObject {
     func login(email: String, password: String) async {
         isBusy = true
         errorMessage = nil
+        infoMessage = nil
         defer { isBusy = false }
         do {
             let response = try await service.login(email: email, password: password)

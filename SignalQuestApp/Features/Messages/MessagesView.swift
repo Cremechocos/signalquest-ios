@@ -788,6 +788,15 @@ private struct NewConversationSheet: View {
     @State private var selected: [MessageSearchUser] = []
     @State private var isBusy = false
     @State private var errorMessage: String?
+    /// Recherche en vol, et dernière requête dont la réponse est arrivée (pour
+    /// ne dire « aucun résultat » que pour ce qui est tapé).
+    @State private var isSearching = false
+    @State private var searchedQuery = ""
+
+    private var trimmedQuery: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var showsNoResult: Bool {
+        !isSearching && errorMessage == nil && !trimmedQuery.isEmpty && searchedQuery == trimmedQuery && results.isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -806,7 +815,7 @@ private struct NewConversationSheet: View {
                     // La limite se dit AVANT de créer : on la découvrait au premier
                     // envoi de photo refusé (SOC-07).
                     if e2ee {
-                        Text("Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction, ni appel.")
+                        Text("Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction. Les appels y dépendent de la conversation : ils peuvent être indisponibles, ou partir après confirmation, sans chiffrement de bout en bout.")
                     }
                 }
 
@@ -834,6 +843,9 @@ private struct NewConversationSheet: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .onSubmit { Task { await search() } }
+                    if isSearching || showsNoResult {
+                        UserSearchStatusRow(isSearching: isSearching)
+                    }
                     ForEach(results.filter { result in !selected.contains(where: { $0.id == result.id }) }) { user in
                         Button {
                             selected.append(user)
@@ -895,13 +907,23 @@ private struct NewConversationSheet: View {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             results = []
+            searchedQuery = ""
+            isSearching = false
             return
         }
+        isSearching = true
         do {
-            results = try await service.searchUsers(query: trimmed)
+            let found = try await service.searchUsers(query: trimmed)
+            guard !Task.isCancelled else { return }
+            results = found
+            searchedQuery = trimmed
+            // Une erreur de recherche (ou de création) précédente ne survit pas à une recherche réussie.
+            errorMessage = nil
         } catch {
+            guard !error.isCancellation, !Task.isCancelled else { return }
             errorMessage = error.userFacingMessage
         }
+        isSearching = false
     }
 
     private func create() async {
@@ -1113,5 +1135,45 @@ enum ConversationListDate {
             return date.formatted(.dateTime.day().month(.abbreviated).locale(locale))
         }
         return date.formatted(.dateTime.day().month(.abbreviated).year().locale(locale))
+    }
+}
+
+extension View {
+    /// Échec d'une action sur une liste déjà remplie (retrait, suppression) :
+    /// bandeau collé en bas, annoncé à VoiceOver. Sans lui, l'erreur n'apparaissait
+    /// que sur une liste vide et la rangée revenait sans explication.
+    func actionErrorBar(_ message: String?) -> some View {
+        safeAreaInset(edge: .bottom, spacing: 0) {
+            if let message {
+                SQInlineError(message: message)
+                    .padding(SQSpace.md)
+                    .background(SQColor.dangerSoft)
+                    .background(SQColor.surface)
+            }
+        }
+    }
+}
+
+/// Ligne d'état d'une recherche d'utilisateurs : chargement, puis « aucun
+/// résultat » (une recherche réussie mais vide ne doit pas ressembler à un
+/// champ resté inactif).
+struct UserSearchStatusRow: View {
+    let isSearching: Bool
+
+    var body: some View {
+        if isSearching {
+            HStack(spacing: SQSpace.sm) {
+                ProgressView().tint(SQColor.brandRed)
+                Text("Recherche en cours")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            Text("Aucun résultat")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .task { UIAccessibility.post(notification: .announcement, argument: String(localized: "Aucun résultat")) }
+        }
     }
 }

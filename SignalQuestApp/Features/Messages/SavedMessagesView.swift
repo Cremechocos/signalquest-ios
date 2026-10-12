@@ -40,6 +40,8 @@ struct SavedMessagesView: View {
                     }
                 }
             }
+            // Échec d'un retrait sur une liste remplie : dit près de la liste.
+            .actionErrorBar(entries.isEmpty ? nil : errorMessage)
             .navigationTitle("Messages enregistrés")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -159,6 +161,7 @@ struct SavedMessagesView: View {
     private func remove(_ entry: SavedMessageEntry) async {
         let id = entry.message.id
         removing.insert(id)
+        errorMessage = nil
         do {
             try await service.unsaveMessage(messageId: id)
             entries.removeAll { $0.message.id == id }

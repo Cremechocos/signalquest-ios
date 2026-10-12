@@ -203,9 +203,39 @@ struct ANFRBandsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 operatorChips
                 if !model.generationRows.isEmpty {
-                    generationsCard
-                    detailCard
-                    footnote
+                    // Un changement d'opérateur ou de génération recharge les chiffres :
+                    // sans indicateur, les anciens passeraient pour ceux de la nouvelle puce.
+                    if model.isLoading {
+                        HStack(spacing: SQSpace.sm) {
+                            ProgressView().tint(SQColor.brandRed)
+                            Text("Chargement…")
+                                .font(SQType.subhead)
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                    } else if let error = model.errorMessage {
+                        VStack(alignment: .leading, spacing: SQSpace.xs) {
+                            Label(error, systemImage: "exclamationmark.triangle")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.warning)
+                            Button {
+                                Task { await model.refresh() }
+                            } label: {
+                                Text("Réessayer")
+                                    .font(SQType.button)
+                                    .foregroundStyle(SQColor.accentInk)
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("anfr.bands.retry")
+                        }
+                    }
+                    Group {
+                        generationsCard
+                        detailCard
+                        footnote
+                    }
+                    .opacity(model.isLoading ? 0.45 : 1)
                 } else if let error = model.errorMessage {
                     ErrorStateView(title: "Statistiques indisponibles", message: error) {
                         Task { await model.refresh() }

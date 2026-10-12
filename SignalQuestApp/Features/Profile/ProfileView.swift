@@ -59,6 +59,8 @@ struct ProfileView: View {
     @State private var showNotificationSettings = false
     /// La déconnexion se confirme : un appui accidentel coupait la session (TRX-31).
     @State private var confirmLogout = false
+    /// `logout()` enchaîne plusieurs appels réseau : sans état d'attente, l'action semblait ignorée et pouvait être relancée.
+    @State private var isLoggingOut = false
 
     init(user: AuthUser) {
         self.user = user
@@ -100,12 +102,18 @@ struct ProfileView: View {
                 // resterait estompée en permanence tant qu'on ne scrolle pas.
                 menuCard
 
-                GradientButton("Déconnexion", systemImage: "rectangle.portrait.and.arrow.right", style: .destructive) {
+                GradientButton("Déconnexion", systemImage: "rectangle.portrait.and.arrow.right", isBusy: isLoggingOut, style: .destructive) {
                     confirmLogout = true
                 }
+                .disabled(isLoggingOut)
                 .confirmationDialog("Te déconnecter ?", isPresented: $confirmLogout, titleVisibility: .visible) {
                     Button("Se déconnecter", role: .destructive) {
-                        Task { await session.logout() }
+                        guard !isLoggingOut else { return }
+                        isLoggingOut = true
+                        Task {
+                            await session.logout()
+                            isLoggingOut = false
+                        }
                     }
                     Button("Annuler", role: .cancel) {}
                 } message: {

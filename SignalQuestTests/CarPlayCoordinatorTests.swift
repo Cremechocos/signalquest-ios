@@ -285,4 +285,13 @@ final class CarPlayCoordinatorTests: XCTestCase {
         XCTAssertTrue(template.emptyViewSubtitleVariants.isEmpty,
                       "pendant le chargement, on n'affirme rien sur le contenu")
     }
+
+    /// Un itinéraire introuvable ne se présente pas comme une panne de connexion.
+    @MainActor
+    func testNoRouteIsNotReportedAsConnectionFailure() {
+        XCTAssertEqual(CarPlayCoordinator.routeFailureMessage(for: CarPlayRouteService.RouteError.noRoute),
+                       String(localized: "Aucun itinéraire trouvé vers cette destination."))
+        XCTAssertEqual(CarPlayCoordinator.routeFailureMessage(for: URLError(.notConnectedToInternet)),
+                       String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie."))
+    }
 }

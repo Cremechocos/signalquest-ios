@@ -673,3 +673,26 @@ private actor SignupIdentityWipeGate {
         continuation = nil
     }
 }
+
+extension AuthSessionTests {
+    /// La raison d'un retour à la connexion (compte suspendu, session expirée,
+    /// compte supprimé) n'a de sens que si l'écran de connexion la montre.
+    func testLoginScreenShowsTheSessionInfoMessage() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repository.appendingPathComponent("SignalQuestApp/Features/Auth/LoginView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("if let info = session.infoMessage"))
+    }
+
+    func testLoginAttemptClearsThePreviousInfoMessage() async {
+        let mock = MockAuthService()
+        let vm = AuthSessionViewModel(service: mock)
+        vm.infoMessage = "Ta session a expiré. Reconnecte-toi pour continuer."
+        await vm.login(email: "qa@example.test", password: "synthetic-password")
+        XCTAssertNil(vm.infoMessage)
+    }
+}

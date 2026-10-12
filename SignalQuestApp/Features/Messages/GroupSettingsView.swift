@@ -30,6 +30,11 @@ struct GroupSettingsView: View {
     @State private var searchQuery = ""
     @State private var searchResults: [MessageSearchUser] = []
     @State private var searchTask: Task<Void, Never>?
+    /// Recherche en vol, dernière requête dont la réponse est arrivée, et échec
+    /// éventuel (dit près du champ, sans toucher à `errorMessage` des actions).
+    @State private var isSearching = false
+    @State private var searchedQuery = ""
+    @State private var searchError: String?
     @State private var photoItem: PhotosPickerItem?
     @State private var showAvatarPicker = false
     @State private var isBusy = false
@@ -178,6 +183,13 @@ struct GroupSettingsView: View {
                             .foregroundStyle(SQColor.label)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                        if isSearching {
+                            UserSearchStatusRow(isSearching: true)
+                        } else if let searchError {
+                            SQInlineError(message: searchError)
+                        } else if showsNoSearchResult {
+                            UserSearchStatusRow(isSearching: false)
+                        }
                         ForEach(searchResults.filter { result in !participants.contains(where: { $0.userId == result.id }) }) { user in
                             Button {
                                 Task { await add(user) }
@@ -314,11 +326,32 @@ struct GroupSettingsView: View {
         let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             searchResults = []
+            searchedQuery = ""
+            searchError = nil
+            isSearching = false
             return
         }
-        let results = (try? await service.searchUsers(query: trimmed)) ?? []
-        guard !Task.isCancelled else { return }
-        searchResults = results
+        isSearching = true
+        do {
+            let results = try await service.searchUsers(query: trimmed)
+            guard !Task.isCancelled else { return }
+            searchResults = results
+            searchedQuery = trimmed
+            searchError = nil
+        } catch {
+            guard !error.isCancellation, !Task.isCancelled else { return }
+            // Une recherche en échec ne doit pas passer pour « aucun résultat ».
+            searchResults = []
+            searchError = error.userFacingMessage
+        }
+        isSearching = false
+    }
+
+    private var showsNoSearchResult: Bool {
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Tous les résultats déjà membres reviennent à ne rien pouvoir ajouter.
+        return !trimmed.isEmpty && searchedQuery == trimmed
+            && searchResults.allSatisfy { result in participants.contains(where: { $0.userId == result.id }) }
     }
 
     /// Nom saisi mais pas encore enregistré.

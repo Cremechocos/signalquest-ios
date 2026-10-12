@@ -112,6 +112,15 @@ struct LoginView: View {
                                 .contentShape(Rectangle())
                                 .accessibilityIdentifier("login.twoFactor.cancel")
                         } else {
+                            // Raison du retour à la connexion (session expirée, compte
+                            // suspendu ou supprimé, mot de passe changé), posée par la session.
+                            if let info = session.infoMessage {
+                                Label(info, systemImage: "info.circle")
+                                    .font(.footnote)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("login.info")
+                            }
                             VStack(alignment: .leading, spacing: SQSpace.xs) {
                                 SQFormFieldLabel("Email")
                                 TextField("Email", text: $email, prompt: SQFormPrompt.text("nom@exemple.fr"))

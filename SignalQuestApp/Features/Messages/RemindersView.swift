@@ -46,6 +46,8 @@ struct RemindersView: View {
                 .scrollContentBackground(.hidden)
             }
         }
+        // Échec d'une suppression sur une liste remplie : dit près de la liste.
+        .actionErrorBar(items.isEmpty ? nil : errorMessage)
         .navigationTitle("Rappels")
         .toolbarTitleInlineCompat()
         .signalQuestBackground()
@@ -117,6 +119,7 @@ struct RemindersView: View {
 
     private func delete(at offsets: IndexSet) async {
         let targets = offsets.map { activeItems[$0] }
+        errorMessage = nil
         for target in targets {
             do {
                 try await service.deleteReminder(conversationId: conversation.id, reminderId: target.id)

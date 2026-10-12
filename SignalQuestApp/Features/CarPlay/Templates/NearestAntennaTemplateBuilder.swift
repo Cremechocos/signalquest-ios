@@ -67,7 +67,7 @@ enum NearestAntennaTemplateBuilder {
             }
             if let download = quality.medianDownloadMbps {
                 items.append(CPInformationItem(title: String(localized: "Débit médian"),
-                                               detail: "\(download) Mb/s"))
+                                               detail: "\(download) \(SQUnits.throughputUnit(mbps: Double(download)))"))
             }
             // Le nombre de mesures qualifie le verdict : « mauvais sur 3 mesures »
             // et « mauvais sur 400 » ne se valent pas, et l'utilisateur qui

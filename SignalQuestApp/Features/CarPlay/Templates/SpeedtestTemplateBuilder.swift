@@ -51,7 +51,7 @@ enum SpeedtestTemplateBuilder {
 
     static func make(state: State, actions: Actions) -> CPInformationTemplate {
         CPInformationTemplate(
-            title: String(localized: "Débit"),
+            title: String(localized: "Speedtest"),
             layout: .twoColumn,
             items: Array(items(for: state).prefix(CarPlayDetailTemplateBuilder.maxItems)),
             actions: buttons(for: state, actions: actions)
@@ -149,11 +149,11 @@ enum SpeedtestTemplateBuilder {
         }
     }
 
-    /// Arrondi à l'entier au-dessus de 10 Mb/s : au volant, la décimale d'un
-    /// débit à 187 Mb/s n'apporte rien et allonge le nombre à lire.
+    /// Arrondi à l'entier au-dessus de 10 Mbit/s : au volant, la décimale d'un
+    /// débit à 187 Mbit/s n'apporte rien et allonge le nombre à lire. L'unité et
+    /// le séparateur décimal sont ceux du reste de l'app (`SQUnits`).
     static func mbps(_ value: Double) -> String {
-        value >= 10
-            ? String(localized: "\(Int(value.rounded())) Mb/s")
-            : String(localized: "\(String(format: "%.1f", value)) Mb/s")
+        guard value.isFinite, value >= 10, value < 1_000 else { return SQUnits.throughput(mbps: value) }
+        return "\(Int(value.rounded())) \(SQUnits.throughputUnit(mbps: value))"
     }
 }

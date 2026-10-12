@@ -19,6 +19,8 @@ final class GamificationViewModel: ObservableObject {
     @Published var questsState: QuestsV2State = .loading
     @Published var season: GamificationV2Season?
     @Published var claimingQuestIds: Set<String> = []
+    /// Échec de la dernière réclamation : sans texte, seule une vibration le signalait.
+    @Published var claimError: String?
 
     private let service: GamificationServicing
     private var questsService: GamificationV2Servicing?
@@ -43,6 +45,8 @@ final class GamificationViewModel: ObservableObject {
             catalog = (try? await c) ?? []
             errorMessage = nil
         } catch {
+            // Un rafraîchissement interrompu n'est pas un échec à afficher.
+            if error.isCancellation { return }
             errorMessage = error.userFacingMessage
         }
     }
@@ -67,6 +71,7 @@ final class GamificationViewModel: ObservableObject {
     func claim(_ quest: GamificationV2Quest) async {
         guard let questsService, quest.isClaimable, !claimingQuestIds.contains(quest.id) else { return }
         claimingQuestIds.insert(quest.id)
+        claimError = nil
         defer { claimingQuestIds.remove(quest.id) }
         do {
             _ = try await questsService.claim(questKey: quest.key, scopeKey: quest.scopeKey)
@@ -82,6 +87,7 @@ final class GamificationViewModel: ObservableObject {
             await load()
         } catch {
             Haptics.error()
+            if !error.isCancellation { claimError = error.userFacingMessage }
             // Retour à la vérité serveur (la quête peut avoir déjà été réclamée ailleurs).
             await loadQuests()
         }
@@ -265,6 +271,12 @@ struct GamificationView: View {
     private func questsSection(_ quests: [GamificationV2Quest]) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm + 2) {
             Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
+            if let claimError = model.claimError {
+                Label(claimError, systemImage: "exclamationmark.triangle")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.dangerInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             ForEach(questGroups(quests), id: \.cadence) { group in
                 // sqFadeUp par groupe (hauteur < viewport) — JAMAIS sur le bloc
                 // entier, sinon la section reste estompée en permanence.

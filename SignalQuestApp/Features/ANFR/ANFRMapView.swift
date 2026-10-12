@@ -377,7 +377,6 @@ struct ANFRMapFilterSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.xl) {
-                SQSheetHandle()
 
                 section(title: "Opérateurs") {
                     FlexibleChips(ANFROperator.allCases) { op in
@@ -448,7 +447,6 @@ struct ANFRDatePickerSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.md) {
-                SQSheetHandle()
                 Text("Choisir une date")
                     .font(SQType.title)
                     .foregroundStyle(SQColor.label)

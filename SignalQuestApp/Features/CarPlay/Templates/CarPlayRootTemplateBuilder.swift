@@ -25,7 +25,7 @@ enum CarPlayRootTemplateBuilder {
             switch self {
             case .nearby: return String(localized: "Antennes autour")
             case .here: return String(localized: "Ici")
-            case .speedtest: return String(localized: "Débit")
+            case .speedtest: return String(localized: "Speedtest")
             case .sentinelle: return String(localized: "Sentinelle")
             }
         }

@@ -148,7 +148,7 @@ final class CarPlayTabsAndPOITests: XCTestCase {
 
         let detail = OperatorComparisonTemplateBuilder.detail(for: stat, metric: .download)
 
-        XCTAssertTrue(detail.hasPrefix("42 Mbps"), "la valeur répond à la question posée")
+        XCTAssertTrue(detail.hasPrefix("42 \(SQUnits.throughputUnit(mbps: 42))"), "la valeur répond à la question posée")
         XCTAssertTrue(detail.contains("128"), "le nombre de mesures dit à quel point s'y fier")
     }
 

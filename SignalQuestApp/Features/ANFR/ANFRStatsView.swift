@@ -225,6 +225,14 @@ struct ANFRStatsView: View {
                         Task { await model.refresh() }
                     }
                     .padding(.top, SQSpace.huge)
+                } else if model.stats != nil {
+                    // Réponse reçue mais sans relevé : un état vide, pas un chargement sans fin.
+                    EmptyStateView(
+                        title: "Aucune statistique disponible",
+                        message: "Les relevés ANFR ne sont pas encore disponibles. Tire l'écran vers le bas pour actualiser.",
+                        systemImage: "chart.bar"
+                    )
+                    .padding(.top, SQSpace.huge)
                 } else {
                     loadingState
                         .padding(.top, SQSpace.huge)

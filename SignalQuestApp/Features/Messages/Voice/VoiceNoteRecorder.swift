@@ -124,7 +124,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
             return nil
         }
         guard restoreFinishedDraft(url: url, duration: elapsed) else {
-            state = .failed(String(localized: "Impossible de démarrer l'enregistrement."))
+            state = .failed(String(localized: "La note vocale n’a pas pu être conservée."))
             return nil
         }
         return url

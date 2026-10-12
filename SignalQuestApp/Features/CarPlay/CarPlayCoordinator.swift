@@ -335,7 +335,7 @@ final class CarPlayCoordinator {
             CarPlayTabBarBuilder.decorate(here, title: String(localized: "Ici"),
                                           systemImage: "dot.radiowaves.left.and.right"),
             poi,
-            CarPlayTabBarBuilder.decorate(speedtest, title: String(localized: "Débit"),
+            CarPlayTabBarBuilder.decorate(speedtest, title: String(localized: "Speedtest"),
                                           systemImage: "speedometer"),
             CarPlayTabBarBuilder.decorate(sentinelle, title: String(localized: "Sentinelle"),
                                           systemImage: "wifi.router.fill"),
@@ -1121,14 +1121,27 @@ final class CarPlayCoordinator {
                 presentNavigationAlert(Self.locationUnavailableMessage)
                 return
             }
-            let plan = try? await routeService.route(from: origin, to: coordinate)
-            guard !Task.isCancelled, generation == routeGeneration else { return }
-            guard let plan else {
-                presentNavigationAlert(String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie."))
+            let plan: RoutePlan
+            do {
+                plan = try await routeService.route(from: origin, to: coordinate)
+            } catch {
+                guard !Task.isCancelled, generation == routeGeneration else { return }
+                presentNavigationAlert(Self.routeFailureMessage(for: error))
                 return
             }
+            guard !Task.isCancelled, generation == routeGeneration else { return }
             beginGuidance(with: plan, title: title, from: origin, to: coordinate)
         }
+    }
+
+    /// Un itinéraire introuvable n'est pas un problème de connexion : le
+    /// conducteur doit savoir qu'il faut choisir une autre destination.
+    static func routeFailureMessage(for error: Error) -> String {
+        if (error as? CarPlayRouteService.RouteError) == .noRoute
+            || (error as? MKError)?.code == .directionsNotFound {
+            return String(localized: "Aucun itinéraire trouvé vers cette destination.")
+        }
+        return String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie.")
     }
 
     private static var locationUnavailableMessage: String {
@@ -1335,7 +1348,7 @@ final class CarPlayCoordinator {
                 )
             } catch {
                 guard !Task.isCancelled else { return }
-                updateSpeedtest(state: .failed(error.localizedDescription))
+                updateSpeedtest(state: .failed(error.userFacingMessage))
             }
         }
     }

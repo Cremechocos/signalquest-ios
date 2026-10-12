@@ -53,6 +53,7 @@ final class CallHistoryViewModel: ObservableObject {
 
     /// Efface tout l'historique (masquage « pour moi » côté serveur + cache local vidé).
     func clearHistory() async {
+        errorMessage = nil
         do {
             try await service.clearHistory()
             calls = []
@@ -66,6 +67,7 @@ final class CallHistoryViewModel: ObservableObject {
     /// Supprime un appel de MON historique (optimiste, rollback si le serveur échoue).
     func deleteEntry(_ call: CallSession) async {
         let previous = calls
+        errorMessage = nil
         calls.removeAll { $0.id == call.id }
         do {
             try await service.deleteEntry(callId: call.id)
@@ -151,15 +153,15 @@ struct CallHistoryView: View {
                             Label("Supprimer", systemImage: "trash")
                         }
                     }
-                    // Rappeler passe par la conversation : son bouton d'appel
-                    // applique les règles (chiffrement, groupe, réseau) ; la
+                    // Le geste ouvre la conversation, sans lancer d'appel : son bouton
+                    // d'appel applique les règles (chiffrement, groupe, réseau) ; la
                     // ligne ne menait nulle part (SOC-44).
                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                         if let conversationId = call.conversationId {
                             Button {
                                 router.route(toConversation: conversationId)
                             } label: {
-                                Label("Rappeler", systemImage: "phone.arrow.up.right")
+                                Label("Ouvrir la conversation", systemImage: "bubble.left.fill")
                             }
                             .tint(SQColor.success)
                         }
@@ -188,6 +190,8 @@ struct CallHistoryView: View {
         }
         .scrollContentBackground(.hidden)
         .signalQuestBackground()
+        // Échec d'une suppression ou de « Tout effacer » : la rangée revient, on dit pourquoi.
+        .actionErrorBar(model.calls.isEmpty ? nil : model.errorMessage)
         .navigationTitle("Appels")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }

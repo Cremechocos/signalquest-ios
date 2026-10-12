@@ -92,15 +92,16 @@ final class CarPlaySpeedtestTests: XCTestCase {
         XCTAssertEqual(SpeedtestTemplateBuilder.phaseLabel(.failed("Timeout")), "Timeout")
     }
 
-    /// Au-dessus de 10 Mb/s, la décimale n'apporte rien et allonge le nombre à
-    /// lire ; en dessous, elle distingue 0,8 de 8.
+    /// Au-dessus de 10 Mbit/s, la décimale n'apporte rien et allonge le nombre à
+    /// lire ; en dessous, elle distingue 0,8 de 8. L'unité et le séparateur
+    /// décimal sont ceux de l'app (`SQUnits`).
     func testThroughputRoundingFavoursReadability() {
-        XCTAssertEqual(SpeedtestTemplateBuilder.mbps(187.4), String(localized: "187 Mb/s"))
+        XCTAssertEqual(SpeedtestTemplateBuilder.mbps(187.4), "187 \(SQUnits.throughputUnit(mbps: 187.4))")
         // 8.26 et non 8.25 : ce dernier n'est pas représentable exactement en
         // binaire et `%.1f` l'arrondit à 8.2, ce qui testerait la norme IEEE 754
         // plutôt que notre règle d'affichage.
-        XCTAssertEqual(SpeedtestTemplateBuilder.mbps(8.26), String(localized: "8.3 Mb/s"))
-        XCTAssertEqual(SpeedtestTemplateBuilder.mbps(0.8), String(localized: "0.8 Mb/s"))
+        XCTAssertEqual(SpeedtestTemplateBuilder.mbps(8.26), SQUnits.throughput(mbps: 8.26))
+        XCTAssertEqual(SpeedtestTemplateBuilder.mbps(0.8), SQUnits.throughput(mbps: 0.8))
     }
 
     /// Plafonds CarPlay, y compris dans l'état le plus chargé.

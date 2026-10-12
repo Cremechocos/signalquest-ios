@@ -1471,6 +1471,22 @@
         }
       }
     },
+    "Aucun itinéraire trouvé vers cette destination." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No route found to this destination."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun itinéraire trouvé vers cette destination."
+          }
+        }
+      }
+    },
     "Aucune publication récente" : {
       "localizations" : {
         "en" : {
@@ -1483,6 +1499,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune publication récente"
+          }
+        }
+      }
+    },
+    "Aucune statistique disponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No statistics available"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune statistique disponible"
           }
         }
       }
@@ -2578,6 +2610,22 @@
         }
       }
     },
+    "La note vocale n’a pas pu être conservée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The voice note could not be kept."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La note vocale n’a pas pu être conservée."
+          }
+        }
+      }
+    },
     "La restauration de l’historique a échoué." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2707,6 +2755,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le signal médian mesuré par la communauté à moins de %@ de toi, tous opérateurs confondus."
+          }
+        }
+      }
+    },
+    "Les relevés ANFR ne sont pas encore disponibles. Tire l'écran vers le bas pour actualiser." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR surveys are not available yet. Pull down to refresh."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les relevés ANFR ne sont pas encore disponibles. Tire l'écran vers le bas pour actualiser."
           }
         }
       }
@@ -2945,6 +3009,22 @@
         }
       }
     },
+    "Ouvrir la conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la conversation"
+          }
+        }
+      }
+    },
     "Ouvrir un lien externe ?" : {
       "localizations" : {
         "en" : {
@@ -3044,6 +3124,22 @@
         }
       }
     },
+    "Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction. Les appels y dépendent de la conversation : ils peuvent être indisponibles, ou partir après confirmation, sans chiffrement de bout en bout." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For now, an encrypted conversation only accepts text: no photos, voice notes, polls or reactions. Calls depend on the conversation: they may be unavailable, or go through after confirmation, without end-to-end encryption."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction. Les appels y dépendent de la conversation : ils peuvent être indisponibles, ou partir après confirmation, sans chiffrement de bout en bout."
+          }
+        }
+      }
+    },
     "Premier appareil approuvé." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3089,6 +3185,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Précision GPS médiane"
+          }
+        }
+      }
+    },
+    "Publication introuvable ou supprimée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post not found or deleted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publication introuvable ou supprimée."
           }
         }
       }
@@ -3270,6 +3382,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réessayer de charger la suite"
+          }
+        }
+      }
+    },
+    "Réessayer la position" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try locating again"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer la position"
           }
         }
       }
@@ -3609,6 +3737,22 @@
         }
       }
     },
+    "Ton compte a été supprimé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account has been deleted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton compte a été supprimé."
+          }
+        }
+      }
+    },
     "Top régions — %@ %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3622,6 +3766,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Top régions — %@ %@"
+          }
+        }
+      }
+    },
+    "Toucher pour arrêter la lecture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to stop playback"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toucher pour arrêter la lecture"
           }
         }
       }
@@ -44185,22 +44345,6 @@
         }
       }
     },
-    "Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction, ni appel." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "For now, an encrypted conversation only accepts text: no photos, voice notes, polls, reactions or calls."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction, ni appel."
-          }
-        }
-      }
-    },
     "Pour situer ton speedtest sur la carte communautaire, SignalQuest a besoin de ta position au moment du test. Elle est publiée telle quelle ; tes zones privées la protègent. Tu peux refuser : le test fonctionnera quand même, sans apparaître sur la carte." : {
       "localizations" : {
         "en" : {
@@ -55629,22 +55773,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Toucher pour déplier"
-          }
-        }
-      }
-    },
-    "Toucher pour mettre en pause" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap to pause"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toucher pour mettre en pause"
           }
         }
       }

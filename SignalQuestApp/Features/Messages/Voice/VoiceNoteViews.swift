@@ -93,10 +93,11 @@ struct VoiceNoteDraftBar: View {
         VStack(spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
                 Button { player.toggle(url: url) } label: {
-                    Image(systemName: player.isPlaying(url) ? "pause.fill" : "play.fill")
+                    // Le toucher arrête la lecture, qui repartirait du début : pas d'icône pause.
+                    Image(systemName: player.isPlaying(url) ? "stop.fill" : "play.fill")
                         .frame(width: 44, height: 44)
                 }
-                .accessibilityLabel(player.isPlaying(url) ? "Toucher pour mettre en pause" : "Toucher pour écouter")
+                .accessibilityLabel(player.isPlaying(url) ? "Toucher pour arrêter la lecture" : "Toucher pour écouter")
                 .accessibilityIdentifier("voiceNote.preview")
 
                 Text("Note vocale")
@@ -151,7 +152,7 @@ struct VoiceNoteBubble: View {
                 Haptics.selection()
                 player.toggle(url: url)
             } label: {
-                Image(systemName: player.isPlaying(url) ? "pause.fill" : "play.fill")
+                Image(systemName: player.isPlaying(url) ? "stop.fill" : "play.fill")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(mine ? SQColor.brandRed : SQColor.onAccent)
                     .frame(width: 34, height: 34)
@@ -182,7 +183,7 @@ struct VoiceNoteBubble: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Note vocale")
         .accessibilityValue(VoiceNotePlayer.formatted(player.isPlaying(url) ? player.duration : duration))
-        .accessibilityHint(player.isPlaying(url) ? "Toucher pour mettre en pause" : "Toucher pour écouter")
+        .accessibilityHint(player.isPlaying(url) ? "Toucher pour arrêter la lecture" : "Toucher pour écouter")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
             Haptics.selection()

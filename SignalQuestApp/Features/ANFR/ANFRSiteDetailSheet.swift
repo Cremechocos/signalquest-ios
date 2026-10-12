@@ -47,7 +47,6 @@ struct ANFRSiteDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    SQSheetHandle()
                     header
                     currentAntennasCard
                     timelineSection
@@ -78,7 +77,7 @@ struct ANFRSiteDetailSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(site.city.isEmpty ? "Support \(site.supId)" : site.city.capitalized)
+            Text(site.city.isEmpty ? String(localized: "Support \(site.supId)") : site.city.capitalized)
                 .font(SQType.title)
                 .sqHeader()
                 .foregroundStyle(SQColor.label)
@@ -118,10 +117,11 @@ struct ANFRSiteDetailSheet: View {
                         .fill((antenna.operator?.color) ?? SQColor.labelSecondary)
                         .frame(width: 10, height: 10)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(antenna.system.isEmpty ? (antenna.operator?.label ?? "Antenne") : antenna.system)
+                        Text(antenna.system.isEmpty ? (antenna.operator?.label ?? String(localized: "Antenne")) : antenna.system)
                             .font(SQFont.body(14, .semibold))
                             .foregroundStyle(SQColor.label)
-                        Text(antenna.statut)
+                        // Statuts ANFR connus traduits ; toute autre valeur reste affichée telle quelle.
+                        Text(LocalizedStringKey(antenna.statut))
                             .font(SQType.micro)
                             .foregroundStyle(SQColor.labelSecondary)
                     }
@@ -178,9 +178,23 @@ struct ANFRSiteDetailSheet: View {
                     }
                 }
             } else if let error = model.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.warning)
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.warning)
+                    Button {
+                        Haptics.light()
+                        Task { await model.load(supId: site.supId) }
+                    } label: {
+                        Text("Réessayer")
+                            .font(SQType.button)
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("anfr.site.retry")
+                }
             } else {
                 Text("Aucune modification archivée pour ce support.")
                     .font(SQType.subhead)

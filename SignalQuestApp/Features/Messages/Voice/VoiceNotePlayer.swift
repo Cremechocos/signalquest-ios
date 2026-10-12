@@ -26,7 +26,7 @@ final class VoiceNotePlayer: NSObject, ObservableObject {
 
     func isPlaying(_ url: URL) -> Bool { playingURL == url }
 
-    /// Bascule lecture/pause. Lancer une autre note arrête la précédente.
+    /// Bascule lecture/arrêt (l'arrêt remet la note au début). Lancer une autre note arrête la précédente.
     func toggle(url: URL) {
         if playingURL == url {
             stop()

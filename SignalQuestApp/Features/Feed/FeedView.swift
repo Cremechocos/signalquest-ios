@@ -554,6 +554,8 @@ struct FeedView: View {
     /// Post ouvert via deep-link / notification (résolu en item complet).
     @State private var routedPostItem: RoutedPost?
     @State private var failedRoutedPostID: String?
+    /// Lien vers une publication supprimée ou inexistante : rien à réessayer.
+    @State private var routedPostMissing = false
     @State private var routedPostRevision = UUID()
     private enum FeedSheet: Identifiable {
         case detail(UnifiedSocialFeedItem)
@@ -683,7 +685,9 @@ struct FeedView: View {
             CallHistoryView(service: services.calls)
         }
         .navigationDestination(isPresented: $showFeedPreferences) {
-            FeedPreferencesView(service: services.feed)
+            FeedPreferencesView(service: services.feed) {
+                Task { await model.load() }
+            }
         }
         .signalQuestBackground()
         .task {
@@ -736,15 +740,21 @@ struct FeedView: View {
             .onDisappear { Task { await model.load() } }
         }
         .alert("Publication", isPresented: Binding(
-            get: { failedRoutedPostID != nil },
-            set: { if !$0 { failedRoutedPostID = nil } }
-        ), presenting: failedRoutedPostID) { retryID in
-            Button("Réessayer") {
-                Task { await openRoutedPost(retryID) }
+            get: { failedRoutedPostID != nil || routedPostMissing },
+            set: { if !$0 { failedRoutedPostID = nil; routedPostMissing = false } }
+        )) {
+            if let retryID = failedRoutedPostID {
+                Button("Réessayer") {
+                    Task { await openRoutedPost(retryID) }
+                }
             }
-            Button("Fermer", role: .cancel) { failedRoutedPostID = nil }
-        } message: { _ in
-            Text("Une erreur est survenue. Réessaie.")
+            Button("Fermer", role: .cancel) { failedRoutedPostID = nil; routedPostMissing = false }
+        } message: {
+            if routedPostMissing {
+                Text("Publication introuvable ou supprimée.")
+            } else {
+                Text("Une erreur est survenue. Réessaie.")
+            }
         }
         // Échec d'une action : bandeau passager, ou message dans la fiche
         // ouverte, qui masquerait le bandeau (SOC-14).
@@ -976,6 +986,7 @@ struct FeedView: View {
         let revision = UUID()
         routedPostRevision = revision
         failedRoutedPostID = nil
+        routedPostMissing = false
         if AppEnvironment.usesDemoData,
            let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
             routedPostItem = RoutedPost(item: existing)
@@ -987,11 +998,13 @@ struct FeedView: View {
             if let fetched {
                 routedPostItem = RoutedPost(item: fetched)
             } else {
-                failedRoutedPostID = id
+                routedPostMissing = true
             }
         } catch {
             guard routedPostRevision == revision, !error.isCancellation else { return }
-            if let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
+            if case .http(let status, _, _, _, _)? = error as? APIError, status == 404 || status == 410 {
+                routedPostMissing = true
+            } else if let existing = model.page?.items.first(where: { $0.id == id || $0.backendPostId == id }) {
                 routedPostItem = RoutedPost(item: existing)
             } else {
                 failedRoutedPostID = id

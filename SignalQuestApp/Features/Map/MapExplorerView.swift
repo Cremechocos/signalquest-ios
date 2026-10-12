@@ -1537,6 +1537,26 @@ final class MapExplorerViewModel: ObservableObject {
     }
 }
 
+/// Échec du recentrage GPS, avec l'action qui correspond à sa cause.
+private enum MapLocationIssue {
+    case denied
+    case unavailable
+
+    var message: String {
+        switch self {
+        case .denied: return String(localized: "Localisation désactivée. Active-la dans Réglages > SignalQuest pour te localiser sur la carte.")
+        case .unavailable: return String(localized: "Position actuelle indisponible")
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .denied: return String(localized: "Ouvrir les Réglages")
+        case .unavailable: return String(localized: "Réessayer la position")
+        }
+    }
+}
+
 struct MapExplorerView: View {
     private struct FriendsStreamTaskKey: Hashable {
         let enabled: Bool
@@ -1603,6 +1623,12 @@ struct MapExplorerView: View {
     /// est présenté.
     @State private var cellsForNewSite: [AndroidCommunitySiteMarker] = []
     @State private var fetchTask: Task<Void, Never>?
+    /// Échec du recentrage GPS : un état à part de `model.errorMessage`, dont le
+    /// « Réessayer » recharge la carte et non la position.
+    @State private var locationIssue: MapLocationIssue?
+    /// Demande de position arrivée à échéance pendant la fenêtre d'autorisation :
+    /// le recentrage reprend dès que l'accès est accordé, sans message d'échec.
+    @State private var recentersWhenAuthorized = false
     @State private var lastRegion: MKCoordinateRegion
     @State private var viewportGate = MapViewportLoadGate()
     @State private var viewportRefreshID = 0
@@ -1903,6 +1929,16 @@ struct MapExplorerView: View {
         }
         // Données rechargées → reconstruit le cache des couches une seule fois.
         .onChangeCompat(of: model.dataVersion) { _, _ in refreshMapRender() }
+        // L'autorisation accordée efface le message de refus et reprend un
+        // recentrage resté en attente de la réponse.
+        .onReceive(services.location.$authorizationStatus) { status in
+            guard LocationFixPolicy.isAuthorized(status) else { return }
+            locationIssue = nil
+            if recentersWhenAuthorized {
+                recentersWhenAuthorized = false
+                centerOnCurrentLocation()
+            }
+        }
         // Tick SSE amis → ne reconstruit QUE la couche amis (PERF-MAP-05).
         .onChangeCompat(of: model.friendsVersion) { _, _ in refreshFriendsRender() }
         // Le zoom modifie les seuils (azimuts ≥ 14, clustering) : reconstruit aussi.
@@ -2581,7 +2617,24 @@ struct MapExplorerView: View {
 
     @ViewBuilder
     private var mapStatusToast: some View {
-        if let error = model.errorMessage {
+        if let issue = locationIssue {
+            VStack(spacing: SQSpace.xs) {
+                mapToast(issue.message, icon: "location.slash", tint: SQColor.warning)
+                Button(issue.actionTitle) {
+                    switch issue {
+                    case .denied:
+                        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                    case .unavailable:
+                        centerOnCurrentLocation()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(SQColor.brandRed)
+                .foregroundStyle(SQColor.onAccent)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("map.location.action")
+            }
+        } else if let error = model.errorMessage {
             VStack(spacing: SQSpace.xs) {
                 mapToast(error, icon: "exclamationmark.triangle.fill", tint: SQColor.warning)
                 Button("Réessayer") { fetchTask = Task { await reloadCurrentRegion() } }
@@ -2673,6 +2726,7 @@ struct MapExplorerView: View {
     }
 
     private func centerOnCurrentLocation() {
+        locationIssue = nil
         Task {
             if let location = await services.location.currentLocation(timeoutSeconds: 8) {
                 let coordinate = location.coordinate
@@ -2680,12 +2734,18 @@ struct MapExplorerView: View {
             } else {
                 // Distinguer le refus d'autorisation (l'utilisateur peut agir) d'une
                 // simple indisponibilité, au lieu d'un message générique opaque (UXP-08).
+                // État propre à la position : ne passe pas par `model.errorMessage`,
+                // dont l'action recharge la carte.
                 let status = services.location.authorizationStatus
-                if status == .denied || status == .restricted {
-                    model.errorMessage = String(localized: "Localisation désactivée. Active-la dans Réglages > SignalQuest pour te localiser sur la carte.")
-                } else {
-                    model.errorMessage = String(localized: "Position actuelle indisponible")
+                if status == .notDetermined {
+                    recentersWhenAuthorized = true
+                    return
                 }
+                let issue: MapLocationIssue = (status == .denied || status == .restricted) ? .denied : .unavailable
+                locationIssue = issue
+                // Un message qui s'efface seul : la carte reste lisible si l'on n'agit pas.
+                try? await Task.sleep(nanoseconds: 12_000_000_000)
+                if locationIssue == issue { locationIssue = nil }
             }
         }
     }

@@ -39,10 +39,13 @@ enum OperatorComparisonTemplateBuilder {
         }
     }
 
-    /// La valeur d'abord, le nombre de mesures ensuite : « 42 Mb/s » répond à la
+    /// La valeur d'abord, le nombre de mesures ensuite : « 42 Mbit/s » répond à la
     /// question, « sur 128 mesures » dit à quel point on peut s'y fier.
     static func detail(for stat: OperatorMetricStat, metric: NearbyOperatorMetric) -> String {
-        var parts = ["\(stat.value) \(metric.unit)"]
+        // Le débit prend l'unité de l'app (« Mbit/s » / « Mbps ») ; `metric.unit`
+        // reste en dur côté Accueil.
+        let unit = metric == .download ? SQUnits.throughputUnit(mbps: Double(stat.value)) : metric.unit
+        var parts = ["\(stat.value) \(unit)"]
         if let extra = stat.detail, !extra.isEmpty { parts.append(extra) }
         parts.append(String(localized: "\(stat.sampleCount) mesure"))
         return parts.joined(separator: " · ")

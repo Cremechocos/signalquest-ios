@@ -429,6 +429,15 @@ private struct AddFriendSheet: View {
     @State private var results: [MessageSearchUser] = []
     @State private var busyId: String?
     @State private var errorMessage: String?
+    /// Recherche en vol et dernière requête dont la réponse est arrivée (pour
+    /// ne dire « aucun résultat » que pour ce qui est tapé).
+    @State private var isSearching = false
+    @State private var searchedQuery = ""
+
+    private var showsNoResult: Bool {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !isSearching && errorMessage == nil && !trimmed.isEmpty && searchedQuery == trimmed && results.isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -445,6 +454,10 @@ private struct AddFriendSheet: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: SQSpace.lg, bottom: SQSpace.sm, trailing: SQSpace.lg))
+                    if isSearching || showsNoResult {
+                        UserSearchStatusRow(isSearching: isSearching)
+                            .listRowBackground(Color.clear)
+                    }
                     ForEach(results) { user in
                         HStack(spacing: SQSpace.md) {
                             SQAvatar(url: user.avatarUrl, name: user.displayName, size: 36)
@@ -524,16 +537,21 @@ private struct AddFriendSheet: View {
 
     private func search() async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { results = []; return }
+        guard !trimmed.isEmpty else { results = []; searchedQuery = ""; isSearching = false; return }
+        isSearching = true
         // Une recherche en échec affichait « aucun résultat » (SOC-44).
         do {
-            results = try await messages.searchUsers(query: trimmed)
+            let found = try await messages.searchUsers(query: trimmed)
+            guard !Task.isCancelled else { return }
+            results = found
+            searchedQuery = trimmed
             errorMessage = nil
         } catch {
-            guard !error.isCancellation else { return }
+            guard !error.isCancellation, !Task.isCancelled else { return }
             results = []
             errorMessage = error.userFacingMessage
         }
+        isSearching = false
     }
 
     private func friendStatus(_ title: LocalizedStringKey, systemImage: String) -> some View {

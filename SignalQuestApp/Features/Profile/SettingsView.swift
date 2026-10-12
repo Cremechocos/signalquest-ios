@@ -2531,7 +2531,13 @@ struct SettingsView: View {
                 await services.push.unregister()
                 guard deletedOwner == LocalAccountScope.currentOwnerScopeId else { return }
                 await session.logout()
-                if case .loggedOut = session.state, let cleanupWarning { session.errorMessage = cleanupWarning }
+                guard case .loggedOut = session.state else { return }
+                if let cleanupWarning {
+                    session.errorMessage = cleanupWarning
+                } else {
+                    // Même canal que « session expirée » / « compte suspendu ».
+                    session.infoMessage = String(localized: "Ton compte a été supprimé.")
+                }
             }
         }
     }
@@ -2920,12 +2926,20 @@ private struct DeleteAccountSheet: View {
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
                 .textFieldStyle(SQTextFieldStyle())
-                .onChange(of: emailCode) { value in
+                .onChangeCompat(of: emailCode) { _, value in
                     emailCode = String(value.filter(\.isNumber).prefix(6))
                 }
             destructiveButton(disabled: emailCode.count != 6) {
                 await delete(using: .email(challengeId: challenge.challengeId, code: emailCode))
             }
+            // Code expiré (10 min) ou perdu : sans renvoi, il fallait fermer la feuille.
+            Button(String(localized: "Renvoyer le code")) {
+                Task { await requestEmailCode() }
+            }
+            .font(SQType.button)
+            .foregroundStyle(SQColor.accentInk)
+            .frame(minHeight: 44)
+            .disabled(isBusy)
         } else {
             Text("Un code à usage unique sera envoyé à \(preview.maskedEmail).")
                 .font(SQType.caption)
@@ -2941,7 +2955,7 @@ private struct DeleteAccountSheet: View {
         disabled: Bool,
         action: @escaping () async -> Void
     ) -> some View {
-        GradientButton("Supprimer définitivement", systemImage: "trash", isBusy: isBusy) {
+        GradientButton("Supprimer définitivement", systemImage: "trash", isBusy: isBusy, style: .destructive) {
             Task { await action() }
         }
         .disabled(disabled || !hasAcknowledged || isBusy)
@@ -2964,7 +2978,10 @@ private struct DeleteAccountSheet: View {
     private func requestEmailCode() async {
         isBusy = true
         defer { isBusy = false }
-        emailChallenge = await model.requestAccountDeletionEmailCode()
+        // Un renvoi qui échoue garde le code précédent (l'erreur s'affiche).
+        guard let challenge = await model.requestAccountDeletionEmailCode() else { return }
+        emailChallenge = challenge
+        emailCode = ""
     }
 
     private func loadSoleAdminGroups() async {
