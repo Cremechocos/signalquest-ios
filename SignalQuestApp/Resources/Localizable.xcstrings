@@ -1955,6 +1955,22 @@
         }
       }
     },
+    "Compte créé avec Apple ? Confirme plutôt avec Apple." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account created with Apple? Confirm with Apple instead."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte créé avec Apple ? Confirme plutôt avec Apple."
+          }
+        }
+      }
+    },
     "Compte sans nom" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1984,6 +2000,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Confiance"
+          }
+        }
+      }
+    },
+    "Confirme ton compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm your account"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirme ton compte"
           }
         }
       }
@@ -2714,6 +2746,22 @@
         }
       }
     },
+    "J’ai retrouvé mon mot de passe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I found my password"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "J’ai retrouvé mon mot de passe"
+          }
+        }
+      }
+    },
     "La clé est créée, mais la sauvegarde de l’historique reste partielle." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2727,6 +2775,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La clé est créée, mais la sauvegarde de l’historique reste partielle."
+          }
+        }
+      }
+    },
+    "La confirmation de ton compte a échoué. Vérifie le mot de passe du compte, ou reprends avec Apple." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account could not be confirmed. Check your account password, or try again with Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La confirmation de ton compte a échoué. Vérifie le mot de passe du compte, ou reprends avec Apple."
           }
         }
       }
@@ -3193,6 +3257,22 @@
         }
       }
     },
+    "Mot de passe du compte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account password"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mot de passe du compte"
+          }
+        }
+      }
+    },
     "N'afficher que" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3206,6 +3286,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "N'afficher que"
+          }
+        }
+      }
+    },
+    "Nouveau mot de passe de chiffrement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New encryption password"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau mot de passe de chiffrement"
           }
         }
       }
@@ -3581,6 +3677,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relais hertzien"
+          }
+        }
+      }
+    },
+    "Remplacer ma clé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace my key"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplacer ma clé"
           }
         }
       }
@@ -4030,6 +4142,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Test %lld/%lld · %@"
+          }
+        }
+      }
+    },
+    "Ton ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app te renvoyant la clé. Tes autres appareils se déverrouilleront avec le nouveau mot de passe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your old password cannot be recovered. A new key replaces the old one: each encrypted conversation becomes readable again when another participant reopens it, as their app sends you the key again. Your other devices will unlock with the new password."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app te renvoyant la clé. Tes autres appareils se déverrouilleront avec le nouveau mot de passe."
           }
         }
       }
@@ -48396,7 +48524,6 @@
       }
     },
     "Réauthentification Apple impossible. Réessaie." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

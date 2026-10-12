@@ -17,6 +17,7 @@ enum E2EEError: Error, LocalizedError, Equatable {
     case decryptFailed
     case keyGenerationFailed
     case staleKey
+    case accountReauthenticationFailed
 
     var errorDescription: String? {
         switch self {
@@ -34,6 +35,8 @@ enum E2EEError: Error, LocalizedError, Equatable {
             return String(localized: "Impossible de créer ta clé de chiffrement. Réessaie.")
         case .staleKey:
             return String(localized: "La clé de cette conversation a changé. Elle sera mise à jour à la prochaine ouverture.")
+        case .accountReauthenticationFailed:
+            return String(localized: "La confirmation de ton compte a échoué. Vérifie le mot de passe du compte, ou reprends avec Apple.")
         }
     }
 }
@@ -45,6 +48,13 @@ protocol E2EEServicing: Sendable {
     /// avec le mot de passe (PBKDF2 210k + AES-GCM) et l'enregistre côté serveur.
     /// L'utilisateur est déverrouillé à l'issue.
     func generateAndRegisterKey(userId: String, password: String) async throws
+    /// Mot de passe de chiffrement oublié : remplace la paire par une nouvelle,
+    /// protégée par `password`. Le serveur exige la preuve du compte (mot de passe
+    /// du compte ou Apple), puis demande aux participants de renvoyer la clé de
+    /// chaque conversation (SOC-08).
+    func replaceForgottenKey(
+        userId: String, password: String, reauthentication: E2EEV2BootstrapReauthentication
+    ) async throws
     /// Re-partage la clé de conversation aux participants qui n'en ont pas encore
     /// (nouveau membre du groupe, clé créée après coup). Silencieux et idempotent —
     /// même comportement qu'Android `shareConversationKeyIfNeeded`.
@@ -178,6 +188,21 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
     }
 
     func generateAndRegisterKey(userId: String, password: String) async throws {
+        try await registerNewKey(userId: userId, password: password, reauthentication: nil)
+    }
+
+    func replaceForgottenKey(
+        userId: String, password: String, reauthentication: E2EEV2BootstrapReauthentication
+    ) async throws {
+        guard let proof = E2EEBootstrapReauthenticationBody(reauthentication) else {
+            throw E2EEError.accountReauthenticationFailed
+        }
+        try await registerNewKey(userId: userId, password: password, reauthentication: proof)
+    }
+
+    private func registerNewKey(
+        userId: String, password: String, reauthentication: E2EEBootstrapReauthenticationBody?
+    ) async throws {
         let session = LocalAccountScope.sessionSnapshot()
         let trimmed = password.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw E2EEError.invalidKey }
@@ -235,14 +260,19 @@ final class E2EEService: E2EEServicing, @unchecked Sendable {
                 publicKeyJwk: publicJwk,
                 encryptedPrivateJwk: combined.base64EncodedNoPadding(),
                 kdfSaltB64: salt.base64EncodedNoPadding(),
-                kdfIterations: iterations
+                kdfIterations: iterations,
+                reauthentication: reauthentication
             )
             return (privateJwk, payload)
         }.value
         do {
-            let _: E2EEBootstrapInitResponse = try await api.requestJSON("/api/e2ee/bootstrap/init", body: payload)
-        } catch APIError.http(let status, _, _, _, _) where status == 404 || status == 405 {
-            let _: E2EEBootstrapInitResponse = try await api.requestJSON("/api/e2ee/bootstrap", body: payload)
+            do {
+                let _: E2EEBootstrapInitResponse = try await api.requestJSON("/api/e2ee/bootstrap/init", body: payload)
+            } catch APIError.http(let status, _, _, _, _) where status == 404 || status == 405 {
+                let _: E2EEBootstrapInitResponse = try await api.requestJSON("/api/e2ee/bootstrap", body: payload)
+            }
+        } catch APIError.http(403, "E2EE_REAUTH_INVALID", _, _, _) {
+            throw E2EEError.accountReauthenticationFailed
         }
 
         if UserDefaults.standard.bool(forKey: Self.legacyLockedKey) { try purgeLegacyKeys(session: session) }
@@ -621,6 +651,32 @@ struct E2EEBootstrapInitRequest: Encodable {
     let encryptedPrivateJwk: String
     let kdfSaltB64: String
     let kdfIterations: Int
+    /// Absent à la première création ; exigé pour remplacer une clé existante.
+    var reauthentication: E2EEBootstrapReauthenticationBody? = nil
+}
+
+/// Preuve du compte pour remplacer une clé : ce remplacement n'accepte que le
+/// mot de passe du compte ou Apple, pas un code reçu par e-mail.
+struct E2EEBootstrapReauthenticationBody: Encodable, Equatable {
+    let method: String
+    var password: String?
+    var identityToken: String?
+
+    init?(_ reauthentication: E2EEV2BootstrapReauthentication) {
+        switch reauthentication {
+        case .password(let value):
+            guard !value.isEmpty, value.count <= 1_024 else { return nil }
+            method = "password"
+            password = value
+        case .apple(let token):
+            let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard (16...20_000).contains(trimmed.count), !trimmed.contains("\n") else { return nil }
+            method = "apple"
+            identityToken = trimmed
+        case .email:
+            return nil
+        }
+    }
 }
 
 struct E2EEBootstrapInitResponse: Decodable {

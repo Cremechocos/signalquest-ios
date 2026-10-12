@@ -2609,6 +2609,79 @@ final class E2EETests: XCTestCase {
         }
     }
 
+    /// SOC-08 — Mot de passe de chiffrement oublié : la nouvelle clé part avec la
+    /// preuve du compte, jamais un code e-mail ; un refus du serveur devient un
+    /// message clair et ne remplace pas la clé locale.
+    func testForgottenKeyIsReplacedOnlyWithTheAccountProof() async throws {
+        XCTAssertNil(E2EEBootstrapReauthenticationBody(.email(challengeId: "challenge-1", code: "123456")))
+        XCTAssertNil(E2EEBootstrapReauthenticationBody(.password("")))
+
+        var capturedBodies: [Data] = []
+        var refuses = false
+        MockURLProtocol.requestHandler = { request in
+            capturedBodies.append(request.httpBody ?? request.httpBodyStream.flatMap { stream in
+                stream.open()
+                defer { stream.close() }
+                var data = Data()
+                var buffer = [UInt8](repeating: 0, count: 4096)
+                while stream.hasBytesAvailable {
+                    let read = stream.read(&buffer, maxLength: 4096)
+                    if read <= 0 { break }
+                    data.append(buffer, count: read)
+                }
+                return data
+            } ?? Data())
+            let status = refuses ? 403 : 200
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+            let body = refuses
+                ? #"{"error":"Mot de passe incorrect","code":"E2EE_REAUTH_INVALID"}"#
+                : #"{"ok":true}"#
+            return (response, Data(body.utf8))
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [MockURLProtocol.self]
+        let store = InMemoryTokenStore()
+        let api = APIClient(
+            config: .test,
+            cookieStore: AuthCookieStore(tokenStore: InMemoryTokenStore()),
+            session: URLSession(configuration: sessionConfig)
+        )
+        let service = E2EEService(api: api, tokenStore: store)
+
+        try await service.generateAndRegisterKey(userId: "u1", password: "first-pass")
+        let first = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(capturedBodies.last)) as? [String: Any])
+        XCTAssertNil(first["reauthentication"], "La première création n'envoie aucune preuve")
+        let firstPrivate = try XCTUnwrap(store.string(for: "privateJwk:current"))
+
+        try await service.replaceForgottenKey(
+            userId: "u1", password: "second-pass", reauthentication: .password("account-pass")
+        )
+        let replaced = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(capturedBodies.last)) as? [String: Any])
+        XCTAssertEqual(replaced["reauthentication"] as? [String: String], ["method": "password", "password": "account-pass"])
+        let secondPrivate = try XCTUnwrap(store.string(for: "privateJwk:current"))
+        XCTAssertNotEqual(secondPrivate, firstPrivate)
+        XCTAssertEqual(try E2EEService.decryptPrivateJWK(
+            password: "second-pass",
+            encryptedPrivateJwkB64: XCTUnwrap(replaced["encryptedPrivateJwk"] as? String),
+            kdfSaltB64: XCTUnwrap(replaced["kdfSaltB64"] as? String),
+            iterations: XCTUnwrap(replaced["kdfIterations"] as? Int)
+        ), secondPrivate)
+
+        refuses = true
+        do {
+            try await service.replaceForgottenKey(
+                userId: "u1", password: "third-pass", reauthentication: .apple(identityToken: String(repeating: "t", count: 32))
+            )
+            XCTFail("Un refus du serveur doit remonter")
+        } catch {
+            XCTAssertEqual(error as? E2EEError, .accountReauthenticationFailed)
+        }
+        let refused = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(capturedBodies.last)) as? [String: Any])
+        XCTAssertEqual(refused["reauthentication"] as? [String: String], ["method": "apple", "identityToken": String(repeating: "t", count: 32)])
+        XCTAssertEqual(try store.string(for: "privateJwk:current"), secondPrivate, "Un refus ne touche pas la clé locale")
+    }
+
     func testE2EECleartextSendBlockedWithoutKey() async {
         let conversation = MessageConversation(
             id: "c1",
