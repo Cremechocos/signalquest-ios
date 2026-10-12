@@ -1682,6 +1682,8 @@ struct MapExplorerView: View {
                 // les panneaux restent au Dynamic Type demandé par le système.
                 .dynamicTypeSize(dynamicTypeSize.isAccessibilitySize ? .xxxLarge : dynamicTypeSize)
         }
+        .overlay(alignment: .leading) { antennaSidePanel }
+        .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: usesAntennaSidePanel ? selectedAntenna?.id : nil)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showsANFRMap) {
             ANFRMapView(service: services.anfr)
@@ -1736,17 +1738,9 @@ struct MapExplorerView: View {
                 .presentationDetents([.medium, .large])
                 .presentationBackgroundCompat(SQColor.bg)
         }
-        .sheet(item: $selectedAntenna) { site in
-            AntennaDetailSheet(
-                site: site,
-                market: model.marketFilter,
-                operatorName: model.operatorFilter,
-                service: services.antennas,
-                sightOrigin: sightOrigin,
-                onIsolateCoverage: { focus in isolateCoverage(focus) }
-            )
-            // Tous les chemins mènent ici : recherche, carte, lien, historique.
-            .onAppear { RecentlyViewedStore.record(.site(site, market: model.marketFilter)) }
+        // iPhone : la fiche en feuille. iPad : en panneau à gauche (`antennaSidePanel`).
+        .sheet(item: compactAntennaSelection) { site in
+            antennaDetail(site)
         }
         .fullScreenCover(item: $selectedPhoto) { target in
             let site = photoSite(for: target.id)
@@ -2163,6 +2157,7 @@ struct MapExplorerView: View {
                 // La pile se dimensionne selon les contrôles : aucun décalage
                 // fixe ne peut faire chevaucher une grande police et l'opérateur.
                 mapBottomControls
+                    .padding(.leading, sidePanelInset(in: proxy.size.width))
 
                 // Pendant la recherche, la carte s'estompe derrière les résultats ;
                 // la toucher referme la recherche.
@@ -2202,6 +2197,8 @@ struct MapExplorerView: View {
                 .padding(.top, SQSpace.sm)
                 .frame(maxWidth: 640)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                // iPad : la recherche et les contrôles se rangent à droite du panneau.
+                .padding(.leading, sidePanelInset(in: proxy.size.width))
             }
             .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: searchIsActive)
         }
@@ -4373,6 +4370,60 @@ struct MapExplorerView: View {
                 showsAzimuths: false,
                 friend: info
             )
+        }
+    }
+
+    /// Sur iPad (largeur régulière), la fiche antenne s'ouvre en panneau à gauche :
+    /// la carte reste visible et manipulable à droite.
+    private var usesAntennaSidePanel: Bool { horizontalSizeClass == .regular }
+
+    /// Jamais plus étroit qu’un iPhone, la largeur pour laquelle la fiche est mise en page.
+    private func sidePanelWidth(in containerWidth: CGFloat) -> CGFloat {
+        min(420, max(402, containerWidth * 0.45))
+    }
+
+    private func sidePanelInset(in containerWidth: CGFloat) -> CGFloat {
+        guard usesAntennaSidePanel, selectedAntenna != nil else { return 0 }
+        return sidePanelWidth(in: containerWidth) + SQSpace.lg
+    }
+
+    private var compactAntennaSelection: Binding<AntennaSite?> {
+        Binding(
+            get: { usesAntennaSidePanel ? nil : selectedAntenna },
+            set: { selectedAntenna = $0 }
+        )
+    }
+
+    private func antennaDetail(_ site: AntennaSite, onClose: (() -> Void)? = nil) -> some View {
+        AntennaDetailSheet(
+            site: site,
+            market: model.marketFilter,
+            operatorName: model.operatorFilter,
+            service: services.antennas,
+            sightOrigin: sightOrigin,
+            onIsolateCoverage: { focus in isolateCoverage(focus) },
+            onClose: onClose
+        )
+        // Tous les chemins mènent ici : recherche, carte, lien, historique.
+        .onAppear { RecentlyViewedStore.record(.site(site, market: model.marketFilter)) }
+    }
+
+    @ViewBuilder
+    private var antennaSidePanel: some View {
+        if usesAntennaSidePanel, let site = selectedAntenna {
+            GeometryReader { geo in
+                antennaDetail(site, onClose: { selectedAntenna = nil })
+                    // Un autre site remplace la fiche au lieu de garder l'état du précédent.
+                    .id(site.id)
+                    .frame(width: sidePanelWidth(in: geo.size.width))
+                    .frame(maxHeight: .infinity)
+                    .background(SQColor.bg)
+                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                    .sqShadowSoft()
+                    .padding(.leading, SQSpace.lg)
+                    .padding(.vertical, SQSpace.sm)
+            }
+            .transition(.move(edge: .leading).combined(with: .opacity))
         }
     }
 

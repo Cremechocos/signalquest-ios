@@ -102,6 +102,8 @@ struct AntennaDetailSheet: View {
     /// Demande à la carte de n'afficher que la couverture de ce site. `nil` quand
     /// la fiche est ouverte hors de la carte.
     var onIsolateCoverage: ((AntennaCoverageFocus) -> Void)?
+    /// Fermeture du panneau latéral iPad : hors présentation, `dismiss` ne fait rien.
+    var onClose: (() -> Void)?
     /// Opérateur dont on affiche la fiche. Modifiable in-situ pour les sites
     /// partagés (multi-opérateurs) : l'utilisateur passe de l'un à l'autre sans
     /// rouvrir la carte.
@@ -169,13 +171,15 @@ struct AntennaDetailSheet: View {
         service: AntennasServicing,
         customSite: AndroidCustomSiteMarker? = nil,
         sightOrigin: AntennaSightOrigin = .device,
-        onIsolateCoverage: ((AntennaCoverageFocus) -> Void)? = nil
+        onIsolateCoverage: ((AntennaCoverageFocus) -> Void)? = nil,
+        onClose: (() -> Void)? = nil
     ) {
         self.site = site
         self.market = market
         self.customSite = customSite
         self.sightOrigin = sightOrigin
         self.onIsolateCoverage = onIsolateCoverage
+        self.onClose = onClose
         // Aucun repli SFR : un site étranger ou communautaire ne doit jamais être
         // ouvert sous une facette française inventée. On conserve le choix reçu
         // lorsqu'il existe réellement, sinon la première facette connue du site ;
@@ -424,7 +428,7 @@ struct AntennaDetailSheet: View {
                 if let onIsolateCoverage, let focus = coverageFocus {
                     GradientButton("Sa couverture", systemImage: "dot.radiowaves.left.and.right") {
                         onIsolateCoverage(focus)
-                        dismiss()
+                        close()
                     }
                 }
                 GradientButton("Itinéraire", systemImage: "car.fill",
@@ -601,7 +605,7 @@ struct AntennaDetailSheet: View {
                         .accessibilityIdentifier("antenna.detail.share")
                     }
                     MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "antenna.detail.close") {
-                        dismiss()
+                        close()
                     }
                 }
             }
@@ -619,6 +623,10 @@ struct AntennaDetailSheet: View {
             }
             contributionBanner
         }
+    }
+
+    private func close() {
+        if let onClose { onClose() } else { dismiss() }
     }
 
     /// « Support 0381234 » : le numéro du registre, que l'on recopie sur place.
