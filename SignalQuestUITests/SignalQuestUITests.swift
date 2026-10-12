@@ -110,6 +110,18 @@ enum SignalQuestUITestSupport {
         return element.isHittable
     }
 
+    /// Le Registre ANFR s'ouvre depuis la feuille Carte, par un menu qui
+    /// propose la carte et les statistiques.
+    static func openMapANFRMenu(in app: XCUIApplication) -> Bool {
+        let layers = app.buttons["map.layers"].firstMatch
+        guard layers.waitForExistence(timeout: 15) else { return false }
+        layers.tap()
+        let anfr = app.buttons["map.anfr"].firstMatch
+        guard anfr.waitForExistence(timeout: 10), scrollToHittable(anfr, in: app) else { return false }
+        anfr.tap()
+        return true
+    }
+
     static func waitForLandscape(_ app: XCUIApplication, timeout: TimeInterval = 5) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
@@ -175,7 +187,7 @@ final class SignalQuestUITests: XCTestCase {
         )
 
         SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
-        XCTAssertTrue(app.buttons["Calques et filtres"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["map.filters"].waitForExistence(timeout: 10))
 
         SignalQuestUITestSupport.tab(named: "Tester", in: app).tap()
         XCTAssertTrue(app.buttons["speedtest.start"].waitForExistence(timeout: 10))
@@ -259,7 +271,7 @@ final class SignalQuestUITests: XCTestCase {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth"])
         SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
-        XCTAssertTrue(app.buttons["Calques et filtres"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["map.filters"].waitForExistence(timeout: 5))
     }
 
     func testSpeedtestIdleState() {
@@ -274,7 +286,7 @@ final class SignalQuestUITests: XCTestCase {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--reset-auth"])
         SignalQuestUITestSupport.enterGuestApplication(app, tab: "map")
-        XCTAssertTrue(app.buttons["Calques et filtres"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["map.filters"].waitForExistence(timeout: 10))
         SignalQuestUITestSupport.tab(named: "Profil", in: app).tap()
         XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 10))
     }

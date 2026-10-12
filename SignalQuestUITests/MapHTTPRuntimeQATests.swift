@@ -4,6 +4,7 @@ import XCTest
 /// Inspect the attached screen as well: accessibility presence alone is not painting.
 @MainActor
 final class MapHTTPRuntimeQATests: XCTestCase {
+
     func testCompactCoverageControlsKeepDetailsAndColorSwitchAccessible() async throws {
         try await exerciseCompactCoverageControls(locale: "fr")
     }
@@ -12,39 +13,39 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         try await exerciseCompactCoverageControls(locale: "en")
     }
 
+    /// La carte ne garde que la pastille « Vue partielle » ; les couleurs de la
+    /// couverture se règlent dans la Légende de la feuille Carte.
     private func exerciseCompactCoverageControls(locale: String) async throws {
         try requireFixture()
         _ = try await configure("partial")
         let app = try launchGuest(locale: locale, extraArguments: ["--qa-map-layers"])
         defer { app.terminate() }
         try selectSFR(in: app)
-        let coverage = app.buttons["map.coverage.legend"]
-        XCTAssertTrue(coverage.waitForExistence(timeout: 25))
         let limits = app.buttons["map.status.limit"]
         XCTAssertTrue(limits.waitForExistence(timeout: 25))
-        XCTAssertGreaterThanOrEqual(coverage.frame.height, 44)
         XCTAssertGreaterThanOrEqual(limits.frame.height, 44)
-        XCTAssertLessThan(coverage.frame.width + limits.frame.width, app.frame.width - 16)
-        XCTAssertFalse(app.segmentedControls.firstMatch.exists)
+        XCTAssertLessThan(limits.frame.width, app.frame.width - 16)
         capture(app, name: "map-context-compact-partial")
 
         try tap(limits, in: app)
         XCTAssertTrue(app.staticTexts["map.status.limit.detail"].waitForExistence(timeout: 10))
         capture(app, name: "map-context-limit-detail")
         try tap(app.buttons["map.status.limit.close"], in: app)
-        try tap(coverage, in: app)
+        try openLayers(in: app)
+        let legend = app.buttons["map.legend"]
+        try reveal(legend, in: app, sheet: Self.layersSheet)
+        try tap(legend, in: app)
         // Le mode est mémorisé entre lancements : exercer une vraie bascule,
         // quel que soit le réglage laissé par une autre recette.
-        app.segmentedControls["map.coverage.mode"].buttons["Signal"].tap()
-        let modeTitle = locale == "en" ? "Generation" : "Génération"
-        let generation = app.segmentedControls["map.coverage.mode"].buttons[modeTitle]
-        XCTAssertTrue(generation.waitForExistence(timeout: 10))
-        generation.tap()
+        try tap(app.buttons["map.coverage.mode.false"], in: app)
+        let generation = app.buttons["map.coverage.mode.true"]
+        try tap(generation, in: app)
         XCTAssertTrue(generation.isSelected)
+        XCTAssertEqual(generation.label, locale == "en" ? "Generation" : "Génération")
         XCTAssertTrue(app.staticTexts["5G"].exists)
         capture(app, name: "map-context-generation-detail")
-        try tap(app.buttons["map.coverage.legend.close"], in: app)
-        XCTAssertEqual(coverage.value as? String, modeTitle)
+        try tap(app.buttons["map.legend.back"], in: app)
+        try closeLayers(in: app)
         XCTAssertTrue(app.buttons["map.operator"].isHittable)
         XCTAssertTrue(app.buttons["map.filters"].isHittable)
         capture(app, name: "map-context-compact-generation")
@@ -66,32 +67,40 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         XCTAssertFalse(events.isEmpty)
         XCTAssertTrue(events.allSatisfy { $0.query["market"] == ["CA"] })
         capture(app, name: "map-initial-gps-canada-measurements")
-        try tap(app.buttons["map.filters"], in: app)
-        XCTAssertTrue(app.buttons["map.filters.market"].label.contains("Canada"))
+        try openLayers(in: app)
+        let country = app.buttons["map.filters.market"]
+        try reveal(country, in: app, sheet: Self.layersSheet)
+        XCTAssertTrue(country.label.contains("Canada"))
         capture(app, name: "map-initial-gps-country-confirmed")
     }
 
-    func testEnglishFilterEditorKeepsCountryAndExpertControlsAccessible() async throws {
+    func testEnglishFilterEditorKeepsScopedControlsAccessible() async throws {
         try requireFixture()
         _ = try await configure("baseline")
-        let app = try launchGuest(locale: "en")
+        let app = try launchGuest(locale: "en", extraArguments: ["--qa-map-layers"])
         defer { app.terminate() }
         try tap(app.buttons["map.filters"], in: app)
-        XCTAssertTrue(app.staticTexts["Country"].exists)
-        XCTAssertTrue(app.buttons["map.filters.market"].isHittable)
-        XCTAssertTrue(app.buttons["map.filters.done"].label.contains("Apply"))
-        capture(app, name: "map-filters-english-country-first")
-        let experts = app.buttons["map.filters.experts"]
-        try reveal(experts, in: app); experts.tap()
-        XCTAssertEqual(experts.value as? String, "Expanded")
+        // Les titres de section sont en petites capitales, y compris pour l'accessibilité.
+        XCTAssertTrue(app.staticTexts["TECHNOLOGIES"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["map.filters.done"].label.contains("Show results"))
+        XCTAssertTrue(app.buttons["map.filters.technology.5G"].isHittable)
+        capture(app, name: "map-filters-english-scoped")
+        let bands = app.buttons["map.filters.bands"]
+        try reveal(bands, in: app)
+        try tap(bands, in: app)
         let band = app.buttons["map.filters.band.78"]
-        try reveal(band, in: app)
-        XCTAssertTrue(band.isHittable)
-        let period = app.buttons["map.filters.speedtestDays"]
+        try tap(band, in: app)
+        XCTAssertTrue(band.isSelected)
+        XCTAssertTrue(app.buttons["map.filters.bandMatch.any"].exists)
+        capture(app, name: "map-filters-english-bands")
+        try tap(app.buttons["map.filters.bands.confirm"], in: app)
+        let period = app.buttons["map.filters.speedtestDays.30"]
         try reveal(period, in: app)
         XCTAssertGreaterThanOrEqual(period.frame.height, 44)
-        XCTAssertTrue(app.staticTexts["Speedtests"].exists)
-        capture(app, name: "map-filters-english-experts")
+        XCTAssertTrue(app.staticTexts["Throughput"].exists)
+        // Chaque segment annonce sa durée ; le titre ne nomme que le groupe.
+        XCTAssertEqual(period.label, "30 d")
+        capture(app, name: "map-filters-english-period")
         try tap(app.buttons["map.filters.cancel"], in: app)
     }
 
@@ -103,15 +112,10 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         ])
         defer { app.terminate() }
         try selectSFR(in: app)
-        try tap(app.buttons["map.filters"], in: app)
-        capture(app, name: "map-filters-accessibility-text-size")
+        try openLayers(in: app)
+        capture(app, name: "map-layers-accessibility-text-size")
         try setLayer("coverage", selected: true, in: app)
-        try tap(app.buttons["map.filters.done"], in: app)
-        let legend = app.descendants(matching: .any)["map.coverage.legend"].firstMatch
-        XCTAssertTrue(legend.waitForExistence(timeout: 15))
-        capture(app, name: "map-coverage-accessibility-text-size")
-        XCTAssertGreaterThanOrEqual(legend.frame.minX, app.frame.minX + 8)
-        XCTAssertLessThanOrEqual(legend.frame.maxX, app.frame.maxX - 8)
+        try closeLayers(in: app)
         XCTAssertTrue(app.buttons["map.operator"].isHittable)
         XCTAssertTrue(app.buttons["map.filters"].isHittable)
         let limits = app.buttons["map.status.limit"]
@@ -119,18 +123,21 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         XCTAssertGreaterThanOrEqual(limits.frame.minX, app.frame.minX + 8)
         XCTAssertLessThanOrEqual(limits.frame.maxX, app.frame.maxX - 8)
         XCTAssertTrue(limits.isHittable)
-        XCTAssertLessThanOrEqual(max(legend.frame.maxY, limits.frame.maxY) + 4,
-                                 app.buttons["map.operator"].frame.minY,
-                                 "Les contrôles contextuels doivent dégager le sélecteur opérateur")
-        capture(app, name: "map-context-both-accessibility-text-size")
+        XCTAssertLessThanOrEqual(limits.frame.maxY + 4, app.buttons["map.operator"].frame.minY,
+                                 "La pastille « Vue partielle » doit dégager la pastille d'état")
+        capture(app, name: "map-context-accessibility-text-size")
         try tap(limits, in: app)
         XCTAssertTrue(app.staticTexts["map.status.limit.detail"].waitForExistence(timeout: 10))
         capture(app, name: "map-context-limit-accessibility-detail")
         try tap(app.buttons["map.status.limit.close"], in: app)
-        try tap(app.buttons["map.coverage.legend"], in: app)
-        // Les options deviennent des rangées accessibles aux très grandes tailles.
-        // Ne pas supposer que la préférence persistée est encore « Signal ».
-        try tap(app.buttons["Signal"], in: app)
+        try openLayers(in: app)
+        let legend = app.buttons["map.legend"]
+        try reveal(legend, in: app, sheet: Self.layersSheet)
+        try tap(legend, in: app)
+        // Les segments s'empilent aux très grandes tailles. Ne pas supposer que
+        // la préférence persistée est encore « Signal ».
+        let signal = app.buttons["map.coverage.mode.false"]
+        try tap(signal, in: app)
         // Libellés du contrat quality-scale v1.
         for title in ["Excellent", "Good", "Fair", "Poor", "Critical", "No network found"] {
             XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 10))
@@ -143,67 +150,66 @@ final class MapHTTPRuntimeQATests: XCTestCase {
             XCUIDevice.shared.orientation = wasLandscape ? .portrait : .landscapeLeft
             let rotated = NSPredicate { _, _ in (app.frame.width > app.frame.height) != wasLandscape }
             XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: rotated, object: nil)], timeout: 15), .completed)
-            XCTAssertTrue(app.buttons["map.coverage.legend.close"].isHittable)
-            XCTAssertTrue(app.buttons["Signal"].isSelected, "La feuille et sa sélection doivent survivre au repli de la rangée")
-            capture(app, name: "map-context-sheet-kept-after-rotation")
+            XCTAssertTrue(app.buttons["map.legend.back"].isHittable)
+            XCTAssertTrue(signal.isSelected, "La feuille et sa sélection doivent survivre à la rotation")
+            capture(app, name: "map-legend-kept-after-rotation")
             XCUIDevice.shared.orientation = wasLandscape ? .landscapeLeft : .portrait
         }
-        try tap(app.buttons["map.coverage.legend.close"], in: app)
+        try tap(app.buttons["map.legend.back"], in: app)
+        try closeLayers(in: app)
         XCTAssertTrue(app.buttons["map.filters"].isHittable)
     }
 
-    func testExpertResetSwipeDismissAndRenderOnlyApply() async throws {
+    func testFilterResetSwipeDismissAndRenderOnlyApply() async throws {
         try requireFixture()
         _ = try await configure("baseline")
         let app = try launchGuest()
         defer { app.terminate() }
         try selectSFR(in: app)
         try tap(app.buttons["map.filters"], in: app)
-        XCTAssertGreaterThanOrEqual(app.buttons["map.filters.reset"].frame.height, 44)
-        try tap(app.buttons["map.filters.reset"], in: app)
+        let reset = app.buttons["map.filters.reset"]
+        XCTAssertGreaterThanOrEqual(reset.frame.height, 44)
+        if reset.isEnabled { try tap(reset, in: app) }
         try tap(app.buttons["map.filters.done"], in: app)
         capture(app, name: "map-azimuth-lines-before-edit")
         try tap(app.buttons["map.filters"], in: app)
-        capture(app, name: "map-filters-initial-country-first")
-        let experts = app.buttons["map.filters.experts"]
-        try reveal(experts, in: app)
-        experts.tap()
-        guard experts.value as? String == "Développé" else {
-            capture(app, name: "map-experts-did-not-expand")
-            XCTFail("Tapping the visible expert heading must expand its controls")
-            throw RecipeError.missingControl
-        }
-        capture(app, name: "map-experts-expanded")
+        capture(app, name: "map-filters-initial")
+        // Toutes cochées au départ : décocher la 5G restreint aux autres.
         let technology = app.buttons["map.filters.technology.5G"]
         try reveal(technology, in: app); technology.tap()
+        XCTAssertFalse(technology.isSelected)
+        let bands = app.buttons["map.filters.bands"]
+        try reveal(bands, in: app); try tap(bands, in: app)
         let band = app.buttons["map.filters.band.78"]
-        try reveal(band, in: app); band.tap()
+        try tap(band, in: app)
+        XCTAssertTrue(band.isSelected)
+        try tap(app.buttons["map.filters.bands.back"], in: app)
         let hidden = app.buttons["map.filters.azimuth.hidden"]
         try reveal(hidden, in: app); hidden.tap()
         XCTAssertTrue(hidden.isSelected)
         try await Task.sleep(for: .milliseconds(250))
-        capture(app, name: "map-filters-expert-draft")
-        try tap(app.buttons["map.filters.reset"], in: app)
-        try scrollFiltersToTop(in: app)
+        capture(app, name: "map-filters-draft")
+        try tap(reset, in: app)
         try reveal(technology, in: app)
-        XCTAssertFalse(technology.isSelected)
-        try reveal(band, in: app)
+        XCTAssertTrue(technology.isSelected)
+        try reveal(bands, in: app); try tap(bands, in: app)
         XCTAssertFalse(band.isSelected)
+        try tap(app.buttons["map.filters.bands.back"], in: app)
         let lines = app.buttons["map.filters.azimuth.lines"]
         try reveal(lines, in: app)
         XCTAssertTrue(lines.isSelected)
         try reveal(hidden, in: app); hidden.tap()
-        let navigation = app.navigationBars["Filtres de la carte"]
-        for _ in 0..<2 where navigation.exists {
-            navigation.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
+        let close = app.buttons["map.filters.cancel"]
+        for _ in 0..<2 where close.exists {
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            origin.withOffset(CGVector(dx: app.frame.midX, dy: close.frame.minY - 10))
                 .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
         }
-        guard navigation.waitForNonExistence(timeout: 10) else {
+        guard close.waitForNonExistence(timeout: 10) else {
             capture(app, name: "map-filters-swipe-not-dismissed")
             throw RecipeError.missingControl
         }
         try tap(app.buttons["map.filters"], in: app)
-        try reveal(experts, in: app); experts.tap()
         try reveal(lines, in: app)
         XCTAssertTrue(lines.isSelected, "Swiping away the sheet must not commit its pending azimuth choice")
         try reveal(hidden, in: app); hidden.tap()
@@ -221,54 +227,45 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         capture(app, name: "map-azimuth-hidden-after-apply")
     }
 
-    func testCountryDraftDoesNotLoadUntilAppliedAndCanBeCancelled() async throws {
+    /// Le pays se choisit dans la feuille Carte et s'applique tout de suite,
+    /// avec un opérateur du pays choisi.
+    func testCountryChoiceAppliesAtOnceWithCompatibleOperator() async throws {
         try requireFixture()
         _ = try await configure("baseline")
         let app = try launchGuest()
         defer { app.terminate() }
         try selectSFR(in: app)
-        try tap(app.buttons["map.filters"], in: app)
-        let draftRevision = try await configure("baseline")
-        try tap(app.buttons["map.filters.market"], in: app)
+        try openLayers(in: app)
+        let country = app.buttons["map.filters.market"]
+        try reveal(country, in: app, sheet: Self.layersSheet)
+        XCTAssertTrue(country.label.contains("France"))
+        let revision = try await configure("baseline")
+        try tap(country, in: app)
         try tap(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Canada")).firstMatch, in: app)
-        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
-        repeat {
-            let leaked = try await state().events.contains {
-                $0.scenario.revision == draftRevision && $0.query["market"] == ["CA"]
-            }
-            guard !leaked else {
-                capture(app, name: "map-country-draft-leaked-before-apply")
-                XCTFail("Choosing a draft country must not load its data before Apply")
-                throw RecipeError.missingControl
-            }
-            try await Task.sleep(for: .milliseconds(100))
-        } while ContinuousClock.now < deadline
-        try tap(app.buttons["map.filters.cancel"], in: app)
-        XCTAssertTrue(app.buttons["map.operator"].label.contains("SFR"))
-        try tap(app.buttons["map.filters"], in: app)
-        XCTAssertTrue(app.buttons["map.filters.market"].label.contains("France"))
-        try tap(app.buttons["map.filters.market"], in: app)
-        try tap(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Canada")).firstMatch, in: app)
-        try tap(app.buttons["map.filters.done"], in: app)
         let appliedDeadline = ContinuousClock.now.advanced(by: .seconds(15))
         var loadedCanada = false
         repeat {
             loadedCanada = try await state().events.contains {
-                $0.scenario.revision == draftRevision && $0.event == "sent"
+                $0.scenario.revision == revision && $0.event == "sent"
                     && $0.query["market"] == ["CA"] && $0.query["operator"] == ["BELL"]
             }
             if loadedCanada { break }
             try await Task.sleep(for: .milliseconds(100))
         } while ContinuousClock.now < appliedDeadline
-        XCTAssertTrue(loadedCanada, "Apply must use the chosen country with a compatible operator")
-        XCTAssertTrue(app.buttons["map.operator"].label.localizedCaseInsensitiveContains("Bell"))
-        capture(app, name: "map-country-draft-applied")
+        XCTAssertTrue(loadedCanada, "Choosing a country must load it with a compatible operator")
+        try closeLayers(in: app)
+        XCTAssertTrue(operatorState(in: app).localizedCaseInsensitiveContains("Bell"))
+        capture(app, name: "map-country-applied")
     }
 
     func testGuestMapPresentsHTTPFixtureMarkers() async throws {
         try requireFixture()
         _ = try await configure("baseline")
         let app = try launchGuest()
+        // `--reset-map` ne remet pas les couches : ne pas hériter de la recette précédente.
+        try openLayers(in: app)
+        for layer in ["antenna", "customSite"] { try setLayer(layer, selected: true, in: app) }
+        try closeLayers(in: app)
         let marker = app.descendants(matching: .any)["map.marker"].firstMatch
         XCTAssertTrue(marker.waitForExistence(timeout: 25), "No fixture marker was exposed by the real map")
         XCTAssertFalse(marker.label.isEmpty)
@@ -307,17 +304,17 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         let failedRevision = try await configure(scenario)
         let app = try launchGuest()
         defer { app.terminate() }
-        try tap(app.buttons["map.filters"], in: app)
-        for layer in ["antenna", "customSite", "friend", "coverage"] { try setLayer(layer, selected: false, in: app) }
+        try openLayers(in: app)
+        for layer in ["antenna", "customSite", "coverage"] { try setLayer(layer, selected: false, in: app) }
         try setLayer("speedtest", selected: true, in: app)
-        try tap(app.buttons["map.filters.done"], in: app)
+        try closeLayers(in: app)
         try selectSFR(in: app)
         guard app.buttons["map.status.retry"].waitForExistence(timeout: scenario == "timeout-one" ? 130 : 45) else {
             capture(app, name: "map-partial-error-not-presented")
             XCTFail("The controlled tile failure must expose a retry action")
             throw RecipeError.missingControl
         }
-        XCTAssertTrue(app.buttons["map.operator"].label.contains("SFR"))
+        XCTAssertTrue(operatorState(in: app).hasPrefix("SFR"))
         let before = try await state()
         let failedEvents = before.events.filter { $0.scenario.revision == failedRevision && $0.event == "sent" && $0.path.contains("/tiles/speedtests/") && $0.query["operator"] == ["SFR"] }
         if scenario == "timeout-one" {
@@ -359,7 +356,7 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         XCTAssertFalse(fresh.isEmpty, "Retry must reach the fixture instead of passing only from the old cache")
         XCTAssertTrue(fresh.allSatisfy { $0.status == 200 })
         XCTAssertEqual(Set(fresh.flatMap { $0.syntheticIDs ?? [] }).count, 5)
-        XCTAssertTrue(app.buttons["map.operator"].label.contains("SFR"))
+        XCTAssertTrue(operatorState(in: app).hasPrefix("SFR"))
         capture(app, name: "map-speedtests-recovered-render")
 
         let map = app.maps.firstMatch
@@ -375,7 +372,7 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         let beforePinch = abs(eastMeasure.frame.midX - centerMeasure.frame.midX)
         map.pinch(withScale: 1.25, velocity: 1)
         try await waitForMapGeometry { abs(eastMeasure.frame.midX - centerMeasure.frame.midX) > beforePinch + 8 }
-        XCTAssertTrue(app.buttons["map.operator"].label.contains("SFR"))
+        XCTAssertTrue(operatorState(in: app).hasPrefix("SFR"))
         capture(app, name: "map-speedtests-after-pan-and-pinch")
 
         let selectedMeasure = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 200 Mbps")).firstMatch
@@ -424,27 +421,38 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         return app
     }
 
-    private func selectSFR(in app: XCUIApplication) throws {
-        let pill = app.buttons["map.operator"]
-        if pill.label.hasSuffix(": SFR") { return }
-        try tap(pill, in: app)
-        let choices = app.buttons.matching(NSPredicate(format: "label == %@", "SFR"))
-        guard choices.firstMatch.waitForExistence(timeout: 15) else {
-            capture(app, name: "map-sfr-menu-choice-not-hittable")
+    /// Valeur de la pastille d'état : « SFR, Antennes et Débits ».
+    private func operatorState(in app: XCUIApplication) -> String {
+        app.buttons["map.operator"].value as? String ?? ""
+    }
+
+    private func openLayers(in app: XCUIApplication) throws {
+        try tap(app.buttons["map.layers"], in: app)
+        guard app.buttons["map.layers.close"].waitForExistence(timeout: 10) else {
+            capture(app, name: "map-layers-not-presented")
             throw RecipeError.missingControl
         }
-        let choice = choices.firstMatch
-        if let menu = app.collectionViews.allElementsBoundByIndex.first(where: {
-            $0.buttons.matching(NSPredicate(format: "label == %@", "SFR")).firstMatch.exists
-        }) {
-            for _ in 0..<4 where choice.frame.minY < menu.frame.minY + 4 {
-                menu.swipeDown(velocity: .slow)
-            }
-        }
-        let ready = NSPredicate { _, _ in choice.isHittable && choice.isEnabled }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: nil)], timeout: 15), .completed)
+    }
+
+    private func closeLayers(in app: XCUIApplication) throws {
+        let close = app.buttons["map.layers.close"]
+        // L'en-tête défile avec le contenu : remonter avant de fermer.
+        let content = app.scrollViews["map.layers.content"]
+        for _ in 0..<8 where close.exists && !close.isHittable && content.exists { content.swipeDown() }
+        if close.exists { try tap(close, in: app) }
+        guard close.waitForNonExistence(timeout: 10) else { throw RecipeError.missingControl }
+    }
+
+    /// L'opérateur se choisit dans la feuille Carte et s'applique tout de suite.
+    private func selectSFR(in app: XCUIApplication) throws {
+        if operatorState(in: app).hasPrefix("SFR") { return }
+        try openLayers(in: app)
+        let choice = app.buttons["map.operator.option.SFR"]
+        try reveal(choice, in: app, sheet: Self.layersSheet)
         choice.tap()
-        let selected = NSPredicate { _, _ in pill.label.hasSuffix(": SFR") }
+        XCTAssertTrue(choice.isSelected)
+        try closeLayers(in: app)
+        let selected = NSPredicate { _, _ in self.operatorState(in: app).hasPrefix("SFR") }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: selected, object: nil)], timeout: 10), .completed)
     }
 
@@ -460,61 +468,55 @@ final class MapHTTPRuntimeQATests: XCTestCase {
         throw RecipeError.missingControl
     }
 
-    /// Lazy grids do not expose off-screen controls until their scroll view reaches them.
-    private func reveal(_ element: XCUIElement, in app: XCUIApplication) throws {
+    /// Une feuille de la carte : sa zone défilante, son en-tête et son pied.
+    private struct SheetScroll { let scroll: String; let header: String; let footer: String? }
+    private static let filtersSheet = SheetScroll(scroll: "map.filters.content", header: "map.filters.cancel", footer: "map.filters.reset")
+    private static let layersSheet = SheetScroll(scroll: "map.layers.content", header: "map.layers.close", footer: nil)
+
+    /// Les grilles paresseuses n'exposent un contrôle qu'une fois atteint par le défilement.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, sheet: SheetScroll = MapHTTPRuntimeQATests.filtersSheet) throws {
         for _ in 0..<10 {
-            if fullyVisibleInFilters(element, in: app) { return }
-            let top = filterNavigation(in: app).frame.maxY + 4
+            if fullyVisible(element, in: app, sheet: sheet) { return }
+            let top = app.buttons[sheet.header].frame.maxY + 4
             let above = element.exists && element.frame.minY < top
-            try scrollFilterContent(in: app, towardTop: above)
+            try scrollContent(in: app, sheet: sheet, towardTop: above)
         }
-        capture(app, name: "map-filter-control-not-visible")
-        XCTFail("Filter control is not reachable inside the sheet's visible scroll area")
+        capture(app, name: "map-sheet-control-not-visible")
+        XCTFail("Control is not reachable inside the sheet's visible scroll area")
         throw RecipeError.missingControl
     }
-    private func scrollFiltersToTop(in app: XCUIApplication) throws {
-        for _ in 0..<10 {
-            if fullyVisibleInFilters(app.buttons["map.filters.market"], in: app) { return }
-            try scrollFilterContent(in: app, towardTop: true)
-        }
-    }
-    private func fullyVisibleInFilters(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
-        guard element.exists, element.isHittable,
-              app.buttons["map.filters.reset"].exists else { return false }
-        let scroll = app.scrollViews["map.filters.content"].frame
-        let top = max(scroll.minY, filterNavigation(in: app).frame.maxY) + 4
-        let bottom = min(scroll.maxY, app.buttons["map.filters.reset"].frame.minY) - 4
-        return element.frame.minY >= top && element.frame.maxY <= bottom
-    }
-    private func scrollFilterContent(in app: XCUIApplication, towardTop: Bool) throws {
-        let scroll = app.scrollViews["map.filters.content"]
-        guard scroll.exists, app.buttons["map.filters.reset"].exists else { throw RecipeError.missingControl }
+    private func visibleBounds(in app: XCUIApplication, sheet: SheetScroll) -> (top: CGFloat, bottom: CGFloat, rect: CGRect)? {
+        let scroll = app.scrollViews[sheet.scroll]
+        guard scroll.exists else { return nil }
         let rect = scroll.frame
-        let top = max(rect.minY, filterNavigation(in: app).frame.maxY + 4)
-        let bottom = min(rect.maxY, app.buttons["map.filters.reset"].frame.minY) - 4
-        guard bottom - top > 80, rect.height > 0 else { throw RecipeError.missingControl }
-        let experts = app.buttons["map.filters.experts"]
-        let wasExpanded = experts.exists && ["Développé", "Expanded"].contains(experts.value as? String ?? "")
-        let upper = top + (bottom - top) * 0.25
-        let lower = top + (bottom - top) * 0.75
-        let origin = app.coordinate(withNormalizedOffset: .zero)
-        let start = origin.withOffset(CGVector(dx: rect.midX, dy: towardTop ? upper : lower))
-        let end = origin.withOffset(CGVector(dx: rect.midX, dy: towardTop ? lower : upper))
-        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
-        if wasExpanded && experts.exists && ["Réduit", "Collapsed"].contains(experts.value as? String ?? "") {
-            capture(app, name: "map-experts-collapsed-by-scroll")
-            XCTFail("Scrolling must not collapse the open expert section")
-            throw RecipeError.missingControl
+        let top = max(rect.minY, app.buttons[sheet.header].frame.maxY) + 4
+        var bottom = rect.maxY - 4
+        if let footer = sheet.footer {
+            let button = app.buttons[footer]
+            guard button.exists else { return nil }
+            bottom = min(bottom, button.frame.minY - 4)
         }
+        return (top, bottom, rect)
     }
-    private func filterNavigation(in app: XCUIApplication) -> XCUIElement {
-        let french = app.navigationBars["Filtres de la carte"]
-        return french.exists ? french : app.navigationBars["Map filters"]
+    private func fullyVisible(_ element: XCUIElement, in app: XCUIApplication, sheet: SheetScroll) -> Bool {
+        guard element.exists, element.isHittable, let bounds = visibleBounds(in: app, sheet: sheet) else { return false }
+        return element.frame.minY >= bounds.top && element.frame.maxY <= bounds.bottom
+    }
+    private func scrollContent(in app: XCUIApplication, sheet: SheetScroll, towardTop: Bool) throws {
+        guard let bounds = visibleBounds(in: app, sheet: sheet),
+              bounds.bottom - bounds.top > 80, bounds.rect.height > 0 else { throw RecipeError.missingControl }
+        let upper = bounds.top + (bounds.bottom - bounds.top) * 0.25
+        let lower = bounds.top + (bounds.bottom - bounds.top) * 0.75
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let start = origin.withOffset(CGVector(dx: bounds.rect.midX, dy: towardTop ? upper : lower))
+        let end = origin.withOffset(CGVector(dx: bounds.rect.midX, dy: towardTop ? lower : upper))
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
     }
 
+    /// Les couches s'appliquent dès le toucher, dans la feuille Carte.
     private func setLayer(_ kind: String, selected: Bool, in app: XCUIApplication) throws {
         let button = app.buttons["map.layer." + kind]
-        try reveal(button, in: app)
+        try reveal(button, in: app, sheet: Self.layersSheet)
         if button.isSelected != selected { try tap(button, in: app) }
         XCTAssertEqual(button.isSelected, selected)
     }

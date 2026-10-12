@@ -361,7 +361,8 @@ struct MapKitMapView: UIViewRepresentable {
             map.showTileAttribution(backdrop.tileAttribution)
             switch backdrop.mapKitKind {
             case .applePlan:
-                let c = MKStandardMapConfiguration(elevationStyle: .flat)
+                // Fond atténué : les couleurs restent aux couches (opérateurs, couverture).
+                let c = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
                 c.pointOfInterestFilter = .excludingAll
                 map.preferredConfiguration = c
             case .imagery:

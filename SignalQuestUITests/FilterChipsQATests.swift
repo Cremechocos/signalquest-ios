@@ -17,7 +17,7 @@ final class FilterChipsQATests: XCTestCase {
     private func run(locale: String) {
         let fr = locale == "fr"
 
-        // Écran ANFR, par les filtres de la carte : le chemin de l'utilisateur.
+        // Écran ANFR, par la feuille Carte : le chemin de l'utilisateur.
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--reset-map"], locale: locale)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -28,12 +28,9 @@ final class FilterChipsQATests: XCTestCase {
         let map = SignalQuestUITestSupport.tab(named: fr ? "Carte" : "Map", in: app)
         XCTAssertTrue(map.waitForExistence(timeout: 25), "Onglet Carte absent en \(locale)")
         map.tap()
-        let filters = app.buttons["map.filters"].firstMatch
-        XCTAssertTrue(filters.waitForExistence(timeout: 15), "Bouton des filtres absent")
-        filters.tap()
+        XCTAssertTrue(SignalQuestUITestSupport.openMapANFRMenu(in: app), "Registre ANFR absent de la feuille Carte")
         let anfrStats = app.buttons["map.filters.anfr.stats"].firstMatch
         XCTAssertTrue(anfrStats.waitForExistence(timeout: 10), "Entrée des statistiques ANFR absente")
-        _ = SignalQuestUITestSupport.scrollToHittable(anfrStats, in: app)
         anfrStats.tap()
         let band = app.buttons[fr ? "5G 3,5 GHz" : "5G 3.5 GHz"]
         XCTAssertTrue(band.waitForExistence(timeout: 25), "Filtre 5G 3,5 GHz absent en \(locale)")

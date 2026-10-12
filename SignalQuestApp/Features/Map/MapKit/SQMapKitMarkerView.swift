@@ -175,13 +175,18 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
         applyAccessibility(for: payload)
         let color = UIColor(payload.markerColor)
         if let count = payload.clusterCount {
+            // Grappe Halo : disque d'encre, chiffre couleur papier, anneau carmin.
+            // Elle se distingue ainsi d'un site, coloré par son opérateur.
             let size: CGFloat = count >= 100 ? 44 : 38
             resize(to: size, radius: size / 2)
-            dot.backgroundColor = color
-            dot.layer.borderColor = Self.outlineColor.cgColor
+            let ink = UIColor(SQColor.label).resolvedColor(with: traitCollection)
+            dot.backgroundColor = ink
+            dot.layer.borderColor = UIColor(SQColor.brandRed).resolvedColor(with: traitCollection).cgColor
+            dot.layer.borderWidth = 3
             dot.alpha = 1
             countLabel.frame = dot.bounds
-            countLabel.textColor = Self.ink(on: color)
+            countLabel.font = .systemFont(ofSize: count >= 100 ? 12 : 11, weight: .heavy)
+            countLabel.textColor = UIColor(SQColor.bg).resolvedColor(with: traitCollection)
             countLabel.text = count > 999 ? "999+" : "\(count)"
             countLabel.isHidden = false
             glyph.isHidden = true
@@ -220,6 +225,7 @@ final class SQMapKitMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
             let outageMark = payload.kind == .communityOutage ? payload.communityOutage : nil
             let hollow = outageMark.map { !$0.confirmed } ?? false
             let fill = hollow ? Self.outlineColor : color
+            dot.layer.borderWidth = 2.5
             dot.backgroundColor = fill
             dot.layer.borderColor = (hollow ? color : Self.outlineColor).cgColor
             dot.alpha = payload.communityObserved ? 0.6 : 1

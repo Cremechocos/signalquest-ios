@@ -1,39 +1,46 @@
 import SwiftUI
 import MapKit
 
-/// Écran ANFR à ouvrir une fois la feuille de filtres fermée.
+/// Écran ANFR à ouvrir une fois la feuille Carte fermée.
 enum MapANFRDestination {
     case map
     case stats
 }
 
+extension MapFilterSelection {
+    /// Réglages fins qui s'écartent du défaut : le chiffre du bouton Filtres.
+    /// Pays, opérateur et couches n'en font pas partie : la pastille d'état les montre.
+    var activeRefinementCount: Int {
+        var count = 0
+        if !technologies.isEmpty { count += 1 }
+        if !bands.isEmpty { count += 1 }
+        if !sharing.isEmpty { count += 1 }
+        if speedtestDays != 0 { count += 1 }
+        if coverageDays != 0 { count += 1 }
+        if azimuthStyle != .lines { count += 1 }
+        if !includeObserved { count += 1 }
+        if layers.contains(.planned), plannedStatuses != Set(PlannedActivationStatus.allCases) { count += 1 }
+        return count
+    }
+}
+
+/// Feuille Filtres : seulement les réglages des couches affichées. Pays,
+/// opérateur et couches se choisissent dans la feuille Carte.
 struct MapAdvancedFilterSheet: View {
     @State private var baseline: MapFilterSelection
     @State private var draft: MapFilterSelection
-    @State private var originalDromRegion: DromRegion?
-    @State private var expertsExpanded = false
-    @State private var adjustmentNotice = false
     @State private var applyError: String?
+    private let dromRegion: DromRegion?
     let allMarkets: [MarketRegistryEntry]
-    /// Sans compte, la couche Amis ne peut rien afficher : on ne la propose pas.
-    let showsFriendsLayer: Bool
     let onApply: (MapFilterSelection) -> Bool
-    /// Données ANFR, rangées ici en section avancée (décision du 29/09) ;
-    /// `nil` masque la section.
-    let onOpenANFR: ((MapANFRDestination) -> Void)?
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(selection: MapFilterSelection, allMarkets: [MarketRegistryEntry],
-         dromRegion: DromRegion?, showsFriendsLayer: Bool = true,
-         onOpenANFR: ((MapANFRDestination) -> Void)? = nil,
-         onApply: @escaping (MapFilterSelection) -> Bool) {
+         dromRegion: DromRegion?, onApply: @escaping (MapFilterSelection) -> Bool) {
         _baseline = State(initialValue: selection)
         _draft = State(initialValue: selection)
-        _originalDromRegion = State(initialValue: dromRegion)
+        self.dromRegion = dromRegion
         self.allMarkets = allMarkets
-        self.showsFriendsLayer = showsFriendsLayer
-        self.onOpenANFR = onOpenANFR
         self.onApply = onApply
     }
 
@@ -44,381 +51,266 @@ struct MapAdvancedFilterSheet: View {
     private var catalogMarket: String { selectedEntry?.marketCode ?? draft.market }
     private var communityAvailable: Bool { selectedEntry?.capabilities.communityLayers == true }
     private var plannedAvailable: Bool { selectedEntry?.capabilities.previsionnel == true }
-    private var draftDromRegion: DromRegion? {
-        guard catalogMarket.uppercased() == "DROM" else { return nil }
-        if baseline.market.uppercased() == "DROM" { return originalDromRegion }
-        guard let latitude = selectedEntry?.defaultCenterLatitude,
-              let longitude = selectedEntry?.defaultCenterLongitude else { return nil }
-        return DromRegion.from(latitude: latitude, longitude: longitude) ?? .guadeloupe
+
+    /// Couches qui ont des réglages ici.
+    private static let filterableLayers: Set<MapDisplayItem.Kind> = [.antenna, .coverage, .speedtest, .planned, .communitySite]
+    private var shownFilterableLayers: [MapDisplayItem.Kind] {
+        MapLayersSheet.layerOrder.filter { draft.layers.contains($0) && Self.filterableLayers.contains($0) }
     }
-    private var operators: [String] {
-        selectedEntry.map { MapFilterSelection.operatorOptions(for: $0, dromRegion: draftDromRegion) } ?? ["ALL"]
+    private var sharingOptions: [MapFilterCatalog.SharingOption] { MapFilterCatalog.sharing(forMarket: catalogMarket) }
+    private var showsRadio: Bool { !shownFilterableLayers.isEmpty }
+    private var showsSharing: Bool { draft.layers.contains(.antenna) && !sharingOptions.isEmpty }
+    private var showsSectors: Bool { draft.layers.contains(.antenna) }
+    private var showsPlanned: Bool { plannedAvailable && draft.layers.contains(.planned) }
+    private var showsObserved: Bool {
+        communityAvailable && (draft.layers.contains(.antenna) || draft.layers.contains(.communitySite))
     }
-    private var columns: [GridItem] {
-        dynamicTypeSize.isAccessibilitySize ? [GridItem(.flexible())]
-            : [GridItem(.adaptive(minimum: 140), spacing: SQSpace.sm)]
+
+    private var title: String {
+        guard shownFilterableLayers.count == 1, let only = shownFilterableLayers.first else {
+            return String(localized: "Filtres")
+        }
+        let layer = MapLayersSheet.layerTitle(only, communityOnly: selectedEntry?.isCommunityOnly == true)
+        return String(localized: "Filtres · \(layer)")
+    }
+
+    private var subtitle: String {
+        let count = draft.activeRefinementCount
+        return count == 0 ? String(localized: "Aucun filtre actif") : String(localized: "\(count) filtres actifs")
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.xxl) {
-                    Text("Choisis ce que tu veux voir.")
-                        .font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
-                    countrySection
-                    operatorSection
-                    layerSection
-                    DisclosureGroup(isExpanded: $expertsExpanded) {
-                        expertSections.padding(.top, SQSpace.xl)
-                    } label: {
-                        VStack(alignment: .leading, spacing: SQSpace.xs2) {
-                            Text("Réglages experts").font(SQType.heading).foregroundStyle(SQColor.label)
-                            Text(expertSummary).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: SQSpace.xl) {
+                        MapSheetHeader(title: title, subtitle: subtitle, closeIdentifier: "map.filters.cancel") { dismiss() }
+                        if !showsRadio {
+                            SQNotice(message: "Les couches affichées n’ont pas de filtre. Choisis-les avec le bouton Carte.")
                         }
+                        if showsRadio { technologySection }
+                        if showsRadio || showsSharing { refineSection }
+                        if showsSectors { sectorsSection }
+                        if draft.layers.contains(.speedtest) || draft.layers.contains(.coverage) { periodSection }
+                        if showsPlanned { plannedSection }
+                        if showsObserved { observedSection }
                     }
-                    .tint(SQColor.accentInk)
-                    .disclosureGroupStyle(MapExpertDisclosureStyle())
-                    anfrSection
-                    if adjustmentNotice {
-                        Text("Les options incompatibles ont été ajustées au pays choisi.")
-                            .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-                            .accessibilityIdentifier("map.filters.adjustment")
-                    }
+                    .padding(.horizontal, SQSpace.lg)
+                    .padding(.top, SQSpace.lg)
+                    .padding(.bottom, SQSpace.xl)
                 }
-                .padding(SQSpace.xl)
-            }
-            .accessibilityIdentifier("map.filters.content")
-            footer
+                .accessibilityIdentifier("map.filters.content")
+                footer
             }
             .background(SQColor.surface)
-            .navigationTitle("Filtres de la carte")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(SQColor.surface, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }
-                        .tint(SQColor.accentInk)
-                        .accessibilityIdentifier("map.filters.cancel")
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
-    private var countrySection: some View {
-        section("Pays") {
-            Menu {
-                ForEach(allMarkets) { entry in
+    // MARK: Sections
+
+    /// La plus récente en tête.
+    private var technologies: [MapFilterCatalog.TechOption] {
+        MapFilterCatalog.technologies(forMarket: catalogMarket).reversed()
+    }
+
+    private var technologySection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack {
+                Text("Technologies").sqKicker().accessibilityAddTraits(.isHeader)
+                Spacer(minLength: SQSpace.sm)
+                if !draft.technologies.isEmpty {
                     Button {
-                        changeMarket(to: entry)
+                        Haptics.selection()
+                        draft.technologies.removeAll()
                     } label: {
-                        if entry.code.caseInsensitiveCompare(draft.market) == .orderedSame
-                            || entry.marketCode.caseInsensitiveCompare(draft.market) == .orderedSame {
-                            Label(marketTitle(entry), systemImage: "checkmark")
-                        } else { Text(marketTitle(entry)) }
+                        Text("Tout").font(SQType.caption.weight(.semibold)).foregroundStyle(SQColor.ink2)
+                            .frame(minWidth: 44, minHeight: 32)
+                            .contentShape(Rectangle())
                     }
-                    .accessibilityIdentifier("map.filters.country.\(entry.code)")
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Toutes les technologies")
+                    .accessibilityIdentifier("map.filters.technology.all")
                 }
-            } label: {
-                menuLabel(title: selectedEntry.map(marketName) ?? draft.market,
-                          symbol: "globe", accessory: selectedEntry.map { flagEmoji($0.countryCode) })
             }
-            .accessibilityIdentifier("map.filters.market")
-            .disabled(allMarkets.isEmpty)
-        }
-    }
-
-    private var operatorSection: some View {
-        section("Opérateur") {
-            Menu {
-                ForEach(operators, id: \.self) { key in
-                    Button { draft.operatorName = key } label: {
-                        if key.caseInsensitiveCompare(draft.operatorName) == .orderedSame {
-                            Label(operatorLabel(key), systemImage: "checkmark")
-                        } else { Text(operatorLabel(key)) }
+            MapRowsTile {
+                ForEach(Array(technologies.enumerated()), id: \.element.value) { index, technology in
+                    MapCheckRow(isOn: draft.technologies.isEmpty || draft.technologies.contains(technology.value),
+                                identifier: "map.filters.technology.\(technology.value)") {
+                        toggleTechnology(technology.value)
+                    } label: {
+                        MapTechTag(technology: technology.value, label: technology.label)
+                        Text(technology.label).font(SQType.callout(.semibold)).foregroundStyle(SQColor.label)
                     }
-                }
-            } label: { menuLabel(title: operatorLabel(draft.operatorName), symbol: "antenna.radiowaves.left.and.right") }
-            .accessibilityIdentifier("map.filters.operator")
-            if let region = draftDromRegion {
-                Text(region.displayName).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-            }
-        }
-    }
-
-    var layerOptions: [(MapDisplayItem.Kind, String, String)] {
-        var options: [(MapDisplayItem.Kind, String, String)] = [
-            (.antenna, selectedEntry?.isCommunityOnly == true ? String(localized: "Sites communautaires") : String(localized: "Antennes"), "antenna.radiowaves.left.and.right"),
-            (.customSite, String(localized: "Sites ajoutés"), "mappin.and.ellipse"),
-            (.speedtest, String(localized: "Speedtests"), "speedometer"),
-            (.photo, String(localized: "Photos"), "photo"),
-            (.friend, String(localized: "Amis"), "person.2"),
-            (.coverage, String(localized: "Couverture"), "dot.radiowaves.left.and.right"),
-            (.outage, String(localized: "Pannes"), "exclamationmark.triangle")
-        ]
-        if !showsFriendsLayer { options.removeAll { $0.0 == .friend } }
-        if plannedAvailable || draft.layers.contains(.planned) {
-            options.append((.planned, String(localized: "Prévisionnels"), "calendar.badge.clock"))
-        }
-        if communityAvailable || draft.layers.contains(.communitySite) {
-            options.append((.communitySite, String(localized: "Cellules observées"), "dot.radiowaves.up.forward"))
-        }
-        return options
-    }
-
-    private var layerSection: some View {
-        section("Couches") {
-            LazyVGrid(columns: columns, spacing: SQSpace.sm) {
-                ForEach(layerOptions, id: \.0.rawValue) { kind, title, icon in
-                    layerChip(kind, title: title, icon: icon, unavailable:
-                        (kind == .coverage && draft.operatorName.uppercased() == "ALL")
-                        || (kind == .planned && !plannedAvailable)
-                        || (kind == .communitySite && !communityAvailable))
-                }
-            }
-            if showsFriendsLayer && draft.layers.contains(.photo) {
-                Toggle("Photos de mes amis seulement", isOn: $draft.photosFriendsOnly)
-                    .tint(SQColor.accent).accessibilityIdentifier("map.filters.photosFriendsOnly")
-            }
-            if draft.operatorName.uppercased() == "ALL" {
-                hint("Choisis un opérateur pour afficher la couverture.")
-            }
-            if selectedEntry?.isCommunityOnly == true {
-                hint("Dans ce pays, les sites proviennent de la communauté.")
-            }
-            if !plannedAvailable { hint("Les sources prévisionnelles ne sont pas disponibles dans ce pays.") }
-        }
-    }
-
-    /// Le registre public des antennes, pour qui veut aller plus loin : un
-    /// bouton permanent sur la carte lui donnait trop de place (29/09).
-    @ViewBuilder
-    private var anfrSection: some View {
-        if let onOpenANFR {
-            VStack(alignment: .leading, spacing: SQSpace.sm2) {
-                HStack(spacing: SQSpace.xs) {
-                    Text("Données ANFR").font(SQType.heading).foregroundStyle(SQColor.label)
-                    SQInfoButton(term: .anfr)
-                }
-                Text("Le registre public des antennes, sur une carte ou en chiffres.")
-                    .font(SQType.caption).foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-                // Pas de grille paresseuse : deux boutons, toujours présents dans
-                // l'arbre d'accessibilité, même avant d'avoir défilé jusqu'à eux.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: SQSpace.sm) { anfrChips(onOpenANFR) }
-                    VStack(alignment: .leading, spacing: SQSpace.sm) { anfrChips(onOpenANFR) }
+                    .mapRowDivider(index > 0)
                 }
             }
         }
     }
 
-    @ViewBuilder
-    private func anfrChips(_ onOpenANFR: @escaping (MapANFRDestination) -> Void) -> some View {
-        chip("Carte ANFR", icon: "map.fill", active: false) {
-            onOpenANFR(.map)
-            dismiss()
+    private var refineSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Affiner").sqKicker().accessibilityAddTraits(.isHeader)
+            MapRowsTile {
+                if showsRadio {
+                    NavigationLink {
+                        MapBandsPage(draft: $draft, catalogMarket: catalogMarket,
+                                     marketName: selectedEntry.map(MapMarketNaming.name) ?? catalogMarket)
+                    } label: {
+                        refineRow(String(localized: "Bandes"), value: bandsSummary, active: !draft.bands.isEmpty)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("map.filters.bands")
+                }
+                if showsSharing {
+                    NavigationLink {
+                        MapSharingPage(draft: $draft, options: sharingOptions)
+                    } label: {
+                        refineRow(String(localized: "Partage"), value: sharingSummary, active: !draft.sharing.isEmpty)
+                    }
+                    .buttonStyle(.plain)
+                    .mapRowDivider(showsRadio)
+                    .accessibilityIdentifier("map.filters.sharing")
+                }
+            }
         }
-        .accessibilityIdentifier("map.filters.anfr.map")
-        chip("Statistiques ANFR", icon: "chart.bar.xaxis", active: false) {
-            onOpenANFR(.stats)
-            dismiss()
-        }
-        .accessibilityIdentifier("map.filters.anfr.stats")
     }
 
-    private var expertSections: some View {
-        VStack(alignment: .leading, spacing: SQSpace.xxl) {
-            section("Générations") {
-                LazyVGrid(columns: columns, spacing: SQSpace.sm) {
-                    chip("Toutes", icon: "sparkles", active: draft.technologies.isEmpty) { draft.technologies.removeAll() }
-                    ForEach(MapFilterCatalog.technologies(forMarket: catalogMarket), id: \.value) { technology in
-                        chip(technology.label, icon: "cellularbars", active: draft.technologies.contains(technology.value)) {
-                            toggle(technology.value, in: &draft.technologies)
-                        }.accessibilityIdentifier("map.filters.technology.\(technology.value)")
+    private var sectorsSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Secteurs sur la carte").sqKicker().accessibilityAddTraits(.isHeader)
+            MapSegmented(selection: $draft.azimuthStyle,
+                         options: AzimuthStyle.allCases.map { ($0, $0.label) },
+                         identifier: "map.filters.azimuth")
+        }
+    }
+
+    private var periodSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            Text("Période").sqKicker().accessibilityAddTraits(.isHeader)
+            if draft.layers.contains(.speedtest) {
+                periodPicker(String(localized: "Débits"), selection: $draft.speedtestDays, identifier: "map.filters.speedtestDays")
+            }
+            if draft.layers.contains(.coverage) {
+                periodPicker(String(localized: "Couverture"), selection: $draft.coverageDays, identifier: "map.filters.coverageDays")
+            }
+        }
+    }
+
+    private var plannedSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Statut prévisionnel").sqKicker().accessibilityAddTraits(.isHeader)
+            MapRowsTile {
+                ForEach(Array(PlannedActivationStatus.allCases.enumerated()), id: \.element) { index, status in
+                    MapCheckRow(isOn: draft.plannedStatuses.contains(status),
+                                identifier: "map.filters.planned.\(status.rawValue)") {
+                        toggle(status, in: &draft.plannedStatuses)
+                    } label: {
+                        Image(systemName: MapExplorerView.plannedStatusGlyph(status))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .frame(width: 22)
+                            .accessibilityHidden(true)
+                        Text(LocalizedStringKey(MapExplorerView.plannedStatusLabel(status)))
+                            .font(SQType.callout(.semibold)).foregroundStyle(SQColor.label)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .mapRowDivider(index > 0)
                 }
             }
-            section("Bandes et fréquences") {
-                LazyVGrid(columns: columns, spacing: SQSpace.sm) {
-                    ForEach(MapFilterCatalog.bands(forMarket: catalogMarket), id: \.band) { band in
-                        chip(band.label, icon: "waveform", active: draft.bands.contains(band.band)) {
-                            toggle(band.band, in: &draft.bands)
-                        }.accessibilityIdentifier("map.filters.band.\(band.band)")
-                    }
-                }
-                if !draft.bands.isEmpty {
-                    Text("Croisement des bandes").font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
-                    Menu {
-                        ForEach(BandMatchMode.allCases, id: \.self) { mode in
-                            Button { draft.bandMatch = mode } label: {
-                                if draft.bandMatch == mode { Label(mode.label, systemImage: "checkmark") }
-                                else { Text(mode.label) }
-                            }
-                        }
-                    } label: { menuLabel(title: draft.bandMatch.label, symbol: "line.3.horizontal.decrease") }
-                    .accessibilityLabel("Croisement des bandes")
-                    .accessibilityValue(draft.bandMatch.label)
-                    .accessibilityIdentifier("map.filters.bandMatch")
-                    Text(draft.bandMatch.explanation).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            let sharing = MapFilterCatalog.sharing(forMarket: catalogMarket)
-            if !sharing.isEmpty {
-                section("Mutualisation") {
-                    LazyVGrid(columns: columns, spacing: SQSpace.sm) {
-                        ForEach(sharing, id: \.value) { option in
-                            chip(option.label, icon: option.icon, active: draft.sharing.contains(option.value)) {
-                                toggle(option.value, in: &draft.sharing)
-                            }.accessibilityIdentifier("map.filters.sharing.\(option.value)")
-                        }
-                    }
-                }
-            }
-            section("Azimuts") {
-                LazyVGrid(columns: columns, spacing: SQSpace.sm) {
-                    ForEach(AzimuthStyle.allCases, id: \.self) { style in
-                        chip(style.label, icon: style.icon, active: draft.azimuthStyle == style) { draft.azimuthStyle = style }
-                            .accessibilityIdentifier("map.filters.azimuth.\(style.rawValue)")
-                    }
-                }
-            }
-            section("Période") {
-                periodPicker("Speedtests", selection: $draft.speedtestDays, identifier: "map.filters.speedtestDays")
-                periodPicker("Couverture", selection: $draft.coverageDays, identifier: "map.filters.coverageDays")
-            }
-            if communityAvailable {
-                section("Cellules observées") {
-                    Toggle("Inclure les cellules non consolidées", isOn: $draft.includeObserved)
-                        .tint(SQColor.accent).accessibilityIdentifier("map.filters.includeObserved")
-                    hint("Affiche aussi les cellules captées, en plus des sites probables consolidés")
-                }
-            }
-            if plannedAvailable && draft.layers.contains(.planned) {
-                section("Statut prévisionnel") {
-                    LazyVGrid(columns: columns, spacing: SQSpace.sm) {
-                        ForEach(PlannedActivationStatus.allCases, id: \.self) { status in
-                            chip(MapExplorerView.plannedStatusLabel(status), icon: MapExplorerView.plannedStatusGlyph(status), active: draft.plannedStatuses.contains(status)) {
-                                toggle(status, in: &draft.plannedStatuses)
-                            }.accessibilityIdentifier("map.filters.planned.\(status.rawValue)")
-                        }
-                    }
-                }
-            }
+        }
+    }
+
+    private var observedSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Cellules observées").sqKicker().accessibilityAddTraits(.isHeader)
+            Toggle("Inclure les cellules non consolidées", isOn: $draft.includeObserved)
+                .font(SQType.callout(.semibold))
+                .foregroundStyle(SQColor.label)
+                .tint(SQColor.accent)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("map.filters.includeObserved")
+            Text("Affiche aussi les cellules captées, en plus des sites probables consolidés")
+                .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var footer: some View {
-        VStack(spacing: SQSpace.md) {
+        VStack(spacing: SQSpace.sm) {
             if let applyError {
                 Text(applyError).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            HStack(alignment: .firstTextBaseline) {
-                Text(draft == baseline ? String(localized: "Filtres actuels") : String(localized: "Modifications à appliquer"))
-                    .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: SQSpace.md)
+            HStack(spacing: SQSpace.sm2) {
                 Button { resetDraft() } label: {
                     Text("Réinitialiser")
-                        .font(SQType.subhead).foregroundStyle(SQColor.accentInk)
+                        .font(SQType.button).foregroundStyle(SQColor.label)
+                        .padding(.horizontal, SQSpace.xs2)
                         .frame(minHeight: 44).contentShape(Rectangle())
                 }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("map.filters.reset")
-            }
-            GradientButton("Appliquer les filtres") {
-                if onApply(draft) { dismiss() }
-                else { applyError = String(localized: "Les pays disponibles ont changé. Vérifie ton choix.") }
-            }
-            .disabled(selectedEntry == nil)
-            .accessibilityIdentifier("map.filters.done")
-        }
-        .padding(.horizontal, SQSpace.xl).padding(.vertical, SQSpace.md)
-        .background(SQColor.surface)
-        .overlay(alignment: .top) { Rectangle().fill(SQColor.separator).frame(height: 0.5) }
-    }
-
-    private var expertSummary: String {
-        let generations = draft.technologies.isEmpty ? String(localized: "Toutes générations") : draft.technologies.sorted().joined(separator: ", ")
-        let catalogue = MapFilterCatalog.bands(forMarket: catalogMarket)
-        let bands = draft.bands.isEmpty ? String(localized: "Toutes bandes")
-            : catalogue.filter { draft.bands.contains($0.band) }.map(\.label).joined(separator: ", ")
-        return [generations, bands, draft.azimuthStyle.label].joined(separator: " · ")
-    }
-
-    private func changeMarket(to entry: MarketRegistryEntry) {
-        applyError = nil
-        let previous = draft
-        draft.market = entry.marketCode.isEmpty ? entry.code : entry.marketCode
-        let normalized = draft.normalized(for: entry, dromRegion: draftDromRegion)
-        adjustmentNotice = normalized.operatorName != previous.operatorName || normalized.bands != previous.bands
-            || normalized.sharing != previous.sharing || normalized.technologies != previous.technologies
-        draft = normalized
-    }
-    private func resetDraft() {
-        applyError = nil
-        draft = .defaults(market: baseline.market, operatorName: baseline.operatorName)
-        if let selectedEntry { draft = draft.normalized(for: selectedEntry, dromRegion: draftDromRegion) }
-        adjustmentNotice = false
-    }
-    private func layerChip(_ kind: MapDisplayItem.Kind, title: String, icon: String, unavailable: Bool = false) -> some View {
-        chip(title, icon: icon, active: draft.layers.contains(kind), disabled: unavailable && !draft.layers.contains(kind)) {
-            toggle(kind, in: &draft.layers)
-        }.accessibilityIdentifier("map.layer.\(kind.rawValue)")
-    }
-    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            Text(title).font(SQType.heading).foregroundStyle(SQColor.label)
-                .accessibilityAddTraits(.isHeader)
-            content()
-        }.frame(maxWidth: .infinity, alignment: .leading)
-    }
-    private func hint(_ text: LocalizedStringKey) -> some View {
-        Text(text).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    private func chip(_ title: String, icon: String, active: Bool, disabled: Bool = false, action: @escaping () -> Void) -> some View {
-        // Sélection = remplissage teinté et coche, sans contour.
-        SQChip(
-            label: title, systemImage: icon, isSelected: active, selectedSystemImage: "checkmark",
-            selectedFill: SQColor.accentSoft, selectedInk: SQColor.accentInk, restFill: SQColor.surfaceMuted,
-            fillsWidth: true, action: action
-        )
-        .disabled(disabled)
-    }
-    private func menuLabel(title: String, symbol: String, accessory: String? = nil) -> some View {
-        HStack(spacing: SQSpace.sm2) {
-            if let accessory { Text(accessory).accessibilityHidden(true) }
-            else { Image(systemName: symbol).foregroundStyle(SQColor.accentInk).accessibilityHidden(true) }
-            Text(title).font(SQType.body).foregroundStyle(SQColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: SQSpace.sm)
-            Image(systemName: "chevron.up.chevron.down").foregroundStyle(SQColor.labelSecondary)
-        }
-        .padding(.horizontal, SQSpace.md2).padding(.vertical, SQSpace.sm).frame(minHeight: 48)
-        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md))
-    }
-    private func periodPicker(_ title: LocalizedStringKey, selection: Binding<Int>, identifier: String) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(title).font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
-            Menu {
-                ForEach([0, 7, 30, 90], id: \.self) { days in
-                    Button { selection.wrappedValue = days } label: {
-                        if selection.wrappedValue == days { Label(periodLabel(days), systemImage: "checkmark") }
-                        else { Text(periodLabel(days)) }
-                    }
+                .buttonStyle(.plain)
+                .disabled(draft.activeRefinementCount == 0)
+                .accessibilityIdentifier("map.filters.reset")
+                GradientButton("Afficher les résultats") {
+                    if onApply(draft) { dismiss() }
+                    else { applyError = String(localized: "Les pays disponibles ont changé. Vérifie ton choix.") }
                 }
-            } label: { menuLabel(title: periodLabel(selection.wrappedValue), symbol: "calendar") }
-            .accessibilityLabel(Text(title))
-            .accessibilityValue(periodLabel(selection.wrappedValue))
-            .accessibilityIdentifier(identifier)
+                .disabled(selectedEntry == nil)
+                .accessibilityIdentifier("map.filters.done")
+            }
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.top, SQSpace.md)
+        .padding(.bottom, SQSpace.sm)
+        .background(SQColor.surface)
+        .overlay(alignment: .top) { Rectangle().fill(SQColor.separator).frame(height: 1) }
+    }
+
+    // MARK: Aides
+
+    private var bandsSummary: String {
+        guard !draft.bands.isEmpty else { return String(localized: "Toutes") }
+        return MapBandsPage.sorted(MapFilterCatalog.bands(forMarket: catalogMarket))
+            .filter { draft.bands.contains($0.band) }
+            .map { MapBandsPage.frequency(of: $0) }
+            .joined(separator: ", ")
+    }
+
+    private var sharingSummary: String {
+        guard !draft.sharing.isEmpty else { return String(localized: "Tous") }
+        return sharingOptions.filter { draft.sharing.contains($0.value) }.map(\.label).joined(separator: ", ")
+    }
+
+    private func refineRow(_ title: String, value: String, active: Bool) -> some View {
+        HStack(spacing: SQSpace.sm2) {
+            Text(LocalizedStringKey(title)).font(SQType.callout(.semibold)).foregroundStyle(SQColor.label)
+            Spacer(minLength: SQSpace.sm)
+            Text(value)
+                .font(SQType.caption.weight(active ? .bold : .semibold))
+                .foregroundStyle(active ? SQColor.accentInk : SQColor.labelSecondary)
+                .multilineTextAlignment(.trailing)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(SQColor.labelTertiary)
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: 46)
+        .contentShape(Rectangle())
+    }
+
+    private func periodPicker(_ title: String, selection: Binding<Int>, identifier: String) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            Text(LocalizedStringKey(title)).font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
+            MapSegmented(selection: selection,
+                         options: [0, 7, 30, 90].map { ($0, periodLabel($0)) },
+                         identifier: identifier)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(Text(LocalizedStringKey(title)))
         }
     }
+
     private func periodLabel(_ days: Int) -> String {
         switch days {
         case 7: return String(localized: "7 j")
@@ -427,49 +319,401 @@ struct MapAdvancedFilterSheet: View {
         default: return String(localized: "Tout")
         }
     }
+
+    /// Aucune case cochée vaut « toutes » : on ne décoche donc pas la dernière.
+    private func toggleTechnology(_ value: String) {
+        let all = Set(technologies.map(\.value))
+        var current = draft.technologies.isEmpty ? all : draft.technologies
+        if current.contains(value) {
+            guard current.count > 1 else { return }
+            current.remove(value)
+        } else {
+            current.insert(value)
+        }
+        draft.technologies = current == all ? [] : current
+    }
+
+    /// Pays, opérateur et couches ne bougent pas : ils ne se règlent pas ici.
+    private func resetDraft() {
+        applyError = nil
+        var next = MapFilterSelection.defaults(market: draft.market, operatorName: draft.operatorName)
+        next.layers = draft.layers
+        next.photosFriendsOnly = draft.photosFriendsOnly
+        if let selectedEntry { next = next.normalized(for: selectedEntry, dromRegion: dromRegion) }
+        draft = next
+    }
+
     private func toggle<Value: Hashable>(_ value: Value, in set: inout Set<Value>) {
         if set.contains(value) { set.remove(value) } else { set.insert(value) }
     }
-    private func operatorLabel(_ key: String) -> String {
-        key.uppercased() == "ALL" ? String(localized: "Tous les opérateurs") : MarketRegistryEntry.operatorLabel(key, in: selectedEntry)
+}
+
+// MARK: - Sous-pages
+
+/// Bandes, en lignes à cocher, et la règle de croisement.
+struct MapBandsPage: View {
+    @Binding var draft: MapFilterSelection
+    let catalogMarket: String
+    let marketName: String
+    @Environment(\.dismiss) private var dismiss
+
+    private var bands: [MapFilterCatalog.BandOption] { Self.sorted(MapFilterCatalog.bands(forMarket: catalogMarket)) }
+
+    /// Du plus bas au plus haut en fréquence, comme on les cite.
+    static func sorted(_ bands: [MapFilterCatalog.BandOption]) -> [MapFilterCatalog.BandOption] {
+        bands.sorted {
+            (Int(frequency(of: $0)) ?? .max, $0.band) < (Int(frequency(of: $1)) ?? .max, $1.band)
+        }
     }
-    private func marketName(_ entry: MarketRegistryEntry) -> String {
-        if entry.marketCode.uppercased() == "DROM" { return String(localized: "Outre-mer français") }
-        return Locale.current.localizedString(forRegionCode: entry.countryCode.uppercased()) ?? entry.label
+
+    /// « B3 (1800) » → « 1800 » ; un libellé sans fréquence reste entier.
+    static func frequency(of band: MapFilterCatalog.BandOption) -> String {
+        guard let open = band.label.firstIndex(of: "("), let close = band.label.lastIndex(of: ")"), open < close else {
+            return band.label
+        }
+        return String(band.label[band.label.index(after: open)..<close])
     }
-    private func marketTitle(_ entry: MarketRegistryEntry) -> String { "\(flagEmoji(entry.countryCode)) \(marketName(entry))" }
-    private func flagEmoji(_ code: String) -> String {
-        let scalars = code.uppercased().unicodeScalars
-        guard scalars.count == 2, scalars.allSatisfy({ (65...90).contains($0.value) }) else { return "🌐" }
-        return String(String.UnicodeScalarView(scalars.compactMap { UnicodeScalar(127397 + $0.value) }))
+
+    private static func designation(of band: MapFilterCatalog.BandOption) -> String {
+        guard let open = band.label.firstIndex(of: "(") else { return "" }
+        return band.label[..<open].trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "/", with: " · ")
+    }
+
+    private var subtitle: String {
+        draft.bands.isEmpty ? String(localized: "Toutes les bandes") : String(localized: "\(draft.bands.count) bandes choisies")
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.xl) {
+                    MapSheetPageHeader(title: String(localized: "Bandes"), subtitle: subtitle,
+                                       backIdentifier: "map.filters.bands.back") { dismiss() }
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        Text(marketName).sqKicker().accessibilityAddTraits(.isHeader)
+                        MapRowsTile {
+                            ForEach(Array(bands.enumerated()), id: \.element.band) { index, band in
+                                MapCheckRow(isOn: draft.bands.contains(band.band),
+                                            identifier: "map.filters.band.\(band.band)") {
+                                    if draft.bands.contains(band.band) { draft.bands.remove(band.band) }
+                                    else { draft.bands.insert(band.band) }
+                                } label: {
+                                    Text(Self.frequency(of: band))
+                                        .font(SQType.callout(.bold)).monospacedDigit()
+                                        .foregroundStyle(SQColor.label)
+                                        .frame(minWidth: 46, alignment: .leading)
+                                    let designation = Self.designation(of: band)
+                                    Text(designation.isEmpty ? String(localized: "MHz") : String(localized: "MHz · \(designation)"))
+                                        .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                                }
+                                .mapRowDivider(index > 0)
+                            }
+                        }
+                    }
+                    if !draft.bands.isEmpty {
+                        VStack(alignment: .leading, spacing: SQSpace.sm) {
+                            Text("Un site doit avoir").sqKicker().accessibilityAddTraits(.isHeader)
+                            MapSegmented(selection: $draft.bandMatch,
+                                         options: BandMatchMode.allCases.map { ($0, $0.label) },
+                                         identifier: "map.filters.bandMatch")
+                            Text(draft.bandMatch.explanation)
+                                .font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.lg)
+                .padding(.bottom, SQSpace.xl)
+            }
+            MapSubpageFooter(clearDisabled: draft.bands.isEmpty, confirmTitle: String(localized: "Valider les bandes"),
+                             identifier: "map.filters.bands") {
+                draft.bands.removeAll()
+            } onConfirm: { dismiss() }
+        }
+        .background(SQColor.surface)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
     }
 }
 
-/// The whole heading is one control, including the space between its labels.
-/// A centre tap must not depend on hitting the small native chevron.
-private struct MapExpertDisclosureStyle: DisclosureGroupStyle {
+/// Partage d'infrastructure, en lignes à cocher.
+struct MapSharingPage: View {
+    @Binding var draft: MapFilterSelection
+    let options: [MapFilterCatalog.SharingOption]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: SQSpace.xl) {
+                    MapSheetPageHeader(title: String(localized: "Partage"),
+                                       subtitle: draft.sharing.isEmpty ? String(localized: "Tous les sites") : nil,
+                                       backIdentifier: "map.filters.sharing.back") { dismiss() }
+                    MapRowsTile {
+                        ForEach(Array(options.enumerated()), id: \.element.value) { index, option in
+                            MapCheckRow(isOn: draft.sharing.contains(option.value),
+                                        identifier: "map.filters.sharing.\(option.value)") {
+                                if draft.sharing.contains(option.value) { draft.sharing.remove(option.value) }
+                                else { draft.sharing.insert(option.value) }
+                            } label: {
+                                Image(systemName: option.icon)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .frame(width: 22)
+                                    .accessibilityHidden(true)
+                                Text(option.label).font(SQType.callout(.semibold)).foregroundStyle(SQColor.label)
+                            }
+                            .mapRowDivider(index > 0)
+                        }
+                    }
+                }
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.lg)
+                .padding(.bottom, SQSpace.xl)
+            }
+            MapSubpageFooter(clearDisabled: draft.sharing.isEmpty, confirmTitle: String(localized: "Valider"),
+                             identifier: "map.filters.sharing") {
+                draft.sharing.removeAll()
+            } onConfirm: { dismiss() }
+        }
+        .background(SQColor.surface)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
+    }
+}
+
+// MARK: - Pièces Halo des feuilles de la carte
+
+/// En-tête de feuille Halo : titre 18, sous-titre gris, bouton fermer en puce.
+struct MapSheetHeader: View {
+    let title: String
+    var subtitle: String? = nil
+    let closeIdentifier: String
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(SQType.title).foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .sqHeader()
+                if let subtitle {
+                    Text(subtitle).font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: closeIdentifier, action: onClose)
+        }
+    }
+}
+
+/// En-tête de page poussée : retour en puce, titre centré.
+struct MapSheetPageHeader: View {
+    let title: String
+    var subtitle: String? = nil
+    let backIdentifier: String
+    let onBack: () -> Void
+
+    var body: some View {
+        HStack(spacing: SQSpace.sm) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: backIdentifier, action: onBack)
+            VStack(spacing: 1) {
+                Text(title).font(SQType.heading).foregroundStyle(SQColor.label).sqHeader()
+                if let subtitle {
+                    Text(subtitle).font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+        }
+    }
+}
+
+/// Bouton rond de 44 pt sur le fond des puces.
+struct MapChipIconButton: View {
+    let systemImage: String
+    let label: LocalizedStringKey
+    let identifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 44, height: 44)
+                .sqSurface(SQColor.chip, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// Sélecteur segmenté pleine largeur (piste et pastille pleine). Les grands
+/// textes l'empilent plutôt que de tronquer les libellés.
+struct MapSegmented<Value: Hashable>: View {
+    @Binding var selection: Value
+    let options: [(Value, String)]
+    let identifier: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    func makeBody(configuration: Configuration) -> some View {
-        VStack(spacing: 0) {
-            Button {
-                withAnimation(reduceMotion ? nil : SQMotion.fast) {
-                    configuration.isExpanded.toggle()
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 3)) : AnyLayout(HStackLayout(spacing: 3))
+        layout {
+            ForEach(Array(options.enumerated()), id: \.offset) { _, option in
+                segment(option.0, label: option.1)
+            }
+        }
+        .padding(SQSpace.xs)
+        .background(SQColor.segTrack, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    private func segment(_ value: Value, label: String) -> some View {
+        let isSelected = value == selection
+        return Button {
+            Haptics.selection()
+            withAnimation(reduceMotion ? nil : SQMotion.snappy) { selection = value }
+        } label: {
+            Text(LocalizedStringKey(label))
+                .font(SQType.chip)
+                .foregroundStyle(isSelected ? SQColor.label : SQColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, SQSpace.sm)
+                .frame(maxWidth: .infinity, minHeight: 36)
+                .background {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .fill(SQColor.segThumb)
+                            .shadow(color: SQColor.shadowSoft, radius: 2, y: 1)
+                    }
                 }
-            } label: {
-                HStack(spacing: SQSpace.md) {
-                    configuration.label
-                    Spacer(minLength: SQSpace.sm)
-                    Image(systemName: configuration.isExpanded ? "chevron.down" : "chevron.right")
-                        .foregroundStyle(SQColor.accentInk)
-                }
-                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("\(identifier).\(String(describing: value))")
+    }
+}
+
+/// Tuile qui groupe des lignes séparées par un filet.
+struct MapRowsTile<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) { content() }
+            .padding(.horizontal, SQSpace.md)
+            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+}
+
+/// Ligne à cocher : contenu libre, case à droite, 46 pt de haut.
+struct MapCheckRow<Label: View>: View {
+    let isOn: Bool
+    let identifier: String
+    let action: () -> Void
+    @ViewBuilder var label: () -> Label
+
+    var body: some View {
+        Button {
+            Haptics.selection()
+            action()
+        } label: {
+            HStack(spacing: SQSpace.sm2) {
+                label()
+                Spacer(minLength: SQSpace.sm)
+                MapCheckbox(isOn: isOn)
+            }
+            .frame(minHeight: 46)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// Case Halo : contour pointillé au repos, carmin plein et coche une fois cochée.
+struct MapCheckbox: View {
+    let isOn: Bool
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        shape.fill(isOn ? SQColor.brandRed : Color.clear)
+            .overlay { if !isOn { shape.strokeBorder(SQColor.dots, lineWidth: 1.5) } }
+            .overlay {
+                if isOn {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundStyle(SQColor.onAccent)
+                }
+            }
+            .frame(width: 20, height: 20)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Étiquette de génération : la couleur de la carte, encre sombre.
+struct MapTechTag: View {
+    let technology: String
+    let label: String
+
+    var body: some View {
+        Text(label)
+            .font(SQFont.body(11, .heavy, relativeTo: .caption2))
+            .foregroundStyle(Color(hex: 0x0F1312))
+            .padding(.horizontal, 7)
+            .frame(minHeight: 22)
+            .background(SQBrand.techColor(technology), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+/// Pied des sous-pages : « Effacer » et la validation, qui ramène aux filtres.
+struct MapSubpageFooter: View {
+    let clearDisabled: Bool
+    let confirmTitle: String
+    let identifier: String
+    let onClear: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        HStack(spacing: SQSpace.sm2) {
+            Button(action: onClear) {
+                Text("Effacer")
+                    .font(SQType.button).foregroundStyle(SQColor.label)
+                    .padding(.horizontal, SQSpace.xs2)
+                    .frame(minHeight: 44).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier("map.filters.experts")
-            .accessibilityValue(configuration.isExpanded ? Text("Développé") : Text("Réduit"))
-            if configuration.isExpanded { configuration.content }
+            .disabled(clearDisabled)
+            .accessibilityIdentifier("\(identifier).clear")
+            GradientButton(confirmTitle, action: onConfirm)
+                .accessibilityIdentifier("\(identifier).confirm")
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.top, SQSpace.md)
+        .padding(.bottom, SQSpace.sm)
+        .background(SQColor.surface)
+        .overlay(alignment: .top) { Rectangle().fill(SQColor.separator).frame(height: 1) }
+    }
+}
+
+extension View {
+    /// Filet entre deux lignes d'une même tuile.
+    func mapRowDivider(_ shown: Bool) -> some View {
+        overlay(alignment: .top) {
+            if shown { Rectangle().fill(SQColor.separator).frame(height: 1).allowsHitTesting(false) }
         }
     }
 }

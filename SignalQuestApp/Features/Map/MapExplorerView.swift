@@ -1634,6 +1634,8 @@ struct MapExplorerView: View {
     @State private var viewportRefreshID = 0
     @State private var seenPrivacyZoneMapRevision: UInt64 = 0
     @State private var showFilterSheet = false
+    /// Feuille Carte : opérateur, couches, fond, pays, légende et registre ANFR.
+    @State private var showLayersSheet = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var filterSheetDetent: PresentationDetent = .large
     // Écrans ANFR, repris du menu Profil : c'est ici qu'on cherche une carte.
@@ -1752,24 +1754,39 @@ struct MapExplorerView: View {
                 operatorAccent: { model.operatorAccent($0) }
             )
         }
-        .sheet(isPresented: $showFilterSheet, onDismiss: {
-            guard let destination = pendingANFR else { return }
-            pendingANFR = nil
-            switch destination {
-            case .map: showsANFRMap = true
-            case .stats: showsANFRStats = true
-            }
-        }) {
+        .sheet(isPresented: $showFilterSheet) {
             MapAdvancedFilterSheet(
                 selection: filterSelection,
                 allMarkets: model.registryMarkets,
                 dromRegion: model.currentDromRegion,
-                showsFriendsLayer: services.auth.hasStoredCredentials(),
-                onOpenANFR: { pendingANFR = $0 },
                 onApply: applyFilterSelection
             )
             .presentationDetents([.medium, .large], selection: $filterSheetDetent)
-            .presentationBackgroundCompat(SQColor.bg)
+            .sqSheet()
+        }
+        .sheet(isPresented: $showLayersSheet, onDismiss: openPendingANFR) {
+            MapLayersSheet(
+                market: model.marketFilter,
+                operatorName: model.operatorFilter,
+                layers: $filters,
+                photosFriendsOnly: $model.photosFriendsOnly,
+                byGeneration: $coverageByGeneration,
+                allMarkets: model.registryMarkets,
+                showsFriendsLayer: services.auth.hasStoredCredentials(),
+                operatorOptions: model.operatorOptions,
+                operatorLabel: { model.operatorShortLabel($0) },
+                operatorAccent: { model.operatorAccent($0) },
+                antennaOperators: antennaLegendOperators,
+                onChooseOperator: { model.chooseOperatorManually($0) },
+                onChooseMarket: { entry in
+                    var next = filterSelection
+                    next.market = entry.marketCode.isEmpty ? entry.code : entry.marketCode
+                    _ = applyFilterSelection(next)
+                },
+                onOpenANFR: { pendingANFR = $0 }
+            )
+            .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
+            .sqSheet()
         }
         .task {
             // QA (DEBUG) : pré-active les couches pour capturer leurs couleurs.
@@ -2269,7 +2286,7 @@ struct MapExplorerView: View {
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
-        .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)) }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .sqShadowSoft()
         .animation(SQMotion.resolve(SQMotion.snappy, reduceMotion), value: effectiveFriendsConnectionState)
     }
@@ -2331,18 +2348,10 @@ struct MapExplorerView: View {
             Spacer()
             marketSwitchNotice
             if showsCoverageKey { coverageFocusBanner }
-            MapContextControls(
-                byGeneration: $coverageByGeneration,
-                showsCoverage: showsCoverageKey,
-                limitMessages: showsDisplayLimit ? model.displayLimitMessages : [],
-                antennaOperators: antennaLegendOperators,
-                marketCode: model.marketFilter,
-                // Même seuil que les traits de secteur des marqueurs.
-                showsAntennaKey: filters.contains(.antenna) && mapZoom >= 13
-            )
+            MapContextControls(limitMessages: showsDisplayLimit ? model.displayLimitMessages : [])
             mapStatusToast
-            HStack {
-                operatorPill
+            HStack(alignment: .bottom) {
+                mapStatePill
                 Spacer(minLength: SQSpace.sm)
                 mapFabStack
             }
@@ -2377,7 +2386,7 @@ struct MapExplorerView: View {
                 }
                 .padding(.horizontal, SQSpace.lg)
                 .padding(.vertical, SQSpace.sm2)
-                .background { sqMapGlassBackground(Capsule(style: .continuous)) }
+                .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
                 .sqShadowCard()
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -2393,8 +2402,8 @@ struct MapExplorerView: View {
         }
     }
 
-    /// Barre de recherche flottante : capsule 42 pt « verre crème » + blur,
-    /// loupe + placeholder Figtree 15 secondaire, ombre carte — sans bordure.
+    /// Barre de recherche flottante Halo : carte blanche de 46 pt à 13 pt de
+    /// coins, ombre carte, filet carmin pendant la saisie.
     private var mapSearchField: some View {
         HStack(spacing: SQSpace.sm) {
             // Slot de tête à largeur fixe : loupe au repos, spinner pendant un
@@ -2422,12 +2431,12 @@ struct MapExplorerView: View {
                         .accessibilityIdentifier("map.search.label")
                 }
                 TextField(
-                    "Ville, adresse ou site", text: $model.searchQuery,
-                    prompt: Text("Ville, adresse ou site").foregroundColor(SQColor.labelSecondary),
+                    "Rechercher un lieu ou un site", text: $model.searchQuery,
+                    prompt: Text("Rechercher un lieu ou un site").foregroundColor(SQColor.labelSecondary),
                     axis: .vertical
                 )
                     .textFieldStyle(.plain)
-                    .font(.body)
+                    .font(SQType.body)
                     .foregroundStyle(SQColor.label)
                     .tint(SQColor.brandRed)
                     .focused($searchFieldFocused)
@@ -2469,13 +2478,14 @@ struct MapExplorerView: View {
                 .accessibilityIdentifier("map.search.clear")
             }
         }
-        .padding(.horizontal, SQSpace.md2)
-        .frame(minHeight: 44)
+        .padding(.leading, SQSpace.md2)
+        .padding(.trailing, model.searchQuery.isEmpty && sightOrigin == .device ? SQSpace.md2 : 0)
+        .frame(minHeight: 46)
         .frame(maxWidth: .infinity)
-        .background { sqMapGlassBackground(Capsule(style: .continuous)) }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay {
-            Capsule(style: .continuous)
-                .strokeBorder(searchFieldFocused ? SQColor.brandRed : .clear, lineWidth: 2)
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .strokeBorder(searchFieldFocused ? SQColor.brandRed : .clear, lineWidth: 1.5)
         }
         .sqShadowCard()
     }
@@ -2487,79 +2497,101 @@ struct MapExplorerView: View {
             showFilterSheet = true
         } label: {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: "line.3.horizontal.decrease")
+                Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(SQColor.label)
-                    .frame(width: 44, height: 44)
-                    .background { sqMapGlassBackground(Circle()) }
+                    .frame(width: 46, height: 46)
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .sqShadowCard()
                 if activeFilterCount > 0 && !dynamicTypeSize.isAccessibilitySize {
-                    Text("\(activeFilterCount)")
-                        .font(SQFont.body(12, .bold, relativeTo: .caption2))
-                        .frame(minWidth: 18, minHeight: 18)
-                        .background(SQColor.brandRed, in: Circle())
-                        .foregroundStyle(SQColor.onAccent)
-                        .offset(x: 4, y: -4)
+                    SQCountBadge(count: activeFilterCount)
+                        .offset(x: 5, y: -5)
                         .accessibilityHidden(true)
                 }
             }
-            .sqShadowCard()
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(Text("Calques et filtres"))
+        .accessibilityLabel(Text("Filtres"))
         .accessibilityValue(Text("Filtres actifs : \(activeFilterCount)"))
         .accessibilityIdentifier("map.filters")
         .disabled(model.registryMarkets.isEmpty)
     }
 
-    /// Sélecteur d'opérateur compact (bas-gauche) : menu des opérateurs du marché
-    /// courant. Remplace la bande d'opérateurs permanente (désencombrement).
-    private var operatorPill: some View {
-        Menu {
-            ForEach(model.operatorOptions, id: \.self) { op in
-                Button {
-                    Haptics.selection()
-                    model.chooseOperatorManually(op)
-                } label: {
-                    Label(
-                        model.operatorShortLabel(op),
-                        systemImage: model.operatorFilter == op ? "checkmark"
-                            : (op.uppercased() == "ALL" ? "circle.grid.2x2" : "dot.radiowaves.left.and.right")
-                    )
-                }
-            }
+    /// Couches affichées, dans l'ordre de la feuille Carte.
+    /// Sans compte, la couche Amis n'affiche rien : elle ne compte pas.
+    private var shownLayers: [MapDisplayItem.Kind] {
+        let signedIn = services.auth.hasStoredCredentials()
+        return MapLayersSheet.layerOrder.filter { filters.contains($0) && ($0 != .friend || signedIn) }
+    }
+
+    /// Pastille d'état (bas-gauche) : l'opérateur et la couche principale, plus
+    /// le nombre des autres. Elle ouvre la feuille Carte, où tout se règle.
+    private var mapStatePill: some View {
+        let layers = shownLayers
+        let primary = layers.first.map { MapLayersSheet.layerTitle($0, communityOnly: model.isCommunityOnlyMarket) }
+        let others = max(layers.count - 1, 0)
+        let operatorText = model.operatorShortLabel(model.operatorFilter)
+        return Button {
+            Haptics.light()
+            showLayersSheet = true
         } label: {
-            HStack(spacing: SQSpace.sm - 1) {
+            HStack(spacing: SQSpace.xs2) {
                 Circle()
-                    .fill(model.operatorFilter.uppercased() == "ALL" ? SQColor.brandRed : model.operatorAccent(model.operatorFilter))
-                    .frame(width: 9, height: 9)
-                Text(model.operatorShortLabel(model.operatorFilter))
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
+                    .fill(model.operatorFilter.uppercased() == "ALL" ? SQColor.label : model.operatorAccent(model.operatorFilter))
+                    .frame(width: 10, height: 10)
+                Text(operatorText)
+                    .font(SQFont.body(13, .heavy, relativeTo: .footnote))
                     .foregroundStyle(SQColor.label)
                     .accessibilityIdentifier("map.operator.label")
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
+                Text(verbatim: "·").foregroundStyle(SQColor.labelSecondary)
+                Text(primary ?? String(localized: "Aucune couche"))
+                    .font(SQFont.body(13, .semibold, relativeTo: .footnote))
                     .foregroundStyle(SQColor.label)
+                if others > 0 {
+                    Text(verbatim: "+\(others)")
+                        .font(SQFont.body(11, .semibold, relativeTo: .caption2))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.chipInk)
+                        .padding(.horizontal, SQSpace.xs2)
+                        .frame(minHeight: 20)
+                        .background(SQColor.chip, in: Capsule())
+                }
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(SQColor.labelSecondary)
             }
-            .padding(.horizontal, SQSpace.md)
+            .lineLimit(1)
+            .padding(.horizontal, SQSpace.md2)
             .frame(minHeight: 44)
-            .foregroundStyle(SQColor.label)
             .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
             .sqShadowCard()
         }
-        .accessibilityLabel("Opérateur affiché : \(model.operatorShortLabel(model.operatorFilter))")
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Carte"))
+        .accessibilityValue(Text(stateAccessibilityValue(operatorText: operatorText, layers: layers)))
+        .accessibilityHint(Text("Choisir l’opérateur, les couches et le fond"))
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("map.operator")
     }
 
-    /// Pile de 2 boutons flottants (bas-droite) : recentrage GPS + rafraîchissement.
-    /// Cercles 46 pt « verre crème » + blur : flèche de localisation brique,
-    /// second bouton encre — ombre carte, sans bordure.
+    private func stateAccessibilityValue(operatorText: String, layers: [MapDisplayItem.Kind]) -> String {
+        let titles = layers.map { MapLayersSheet.layerTitle($0, communityOnly: model.isCommunityOnlyMarket) }
+        let layersText = titles.isEmpty ? String(localized: "Aucune couche") : ListFormatter.localizedString(byJoining: titles)
+        return "\(operatorText), \(layersText)"
+    }
+
+    /// Boutons flottants (bas-droite) : la feuille Carte, puis le recentrage GPS.
+    /// La carte recharge seule à chaque déplacement : pas de bouton « rafraîchir ».
     private var mapFabStack: some View {
-        // Un seul FAB (recentrage GPS) : le bouton « rafraîchir » a été retiré — la
-        // carte recharge déjà automatiquement à chaque déplacement/zoom (onMoveEnd),
-        // il faisait doublon et alourdissait la bande basse.
-        mapFab(icon: "location", tint: SQColor.brandRed, label: "Recentrer sur ma position") {
-            centerOnCurrentLocation()
+        VStack(spacing: SQSpace.sm2) {
+            mapFab(icon: "square.3.layers.3d", label: "Carte") {
+                showLayersSheet = true
+            }
+            .accessibilityIdentifier("map.layers")
+            mapFab(icon: "location", tint: SQColor.brandRed, label: "Recentrer sur ma position") {
+                centerOnCurrentLocation()
+            }
         }
     }
 
@@ -2569,10 +2601,10 @@ struct MapExplorerView: View {
             action()
         } label: {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
-                .frame(width: 46, height: 46)
+                .font(.system(size: 17, weight: .semibold))
+                .frame(width: 44, height: 44)
                 .foregroundStyle(tint)
-                .background { sqMapGlassBackground(Circle()) }
+                .sqSurface(SQColor.surface, in: Circle())
                 .sqShadowCard()
         }
         .buttonStyle(SQPressButtonStyle())
@@ -2715,19 +2747,16 @@ struct MapExplorerView: View {
         }
     }
 
-    private var activeFilterCount: Int {
-        var count = 0
-        if !model.techFilters.isEmpty { count += 1 }
-        if !model.bandFilters.isEmpty { count += 1 }
-        if !model.sharingFilters.isEmpty { count += 1 }
-        if model.speedtestDays != 0 { count += 1 }
-        if model.coverageDays != 0 { count += 1 }
-        if model.azimuthStyle != .lines { count += 1 }
-        if !model.includeObservedSites { count += 1 }
-        if filters.contains(.photo), model.photosFriendsOnly { count += 1 }
-        if filters.contains(.planned), model.plannedStatusFilters != Set(PlannedActivationStatus.allCases) { count += 1 }
-        if filters != MapFilterStore.defaultFilters { count += 1 }
-        return count
+    private var activeFilterCount: Int { filterSelection.activeRefinementCount }
+
+    /// Écran ANFR demandé depuis la feuille Carte, ouvert une fois celle-ci fermée.
+    private func openPendingANFR() {
+        guard let destination = pendingANFR else { return }
+        pendingANFR = nil
+        switch destination {
+        case .map: showsANFRMap = true
+        case .stats: showsANFRStats = true
+        }
     }
 
     private func centerOnCurrentLocation() {
@@ -2818,7 +2847,7 @@ struct MapExplorerView: View {
                 }
                 .padding(.leading, SQSpace.md2)
                 .padding(.trailing, SQSpace.sm)
-                .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                 .sqShadowSoft()
                 ForEach(recentSearchResults) { result in
                     Button { openRecent(result) } label: {
@@ -2871,7 +2900,7 @@ struct MapExplorerView: View {
             .padding(.horizontal, SQSpace.md2)
             .padding(.vertical, SQSpace.sm2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .sqShadowSoft()
         }
     }
@@ -2908,7 +2937,7 @@ struct MapExplorerView: View {
         .padding(.horizontal, SQSpace.md2)
         .padding(.vertical, SQSpace.sm2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)) }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .sqShadowSoft()
     }
 

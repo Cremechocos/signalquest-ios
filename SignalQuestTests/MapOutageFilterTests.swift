@@ -55,15 +55,9 @@ final class MapOutageFilterTests: XCTestCase {
         return payload.markets
     }
 
-    private func sheet(market: String, markets: [MarketRegistryEntry], signedIn: Bool = true) -> MapAdvancedFilterSheet {
-        var selection = MapFilterSelection.defaults(market: market, operatorName: "ALL")
-        selection.azimuthStyle = .lobes
-        selection.speedtestDays = 30
-        selection.coverageDays = 30
-        selection.includeObserved = false
-        selection.plannedStatuses = []
-        return MapAdvancedFilterSheet(selection: selection, allMarkets: markets, dromRegion: nil,
-                                      showsFriendsLayer: signedIn, onApply: { _ in true })
+    private func sheet(market: String, markets: [MarketRegistryEntry], signedIn: Bool = true) -> MapLayersSheet {
+        MapLayersSheet(market: market, operatorName: "ALL", layers: .constant(MapFilterStore.defaultFilters),
+                       allMarkets: markets, showsFriendsLayer: signedIn)
     }
 
     /// Un invité n'a pas d'amis à afficher : la puce « Amis » ne lui est pas proposée.

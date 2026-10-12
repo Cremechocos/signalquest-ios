@@ -82,15 +82,15 @@ final class Audit2TourQATests: XCTestCase {
             snap("carte-filtres-bas")
             dismissSheet(app)
         }
+        // La pastille d'état ouvre la feuille Carte (opérateur, couches, fond).
         if tapIfExists(identified("map.operator", in: app), in: app) {
             pause(1.5)
             snap("carte-operateur")
-            dismissMenu(app)
-        }
-        if tapIfExists(identified("map.coverage.legend", in: app), in: app) {
-            pause(1.5)
-            snap("carte-legende")
-            dismissMenu(app)
+            if tapIfExists(identified("map.legend", in: app), in: app) {
+                pause(1.5)
+                snap("carte-legende")
+            }
+            dismissSheet(app)
         }
         // La recherche ouvre le clavier, qui masque la barre d'onglets : on la
         // photographie en dernier sur cet écran et on referme le clavier.

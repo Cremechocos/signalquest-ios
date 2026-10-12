@@ -58,20 +58,17 @@ final class ProfileReorgQATests: XCTestCase {
             )
         }
 
-        // ── Carte : les deux écrans ANFR, en section avancée des filtres ─────
-        // (Lot 4g : plus de bouton permanent sur la carte).
+        // ── Carte : les deux écrans ANFR, dans la feuille Carte ──────────────
+        // (plus de bouton permanent sur la carte).
         SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
         Thread.sleep(forTimeInterval: 6)
-        let filters = app.buttons["map.filters"].firstMatch
-        XCTAssertTrue(filters.waitForExistence(timeout: 15), "Le bouton des filtres manque sur la carte")
-        filters.tap()
+        XCTAssertTrue(SignalQuestUITestSupport.openMapANFRMenu(in: app), "Le Registre ANFR manque dans la feuille Carte")
         let anfrStats = app.buttons["map.filters.anfr.stats"].firstMatch
-        XCTAssertTrue(anfrStats.waitForExistence(timeout: 10), "La section ANFR manque dans les filtres")
-        _ = SignalQuestUITestSupport.scrollToHittable(anfrStats, in: app)
+        XCTAssertTrue(anfrStats.waitForExistence(timeout: 10), "Le menu ANFR ne propose pas les statistiques")
         snap(app, "reorg-02-carte-filtres-anfr")
         XCTAssertTrue(app.buttons["map.filters.anfr.map"].firstMatch.exists)
         anfrStats.tap()
-        // L'écran s'ouvre à la fermeture de la feuille de filtres.
+        // L'écran s'ouvre à la fermeture de la feuille Carte.
         XCTAssertTrue(app.staticTexts["Statistiques ANFR"].firstMatch.waitForExistence(timeout: 10),
                       "Les statistiques ANFR ne se sont pas ouvertes")
         Thread.sleep(forTimeInterval: 3)

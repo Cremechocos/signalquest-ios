@@ -11,7 +11,7 @@ final class MapAccessibilityQATests: XCTestCase {
         let app = XCUIApplication()
         SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--reset-map", "--qa-demo-friends", "--qa-demo-photos"])
         SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
-        XCTAssertTrue(app.buttons["Calques et filtres"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["map.filters"].waitForExistence(timeout: 20))
 
         // Ancré sur l'identifiant du marqueur, pas sur son libellé : « Photos »
         // et « Antennes » existent aussi comme puces de filtre, donc matcher le

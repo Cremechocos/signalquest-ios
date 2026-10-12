@@ -23,12 +23,15 @@ final class SpeedtestMapVisibilityQATests: XCTestCase {
         }
         mapTab.tap()
         XCTAssertTrue(app.buttons["map.filters"].waitForExistence(timeout: 20))
+        // La pastille d'état annonce « SFR, Antennes… » ; l'opérateur se
+        // choisit dans la feuille Carte et s'applique tout de suite.
         let operatorButton = app.buttons["map.operator"]
-        if !operatorButton.label.hasSuffix(": SFR") {
+        if !((operatorButton.value as? String)?.hasPrefix("SFR") ?? false) {
             operatorButton.tap()
-            let sfr = app.buttons.matching(NSPredicate(format: "label == %@", "SFR")).firstMatch
+            let sfr = app.buttons["map.operator.option.SFR"]
             XCTAssertTrue(sfr.waitForExistence(timeout: 10))
             sfr.tap()
+            app.buttons["map.layers.close"].tap()
         }
         let marker = app.buttons.matching(NSPredicate(format: "label == %@", "Mesure de débit 100 Mbps")).firstMatch
         let displayed = NSPredicate { _, _ in marker.exists && marker.isHittable }
