@@ -38,6 +38,13 @@ final class NotificationsCenterViewModel: ObservableObject {
         let badgeTicket = badge?.notificationBadgeRefreshTicket()
         let generation = UUID()
         loadGeneration = generation
+        if AppEnvironment.usesDemoData {
+            // Tours de captures : une activité plausible, sans réseau.
+            if items.isEmpty { items = AppNotification.demo() }
+            unreadCount = items.filter { $0.read != true }.count
+            errorMessage = nil
+            return
+        }
         isLoading = true
         isLoadingMore = false
         errorMessage = nil
@@ -88,7 +95,7 @@ final class NotificationsCenterViewModel: ObservableObject {
         failedAction = nil
         defer { pendingReadIDs.remove(id) }
         do {
-            try await service.markRead(id: id)
+            if !AppEnvironment.usesDemoData { try await service.markRead(id: id) }
             guard actionGeneration == generation, isCurrentAccount else { return }
             loadGeneration = UUID()
             isLoading = false
@@ -112,7 +119,7 @@ final class NotificationsCenterViewModel: ObservableObject {
         failedAction = nil
         defer { isMutating = false }
         do {
-            try await service.markAllRead()
+            if !AppEnvironment.usesDemoData { try await service.markAllRead() }
             guard isCurrentAccount else { return }
             actionGeneration = UUID()
             loadGeneration = UUID()
@@ -136,7 +143,7 @@ final class NotificationsCenterViewModel: ObservableObject {
         failedAction = nil
         defer { isMutating = false }
         do {
-            try await service.deleteAll()
+            if !AppEnvironment.usesDemoData { try await service.deleteAll() }
             guard isCurrentAccount else { return }
             actionGeneration = UUID()
             loadGeneration = UUID()
@@ -169,6 +176,22 @@ private extension AppNotification {
         AppNotification(id: id, type: type, title: title, message: message,
             createdAt: createdAt, read: value, link: link, metadata: metadata)
     }
+
+    /// Activité de démonstration : trois non-lues du jour, puis la semaine et plus ancien.
+    static func demo(now: Date = .now) -> [AppNotification] {
+        func item(_ id: String, _ type: String, _ message: String?, ago: TimeInterval, read: Bool) -> AppNotification {
+            AppNotification(id: "demo-\(id)", type: type, title: nil, message: message,
+                            createdAt: now.addingTimeInterval(-ago), read: read, link: nil, metadata: nil)
+        }
+        return [
+            item("1", "message_new", "Marc : « On compare nos débits ? »", ago: 12 * 60, read: false),
+            item("2", "community_outage", "Bouygues · Gare de la Part-Dieu", ago: 40 * 60, read: false),
+            item("3", "social_reaction", "Camille a aimé ta mesure de 312 Mbit/s", ago: 2 * 3_600, read: false),
+            item("4", "friend_accepted", "Léa fait maintenant partie de tes amis", ago: 2 * 86_400, read: true),
+            item("5", "social_repost", nil, ago: 3 * 86_400, read: true),
+            item("6", "social_comment", "Julien : « Même chose à Villeurbanne »", ago: 12 * 86_400, read: true),
+        ]
+    }
 }
 
 struct NotificationsCenterView: View {
@@ -186,6 +209,12 @@ struct NotificationsCenterView: View {
 
     var body: some View {
         List {
+            Section {
+                header
+                    .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.sm, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
             if let error = model.actionErrorMessage {
                 Section {
                     HStack(spacing: SQSpace.md) {
@@ -218,8 +247,7 @@ struct NotificationsCenterView: View {
                         Task { await model.load() }
                     }
                     .listRowBackground(Color.clear)
-                    // Marges de page : sans elles la carte touchait les deux bords.
-                    .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.lg, bottom: SQSpace.sm, trailing: SQSpace.lg))
+                    .listRowInsets(EdgeInsets())
                 }
             } else if !model.isLoading, model.items.isEmpty {
                 Section {
@@ -232,28 +260,35 @@ struct NotificationsCenterView: View {
                     .listRowInsets(EdgeInsets())
                 }
             } else {
-                Section {
-                    ForEach(model.items) { item in
-                        Button {
-                            Task { await model.markRead(item.id) }
-                            route(item)
-                        } label: {
-                            notificationRow(item)
+                ForEach(NotificationPeriod.groups(model.items)) { group in
+                    Section {
+                        ForEach(group.items) { item in
+                            Button {
+                                Task { await model.markRead(item.id) }
+                                route(item)
+                            } label: {
+                                notificationRow(item, period: group.period)
+                            }
+                            .buttonStyle(.plain)
+                            .listRowBackground(SQColor.surface)
+                            .listRowSeparatorTint(SQColor.separator)
+                            .swipeActions {
+                                Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
+                            }
                         }
-                        .buttonStyle(SQPressButtonStyle())
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
-                        .swipeActions {
-                            Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
-                        }
+                    } header: {
+                        Text(group.period.title).sqKicker().textCase(nil)
                     }
+                }
+                Section {
                     if model.isLoadingMore {
                         SQSpinner().frame(maxWidth: .infinity)
                     } else if model.nextCursor != nil {
                         Button(model.paginationErrorMessage == nil ? "Charger la suite" : "Réessayer") {
                             Task { await model.loadMore() }
                         }
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(SQColor.label)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .accessibilityIdentifier("notifications.loadMore")
                     }
@@ -262,26 +297,32 @@ struct NotificationsCenterView: View {
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.dangerInk)
                     }
-                } header: {
-                    Text("Activité")
-                        .font(SQType.subhead)
+                } footer: {
+                    Text("Glisse une notification vers la gauche pour la marquer comme lue.")
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .textCase(nil)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
                 }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
         }
-        .listStyle(.plain)
+        .listStyle(.insetGrouped)
+        .modifier(NotificationListMargins())
         .scrollContentBackground(.hidden)
         .sqReadableWidth()
-        .signalQuestBackground()
+        .background(SQColor.bg.ignoresSafeArea())
+        // Le titre vit en tête de liste ; la barre garde le retour et le menu.
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) { Color.clear.frame(width: 1, height: 1).accessibilityHidden(true) }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("Tout marquer comme lu") { Task { await model.markAll() } }
                     Button("Tout supprimer", role: .destructive) { confirmDeleteAll = true }
-                } label: { Image(systemName: "ellipsis.circle").foregroundStyle(SQColor.label) }
+                } label: { Image(systemName: "ellipsis").foregroundStyle(SQColor.label) }
                 .accessibilityLabel("Options")
                 .disabled(model.isMutating || !model.pendingReadIDs.isEmpty)
             }
@@ -295,38 +336,65 @@ struct NotificationsCenterView: View {
         .refreshable { await model.load() }
     }
 
+    /// Grand titre et nombre de non-lues, comme les autres écrans Halo.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Notifications")
+                .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                .foregroundStyle(SQColor.label)
+                .sqHeader()
+            if model.unreadCount > 0 {
+                Text("\(model.unreadCount) non lues")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+            } else if !model.items.isEmpty {
+                Text("Tout est lu")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     @ViewBuilder
-    private func notificationRow(_ item: AppNotification) -> some View {
+    private func notificationRow(_ item: AppNotification, period: NotificationPeriod) -> some View {
         let isUnread = item.read != true
         let titleText = item.title ?? Self.title(for: item.type)
-        HStack(alignment: .top, spacing: SQSpace.md) {
-            SQIconPastille(systemImage: icon(for: item.type), size: 38, font: .system(size: 15, weight: .medium))
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: SQSpace.sm) {
-                    Text(titleText)
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                    if isUnread {
-                        Circle().fill(SQColor.brandRed).frame(width: 8, height: 8)
-                            .accessibilityLabel("Non lue")
-                    }
-                }
-                if let message = item.message {
+        let isOutage = Self.isOutage(item.type)
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
+            SQIconPastille(systemImage: icon(for: item.type), size: 38,
+                           tint: isOutage ? SQColor.dangerInk : SQColor.ink2,
+                           fill: isOutage ? SQColor.dangerSoft : SQColor.chip,
+                           font: .system(size: 15, weight: .semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(titleText)
+                    .font(SQType.callout(isUnread ? .heavy : .semibold))
+                    .foregroundStyle(SQColor.label)
+                if let message = item.message, !message.isEmpty {
                     Text(message)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                 }
                 if let date = item.createdAt {
-                    Text(date, format: .relative(presentation: .named))
-                        .font(SQFont.body(12, relativeTo: .caption2))
-                        .foregroundStyle(SQColor.labelSecondary)
+                    Group {
+                        switch period {
+                        case .today: Text(date, format: .relative(presentation: .named))
+                        case .thisWeek: Text(date, format: .dateTime.weekday(.wide))
+                        case .older: Text(date, format: .dateTime.day().month(.wide))
+                        }
+                    }
+                    .font(SQFont.body(12, relativeTo: .caption2))
+                    .foregroundStyle(SQColor.labelSecondary)
                 }
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if isUnread {
+                Circle().fill(SQColor.brandRed).frame(width: 9, height: 9)
+                    .padding(.top, 6)
+                    .accessibilityLabel("Non lue")
+            }
         }
-        .padding(SQSpace.md2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
+        .padding(.vertical, SQSpace.xs)
         .contentShape(Rectangle())
     }
 
@@ -360,8 +428,6 @@ struct NotificationsCenterView: View {
         return nil
     }
 
-    /// Icône par type de notification (pastille unique `accentSoft` de la DA
-    /// Crème : seule la forme distingue le type, la brique reste l'accent).
     /// Titre lisible quand le serveur n'en envoie pas : la liste affichait le
     /// type technique (« social_follow », SOC-44).
     static func title(for kind: String?) -> String {
@@ -379,8 +445,16 @@ struct NotificationsCenterView: View {
         }
     }
 
+    /// Une panne se signale en rouge ; les autres types partagent la pastille
+    /// neutre et se distinguent par la forme.
+    static func isOutage(_ kind: String?) -> Bool {
+        (kind ?? "").lowercased().contains("outage")
+    }
+
     private func icon(for kind: String?) -> String {
         let k = (kind ?? "").lowercased()
+        if Self.isOutage(k) { return "exclamationmark.triangle.fill" }
+        if k.contains("repost") { return "arrow.2.squarepath" }
         if k.contains("antenna_report") || k.contains("site_report") {
             return "exclamationmark.bubble.fill"
         }
@@ -394,5 +468,56 @@ struct NotificationsCenterView: View {
             return "person.fill.badge.plus"
         }
         return "bell.fill"
+    }
+}
+
+/// Période d'une notification : la liste se lit comme un fil daté
+/// (« Aujourd’hui », « Cette semaine », « Plus ancien »), dans l'ordre du serveur.
+enum NotificationPeriod: Int, CaseIterable, Identifiable {
+    case today, thisWeek, older
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .today: return String(localized: "Aujourd’hui")
+        case .thisWeek: return String(localized: "Cette semaine")
+        case .older: return String(localized: "Plus ancien")
+        }
+    }
+
+    static func of(_ date: Date?, now: Date = .now, calendar: Calendar = .current) -> NotificationPeriod {
+        guard let date else { return .older }
+        if calendar.isDate(date, inSameDayAs: now) { return .today }
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let weekAgo = calendar.date(byAdding: .day, value: -6, to: startOfToday) else { return .older }
+        return date >= weekAgo ? .thisWeek : .older
+    }
+
+    struct Bucket: Identifiable {
+        let period: NotificationPeriod
+        let items: [AppNotification]
+        var id: Int { period.rawValue }
+    }
+
+    static func groups(_ items: [AppNotification], now: Date = .now, calendar: Calendar = .current) -> [Bucket] {
+        let byPeriod = Dictionary(grouping: items) { of($0.createdAt, now: now, calendar: calendar) }
+        return allCases.compactMap { period in
+            byPeriod[period].map { Bucket(period: period, items: $0) }
+        }
+    }
+}
+
+/// Marges d'une liste groupée sous un en-tête maison (iOS 17+ ; iOS 16 garde
+/// celles du système).
+private struct NotificationListMargins: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content
+                .contentMargins(.top, SQSpace.xs, for: .scrollContent)
+                .listSectionSpacing(SQSpace.lg)
+        } else {
+            content
+        }
     }
 }

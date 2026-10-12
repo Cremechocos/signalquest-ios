@@ -11,6 +11,30 @@ final class NotificationMutationTests: XCTestCase {
             createdAt: nil, read: read, link: nil, metadata: nil)
     }
 
+    /// Les sections suivent le jour civil : « Aujourd’hui », les six jours d'avant,
+    /// puis le reste ; une notification sans date va en « Plus ancien ». L'ordre
+    /// du serveur est gardé dans chaque section.
+    func testPeriodsGroupByCalendarDayAndKeepServerOrder() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 13, hour: 1, minute: 10))!
+        func dated(_ id: String, _ ago: TimeInterval?) -> AppNotification {
+            AppNotification(id: id, type: nil, title: id, message: nil,
+                createdAt: ago.map { now.addingTimeInterval(-$0) }, read: false, link: nil, metadata: nil)
+        }
+        XCTAssertEqual(NotificationPeriod.of(now.addingTimeInterval(-600), now: now, calendar: calendar), .today)
+        // 01 h 10 moins deux heures : c'est hier, donc « Cette semaine ».
+        XCTAssertEqual(NotificationPeriod.of(now.addingTimeInterval(-7_200), now: now, calendar: calendar), .thisWeek)
+        XCTAssertEqual(NotificationPeriod.of(now.addingTimeInterval(-6 * 86_400), now: now, calendar: calendar), .thisWeek)
+        XCTAssertEqual(NotificationPeriod.of(now.addingTimeInterval(-8 * 86_400), now: now, calendar: calendar), .older)
+        XCTAssertEqual(NotificationPeriod.of(nil, now: now, calendar: calendar), .older)
+
+        let groups = NotificationPeriod.groups([dated("a", 60), dated("old", 20 * 86_400), dated("b", 120), dated("none", nil)], now: now)
+        XCTAssertEqual(groups.map(\.period), [.today, .older])
+        XCTAssertEqual(groups.first?.items.map(\.id), ["a", "b"])
+        XCTAssertEqual(groups.last?.items.map(\.id), ["old", "none"])
+    }
+
     func testPageDecoderAcceptsNewCursorAndLegacyItems() throws {
         let current = Data(#"{"notifications":[{"id":"a","read":false}],"nextCursor":"after-a","unreadCount":51}"#.utf8)
         let page = try JSONDecoder.signalQuest.decode(AppNotificationPage.self, from: current)

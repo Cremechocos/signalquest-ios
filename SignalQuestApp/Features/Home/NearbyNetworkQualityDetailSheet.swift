@@ -8,200 +8,126 @@ struct NearbyNetworkQualityDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: SQSpace.lg) {
-                    hero
-                    intro
-                    operatorSourceNote
-                    criteriaCard
-                    verdictRuleCard
-                    footerNote
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                header
+                Text("Ce verdict s’appuie sur les mesures partagées par la communauté à moins de \(radiusText) de toi, pour le réseau \(quality.operatorLabel).")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+                criteriaTile
+                SQNotice(message: String(localized: "On retient le moins bon des deux critères : un réseau « au top » doit bien capter et être rapide.")
+                         + " " + limitingText)
+                VStack(spacing: SQSpace.sm) {
+                    SQFactRow(label: String(localized: "Mesures"), value: quality.sampleCount.formatted(.number))
+                    SQFactRow(label: String(localized: "Rayon"), value: radiusText)
+                    SQFactRow(label: String(localized: "Opérateur"), value: operatorSourceText)
                 }
-                .padding(SQSpace.lg)
-                .padding(.bottom, SQSpace.xl)
+                Text("En itinérance, l’opérateur estimé ne confirme pas le réseau radio utilisé.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .signalQuestBackground()
-            .navigationTitle("Réseau autour de toi")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    .accessibilityLabel("Fermer")
-                }
-            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .sqSheet()
     }
 
-    // MARK: Hero — jauge du verdict combiné
-
-    private var hero: some View {
-        let color = quality.level.swiftUIColor
-        let fraction = CGFloat((quality.level.qualityRank ?? 0) + 1) / 5
-        return VStack(spacing: SQSpace.md) {
-            ZStack {
-                Circle().stroke(SQColor.surfaceMuted, lineWidth: 14)
-                Circle()
-                    .trim(from: 0, to: fraction)
-                    .stroke(color, style: StrokeStyle(lineWidth: 14, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                VStack(spacing: 3) {
-                    Image(systemName: "cellularbars")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(color)
-                    Text(quality.level.title)
-                        .font(SQFont.display(23, .bold))
-                        .foregroundStyle(SQColor.label)
-                    Text("Réseau \(quality.operatorLabel)")
-                        .font(SQFont.body(13))
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
+    private var header: some View {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("D’où vient ce verdict").sqKicker()
+                Text(verbatim: "\(quality.operatorLabel) · \(quality.level.title)")
+                    .font(SQType.title)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .sqHeader()
             }
-            .frame(width: 190, height: 190)
-            .padding(.top, SQSpace.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "home.verdict.close") { dismiss() }
         }
-        .frame(maxWidth: .infinity)
     }
 
-    private var intro: some View {
-        Text("Ce diagnostic s'appuie sur les mesures partagées par la communauté SignalQuest à moins de \(radiusText) de toi, pour le réseau \(quality.operatorLabel).")
-            .font(SQFont.body(14))
-            .foregroundStyle(SQColor.labelSecondary)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, SQSpace.sm)
-    }
-
-    @ViewBuilder
-    private var operatorSourceNote: some View {
-        Group {
-            switch quality.operatorSource {
-            case .ipAsn:
-                Text("Opérateur estimé par l'accès Internet mobile (IP/ASN). En itinérance, cela ne confirme pas le réseau radio servant.")
-            case .simPlmn:
-                Text("Opérateur déduit du PLMN de la SIM. En itinérance, il peut différer du réseau radio utilisé.")
-            }
+    private var operatorSourceText: String {
+        switch quality.operatorSource {
+        case .ipAsn: return String(localized: "estimé par l’accès Internet")
+        case .simPlmn: return String(localized: "déduit de la SIM")
         }
-        .font(SQFont.body(12))
-        .foregroundStyle(SQColor.labelSecondary)
-        .multilineTextAlignment(.center)
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, SQSpace.sm)
     }
 
     // MARK: Les deux critères
 
-    private var criteriaCard: some View {
-        GlassCard {
-            VStack(spacing: SQSpace.md) {
-                criterionRow(
-                    icon: "antenna.radiowaves.left.and.right",
-                    title: "Couverture",
-                    band: quality.signalBand,
-                    valueText: quality.medianRsrpDbm.map { "\($0) dBm" } ?? "—",
-                    caption: "Force du signal capté. Plus la valeur est proche de zéro, plus le signal est puissant (ex. −80 vaut mieux que −105)."
-                )
-                Divider().overlay(SQColor.separator)
-                criterionRow(
-                    icon: "speedometer",
-                    title: "Débit",
-                    band: quality.speedBand,
-                    valueText: quality.medianDownloadMbps.map { "\($0) Mbps" } ?? "—",
-                    caption: "Vitesse de téléchargement typique mesurée par la communauté sur ce réseau."
-                )
-            }
+    private var criteriaTile: some View {
+        VStack(spacing: SQSpace.md) {
+            criterionRow(
+                icon: "antenna.radiowaves.left.and.right",
+                title: String(localized: "Signal"),
+                band: quality.signalBand,
+                valueText: quality.medianRsrpDbm.map { "\($0) dBm" } ?? "—",
+                caption: String(localized: "Force du signal capté : plus la valeur est proche de zéro, plus il est puissant.")
+            )
+            Divider().overlay(SQColor.separator)
+            criterionRow(
+                icon: "speedometer",
+                title: String(localized: "Débit"),
+                band: quality.speedBand,
+                valueText: quality.medianDownloadMbps.map { SQUnits.throughput(mbps: Double($0)) } ?? "—",
+                caption: String(localized: "Vitesse de téléchargement typique mesurée sur ce réseau.")
+            )
         }
+        .padding(SQSpace.md)
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private func criterionRow(icon: String, title: String, band: CoverageQualityBand, valueText: String, caption: String) -> some View {
-        let tint = band == .unknown ? SQColor.labelTertiary : band.swiftUIColor
+        let known = band != .unknown
         return HStack(alignment: .top, spacing: SQSpace.md) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(tint)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(SQColor.ink2)
                 .frame(width: 38, height: 38)
-                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(LocalizedStringKey(title)).font(SQFont.body(15, .semibold)).foregroundStyle(SQColor.label)
-                    Spacer()
-                    Text(valueText).font(SQFont.body(15, .semibold)).monospacedDigit().foregroundStyle(SQColor.label)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SQSpace.xs2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(verbatim: title).font(SQType.rowTitle).foregroundStyle(SQColor.label)
+                    Spacer(minLength: SQSpace.sm)
+                    Text(verbatim: valueText).font(SQType.rowTitle).monospacedDigit().foregroundStyle(SQColor.label)
                 }
-                if band == .unknown {
-                    Text("Pas assez de mesures")
-                        .font(SQFont.body(12, .semibold))
-                        .foregroundStyle(SQColor.labelSecondary)
-                } else {
-                    // Texte à l'encre, couleur portée par le point : la teinte de la bande sur
-                    // sa propre teinte à 14 % ne tient pas 4,5:1.
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(band.swiftUIColor)
-                            .frame(width: 8, height: 8)
-                            .accessibilityHidden(true)
-                        Text(band.title)
-                            .font(SQFont.body(12, .bold))
-                            .foregroundStyle(SQColor.label)
+                // Texte à l'encre, couleur portée par le point : la teinte de la bande sur
+                // sa propre teinte ne tient pas 4,5:1.
+                HStack(spacing: 5) {
+                    if known {
+                        Circle().fill(band.swiftUIColor).frame(width: 7, height: 7).accessibilityHidden(true)
                     }
-                    .padding(.horizontal, 8).padding(.vertical, 2)
-                    .background(band.swiftUIColor.opacity(0.14), in: Capsule(style: .continuous))
+                    Text(verbatim: known ? band.title : String(localized: "Pas assez de mesures"))
+                        .font(SQType.caption(.bold))
+                        .foregroundStyle(known ? SQColor.label : SQColor.labelSecondary)
                 }
-                Text(LocalizedStringKey(caption))
-                    .font(SQFont.body(12))
-                    .foregroundStyle(SQColor.labelSecondary)
+                .padding(.horizontal, SQSpace.sm)
+                .padding(.vertical, 3)
+                .background(known ? band.swiftUIColor.opacity(0.14) : SQColor.chip, in: Capsule(style: .continuous))
+                Text(verbatim: caption)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .accessibilityElement(children: .combine)
     }
 
-    // MARK: La règle du verdict
-
-    private var verdictRuleCard: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: SQSpace.sm) {
-                Label("Comment on décide", systemImage: "questionmark.circle")
-                    .font(SQFont.body(13, .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
-                Text("Un réseau « au top » doit à la fois **bien capter** et **être rapide**. On retient donc le **moins bon** des deux critères.")
-                    .font(SQFont.body(13.5))
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-                limitingText
-                    .font(SQFont.body(12.5))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    @ViewBuilder
-    private var limitingText: some View {
+    /// La phrase qui dit quel critère fixe le verdict ; en gras dans l'encadré.
+    private var limitingText: String {
         switch limiting {
-        case .coverage: Text("Ici, c'est la **couverture** qui tire le verdict vers le bas.")
-        case .speed: Text("Ici, c'est le **débit** qui tire le verdict vers le bas.")
-        case .tie: Text("Ici, **couverture et débit** sont au même niveau.")
-        case .coverageOnly: Text("Ici, seule la **couverture** a assez de mesures : le verdict s'appuie dessus.")
-        case .speedOnly: Text("Ici, seul le **débit** a assez de mesures : le verdict s'appuie dessus.")
+        case .coverage: return String(localized: "**Ici, c’est le signal qui tire le verdict vers le bas.**")
+        case .speed: return String(localized: "**Ici, c’est le débit qui tire le verdict vers le bas.**")
+        case .tie: return String(localized: "**Ici, signal et débit sont au même niveau.**")
+        case .coverageOnly: return String(localized: "**Ici, seul le signal a assez de mesures : le verdict s’appuie dessus.**")
+        case .speedOnly: return String(localized: "**Ici, seul le débit a assez de mesures : le verdict s’appuie dessus.**")
         }
-    }
-
-    // MARK: Fiabilité
-
-    private var footerNote: some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: "person.3.fill").font(.caption).foregroundStyle(SQColor.labelTertiary)
-            Text("\(quality.sampleCount) mesure de la communauté · rayon \(radiusText)")
-                .font(SQFont.body(12))
-                .foregroundStyle(SQColor.labelSecondary)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: Dérivés

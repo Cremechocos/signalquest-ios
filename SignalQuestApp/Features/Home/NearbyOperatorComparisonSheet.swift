@@ -1,11 +1,8 @@
 import SwiftUI
 
-/// Comparaison des opérateurs autour de toi pour une métrique (débit ou signal) :
-/// classement par valeur médiane communautaire (barres colorées, leader couronné).
-/// Ouverte au tap sur une tuile du pouls réseau de l'Accueil. Charge son propre
-/// classement. Lecture seule.
+/// Comparaison des opérateurs autour de toi : classement par valeur médiane communautaire,
+/// en débit ou en signal (sélecteur en tête). Charge son propre classement. Lecture seule.
 struct NearbyOperatorComparisonSheet: View {
-    let metric: NearbyOperatorMetric
     let latitude: Double
     let longitude: Double
     var radiusMeters: Int = 1000
@@ -13,17 +10,27 @@ struct NearbyOperatorComparisonSheet: View {
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var metric: NearbyOperatorMetric
     @State private var stats: [OperatorMetricStat] = []
     @State private var loaded = false
     @State private var loadFailed = false
     @State private var animate = false
 
+    init(metric: NearbyOperatorMetric, latitude: Double, longitude: Double, radiusMeters: Int = 1000) {
+        _metric = State(initialValue: metric)
+        self.latitude = latitude
+        self.longitude = longitude
+        self.radiusMeters = radiusMeters
+    }
+
     private var maxValue: Int { max(stats.map(\.value).max() ?? 1, 1) }
     private var totalSamples: Int { stats.reduce(0) { $0 + $1.sampleCount } }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                header
+                metricPicker
                 if !loaded {
                     SQSpinner()
                         .frame(maxWidth: .infinity)
@@ -33,48 +40,51 @@ struct NearbyOperatorComparisonSheet: View {
                         loaded = false
                         Task { await load() }
                     }
-                    .padding(SQSpace.lg)
                 } else if stats.isEmpty {
                     EmptyStateView(
                         title: "Pas encore de comparaison",
                         message: "Aucune mesure d'opérateur partagée dans ce rayon pour l'instant.",
                         systemImage: "chart.bar.xaxis"
                     )
-                    .padding(.top, SQSpace.xxl)
+                    .padding(.top, SQSpace.lg)
                 } else {
-                    VStack(spacing: SQSpace.lg) {
-                        intro
-                        VStack(spacing: SQSpace.md) {
-                            ForEach(Array(stats.enumerated()), id: \.element.id) { index, stat in
-                                operatorCard(stat, rank: index + 1, isLeader: index == 0)
-                            }
+                    intro
+                    VStack(spacing: 0) {
+                        ForEach(Array(stats.enumerated()), id: \.element.id) { index, stat in
+                            if index > 0 { Divider().overlay(SQColor.separator) }
+                            operatorRow(stat, rank: index + 1)
                         }
-                        footer
                     }
-                    .padding(SQSpace.lg)
-                    .padding(.bottom, SQSpace.xl)
+                    .padding(.horizontal, SQSpace.md)
+                    .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                    footer
                 }
             }
-            .signalQuestBackground()
-            .navigationTitle("Opérateurs autour de toi")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    .accessibilityLabel("Fermer")
-                }
-            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        .task { await load() }
+        .sqSheet()
+        .task(id: metric) { await load() }
     }
 
     private func load() async {
+        if AppEnvironment.usesDemoData {
+            // Tours de captures : un classement plausible, sans réseau.
+            stats = metric == .download
+                ? [.init(operatorName: "Orange", value: 214, sampleCount: 18, detail: nil),
+                   .init(operatorName: "SFR", value: 132, sampleCount: 11, detail: nil),
+                   .init(operatorName: "Free Mobile", value: 96, sampleCount: 9, detail: nil),
+                   .init(operatorName: "Bouygues", value: 71, sampleCount: 7, detail: nil)]
+                : [.init(operatorName: "Orange", value: -84, sampleCount: 18, detail: nil),
+                   .init(operatorName: "Bouygues", value: -91, sampleCount: 7, detail: nil),
+                   .init(operatorName: "SFR", value: -95, sampleCount: 11, detail: nil),
+                   .init(operatorName: "Free Mobile", value: -103, sampleCount: 9, detail: nil)]
+            loaded = true
+            animate = true
+            return
+        }
         do {
             // Une panne réseau n'est pas une zone sans mesures : elle a son état.
             stats = try await services.nearbyQuality.loadOperatorRanking(
@@ -86,76 +96,118 @@ struct NearbyOperatorComparisonSheet: View {
             loadFailed = true
         }
         loaded = true
+        animate = false
         withAnimation(SQMotion.resolve(.easeOut(duration: 0.55), reduceMotion)) { animate = true }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Autour de toi · \(radiusText)").sqKicker()
+                Text("Comparer les opérateurs")
+                    .font(SQType.title)
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "home.compare.close") { dismiss() }
+        }
+    }
+
+    /// Débit ou signal : deux moitiés égales sur la piste segmentée Halo.
+    private var metricPicker: some View {
+        HStack(spacing: 3) {
+            segment(.download, label: "Débit")
+            segment(.signal, label: "Signal")
+        }
+        .padding(SQSpace.xs)
+        .background(SQColor.segTrack, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    private func segment(_ value: NearbyOperatorMetric, label: LocalizedStringKey) -> some View {
+        let isSelected = metric == value
+        return Button {
+            guard !isSelected else { return }
+            Haptics.selection()
+            withAnimation(reduceMotion ? nil : SQMotion.snappy) { metric = value }
+        } label: {
+            Text(label)
+                .font(SQType.chip)
+                .foregroundStyle(isSelected ? SQColor.label : SQColor.labelSecondary)
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .background {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .fill(SQColor.segThumb)
+                            .shadow(color: SQColor.shadowSoft, radius: 2, y: 1)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("home.compare.metric.\(value == .download ? "download" : "signal")")
     }
 
     private var intro: some View {
         let sentence: String
         switch metric {
         case .download:
-            sentence = String(localized: "Le débit médian mesuré par la communauté à moins de \(radiusText) de toi, tous opérateurs confondus.")
+            sentence = String(localized: "Débit médian en réception, mesuré par la communauté à moins de \(radiusText), sur tout l’historique.")
         case .signal:
-            sentence = String(localized: "Le signal médian mesuré par la communauté à moins de \(radiusText) de toi, tous opérateurs confondus.")
+            sentence = String(localized: "Signal médian capté, mesuré par la communauté à moins de \(radiusText), sur tout l’historique.")
         }
         return Text(sentence)
-            .font(SQFont.body(14))
-            .foregroundStyle(SQColor.labelSecondary)
-            .multilineTextAlignment(.center)
+            .font(SQType.callout)
+            .foregroundStyle(SQColor.ink2)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, SQSpace.sm)
     }
 
-    private func operatorCard(_ stat: OperatorMetricStat, rank: Int, isLeader: Bool) -> some View {
+    private func operatorRow(_ stat: OperatorMetricStat, rank: Int) -> some View {
         let color = SQBrand.operatorColor(stat.operatorName)
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
-                Text("\(rank)")
-                    .font(SQFont.body(13, .bold))
-                    .foregroundStyle(isLeader ? SQBrand.operatorBadgeForeground(stat.operatorName) : SQColor.labelSecondary)
-                    .frame(width: 24, height: 24)
-                    .background(isLeader ? color : SQColor.surfaceMuted, in: Circle())
-                Circle().fill(color).frame(width: 9, height: 9)
-                Text(stat.operatorName)
-                    .font(SQFont.body(15.5, .semibold))
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
-                if isLeader {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(color)
+                Text(verbatim: "\(rank)")
+                    .font(SQType.caption(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(width: 16)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(color)
+                    .frame(width: 4, height: 18)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: stat.operatorName)
+                        .font(SQType.callout(.bold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
+                    Text(verbatim: detailText(stat))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer(minLength: SQSpace.sm)
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(verbatim: valueText(stat))
                         .font(SQFont.display(20, .bold))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
-                    Text(verbatim: unitText(stat)).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
+                    Text(verbatim: unitText(stat))
+                        .font(SQType.caption(.semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(SQColor.surfaceMuted)
+                    Capsule().fill(SQColor.chip)
                     Capsule().fill(color)
                         .frame(width: animate ? max(6, geo.size.width * CGFloat(fraction(for: stat))) : 0)
                 }
             }
-            .frame(height: 8)
-            Text(detailText(stat))
-                .font(SQFont.body(12))
-                .foregroundStyle(SQColor.labelSecondary)
+            .frame(height: 6)
+            .padding(.leading, 28)
+            .accessibilityHidden(true)
         }
-        .padding(SQSpace.md)
-        .background(
-            (isLeader ? color.opacity(0.08) : SQColor.surface),
-            in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-        )
-        // Fond seul (règle No-Border) : le liseré n'existe qu'en « Noir intense »,
-        // où rien d'autre ne détache la carte du fond.
-        .overlay(
-            RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
-        )
+        .padding(.vertical, SQSpace.md)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(rank). \(stat.operatorName), \(valueText(stat)) \(unitText(stat)), \(measurementCountText(stat.sampleCount)).")
     }
@@ -177,14 +229,12 @@ struct NearbyOperatorComparisonSheet: View {
     }
 
     private var footer: some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: "person.3.fill").font(.caption).foregroundStyle(SQColor.labelTertiary)
-            Text([String(localized: "\(totalSamples) mesure au total · rayon \(radiusText)"),
-                  String(localized: "tout l’historique")].joined(separator: " · "))
-                .font(SQFont.body(12))
-                .foregroundStyle(SQColor.labelSecondary)
-        }
-        .frame(maxWidth: .infinity)
+        Text([String(localized: "\(totalSamples) mesure au total · rayon \(radiusText)"),
+              String(localized: "tout l’historique")].joined(separator: " · "))
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
     }
 
     /// Remplissage de barre : proportion du max pour le débit ; échelle absolue

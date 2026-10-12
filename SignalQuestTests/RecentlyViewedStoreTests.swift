@@ -115,3 +115,77 @@ final class RecentlyViewedStoreTests: XCTestCase {
         wait(for: [announced], timeout: 1)
     }
 }
+
+/// Accueil modulable : préréglages, retouches et mémoire par compte.
+final class HomeLayoutTests: XCTestCase {
+    private let alice = "user:" + String(repeating: "a", count: 64)
+    private let bruno = "user:" + String(repeating: "b", count: 64)
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "HomeLayoutTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        super.tearDown()
+    }
+
+    func testDefaultIsTheCommunityPresetWithTwoSmallSideBySide() {
+        let layout = HomeLayout.default
+        XCTAssertEqual(layout.matchingPreset, .community)
+        XCTAssertEqual(layout.entries.first?.module, .network, "« Mon réseau » ouvre l'accueil")
+        let rows = layout.rows(pairingSmall: true)
+        XCTAssertEqual(rows.map { $0.map(\.module) }[2], [.latestTest, .week])
+        XCTAssertTrue(layout.rows(pairingSmall: false).allSatisfy { $0.count == 1 },
+                      "Aux grandes tailles de texte, chaque module prend la pleine largeur")
+    }
+
+    func testLoneSmallTakesTheFullRow() {
+        var layout = HomeLayout.default
+        layout.remove(.week)
+        XCTAssertTrue(layout.rows(pairingSmall: true).allSatisfy { $0.count == 1 })
+    }
+
+    func testEditingKeepsEveryModuleOnceAndInASupportedSize() {
+        var layout = HomeLayout.preset(.essential)
+        layout.add(.week)
+        layout.add(.week)
+        XCTAssertEqual(layout.entries.filter { $0.module == .week }.count, 1)
+        layout.toggleSize(.week)
+        XCTAssertEqual(layout.entries.last?.size, .small)
+        layout.toggleSize(.outages)
+        XCTAssertEqual(layout.entries[1].size, .large, "Les pannes n'existent qu'en Large")
+        layout.move(.week, by: -10)
+        XCTAssertEqual(layout.entries.first?.module, .week)
+        layout.move(.week, by: 1)
+        XCTAssertEqual(layout.entries.map(\.module), [.network, .week, .outages, .latestTest])
+        layout.move(fromOffsets: IndexSet(integer: 0), toOffset: 4)
+        XCTAssertEqual(layout.entries.map(\.module), [.week, .outages, .latestTest, .network])
+        layout.remove(.network)
+        XCTAssertTrue(layout.available.contains(.network), "Un module retiré revient dans « À ajouter »")
+        XCTAssertNil(layout.matchingPreset)
+    }
+
+    func testEachAccountKeepsItsOwnHome() {
+        HomeLayoutStore.save(.preset(.field), ownerScopeId: alice, defaults: defaults)
+        XCTAssertEqual(HomeLayoutStore.layout(ownerScopeId: alice, defaults: defaults), .preset(.field))
+        XCTAssertEqual(HomeLayoutStore.layout(ownerScopeId: bruno, defaults: defaults), .default)
+        HomeLayoutStore.save(.default, ownerScopeId: alice, defaults: defaults)
+        XCTAssertEqual(HomeLayoutStore.layout(ownerScopeId: alice, defaults: defaults), .default)
+    }
+
+    func testUnknownOrDuplicatedModulesAreDroppedNotTheWholeHome() throws {
+        let json = #"{"version":2,"entries":[{"module":"radar","size":"large"},{"module":"week","size":"small"},{"module":"outages","size":"small"},{"module":"week","size":"large"}]}"#
+        let layout = try JSONDecoder().decode(HomeLayout.self, from: Data(json.utf8))
+        XCTAssertEqual(layout.entries, [
+            HomeModuleEntry(module: .week, size: .small),
+            HomeModuleEntry(module: .outages, size: .large),
+        ])
+        let roundTrip = try JSONDecoder().decode(HomeLayout.self, from: JSONEncoder().encode(layout))
+        XCTAssertEqual(roundTrip, layout)
+    }
+}

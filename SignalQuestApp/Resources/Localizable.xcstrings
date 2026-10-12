@@ -65940,6 +65940,1346 @@
           }
         }
       }
+    },
+    "Active la localisation pour comparer les opérateurs autour de toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on location to compare operators around you."
+          }
+        }
+      }
+    },
+    "Active la localisation pour voir les mesures autour de toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on location to see measurements around you."
+          }
+        }
+      }
+    },
+    "Active la localisation pour voir les pannes autour de toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on location to see outages around you."
+          }
+        }
+      }
+    },
+    "Active la localisation pour voir les sites qui évoluent autour de toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on location to see sites changing around you."
+          }
+        }
+      }
+    },
+    "Ajoute les modules qui t’intéressent : ton réseau, les pannes proches, la communauté…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add the modules you care about: your network, nearby outages, the community…"
+          }
+        }
+      }
+    },
+    "Ajouter %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add %@"
+          }
+        }
+      }
+    },
+    "Amis en direct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live friends"
+          }
+        }
+      }
+    },
+    "Antennes suivies indisponibles pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Followed antennas are unavailable right now."
+          }
+        }
+      }
+    },
+    "Aucun ami ne partage sa position en ce moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No friend is sharing their location right now."
+          }
+        }
+      }
+    },
+    "Aucun module : ajoute-en un ci-dessous." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No modules: add one below."
+          }
+        }
+      }
+    },
+    "Aucune mesure récente à moins d’un kilomètre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No recent measurement within a kilometre."
+          }
+        }
+      }
+    },
+    "Aucune panne signalée autour de toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No outage reported around you"
+          }
+        }
+      }
+    },
+    "Autorise la localisation pour voir le verdict, les pannes et l’opérateur le plus rapide autour de toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow location to see the verdict, outages and the fastest operator around you."
+          }
+        }
+      }
+    },
+    "Bon réseau ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Good network here"
+          }
+        }
+      }
+    },
+    "Bonjour, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hello, %@"
+          }
+        }
+      }
+    },
+    "Ce module n’existe qu’en Large" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This module only comes in Large"
+          }
+        }
+      }
+    },
+    "Classement de tes amis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your friends’ leaderboard"
+          }
+        }
+      }
+    },
+    "Comprendre d’où vient ce verdict" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See where this verdict comes from"
+          }
+        }
+      }
+    },
+    "Connecté en %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected on %@"
+          }
+        }
+      }
+    },
+    "Connecté en %@ · opérateur estimé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected on %@ · estimated operator"
+          }
+        }
+      }
+    },
+    "Connecté · opérateur estimé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected · estimated operator"
+          }
+        }
+      }
+    },
+    "Descendre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move down"
+          }
+        }
+      }
+    },
+    "Disponible au retour du réseau. Le verdict et les mesures autour de toi reviendront d’eux-mêmes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available when the network is back. The verdict and nearby measurements will return on their own."
+          }
+        }
+      }
+    },
+    "Débit médian · comparer en détail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median speed · compare in detail"
+          }
+        }
+      }
+    },
+    "Glisse ≡ pour déplacer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag ≡ to move"
+          }
+        }
+      }
+    },
+    "Invite des amis pour te comparer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invite friends to compare"
+          }
+        }
+      }
+    },
+    "La communauté autour de toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The community around you"
+          }
+        }
+      }
+    },
+    "La localisation est désactivée pour SignalQuest. Active-la dans les Réglages pour voir le verdict, les pannes et les mesures autour de toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location is off for SignalQuest. Turn it on in Settings to see the verdict, outages and measurements around you."
+          }
+        }
+      }
+    },
+    "Large" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large"
+          }
+        }
+      }
+    },
+    "Le fil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feed"
+          }
+        }
+      }
+    },
+    "Le test fonctionne sans compte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The test works without an account."
+          }
+        }
+      }
+    },
+    "Les mesures, pannes et photos partagées par la communauté se retrouvent dans le fil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measurements, outages and photos shared by the community are in the feed."
+          }
+        }
+      }
+    },
+    "L’ordre, les tailles et les modules reprennent le préréglage Communauté." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Order, sizes and modules return to the Community preset."
+          }
+        }
+      }
+    },
+    "Mesures autour de toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measurements around you"
+          }
+        }
+      }
+    },
+    "Mode données réduites activé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low Data Mode is on"
+          }
+        }
+      }
+    },
+    "Modifier l’accueil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Home"
+          }
+        }
+      }
+    },
+    "Mon réseau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My network"
+          }
+        }
+      }
+    },
+    "Mon réseau, pannes et ton dernier test. Rien d’autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My network, outages and your latest test. Nothing else."
+          }
+        }
+      }
+    },
+    "Mon réseau, pannes, ce qui bouge, opérateurs ici, mesures autour de toi et antennes suivies." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My network, outages, what’s changing, operators here, measurements around you and followed antennas."
+          }
+        }
+      }
+    },
+    "Mon réseau, pannes, ton test, ta semaine, ce qui bouge, la communauté et tes antennes. Par défaut." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My network, outages, your test, your week, what’s changing, the community and your antennas. Default."
+          }
+        }
+      }
+    },
+    "Monter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move up"
+          }
+        }
+      }
+    },
+    "Montre la mesure sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows the measurement on the map"
+          }
+        }
+      }
+    },
+    "Montre le site sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows the site on the map"
+          }
+        }
+      }
+    },
+    "Montre sa position sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows their location on the map"
+          }
+        }
+      }
+    },
+    "Nouveau site %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New %@ site"
+          }
+        }
+      }
+    },
+    "Opérateurs ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operators here"
+          }
+        }
+      }
+    },
+    "Ouvre la fiche du site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the site sheet"
+          }
+        }
+      }
+    },
+    "Ouvre le Speedtest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the speed test"
+          }
+        }
+      }
+    },
+    "Ouvre le fil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the feed"
+          }
+        }
+      }
+    },
+    "Ouvre les classements" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the leaderboards"
+          }
+        }
+      }
+    },
+    "Ouvrir le fil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the feed"
+          }
+        }
+      }
+    },
+    "Pannes proches, sites qui évoluent, le fil et les classements : crée un compte pour les voir ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearby outages, changing sites, the feed and leaderboards: create an account to see them here."
+          }
+        }
+      }
+    },
+    "Pannes près de toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outages near you"
+          }
+        }
+      }
+    },
+    "Pannes près de toi, réservé aux membres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outages near you, for members only"
+          }
+        }
+      }
+    },
+    "Pas encore assez de mesures autour de toi pour comparer les opérateurs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough measurements around you yet to compare operators."
+          }
+        }
+      }
+    },
+    "Passe de Petit à Large" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switches between Small and Large"
+          }
+        }
+      }
+    },
+    "Passer en Large" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make Large"
+          }
+        }
+      }
+    },
+    "Passer en Petit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make Small"
+          }
+        }
+      }
+    },
+    "Petit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small"
+          }
+        }
+      }
+    },
+    "Position %lld sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position %lld of %lld"
+          }
+        }
+      }
+    },
+    "Préréglages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presets"
+          }
+        }
+      }
+    },
+    "Raccourcis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shortcuts"
+          }
+        }
+      }
+    },
+    "Retirer de l’accueil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Home"
+          }
+        }
+      }
+    },
+    "Revenir à l’accueil par défaut ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go back to the default Home?"
+          }
+        }
+      }
+    },
+    "Rien de nouveau déclaré autour de toi pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing new declared around you for now."
+          }
+        }
+      }
+    },
+    "Réseau au top ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Great network here"
+          }
+        }
+      }
+    },
+    "Réseau correct ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fair network here"
+          }
+        }
+      }
+    },
+    "Réseau faible ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weak network here"
+          }
+        }
+      }
+    },
+    "Réseau très faible ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Very weak network here"
+          }
+        }
+      }
+    },
+    "Sans réseau constaté ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No network observed here"
+          }
+        }
+      }
+    },
+    "Sur ton accueil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On your Home"
+          }
+        }
+      }
+    },
+    "Ta semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your week"
+          }
+        }
+      }
+    },
+    "Taille" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Size"
+          }
+        }
+      }
+    },
+    "Terrain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field"
+          }
+        }
+      }
+    },
+    "Tester mon débit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test my speed"
+          }
+        }
+      }
+    },
+    "Ton accueil est vide" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Home is empty"
+          }
+        }
+      }
+    },
+    "Ton dernier test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your latest test"
+          }
+        }
+      }
+    },
+    "Ton test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your test"
+          }
+        }
+      }
+    },
+    "Touche l’étoile d’une fiche antenne pour la suivre et la retrouver ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the star on an antenna sheet to follow it and find it here."
+          }
+        }
+      }
+    },
+    "Un préréglage remplace l’ordre et les tailles ; tu peux ensuite tout ajuster." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A preset replaces the order and sizes; you can then adjust everything."
+          }
+        }
+      }
+    },
+    "%@ passe en %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is moving to %@"
+          }
+        }
+      }
+    },
+    "activation déclarée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "activation declared"
+          }
+        }
+      }
+    },
+    "aucun service" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "no service"
+          }
+        }
+      }
+    },
+    "confirmée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "confirmed"
+          }
+        }
+      }
+    },
+    "déclaré à l’ANFR" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "declared to ANFR"
+          }
+        }
+      }
+    },
+    "pour %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "for %@"
+          }
+        }
+      }
+    },
+    "prévu par l’opérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "planned by the operator"
+          }
+        }
+      }
+    },
+    "service dégradé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "degraded service"
+          }
+        }
+      }
+    },
+    "signalée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "reported"
+          }
+        }
+      }
+    },
+    "signalée %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "reported %@"
+          }
+        }
+      }
+    },
+    "À ajouter" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To add"
+          }
+        }
+      }
+    },
+    "Ça bouge près de toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What’s changing near you"
+          }
+        }
+      }
+    },
+    "selon %lld mesures de la communauté" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "from %lld community measurement"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "from %lld community measurements"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "selon %lld mesure de la communauté"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "selon %lld mesures de la communauté"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Voir les %lld pannes" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "See the outage"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "See all %lld outages"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Voir la panne"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Voir les %lld pannes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Voir les %lld antennes" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "See the antenna"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "See all %lld antennas"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Voir l’antenne"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Voir les %lld antennes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%llde de tes amis" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "#%lld among your friends"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "#%lld among your friends"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lldᵉʳ de tes amis"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lldᵉ de tes amis"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "**Ici, c’est le débit qui tire le verdict vers le bas.**" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Here, speed is what pulls the verdict down.**"
+          }
+        }
+      }
+    },
+    "**Ici, c’est le signal qui tire le verdict vers le bas.**" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Here, signal is what pulls the verdict down.**"
+          }
+        }
+      }
+    },
+    "**Ici, seul le débit a assez de mesures : le verdict s’appuie dessus.**" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Here, only speed has enough measurements: the verdict relies on it.**"
+          }
+        }
+      }
+    },
+    "**Ici, seul le signal a assez de mesures : le verdict s’appuie dessus.**" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Here, only signal has enough measurements: the verdict relies on it.**"
+          }
+        }
+      }
+    },
+    "**Ici, signal et débit sont au même niveau.**" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Here, signal and speed are at the same level.**"
+          }
+        }
+      }
+    },
+    "Ce verdict s’appuie sur les mesures partagées par la communauté à moins de %@ de toi, pour le réseau %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This verdict relies on measurements shared by the community within %@ of you, for the %@ network."
+          }
+        }
+      }
+    },
+    "D’où vient ce verdict" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Where this verdict comes from"
+          }
+        }
+      }
+    },
+    "En itinérance, l’opérateur estimé ne confirme pas le réseau radio utilisé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When roaming, the estimated operator doesn’t confirm the radio network in use."
+          }
+        }
+      }
+    },
+    "Force du signal capté : plus la valeur est proche de zéro, plus il est puissant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Received signal strength: the closer to zero, the stronger."
+          }
+        }
+      }
+    },
+    "On retient le moins bon des deux critères : un réseau « au top » doit bien capter et être rapide." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We keep the weaker of the two criteria: a “top” network must have good signal and be fast."
+          }
+        }
+      }
+    },
+    "Vitesse de téléchargement typique mesurée sur ce réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Typical download speed measured on this network."
+          }
+        }
+      }
+    },
+    "déduit de la SIM" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "inferred from the SIM"
+          }
+        }
+      }
+    },
+    "estimé par l’accès Internet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "estimated from the internet connection"
+          }
+        }
+      }
+    },
+    "Autour de toi · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Around you · %@"
+          }
+        }
+      }
+    },
+    "Comparer les opérateurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare operators"
+          }
+        }
+      }
+    },
+    "Débit médian en réception, mesuré par la communauté à moins de %@, sur tout l’historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median download speed, measured by the community within %@, over all history."
+          }
+        }
+      }
+    },
+    "Signal médian capté, mesuré par la communauté à moins de %@, sur tout l’historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Median received signal, measured by the community within %@, over all history."
+          }
+        }
+      }
+    },
+    "Aujourd’hui" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Today"
+          }
+        }
+      }
+    },
+    "Cette semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This week"
+          }
+        }
+      }
+    },
+    "Plus ancien" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Older"
+          }
+        }
+      }
+    },
+    "Tout est lu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All caught up"
+          }
+        }
+      }
+    },
+    "Glisse une notification vers la gauche pour la marquer comme lue." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swipe a notification left to mark it as read."
+          }
+        }
+      }
+    },
+    "%lld non lues" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unread"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld unread"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld non lue"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld non lues"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
