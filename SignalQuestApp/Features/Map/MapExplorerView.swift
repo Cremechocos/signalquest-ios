@@ -3050,12 +3050,6 @@ struct MapExplorerView: View {
         .lineLimit(1)
     }
 
-    private static let searchDistanceFormatter: MKDistanceFormatter = {
-        let formatter = MKDistanceFormatter()
-        formatter.unitStyle = .abbreviated
-        return formatter
-    }()
-
     /// Distance depuis la dernière position connue, si elle est récente.
     private func searchDistance(_ result: MapSearchResult) -> String? {
         guard let here = services.location.cachedLocation() else { return nil }
@@ -3067,7 +3061,7 @@ struct MapExplorerView: View {
         case .place(let place):
             target = CLLocation(latitude: place.latitude, longitude: place.longitude)
         }
-        return Self.searchDistanceFormatter.string(fromDistance: here.distance(from: target))
+        return SQUnits.distance(meters: here.distance(from: target))
     }
 
     private func searchResultAccessibilityLabel(_ result: MapSearchResult) -> String {
@@ -4647,6 +4641,8 @@ private enum MapProfileQASearch {
 struct MapItemSheet: View {
     let item: MapDisplayItem
     @EnvironmentObject private var services: AppServices
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var speedtestDetail: SpeedtestDetail?
     @State private var detailError: String?
 
@@ -4662,15 +4658,19 @@ struct MapItemSheet: View {
                     genericContent
                 }
             }
-            .padding()
-            .padding(.top, SQSpace.sm)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
         }
+        .accessibilityIdentifier("map.item.content")
         .task(id: item.backendId) { await loadSpeedtestDetailIfNeeded() }
         .presentationDetents([.height(360), .medium, .large])
-        .presentationDragIndicator(.visible)
-        .presentationBackgroundCompat(SQColor.bg)
+        // Fond papier : les tuiles et les détails sont des cartes blanches.
+        .sqSheet(background: SQColor.bg)
     }
 
+    /// Le débit de réception fait le titre ; envoi, latence et gigue en
+    /// tuiles ; maximums et latence minimale dans les détails.
     private var speedtestContent: some View {
         let detail = speedtestDetail
         let local = item.details
@@ -4682,108 +4682,160 @@ struct MapItemSheet: View {
         let pingAverage = detail?.pingAvg ?? detail?.ping ?? local?.pingMs
         let tech = detail?.networkType ?? local?.tech
         let network = [detail?.connectionType, detail?.networkType].compactMap { $0 }.joined(separator: " / ")
-        return VStack(alignment: .leading, spacing: SQSpace.md2) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(SignalFormatters.speed(downloadAverage))
-                        .font(SQType.display)
-                        .foregroundStyle(speedColor(downloadAverage))
-                    Text("Speedtest")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-                Spacer()
-                TechBadge(text: tech ?? "Speedtest", color: SQColor.brandBlue)
-            }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-                // Vocabulaire du lexique (MES-24) : plus de « DL/UL » ni de « Ping ».
-                SQMetricTile.wrapping(label: "Réception moy.", value: SignalFormatters.speed(downloadAverage), highlight: true)
-                SQMetricTile.wrapping(label: "Réception max", value: SignalFormatters.speed(downloadMax))
-                SQMetricTile.wrapping(label: "Envoi moy.", value: SignalFormatters.speed(uploadAverage))
-                SQMetricTile.wrapping(label: "Envoi max", value: SignalFormatters.speed(uploadMax))
-                SQMetricTile.wrapping(label: "Latence min", value: SignalFormatters.ms(pingMin))
-                SQMetricTile.wrapping(label: "Latence moy.", value: SignalFormatters.ms(pingAverage))
-                SQMetricTile.wrapping(label: "Gigue", value: SignalFormatters.ms(detail?.jitter))
-                SQMetricTile.wrapping(label: "Réseau", value: network.isEmpty ? (tech ?? "—") : network)
-            }
+        return VStack(alignment: .leading, spacing: SQSpace.lg) {
+            header(
+                kicker: [String(localized: "Speedtest"), detail?.mobileOperator ?? local?.operatorName, tech],
+                value: downloadAverage.map { SQUnits.throughputValue(mbps: $0) } ?? "—",
+                unit: downloadAverage.map { String(localized: "\(SQUnits.throughputUnit(mbps: $0)) en réception") },
+                caption: [formatDate(detail?.timestamp ?? local?.timestamp), distanceText]
+            )
+            tiles([
+                ("Envoi", uploadAverage.map { SQUnits.throughputValue(mbps: $0) }, uploadAverage.map { SQUnits.throughputUnit(mbps: $0) }),
+                ("Latence", pingAverage.map { "\(Int($0.rounded()))" }, "ms"),
+                ("Gigue", detail?.jitter.map { $0.formatted(.number.precision(.fractionLength(0...1))) }, "ms")
+            ])
             detailRows([
-                ("Opérateur", detail?.mobileOperator ?? local?.operatorName),
+                // Un maximum égal au chiffre du titre ne dit rien de plus.
+                ("Réception max", downloadMax == downloadAverage ? nil : downloadMax.map(SignalFormatters.speed)),
+                ("Envoi max", uploadMax == uploadAverage ? nil : uploadMax.map(SignalFormatters.speed)),
+                ("Latence min", pingMin.map(SignalFormatters.ms)),
                 ("Réseau", network),
                 ("Serveur de mesure", detail?.downloadServerName ?? detail?.server),
                 ("Flux simultanés", detail?.streams.map(String.init)),
                 ("Durée", SignalFormatters.duration(detail?.testDuration)),
                 ("Appareil", [detail?.deviceType, detail?.deviceModel].compactMap { $0 }.joined(separator: " ")),
-                ("Date", formatDate(detail?.timestamp ?? local?.timestamp)),
                 ("Position", coordinatesText(lat: detail?.latitude ?? item.coordinate.latitude, lon: detail?.longitude ?? item.coordinate.longitude))
             ])
             if let detailError {
-                Label(detailError, systemImage: "exclamationmark.triangle")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.warning)
+                SQNotice(message: detailError)
             }
         }
     }
 
+    /// La qualité se lit dans l'adjectif et sur le point de la carte, pas
+    /// dans la couleur du chiffre, trop peu contrastée.
     private var coverageContent: some View {
         let details = item.details
         let rsrp = details?.rsrp ?? details?.avgRsrp
-        return VStack(alignment: .leading, spacing: SQSpace.md2) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(SignalFormatters.dbm(rsrp))
-                        .font(SQType.display)
-                        .foregroundStyle(coverageColor(rsrp))
-                    HStack(spacing: 6) {
-                        Text(details?.clusterCount == nil ? "Couverture" : "Couverture agrégée")
-                            .font(SQType.subhead)
-                            .foregroundStyle(SQColor.labelSecondary)
-                        if let tech = details?.tech {
-                            TechBadge(text: tech, color: TechAccent.color(for: tech))
-                        }
-                        if let band = details?.band {
-                            TechBadge(text: SQUnits.band(band, technology: details?.tech), color: SQColor.brandOrange)
-                        }
-                    }
-                }
-                Spacer()
-                TechBadge(text: kindLabel, color: SQColor.brandGreen)
-            }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                SQMetricTile.wrapping(label: "RSRP", value: SignalFormatters.dbm(rsrp), highlight: true)
-                SQMetricTile.wrapping(label: "RSRQ", value: SignalFormatters.db(details?.rsrq))
-                SQMetricTile.wrapping(label: "SNR", value: SignalFormatters.db(details?.snr))
-                SQMetricTile.wrapping(label: "Points", value: SignalFormatters.count(details?.clusterCount ?? details?.sampleCount))
-                SQMetricTile.wrapping(label: "Clusters", value: SignalFormatters.count(details?.returnedClusters ?? details?.totalClusters))
-                SQMetricTile.wrapping(label: "Type", value: details?.cellType ?? details?.representation ?? "—")
-            }
+        let quality = SQQualityScale.Signal(dbm: rsrp, technology: details?.tech)
+        let points = details?.clusterCount ?? details?.sampleCount
+        let aggregated = details?.clusterCount.map { String(localized: "Agrégé sur \($0) points") }
+        return VStack(alignment: .leading, spacing: SQSpace.lg) {
+            header(
+                kicker: [details?.clusterCount == nil ? String(localized: "Couverture") : String(localized: "Couverture agrégée"),
+                         details?.operatorName, details?.tech,
+                         details?.band.map { SQUnits.band($0, technology: details?.tech) }],
+                value: rsrp.map { "\(Int($0.rounded()))" } ?? "—",
+                unit: rsrp.map { _ in String(localized: "dBm · signal \(quality.label.lowercased())") },
+                caption: [aggregated, formatDate(details?.timestamp), distanceText]
+            )
+            tiles([
+                ("RSRQ", details?.rsrq.map { "\(Int($0.rounded()))" }, "dB"),
+                ("SNR", details?.snr.map { "\(Int($0.rounded()))" }, "dB"),
+                ("Points", points.map { SignalFormatters.count($0) }, nil)
+            ])
             detailRows([
-                ("Opérateur", details?.operatorName),
+                ("Source", details?.note ?? "SignalQuest"),
+                ("Cellule primaire", details?.isPrimary.map { $0 ? String(localized: "Oui") : String(localized: "Non") }),
                 ("Groupe", details?.groupId),
-                ("Primaire", details?.isPrimary.map { $0 ? String(localized: "Oui") : String(localized: "Non") }),
-                ("Date", formatDate(details?.timestamp)),
-                ("Position", coordinatesText(lat: item.coordinate.latitude, lon: item.coordinate.longitude)),
-                ("Source", details?.note ?? "SignalQuest")
+                ("Clusters", (details?.returnedClusters ?? details?.totalClusters).map { SignalFormatters.count($0) }),
+                ("Type", details?.cellType ?? details?.representation),
+                ("Position", coordinatesText(lat: item.coordinate.latitude, lon: item.coordinate.longitude))
             ])
         }
     }
 
     private var genericContent: some View {
         VStack(alignment: .leading, spacing: SQSpace.lg) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .top, spacing: SQSpace.sm2) {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text(kindLabel).sqKicker()
                     Text(item.title)
                         .font(SQType.title)
                         .foregroundStyle(SQColor.label)
-                    Text(item.subtitle)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !item.subtitle.isEmpty {
+                        Text(item.subtitle)
+                            .font(SQType.subhead(.regular))
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
                 }
-                Spacer()
-                TechBadge(text: kindLabel, color: SQColor.brandGreen)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                closeButton
             }
             if let metric = item.metric {
-                MetricPill(title: "Donnée", value: metric, systemImage: "waveform.path.ecg")
+                detailRows([("Donnée", metric)])
             }
         }
+    }
+
+    private var closeButton: some View {
+        MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "map.item.close") { dismiss() }
+    }
+
+    /// Petites capitales qui disent quoi, quel opérateur, quelle technologie ;
+    /// grand chiffre d'encre et son unité ; date et distance.
+    private func header(kicker: [String?], value: String, unit: String?, caption: [String?]) -> some View {
+        let kickerText = kicker.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        let captionText = caption.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        return HStack(alignment: .top, spacing: SQSpace.sm2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text(kickerText).sqKicker()
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(value)
+                        .font(SQFont.display(34, .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.label)
+                    if let unit {
+                        Text(unit)
+                            .font(SQType.callout(.semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if !captionText.isEmpty {
+                    Text(captionText)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            closeButton
+        }
+    }
+
+    @ViewBuilder
+    private func tiles(_ values: [(String, String?, String?)]) -> some View {
+        // Trois tirets n'apprennent rien : sans aucune valeur, pas de tuiles.
+        if values.contains(where: { $0.1 != nil }) {
+            tileGrid(values)
+        }
+    }
+
+    private func tileGrid(_ values: [(String, String?, String?)]) -> some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm),
+                            count: dynamicTypeSize.isAccessibilitySize ? 1 : values.count)
+        return LazyVGrid(columns: columns, spacing: SQSpace.sm) {
+            ForEach(Array(values.enumerated()), id: \.offset) { _, tile in
+                SQStatTile(label: tile.0, value: tile.1 ?? "—", unit: tile.1 == nil ? nil : tile.2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(SQSpace.sm2)
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            }
+        }
+    }
+
+    /// Distance depuis la dernière position connue, si elle est récente.
+    private var distanceText: String? {
+        guard let here = services.location.cachedLocation() else { return nil }
+        let point = CLLocation(latitude: item.coordinate.latitude, longitude: item.coordinate.longitude)
+        return String(localized: "à \(SQUnits.distance(meters: here.distance(from: point))) de toi")
     }
 
     private func loadSpeedtestDetailIfNeeded() async {
@@ -4814,29 +4866,24 @@ struct MapItemSheet: View {
         }
     }
 
+    /// Lignes à points de conduite ; les lignes vides restent masquées.
+    @ViewBuilder
     private func detailRows(_ rows: [(String, String?)]) -> some View {
-        let visibleRows = rows.filter { value in
-            guard let text = value.1?.trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
-            return !text.isEmpty && text != "—"
+        let visibleRows = rows.compactMap { row -> (String, String)? in
+            guard let text = row.1?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty, text != "—" else { return nil }
+            return (row.0, text)
         }
-        return VStack(spacing: SQSpace.sm) {
-            ForEach(Array(visibleRows.enumerated()), id: \.offset) { _, row in
-                HStack(alignment: .firstTextBaseline) {
-                    // Clé du catalogue : un libellé passé en `String` restait
-                    // en français dans l'app anglaise.
-                    Text(LocalizedStringKey(row.0))
-                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
-                        .foregroundStyle(SQColor.labelSecondary)
-                    Spacer(minLength: 12)
-                    Text(row.1 ?? "—")
-                        .font(SQFont.archivo(13, .semibold, relativeTo: .footnote))
-                        .foregroundStyle(SQColor.label)
-                        .multilineTextAlignment(.trailing)
+        if !visibleRows.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Détails").sqKicker().accessibilityAddTraits(.isHeader)
+                VStack(spacing: SQSpace.sm) {
+                    ForEach(Array(visibleRows.enumerated()), id: \.offset) { _, row in
+                        SQFactRow(label: row.0, value: row.1)
+                    }
                 }
-                .padding(.vertical, SQSpace.sm)
-                .padding(.horizontal, SQSpace.sm2)
-                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                .overlay { RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
+                .padding(SQSpace.md)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             }
         }
     }
@@ -4849,19 +4896,5 @@ struct MapItemSheet: View {
     private func coordinatesText(lat: Double?, lon: Double?) -> String? {
         guard let lat, let lon else { return nil }
         return String(format: "%.5f, %.5f", lat, lon)
-    }
-
-    private func speedColor(_ speed: Double?) -> Color {
-        // Échelle canonique unique (SQNetworkColors) ; `nil` garde le bleu
-        // « pas de donnée » propre à cette fiche.
-        guard let speed else { return SQColor.brandBlue }
-        return SQNetworkColors.speedColor(speed)
-    }
-
-    private func coverageColor(_ rsrp: Double?) -> Color {
-        // Échelle canonique unique (SQNetworkColors) ; `nil` garde le bleu
-        // « pas de donnée » propre à cette fiche.
-        guard let rsrp else { return SQColor.brandBlue }
-        return SQNetworkColors.rsrpColor(rsrp)
     }
 }

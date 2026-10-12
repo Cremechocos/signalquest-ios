@@ -65390,6 +65390,86 @@
           }
         }
       }
+    },
+    "%@ en réception" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ download"
+          }
+        }
+      }
+    },
+    "dBm · signal %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dBm · %@ signal"
+          }
+        }
+      }
+    },
+    "à %@ de toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ from you"
+          }
+        }
+      }
+    },
+    "Cellule primaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primary cell"
+          }
+        }
+      }
+    },
+    "Agrégé sur %lld points" : {
+      "localizations" : {
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Agrégé sur %lld point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Agrégé sur %lld points"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Aggregated from %lld point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Aggregated from %lld points"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
