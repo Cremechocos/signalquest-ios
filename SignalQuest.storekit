@@ -27,7 +27,7 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Journal synchronisé et accès anticipé à certains outils communautaires.",
+              "description" : "Badge Basic acier ; soutient le développement.",
               "displayName" : "Basic mensuel",
               "locale" : "fr_FR"
             }
@@ -48,7 +48,7 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Journal synchronisé et accès anticipé, facturé annuellement.",
+              "description" : "Badge Basic acier, facturé annuellement.",
               "displayName" : "Basic annuel",
               "locale" : "fr_FR"
             }
@@ -69,7 +69,7 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Analyses détaillées, tendances du journal et stories personnalisées.",
+              "description" : "Journal radio, Sentinelle, stories et badge or.",
               "displayName" : "Premium mensuel",
               "locale" : "fr_FR"
             }
@@ -90,7 +90,7 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Analyses détaillées, tendances du journal et stories personnalisées, facturé annuellement.",
+              "description" : "Journal radio, Sentinelle, stories, facturé à l'année.",
               "displayName" : "Premium annuel",
               "locale" : "fr_FR"
             }

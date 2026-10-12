@@ -3028,6 +3028,22 @@
         }
       }
     },
+    "Merci ! Ton abonnement finance le développement ; tout ce qui est gratuit le reste." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thank you! Your subscription funds development; everything free stays free."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merci ! Ton abonnement finance le développement ; tout ce qui est gratuit le reste."
+          }
+        }
+      }
+    },
     "Mes grands-parents" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -55452,22 +55468,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton abonnement %1$@ est déjà géré par %2$@. Gère-le sur cette plateforme pour éviter un doublon."
-          }
-        }
-      }
-    },
-    "Ton abonnement finance directement le développement de SignalQuest" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your subscription directly funds SignalQuest’s development"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ton abonnement finance directement le développement de SignalQuest"
           }
         }
       }

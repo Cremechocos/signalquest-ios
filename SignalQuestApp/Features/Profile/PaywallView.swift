@@ -211,7 +211,7 @@ struct PaywallView: View {
                 Text("Le plus complet")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(SQColor.accentInk)
-                    .padding(.horizontal, SQSpace.sm + 2)
+                    .padding(.horizontal, SQSpace.sm2)
                     .padding(.vertical, SQSpace.xs + 1)
                     .background(SQColor.onAccent, in: Capsule(style: .continuous))
             } else {
@@ -241,6 +241,12 @@ struct PaywallView: View {
                         .foregroundStyle(primaryText)
                         .symbolRenderingMode(.hierarchical)
                 }
+            }
+            // Basic est un soutien pur : un remerciement, hors de la liste des avantages.
+            if tier == .basic {
+                Text("Merci ! Ton abonnement finance le développement ; tout ce qui est gratuit le reste.")
+                    .font(SQType.caption)
+                    .foregroundStyle(primaryText)
             }
 
             if let product, let equivalent = SubscriptionPriceCopy.monthlyEquivalent(product: product) {
@@ -443,7 +449,6 @@ struct PaywallView: View {
             // est son seul droit. Ne rien ajouter ici sans gater d'abord.
             return [
                 String(localized: "Badge Basic acier sur ton profil et tes publications"),
-                String(localized: "Ton abonnement finance directement le développement de SignalQuest"),
             ]
         case .premium:
             return [
