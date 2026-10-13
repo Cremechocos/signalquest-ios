@@ -196,6 +196,12 @@ final class AccessibilityAuditTests: XCTestCase {
                 "speedtest.driveTest.label", "speedtest.account.",
                 // Bilan du dernier trajet, à l'encre sur `surfaceMuted` (Lot 4c).
                 "drivetest.lastTrip.",
+                // Rangées de l'explication du Drive Test (Halo, 13/10) : titre
+                // `label` 15 pt et détail `labelSecondary` 13,5 pt sur `surface`
+                // (`testBodyTextTokensMeetAA`). Les quatre rangées sont
+                // identiques ; l'auditeur en signale toujours les deux mêmes
+                // nœuds, quel que soit l'espacement, et rien à l'écran.
+                "drivetest.disclosure.",
                 // Messagerie (Lot 4e) : `label`/`labelSecondary`/`accentInk` sur
                 // les surfaces, `onAccent` sur brique, `dangerInk` sur `surfaceMuted`
                 // (`testBodyTextTokensMeetAA`, `testSemanticTokensMeetAA`,

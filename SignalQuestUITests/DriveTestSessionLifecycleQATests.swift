@@ -22,10 +22,14 @@ final class DriveTestSessionLifecycleQATests: XCTestCase {
         shot.name = "diag-\(moment)"
         shot.lifetime = .keepAlways
         add(shot)
-        let labels = app.buttons.allElementsBoundByIndex.prefix(30).map { element in
-            let identifier = element.identifier
-            let label = element.label
-            return identifier.isEmpty ? label : "\(identifier)|\(label)"
+        // Une photo figée de l'arbre : parcourus un à un, les boutons de la carte
+        // pouvaient disparaître entre le compte et la lecture (« index 9 »).
+        func buttons(in snapshot: XCUIElementSnapshot) -> [XCUIElementSnapshot] {
+            (snapshot.elementType == .button ? [snapshot] : []) + snapshot.children.flatMap(buttons(in:))
+        }
+        let all = (try? app.snapshot()).map(buttons(in:)) ?? []
+        let labels = all.prefix(30).map { element in
+            element.identifier.isEmpty ? element.label : "\(element.identifier)|\(element.label)"
         }
         print("SQ_DIAG \(moment) boutons=\(labels)")
     }

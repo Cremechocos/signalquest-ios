@@ -136,6 +136,8 @@ final class DriveTestViewModel: ObservableObject {
     /// seulement, jamais écrit sur le disque avec le résumé.
     @Published private(set) var lastSessionTrace: DriveShareTrace?
     private var sessionStartedAt: Date?
+    /// Début de la session en cours, pour la durée affichée en haut de la carte.
+    var sessionStartDate: Date? { isRunning ? sessionStartedAt : nil }
     /// Un VPN a été vu à un moment de la session : le bilan ne doit pas dépendre
     /// de l'état au moment de l'arrêt.
     private var vpnSeenDuringSession = false
@@ -1258,7 +1260,11 @@ struct DriveTestView: View {
     /// Pendant un trajet, le panneau se réduit à l'état du test et à l'arrêt :
     /// déplié, il cachait la moitié de la carte (MES-19).
     @State private var panelCollapsed = false
+    /// Bilan affiché juste après l'arrêt d'un trajet, jusqu'à « Nouveau trajet ».
+    @State private var showsFinishedTrip = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.dismiss) private var dismiss
 
     init(services: AppServices) {
         _model = ObservedObject(wrappedValue: services.driveTest)
@@ -1285,11 +1291,41 @@ struct DriveTestView: View {
                 .padding(.bottom, Self.mapLegalBand)
         }
         .overlay(alignment: .topTrailing) { mapLegendControl }
+        .overlay(alignment: .topLeading) {
+            // Même verre que le bouton de légende, en face : posé sur la carte.
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 40, height: 40)
+                    .background { sqMapGlassBackground(Circle()) }
+                    .sqShadowSoft()
+                    .padding(2)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel("Retour")
+            .accessibilityIdentifier("drivetest.back")
+            .padding(.leading, SQSpace.md)
+            .padding(.top, SQSpace.sm)
+        }
+        .overlay(alignment: .top) { sessionClockPill }
         .onReceive(services.location.$authorizationStatus) { status in
             locationAuthorized = status == .authorizedWhenInUse || status == .authorizedAlways
         }
+        // Le bilan s'affiche quand une session s'arrête, quelle qu'en soit la cause.
+        .onChangeCompat(of: model.isRunning) { wasRunning, isRunning in
+            // Un trajet vide n'est pas gardé : le bilan affiché serait alors celui
+            // d'un ancien trajet, qui reste dans la tuile « Dernier trajet ».
+            if wasRunning && !isRunning, let recap = model.lastSessionRecap,
+               Date().timeIntervalSince(recap.endedAt) < 60 {
+                showsFinishedTrip = true
+            }
+            if isRunning { showsFinishedTrip = false }
+        }
         .navigationTitle("Drive Test")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
         .onAppear {
             DriveTestViewModel.migrateLegacyDataCap()
             model.onAppear()
@@ -1330,6 +1366,35 @@ struct DriveTestView: View {
                 visibilityService: services.speedtest,
                 guestMode: services.auth.cachedUser() == nil
             )
+        }
+    }
+
+    /// « En cours · 12:04 » au-dessus de la carte pendant une session ;
+    /// « En pause » en ambre quand le Wi-Fi l'interrompt.
+    @ViewBuilder
+    private var sessionClockPill: some View {
+        if let startedAt = model.sessionStartDate {
+            TimelineView(.periodic(from: startedAt, by: 1)) { context in
+                let elapsed = Duration.seconds(max(0, context.date.timeIntervalSince(startedAt)))
+                let clock = elapsed.formatted(.time(pattern: elapsed >= .seconds(3_600) ? .hourMinuteSecond : .minuteSecond))
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(model.isPausedForWiFi ? SQColor.warning : SQColor.danger)
+                        .frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
+                    Text(model.isPausedForWiFi ? "En pause · \(clock)" : "En cours · \(clock)")
+                        .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.label)
+                }
+                .padding(.horizontal, SQSpace.sm2)
+                .frame(minHeight: 36)
+                .background { sqMapGlassBackground(Capsule(style: .continuous)) }
+                .sqShadowSoft()
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("drivetest.session.clock")
+            }
+            .padding(.top, SQSpace.sm + 4)
         }
     }
 
@@ -1474,60 +1539,24 @@ struct DriveTestView: View {
             ScrollView { panelContent }
         }
         .padding(SQSpace.lg)
-        .background { sqMapGlassBackground(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)) }
+        .background {
+            RoundedRectangle(cornerRadius: SQRadius.xl + 4, style: .continuous)
+                .fill(SQColor.surface)
+        }
         .sqShadowDock()
     }
 
     private var panelContent: some View {
-        VStack(spacing: SQSpace.sm2) {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
             if model.isVPNActive {
                 VPNWarningBanner(message: "VPN actif : opérateur non détectable, ces tests ne seront pas publiés sur la carte.")
             }
             if model.isRunning {
-                // Pendant le trajet : opérateur, résultats des speedtests et arrêt,
-                // y compris pendant la pause WiFi. Réduit, il ne garde que l'état
-                // du test en cours et l'arrêt.
-                if panelCollapsed {
-                    HStack(spacing: SQSpace.sm) {
-                        if model.isPausedForWiFi { pauseBanner } else { liveReadout }
-                        panelToggle
-                    }
-                } else {
-                    HStack(spacing: SQSpace.sm) {
-                        operatorRow
-                        panelToggle
-                    }
-                    if model.isPausedForWiFi { pauseBanner }
-                    if !model.isPausedForWiFi {
-                        liveReadout
-                        sessionStats
-                    }
-                    sessionMetricsRow
-                }
+                runningPanel
+            } else if showsFinishedTrip, let recap = model.lastSessionRecap {
+                finishedTripPanel(recap)
             } else {
-                operatorRow
-                // Une session vient de se terminer : dire ce qu'elle a produit avant
-                // de reproposer un démarrage. Sans ce récapitulatif, l'écran
-                // revenait au choix du mode et tout le trajet disparaissait de vue.
-                if let recap = model.lastSessionRecap {
-                    sessionRecapCard(recap)
-                    // Hors de la carte : elle est lue d'un bloc par VoiceOver.
-                    Button { showDriveShare = true } label: {
-                        Label("Partager le trajet", systemImage: "square.and.arrow.up")
-                            .font(SQFont.body(14, .semibold))
-                            .foregroundStyle(SQColor.accentInk)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("drivetest.lastTrip.share")
-                    .sheet(isPresented: $showDriveShare) {
-                        DriveShareSheet(recap: recap, trace: model.lastSessionTrace)
-                    }
-                }
-                // Panneau complet avant démarrage : mode + secteur (si opérateur identifié).
-                driveTestPurpose
-                if model.displayedOperatorLabel != nil { sectorBanner }
+                readyPanel
             }
             if let errorMessage = model.errorMessage {
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
@@ -1549,6 +1578,552 @@ struct DriveTestView: View {
             }
             actionButton
         }
+    }
+
+    // MARK: Prêt — titre, opérateur, dernier trajet, réglages du trajet
+
+    @ViewBuilder
+    private var readyPanel: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: SQSpace.sm) {
+                panelTitle
+                Spacer(minLength: SQSpace.xs)
+                operatorPill
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                panelTitle
+                operatorPill
+            }
+        }
+        operatorSourceLine
+        // Le dernier trajet reste lisible d'une visite à l'autre (MES-14).
+        if let recap = model.lastSessionRecap {
+            lastTripTile(recap)
+        }
+        driveTestPurpose
+        // Secteur seulement quand l'opérateur est identifié.
+        if model.displayedOperatorLabel != nil { sectorLine }
+    }
+
+    private var panelTitle: some View {
+        Text("Drive Test")
+            .font(SQFont.display(24, .bold, relativeTo: .title))
+            .foregroundStyle(SQColor.label)
+            .sqHeader()
+            .accessibilityIdentifier("drivetest.title")
+    }
+
+    /// Opérateur en pastille, point de sa couleur ; « en cours de détection… »
+    /// tant qu'il n'est pas connu.
+    private var operatorPill: some View {
+        HStack(spacing: 6) {
+            // Pas de point sans opérateur : invisible, il restait un nœud que
+            // l'audit de contraste mesurait.
+            if let key = model.displayedOperatorKey {
+                Circle().fill(model.operatorColor(key))
+                    .frame(width: 8, height: 8)
+                    .accessibilityHidden(true)
+            }
+            Text(operatorRowTitle)
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.labelSecondary : SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("drivetest.operator.title")
+        }
+        .padding(.horizontal, SQSpace.sm2)
+        .padding(.vertical, 6)
+        .frame(minHeight: 30)
+        .background(SQColor.chip, in: Capsule(style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Opérateur détecté")
+        .accessibilityValue(model.displayedOperatorLabel.map { [$0, operatorRowSubtitle].compactMap { $0 }.joined(separator: ", ") } ?? operatorRowTitle)
+    }
+
+    /// L'origine de l'information reste visible ; ni la SIM ni l'IP ne prouvent
+    /// à elles seules le réseau radio servant en itinérance.
+    @ViewBuilder
+    private var operatorSourceLine: some View {
+        if let subtitle = operatorRowSubtitle {
+            HStack(spacing: SQSpace.xs) {
+                Text(subtitle)
+                    .font(Self.panelCaption)
+                    .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.warning : SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("drivetest.operator.subtitle")
+                if operatorGuessedFromIP {
+                    SQInfoButton(term: .ipOperator)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func lastTripTile(_ recap: DriveTestViewModel.SessionRecap) -> some View {
+        HStack(spacing: SQSpace.sm2) {
+            SQIconPastille(systemImage: "flag.checkered", size: 36, tint: SQColor.accentInk, fill: SQColor.accentSoft)
+            VStack(alignment: .leading, spacing: 2) {
+                // Conservé d'une visite à l'autre : la date dit de quel trajet il s'agit.
+                Text("Dernier trajet · \(recap.endedAt.formatted(.relative(presentation: .named)))")
+                    .font(SQFont.body(14, .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("drivetest.lastTrip.title")
+                // Encre : le bilan est l'information de la tuile, pas un détail.
+                Text(recap.summaryLine)
+                    .font(SQFont.body(13))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("drivetest.lastTrip.summary")
+                if let caveat = recap.caveat { caveatLabel(caveat) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("drivetest.lastTrip")
+            shareTripButton(recap)
+        }
+        .padding(SQSpace.sm2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
+
+    private func caveatLabel(_ caveat: String) -> some View {
+        Label {
+            Text(caveat)
+                .font(SQFont.body(12.5))
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(SQColor.warning)
+        }
+        .accessibilityIdentifier("drivetest.lastTrip.caveat")
+    }
+
+    private func shareTripButton(_ recap: DriveTestViewModel.SessionRecap) -> some View {
+        MapChipIconButton(systemImage: "square.and.arrow.up", label: "Partager le trajet",
+                          identifier: "drivetest.lastTrip.share") {
+            showDriveShare = true
+        }
+        .sheet(isPresented: $showDriveShare) {
+            DriveShareSheet(recap: recap, trace: model.lastSessionTrace)
+        }
+    }
+
+    private var driveTestPurpose: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            // L'explication vit dans le glossaire (ⓘ) et l'écran d'explication :
+            // la ligne qui la répétait allongeait le panneau (MES-19).
+            HStack(spacing: SQSpace.xs) {
+                // Titre de section plutôt qu'un surtitre en capitales de 12 pt :
+                // l'audit d'accessibilité refusait ce dernier, même à l'encre.
+                Text("Pendant ton trajet")
+                    .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("drivetest.purpose.title")
+                SQInfoButton(term: .driveTest)
+                Spacer(minLength: 0)
+            }
+            let tiles = Group {
+                settingTile(
+                    "Un test tous les",
+                    selection: $driveIntervalMeters,
+                    options: [(250, "250 m"), (500, "500 m"), (1_000, "1 km"), (2_000, "2 km")],
+                    identifier: "drivetest.interval"
+                )
+                settingTile(
+                    "Plafond de données",
+                    selection: $driveDataCapMB,
+                    options: [(500, "500 Mo"), (2_000, "2 Go"), (5_000, "5 Go"), (0, "Sans limite")],
+                    identifier: "drivetest.dataCap"
+                )
+            }
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.sm) { tiles }
+            } else {
+                HStack(alignment: .top, spacing: SQSpace.sm) { tiles }
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Tuile à menu : le titre, la valeur choisie et un chevron.
+    private func settingTile(
+        _ title: LocalizedStringKey,
+        selection: Binding<Int>,
+        options: [(Int, LocalizedStringKey)],
+        identifier: String
+    ) -> some View {
+        Menu {
+            Picker(title, selection: selection) {
+                ForEach(options, id: \.0) { option in
+                    Text(option.1).tag(option.0)
+                }
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(Self.panelCaption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 4) {
+                    Text(options.first { $0.0 == selection.wrappedValue }?.1 ?? "—")
+                        .font(SQFont.display(17, .bold, relativeTo: .headline))
+                        .foregroundStyle(SQColor.label)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, SQSpace.sm)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(minHeight: 44)
+            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+
+    // MARK: En cours — état du test, valeur en direct, trajet, antenne
+
+    @ViewBuilder
+    private var runningPanel: some View {
+        // Pendant le trajet : état du test, résultats et arrêt, y compris pendant
+        // la pause Wi-Fi. Réduit, il ne garde que l'état du test et l'arrêt.
+        // En pause, le bandeau dit déjà l'état : l'opérateur prend sa place.
+        if model.isPausedForWiFi {
+            HStack(spacing: SQSpace.sm) {
+                operatorPill
+                Spacer(minLength: 0)
+                panelToggle
+            }
+        } else {
+            // Les deux pastilles sur une ligne quand elles y tiennent entières ;
+            // sinon l'opérateur passe dessous.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: SQSpace.sm) {
+                    statusPill.fixedSize()
+                    Spacer(minLength: 0)
+                    operatorPill.fixedSize()
+                    panelToggle
+                }
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    HStack(spacing: SQSpace.sm) {
+                        statusPill
+                        Spacer(minLength: 0)
+                        panelToggle
+                    }
+                    operatorPill
+                }
+            }
+        }
+        if model.isPausedForWiFi {
+            pauseBanner
+        } else {
+            liveReadout
+        }
+        if !panelCollapsed {
+            if !model.isPausedForWiFi { currentTestLine }
+            sessionTiles
+            if let summary = model.summary, summary.count > 0 {
+                Text(verbatim: [
+                    String(localized: "\(summary.count) test"),
+                    String(localized: "réception moyenne \(SQUnits.throughput(mbps: summary.avgDownload))"),
+                    String(localized: "latence minimale \(SQUnits.milliseconds(summary.minPing))")
+                ].joined(separator: " · "))
+                    .font(SQFont.body(12))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // Le bandeau dit déjà « En pause — Wi-Fi détecté » : seul un autre
+            // état (prochain test, reprise) mérite sa ligne.
+            if model.isPausedForWiFi, model.statusLabel != String(localized: "Prêt"),
+               model.statusLabel != String(localized: "En pause — Wi-Fi détecté") {
+                Label {
+                    Text(model.statusLabel)
+                        .font(Self.panelCaption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "clock").font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            sectorLine
+        }
+    }
+
+    /// « Test 3 · Réception », « Prochain test dans 320 m » : encre pleine.
+    private var statusPill: some View {
+        HStack(spacing: 6) {
+            if model.livePhase == .ping || model.livePhase == .download || model.livePhase == .upload {
+                SQSpinner().controlSize(.small).tint(SQColor.onInk)
+            }
+            Text(model.statusLabel)
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .foregroundStyle(SQColor.onInk)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, SQSpace.sm2)
+        .padding(.vertical, 6)
+        .frame(minHeight: 30)
+        .background(SQColor.label, in: Capsule(style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var isMeasuringThroughput: Bool {
+        model.livePhase == .download || model.livePhase == .upload
+    }
+
+    /// Débit en direct pendant la mesure ; sinon la réception du dernier test.
+    private var liveReadout: some View {
+        let mbps = isMeasuringThroughput ? model.liveMbps : model.liveDownload
+        return HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(verbatim: throughputValue(mbps))
+                .font(SQFont.display(44, .bold))
+                .monospacedDigit()
+                .foregroundStyle(mbps > 0 ? SQColor.label : SQColor.labelTertiary)
+                .contentTransition(.numericText())
+            Text(verbatim: SQUnits.throughputUnit(mbps: mbps))
+                .font(SQFont.body(14, .semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+            Spacer(minLength: SQSpace.xs)
+            if let best = model.summary?.maxDownload, best > 0 {
+                Text("Meilleur test \(SQUnits.throughput(mbps: best))")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Valeurs du test courant : se remplissent en direct et RESTENT jusqu'au
+    /// test suivant.
+    private var currentTestLine: some View {
+        Text(verbatim: [
+            "\(String(localized: "Latence")) \(model.livePing > 0 ? "\(Int(model.livePing.rounded()))" : "—") ms",
+            "\(String(localized: "Réception")) \(throughputValue(model.liveDownload)) \(SQUnits.throughputUnit(mbps: model.liveDownload))",
+            "\(String(localized: "Envoi")) \(throughputValue(model.liveUpload)) \(SQUnits.throughputUnit(mbps: model.liveUpload))"
+        ].joined(separator: " · "))
+            .font(Self.panelCaption)
+            .monospacedDigit()
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Distance parcourue, tests et données consommées. Le volume est celui des
+    /// speedtests : c'est lui qui pèse sur le forfait.
+    private var sessionTiles: some View {
+        tileRow([
+            ("Distance", distanceText),
+            ("Tests", "\(model.testCount)"),
+            ("Données", DriveTestViewModel.formattedBytes(model.sessionBytes))
+        ])
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Progression de la session")
+        .accessibilityValue(
+            Text("\(distanceText) parcourus, \(DriveTestViewModel.formattedBytes(model.sessionBytes)) de données")
+        )
+    }
+
+    @ViewBuilder
+    private func tileRow(_ items: [(LocalizedStringKey, String)]) -> some View {
+        let tiles = ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.0)
+                    .font(SQFont.body(10.5, .bold, relativeTo: .caption2))
+                    .tracking(10.5 * 0.12)
+                    .textCase(.uppercase)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: item.1)
+                    .font(SQFont.display(17, .bold, relativeTo: .headline))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, SQSpace.sm)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+        }
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: SQSpace.sm) { tiles }
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            HStack(alignment: .top, spacing: SQSpace.sm) { tiles }
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// Distance lisible : mètres sous 1 km, puis kilomètres à une décimale.
+    private var distanceText: String {
+        Self.distanceText(model.distanceMeters)
+    }
+
+    private static func distanceText(_ meters: Double) -> String {
+        let formatter = MeasurementFormatter()
+        formatter.numberFormatter.maximumFractionDigits = meters < 1_000 ? 0 : 1
+        // `.naturalScale` choisit l'unité selon l'ordre de grandeur — et descend en
+        // MILLIMÈTRES sous le mètre : au démarrage d'une session le panneau
+        // affichait « 0 mm ». On garde l'unité fournie tant qu'on n'a pas parcouru
+        // au moins un mètre.
+        formatter.unitOptions = meters < 1 ? .providedUnit : .naturalScale
+        return formatter.string(from: Measurement(value: meters, unit: UnitLength.meters))
+    }
+
+    /// Bandeau « en pause Wi-Fi » (reprise auto en cellulaire) : ambre teinté.
+    private var pauseBanner: some View {
+        HStack(spacing: SQSpace.sm2) {
+            Image(systemName: "wifi")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(SQColor.warning)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("En pause — Wi-Fi détecté")
+                    .font(SQFont.body(14.5, .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Reprise automatique en cellulaire")
+                    .font(SQFont.body(12.5))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, SQSpace.sm2)
+        .padding(.vertical, SQSpace.sm)
+        .frame(maxWidth: .infinity)
+        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Session en pause : Wi-Fi détecté, reprise automatique en cellulaire")
+    }
+
+    /// Antenne la plus proche, avec l'écart, et la pastille du secteur.
+    private var sectorLine: some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: model.nearestSite == nil ? "antenna.radiowaves.left.and.right.slash" : "antenna.radiowaves.left.and.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityHidden(true)
+            if let detail = sectorDetail {
+                Text(detail)
+                    .font(Self.panelCaption)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("drivetest.sector.detail")
+            } else if model.nearestSite == nil {
+                Text(sectorTitle)
+                    .font(Self.panelCaption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("drivetest.sector.title")
+            }
+            Spacer(minLength: SQSpace.xs)
+            if model.nearestSite != nil {
+                // L'icône double la couleur : lisible sans distinguer le vert de l'ambre.
+                Label {
+                    Text(sectorTitle).foregroundStyle(SQColor.label)
+                } icon: {
+                    Image(systemName: sectorIcon).foregroundStyle(sectorColor)
+                }
+                    .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                    .labelStyle(.titleAndIcon)
+                    .padding(.horizontal, SQSpace.sm)
+                    .padding(.vertical, 4)
+                    .background(sectorSoftColor, in: Capsule(style: .continuous))
+                    .fixedSize()
+                    .accessibilityIdentifier("drivetest.sector.title")
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Trajet terminé — bilan juste après l'arrêt
+
+    @ViewBuilder
+    private func finishedTripPanel(_ recap: DriveTestViewModel.SessionRecap) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            Label("Trajet terminé", systemImage: "flag.checkered")
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .foregroundStyle(SQColor.success)
+                .padding(.horizontal, SQSpace.sm2)
+                .padding(.vertical, 5)
+                .background(SQColor.successSoft, in: Capsule(style: .continuous))
+                .accessibilityIdentifier("drivetest.lastTrip.title")
+            Spacer(minLength: SQSpace.xs)
+            Text(recap.endedAt.formatted(.relative(presentation: .named)))
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+        if let average = recap.averageDownloadMbps, average > 0 {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(verbatim: SQUnits.throughputValue(mbps: average))
+                    .font(SQFont.display(40, .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.label)
+                Text("\(SQUnits.throughputUnit(mbps: average)) en moyenne")
+                    .font(SQFont.body(14, .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .accessibilityElement(children: .combine)
+        }
+        tileRow([
+            ("Distance", Self.distanceText(recap.distanceMeters)),
+            ("Tests", "\(recap.testCount)"),
+            ("Données", DriveTestViewModel.formattedBytes(recap.bytes))
+        ])
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(recap.summaryLine))
+        .accessibilityIdentifier("drivetest.lastTrip.summary")
+        if let caveat = recap.caveat { caveatLabel(caveat) }
+        VStack(spacing: SQSpace.xxs) {
+            if let best = recap.maxDownloadMbps, best > 0 {
+                recapRow("Réception max", SQUnits.throughput(mbps: best))
+            }
+            if let minPing = model.summary?.minPing, minPing > 0 {
+                recapRow("Latence minimale", SQUnits.milliseconds(minPing))
+            }
+        }
+        // Empilés : côte à côte, « Partager le trajet » passait sur deux lignes.
+        VStack(spacing: SQSpace.xs2) {
+            GradientButton("Partager le trajet", systemImage: "square.and.arrow.up") { showDriveShare = true }
+                .accessibilityIdentifier("drivetest.lastTrip.share")
+            GradientButton("Nouveau trajet", style: .secondary) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { showsFinishedTrip = false }
+            }
+            .accessibilityIdentifier("drivetest.newTrip")
+        }
+        Color.clear.frame(height: 0)
+            .sheet(isPresented: $showDriveShare) {
+                DriveShareSheet(recap: recap, trace: model.lastSessionTrace)
+            }
+    }
+
+    private func recapRow(_ label: LocalizedStringKey, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+            Text(label)
+                .font(SQType.subhead(.regular))
+                .foregroundStyle(SQColor.labelSecondary)
+                .layoutPriority(1)
+            SQDotLeader()
+                .frame(minWidth: SQSpace.md, maxWidth: .infinity)
+                .frame(height: 1)
+                .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
+            Text(verbatim: value)
+                .font(SQFont.body(14, .bold, relativeTo: .subheadline))
+                .monospacedDigit()
+                .foregroundStyle(SQColor.label)
+                .layoutPriority(1)
+        }
+        .frame(minHeight: 28)
+        .accessibilityElement(children: .combine)
     }
 
     private static let mapLegalBand: CGFloat = 20
@@ -1573,256 +2148,6 @@ struct DriveTestView: View {
         .buttonStyle(SQPressButtonStyle())
         .accessibilityLabel(panelCollapsed ? "Afficher le détail du trajet" : "Réduire le panneau")
         .accessibilityIdentifier("drivetest.panel.toggle")
-    }
-
-    private var driveTestPurpose: some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs) {
-            // L'explication vit dans le glossaire (ⓘ) et l'écran d'explication :
-            // la ligne qui la répétait allongeait le panneau (MES-19).
-            HStack(spacing: SQSpace.xs) {
-                Text("Des speedtests pendant ton trajet").font(SQType.subhead)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("drivetest.purpose.title")
-                SQInfoButton(term: .driveTest)
-                Spacer(minLength: 0)
-            }
-            HStack {
-                Text("Distance entre tests").font(Self.panelCaption).foregroundStyle(SQColor.labelSecondary)
-                    .accessibilityIdentifier("drivetest.interval.label")
-                Spacer()
-                Picker("Distance entre tests", selection: $driveIntervalMeters) {
-                    Text("250 m").tag(250)
-                    Text("500 m").tag(500)
-                    Text("1 km").tag(1_000)
-                    Text("2 km").tag(2_000)
-                }
-                .pickerStyle(.menu).labelsHidden().tint(SQColor.accentInk).frame(minHeight: 44)
-                .accessibilityIdentifier("drivetest.interval")
-            }
-            HStack {
-                Text("Plafond de données").font(Self.panelCaption).foregroundStyle(SQColor.labelSecondary)
-                    .accessibilityIdentifier("drivetest.dataCap.label")
-                Spacer()
-                Picker("Plafond de données", selection: $driveDataCapMB) {
-                    Text("500 Mo").tag(500)
-                    Text("2 Go").tag(2_000)
-                    Text("5 Go").tag(5_000)
-                    Text("Sans limite").tag(0)
-                }
-                .pickerStyle(.menu).labelsHidden().tint(SQColor.accentInk).frame(minHeight: 44)
-                .accessibilityIdentifier("drivetest.dataCap")
-            }
-        }
-    }
-
-    private func sessionRecapCard(_ recap: DriveTestViewModel.SessionRecap) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs2) {
-            HStack(spacing: SQSpace.sm) {
-                Image(systemName: "flag.checkered")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .accessibilityHidden(true)
-                // Conservé d'une visite à l'autre : la date dit de quel trajet il s'agit.
-                Text("Dernier trajet · \(recap.endedAt.formatted(.relative(presentation: .named)))")
-                    .font(SQFont.body(14, .semibold))
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("drivetest.lastTrip.title")
-                Spacer()
-            }
-            // Encre : le bilan est l'information de la carte, pas un détail.
-            Text(recap.summaryLine)
-                .font(SQFont.body(13))
-                .foregroundStyle(SQColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("drivetest.lastTrip.summary")
-            if let caveat = recap.caveat {
-                Label {
-                    Text(caveat)
-                        .font(SQFont.body(12.5))
-                        .foregroundStyle(SQColor.label)
-                        .fixedSize(horizontal: false, vertical: true)
-                } icon: {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(SQColor.warning)
-                }
-                .accessibilityIdentifier("drivetest.lastTrip.caveat")
-            }
-        }
-        .padding(SQSpace.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("drivetest.lastTrip")
-    }
-
-    /// Distance parcourue et données consommées — les deux chiffres qui manquaient
-    /// pendant un trajet. Le volume est celui des speedtests : c'est lui qui pèse
-    /// sur le forfait, et il pouvait atteindre plusieurs gigaoctets sans que rien
-    /// ne l'indique.
-    private var sessionMetricsRow: some View {
-        HStack(spacing: SQSpace.md) {
-            Label {
-                Text(distanceText)
-                    .font(SQFont.body(13, .semibold))
-                    .monospacedDigit()
-            } icon: {
-                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .foregroundStyle(SQColor.label)
-
-            Group {
-                Divider().frame(height: 14)
-                Label {
-                    Text(DriveTestViewModel.formattedBytes(model.sessionBytes))
-                        .font(SQFont.body(13, .semibold))
-                        .monospacedDigit()
-                } icon: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundStyle(SQColor.label)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.xs + 3)
-        .frame(maxWidth: .infinity)
-        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Progression de la session")
-        .accessibilityValue(
-            Text("\(distanceText) parcourus, \(DriveTestViewModel.formattedBytes(model.sessionBytes)) de données")
-        )
-    }
-
-    /// Distance lisible : mètres sous 1 km, puis kilomètres à une décimale.
-    private var distanceText: String {
-        let meters = model.distanceMeters
-        let formatter = MeasurementFormatter()
-        formatter.numberFormatter.maximumFractionDigits = meters < 1_000 ? 0 : 1
-        // `.naturalScale` choisit l'unité selon l'ordre de grandeur — et descend en
-        // MILLIMÈTRES sous le mètre : au démarrage d'une session le panneau
-        // affichait « 0 mm ». On garde l'unité fournie tant qu'on n'a pas parcouru
-        // au moins un mètre.
-        formatter.unitOptions = meters < 1 ? .providedUnit : .naturalScale
-        return formatter.string(from: Measurement(value: meters, unit: UnitLength.meters))
-    }
-
-    /// Bandeau « en pause WiFi » (reprise auto en cellulaire) pendant l'enregistrement :
-    /// statut ambre en pastille teintée.
-    private var pauseBanner: some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: "pause.circle.fill")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(SQColor.warning)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("En pause — Wi-Fi détecté")
-                    .font(SQFont.body(13, .semibold))
-                    .foregroundStyle(SQColor.label)
-                Text("Reprise automatique en cellulaire")
-                    .font(SQFont.body(12))
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.xs + 3)
-        .frame(maxWidth: .infinity)
-        .background(SQColor.warningSoft, in: Capsule(style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Session en pause : Wi-Fi détecté, reprise automatique en cellulaire")
-    }
-
-    private var liveReadout: some View {
-        HStack(spacing: SQSpace.sm) {
-            SQSpinner().controlSize(.small).tint(SQColor.brandRed)
-            Text(model.statusLabel)
-                .font(SQFont.body(13, .semibold))
-                .foregroundStyle(SQColor.label)
-                .sqSingleLine()
-            Spacer()
-            if model.livePhase == .download || model.livePhase == .upload {
-                Text(verbatim: SQUnits.throughput(mbps: model.liveMbps))
-                    .font(SQFont.body(13, .bold))
-                    .foregroundStyle(SQColor.accentInk)
-                    .monospacedDigit()
-            }
-        }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.xs + 3)
-        .frame(maxWidth: .infinity)
-        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
-    }
-
-    private var sectorBanner: some View {
-        HStack(spacing: SQSpace.sm2) {
-            Image(systemName: sectorIcon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(sectorColor)
-                .frame(width: 38, height: 38)
-                .background(sectorSoftColor, in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(sectorTitle)
-                    .font(SQFont.body(14.5, .semibold))
-                    .foregroundStyle(SQColor.label)
-                    .accessibilityIdentifier("drivetest.sector.title")
-                if let detail = sectorDetail {
-                    Text(detail)
-                        .font(Self.panelCaption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .accessibilityIdentifier("drivetest.sector.detail")
-                }
-            }
-            Spacer()
-        }
-    }
-
-    /// L'origine de l'information reste visible ; ni la SIM ni l'IP ne prouvent
-    /// à elles seules le réseau radio servant en itinérance.
-    private var operatorRow: some View {
-        HStack(spacing: SQSpace.sm) {
-            // Invisible (opacité 0) pendant la détection, la pastille restait un
-            // nœud que l'audit de contraste mesurait : plus dessinée sans opérateur.
-            Group {
-                if model.displayedOperatorKey != nil {
-                    Circle().fill(model.operatorColor(model.displayedOperatorKey))
-                } else {
-                    Color.clear
-                }
-            }
-            .frame(width: 10, height: 10)
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(operatorRowTitle)
-                    .font(SQFont.body(15, .semibold))
-                    .foregroundStyle(SQColor.label)
-                    .accessibilityIdentifier("drivetest.operator.title")
-                if let subtitle = operatorRowSubtitle {
-                    Text(subtitle)
-                        .font(Self.panelCaption)
-                        .foregroundStyle(model.displayedOperatorLabel == nil ? SQColor.warning : SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("drivetest.operator.subtitle")
-                }
-            }
-            Spacer()
-            if operatorGuessedFromIP {
-                SQInfoButton(term: .ipOperator)
-                    .accessibilityHidden(true)
-            }
-        }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.xs + 4)
-        .frame(maxWidth: .infinity)
-        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Opérateur détecté")
-        .accessibilityValue(model.displayedOperatorLabel.map { [$0, operatorRowSubtitle].compactMap { $0 }.joined(separator: ", ") } ?? operatorRowTitle)
-        .modifier(DriveTestOptionalExplains(term: operatorGuessedFromIP ? .ipOperator : nil))
     }
 
     private var operatorGuessedFromIP: Bool {
@@ -1865,51 +2190,8 @@ struct DriveTestView: View {
         return map
     }
 
-    private var sessionStats: some View {
-        VStack(spacing: SQSpace.xs2) {
-            // Valeurs du test courant : se remplissent en live et RESTENT jusqu'au test suivant.
-            HStack(spacing: 0) {
-                stat(label: "Latence", value: model.livePing > 0 ? "\(Int(model.livePing.rounded()))" : "—", unit: "ms")
-                divider
-                stat(label: "Réception", value: throughputValue(model.liveDownload), unit: SQUnits.throughputUnit(mbps: model.liveDownload))
-                divider
-                stat(label: "Envoi", value: throughputValue(model.liveUpload), unit: SQUnits.throughputUnit(mbps: model.liveUpload))
-            }
-            .padding(.vertical, SQSpace.sm)
-            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            if let summary = model.summary, summary.count > 0 {
-                Text(verbatim: [
-                    String(localized: "\(summary.count) test"),
-                    String(localized: "réception moyenne \(SQUnits.throughput(mbps: summary.avgDownload))"),
-                    String(localized: "latence minimale \(SQUnits.milliseconds(summary.minPing))")
-                ].joined(separator: " · "))
-                    .font(SQFont.body(12))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
     private func throughputValue(_ mbps: Double) -> String {
         mbps > 0 ? SQUnits.throughputValue(mbps: mbps) : "—"
-    }
-
-    private var divider: some View {
-        Rectangle().fill(SQColor.separator).frame(width: 1, height: 26)
-    }
-
-    private func stat(label: String, value: String, unit: String?) -> some View {
-        VStack(spacing: 1) {
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value)
-                    .font(SQFont.display(20, .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.label)
-                if let unit { Text(unit).font(SQType.micro).foregroundStyle(SQColor.labelSecondary) }
-            }
-            Text(LocalizedStringKey(label)).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
@@ -1925,10 +2207,9 @@ struct DriveTestView: View {
                         model.requestImmediateTest()
                     }
                 }
-                // Action en cours / stop = capsule brique (la seule grande surface accent).
-                GradientButton("Arrêter le drive test", systemImage: "stop.fill", style: .accent) { model.stop() }
+                GradientButton("Arrêter le drive test", systemImage: "stop.fill", style: .destructive) { model.stop() }
             }
-        } else {
+        } else if !(showsFinishedTrip && model.lastSessionRecap != nil) {
             GradientButton(startButtonTitle, systemImage: "play.fill") { requestStart() }
                 .accessibilityIdentifier("drivetest.start")
         }

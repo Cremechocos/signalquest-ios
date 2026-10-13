@@ -178,42 +178,55 @@ struct DriveTestPreflightSheet: View {
     let onAction: (DriveTestPreflightIssue.Action) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.lg) {
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text(report.isBlocked ? "Impossible de démarrer le Drive Test" : "Avant de démarrer")
-                    .font(SQFont.display(24, .bold))
-                    .foregroundStyle(SQColor.label)
-                    .accessibilityAddTraits(.isHeader)
-                Text(
-                    report.isBlocked
-                    ? "Corrige le point bloquant ci-dessous."
-                    : "Seuls les points susceptibles d'affecter cette session sont affichés."
-                )
-                .font(SQFont.body(14))
-                .foregroundStyle(SQColor.labelSecondary)
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack {
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "drivetest.preflight.close") {
+                        close()
+                    }
+                    Spacer()
+                }
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text(report.isBlocked ? "Impossible de démarrer le Drive Test" : "Avant de démarrer")
+                        .font(SQFont.display(28, .bold, relativeTo: .title))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(
+                        report.isBlocked
+                        ? "Corrige le point bloquant ci-dessous."
+                        : "Seuls les points susceptibles d'affecter cette session sont affichés."
+                    )
+                    .font(SQFont.body(15, relativeTo: .callout))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
 
-            ScrollView {
-                VStack(spacing: SQSpace.sm) {
-                    ForEach(report.issues) { issue in
+                VStack(spacing: 0) {
+                    ForEach(Array(report.issues.enumerated()), id: \.element.id) { index, issue in
+                        if index > 0 { Divider().padding(.leading, 64) }
                         issueRow(issue)
                     }
                 }
+                .sqCardBackground()
             }
-
-            // Boutons Crème empilés : côte à côte, « Démarrer quand même » passait
-            // sur deux lignes dans des capsules système (Lot 4c).
-            VStack(spacing: SQSpace.xs) {
-                if !report.isBlocked {
-                    GradientButton("Démarrer quand même", systemImage: "play.fill") {
-                        dismiss()
-                        onStartAnyway()
-                    }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.md)
+            .padding(.bottom, SQSpace.md)
+        }
+        // Le bouton reste visible quelle que soit la longueur de la liste ; fermer
+        // passe par le bouton rond. Bloqué, seule l'action de la ligne demeure.
+        .safeAreaInset(edge: .bottom) {
+            if !report.isBlocked {
+                GradientButton("Démarrer quand même", systemImage: "play.fill") {
+                    dismiss()
+                    onStartAnyway()
                 }
-                GradientButton("Fermer", style: report.isBlocked ? .primary : .ghost) { close() }
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.vertical, SQSpace.sm)
+                .background(SQColor.bg)
             }
         }
-        .padding(SQSpace.lg)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         // Opaque : le verre laissait voir, flou, le bouton du panneau derrière.
@@ -222,18 +235,19 @@ struct DriveTestPreflightSheet: View {
 
     private func issueRow(_ issue: DriveTestPreflightIssue) -> some View {
         HStack(alignment: .top, spacing: SQSpace.sm2) {
-            Image(systemName: icon(for: issue))
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(color(for: issue))
-                .frame(width: 38, height: 38)
-                .background(color(for: issue).opacity(0.14), in: Circle())
-                .accessibilityHidden(true)
+            SQIconPastille(
+                systemImage: icon(for: issue),
+                size: 38,
+                tint: issue.severity == .blocking ? SQColor.dangerInk : SQColor.warning,
+                fill: issue.severity == .blocking ? SQColor.dangerSoft : SQColor.warningSoft
+            )
             VStack(alignment: .leading, spacing: 3) {
                 Text(title(for: issue))
-                    .font(SQFont.body(14.5, .semibold))
+                    .font(SQFont.body(15, .semibold, relativeTo: .body))
                     .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(detail(for: issue))
-                    .font(SQFont.body(12.5))
+                    .font(SQFont.body(13.5, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if issue.action != .none {
@@ -242,19 +256,22 @@ struct DriveTestPreflightSheet: View {
                         onAction(issue.action)
                     } label: {
                         Text(actionTitle(for: issue.action))
-                            .font(SQFont.body(14, .semibold))
-                            .foregroundStyle(SQColor.accentInk)
+                            .font(SQFont.body(13.5, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(SQColor.label)
+                            .padding(.horizontal, SQSpace.md)
                             .frame(minHeight: 44)
-                            .contentShape(Rectangle())
+                            .sqSurface(SQColor.chip, in: Capsule(style: .continuous))
+                            .contentShape(Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(SQPressButtonStyle())
+                    .padding(.top, SQSpace.xs)
                 }
             }
             Spacer(minLength: 0)
         }
-        .padding(SQSpace.md)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 
@@ -307,10 +324,6 @@ struct DriveTestPreflightSheet: View {
         case .wifi: return "wifi"
         case .constrainedNetwork: return "tortoise.fill"
         }
-    }
-
-    private func color(for issue: DriveTestPreflightIssue) -> Color {
-        issue.severity == .blocking ? SQColor.danger : SQColor.warning
     }
 
     private func actionTitle(for action: DriveTestPreflightIssue.Action) -> String {

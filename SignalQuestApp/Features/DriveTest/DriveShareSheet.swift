@@ -94,80 +94,78 @@ struct DriveShareSheet: View {
     @State private var image: UIImage?
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    Group {
-                        if let image {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFit()
-                                .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                                .sqShadowCard()
-                        } else {
-                            SQSpinner().frame(maxWidth: .infinity, minHeight: 240)
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack {
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "driveShare.close") {
+                        dismiss()
                     }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Aperçu de la carte du trajet")
-                    .accessibilityIdentifier("driveShare.preview")
-
-                    VStack(spacing: 0) {
-                        Toggle("Masquer le départ et l’arrivée", isOn: $options.hidesEnds)
-                            .disabled(!options.showsRoute)
-                            .frame(minHeight: 44)
-                            .accessibilityIdentifier("driveShare.hidesEnds")
-                        Toggle("Montrer le tracé", isOn: $options.showsRoute)
-                            .frame(minHeight: 44)
-                            .accessibilityIdentifier("driveShare.showsRoute")
-                        Toggle("Montrer l’opérateur", isOn: $options.showsOperator)
-                            .frame(minHeight: 44)
-                            .accessibilityIdentifier("driveShare.showsOperator")
-                    }
-                    .font(SQFont.body(15))
-                    .tint(SQColor.brandRed)
-                    .padding(.horizontal, SQSpace.md)
-                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-
-                    Text("Le tracé est dessiné sans fond de carte. Retirer le départ et l’arrivée enlève 500 m à chaque bout.")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
                 }
-                .padding(SQSpace.lg)
+                Text("Partager le trajet")
+                    .font(SQFont.display(28, .bold, relativeTo: .title))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+
+                Group {
+                    if let image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                            .sqShadowCard()
+                    } else {
+                        SQSpinner().frame(maxWidth: .infinity, minHeight: 240)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Aperçu de la carte du trajet")
+                .accessibilityIdentifier("driveShare.preview")
+
+                VStack(spacing: 0) {
+                    optionRow("Masquer le départ et l’arrivée", systemImage: "mappin.slash",
+                              isOn: $options.hidesEnds, identifier: "driveShare.hidesEnds")
+                        .disabled(!options.showsRoute)
+                    Divider().padding(.leading, 60)
+                    optionRow("Montrer le tracé", systemImage: "point.topleft.down.to.point.bottomright.curvepath",
+                              isOn: $options.showsRoute, identifier: "driveShare.showsRoute")
+                    Divider().padding(.leading, 60)
+                    optionRow("Montrer l’opérateur", systemImage: "antenna.radiowaves.left.and.right",
+                              isOn: $options.showsOperator, identifier: "driveShare.showsOperator")
+                }
+                .sqCardBackground()
+
+                Text("Le tracé est dessiné sans fond de carte. Retirer le départ et l’arrivée enlève 500 m à chaque bout.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.md)
+            .padding(.bottom, SQSpace.lg)
+            .sqReadableWidth()
+        }
+        .background(SQColor.bg)
+        // Barre fixe, comme la carte de partage d'un speedtest : « Partager »
+        // restait sous la ligne de flottaison, derrière l'aperçu et les options.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let image {
+                ShareLink(
+                    item: Image(uiImage: image),
+                    preview: SharePreview(Text("Drive Test"), image: Image(uiImage: image))
+                ) {
+                    Label("Partager", systemImage: "square.and.arrow.up")
+                        .font(SQType.button)
+                        .frame(maxWidth: .infinity, minHeight: SQSpace.primaryActionHeight)
+                        .foregroundStyle(SQColor.onInk)
+                        .background(SQColor.label, in: Capsule(style: .continuous))
+                }
+                .accessibilityIdentifier("driveShare.share")
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.vertical, SQSpace.sm)
                 .sqReadableWidth()
-            }
-            .background(SQColor.bg)
-            // Barre fixe, comme la carte de partage d'un speedtest : « Partager »
-            // restait sous la ligne de flottaison, derrière l'aperçu et les options.
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if let image {
-                    VStack(spacing: 0) {
-                        Divider()
-                        ShareLink(
-                            item: Image(uiImage: image),
-                            preview: SharePreview(Text("Drive Test"), image: Image(uiImage: image))
-                        ) {
-                            Label("Partager", systemImage: "square.and.arrow.up")
-                                .font(SQType.button)
-                                .frame(maxWidth: .infinity, minHeight: 52)
-                                .foregroundStyle(SQColor.onAccent)
-                                .background(SQColor.brandRed, in: Capsule(style: .continuous))
-                        }
-                        .accessibilityIdentifier("driveShare.share")
-                        .padding(.horizontal, SQSpace.lg)
-                        .padding(.vertical, SQSpace.md)
-                        .sqReadableWidth()
-                    }
-                    .background(SQColor.bg)
-                }
-            }
-            .navigationTitle("Partager le trajet")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Fermer") { dismiss() }
-                }
+                .background(SQColor.bg)
             }
         }
         .task(id: RenderKey(options: options, dark: colorScheme == .dark)) {
@@ -176,6 +174,25 @@ struct DriveShareSheet: View {
                 theme: SQShareCardTheme.current(colorScheme: colorScheme)
             )
         }
+    }
+
+    private func optionRow(
+        _ title: LocalizedStringKey, systemImage: String, isOn: Binding<Bool>, identifier: String
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            HStack(spacing: SQSpace.sm2) {
+                SQIconPastille(systemImage: systemImage, size: 32, tint: SQColor.accentInk, fill: SQColor.accentSoft)
+                Text(title)
+                    .font(SQFont.body(15, relativeTo: .body))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .tint(SQColor.brandRed)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs2)
+        .frame(minHeight: 52)
+        .accessibilityIdentifier(identifier)
     }
 
     private struct RenderKey: Hashable {

@@ -34,6 +34,22 @@
         }
       }
     },
+    "%@ en moyenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ on average"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en moyenne"
+          }
+        }
+      }
+    },
     "%@ en upload" : {
       "localizations" : {
         "en" : {
@@ -2474,6 +2490,22 @@
         }
       }
     },
+    "Données" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Données"
+          }
+        }
+      }
+    },
     "Durée de chaque sens" : {
       "localizations" : {
         "en" : {
@@ -2572,6 +2604,22 @@
         }
       }
     },
+    "En cours · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Running · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours · %@"
+          }
+        }
+      }
+    },
     "En envoi" : {
       "localizations" : {
         "en" : {
@@ -2584,6 +2632,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En envoi"
+          }
+        }
+      }
+    },
+    "En pause · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En pause · %@"
           }
         }
       }
@@ -3333,6 +3397,22 @@
         }
       }
     },
+    "Latence minimale" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lowest latency"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latence minimale"
+          }
+        }
+      }
+    },
     "Le Mode données faibles est activé." : {
       "localizations" : {
         "en" : {
@@ -3625,6 +3705,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mauvais"
+          }
+        }
+      }
+    },
+    "Meilleur test %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Best test %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meilleur test %@"
           }
         }
       }
@@ -3939,6 +4035,38 @@
         }
       }
     },
+    "Nouveau trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New trip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau trajet"
+          }
+        }
+      }
+    },
+    "Ouvre le choix du serveur de test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the test server choice"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre le choix du serveur de test"
+          }
+        }
+      }
+    },
     "Ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple." : {
       "localizations" : {
         "en" : {
@@ -4050,6 +4178,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas encore vue"
+          }
+        }
+      }
+    },
+    "Pendant ton trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During your trip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant ton trajet"
           }
         }
       }
@@ -4560,6 +4704,22 @@
         }
       }
     },
+    "Serveur auto" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto server"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serveur auto"
+          }
+        }
+      }
+    },
     "Serveur iPerf3 sélectionné indisponible — test via Cloudflare" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4923,6 +5083,22 @@
         }
       }
     },
+    "Test du trajet · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trip test · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test du trajet · %@"
+          }
+        }
+      }
+    },
     "Ton ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app te renvoyant la clé. Tes autres appareils se déverrouilleront avec le nouveau mot de passe." : {
       "localizations" : {
         "en" : {
@@ -5034,6 +5210,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Toutes les clés d’historique n’ont pas pu être sauvegardées."
+          }
+        }
+      }
+    },
+    "Trajet terminé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trip finished"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trajet terminé"
           }
         }
       }
@@ -5250,6 +5442,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vérifier en données mobiles"
+          }
+        }
+      }
+    },
+    "Wi-Fi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wi-Fi"
           }
         }
       }
@@ -26672,22 +26880,6 @@
         }
       }
     },
-    "Des speedtests pendant ton trajet" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speedtests along your route"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Des speedtests pendant ton trajet"
-          }
-        }
-      }
-    },
     "Descendant" : {
       "localizations" : {
         "en" : {
@@ -26975,22 +27167,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Distance antenne"
-          }
-        }
-      }
-    },
-    "Distance entre tests" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Distance between tests"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Distance entre tests"
           }
         }
       }
@@ -44509,22 +44685,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photos indisponibles"
-          }
-        }
-      }
-    },
-    "Pic : %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Peak: %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pic : %@"
           }
         }
       }
@@ -64337,22 +64497,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "validée %lld×"
-          }
-        }
-      }
-    },
-    "variation de la latence" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "latency variation"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "variation de la latence"
           }
         }
       }

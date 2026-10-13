@@ -96,6 +96,8 @@ struct SpeedtestView: View {
     /// chaque arrêt : tout tick d'une génération périmée est ignoré.
     @State private var runGeneration: Int = 0
     @State private var showSettings = false
+    /// Page « Serveur de test » ouverte depuis la pastille réseau.
+    @State private var showServerPage = false
     @State private var showDriveTest = false
     @State private var showLocationPriming = false
     @State private var primingDenied = false
@@ -167,6 +169,7 @@ struct SpeedtestView: View {
                 // Jauge posée sur le fond, ligne d'état, puis les trois valeurs :
                 // la mesure se lit d'un bloc, sans cadre autour.
                 VStack(spacing: SQSpace.md) {
+                    networkBar
                     if let burstProgress {
                         burstRunningPill(index: burstProgress.index, total: burstProgress.total)
                     }
@@ -267,6 +270,7 @@ struct SpeedtestView: View {
         .navigationDestination(isPresented: $showDriveTest) {
             DriveTestView(services: services)
         }
+        .navigationDestination(isPresented: $showServerPage) { serverPage }
         // F4 : « Lance un Drive Test » (Siri/Raccourcis) → présente Drive Test
         // une fois l'onglet Speed actif.
         .onReceive(router.$pendingDriveTest) { pending in
@@ -446,25 +450,40 @@ struct SpeedtestView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
                 .sqHeader()
-            SpeedtestServerBar(
-                // Fournisseur du chemin mesuré : FAI IP en Wi‑Fi, opérateur
-                // servant/SIM seulement en cellulaire. Cf. headerOperatorName.
-                operatorName: headerOperatorName,
-                network: result?.networkDisplayName ?? currentNetworkStatus.displayName,
-                // Serveur de download/ping ACTIF. On n'affiche plus le VPS de
-                // mesure : l'opérateur prend sa place dans le bandeau.
-                server: result?.downloadServerName ?? (isRunning ? liveProgress.serverName : nil) ?? downloadTarget.displayName,
-                isOnline: services.networkPath.isOnline
-            )
-            if isRunning, let notice = liveProgress.notice {
-                Label(notice, systemImage: "arrow.triangle.swap")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.warning)
-                    .lineLimit(2)
-                    .transition(.opacity)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Pastille réseau centrée au-dessus de la jauge : le lien et le serveur
+    /// de la mesure. Un appui ouvre la page « Serveur de test ».
+    @ViewBuilder
+    private var networkBar: some View {
+        SpeedtestServerBar(
+            // Fournisseur du chemin mesuré : FAI IP en Wi‑Fi, opérateur
+            // servant/SIM seulement en cellulaire. Cf. headerOperatorName.
+            operatorName: headerOperatorName,
+            network: result?.networkDisplayName ?? currentNetworkStatus.displayName,
+            // Serveur de download/ping ACTIF ; avant le test, le choix du réglage.
+            server: result?.downloadServerName ?? (isRunning ? liveProgress.serverName : nil) ?? idleServerLabel,
+            isOnline: services.networkPath.isOnline,
+            // Pas de changement de serveur au milieu d'une mesure.
+            action: isRunning ? nil : { showServerPage = true }
+        )
+        .frame(maxWidth: .infinity)
+        if isRunning, let notice = liveProgress.notice {
+            Label(notice, systemImage: "arrow.triangle.swap")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.warning)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .transition(.opacity)
+        }
+    }
+
+    /// « Serveur auto » plutôt qu'« Auto » seul, qui ne disait pas de quoi il s'agit.
+    private var idleServerLabel: String {
+        downloadTarget == .hybridAuto ? String(localized: "Serveur auto") : selectedServerName
     }
 
     private var driveTestCapsule: some View {
@@ -886,24 +905,7 @@ struct SpeedtestView: View {
                         .padding(.top, SQSpace.sm)
                     VStack(spacing: 0) {
                         NavigationLink {
-                            SpeedtestServerPage(
-                                selection: Binding(
-                                    get: { downloadTarget },
-                                    set: { downloadTargetRaw = $0.rawValue }
-                                ),
-                                libreSpeedHost: $libreSpeedHost,
-                                iperfServerId: $iperfServerId,
-                                servers: iperfCatalogServers,
-                                // Dernière position CONNUE, jamais une demande : ouvrir
-                                // le sélecteur ne doit ni déclencher le prompt système
-                                // ni attendre un fix. `nil` = tri par distance masqué.
-                                userLocation: services.location.cachedLocation().map {
-                                    Coordinates(
-                                        latitude: $0.coordinate.latitude,
-                                        longitude: $0.coordinate.longitude
-                                    )
-                                }
-                            )
+                            serverPage
                         } label: {
                             HStack(spacing: SQSpace.md) {
                                 SQIconPastille(systemImage: "server.rack", size: 34, font: .system(size: 14, weight: .semibold))
@@ -982,6 +984,27 @@ struct SpeedtestView: View {
         }
         .presentationDetents([.large, .medium])
         .presentationDragIndicator(.visible)
+    }
+
+    private var serverPage: some View {
+        SpeedtestServerPage(
+            selection: Binding(
+                get: { downloadTarget },
+                set: { downloadTargetRaw = $0.rawValue }
+            ),
+            libreSpeedHost: $libreSpeedHost,
+            iperfServerId: $iperfServerId,
+            servers: iperfCatalogServers,
+            // Dernière position CONNUE, jamais une demande : ouvrir
+            // le sélecteur ne doit ni déclencher le prompt système
+            // ni attendre un fix. `nil` = tri par distance masqué.
+            userLocation: services.location.cachedLocation().map {
+                Coordinates(
+                    latitude: $0.coordinate.latitude,
+                    longitude: $0.coordinate.longitude
+                )
+            }
+        )
     }
 
     /// Serveur affiché sous « Serveur de test » : le POP du catalogue ou le

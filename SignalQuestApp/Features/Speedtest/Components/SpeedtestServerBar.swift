@@ -10,6 +10,8 @@ struct SpeedtestServerBar: View {
     let server: String
     /// Connexion disponible : le point est vert en ligne, rouge hors ligne.
     var isOnline: Bool = true
+    /// Ouvre la page « Serveur de test » ; `nil` pendant une mesure.
+    var action: (() -> Void)? = nil
 
     /// « 5G NSA · Orange · CloudFront Paris » ou « Wi‑Fi · SFR · Lyon BBR » :
     /// le lien réellement utilisé est toujours annoncé avant son fournisseur.
@@ -24,6 +26,23 @@ struct SpeedtestServerBar: View {
     }
 
     var body: some View {
+        if let action {
+            Button {
+                Haptics.selection()
+                action()
+            } label: {
+                pill(showsChevron: true)
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityHint("Ouvre le choix du serveur de test")
+            .accessibilityIdentifier("speedtest.networkBar")
+        } else {
+            pill(showsChevron: false)
+                .accessibilityIdentifier("speedtest.networkBar")
+        }
+    }
+
+    private func pill(showsChevron: Bool) -> some View {
         HStack(spacing: 7) {
             Circle()
                 .fill(isOnline ? SQColor.success : SQColor.danger)
@@ -33,9 +52,17 @@ struct SpeedtestServerBar: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(SQColor.label)
                 .lineLimit(2)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.vertical, 7)
+        .frame(minHeight: 44)
         .padding(.horizontal, SQSpace.md2)
         .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
         .sqShadowSoft()

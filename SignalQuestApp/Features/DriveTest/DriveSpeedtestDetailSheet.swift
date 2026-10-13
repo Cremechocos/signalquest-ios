@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Détails d'un point speedtest tapé sur la mini-carte Drive Test. UI soignée :
-/// anneau de jauge coloré par débit, tuiles de métriques, sparkline du download et
-/// méta (génération, opérateur, serveur, lieu, heure). Seule la visibilité sur
+/// Détails d'un point speedtest tapé sur la mini-carte Drive Test, comme la
+/// fiche d'un test : jauge, trois valeurs, courbe de réception et détails
+/// (génération, opérateur, serveur, lieu, heure). Seule la visibilité sur
 /// la carte publique se règle ici : l'historique local ne garde pas tout un trajet.
 struct DriveSpeedtestDetailSheet: View {
     let point: DriveSpeedtestPoint
@@ -24,34 +24,28 @@ struct DriveSpeedtestDetailSheet: View {
     private var result: SpeedtestRunResult { point.result }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: SQSpace.lg) {
-                    hero
-                    metricsGrid
-                    if let series = result.downloadSeriesMbps, series.count > 2 {
-                        sparkleCard(series: series)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                HStack {
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "drivetest.detail.close") {
+                        dismiss()
                     }
-                    metaCard
-                    SpeedtestVisibilityControls(model: visibility)
+                    Spacer()
                 }
-                .padding(SQSpace.lg)
-                .padding(.bottom, SQSpace.xl)
-            }
-            .signalQuestBackground()
-            .navigationTitle("Détails du test")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    .accessibilityLabel("Fermer")
+                header
+                speedCard
+                if let series = result.downloadSeriesMbps, series.count > 2 {
+                    curveCard(series: series)
                 }
+                metaCard
+                SpeedtestVisibilityControls(model: visibility)
             }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
+            .sqReadableWidth()
         }
+        .signalQuestBackground()
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .task { marketEntry = await services.markets.market(forCode: result.marketCode) }
@@ -62,146 +56,215 @@ struct DriveSpeedtestDetailSheet: View {
         }
     }
 
-    // MARK: Hero — anneau de jauge coloré par débit
+    // MARK: En-tête — « Test du trajet · 14:12 », lieu, pastilles
 
-    private var hero: some View {
-        let download = result.downloadAverageMbps
-        let color = Self.speedColor(download)
-        return VStack(spacing: SQSpace.md) {
-            ZStack {
-                Circle()
-                    .stroke(SQColor.surfaceMuted, lineWidth: 14)
-                Circle()
-                    .trim(from: 0, to: Self.gaugeFraction(download))
-                    .stroke(color, style: StrokeStyle(lineWidth: 14, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                VStack(spacing: 2) {
-                    Text(verbatim: SQUnits.throughputValue(mbps: download))
-                        .font(SQType.metricLarge)
-                        .monospacedDigit()
-                        .foregroundStyle(SQColor.label)
-                    Text(verbatim: SQUnits.throughputUnit(mbps: download))
-                        .font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
-                    Text(Self.speedLabel(download))
-                        .font(SQFont.body(12, .bold))
-                        .foregroundStyle(color)
-                        .padding(.horizontal, SQSpace.sm)
-                        .padding(.vertical, 3)
-                        .background(color.opacity(0.14), in: Capsule(style: .continuous))
-                        .padding(.top, 2)
-                }
-            }
-            .frame(width: 196, height: 196)
-            .padding(.top, SQSpace.sm)
-
-            HStack(spacing: SQSpace.sm) {
-                if let gen = generationText {
-                    // Couleur data de la techno (même signification que sur la carte).
-                    SQEditorialTag(text: gen, color: SQBrand.techColor(gen))
-                }
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Test du trajet · \(result.createdAt.formatted(date: .omitted, time: .shortened))")
+                .font(SQFont.body(12, .bold, relativeTo: .caption))
+                .tracking(12 * 0.16)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(placeText ?? String(localized: "Détails du test"))
+                .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            let download = result.downloadAverageMbps
+            let pills = Group {
                 if let op = operatorText {
+                    // Couleur data de l'opérateur et de la techno, comme sur la carte.
                     SQEditorialTag(text: op, color: SQBrand.operatorColor(op))
                 }
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: Tuiles de métriques
-
-    private var metricsGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
-        return GlassCard {
-            LazyVGrid(columns: columns, spacing: SQSpace.sm) {
-                // Vocabulaire du lexique et unités de SQUnits, comme le test
-                // ponctuel : « Download », « Ping » et « Mbps » restaient ici (MES-24).
-                metricTile("Réception", value: SQUnits.throughputValue(mbps: result.downloadAverageMbps),
-                           unit: SQUnits.throughputUnit(mbps: result.downloadAverageMbps),
-                           detail: Self.peak(result.downloadMaxMbps), color: Self.speedColor(result.downloadAverageMbps), icon: "arrow.down")
-                metricTile("Envoi", value: result.uploadAverageMbps.map { SQUnits.throughputValue(mbps: $0) } ?? "—",
-                           unit: SQUnits.throughputUnit(mbps: result.uploadAverageMbps ?? 0),
-                           detail: Self.peak(result.uploadMaxMbps), color: SQColor.success, icon: "arrow.up")
-                metricTile("Latence", value: Self.wholeMs(result.primaryPingMs), unit: "ms",
-                           detail: pingRange, color: SQColor.warning, icon: "bolt.horizontal", term: .latency)
-                metricTile("Gigue", value: Self.wholeMs(result.jitterMs), unit: "ms",
-                           detail: String(localized: "variation de la latence"), color: SQColor.info, icon: "waveform.path", term: .jitter)
-            }
-        }
-    }
-
-    private func metricTile(_ title: String, value: String, unit: String, detail: String, color: Color, icon: String, term: SQTerm? = nil) -> some View {
-        SQMetricTile(label: title, value: value, unit: unit, term: term, icon: icon, iconTint: color, detail: detail, size: .large)
-    }
-
-    // MARK: Sparkline du download
-
-    private func sparkleCard(series: [Double]) -> some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: SQSpace.sm) {
-                Text("Débit pendant le test")
-                    .font(SQFont.body(13, .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
-                let trace = result.measurementTrace?.phases.first { $0.phase == "download" }
-                SpeedtestShareGraph(series: series, averageMbps: result.downloadAverageMbps,
-                    accent: Self.speedColor(result.downloadAverageMbps), plotBackground: SQColor.surfaceMuted,
-                    gridColor: SQColor.separator, labelColor: SQColor.labelSecondary,
-                    timedSeries: trace?.recentSeries, timedAverageSeries: trace?.averageSeries,
-                    timeOriginMs: trace?.sampleStartMs, unitLabel: SQUnits.throughputUnit(mbps: 0))
-                    .frame(height: 108)
-                if trace == nil {
-                    Text("Courbe historique sans horodatage").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                if let gen = generationText {
+                    SQEditorialTag(text: gen, color: SQBrand.techColor(gen))
+                }
+                if download > 0 {
+                    SQEditorialTag(text: Self.speedLabel(download), color: Self.speedColor(download))
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.xs) { pills }
+            } else {
+                HStack(spacing: SQSpace.xs) { pills }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Débits mesurés — jauge, trois valeurs et pics
+
+    private var speedCard: some View {
+        detailCard("Débits mesurés") {
+            ViewThatFits(in: .horizontal) {
+                dial(width: 280)
+                dial(width: 240)
+            }
+            .frame(maxWidth: .infinity)
+            // Vocabulaire du lexique et unités de SQUnits, comme le test
+            // ponctuel : « Download », « Ping » et « Mbps » restaient ici (MES-24).
+            let metrics = Group {
+                triCell("Envoi", value: result.uploadAverageMbps.map { SQUnits.throughputValue(mbps: $0) } ?? "—",
+                        unit: SQUnits.throughputUnit(mbps: result.uploadAverageMbps ?? 0))
+                triCell("Latence", value: Self.wholeMs(result.primaryPingMs), unit: "ms", term: .latency)
+                triCell("Gigue", value: Self.wholeMs(result.jitterMs), unit: "ms", term: .jitter)
+            }
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.sm) { metrics }
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                HStack(alignment: .top, spacing: SQSpace.sm) { metrics }
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            VStack(spacing: SQSpace.xxs) {
+                dotRow("Réception max", Self.peakValue(result.downloadMaxMbps))
+                dotRow("Envoi max", Self.peakValue(result.uploadMaxMbps))
+                dotRow("Min · max", pingRange)
+            }
         }
     }
 
-    // MARK: Méta
+    private func dial(width: CGFloat) -> some View {
+        SignatureSpeedDial(
+            value: result.downloadAverageMbps,
+            unit: SQUnits.throughputUnit(mbps: 0),
+            phaseTitle: String(localized: "Réception"),
+            phase: .finished,
+            completionLabel: nil,
+            extendsToTenGigabits: (result.downloadMaxMbps ?? 0) > 1_000,
+            width: width
+        )
+    }
 
-    private var metaCard: some View {
-        VStack(spacing: 0) {
-            metaRow("antenna.radiowaves.left.and.right", "Opérateur", operatorText ?? "—")
-            metaDivider
-            metaRow("cellularbars", "Réseau", generationText ?? connectionText,
-                    term: generationText?.hasPrefix("5G") == true ? .fiveGModes : nil)
-            if let ssid = result.wifiSSID, !ssid.isEmpty {
-                metaDivider
-                metaRow("wifi", "Wi-Fi", ssid)
+    private func triCell(_ title: LocalizedStringKey, value: String, unit: String, term: SQTerm? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 2) {
+                Text(title)
+                    .font(SQFont.body(11, .bold, relativeTo: .caption2))
+                    .tracking(11 * 0.12)
+                    .textCase(.uppercase)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let term { SQInfoButton(term: term) }
             }
-            metaDivider
-            metaRow("server.rack", "Serveur de mesure", serverText)
-            metaDivider
-            metaRow("timer", "Durée", "\(result.durationSeconds.formatted(.number.precision(.fractionLength(0...1)))) s")
-            metaDivider
-            metaRow("clock", "Heure", result.createdAt.formatted(date: .abbreviated, time: .shortened))
-            if let place = placeText {
-                metaDivider
-                metaRow("mappin.and.ellipse", "Lieu", place)
+            // La valeur ne se coupe jamais : l'unité passe dessous si la tuile
+            // est trop étroite.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 3) { triValue(value, unit: unit) }
+                VStack(alignment: .leading, spacing: 0) { triValue(value, unit: unit) }
             }
         }
-        .padding(.vertical, SQSpace.xs)
+        .padding(.horizontal, SQSpace.sm2)
+        .padding(.vertical, SQSpace.sm)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func triValue(_ value: String, unit: String) -> some View {
+        Text(verbatim: value)
+            .font(SQFont.display(20, .bold))
+            .monospacedDigit()
+            .foregroundStyle(SQColor.label)
+            .fixedSize()
+        Text(verbatim: unit)
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+    }
+
+    // MARK: Courbe de réception
+
+    private func curveCard(series: [Double]) -> some View {
+        detailCard("Débit pendant le test") {
+            let trace = result.measurementTrace?.phases.first { $0.phase == "download" }
+            SpeedtestShareGraph(series: series, averageMbps: result.downloadAverageMbps,
+                accent: Self.speedColor(result.downloadAverageMbps), plotBackground: SQColor.surfaceMuted,
+                gridColor: SQColor.separator, labelColor: SQColor.labelSecondary,
+                timedSeries: trace?.recentSeries, timedAverageSeries: trace?.averageSeries,
+                timeOriginMs: trace?.sampleStartMs, unitLabel: SQUnits.throughputUnit(mbps: 0))
+                .frame(height: 108)
+            if trace == nil {
+                Text("Courbe historique sans horodatage").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+    }
+
+    // MARK: Détails de la mesure
+
+    private var metaCard: some View {
+        detailCard("Détails de la mesure") {
+            VStack(spacing: SQSpace.xxs) {
+                dotRow("Opérateur", operatorText ?? "—")
+                dotRow("Réseau", generationText ?? connectionText,
+                       term: generationText?.hasPrefix("5G") == true ? .fiveGModes : nil)
+                if let ssid = result.wifiSSID, !ssid.isEmpty {
+                    dotRow("Wi-Fi", ssid)
+                }
+                dotRow("Serveur de mesure", serverText)
+                dotRow("Durée", "\(result.durationSeconds.formatted(.number.precision(.fractionLength(0...1)))) s")
+                dotRow("Heure", result.createdAt.formatted(date: .abbreviated, time: .shortened))
+                if let place = placeText {
+                    dotRow("Lieu", place)
+                }
+            }
+        }
+    }
+
+    // MARK: Briques — carte à sur-titre et ligne clé · · · valeur
+
+    private func detailCard<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            Text(title)
+                .font(SQFont.body(12, .bold, relativeTo: .caption))
+                .tracking(12 * 0.16)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
+                .sqHeader()
+            content()
+        }
+        .padding(SQSpace.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .sqCardBackground()
     }
 
-    private func metaRow(_ icon: String, _ label: String, _ value: String, term: SQTerm? = nil) -> some View {
-        HStack(spacing: SQSpace.md) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 36, height: 36)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
-            Text(LocalizedStringKey(label)).font(SQFont.body(14.5, .medium)).foregroundStyle(SQColor.labelSecondary)
+    /// Les très grands textes empilent la clé et la valeur plutôt que de les tronquer.
+    private func dotRow(_ label: LocalizedStringKey, _ value: String, term: SQTerm? = nil) -> some View {
+        let labelView = HStack(spacing: 2) {
+            Text(label)
+                .font(SQType.subhead(.regular))
+                .foregroundStyle(SQColor.labelSecondary)
             if let term { SQInfoButton(term: term) }
-            Spacer()
-            Text(value).font(SQFont.body(14.5, .semibold)).foregroundStyle(SQColor.label)
-                .multilineTextAlignment(.trailing).lineLimit(2)
         }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.sm)
-    }
-
-    private var metaDivider: some View {
-        Rectangle().fill(SQColor.separator).frame(height: 1).padding(.leading, SQSpace.md + 36 + SQSpace.md)
+        let valueText = Text(verbatim: value)
+            .font(SQFont.body(14, .bold, relativeTo: .subheadline))
+            .monospacedDigit()
+            .foregroundStyle(SQColor.label)
+            .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
+            .fixedSize(horizontal: false, vertical: true)
+        return Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                    labelView
+                    valueText
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, SQSpace.xxs)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    labelView
+                        .layoutPriority(1)
+                    SQDotLeader()
+                        .frame(minWidth: SQSpace.md, maxWidth: .infinity)
+                        .frame(height: 1)
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
+                    valueText
+                        .layoutPriority(1)
+                }
+                .frame(minHeight: 28)
+            }
+        }
     }
 
     // MARK: Textes dérivés
@@ -232,21 +295,15 @@ struct DriveSpeedtestDetailSheet: View {
 
     // MARK: Helpers couleur/format (échelle SpeedBand)
 
-    /// « Pic : 412 Mbit/s ».
-    static func peak(_ mbps: Double?) -> String {
+    /// « 412 Mbit/s », ou un tiret quand la mesure manque.
+    static func peakValue(_ mbps: Double?) -> String {
         guard let mbps, mbps.isFinite, mbps > 0 else { return "—" }
-        return String(localized: "Pic : \(SQUnits.throughput(mbps: mbps))")
+        return SQUnits.throughput(mbps: mbps)
     }
 
     static func wholeMs(_ value: Double?) -> String {
         guard let value, value.isFinite, value >= 0 else { return "—" }
         return "\(Int(value.rounded()))"
-    }
-
-    static func gaugeFraction(_ mbps: Double) -> CGFloat {
-        // Échelle « log » douce : 0 → 0, ~50 → 0.5, 1000+ → 1.
-        let clamped = max(0, min(mbps, 1000))
-        return CGFloat(min(1, log10(clamped + 1) / 3))
     }
 
     /// Libellés de l'échelle unique : « Moyen » comme sur la carte, et traduits.

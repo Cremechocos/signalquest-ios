@@ -133,7 +133,7 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
             acknowledge.tap() // Information only; never starts a drive test.
             XCTAssertTrue(acknowledge.waitForNonExistence(timeout: 5))
         }
-        let purpose = locale == "fr" ? "Des speedtests pendant ton trajet" : "Speedtests along your route"
+        let purpose = locale == "fr" ? "Pendant ton trajet" : "During your trip"
         XCTAssertTrue(app.staticTexts[purpose].waitForExistence(timeout: 10))
         capture(app, name: "measurement-\(locale)-drive-controls")
         for (identifier, choice) in [("drivetest.interval", "1 km"),
