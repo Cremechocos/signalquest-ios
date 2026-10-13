@@ -1,14 +1,14 @@
 {
   "schemaVersion": 3,
   "contract": {
-    "registryVersion": "market-v3-2026-08-15-ob1346-a62-parser2-names3-c385cce4f80a-7bc5b3845c52",
+    "registryVersion": "market-v3-2026-08-15-ob1346-a62-parser2-names3-c385cce4f80a-1d71b9f3b4de",
     "minimumCompatibleSchemaVersion": 3,
     "positionDate": "2026-08-15",
     "plmnRegistryVersion": "2026-08-15-ob1346-a62-parser2-names3",
     "plmnContentSha256": "ba972a1edc8d9a0a7dbc4161a046724011a92ddd3e1b1a66884a73b93def541e",
     "plmnResolutionVersion": 1,
     "plmnResolutionSha256": "c385cce4f80ac6734c5ef7d4a6ec31cf404b1c2a80fd36fb387c07138ea0d6b7",
-    "marketContentSha256": "7bc5b3845c52eb2214b8f558a8f9a58d37aa9700a4f14774cd48fe8783c42b32"
+    "marketContentSha256": "1d71b9f3b4dedfcfce534fe5f0fcd8f2a1e07e520d8092371e6741fe147fd937"
   },
   "registeredPlmnMarkets": {
     "20200": "GR",
@@ -3516,7 +3516,7 @@
         "url": "https://www.omgeving.vlaanderen.be/nl/onderzoek-cijfers-en-geotoepassingen/cijfers-en-kaarten/kaart-zendantennes",
         "status": "compatible",
         "checkedAt": "2026-05-14",
-        "notes": "Source exploitable via WFS public Mercator Vlaanderen us:us_zndant_pnt avec sortie GeoJSON; metadata Linked Data publiee sous modellicentie gratis hergebruik, attribution requise.",
+        "notes": "Source exploitable via WFS public Mercator Vlaanderen us:us_zndant_pnt avec sortie GeoJSON ; métadonnées Linked Data publiées sous modellicentie gratis hergebruik, attribution requise.",
         "supports": {
           "sites": true,
           "details": true,
@@ -3532,7 +3532,7 @@
           "url": "https://www.omgeving.vlaanderen.be/nl/onderzoek-cijfers-en-geotoepassingen/cijfers-en-kaarten/kaart-zendantennes",
           "status": "compatible",
           "checkedAt": "2026-05-14",
-          "notes": "Source exploitable via WFS public Mercator Vlaanderen us:us_zndant_pnt avec sortie GeoJSON; metadata Linked Data publiee sous modellicentie gratis hergebruik, attribution requise.",
+          "notes": "Source exploitable via WFS public Mercator Vlaanderen us:us_zndant_pnt avec sortie GeoJSON ; métadonnées Linked Data publiées sous modellicentie gratis hergebruik, attribution requise.",
           "supports": {
             "sites": true,
             "details": true,
@@ -3542,12 +3542,12 @@
           }
         },
         {
-          "label": "Carte des antennes emettrices de Bruxelles",
+          "label": "Carte des antennes émettrices de Bruxelles",
           "authority": "Bruxelles Environnement",
           "url": "https://environnement.brussels/citoyen/lenvironnement-bruxelles/proteger-sa-sante/ou-sont-les-antennes",
           "status": "compatible",
           "checkedAt": "2026-05-14",
-          "notes": "Source exploitable via API Geodata Bruxelles postgis/risk r_gsm_anten_indoor/outdoor; Bruxelles Environnement annonce ses donnees cartographiques OpenData sauf mention contraire, licence CC-BY avec attribution.",
+          "notes": "Source exploitable via API Geodata Bruxelles postgis/risk r_gsm_anten_indoor/outdoor ; Bruxelles Environnement annonce ses données cartographiques OpenData sauf mention contraire, licence CC-BY avec attribution.",
           "supports": {
             "sites": true,
             "details": true,
@@ -3562,7 +3562,7 @@
           "url": "https://www.bipt-data.be/en/projects/atlas/mobile",
           "status": "coverage-only",
           "checkedAt": "2026-05-14",
-          "notes": "Couverture mobile par operateur, utile pour couche couverture mais pas comme inventaire antennes.",
+          "notes": "Couverture mobile par opérateur, utile pour couche couverture mais pas comme inventaire antennes.",
           "supports": {
             "sites": false,
             "details": false,
@@ -3758,7 +3758,7 @@
         "url": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.bakom.standorte-mobilfunkanlagen",
         "status": "compatible",
         "checkedAt": "2026-05-14",
-        "notes": "Collection STAC geo.admin ch.bakom.standorte-mobilfunkanlagen, asset GeoJSON EPSG:2056 converti cote serveur; rel=license terms_by, usage public et commercial permis avec citation de la source.",
+        "notes": "Collection STAC geo.admin ch.bakom.standorte-mobilfunkanlagen, asset GeoJSON EPSG:2056 converti côté serveur ; rel=license terms_by, usage public et commercial permis avec citation de la source.",
         "supports": {
           "sites": true,
           "details": true,
@@ -3774,7 +3774,7 @@
           "url": "https://data.geo.admin.ch/api/stac/v0.9/collections/ch.bakom.standorte-mobilfunkanlagen",
           "status": "compatible",
           "checkedAt": "2026-05-14",
-          "notes": "Collection STAC geo.admin ch.bakom.standorte-mobilfunkanlagen, asset GeoJSON EPSG:2056 converti cote serveur; rel=license terms_by, usage public et commercial permis avec citation de la source.",
+          "notes": "Collection STAC geo.admin ch.bakom.standorte-mobilfunkanlagen, asset GeoJSON EPSG:2056 converti côté serveur ; rel=license terms_by, usage public et commercial permis avec citation de la source.",
           "supports": {
             "sites": true,
             "details": true,
@@ -3789,7 +3789,7 @@
           "url": "https://www.bakom.admin.ch/en/broadband-atlas",
           "status": "coverage-only",
           "checkedAt": "2026-05-14",
-          "notes": "Couverture mobile attendue par grille; complete les antennes mais ne remplace pas les sites.",
+          "notes": "Couverture mobile attendue par grille ; complète les antennes mais ne remplace pas les sites.",
           "supports": {
             "sites": false,
             "details": false,
@@ -34574,7 +34574,7 @@
         "url": "https://geo.anacom.pt/publico/",
         "status": "coverage-only",
         "checkedAt": "2026-05-14",
-        "notes": "Plateforme officielle ArcGIS; les couches verifiees exposent couvertures mobiles et infrastructures ITED/ITUR, pas un inventaire mobile site-a-site confirme.",
+        "notes": "Plateforme officielle ArcGIS ; les couches vérifiées exposent couvertures mobiles et infrastructures ITED/ITUR, pas un inventaire mobile site à site confirmé.",
         "supports": {
           "sites": false,
           "details": false,
@@ -34590,7 +34590,7 @@
           "url": "https://geo.anacom.pt/publico/",
           "status": "coverage-only",
           "checkedAt": "2026-05-14",
-          "notes": "Plateforme officielle ArcGIS; les couches verifiees exposent couvertures mobiles et infrastructures ITED/ITUR, pas un inventaire mobile site-a-site confirme.",
+          "notes": "Plateforme officielle ArcGIS ; les couches vérifiées exposent couvertures mobiles et infrastructures ITED/ITUR, pas un inventaire mobile site à site confirmé.",
           "supports": {
             "sites": false,
             "details": false,
@@ -34600,12 +34600,12 @@
           }
         },
         {
-          "label": "Estacoes de base 5G",
+          "label": "Estações de base 5G",
           "authority": "ANACOM / Portal 5G",
           "url": "https://portal5g.pt/noticias/anacom-revela-que-numero-de-estacoes-de-base-5g-aumentou-66-no-1-o-trimestre-de-2025/",
           "status": "coverage-only",
           "checkedAt": "2026-05-14",
-          "notes": "Statistiques officielles par zones administratives; pas de coordonnees site a site.",
+          "notes": "Statistiques officielles par zones administratives ; pas de coordonnées site à site.",
           "supports": {
             "sites": false,
             "details": false,
@@ -34800,11 +34800,11 @@
       ],
       "source": {
         "label": "InfoAntenas / VCTEL",
-        "authority": "Ministerio de Transformacion Digital",
+        "authority": "Ministerio de Transformación Digital",
         "url": "https://geoportal.minetur.gob.es/VCTEL/jsp/ayuda.jsp",
         "status": "map-only",
         "checkedAt": "2026-05-14",
-        "notes": "Carte officielle des antennes et niveaux d exposition; le ministere indique que la base/API complete n est pas accessible publiquement.",
+        "notes": "Carte officielle des antennes et niveaux d’exposition ; le ministère indique que la base/API complète n’est pas accessible publiquement.",
         "supports": {
           "sites": true,
           "details": true,
@@ -34816,11 +34816,11 @@
       "sources": [
         {
           "label": "InfoAntenas / VCTEL",
-          "authority": "Ministerio de Transformacion Digital",
+          "authority": "Ministerio de Transformación Digital",
           "url": "https://geoportal.minetur.gob.es/VCTEL/jsp/ayuda.jsp",
           "status": "map-only",
           "checkedAt": "2026-05-14",
-          "notes": "Carte officielle des antennes et niveaux d exposition; le ministere indique que la base/API complete n est pas accessible publiquement.",
+          "notes": "Carte officielle des antennes et niveaux d’exposition ; le ministère indique que la base/API complète n’est pas accessible publiquement.",
           "supports": {
             "sites": true,
             "details": true,
@@ -35036,7 +35036,7 @@
         "url": "https://www.rak.ba/",
         "status": "unavailable",
         "checkedAt": "2026-05-14",
-        "notes": "Autorite identifiee, mais aucun registre public geolocalise de stations mobiles n a ete trouve.",
+        "notes": "Autorité identifiée, mais aucun registre public géolocalisé de stations mobiles n’a été trouvé.",
         "supports": {
           "sites": false,
           "details": false,
@@ -35052,7 +35052,7 @@
           "url": "https://www.rak.ba/",
           "status": "unavailable",
           "checkedAt": "2026-05-14",
-          "notes": "Autorite identifiee, mais aucun registre public geolocalise de stations mobiles n a ete trouve.",
+          "notes": "Autorité identifiée, mais aucun registre public géolocalisé de stations mobiles n’a été trouvé.",
           "supports": {
             "sites": false,
             "details": false,
@@ -35205,12 +35205,12 @@
         }
       ],
       "source": {
-        "label": "Reseau observe communaute / NetMonster",
-        "authority": "Communaute SignalQuest",
+        "label": "Réseau observé par la communauté / NetMonster",
+        "authority": "Communauté SignalQuest",
         "url": "https://lu.netmonster-db.com/",
         "status": "unavailable",
         "checkedAt": "2026-05-14",
-        "notes": "Pas de registre antennes officiel public exploitable; les antennes Luxembourg proviennent de la couche communautaire (sites custom synchronises depuis NetMonster, MCC 270).",
+        "notes": "Pas de registre antennes officiel public exploitable ; les antennes Luxembourg proviennent de la couche communautaire (sites custom synchronisés depuis NetMonster, MCC 270).",
         "supports": {
           "sites": false,
           "details": false,
@@ -35221,12 +35221,12 @@
       },
       "sources": [
         {
-          "label": "Reseau observe communaute / NetMonster",
-          "authority": "Communaute SignalQuest",
+          "label": "Réseau observé par la communauté / NetMonster",
+          "authority": "Communauté SignalQuest",
           "url": "https://lu.netmonster-db.com/",
           "status": "unavailable",
           "checkedAt": "2026-05-14",
-          "notes": "Pas de registre antennes officiel public exploitable; les antennes Luxembourg proviennent de la couche communautaire (sites custom synchronises depuis NetMonster, MCC 270).",
+          "notes": "Pas de registre antennes officiel public exploitable ; les antennes Luxembourg proviennent de la couche communautaire (sites custom synchronisés depuis NetMonster, MCC 270).",
           "supports": {
             "sites": false,
             "details": false,
@@ -35367,7 +35367,7 @@
         "url": "https://www.mastedatabasen.dk/viskort/ContentPages/DataFraDatabasen.aspx?callingapp=mastedb",
         "status": "unavailable",
         "checkedAt": "2026-05-14",
-        "notes": "API/WFS officielle avec coordonnees, technologie et frequence, mais le flux public verifie ne fournit pas le titulaire MNO par enregistrement.",
+        "notes": "API/WFS officielle avec coordonnées, technologie et fréquence, mais le flux public vérifié ne fournit pas le titulaire MNO par enregistrement.",
         "supports": {
           "sites": false,
           "details": false,
@@ -35383,7 +35383,7 @@
           "url": "https://www.mastedatabasen.dk/viskort/ContentPages/DataFraDatabasen.aspx?callingapp=mastedb",
           "status": "unavailable",
           "checkedAt": "2026-05-14",
-          "notes": "API/WFS officielle avec coordonnees, technologie et frequence, mais le flux public verifie ne fournit pas le titulaire MNO par enregistrement.",
+          "notes": "API/WFS officielle avec coordonnées, technologie et fréquence, mais le flux public vérifié ne fournit pas le titulaire MNO par enregistrement.",
           "supports": {
             "sites": false,
             "details": false,
@@ -35536,7 +35536,7 @@
         "url": "https://tieto.traficom.fi/en/open-data",
         "status": "compatible",
         "checkedAt": "2026-05-14",
-        "notes": "Open Data officiel Radio stations in Finland en OData v4; a confirmer avant ajout: filtrage mobile public, operateur, coordonnees et champs techniques.",
+        "notes": "Open Data officiel Radio stations in Finland en OData v4 ; à confirmer avant ajout : filtrage mobile public, opérateur, coordonnées et champs techniques.",
         "supports": {
           "sites": true,
           "details": true,
@@ -35552,7 +35552,7 @@
           "url": "https://tieto.traficom.fi/en/open-data",
           "status": "compatible",
           "checkedAt": "2026-05-14",
-          "notes": "Open Data officiel Radio stations in Finland en OData v4; a confirmer avant ajout: filtrage mobile public, operateur, coordonnees et champs techniques.",
+          "notes": "Open Data officiel Radio stations in Finland en OData v4 ; à confirmer avant ajout : filtrage mobile public, opérateur, coordonnées et champs techniques.",
           "supports": {
             "sites": true,
             "details": true,
@@ -35719,7 +35719,7 @@
         "url": "https://siteviewer.comreg.ie/",
         "status": "unconfirmed",
         "checkedAt": "2026-05-14",
-        "notes": "SiteViewer expose une API publique mobile-masts avec coordonnees, operateur et services, mais les metadonnees officielles consultees indiquent Open Data/Data Sharing non disponibles; non integree sans clarification de licence.",
+        "notes": "SiteViewer expose une API publique mobile-masts avec coordonnées, opérateur et services, mais les métadonnées officielles consultées indiquent Open Data/Data Sharing non disponibles ; non intégrée sans clarification de licence.",
         "supports": {
           "sites": false,
           "details": false,
@@ -35735,7 +35735,7 @@
           "url": "https://siteviewer.comreg.ie/",
           "status": "unconfirmed",
           "checkedAt": "2026-05-14",
-          "notes": "SiteViewer expose une API publique mobile-masts avec coordonnees, operateur et services, mais les metadonnees officielles consultees indiquent Open Data/Data Sharing non disponibles; non integree sans clarification de licence.",
+          "notes": "SiteViewer expose une API publique mobile-masts avec coordonnées, opérateur et services, mais les métadonnées officielles consultées indiquent Open Data/Data Sharing non disponibles ; non intégrée sans clarification de licence.",
           "supports": {
             "sites": false,
             "details": false,
@@ -35881,7 +35881,7 @@
     },
     {
       "code": "SI",
-      "label": "Slovenie",
+      "label": "Slovénie",
       "countryCode": "si",
       "publicSelectable": false,
       "antennaCompatible": false,
@@ -35905,7 +35905,7 @@
         "url": "https://gis.akos-rs.si/api/Akos/GetLayers",
         "status": "unconfirmed",
         "checkedAt": "2026-05-14",
-        "notes": "Geoportail mobile avec couche bazne_postaje WMS: operateur MNC, technologies, frequence et azimut visibles via GetFeatureInfo; WFS/bulk public non confirme, donc pas integre.",
+        "notes": "Géoportail mobile avec couche bazne_postaje WMS : opérateur MNC, technologies, fréquence et azimut visibles via GetFeatureInfo ; WFS/bulk public non confirmé, donc pas intégré.",
         "supports": {
           "sites": false,
           "details": false,
@@ -35921,7 +35921,7 @@
           "url": "https://gis.akos-rs.si/api/Akos/GetLayers",
           "status": "unconfirmed",
           "checkedAt": "2026-05-14",
-          "notes": "Geoportail mobile avec couche bazne_postaje WMS: operateur MNC, technologies, frequence et azimut visibles via GetFeatureInfo; WFS/bulk public non confirme, donc pas integre.",
+          "notes": "Géoportail mobile avec couche bazne_postaje WMS : opérateur MNC, technologies, fréquence et azimut visibles via GetFeatureInfo ; WFS/bulk public non confirmé, donc pas intégré.",
           "supports": {
             "sites": false,
             "details": false,
@@ -36059,7 +36059,7 @@
         "url": "https://si2pem.gov.pl/api-docs/",
         "status": "auth-required",
         "checkedAt": "2026-05-14",
-        "notes": "Swagger REST officiel expose stations, antennes, azimut, hauteur et frequence, mais /api/base_stations requiert un token Bearer; pas integre comme source publique.",
+        "notes": "Swagger REST officiel expose stations, antennes, azimut, hauteur et fréquence, mais /api/base_stations requiert un token Bearer ; pas intégré comme source publique.",
         "supports": {
           "sites": false,
           "details": false,
@@ -36075,7 +36075,7 @@
           "url": "https://si2pem.gov.pl/api-docs/",
           "status": "auth-required",
           "checkedAt": "2026-05-14",
-          "notes": "Swagger REST officiel expose stations, antennes, azimut, hauteur et frequence, mais /api/base_stations requiert un token Bearer; pas integre comme source publique.",
+          "notes": "Swagger REST officiel expose stations, antennes, azimut, hauteur et fréquence, mais /api/base_stations requiert un token Bearer ; pas intégré comme source publique.",
           "supports": {
             "sites": false,
             "details": false,
@@ -36245,7 +36245,7 @@
         "url": "https://www.rtr.at/medien/was_wir_tun/frequenzverwaltung/senderkataster/Senderkataster.de.html",
         "status": "needs-schema-check",
         "checkedAt": "2026-05-14",
-        "notes": "Senderkataster officiel mis a jour regulierement; schema/API a confirmer avant ajout.",
+        "notes": "Senderkataster officiel mis à jour régulièrement ; schéma/API à confirmer avant ajout.",
         "supports": {
           "sites": false,
           "details": false,
@@ -36261,7 +36261,7 @@
           "url": "https://www.rtr.at/medien/was_wir_tun/frequenzverwaltung/senderkataster/Senderkataster.de.html",
           "status": "needs-schema-check",
           "checkedAt": "2026-05-14",
-          "notes": "Senderkataster officiel mis a jour regulierement; schema/API a confirmer avant ajout.",
+          "notes": "Senderkataster officiel mis à jour régulièrement ; schéma/API à confirmer avant ajout.",
           "supports": {
             "sites": false,
             "details": false,
@@ -36440,7 +36440,7 @@
         "url": "https://www.bundesnetzagentur.de/DE/Fachthemen/Telekommunikation/Technik/EMF/EMF-Datenportal/emf_datenportal_node.html",
         "status": "unavailable",
         "checkedAt": "2026-05-14",
-        "notes": "Le portail officiel detaille est reserve aux communes et autorites; pas de bulk/API publique exploitable confirme.",
+        "notes": "Le portail officiel détaillé est réservé aux communes et autorités ; pas de bulk/API publique exploitable confirmé.",
         "supports": {
           "sites": false,
           "details": false,
@@ -36456,7 +36456,7 @@
           "url": "https://www.bundesnetzagentur.de/DE/Fachthemen/Telekommunikation/Technik/EMF/EMF-Datenportal/emf_datenportal_node.html",
           "status": "unavailable",
           "checkedAt": "2026-05-14",
-          "notes": "Le portail officiel detaille est reserve aux communes et autorites; pas de bulk/API publique exploitable confirme.",
+          "notes": "Le portail officiel détaillé est réservé aux communes et autorités ; pas de bulk/API publique exploitable confirmé.",
           "supports": {
             "sites": false,
             "details": false,
@@ -36670,7 +36670,7 @@
         "url": "https://data.overheid.nl/community/datarequest/antenneregister-data",
         "status": "map-only",
         "checkedAt": "2026-05-14",
-        "notes": "Registre officiel visible manuellement; demande open data indique une disponibilite non fournie dans le format souhaite, sans API publique confirmee.",
+        "notes": "Registre officiel visible manuellement ; demande open data indique une disponibilité non fournie dans le format souhaité, sans API publique confirmée.",
         "supports": {
           "sites": false,
           "details": false,
@@ -36686,7 +36686,7 @@
           "url": "https://data.overheid.nl/community/datarequest/antenneregister-data",
           "status": "map-only",
           "checkedAt": "2026-05-14",
-          "notes": "Registre officiel visible manuellement; demande open data indique une disponibilite non fournie dans le format souhaite, sans API publique confirmee.",
+          "notes": "Registre officiel visible manuellement ; demande open data indique une disponibilité non fournie dans le format souhaité, sans API publique confirmée.",
           "supports": {
             "sites": false,
             "details": false,
@@ -36846,7 +36846,7 @@
         "url": "https://www.ofcom.org.uk/siteassets/resources/documents/about-ofcom/foi/2021/january/phone-masts-and-telecoms-infrastructure.pdf",
         "status": "unavailable",
         "checkedAt": "2026-05-14",
-        "notes": "Sitefinder n est plus maintenu comme inventaire public moderne; aucune source officielle machine-readable site-a-site exploitable n est confirmee.",
+        "notes": "Sitefinder n’est plus maintenu comme inventaire public moderne ; aucune source officielle machine-readable site à site exploitable n’est confirmée.",
         "supports": {
           "sites": false,
           "details": false,
@@ -36862,7 +36862,7 @@
           "url": "https://www.ofcom.org.uk/siteassets/resources/documents/about-ofcom/foi/2021/january/phone-masts-and-telecoms-infrastructure.pdf",
           "status": "unavailable",
           "checkedAt": "2026-05-14",
-          "notes": "Sitefinder n est plus maintenu comme inventaire public moderne; aucune source officielle machine-readable site-a-site exploitable n est confirmee.",
+          "notes": "Sitefinder n’est plus maintenu comme inventaire public moderne ; aucune source officielle machine-readable site à site exploitable n’est confirmée.",
           "supports": {
             "sites": false,
             "details": false,
