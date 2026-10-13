@@ -61,6 +61,11 @@ struct SpeedtestView: View {
     /// Octets échangés par le dernier test, mesurés par `SpeedtestDataMeter`.
     @State private var lastRunBytes: Int?
     @State private var history: [SpeedtestRunResult] = []
+    /// Tests de l'historique pas encore partis vers le serveur (« À envoyer »).
+    @State private var pendingHistoryIds: Set<UUID> = []
+    /// Échelle de la jauge étendue à 10 G pour tout le test, dès qu'une mesure a
+    /// dépassé 1 Gbit/s : l'arc ne change pas d'échelle à chaque creux.
+    @State private var gigabitScale = false
     /// Derniers tests du compte, tous appareils (UI-12). Vide en invité.
     @State private var accountHistory: [SocialShareableSpeedtest] = []
     @State private var errorMessage: String?
@@ -148,29 +153,40 @@ struct SpeedtestView: View {
                 header
 
                 if isVPNActive {
-                    VPNWarningBanner()
+                    alertCard(
+                        title: "VPN actif",
+                        message: String(localized: "Ton opérateur ne peut pas être détecté : ce test ne sera pas publié sur la carte."),
+                        systemImage: "lock.shield",
+                        tone: .warning
+                    )
                 }
 
-                if viewportHeight > 0, viewportHeight < 640 {
-                    signatureDial
-                        .scaleEffect(0.8)
-                        .frame(width: 248, height: 248)
+                // Jauge posée sur le fond, ligne d'état, puis les trois valeurs :
+                // la mesure se lit d'un bloc, sans cadre autour.
+                VStack(spacing: SQSpace.md) {
+                    if viewportHeight > 0, viewportHeight < 640 {
+                        signatureDial
+                            .scaleEffect(0.82)
+                            .frame(width: 279, height: 144)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        ViewThatFits(in: .horizontal) {
+                            signatureDial
+                            signatureDial
+                                .scaleEffect(0.88)
+                                .frame(width: 300, height: 155)
+                        }
                         .frame(maxWidth: .infinity)
-                } else {
-                    ViewThatFits(in: .horizontal) {
-                        signatureDial
-                        signatureDial
-                            .scaleEffect(0.9)
-                            .frame(width: 279, height: 279)
                     }
-                    .frame(maxWidth: .infinity)
-                }
 
-                SpeedtestTriMetric(
-                    activePhase: phase,
-                    progress: liveProgress,
-                    result: result
-                )
+                    measurementStatusLine
+
+                    SpeedtestTriMetric(
+                        activePhase: phase,
+                        progress: liveProgress,
+                        result: result
+                    )
+                }
 
                 primaryAction
 
@@ -189,22 +205,30 @@ struct SpeedtestView: View {
                                              dataUsedBytes: lastRunBytes)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
-                    sharePanel(for: result)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                     resultDetail(for: result)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
 
                 if let runErrorMessage {
-                    ErrorStateView(title: "Speedtest impossible", message: runErrorMessage) {
+                    alertCard(title: "Speedtest impossible", message: runErrorMessage, systemImage: "exclamationmark.triangle", tone: .danger, actionTitle: "Réessayer") {
                         self.runErrorMessage = nil
                         start()
                     }
                     .transition(.opacity)
                 }
 
-                if let errorMessage {
-                    ErrorStateView(title: "Speedtest non synchronisé", message: errorMessage) {
+                // Le message brut du serveur (« not found »…) ne dit rien à
+                // l'utilisateur : la carte dit ce qui arrive au résultat.
+                if errorMessage != nil {
+                    alertCard(
+                        title: "Speedtest non synchronisé",
+                        message: String(localized: "Le résultat est gardé sur ton iPhone. Il partira dès que le serveur répondra."),
+                        systemImage: "exclamationmark.icloud",
+                        tone: .danger,
+                        detail: errorMessage,
+                        actionTitle: "Réessayer",
+                        isBusy: isRetryingPendingSave
+                    ) {
                         guard !isRetryingPendingSave else { return }
                         isRetryingPendingSave = true
                         Task {
@@ -216,6 +240,7 @@ struct SpeedtestView: View {
                                 self.errorMessage = error.userFacingMessage
                             }
                             history = await services.speedtest.history()
+                            pendingHistoryIds = await services.speedtest.pendingClientIds()
                         }
                     }
                     .transition(.opacity)
@@ -303,6 +328,9 @@ struct SpeedtestView: View {
             .presentationDragIndicator(.visible)
         }
         .sqAnimation(.snappy(duration: 0.32), value: phase)
+        .onChangeCompat(of: gaugeDisplay.value) { _, value in
+            if gaugeDisplay.unit != "ms", value > 1_000 { gigabitScale = true }
+        }
         .sqAnimation(.snappy(duration: 0.28), value: result)
         .task(id: result?.id) { await loadTypicalNearby(for: result) }
         .task {
@@ -313,6 +341,7 @@ struct SpeedtestView: View {
             // L'historique est local : l'afficher tout de suite, avant les appels
             // réseau ci-dessous qui peuvent traîner hors couverture (MES-04).
             history = await services.speedtest.history()
+            pendingHistoryIds = await services.speedtest.pendingClientIds()
             // Relecture fraîche de CoreTelephony (opérateur/techno) à l'ouverture
             // de la page, plutôt que le dernier statut publié au démarrage.
             services.networkPath.refreshNow()
@@ -327,6 +356,7 @@ struct SpeedtestView: View {
             iperfCatalogServers = activeIPerfServers
             await services.speedtest.retryPendingSaves()
             history = await services.speedtest.history()
+            pendingHistoryIds = await services.speedtest.pendingClientIds()
             await loadAccountHistory()
             await runQASpeedtestIfNeeded()
         }
@@ -339,43 +369,59 @@ struct SpeedtestView: View {
             // un test/rafale se serait terminé pendant l'absence.
             if newValue == .active { isVPNActive = VPNDetector.isActive() }
             if newValue == .active, runTask == nil {
-                Task { history = await services.speedtest.history() }
+                Task {
+                    history = await services.speedtest.history()
+                    pendingHistoryIds = await services.speedtest.pendingClientIds()
+                }
             }
         }
     }
 
-    /// 310 pt sur les iPhone actuels pour laisser respirer la valeur ; repli
-    /// proportionnel sur les écrans compacts afin de ne jamais rogner l'arc.
+    /// Jauge pleine largeur (340 pt) ; repli proportionnel sur les écrans
+    /// compacts afin de ne jamais rogner l'arc.
     private var signatureDial: some View {
-        VStack(spacing: SQSpace.xs) {
         SignatureSpeedDial(
             value: gaugeDisplay.value,
             unit: gaugeDisplay.unit,
             phaseTitle: liveProgress.stage == "finalizing" ? String(localized: "Finalisation") : phase.dialTitle,
             phase: phase,
-            completionLabel: dialCompletionLabel
+            completionLabel: dialCompletionLabel,
+            extendsToTenGigabits: dialExtendsToTenGigabits
         )
+    }
+
+    /// Étape de la mesure et temps écoulés, sur une ligne sous la jauge.
+    @ViewBuilder
+    private var measurementStatusLine: some View {
         if phase == .download || phase == .upload {
-            Text(liveProgress.stage == "warmup" ? String(localized: "Chauffe") : liveProgress.stage == "reconnecting" ? String(localized: "Reconnexion") : liveProgress.stage == "preparation" ? String(localized: "Préparation") : String(localized: "Mesure"))
-                .font(.caption.weight(.semibold))
-            if let useful = liveProgress.usefulElapsedSeconds {
-                Text("Temps utile : \(useful, format: .number.precision(.fractionLength(1))) s")
-                    .font(.caption).monospacedDigit()
+            HStack(spacing: SQSpace.xs2) {
+                Text(liveProgress.stage == "warmup" ? String(localized: "Chauffe") : liveProgress.stage == "reconnecting" ? String(localized: "Reconnexion") : liveProgress.stage == "preparation" ? String(localized: "Préparation") : String(localized: "Mesure"))
+                    .font(SQType.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.label)
+                if let useful = liveProgress.usefulElapsedSeconds {
+                    Text(verbatim: "·").accessibilityHidden(true)
+                    Text("Temps utile : \(useful, format: .number.precision(.fractionLength(1))) s")
+                }
+                if let total = liveProgress.totalElapsedSeconds {
+                    Text(verbatim: "·").accessibilityHidden(true)
+                    Text("Total : \(total, format: .number.precision(.fractionLength(1))) s")
+                }
             }
-            if let total = liveProgress.totalElapsedSeconds {
-                Text("Total : \(total, format: .number.precision(.fractionLength(1))) s")
-                    .font(.caption).foregroundStyle(SQColor.labelSecondary).monospacedDigit()
-            }
-        }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .monospacedDigit()
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
         }
     }
 
-    // MARK: - Header (titre centré + capsule serveur, DA « Crème & Terre cuite »)
+    // MARK: - Header (Halo : boutons sur une ligne, grand titre à gauche, pastille réseau)
 
     private var header: some View {
-        VStack(spacing: SQSpace.sm2) {
-            // Titre centré entre deux emplacements de même largeur : le Drive Test
-            // s'y nomme en toutes lettres quand la place le permet (UI-12).
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            // Le Drive Test s'y nomme en toutes lettres quand la place le permet (UI-12).
             HStack(spacing: SQSpace.sm) {
                 ViewThatFits(in: .horizontal) {
                     driveTestCapsule
@@ -384,20 +430,18 @@ struct SpeedtestView: View {
                     }
                 }
                 .accessibilityIdentifier("speedtest.driveTest")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Text("Speedtest")
-                    .font(SQType.title)
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .sqHeader()
-                    .layoutPriority(1)
+                Spacer(minLength: SQSpace.sm)
                 headerButton(systemImage: "slider.horizontal.3", label: "Réglages du test") {
                     showSettings = true
                 }
                 .accessibilityIdentifier("speedtest.settings")
-                .frame(maxWidth: .infinity, alignment: .trailing)
             }
+            Text("Speedtest")
+                .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
+                .foregroundStyle(SQColor.label)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .sqHeader()
             SpeedtestServerBar(
                 // Fournisseur du chemin mesuré : FAI IP en Wi‑Fi, opérateur
                 // servant/SIM seulement en cellulaire. Cf. headerOperatorName.
@@ -413,10 +457,10 @@ struct SpeedtestView: View {
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.warning)
                     .lineLimit(2)
-                    .multilineTextAlignment(.center)
                     .transition(.opacity)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var driveTestCapsule: some View {
@@ -443,9 +487,8 @@ struct SpeedtestView: View {
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(SQColor.label)
                 .frame(width: 44, height: 44)
-                .sqSurface(SQColor.surface, in: Circle())
-                .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-                .sqShadowSoft()
+                .sqSurface(SQColor.chip, in: Circle())
+                .contentShape(Circle())
         }
         .buttonStyle(SQPressButtonStyle())
         .accessibilityLabel(LocalizedStringKey(label))
@@ -460,14 +503,26 @@ struct SpeedtestView: View {
                 burstRunningPill(index: burstProgress.index, total: burstProgress.total)
             }
             if isRunning {
-                GradientButton("Arrêter", systemImage: "stop.fill", style: .accent, action: stop)
+                // L'encre reste réservée à l'action principale.
+                GradientButton("Arrêter", systemImage: "stop.fill", style: .destructive, action: stop)
             } else {
-                GradientButton(primaryButtonTitle, systemImage: primaryButtonIcon, action: start)
-                    .accessibilityIdentifier("speedtest.start")
+                HStack(spacing: SQSpace.sm) {
+                    GradientButton(primaryButtonTitle, systemImage: primaryButtonIcon, action: start)
+                        .accessibilityIdentifier("speedtest.start")
+                    if let result {
+                        shareButton(for: result)
+                    }
+                }
             }
         }
         // iPad : un bouton, pas une barre de 670 pt (UI-17).
         .sqReadableWidth(440)
+        .sheet(item: $sharePreviewResult) { selectedResult in
+            SpeedtestSharePreviewSheet(
+                result: selectedResult,
+                theme: SQShareCardTheme.current(colorScheme: colorScheme)
+            )
+        }
     }
 
     private var dataWarningMessage: String {
@@ -502,40 +557,50 @@ struct SpeedtestView: View {
 
     @ViewBuilder
     private func burstRunningPill(index: Int, total: Int) -> some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: "bolt.fill")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(SQColor.brandRed)
-            Text("Rafale · test \(index)/\(total)")
-                .font(SQFont.body(12, .semibold))
-                .foregroundStyle(SQColor.label)
-            ProgressView(value: Double(index), total: Double(total))
-                .frame(width: 90)
-                .tint(SQColor.brandRed)
+        HStack(spacing: SQSpace.sm2) {
+            Label {
+                Text("Rafale · test \(index)/\(total)")
+            } icon: {
+                Image(systemName: "bolt.fill")
+            }
+            .font(SQFont.body(12, .semibold))
+            .foregroundStyle(SQColor.onInk)
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 28)
+            .background(SQColor.label, in: Capsule(style: .continuous))
+            // Un segment par test : vert une fois mesuré, encre pour le test en cours.
+            HStack(spacing: SQSpace.xs) {
+                ForEach(1...max(total, 1), id: \.self) { step in
+                    Capsule(style: .continuous)
+                        .fill(step < index ? SQColor.success : step == index ? SQColor.label : SQColor.surfaceMuted)
+                        .frame(width: total > 5 ? 12 : 22, height: 5)
+                }
+            }
+            .accessibilityHidden(true)
         }
-        .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
-        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
-        .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-        .sqShadowSoft()
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 
-    // MARK: - Share panel
+    // MARK: - Share
 
-    @ViewBuilder
-    private func sharePanel(for result: SpeedtestRunResult) -> some View {
-        GradientButton(
-            "Partager le résultat",
-            systemImage: "square.and.arrow.up",
-            style: .secondary
-        ) {
+    /// Partage du résultat : bouton rond à côté de « Relancer le test ».
+    private func shareButton(for result: SpeedtestRunResult) -> some View {
+        Button {
+            Haptics.light()
             sharePreviewResult = result
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: SQSpace.primaryActionHeight + 8, height: SQSpace.primaryActionHeight)
+                .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
+                .overlay { Capsule(style: .continuous).strokeBorder(SQColor.separator, lineWidth: 1) }
+                .contentShape(Capsule(style: .continuous))
         }
-        .sheet(item: $sharePreviewResult) { selectedResult in
-            SpeedtestSharePreviewSheet(
-                result: selectedResult,
-                theme: SQShareCardTheme.current(colorScheme: colorScheme)
-            )
-        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(Text("Partager le résultat"))
+        .accessibilityIdentifier("speedtest.share")
     }
 
     private func resetShareState() {
@@ -564,19 +629,22 @@ struct SpeedtestView: View {
     /// lire douze valeurs pour savoir si sa connexion est bonne (MES-05).
     @ViewBuilder
     private func resultDetail(for result: SpeedtestRunResult) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
             Button {
                 Haptics.selection()
                 withAnimation(SQMotion.resolve(.snappy(duration: 0.25), reduceMotion)) { showResultDetails.toggle() }
             } label: {
-                HStack(alignment: .firstTextBaseline) {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                     Text("Détails de la mesure")
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
+                        .font(SQFont.body(12, .bold, relativeTo: .caption))
+                        .tracking(12 * 0.16)
+                        .textCase(.uppercase)
+                        .foregroundStyle(SQColor.labelSecondary)
                     Spacer()
-                    Text(result.createdAt.formatted(date: .abbreviated, time: .shortened))
+                    Text(result.createdAt.formatted(.dateTime.day().month(.abbreviated).hour().minute()))
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(1)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SQColor.labelSecondary)
@@ -591,71 +659,148 @@ struct SpeedtestView: View {
             .accessibilityIdentifier("speedtest.result.details")
 
             if showResultDetails {
-            Rectangle()
-                .fill(SQColor.separator)
-                .frame(height: 1)
-
-            LazyVGrid(columns: resultColumns, spacing: SQSpace.md) {
                 // Vocabulaire du lexique : plus de « DL max » à côté de « Réception
                 // moy. », ni de « Jitter » ici et « Gigue » ailleurs (TRX-25).
-                detailItem(label: "Réception (moyenne)", value: speed(result.downloadAverageMbps), highlight: true)
-                detailItem(label: "Réception (pic)", value: speed(result.downloadMaxMbps), highlight: true)
-                detailItem(label: "Envoi (moyenne)", value: speed(result.uploadAverageMbps))
-                detailItem(label: "Envoi (pic)", value: speed(result.uploadMaxMbps))
-                detailItem(label: "Latence", value: ms(result.primaryPingMs), trailing: result.pingProtocol)
-                detailItem(label: "Gigue", value: ms(result.jitterMs))
-                detailItem(label: "Latence en réception", value: ms(result.pingDlMs))
-                detailItem(label: "Gigue en réception", value: ms(result.jitterDlMs))
-                detailItem(label: "Latence en envoi", value: ms(result.pingUlMs))
-                detailItem(label: "Gigue en envoi", value: ms(result.jitterUlMs))
-                detailItem(label: "Réseau", value: result.networkShareDisplayName)
-                // Le ping ET le download sont mesurés contre la même source (le CDN
-                // sélectionné, AWS CloudFront par défaut). On affiche donc ce serveur
-                // unique au lieu du VPS de session/upload (qui n'est qu'un détail
-                // technique et induisait en erreur ici).
-                detailItem(label: "Serveur de mesure", value: result.downloadServerName ?? result.serverName ?? "—")
-            }
+                VStack(spacing: SQSpace.xs) {
+                    detailItem(label: "Réception (moyenne)", value: speed(result.downloadAverageMbps), highlight: true)
+                    detailItem(label: "Réception (pic)", value: speed(result.downloadMaxMbps), highlight: true)
+                    detailItem(label: "Envoi (moyenne)", value: speed(result.uploadAverageMbps))
+                    detailItem(label: "Envoi (pic)", value: speed(result.uploadMaxMbps))
+                    detailItem(label: "Latence", value: ms(result.primaryPingMs), trailing: result.pingProtocol)
+                    detailItem(label: "Gigue", value: ms(result.jitterMs))
+                    detailItem(label: "Latence en réception", value: ms(result.pingDlMs))
+                    detailItem(label: "Gigue en réception", value: ms(result.jitterDlMs))
+                    detailItem(label: "Latence en envoi", value: ms(result.pingUlMs))
+                    detailItem(label: "Gigue en envoi", value: ms(result.jitterUlMs))
+                    detailItem(label: "Réseau", value: result.networkShareDisplayName)
+                    // Le ping ET le download sont mesurés contre la même source (le CDN
+                    // sélectionné, AWS CloudFront par défaut). On affiche donc ce serveur
+                    // unique au lieu du VPS de session/upload (qui n'est qu'un détail
+                    // technique et induisait en erreur ici).
+                    detailItem(label: "Serveur de mesure", value: result.downloadServerName ?? result.serverName ?? "—")
+                }
+                .padding(.bottom, SQSpace.xs)
             }
         }
-        .padding(SQSpace.cardPadding)
+        .padding(.horizontal, SQSpace.cardPadding)
+        .padding(.vertical, SQSpace.xs)
         .sqCardBackground()
     }
 
+    /// Ligne clé · · · valeur, comme le « Diagnostic radio » du web. Les très
+    /// grands textes empilent la clé et la valeur plutôt que de les tronquer.
     private func detailItem(label: String, value: String, trailing: String? = nil, highlight: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(LocalizedStringKey(label))
-                .font(SQType.micro)
-                .foregroundStyle(SQColor.labelSecondary)
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value)
-                    .font(SQFont.display(17, .semibold, relativeTo: .body))
-                    .monospacedDigit()
-                    .foregroundStyle(highlight ? SQColor.brandRed : SQColor.label)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let trailing {
-                    Text(trailing)
-                        .font(SQType.micro)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+        let valueText = HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(value)
+                .font(SQFont.body(14, .bold, relativeTo: .subheadline))
+                .monospacedDigit()
+                .foregroundStyle(highlight ? SQColor.accentInk : SQColor.label)
+                .multilineTextAlignment(.trailing)
+            if let trailing {
+                Text(trailing)
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
         }
+        let labelText = Text(LocalizedStringKey(label))
+            .font(SQType.subhead(.regular))
+            .foregroundStyle(SQColor.labelSecondary)
+        return Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                    labelText
+                    valueText
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                // Le libellé et la valeur passent avant les pointillés, qui
+                // remplissent seulement l'espace restant.
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    labelText
+                        .layoutPriority(1)
+                    SQDotLeader()
+                        .frame(minWidth: SQSpace.md, maxWidth: .infinity)
+                        .frame(height: 1)
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
+                    valueText
+                        .layoutPriority(1)
+                }
+                .frame(minHeight: 28)
+            }
+        }
+    }
+
+    // MARK: - Alerts
+
+    enum AlertTone { case warning, danger }
+
+    /// Carte d'alerte Halo : ambre posée sur le fond pour un avertissement,
+    /// carte blanche à pastille rouge pour un échec, « Réessayer » en dessous.
+    private func alertCard(
+        title: String,
+        message: String,
+        systemImage: String,
+        tone: AlertTone,
+        detail: String? = nil,
+        actionTitle: String? = nil,
+        isBusy: Bool = false,
+        action: (() -> Void)? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.sm2) {
+                SQIconPastille(
+                    systemImage: systemImage,
+                    size: 32,
+                    tint: tone == .danger ? SQColor.dangerInk : SQColor.warning,
+                    fill: tone == .danger ? SQColor.dangerSoft : SQColor.chip,
+                    font: .system(size: 14, weight: .semibold)
+                )
+                Text(LocalizedStringKey(title))
+                    .font(SQFont.body(15, .bold))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(message)
+                .font(SQType.subhead(.regular))
+                .foregroundStyle(SQColor.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+            if let detail, !detail.isEmpty {
+                Text(verbatim: detail)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let actionTitle, let action {
+                GradientButton(actionTitle, systemImage: "arrow.clockwise", isBusy: isBusy, style: .secondary, action: action)
+                    .padding(.top, SQSpace.xxs)
+            }
+        }
+        .padding(SQSpace.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            if tone == .warning {
+                RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+                    .fill(SQColor.warningSoft)
+            }
+        }
+        .modifier(AlertCardSurface(isCard: tone == .danger))
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - Burst summary
 
     private func burstSummaryCard(_ s: SpeedtestBurstSummary) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(alignment: .center) {
-                Label(
-                    "\(String(localized: "Rafale")) — \(s.count) test",
-                    systemImage: "bolt.fill"
-                )
-                    .font(SQType.heading)
-                    .foregroundStyle(SQColor.label)
+                Label {
+                    Text(verbatim: "\(String(localized: "Rafale")) · \(String(localized: "\(s.count) test"))")
+                } icon: {
+                    Image(systemName: "bolt.fill")
+                }
+                .font(SQFont.body(12, .bold, relativeTo: .caption))
+                .tracking(12 * 0.16)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
                 Spacer()
                 if s.truncatedAt != nil {
                     Text("arrêtée")
@@ -665,10 +810,8 @@ struct SpeedtestView: View {
                         .foregroundStyle(SQColor.warning)
                 }
             }
-            Rectangle()
-                .fill(SQColor.separator)
-                .frame(height: 1)
-            LazyVGrid(columns: resultColumns, spacing: SQSpace.md) {
+            .frame(minHeight: 28)
+            VStack(spacing: SQSpace.xs) {
                 detailItem(label: "Réception (moyenne)", value: speed(s.avgDownload), highlight: true)
                 detailItem(label: "Réception (pic)", value: speed(s.maxDownload), highlight: true)
                 detailItem(label: "Envoi (moyenne)", value: speed(s.avgUpload))
@@ -785,14 +928,8 @@ struct SpeedtestView: View {
         .presentationDragIndicator(.visible)
     }
 
-    private var resultColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.md), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
-    }
-
     // MARK: - History
 
-    // Fidèle au prototype : les cartes d'historique suivent directement le
-    // bouton, sans titre de section (le contexte suffit).
     private var accountOnlyHistory: [SocialShareableSpeedtest] {
         SpeedtestAccountHistory.accountOnly(accountHistory, local: history)
     }
@@ -811,20 +948,25 @@ struct SpeedtestView: View {
                 )
             } else {
                 if !history.isEmpty {
-                    VStack(spacing: SQSpace.sm2) {
-                        ForEach(Array(history.enumerated()), id: \.element.id) { _, item in
-                            Button {
-                                Haptics.selection()
-                                detailResult = item
-                            } label: {
-                                SpeedtestHistoryRow(result: item)
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        historyKicker("Tes tests")
+                        VStack(spacing: 0) {
+                            ForEach(Array(history.enumerated()), id: \.element.id) { index, item in
+                                if index > 0 { historyDivider }
+                                Button {
+                                    Haptics.selection()
+                                    detailResult = item
+                                } label: {
+                                    SpeedtestHistoryRow(result: item, isPending: pendingHistoryIds.contains(item.id))
+                                }
+                                .buttonStyle(SQPressButtonStyle())
+                                .accessibilityHint("Voir le détail du test")
                             }
-                            .buttonStyle(SQPressButtonStyle())
-                            // Fond de carte commun : liseré en « Noir intense » (TRX-09).
-                            .sqCardBackground(cornerRadius: SQRadius.md)
-                            .sqFadeUp()
-                            .accessibilityHint("Voir le détail du test")
                         }
+                        .padding(.vertical, 2)
+                        // Fond de carte commun : liseré en « Noir intense » (TRX-09).
+                        .sqCardBackground()
+                        .sqFadeUp()
                     }
                 }
                 if !accountOnlyHistory.isEmpty {
@@ -834,26 +976,47 @@ struct SpeedtestView: View {
         }
     }
 
+    /// Surtitre de section (« Tes tests », « Sur ton compte »), 12 pt : le
+    /// kicker de 11 pt ne passe pas l'audit de contraste.
+    private func historyKicker(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(SQFont.body(12, .bold, relativeTo: .caption))
+            .tracking(12 * 0.14)
+            .textCase(.uppercase)
+            .foregroundStyle(SQColor.labelSecondary)
+            .padding(.horizontal, SQSpace.xs)
+            .sqHeader()
+    }
+
+    private var historyDivider: some View {
+        Rectangle()
+            .fill(SQColor.separator)
+            .frame(height: 1)
+            .padding(.leading, SQSpace.cardPadding)
+    }
+
     /// Les tests du compte absents de ce téléphone : après une réinstallation
     /// ou sur un nouvel iPhone, l'onglet n'affiche plus « Aucun test » pour un
     /// compte qui en a des centaines (UI-12).
     private var accountHistorySection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm2) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Sur ton compte")
-                    .font(SQType.heading)
-                    .foregroundStyle(SQColor.label)
-                    .sqHeader()
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                historyKicker("Sur ton compte")
                 Text("Tes tests faits sur un autre appareil ou avant une réinstallation.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, SQSpace.xs)
             }
             .padding(.top, history.isEmpty ? 0 : SQSpace.sm)
-            ForEach(accountOnlyHistory) { test in
-                AccountSpeedtestRow(test: test)
-                    .sqCardBackground(cornerRadius: SQRadius.md)
+            VStack(spacing: 0) {
+                ForEach(Array(accountOnlyHistory.enumerated()), id: \.element.id) { index, test in
+                    if index > 0 { historyDivider }
+                    AccountSpeedtestRow(test: test)
+                }
             }
+            .padding(.vertical, 2)
+            .sqCardBackground()
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("speedtest.accountHistory")
@@ -887,13 +1050,13 @@ struct SpeedtestView: View {
 
     private var mapPublicationNotice: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Label {
+            HStack(spacing: SQSpace.sm2) {
+                SQIconPastille(systemImage: "map", size: 32, tint: SQColor.accentInk, fill: SQColor.accentSoft,
+                               font: .system(size: 14, weight: .semibold))
                 Text("Tes speedtests sur la carte")
-                    .font(SQFont.body(15, .semibold))
+                    .font(SQFont.body(15, .bold))
                     .foregroundStyle(SQColor.label)
-            } icon: {
-                Image(systemName: "map")
-                    .foregroundStyle(SQColor.brandRed)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text("Tes speedtests en réseau mobile, anciens compris, apparaissent sur la carte à l’endroit où tu les as faits. Ceux faits dans tes zones privées restent cachés. Pour en masquer un, ouvre-le dans ton historique.")
                 .font(SQType.caption)
@@ -903,19 +1066,25 @@ struct SpeedtestView: View {
                 Haptics.selection()
                 mapPublicationNoticeSeen = true
             }
-            .font(SQFont.body(14, .semibold))
+            .font(SQFont.body(14, .bold))
             .foregroundStyle(SQColor.accentInk)
             .frame(minHeight: 44)
             .accessibilityIdentifier("speedtest.mapPublicationNotice.dismiss")
         }
-        .padding(SQSpace.lg)
+        .padding(SQSpace.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
+        .sqCardBackground()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("speedtest.mapPublicationNotice")
     }
 
     // MARK: - Derived state
+
+    /// Jauge 1 → 10 G : une mesure du test en cours, ou du résultat affiché, a
+    /// dépassé le gigabit (5G, fibre en Wi-Fi).
+    private var dialExtendsToTenGigabits: Bool {
+        gigabitScale || max(result?.downloadMaxMbps ?? 0, result?.uploadMaxMbps ?? 0) > 1_000
+    }
 
     private var isRunning: Bool {
         runTask != nil
@@ -960,8 +1129,8 @@ struct SpeedtestView: View {
     /// léger EMA — cf. `SpeedtestLiveSampler`) : l'aiguille suit le réseau en
     /// temps réel. La valeur finale (phases saving/finished) reste la MOYENNE.
     private var gaugeDisplay: (value: Double, unit: String) {
-        // L'aiguille reste en Mbit/s même au-delà du gigabit : l'unité ne bascule
-        // pas en Gbit/s sous une valeur qui, elle, ne change pas d'échelle.
+        // Toujours en Mbit/s ici : la jauge passe elle-même en Gbit/s au-delà
+        // du gigabit, et étend alors son échelle à 10 G.
         let mbit = SQUnits.throughputUnit(mbps: 0)
         switch phase {
         case .ping:
@@ -1148,6 +1317,7 @@ struct SpeedtestView: View {
         }
         try ensureActiveRunSession(sessionID)
         history = await services.speedtest.history()
+        pendingHistoryIds = await services.speedtest.pendingClientIds()
         try ensureActiveRunSession(sessionID)
         phase = .finished
         liveProgress = SpeedtestLiveProgress(
@@ -1171,6 +1341,7 @@ struct SpeedtestView: View {
         networkAbortMessage = nil
         burstProgress = nil
         burstSummary = nil
+        gigabitScale = false
         background.begin(name: "speedtest")
         liveActivity.start(serverName: "SignalQuest", network: services.networkPath.status.displayName)
         let sessionID = UUID()
@@ -1222,6 +1393,7 @@ struct SpeedtestView: View {
         runErrorMessage = nil
         networkAbortMessage = nil
         burstSummary = nil
+        gigabitScale = false
         let total = max(2, min(count, 20))
         burstProgress = (1, total)
         background.begin(name: "speedtest-burst")
@@ -1527,3 +1699,16 @@ private func ms(_ value: Double?) -> String {
 // MARK: - Server picker (iPerf3 OVH + Bouygues)
 
 // MARK: - Comparable helper
+
+/// Fond de carte des alertes d'échec ; l'avertissement reste un aplat ambre.
+private struct AlertCardSurface: ViewModifier {
+    let isCard: Bool
+
+    func body(content: Content) -> some View {
+        if isCard {
+            content.sqCardBackground()
+        } else {
+            content
+        }
+    }
+}

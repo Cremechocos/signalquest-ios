@@ -146,8 +146,34 @@ final class SpeedtestTests: XCTestCase {
             phase: .download,
             completionLabel: nil
         )
-        XCTAssertEqual(dial.diameter, 310)
-        XCTAssertEqual(dial.arcRadius, 110)
+        XCTAssertEqual(dial.width, 340)
+        XCTAssertEqual(dial.arcRadius, 124)
+        XCTAssertEqual(dial.decades, 3)
+        XCTAssertEqual(dial.ticks.map(\.label), ["1", "10", "100", "1 G"])
+
+        // Au-delà du gigabit, l'échelle passe à 10 G et la valeur en Gbit/s.
+        let gigabit = SignatureSpeedDial(
+            value: 2_350,
+            unit: "Mbps",
+            phaseTitle: "Téléchargement",
+            phase: .download,
+            completionLabel: nil
+        )
+        XCTAssertEqual(gigabit.decades, 4)
+        XCTAssertEqual(gigabit.ticks.last?.label, "10 G")
+        XCTAssertEqual(gigabit.normalized, log10(2_350) / 4, accuracy: 0.0001)
+        XCTAssertEqual(gigabit.displayUnit, SQUnits.throughputUnit(mbps: 2_350))
+
+        // L'écran garde l'échelle étendue pendant un creux sous le gigabit.
+        let extended = SignatureSpeedDial(
+            value: 640,
+            unit: "Mbps",
+            phaseTitle: "Téléchargement",
+            phase: .download,
+            completionLabel: nil,
+            extendsToTenGigabits: true
+        )
+        XCTAssertEqual(extended.decades, 4)
     }
 
     func testSpeedtestPayloadEncodesNullRadioFields() throws {

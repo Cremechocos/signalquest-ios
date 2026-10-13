@@ -1827,6 +1827,22 @@
         }
       }
     },
+    "Ce que ce débit permet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What this speed allows"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que ce débit permet"
+          }
+        }
+      }
+    },
     "Ce qui aide à le reconnaître" : {
       "localizations" : {
         "en" : {
@@ -3247,6 +3263,22 @@
         }
       }
     },
+    "Le résultat est gardé sur ton iPhone. Il partira dès que le serveur répondra." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The result is kept on your iPhone. It will be sent as soon as the server responds."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le résultat est gardé sur ton iPhone. Il partira dès que le serveur répondra."
+          }
+        }
+      }
+    },
     "Le signal médian mesuré par la communauté à moins de %@ de toi, tous opérateurs confondus." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4496,6 +4528,22 @@
         }
       }
     },
+    "Tes tests" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your tests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes tests"
+          }
+        }
+      }
+    },
     "Test %lld/%lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4558,6 +4606,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton compte a été supprimé."
+          }
+        }
+      }
+    },
+    "Ton opérateur ne peut pas être détecté : ce test ne sera pas publié sur la carte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your carrier can’t be detected: this test won’t be published on the map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton opérateur ne peut pas être détecté : ce test ne sera pas publié sur la carte."
           }
         }
       }
@@ -4742,6 +4806,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Utilisateur"
+          }
+        }
+      }
+    },
+    "VPN actif" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VPN on"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VPN actif"
           }
         }
       }
@@ -5303,6 +5383,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À %@"
+          }
+        }
+      }
+    },
+    "À envoyer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To send"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À envoyer"
           }
         }
       }

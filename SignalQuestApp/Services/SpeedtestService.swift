@@ -2625,6 +2625,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         SQSpotlight.donateLastSpeedtest(snapshot)
     }
 
+    /// Tests de l'historique encore dans la file d'envoi : l'onglet Tester
+    /// les marque « À envoyer ».
+    func pendingClientIds() async -> Set<UUID> {
+        Set(await pendingEntries().items.map(\.save.result.id))
+    }
+
     private struct PendingEntry {
         let save: PendingSpeedtestSave
         let store: SpeedtestPendingStoring

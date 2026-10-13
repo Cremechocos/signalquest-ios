@@ -19,16 +19,18 @@ struct SpeedtestVerdictCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            HStack(spacing: SQSpace.sm) {
-                // La couleur de l'échelle sur le point, le mot à l'encre (TRX-04).
-                Circle()
-                    .fill(verdict.tier.color)
-                    .frame(width: 10, height: 10)
-                    .accessibilityHidden(true)
-                Text(verbatim: verdict.tier.label)
-                    .font(SQFont.display(22, .bold, relativeTo: .title2))
-                    .foregroundStyle(SQColor.label)
-                    .accessibilityIdentifier("speedtest.verdict.tier")
+            // Palier en pastille, puis ce qu'il permet : le verdict se lit avant
+            // les usages.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: SQSpace.sm) {
+                    tierPill
+                    Spacer(minLength: SQSpace.sm)
+                    usageCaption
+                }
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    tierPill
+                    usageCaption
+                }
             }
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 ForEach(SpeedtestVerdict.Usage.allCases, id: \.self) { usage in
@@ -70,6 +72,31 @@ struct SpeedtestVerdictCard: View {
         .sqCardBackground()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("speedtest.verdict")
+    }
+
+    /// La couleur de l'échelle sur le point et le fond doux, le mot à l'encre (TRX-04).
+    private var tierPill: some View {
+        HStack(spacing: SQSpace.xs2) {
+            Circle()
+                .fill(verdict.tier.color)
+                .frame(width: 8, height: 8)
+                .accessibilityHidden(true)
+            Text(verbatim: verdict.tier.label)
+                .font(SQFont.body(15, .bold, relativeTo: .headline))
+                .foregroundStyle(SQColor.label)
+                .accessibilityIdentifier("speedtest.verdict.tier")
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs2)
+        .background(verdict.tier.color.opacity(0.14), in: Capsule(style: .continuous))
+        .fixedSize()
+    }
+
+    private var usageCaption: some View {
+        Text("Ce que ce débit permet")
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func usageRow(_ usage: SpeedtestVerdict.Usage, fit: SpeedtestVerdict.Fit) -> some View {

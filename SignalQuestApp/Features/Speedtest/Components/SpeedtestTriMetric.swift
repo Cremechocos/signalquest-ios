@@ -110,31 +110,25 @@ struct SpeedtestTriMetric: View {
 
     func valueColor(_ value: String, state: CellState, quality: Color?) -> Color {
         if value == "—" { return SQColor.label }
-        // La qualité reste portée par la barrette. Les couleurs RF/qualité ne
+        // La qualité reste portée par la jauge. Les couleurs RF/qualité ne
         // sont pas toutes des encres texte garanties à 4,5:1.
         return SQColor.label
-    }
-
-    /// Barrette : qualité (phase active) / olive (terminée) / muted (à venir).
-    func barColor(_ state: CellState, quality: Color?) -> Color {
-        switch state {
-        case .active: return quality ?? SQColor.brandRed
-        case .done: return SQColor.success
-        case .pending: return SQColor.surfaceMuted
-        }
     }
 
     @ViewBuilder
     /// `id` : identifiant stable des tests, indépendant du libellé affiché.
     func cell(id: String, title: String, value: String, unit: String, state: CellState, quality: Color?) -> some View {
-        VStack(spacing: 3) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(LocalizedStringKey(title))
-                .font(SQFont.body(12))
-                .foregroundStyle(SQColor.label)
+                .font(SQFont.body(12, .bold, relativeTo: .caption))
+                .tracking(12 * 0.12)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("speedtest.metric.\(id).title")
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
-                    .font(SQFont.display(20, .bold, relativeTo: .title3))
+                    .font(SQFont.display(21, .bold, relativeTo: .title3))
                     .monospacedDigit()
                     .foregroundStyle(valueColor(value, state: state, quality: quality))
                     .contentTransition(.numericText())
@@ -146,14 +140,18 @@ struct SpeedtestTriMetric: View {
             }
             .lineLimit(1)
             .minimumScaleFactor(0.82)
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(barColor(state, quality: quality))
-                .frame(width: 26, height: 4)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, SQSpace.md2)
-        .padding(.horizontal, SQSpace.sm)
-        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, SQSpace.md)
+        .padding(.horizontal, SQSpace.md)
+        .sqCardBackground(cornerRadius: SQRadius.lg, elevation: .rest)
+        // La valeur en cours de mesure est entourée d'encre, comme l'aiguille.
+        .overlay {
+            if state == .active {
+                RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+                    .strokeBorder(SQColor.label, lineWidth: 1.5)
+            }
+        }
         .sqAnimation(.snappy(duration: 0.25), value: state)
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier("speedtest.metric.\(id)")

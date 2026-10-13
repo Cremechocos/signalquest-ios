@@ -704,7 +704,7 @@ struct SQFactRow: View {
 }
 
 /// Points de conduite d'une ligne clé-valeur (`--h-dots`).
-private struct SQDotLeader: View {
+struct SQDotLeader: View {
     var body: some View {
         GeometryReader { proxy in
             Path { path in

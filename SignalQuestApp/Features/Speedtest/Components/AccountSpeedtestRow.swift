@@ -7,19 +7,17 @@ struct AccountSpeedtestRow: View {
 
     var body: some View {
         HStack(spacing: SQSpace.md) {
-            ZStack {
-                Circle()
-                    .fill(SQColor.surfaceMuted)
-                    .frame(width: 40, height: 40)
-                Image(systemName: "icloud")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-            .accessibilityHidden(true)
+            Image(systemName: "icloud")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(SQColor.ink2)
+                .frame(width: 34, height: 34)
+                .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(verbatim: titleLine)
-                    .font(SQFont.body(15, .semibold))
+                    .font(SQFont.body(15, .bold))
+                    .monospacedDigit()
                     .foregroundStyle(SQColor.label)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("speedtest.account.title")
@@ -34,7 +32,8 @@ struct AccountSpeedtestRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, SQSpace.cardPadding)
-        .padding(.vertical, SQSpace.md + 3)
+        .padding(.vertical, SQSpace.sm2)
+        .frame(minHeight: 58)
         .accessibilityElement(children: .combine)
     }
 

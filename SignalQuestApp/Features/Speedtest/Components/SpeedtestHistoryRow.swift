@@ -2,22 +2,22 @@ import SwiftUI
 
 struct SpeedtestHistoryRow: View {
     let result: SpeedtestRunResult
+    /// Encore dans la file d'envoi : pastille « À envoyer ».
+    var isPending = false
 
     var body: some View {
         HStack(spacing: SQSpace.md) {
-            ZStack {
-                Circle()
-                    .fill(SQColor.fill)
-                    .frame(width: 40, height: 40)
-                Image(systemName: networkSymbol)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-            .accessibilityHidden(true)
+            Image(systemName: networkSymbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(SQColor.ink2)
+                .frame(width: 34, height: 34)
+                .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(titleLine)
-                    .font(SQFont.body(15, .semibold))
+                    .font(SQFont.body(15, .bold))
+                    .monospacedDigit()
                     .foregroundStyle(SQColor.label)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -26,6 +26,16 @@ struct SpeedtestHistoryRow: View {
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
+                if isPending {
+                    Text("À envoyer")
+                        .font(SQFont.body(11, .semibold))
+                        .foregroundStyle(SQColor.warning)
+                        .padding(.horizontal, SQSpace.sm)
+                        .padding(.vertical, 2)
+                        .background(SQColor.warningSoft, in: Capsule(style: .continuous))
+                        .padding(.top, 2)
+                        .accessibilityIdentifier("speedtest.history.pending")
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -35,7 +45,8 @@ struct SpeedtestHistoryRow: View {
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, SQSpace.cardPadding)
-        .padding(.vertical, SQSpace.md + 3)
+        .padding(.vertical, SQSpace.sm2)
+        .frame(minHeight: 58)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
