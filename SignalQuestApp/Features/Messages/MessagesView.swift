@@ -179,6 +179,22 @@ struct MessagesView: View {
     /// Porte E2EE v2 ouverte côté serveur, mais cet appareil n'y est pas encore entré.
     @State private var needsV2Activation = false
     @State private var showV2Activation = false
+    /// Recherche et filtre de la liste, appliqués sur l'appareil.
+    @State private var query = ""
+    @State private var filter: InboxFilter = .all
+
+    enum InboxFilter: String, CaseIterable {
+        case all, unread, groups, encrypted
+
+        var title: LocalizedStringKey {
+            switch self {
+            case .all: "Toutes"
+            case .unread: "Non lues"
+            case .groups: "Groupes"
+            case .encrypted: "Chiffrées"
+            }
+        }
+    }
 
     /// Insets des rangées : gap vertical de 14 pt entre cartes (2 × 7),
     /// marge d'écran 20 pt.
@@ -244,6 +260,11 @@ struct MessagesView: View {
                 if E2EEV2RuntimeReadGate.enabled {
                     E2EEV2NotificationPreviewNotice()
                 }
+                if !model.conversations.isEmpty {
+                    SQSearchField(text: $query, placeholder: "Rechercher une conversation")
+                        .accessibilityIdentifier("messages.search")
+                    filterChips
+                }
             }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
@@ -256,16 +277,27 @@ struct MessagesView: View {
                     .listRowSeparator(.hidden)
                     .listRowInsets(cardRowInsets)
             }
-            ForEach(model.conversations) { conversation in
+            let visible = visibleConversations
+            ForEach(Array(visible.enumerated()), id: \.element.id) { index, conversation in
                 Button {
                     routedConversationId = conversation.id
                 } label: {
-                    conversationCard(conversation)
+                    conversationRow(conversation, isFirst: index == 0)
                 }
                 .buttonStyle(.plain)
-                .listRowBackground(Color.clear)
+                // Une seule carte pour toute la liste : chaque rangée en porte un
+                // morceau, arrondi en haut pour la première, en bas pour la dernière.
+                .listRowBackground(
+                    MessagesCardSegment(top: index == 0, bottom: index == visible.count - 1)
+                        .fill(SQColor.surface)
+                        .overlay {
+                            MessagesCardSegment(top: index == 0, bottom: index == visible.count - 1)
+                                .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
+                        }
+                        .padding(.horizontal, SQSpace.xl)
+                )
                 .listRowSeparator(.hidden)
-                .listRowInsets(cardRowInsets)
+                .listRowInsets(EdgeInsets(top: 0, leading: SQSpace.xl, bottom: 0, trailing: SQSpace.xl))
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     if isUnread(conversation) {
                         Button { setRead(true, conversation) } label: {
@@ -307,6 +339,16 @@ struct MessagesView: View {
                         Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 }
+            }
+            if !model.conversations.isEmpty && visible.isEmpty {
+                Text("Aucune conversation ne correspond.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SQSpace.xl)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .accessibilityIdentifier("messages.noMatch")
             }
             if !model.isLoading && model.conversations.isEmpty && model.errorMessage == nil {
                 EmptyStateView(
@@ -532,45 +574,92 @@ struct MessagesView: View {
         showNewConversation = true
     }
 
-    /// En-tête custom (pas de gros titre nav système) : retour 40 pt circulaire,
-    /// titre Bricolage 24, composer 40 pt.
+    /// En-tête Halo : retour rond, « Nouvelle conversation » en rond encre, puis
+    /// le grand titre et le nombre de conversations non lues.
     private var header: some View {
-        HStack(spacing: SQSpace.md) {
-            Button {
-                Haptics.light()
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(SQColor.label)
-                    .frame(width: 40, height: 40)
-                    .sqSurface(SQColor.surface, in: Circle())
-                    .sqShadowSoft()
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "messages.back") { dismiss() }
+                Spacer(minLength: SQSpace.sm)
+                Button {
+                    Haptics.light()
+                    showNewConversation = true
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(SQColor.onInk)
+                        .frame(width: 44, height: 44)
+                        .background(SQColor.label, in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityLabel("Nouvelle conversation")
+                .accessibilityIdentifier("messages.new")
             }
-            .buttonStyle(.plain)
-            .frame(width: 44, height: 44)
-            .accessibilityLabel("Retour")
-
-            Text("Messages")
-                .font(SQType.title)
-                .foregroundStyle(SQColor.label)
-
-            Spacer(minLength: SQSpace.sm)
-
-            Button {
-                Haptics.light()
-                showNewConversation = true
-            } label: {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 16, weight: .medium))
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Messages")
+                    .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
                     .foregroundStyle(SQColor.label)
-                    .frame(width: 40, height: 40)
-                    .sqSurface(SQColor.surface, in: Circle())
-                    .sqShadowSoft()
+                    .sqHeader()
+                let unread = model.conversations.filter(isUnread).count
+                if unread > 0 {
+                    Text("\(unread) conversations non lues")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityIdentifier("messages.unreadCount")
+                }
             }
-            .buttonStyle(.plain)
-            .frame(width: 44, height: 44)
-            .accessibilityLabel("Nouvelle conversation")
+        }
+    }
+
+    /// Filtres de la liste en pastilles : la pastille active est pleine encre.
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SQSpace.sm) {
+                ForEach(InboxFilter.allCases, id: \.self) { option in
+                    let selected = filter == option
+                    let count = option == .unread ? model.conversations.filter(isUnread).count : 0
+                    Button {
+                        Haptics.selection()
+                        filter = option
+                    } label: {
+                        HStack(spacing: SQSpace.xs) {
+                            Text(option.title)
+                            if count > 0 { Text(verbatim: "\(count)").monospacedDigit() }
+                        }
+                        .font(SQType.subhead(.semibold))
+                        .sqSingleLine()
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, SQSpace.md2)
+                        .frame(minHeight: 34)
+                        .foregroundStyle(selected ? SQColor.onInk : SQColor.chipInk)
+                        .background(selected ? SQColor.label : SQColor.chip, in: Capsule(style: .continuous))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(SQPressButtonStyle(scale: 0.97))
+                    .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityIdentifier("messages.filter.\(option.rawValue)")
+                }
+            }
+            .padding(.horizontal, SQSpace.xl)
+        }
+        .padding(.horizontal, -SQSpace.xl)
+    }
+
+    /// Conversations après le filtre et la recherche (titre, puis aperçu).
+    private var visibleConversations: [MessageConversation] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return model.conversations.filter { conversation in
+            switch filter {
+            case .all: break
+            case .unread: guard isUnread(conversation) else { return false }
+            case .groups: guard conversation.isGroup else { return false }
+            case .encrypted: guard conversation.e2eeEnabled == true else { return false }
+            }
+            guard !needle.isEmpty else { return true }
+            return conversation.displayTitle(excluding: currentUserId).localizedStandardContains(needle)
+                || lastMessagePreview(conversation).localizedStandardContains(needle)
         }
     }
 
@@ -628,45 +717,90 @@ struct MessagesView: View {
             ?? conversation.participants.first
     }
 
-    /// Carte de conversation (rayon 22, fond surface, ombre carte) : avatar 52,
-    /// nom Figtree 600 16, aperçu 13.5 (encre + medium si non-lu), heure à droite
-    /// (accent si non-lu) + pastille non-lu accent.
-    private func conversationCard(_ conversation: MessageConversation) -> some View {
-        let unread = isUnread(conversation)
-        let title = conversation.displayTitle(excluding: currentUserId)
-        return HStack(spacing: SQSpace.md + 1) {
+    /// Avatar de la rangée : la photo du groupe ou de l'interlocuteur ; un groupe
+    /// sans photo montre deux de ses membres superposés.
+    @ViewBuilder
+    private func rowAvatar(_ conversation: MessageConversation, title: String) -> some View {
+        let others = conversation.participants.filter { $0.userId != currentUserId }
+        if conversation.isGroup, conversation.groupPhotoUrl == nil, others.count >= 2 {
+            ZStack(alignment: .topLeading) {
+                SQAvatar(url: others[0].user.avatarUrl, name: others[0].user.displayName, size: 30)
+                SQAvatar(url: others[1].user.avatarUrl, name: others[1].user.displayName, size: 30)
+                    .padding(2)
+                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .offset(x: 12, y: 12)
+            }
+            .frame(width: 44, height: 44, alignment: .topLeading)
+        } else {
             SQAvatar(
                 url: conversation.groupPhotoUrl ?? otherParticipant(conversation)?.user.avatarUrl,
                 name: title.isEmpty ? "Conversation" : title,
-                size: 52
+                size: 44
             )
-            .accessibilityHidden(true)
-            .overlay(alignment: .bottomTrailing) {
-                if isOnline(conversation) {
-                    Circle()
-                        .fill(SQColor.brandGreen)
-                        .frame(width: 13, height: 13)
-                        .overlay { Circle().stroke(SQColor.surface, lineWidth: 2) }
-                        .accessibilityLabel("En ligne")
+        }
+    }
+
+    /// Rangée de la carte des conversations : avatar 44 et présence, nom avec
+    /// cadenas, sourdine et épingle, heure (carmin si non lu), aperçu et pastille.
+    private func conversationRow(_ conversation: MessageConversation, isFirst: Bool) -> some View {
+        let unread = isUnread(conversation)
+        let title = conversation.displayTitle(excluding: currentUserId)
+        let unreadCount = conversation.e2eeV2?.unreadCount ?? 0
+        return HStack(spacing: SQSpace.md) {
+            rowAvatar(conversation, title: title)
+                .accessibilityHidden(true)
+                .overlay(alignment: .bottomTrailing) {
+                    if isOnline(conversation) {
+                        Circle()
+                            .fill(SQColor.brandGreen)
+                            .frame(width: 13, height: 13)
+                            .overlay { Circle().stroke(SQColor.surface, lineWidth: 2.5) }
+                            .offset(x: 2, y: 2)
+                            .accessibilityLabel("En ligne")
+                    }
                 }
-            }
-            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Text(title.isEmpty ? String(localized: "Conversation") : title)
-                        .font(SQType.rowTitle)
+                        .font(unread ? SQType.body(.bold) : SQType.rowTitle)
                         .foregroundStyle(SQColor.label)
                         .sqSingleLine()
+                        .layoutPriority(1)
                         .accessibilityIdentifier("messages.row.title")
                     // Badges de l'interlocuteur, comme dans le fil.
                     SQUserBadges(badges: conversation.otherParticipantBadges(excluding: currentUserId), size: 12)
-                }
-                HStack(spacing: SQSpace.xs + 1) {
                     if conversation.e2eeEnabled == true {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(unread ? SQColor.label : SQColor.labelSecondary)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
                             .accessibilityLabel("Conversation chiffrée")
                     }
+                    if conversation.muted {
+                        Image(systemName: "bell.slash.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityLabel("En sourdine")
+                            .accessibilityIdentifier("messages.row.muted")
+                    }
+                    if conversation.pinnedAt != nil {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityLabel("Épinglée")
+                            .accessibilityIdentifier("messages.row.pinned")
+                    }
+                    Spacer(minLength: SQSpace.xs)
+                    if let date = conversation.listDate {
+                        // `accentInk` : la brique n'est garantie que pour le grand texte.
+                        Text(verbatim: ConversationListDate.label(for: date))
+                            .font(SQType.micro(unread ? .bold : .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(unread ? SQColor.accentInk : SQColor.labelSecondary)
+                            .fixedSize()
+                            .accessibilityIdentifier("messages.row.date")
+                    }
+                }
+                HStack(spacing: SQSpace.sm) {
                     if let draft = drafts[conversation.id] {
                         draftPreview(draft)
                     } else {
@@ -676,45 +810,42 @@ struct MessagesView: View {
                             .sqSingleLine()
                             .accessibilityIdentifier("messages.row.preview")
                     }
-                }
-            }
-            Spacer(minLength: SQSpace.sm)
-            VStack(alignment: .trailing, spacing: 5) {
-                HStack(spacing: 4) {
-                    if conversation.muted {
-                        Image(systemName: "bell.slash.fill")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .accessibilityLabel("En sourdine")
-                            .accessibilityIdentifier("messages.row.muted")
-                    }
-                    if conversation.pinnedAt != nil {
-                        Image(systemName: "pin.fill")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .accessibilityLabel("Épinglée")
-                            .accessibilityIdentifier("messages.row.pinned")
-                    }
-                    if let date = conversation.listDate {
-                        // `accentInk` : la brique n'est garantie que pour le grand texte.
-                        Text(verbatim: ConversationListDate.label(for: date))
-                            .font(SQType.micro(.medium))
-                            .foregroundStyle(unread ? SQColor.accentInk : SQColor.labelSecondary)
-                            .accessibilityIdentifier("messages.row.date")
-                    }
-                }
-                if unread {
-                    Circle()
-                        .fill(SQColor.brandRed)
-                        .frame(width: 12, height: 12)
+                    Spacer(minLength: 0)
+                    if unread {
+                        // Le nombre quand le serveur le sert (v2), sinon un point.
+                        Group {
+                            if unreadCount > 0 {
+                                Text(verbatim: "\(unreadCount)")
+                                    .font(SQType.micro(.heavy))
+                                    .monospacedDigit()
+                                    .foregroundStyle(SQColor.onAccent)
+                                    .padding(.horizontal, 6)
+                                    .frame(minWidth: 20, minHeight: 20)
+                                    .background(SQColor.brandRed, in: Capsule())
+                            } else {
+                                Circle()
+                                    .fill(SQColor.brandRed)
+                                    .frame(width: 10, height: 10)
+                            }
+                        }
                         .accessibilityLabel("Non lu")
+                    }
                 }
             }
         }
-        .padding(.vertical, 14)
+        .padding(.vertical, SQSpace.md)
         .padding(.horizontal, SQSpace.lg)
-        .sqCardBackground()
-        .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .frame(minHeight: 68)
+        .overlay(alignment: .top) {
+            if !isFirst {
+                Rectangle()
+                    .fill(SQColor.separator)
+                    .frame(height: 1)
+                    .padding(.leading, SQSpace.lg + 44 + SQSpace.md)
+                    .accessibilityHidden(true)
+            }
+        }
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -798,109 +929,191 @@ private struct NewConversationSheet: View {
         !isSearching && errorMessage == nil && !trimmedQuery.isEmpty && searchedQuery == trimmedQuery && results.isEmpty
     }
 
+    private var cardShape: RoundedRectangle { RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous) }
+
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    TextField("Nom du groupe optionnel", text: $title)
-                    Toggle(isOn: $e2ee) {
-                        HStack(spacing: SQSpace.xs) {
-                            Text("Conversation chiffrée")
-                            SQInfoButton(term: .endToEndEncryption)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MapChipIconButton(systemImage: "xmark", label: "Annuler", identifier: "newConversation.cancel") { dismiss() }
+
+                Text("Nouveau message")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .accessibilityAddTraits(.isHeader)
+
+                // La recherche d'abord : c'est par elle qu'on commence.
+                SQSearchField(text: $query, placeholder: "Nom, handle ou email", onSubmit: { Task { await search() } })
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("newConversation.search")
+
+                if !selected.isEmpty {
+                    selectedChips
+                }
+
+                section("Groupe") {
+                    VStack(spacing: 0) {
+                        TextField("Nom du groupe optionnel", text: $title)
+                            .font(SQType.body)
+                            .padding(.horizontal, SQSpace.md)
+                            .frame(minHeight: 48)
+                        Divider().padding(.leading, SQSpace.md)
+                        Toggle(isOn: $e2ee) {
+                            HStack(spacing: SQSpace.xs) {
+                                Text("Conversation chiffrée")
+                                    .font(SQType.body(.semibold))
+                                    .foregroundStyle(SQColor.label)
+                                SQInfoButton(term: .endToEndEncryption)
+                            }
                         }
+                        .tint(SQColor.brandRed)
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minHeight: 52)
                     }
-                } header: {
-                    Text("Groupe")
-                } footer: {
+                    .sqSurface(SQColor.surface, in: cardShape)
                     // La limite se dit AVANT de créer : on la découvrait au premier
                     // envoi de photo refusé (SOC-07).
                     if e2ee {
                         Text("Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction. Les appels y dépendent de la conversation : ils peuvent être indisponibles, ou partir après confirmation, sans chiffrement de bout en bout.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, SQSpace.xs)
                     }
                 }
 
-                if !selected.isEmpty {
-                    Section("Participants") {
-                        ForEach(selected) { user in
-                            HStack {
-                                SQAvatar(url: user.avatarUrl, name: user.displayName, size: 34)
-                                    .accessibilityHidden(true)
-                                Text(user.displayName)
-                                Spacer()
-                                Button {
-                                    selected.removeAll { $0.id == user.id }
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                }
-                                .accessibilityLabel("Retirer \(user.displayName)")
+                if isSearching || showsNoResult || !results.isEmpty {
+                    section("Résultats") {
+                        VStack(spacing: 0) {
+                            if isSearching || showsNoResult {
+                                UserSearchStatusRow(isSearching: isSearching)
+                                    .padding(.horizontal, SQSpace.md)
+                                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                            }
+                            ForEach(Array(results.enumerated()), id: \.element.id) { index, user in
+                                if index > 0 || isSearching || showsNoResult { Divider().padding(.leading, SQSpace.md + 36 + SQSpace.md) }
+                                resultRow(user)
                             }
                         }
-                    }
-                }
-
-                Section("Recherche") {
-                    TextField("Nom, handle ou email", text: $query)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onSubmit { Task { await search() } }
-                    if isSearching || showsNoResult {
-                        UserSearchStatusRow(isSearching: isSearching)
-                    }
-                    ForEach(results.filter { result in !selected.contains(where: { $0.id == result.id }) }) { user in
-                        Button {
-                            selected.append(user)
-                        } label: {
-                            HStack {
-                                SQAvatar(url: user.avatarUrl, name: user.displayName, size: 34)
-                                    .accessibilityHidden(true)
-                                VStack(alignment: .leading) {
-                                    Text(user.displayName)
-                                    if let subtitle = user.publicSubtitle {
-                                        Text(verbatim: subtitle)
-                                            .font(SQType.caption)
-                                            .foregroundStyle(SQColor.labelSecondary)
-                                    }
-                                }
-                                Spacer()
-                                Image(systemName: "plus.circle")
-                                    .accessibilityHidden(true)
-                            }
-                        }
+                        .sqSurface(SQColor.surface, in: cardShape)
                     }
                 }
 
                 if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(SQColor.dangerInk) }
+                    Text(errorMessage)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("newConversation.error")
                 }
+
+                GradientButton(startLabel, isBusy: isBusy) {
+                    Task { await create() }
+                }
+                .disabled(selected.isEmpty || isBusy)
+                .accessibilityIdentifier("newConversation.create")
             }
-            .scrollContentBackground(.hidden)
-            .signalQuestBackground()
-            .navigationTitle("Nouvelle conversation")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(isBusy ? "Création…" : "Créer") {
-                        Task { await create() }
+            .padding(SQSpace.lg)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .sqSheet(background: SQColor.bg)
+        .onChangeCompat(of: query) { _, _ in
+            // Debounce annulable : annule la requête précédente avant d'en relancer
+            // une et abandonne si annulée pendant l'attente — évite les rafales
+            // réseau et les réponses périmées qui écrasent les récentes.
+            searchTask?.cancel()
+            searchTask = Task {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                guard !Task.isCancelled else { return }
+                await search()
+            }
+        }
+    }
+
+    /// « Démarrer », puis le nombre de personnes choisies.
+    private var startLabel: String {
+        if isBusy { return String(localized: "Création…") }
+        if selected.isEmpty { return String(localized: "Démarrer") }
+        return String(localized: "Démarrer · \(selected.count) personnes")
+    }
+
+    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(title)
+                .sqKicker()
+                .accessibilityAddTraits(.isHeader)
+                .padding(.leading, SQSpace.xs)
+            content()
+        }
+    }
+
+    /// Personnes choisies en pastilles, chacune avec sa croix pour la retirer.
+    private var selectedChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SQSpace.sm) {
+                ForEach(selected) { user in
+                    Button {
+                        Haptics.selection()
+                        selected.removeAll { $0.id == user.id }
+                    } label: {
+                        HStack(spacing: SQSpace.xs) {
+                            Text(verbatim: user.displayName)
+                                .sqSingleLine()
+                            Image(systemName: "xmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .accessibilityHidden(true)
+                        }
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minHeight: 32)
+                        .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
-                    .disabled(selected.isEmpty || isBusy)
-                    .tint(SQColor.brandRed)
-                }
-            }
-            .onChangeCompat(of: query) { _, _ in
-                // Debounce annulable : annule la requête précédente avant d'en relancer
-                // une et abandonne si annulée pendant l'attente — évite les rafales
-                // réseau et les réponses périmées qui écrasent les récentes.
-                searchTask?.cancel()
-                searchTask = Task {
-                    try? await Task.sleep(nanoseconds: 350_000_000)
-                    guard !Task.isCancelled else { return }
-                    await search()
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Retirer \(user.displayName)")
                 }
             }
         }
+    }
+
+    /// Résultat de recherche : un toucher coche ou décoche la personne.
+    private func resultRow(_ user: MessageSearchUser) -> some View {
+        let isSelected = selected.contains { $0.id == user.id }
+        return Button {
+            Haptics.selection()
+            if isSelected {
+                selected.removeAll { $0.id == user.id }
+            } else {
+                selected.append(user)
+            }
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                SQAvatar(url: user.avatarUrl, name: user.displayName, size: 36)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: user.displayName)
+                        .font(SQType.body(.semibold))
+                        .foregroundStyle(SQColor.label)
+                    if let subtitle = user.publicSubtitle {
+                        Text(verbatim: subtitle)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func search() async {
@@ -1175,5 +1388,50 @@ struct UserSearchStatusRow: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .task { UIAccessibility.post(notification: .announcement, argument: String(localized: "Aucun résultat")) }
         }
+    }
+}
+
+/// Morceau de la carte unique des conversations : coins arrondis en haut pour
+/// la première rangée, en bas pour la dernière, droits entre les deux.
+struct MessagesCardSegment: InsettableShape {
+    var top: Bool
+    var bottom: Bool
+    var radius: CGFloat = SQRadius.xl
+    var insetAmount: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        let rect = rect.insetBy(dx: insetAmount, dy: insetAmount)
+        let r = min(max(radius - insetAmount, 0), rect.height / 2)
+        let topRadius = top ? r : 0
+        let bottomRadius = bottom ? r : 0
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + topRadius))
+        if topRadius > 0 {
+            path.addArc(center: CGPoint(x: rect.minX + topRadius, y: rect.minY + topRadius), radius: topRadius,
+                        startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        }
+        path.addLine(to: CGPoint(x: rect.maxX - topRadius, y: rect.minY))
+        if topRadius > 0 {
+            path.addArc(center: CGPoint(x: rect.maxX - topRadius, y: rect.minY + topRadius), radius: topRadius,
+                        startAngle: .degrees(270), endAngle: .degrees(0), clockwise: false)
+        }
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - bottomRadius))
+        if bottomRadius > 0 {
+            path.addArc(center: CGPoint(x: rect.maxX - bottomRadius, y: rect.maxY - bottomRadius), radius: bottomRadius,
+                        startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        }
+        path.addLine(to: CGPoint(x: rect.minX + bottomRadius, y: rect.maxY))
+        if bottomRadius > 0 {
+            path.addArc(center: CGPoint(x: rect.minX + bottomRadius, y: rect.maxY - bottomRadius), radius: bottomRadius,
+                        startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    func inset(by amount: CGFloat) -> MessagesCardSegment {
+        var shape = self
+        shape.insetAmount += amount
+        return shape
     }
 }
