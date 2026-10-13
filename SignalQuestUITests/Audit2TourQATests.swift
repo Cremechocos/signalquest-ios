@@ -260,11 +260,11 @@ final class Audit2TourQATests: XCTestCase {
             ("Sentinelle", "Sentinel", "sentinelle"),
             ("Antennes suivies", "Followed antennas", "antennes-suivies"),
             ("Territoires", "Territories", "territoires"),
-            ("Mes enregistrements de trajet", "My trip recordings", "trajets"),
+            ("Enregistrements de trajet", "Trip recordings", "trajets"),
             ("Mes mesures", "My measurements", "mes-mesures"),
             ("Logs antennes", "Antenna logs", "logs-antennes"),
             ("Mes identifications", "My identifications", "identifications"),
-            ("Mes signalements d'antenne", "My antenna reports", "signalements-antenne"),
+            ("Signalements d’antenne", "Antenna reports", "signalements-antenne"),
             ("Pannes signalées", "Reported outages", "pannes"),
             ("Photos", "Photos", "photos"),
             ("Abonnements", "Subscriptions", "abonnements"),
@@ -296,7 +296,7 @@ final class Audit2TourQATests: XCTestCase {
         }
         goTab(t("Profil", "Profile"), in: app)
         app.swipeDown(); app.swipeDown()
-        if tapIfExists(app.buttons[t("Éditer le profil", "Edit profile")].firstMatch, in: app) {
+        if tapIfExists(app.buttons["profile.edit"].firstMatch, in: app) {
             pause(2)
             snap("editer-profil")
             dismissSheet(app)

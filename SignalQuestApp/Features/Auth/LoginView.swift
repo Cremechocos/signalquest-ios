@@ -642,24 +642,33 @@ struct AuthFieldRow<Field: View>: View {
     let label: LocalizedStringKey
     var isFocused = false
     var isError = false
+    /// Indication courte à droite du libellé, comme un compteur de caractères.
+    var accessory: Text?
     let field: Field
     let onTap: () -> Void
 
-    init(_ label: LocalizedStringKey, isFocused: Bool = false, isError: Bool = false,
+    init(_ label: LocalizedStringKey, isFocused: Bool = false, isError: Bool = false, accessory: Text? = nil,
          @ViewBuilder field: () -> Field, onTap: @escaping () -> Void) {
         self.label = label
         self.isFocused = isFocused
         self.isError = isError
+        self.accessory = accessory
         self.field = field()
         self.onTap = onTap
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.xxs) {
-            Text(label)
-                .font(SQType.caption(.bold))
-                .foregroundStyle(isError ? SQColor.dangerInk : SQColor.labelSecondary)
-                .accessibilityHidden(true)
+            HStack(spacing: SQSpace.sm) {
+                Text(label)
+                    .foregroundStyle(isError ? SQColor.dangerInk : SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+                if let accessory {
+                    Spacer(minLength: 0)
+                    accessory.foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .font(SQType.caption(.bold))
             field
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)

@@ -813,11 +813,13 @@ final class SignalQuestUITests: XCTestCase {
     }
 
     private func logoutFromProfile(in app: XCUIApplication) {
-        let logout = app.buttons["Déconnexion"]
+        let logout = app.buttons["profile.logout"]
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(logout, in: app), "Déconnexion inaccessible")
         logout.tap()
         // La déconnexion se confirme (TRX-31).
-        let confirm = app.buttons["Se déconnecter"]
+        // La rangée du profil porte le même libellé : on vise le bouton du dialogue.
+        let confirm = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@",
+                                                       "Se déconnecter", "profile.logout")).firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Confirmation de déconnexion absente")
         confirm.tap()
         XCTAssertTrue(app.buttons["Se connecter"].waitForExistence(timeout: 20), "Le logout n'a pas rouvert la connexion")

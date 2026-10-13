@@ -67450,6 +67450,616 @@
           }
         }
       }
+    },
+    "Contributions" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contributions"
+          }
+        }
+      }
+    },
+    "Enregistrements de trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trip recordings"
+          }
+        }
+      }
+    },
+    "Modifier le profil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit profile"
+          }
+        }
+      }
+    },
+    "Signalements d’antenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna reports"
+          }
+        }
+      }
+    },
+    "Suivis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Following"
+          }
+        }
+      }
+    },
+    "Active la double authentification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turns on two-factor authentication"
+          }
+        }
+      }
+    },
+    "Désactive la double authentification" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turns off two-factor authentication"
+          }
+        }
+      }
+    },
+    "Aide" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help"
+          }
+        }
+      }
+    },
+    "Associer ton compte Apple" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link your Apple account"
+          }
+        }
+      }
+    },
+    "Associé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linked"
+          }
+        }
+      }
+    },
+    "Non associé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not linked"
+          }
+        }
+      }
+    },
+    "Désactivée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disabled"
+          }
+        }
+      }
+    },
+    "Choisis un nouveau mot de passe d’au moins 8 caractères." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a new password of at least 8 characters."
+          }
+        }
+      }
+    },
+    "Contact et signalement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact and report a problem"
+          }
+        }
+      }
+    },
+    "Contraste et textes renforcés dehors" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stronger contrast and text outdoors"
+          }
+        }
+      }
+    },
+    "C’est définitif. Voici ce qui se passe pour tes données." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is permanent. Here’s what happens to your data."
+          }
+        }
+      }
+    },
+    "Demande %@ à l’ouverture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Asks for %@ when opening"
+          }
+        }
+      }
+    },
+    "Fichier JSON (RGPD)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSON file (GDPR)"
+          }
+        }
+      }
+    },
+    "Fonds noirs purs en thème sombre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pure black backgrounds in dark mode"
+          }
+        }
+      }
+    },
+    "La déconnexion automatique efface la session après une inactivité prolongée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic sign-out clears the session after a long period of inactivity."
+          }
+        }
+      }
+    },
+    "Le fond de carte choisi reçoit la zone consultée : Apple, OpenStreetMap ou OpenTopoMap." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The chosen map background receives the area you view: Apple, OpenStreetMap or OpenTopoMap."
+          }
+        }
+      }
+    },
+    "Noir intense" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pure black"
+          }
+        }
+      }
+    },
+    "Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protects opening the app with biometrics or the device passcode after the chosen delay. Content is hidden in the app switcher, even during this delay."
+          }
+        }
+      }
+    },
+    "Sur l'écran de la voiture, te signale quand tu traverses une zone où le réseau est mauvais. Jamais deux fois la même zone, et rien pendant une manœuvre annoncée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the car screen, tells you when you drive through an area with poor coverage. Never twice for the same area, and nothing during an announced maneuver."
+          }
+        }
+      }
+    },
+    "Sur un écran OLED, un pixel noir est éteint : l'affichage consomme moins. Sans effet en thème clair." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On an OLED screen, a black pixel is off, so the display uses less power. No effect in light mode."
+          }
+        }
+      }
+    },
+    "Tu pourras te connecter en un geste, même avec « Masquer mon e-mail ». Ton mot de passe actuel reste valable." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’ll be able to sign in with one tap, even with Hide My Email. Your current password stays valid."
+          }
+        }
+      }
+    },
+    "Télécharger mes données" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download my data"
+          }
+        }
+      }
+    },
+    "Une alerte au plus toutes les 10 min" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At most one alert every 10 min"
+          }
+        }
+      }
+    },
+    "Changer la photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change photo"
+          }
+        }
+      }
+    },
+    "Quelques mots sur toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A few words about you"
+          }
+        }
+      }
+    },
+    "Ton nom" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your name"
+          }
+        }
+      }
+    },
+    "Ton nom et ta bio sont visibles sur ton profil public et dans les classements." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your name and bio appear on your public profile and in leaderboards."
+          }
+        }
+      }
+    },
+    "%lld caractères sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld of %2$lld characters"
+          }
+        }
+      }
+    },
+    "Afficher mon @" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show my @"
+          }
+        }
+      }
+    },
+    "Au lieu de ton nom dans les classements" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instead of your name in leaderboards"
+          }
+        }
+      }
+    },
+    "Ce que tes amis et la communauté voient de toi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What your friends and the community see about you."
+          }
+        }
+      }
+    },
+    "Ces partages sont désactivés par défaut. Désactiver un partage retire aussi ce qui était déjà publié en direct." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These are off by default. Turning one off also removes what was already shared live."
+          }
+        }
+      }
+    },
+    "Dernière activité visible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show last activity"
+          }
+        }
+      }
+    },
+    "Ma position en direct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My live location"
+          }
+        }
+      }
+    },
+    "Mes données radio" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My radio data"
+          }
+        }
+      }
+    },
+    "Mes photos sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My photos on the map"
+          }
+        }
+      }
+    },
+    "Profil public" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public profile"
+          }
+        }
+      }
+    },
+    "Quand partager" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When to share"
+          }
+        }
+      }
+    },
+    "Qui peut m’écrire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Who can message me"
+          }
+        }
+      }
+    },
+    "Aperçu des messages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message previews"
+          }
+        }
+      }
+    },
+    "Aucune alerte n’arrive tant qu’elles sont désactivées dans les réglages de l’iPhone : messages, pannes, réponses." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No alerts arrive while they’re turned off in iPhone Settings: messages, outages, replies."
+          }
+        }
+      }
+    },
+    "Bannière dans l’app" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In-app banner"
+          }
+        }
+      }
+    },
+    "Commentaires compris" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comments included"
+          }
+        }
+      }
+    },
+    "Conversations chiffrées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted conversations"
+          }
+        }
+      }
+    },
+    "J’aime sur mes photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Likes on my photos"
+          }
+        }
+      }
+    },
+    "Notifications coupées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications are off"
+          }
+        }
+      }
+    },
+    "Notifications pas encore activées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications not turned on yet"
+          }
+        }
+      }
+    },
+    "Ouvrir les réglages de l’iPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open iPhone Settings"
+          }
+        }
+      }
+    },
+    "Pannes de la communauté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Community outages"
+          }
+        }
+      }
+    },
+    "Par e-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By email"
+          }
+        }
+      }
+    },
+    "Réponses à mes signalements" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replies to my reports"
+          }
+        }
+      }
+    },
+    "Une bannière s’affiche quand un message arrive pendant que l’app est ouverte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A banner appears when a message arrives while the app is open."
+          }
+        }
+      }
+    },
+    "%lld missions à réclamer" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mission to claim"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld missions to claim"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mission à réclamer"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld missions à réclamer"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

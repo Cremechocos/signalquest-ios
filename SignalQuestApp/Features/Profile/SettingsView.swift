@@ -2118,6 +2118,7 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var appleError: String?
     @State private var showUnlinkAppleConfirm = false
+    @State private var showAppleSheet = false
 
     private var appleLinked: Bool {
         if case .authenticated(let user) = session.state { return user.appleLinked == true }
@@ -2144,158 +2145,111 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                if twoFactorStateUnknown {
-                    HStack(spacing: SQSpace.sm) {
-                        settingsLabel("Double authentification", systemImage: "lock.shield")
-                        Spacer(minLength: 0)
-                        SQSpinner()
-                            .accessibilityLabel(Text("Vérification de la double authentification"))
-                    }
-                    .task { await session.refreshUser() }
-                } else if twoFactorEnabled {
-                    Button(role: .destructive) {
-                        guard case .authenticated(let user) = session.state,
-                              let operation = TwoFactorEnrollmentService(api: services.api, userID: user.id) else {
-                            model.errorMessage = TwoFactorEnrollmentError.sessionChanged.localizedDescription
-                            return
-                        }
-                        twoFactorDisable = operation
-                        show2FADisable = true
-                    } label: {
-                        settingsLabel("Désactiver la double authentification", systemImage: "lock.open")
-                    }
-                    .disabled(isDisabling2FA)
-                } else {
-                    Button {
-                        guard case .authenticated(let user) = session.state,
-                              let enrollment = TwoFactorEnrollmentService(api: services.api, userID: user.id) else {
-                            model.errorMessage = TwoFactorEnrollmentError.sessionChanged.localizedDescription
-                            return
-                        }
-                        twoFactorEnrollment = enrollment
-                    } label: {
-                        settingsLabel("Activer la double authentification", systemImage: "lock.shield")
-                    }
-                }
+                SQSettingsHeader(title: "Réglages", backIdentifier: "settings.back")
+            }
+            // Marge basse : la cellule, même transparente, garde ses coins
+            // arrondis, qui rogneraient le bas du texte.
+            .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.md, trailing: 0))
+            .listRowBackground(Color.clear)
+
+            Section {
                 NavigationLink {
                     ChangePasswordView(appleLinked: appleLinked)
-                } label: { settingsLabel("Changer le mot de passe", systemImage: "key.fill") }
+                } label: { SQSettingsRowLabel("Mot de passe", systemImage: "key") }
+                .accessibilityIdentifier("settings.password")
+                twoFactorRow
+                Button {
+                    appleError = nil
+                    showAppleSheet = true
+                } label: {
+                    SQSettingsRowLabel("Compte Apple", systemImage: "applelogo",
+                                       value: appleLinked ? String(localized: "Associé") : String(localized: "Non associé"),
+                                       showsChevron: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.apple")
                 // Masqué tant que la v2 dort : l'écran créait une identité locale
                 // pour un chiffrement qui ne peut encore ni envoyer ni lire (E2E-03).
                 if E2EEV2RuntimeWriteGate.enabled {
                     NavigationLink {
                         E2EEV2TrustedDevicesView(api: services.api)
-                    } label: { settingsLabel("Appareils", systemImage: "lock.shield") }
+                    } label: { SQSettingsRowLabel("Appareils", systemImage: "lock.shield") }
                 }
             } header: {
-                Text("Compte et sécurité")
-                    .foregroundStyle(SQColor.label)
+                Text("Compte").sqKicker()
+                    .accessibilityIdentifier("settings.header.account")
             }
             .listRowBackground(SQColor.surface)
+
             Section {
-                if appleLinked {
-                    HStack(spacing: SQSpace.md) {
-                        settingsLabel("Compte Apple associé", systemImage: "applelogo")
-                        Spacer()
-                        Image(systemName: "checkmark.seal.fill").foregroundStyle(SQColor.success)
+                Toggle(isOn: Binding(
+                    get: { appLockEnabled },
+                    set: { newValue in
+                        appLockSetup.setEnabled(newValue, credentials: services.api.credentials)
                     }
-                    Button(role: .destructive) {
-                        showUnlinkAppleConfirm = true
-                    } label: { settingsLabel("Dissocier le compte Apple", systemImage: "minus.circle") }
-                } else {
-                    SignInWithAppleButton(.continue) { request in
-                        request.requestedScopes = [.fullName, .email]
-                    } onCompletion: { result in handleAppleLink(result) }
-                    .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
-                    .frame(height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                )) {
+                    SQSettingsRowLabel("Verrouiller SignalQuest", systemImage: "lock",
+                                       subtitle: String(localized: "Demande \(BiometricAuth.kind.label) à l’ouverture"))
                 }
-                if let appleError {
-                    Text(appleError).font(SQFont.body(12, relativeTo: .caption)).foregroundStyle(SQColor.dangerInk)
+                .accessibilityIdentifier("settings.app-lock")
+                .accessibilityHint("Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai.")
+                .disabled(appLockSetup.isConfirming || (!canAuthenticateDeviceOwner && !appLockEnabled))
+                if !canAuthenticateDeviceOwner && !appLockEnabled {
+                    Text("Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
-            } header: {
-                Text("Compte Apple")
-            } footer: {
-                Text(appleLinked
-                     ? "Tu peux te connecter avec Apple, même en masquant ton e-mail."
-                     : "Associe ton Apple ID pour te connecter en un geste, même avec « Masquer mon e-mail ».")
-                    .font(SQType.caption)
-                    .accessibilityIdentifier("settings.apple.footer")
-            }
-            .foregroundStyle(SQColor.label)
-            .listRowBackground(SQColor.surface)
-            Group {
-                Section {
+                if let appLockError = appLockSetup.errorMessage {
+                    Text(appLockError).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
+                }
+                if appLockEnabled {
+                    SQSettingsMenuRow("Verrouillage", systemImage: "clock", selection: $lockGraceSeconds,
+                                      valueLabel: Self.lockGraceLabel(lockGraceSeconds)) {
+                        Text("Immédiat").tag(0.0)
+                        Text("Après 1 min").tag(60.0)
+                        Text("Après 5 min").tag(300.0)
+                        Text("Après 15 min").tag(900.0)
+                    }
+                    SQSettingsMenuRow("Déconnexion auto", systemImage: "rectangle.portrait.and.arrow.right",
+                                      selection: $autoLogoutSeconds,
+                                      valueLabel: Self.autoLogoutLabel(autoLogoutSeconds)) {
+                        Text("Jamais").tag(0.0)
+                        Text("Après 15 min").tag(900.0)
+                        Text("Après 1 h").tag(3600.0)
+                        Text("Après 8 h").tag(28800.0)
+                    }
+                    .accessibilityHint("La déconnexion automatique efface la session après une inactivité prolongée.")
+                }
+                // Désactivation de la mémorisation E2EE par biométrie (l'activation
+                // se fait depuis la feuille de déverrouillage chiffré).
+                if e2eeBiometricEnabled {
                     Toggle(isOn: Binding(
-                        get: { appLockEnabled },
+                        get: { e2eeBiometricEnabled },
                         set: { newValue in
-                            appLockSetup.setEnabled(newValue, credentials: services.api.credentials)
+                            e2eeBiometricEnabled = newValue
+                            if !newValue { E2EEBiometric.clear() }
                         }
                     )) {
-                        settingsLabel("Verrouiller SignalQuest", systemImage: "lock.shield")
+                        SQSettingsRowLabel("Messagerie chiffrée via \(BiometricAuth.kind.label)",
+                                           systemImage: "lock.shield",
+                                           localizedTitle: "Messagerie chiffrée via \(BiometricAuth.kind.label)")
                     }
-                    .accessibilityIdentifier("settings.app-lock")
-                    .disabled(appLockSetup.isConfirming || (!canAuthenticateDeviceOwner && !appLockEnabled))
-                    if !canAuthenticateDeviceOwner && !appLockEnabled {
-                        Text("Configure un code pour l’appareil dans les Réglages iOS afin d’activer le verrouillage.")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    if let appLockError = appLockSetup.errorMessage {
-                        Text(appLockError).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
-                    }
-                    if appLockEnabled {
-                        Picker(selection: $lockGraceSeconds) {
-                            Text("Immédiat").tag(0.0)
-                            Text("Après 1 min").tag(60.0)
-                            Text("Après 5 min").tag(300.0)
-                            Text("Après 15 min").tag(900.0)
-                        } label: { settingsLabel("Verrouillage", systemImage: "clock") }
-                        .tint(SQColor.accentInk)
-                        Picker(selection: $autoLogoutSeconds) {
-                            Text("Jamais").tag(0.0)
-                            Text("Après 15 min").tag(900.0)
-                            Text("Après 1 h").tag(3600.0)
-                            Text("Après 8 h").tag(28800.0)
-                        } label: { settingsLabel("Déconnexion auto", systemImage: "rectangle.portrait.and.arrow.right") }
-                        .tint(SQColor.accentInk)
-                    }
-                    // Désactivation de la mémorisation E2EE par biométrie (l'activation
-                    // se fait depuis la feuille de déverrouillage chiffré).
-                    if e2eeBiometricEnabled {
-                        Toggle(isOn: Binding(
-                            get: { e2eeBiometricEnabled },
-                            set: { newValue in
-                                e2eeBiometricEnabled = newValue
-                                if !newValue { E2EEBiometric.clear() }
-                            }
-                        )) {
-                            settingsLabel("Messagerie chiffrée via \(BiometricAuth.kind.label)",
-                                systemImage: "lock.shield",
-                                localizedTitle: "Messagerie chiffrée via \(BiometricAuth.kind.label)")
-                        }
-                    }
-                } header: {
-                    Text("Verrouillage")
-                } footer: {
-                    Text("Protège l’ouverture avec la biométrie ou le code de l’appareil après le délai choisi. Le contenu est masqué dans le sélecteur d’apps, même pendant ce délai. La déconnexion automatique efface la session après une inactivité prolongée.")
-                        .accessibilityIdentifier("settings.footer.lock")
-                        .font(SQType.caption)
                 }
-                .tint(SQColor.brandRed)
-                .foregroundStyle(SQColor.label)
-                .listRowBackground(SQColor.surface)
+            } header: {
+                Text("Sécurité").sqKicker()
+                    .accessibilityIdentifier("settings.header.security")
             }
-            // Cinq groupes (TRX-22) : compte et sécurité, confidentialité,
-            // notifications, affichage et carte, aide et légal. Piège : un
-            // NavigationLink à fermeture traînante en tête de `Section` fait
-            // résoudre vers TableRowContent ; le modificateur qui le suit ancre
-            // la résolution côté vues.
+            .tint(SQColor.brandRed)
+            .listRowBackground(SQColor.surface)
+
+            // Piège : un NavigationLink à fermeture traînante en tête de
+            // `Section` fait résoudre vers TableRowContent ; le modificateur qui
+            // le suit ancre la résolution côté vues.
             Section {
                 NavigationLink {
                     PrivacySettingsView(service: services.privacy)
                 } label: {
-                    settingsLabel("Confidentialité", systemImage: "hand.raised.fill")
+                    SQSettingsRowLabel("Confidentialité", systemImage: "hand.raised")
                 }
                 .accessibilityIdentifier("settings.privacy")
                 // Notifications, appels et antennes suivies : un écran à part,
@@ -2304,136 +2258,126 @@ struct SettingsView: View {
                 NavigationLink {
                     NotificationSettingsView(userService: services.users)
                 } label: {
-                    settingsLabel("Notifications", systemImage: "bell.badge")
+                    SQSettingsRowLabel("Notifications", systemImage: "bell")
                 }
                 .accessibilityIdentifier("settings.notifications")
             }
             .listRowBackground(SQColor.surface)
+
             Section {
                 Toggle(isOn: $fieldMode) {
-                    settingsLabel("Mode terrain", systemImage: "sun.max.fill")
+                    SQSettingsRowLabel("Mode terrain", systemImage: "sun.max",
+                                       subtitle: String(localized: "Contraste et textes renforcés dehors"))
                 }
-                .tint(SQColor.brandRed)
-                Text("Renforce le contraste, la graisse des textes et la taille des contrôles pour une lecture plus fiable en extérieur.")
-                    .font(SQFont.body(13, relativeTo: .footnote))
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("settings.help.fieldMode")
+                .accessibilityHint("Renforce le contraste, la graisse des textes et la taille des contrôles pour une lecture plus fiable en extérieur.")
+                .accessibilityIdentifier("settings.fieldMode")
                 Toggle(isOn: $pureBlack) {
-                    settingsLabel("Noir intense (OLED)", systemImage: "circle.lefthalf.filled")
+                    SQSettingsRowLabel("Noir intense", systemImage: "circle.lefthalf.filled",
+                                       subtitle: String(localized: "Fonds noirs purs en thème sombre"))
                 }
-                .tint(SQColor.brandRed)
-                Text("En thème sombre, les fonds passent au noir pur. Sur un écran OLED, un pixel noir est éteint : l'affichage consomme moins. Sans effet en thème clair.")
-                    .font(SQFont.body(13, relativeTo: .footnote))
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("settings.help.oled")
-            } header: {
-                Text("Affichage et carte")
-                    .foregroundStyle(SQColor.label)
-            }
-            .listRowBackground(SQColor.surface)
-            Section {
-                ForEach(MapBackdrop.allCases) { option in
-                    Button {
+                .accessibilityHint("Sur un écran OLED, un pixel noir est éteint : l'affichage consomme moins. Sans effet en thème clair.")
+                .accessibilityIdentifier("settings.oled")
+                SQUnitsSettingRow(service: services.privacy)
+                SQSettingsMenuRow("Fond de carte", systemImage: "map", selection: Binding(
+                    get: { MapBackdrop.resolve(mapBackdropRaw) },
+                    set: { option in
                         mapBackdropRaw = option.rawValue
                         Haptics.selection()
-                    } label: {
-                        HStack(spacing: SQSpace.md) {
-                            Image(systemName: option.systemImage)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(SQColor.brandRed)
-                                .frame(width: 36, height: 36)
-                                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(option.label).foregroundStyle(SQColor.label)
-                                Text(option.subtitle)
-                                    .font(SQType.caption)
-                                    .foregroundStyle(SQColor.labelSecondary)
-                            }
-                            Spacer()
-                            if MapBackdrop.resolve(mapBackdropRaw) == option {
-                                Image(systemName: "checkmark")
-                                    .font(SQFont.body(17, .bold, relativeTo: .body))
-                                    .foregroundStyle(SQColor.brandRed)
-                                    .transition(.scale.combined(with: .opacity))
-                            }
-                        }
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(MapBackdrop.resolve(mapBackdropRaw) == option ? .isSelected : [])
+                ), valueLabel: MapBackdrop.resolve(mapBackdropRaw).label) {
+                    ForEach(MapBackdrop.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
                 }
+                .accessibilityIdentifier("settings.mapBackdrop")
             } header: {
-                Text("Fond de carte")
+                Text("Affichage").sqKicker()
+                    .accessibilityIdentifier("settings.header.display")
             } footer: {
-                Text("La zone consultée est transmise au fournisseur du fond choisi : Apple Maps, OpenStreetMap ou OpenTopoMap.")
+                Text("Le fond de carte choisi reçoit la zone consultée : Apple, OpenStreetMap ou OpenTopoMap.")
                     .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
-            .sqAnimation(SQMotion.snappy, value: mapBackdropRaw)
+            .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
+
             Section {
                 Toggle(isOn: $carPlayCoverageAlerts) {
-                    settingsLabel("Alerte zone mal couverte", systemImage: "car.fill")
+                    SQSettingsRowLabel("Alerte zone mal couverte", systemImage: "car",
+                                       subtitle: String(localized: "Une alerte au plus toutes les 10 min"))
                 }
-                .tint(SQColor.brandRed)
-                Text("Sur l'écran de la voiture, te signale quand tu traverses une zone où le réseau est mauvais. Au maximum une alerte toutes les 10 minutes, jamais deux fois la même zone, et rien pendant une manœuvre annoncée.")
-                    .font(SQFont.body(12))
-                    .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityHint("Sur l'écran de la voiture, te signale quand tu traverses une zone où le réseau est mauvais. Jamais deux fois la même zone, et rien pendant une manœuvre annoncée.")
             } header: {
-                Text("CarPlay")
+                Text("CarPlay").sqKicker()
+                    .accessibilityIdentifier("settings.header.carplay")
             }
+            .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
-            Section("Aide et légal") {
+
+            Section {
                 NavigationLink {
                     SQGlossaryView()
                 } label: {
-                    settingsLabel("Aide et glossaire", systemImage: "questionmark.circle")
+                    SQSettingsRowLabel("Aide et glossaire", systemImage: "questionmark.circle")
                 }
                 .accessibilityIdentifier("settings.glossary")
-                Link(destination: AppConfig.current.termsURL) {
-                    settingsLabel("Conditions d’utilisation", systemImage: "doc.text")
-                }
-                Link(destination: AppConfig.current.privacyURL) {
-                    settingsLabel("Politique de confidentialité", systemImage: "hand.raised")
-                }
-                Link(destination: AppConfig.current.legalURL) {
-                    settingsLabel("Mentions légales", systemImage: "building.columns")
-                }
                 if let contact = AppConfig.current.contactMailtoURL {
                     Link(destination: contact) {
-                        settingsLabel("Contact & signalement", systemImage: "envelope")
+                        SQSettingsRowLabel("Contact et signalement", systemImage: "envelope", showsChevron: true)
                     }
                 }
                 Button {
                     Task { await model.exportData() }
                 } label: {
                     HStack {
-                        settingsLabel("Télécharger mes données (RGPD)", systemImage: "square.and.arrow.down")
+                        SQSettingsRowLabel("Télécharger mes données", systemImage: "square.and.arrow.down",
+                                           subtitle: String(localized: "Fichier JSON (RGPD)"))
                         if model.isExporting {
-                            Spacer()
                             SQSpinner().tint(SQColor.brandRed)
                         }
                     }
                 }
+                .buttonStyle(.plain)
                 .disabled(model.isExporting)
+                .accessibilityIdentifier("settings.export")
+            } header: {
+                Text("Aide").sqKicker()
+                    .accessibilityIdentifier("settings.header.help")
+            } footer: {
+                Text(legalLinks)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.label)
+                    .tint(SQColor.label)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, SQSpace.md)
+                    .accessibilityIdentifier("settings.legal")
             }
-            .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
+
             Section {
                 Button(role: .destructive) { showDeleteConfirm = true } label: {
-                    Label("Supprimer mon compte", systemImage: "trash")
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.dangerInk)
-                        .frame(maxWidth: .infinity)
+                    SQSettingsRowLabel("Supprimer mon compte", systemImage: "trash", tone: .danger, showsChevron: true)
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.deleteAccount")
+            } footer: {
+                Text(verbatim: SQSettingsHeader.versionLine)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, SQSpace.sm)
             }
-            .listRowBackground(SQColor.dangerSoft)
+            .listRowBackground(SQColor.surface)
         }
+        .modifier(CompactListMargins())
         .scrollContentBackground(.hidden)
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Réglages")
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         // L'échec d'une action (export, double authentification) s'affichait
         // tout en bas du formulaire, hors de vue (AF-PROF-06).
         .alert(
@@ -2505,12 +2449,7 @@ struct SettingsView: View {
         } message: {
             Text("Saisis un code de ton application d'authentification pour confirmer la désactivation.")
         }
-        .alert("Dissocier le compte Apple ?", isPresented: $showUnlinkAppleConfirm) {
-            Button("Annuler", role: .cancel) {}
-            Button("Dissocier", role: .destructive) { unlinkApple() }
-        } message: {
-            Text("Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès.")
-        }
+        .sheet(isPresented: $showAppleSheet) { appleSheet }
         .sheet(item: $model.exportedFile, onDismiss: { model.clearExport() }) { file in
             ShareSheet(items: [file.url])
         }
@@ -2543,22 +2482,135 @@ struct SettingsView: View {
         }
     }
 
-    /// Rangée de réglage (DA Crème) : pastille d'icône 36 pt `accentSoft`
-    /// (icône brique) + libellé Figtree Medium 17. Aucune bordure.
-    private func settingsLabel(_ title: String, systemImage: String,
-                               localizedTitle: LocalizedStringKey? = nil) -> some View {
-        HStack(spacing: SQSpace.md) {
-            Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(SQColor.accentInk)
-                .frame(width: 36, height: 36)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                .accessibilityHidden(true)
-            Text(localizedTitle ?? LocalizedStringKey(title))
-                .font(SQFont.body(17, .medium, relativeTo: .body))
-                .foregroundStyle(SQColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("settings.label.\(title)")
+    /// Double authentification : une ligne avec son état. Activée, elle mène
+    /// à la désactivation (code demandé) ; désactivée, à l'activation.
+    @ViewBuilder
+    private var twoFactorRow: some View {
+        if twoFactorStateUnknown {
+            HStack(spacing: SQSpace.sm) {
+                SQSettingsRowLabel("Double authentification", systemImage: "checkmark.shield")
+                SQSpinner()
+                    .accessibilityLabel(Text("Vérification de la double authentification"))
+            }
+            .task { await session.refreshUser() }
+        } else {
+            Button {
+                guard case .authenticated(let user) = session.state,
+                      let operation = TwoFactorEnrollmentService(api: services.api, userID: user.id) else {
+                    model.errorMessage = TwoFactorEnrollmentError.sessionChanged.localizedDescription
+                    return
+                }
+                if twoFactorEnabled {
+                    twoFactorDisable = operation
+                    show2FADisable = true
+                } else {
+                    twoFactorEnrollment = operation
+                }
+            } label: {
+                SQSettingsRowLabel("Double authentification", systemImage: "checkmark.shield",
+                                   value: twoFactorEnabled ? String(localized: "Activée") : String(localized: "Désactivée"),
+                                   showsChevron: true)
+            }
+            .buttonStyle(.plain)
+            .disabled(isDisabling2FA)
+            .accessibilityHint(twoFactorEnabled ? "Désactive la double authentification" : "Active la double authentification")
+            .accessibilityIdentifier("settings.twoFactor")
+        }
+    }
+
+    /// Conditions, confidentialité et mentions légales sur une ligne de liens.
+    private var legalLinks: AttributedString {
+        let links: [(String, URL)] = [
+            (String(localized: "Conditions d’utilisation"), AppConfig.current.termsURL),
+            (String(localized: "Confidentialité"), AppConfig.current.privacyURL),
+            (String(localized: "Mentions légales"), AppConfig.current.legalURL),
+        ]
+        var text = AttributedString()
+        for (index, link) in links.enumerated() {
+            if index > 0 { text.append(AttributedString(" · ")) }
+            var part = AttributedString(link.0)
+            part.link = link.1
+            part.underlineStyle = .single
+            text.append(part)
+        }
+        return text
+    }
+
+    private static func lockGraceLabel(_ seconds: Double) -> String {
+        switch seconds {
+        case ..<1: String(localized: "Immédiat")
+        case ..<61: String(localized: "Après 1 min")
+        case ..<301: String(localized: "Après 5 min")
+        default: String(localized: "Après 15 min")
+        }
+    }
+
+    private static func autoLogoutLabel(_ seconds: Double) -> String {
+        switch seconds {
+        case ..<1: String(localized: "Jamais")
+        case ..<901: String(localized: "Après 15 min")
+        case ..<3601: String(localized: "Après 1 h")
+        default: String(localized: "Après 8 h")
+        }
+    }
+
+    /// Compte Apple : une feuille courte qui explique l'association et porte le
+    /// bouton officiel, ou la dissociation quand le compte est déjà associé.
+    private var appleSheet: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        Text("Compte").sqKicker()
+                        Text(appleLinked ? "Compte Apple associé" : "Associer ton compte Apple")
+                            .font(SQFont.display(22, .bold, relativeTo: .title2))
+                            .foregroundStyle(SQColor.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .sqHeader()
+                    }
+                    Spacer(minLength: SQSpace.sm)
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "settings.apple.close") {
+                        showAppleSheet = false
+                    }
+                }
+                Text(appleLinked
+                     ? "Tu peux te connecter avec Apple, même en masquant ton e-mail."
+                     : "Tu pourras te connecter en un geste, même avec « Masquer mon e-mail ». Ton mot de passe actuel reste valable.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("settings.apple.footer")
+                if let appleError {
+                    SQNotice(message: appleError, systemImage: "exclamationmark.triangle", tone: .danger)
+                }
+                if appleLinked {
+                    GradientButton("Dissocier le compte Apple", systemImage: "minus.circle", style: .destructive) {
+                        showUnlinkAppleConfirm = true
+                    }
+                    .accessibilityIdentifier("settings.apple.unlink")
+                } else {
+                    SignInWithAppleButton(.continue) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in handleAppleLink(result) }
+                    .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
+                    .frame(height: 50)
+                    .clipShape(Capsule(style: .continuous))
+                    .accessibilityIdentifier("settings.apple.link")
+                }
+            }
+            .padding(.horizontal, SQSpace.xl)
+            .padding(.top, SQSpace.xl)
+            .padding(.bottom, SQSpace.lg)
+            .frame(maxWidth: 520, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+        .presentationDetents([.medium, .large])
+        .sqSheet(background: SQColor.surface)
+        .alert("Dissocier le compte Apple ?", isPresented: $showUnlinkAppleConfirm) {
+            Button("Annuler", role: .cancel) {}
+            Button("Dissocier", role: .destructive) { unlinkApple() }
+        } message: {
+            Text("Tu ne pourras plus te connecter via Apple. Si ton compte a été créé avec Apple, définis d'abord un mot de passe via « Mot de passe oublié » pour ne pas perdre l'accès.")
         }
     }
 
@@ -2579,6 +2631,7 @@ struct SettingsView: View {
                     try await services.auth.linkApple(identityToken: token)
                     await session.refreshUser()
                     Haptics.success()
+                    showAppleSheet = false
                 } catch {
                     appleError = error.userFacingMessage
                     Haptics.error()
@@ -2597,10 +2650,186 @@ struct SettingsView: View {
                 try await services.auth.unlinkApple()
                 await session.refreshUser()
                 Haptics.success()
+                showAppleSheet = false
             } catch {
                 appleError = error.userFacingMessage
                 Haptics.error()
             }
+        }
+    }
+}
+
+/// En-tête Halo des pages de réglages : retour rond, grand titre, une phrase.
+/// La barre de navigation est masquée par la page, qui garde le balayage retour.
+struct SQSettingsHeader: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: LocalizedStringKey
+    var subtitle: LocalizedStringKey?
+    let backIdentifier: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: backIdentifier) { dismiss() }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text(title)
+                    .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .sqHeader()
+                if let subtitle {
+                    Text(subtitle)
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// « SignalQuest 1.0 (169) », comme dans les réglages d'iOS.
+    static var versionLine: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "SignalQuest \(version) (\(build))"
+    }
+}
+
+/// Libellé d'une ligne de réglage Halo : petite icône, titre, sous-titre court,
+/// valeur à droite et chevron facultatifs. Sert de `label` aux Toggle, Picker
+/// et NavigationLink natifs, qui ajoutent leur propre commande.
+struct SQSettingsRowLabel: View {
+    enum Tone { case neutral, danger }
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let title: String
+    let systemImage: String
+    var localizedTitle: LocalizedStringKey?
+    var subtitle: String?
+    var value: String?
+    var tone: Tone = .neutral
+    /// Pour un Button ou un Link : le NavigationLink dessine déjà le sien.
+    var showsChevron = false
+
+    init(_ title: String, systemImage: String, localizedTitle: LocalizedStringKey? = nil, subtitle: String? = nil,
+         value: String? = nil, tone: Tone = .neutral, showsChevron: Bool = false) {
+        self.title = title
+        self.systemImage = systemImage
+        self.localizedTitle = localizedTitle
+        self.subtitle = subtitle
+        self.value = value
+        self.tone = tone
+        self.showsChevron = showsChevron
+    }
+
+    var body: some View {
+        HStack(spacing: SQSpace.md) {
+            if !dynamicTypeSize.isAccessibilitySize {
+                ProfileMenuIcon(systemImage: systemImage,
+                                tint: tone == .danger ? SQColor.dangerInk : SQColor.labelSecondary,
+                                fill: tone == .danger ? SQColor.dangerSoft : SQColor.surfaceMuted)
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                Text(localizedTitle ?? LocalizedStringKey(title))
+                    .font(SQFont.body(16, .semibold, relativeTo: .body))
+                    .foregroundStyle(tone == .danger ? SQColor.dangerInk : SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("settings.label.\(title)")
+                if let subtitle {
+                    Text(verbatim: subtitle)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let value {
+                Text(verbatim: value)
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(1)
+                    // La valeur reste entière ; c'est le titre qui passe à la ligne.
+                    .layoutPriority(1)
+            }
+            if showsChevron {
+                // Même chevron que celui des NavigationLink du système.
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(uiColor: .tertiaryLabel))
+                    .accessibilityHidden(true)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+/// Réglage à choix : la valeur reste à droite du libellé, sur une ligne, et
+/// ouvre un menu natif. Un `Picker` en style menu renvoie sa valeur sous un
+/// libellé un peu long.
+struct SQSettingsMenuRow<Value: Hashable, Options: View>: View {
+    let title: String
+    let systemImage: String
+    var subtitle: String?
+    @Binding var selection: Value
+    let valueLabel: String
+    @ViewBuilder let options: Options
+
+    init(_ title: String, systemImage: String, subtitle: String? = nil, selection: Binding<Value>,
+         valueLabel: String, @ViewBuilder options: () -> Options) {
+        self.title = title
+        self.systemImage = systemImage
+        self.subtitle = subtitle
+        _selection = selection
+        self.valueLabel = valueLabel
+        self.options = options()
+    }
+
+    var body: some View {
+        Menu {
+            Picker(selection: $selection) { options } label: { Text(LocalizedStringKey(title)) }
+                .pickerStyle(.inline)
+        } label: {
+            HStack(spacing: SQSpace.xs) {
+                SQSettingsRowLabel(title, systemImage: systemImage, subtitle: subtitle, value: valueLabel)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .tint(SQColor.label)
+    }
+}
+
+/// Unités de distance : un menu natif. Le choix suit le compte (web, Android),
+/// d'où le passage par les préférences serveur, comme avant dans Confidentialité.
+struct SQUnitsSettingRow: View {
+    @StateObject private var model: PrivacySettingsViewModel
+    @EnvironmentObject private var unitsStore: SQUnitsStore
+
+    init(service: PrivacyServicing) {
+        _model = StateObject(wrappedValue: PrivacySettingsViewModel(service: service))
+    }
+
+    var body: some View {
+        let current = model.preferencesLoaded ? model.preferences.unitsSystem : unitsStore.system
+        SQSettingsMenuRow("Unités", systemImage: "ruler", subtitle: model.preferencesError,
+                          selection: Binding(
+                              get: { current },
+                              set: { value in Task { await model.setUnits(value) } }
+                          ), valueLabel: current.label) {
+            ForEach(SQUnitsSystem.allCases, id: \.self) { system in
+                Text(system.label).tag(system)
+            }
+        }
+        .disabled(!model.preferencesLoaded || model.isLoadingPreferences || model.isSavingPreferences || !model.isSessionCurrent)
+        .accessibilityHint("\(unitsStore.system.hint). Le réglage s'applique partout dans l'app et suit ton compte sur le web et Android.")
+        .accessibilityIdentifier("settings.units")
+        .task {
+            // Le modèle propage l'unité au reste de l'app via ce miroir.
+            model.unitsStore = unitsStore
+            if !model.preferencesLoaded { await model.loadPreferences() }
         }
     }
 }
@@ -2610,68 +2839,81 @@ struct ChangePasswordView: View {
     /// l'écran dit comment en choisir un plutôt que d'exiger l'actuel (AF-PROF-05).
     var appleLinked = false
     @EnvironmentObject private var services: AppServices
+    private enum Field { case current, new }
+    @FocusState private var focus: Field?
     @State private var current = ""
     @State private var newValue = ""
-    @State private var confirm = ""
     @State private var error: String?
     @State private var isBusy = false
     @State private var success = false
 
     var body: some View {
-        Form {
-            if appleLinked {
-                Section {
-                    Label("Compte créé avec Apple ? Il n’a pas de mot de passe que tu connais. Pour en choisir un, déconnecte-toi puis touche « Mot de passe oublié ? » sur l’écran de connexion.",
-                          systemImage: "applelogo")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                SQSettingsHeader(title: "Mot de passe",
+                                 subtitle: "Choisis un nouveau mot de passe d’au moins 8 caractères.",
+                                 backIdentifier: "settings.password.back")
+                if appleLinked {
+                    SQNotice(message: "Compte créé avec Apple ? Il n’a pas de mot de passe que tu connais. Pour en choisir un, déconnecte-toi puis touche « Mot de passe oublié ? » sur l’écran de connexion.",
+                             systemImage: "applelogo", tone: .neutral)
                         .accessibilityIdentifier("settings.password.appleHint")
                 }
-                .listRowBackground(SQColor.surface)
-            }
-            Section("Mot de passe actuel") {
-                SecureField("Mot de passe", text: $current)
-                    .textContentType(.password)
-                    .foregroundStyle(SQColor.label)
-            }
-            .listRowBackground(SQColor.surface)
-            Section("Nouveau mot de passe") {
-                // `.newPassword` : le trousseau propose un mot de passe fort et
-                // l'enregistre, au lieu de traiter ce champ comme une connexion.
-                SecureField("Au moins 8 caractères", text: $newValue)
-                    .textContentType(.newPassword)
-                    .foregroundStyle(SQColor.label)
-                SecureField("Confirmer", text: $confirm)
-                    .textContentType(.newPassword)
-                    .foregroundStyle(SQColor.label)
-            }
-            .listRowBackground(SQColor.surface)
-            if let error {
-                Section { Text(error).foregroundStyle(SQColor.dangerInk) }
-                    .listRowBackground(SQColor.dangerSoft)
-            }
-            if success {
-                Section { Label("Mot de passe modifié", systemImage: "checkmark.circle").foregroundStyle(SQColor.success) }
-                    .listRowBackground(SQColor.successSoft)
-            }
-            Section {
-                GradientButton("Mettre à jour", systemImage: "key.fill", isBusy: isBusy) {
+                AuthFieldGroup {
+                    AuthFieldRow("Mot de passe actuel", isFocused: focus == .current) {
+                        AuthPasswordInput(label: "Mot de passe actuel", text: $current, contentType: .password,
+                                          identifier: "settings.password.current")
+                            .submitLabel(.next)
+                            .focused($focus, equals: .current)
+                            .onSubmit { focus = .new }
+                    } onTap: { focus = .current }
+                    AuthFieldDivider()
+                    // `.newPassword` : le trousseau propose un mot de passe fort et
+                    // l'enregistre, au lieu de traiter ce champ comme une connexion.
+                    AuthFieldRow("Nouveau mot de passe", isFocused: focus == .new) {
+                        AuthPasswordInput(label: "Nouveau mot de passe", text: $newValue, contentType: .newPassword,
+                                          identifier: "settings.password.new")
+                            .submitLabel(.done)
+                            .focused($focus, equals: .new)
+                            .onSubmit { if canSubmit { Task { await save() } } }
+                    } onTap: { focus = .new }
+                }
+                Label {
+                    Text("8 caractères minimum")
+                } icon: {
+                    Image(systemName: newValue.count >= 8 ? "checkmark" : "info.circle")
+                }
+                .font(SQType.caption(newValue.count >= 8 ? .semibold : .regular))
+                .foregroundStyle(newValue.count >= 8 ? SQColor.success : SQColor.labelSecondary)
+                .padding(.leading, SQSpace.xs)
+                .padding(.top, -SQSpace.sm)
+                if let error {
+                    SQNotice(message: error, systemImage: "exclamationmark.triangle", tone: .danger)
+                        .accessibilityIdentifier("settings.password.error")
+                }
+                if success {
+                    SQNotice(message: "Mot de passe modifié", systemImage: "checkmark.circle", tone: .success)
+                        .accessibilityIdentifier("settings.password.success")
+                }
+                GradientButton("Mettre à jour", isBusy: isBusy) {
                     Task { await save() }
                 }
                 .disabled(!canSubmit)
+                .accessibilityIdentifier("settings.password.submit")
             }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets())
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
-        .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.interactively)
         .signalQuestBackground()
         .navigationTitle("Mot de passe")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
     }
 
     private var canSubmit: Bool {
-        newValue.count >= 8 && newValue == confirm && !current.isEmpty && !isBusy
+        newValue.count >= 8 && !current.isEmpty && !isBusy
     }
 
     private func save() async {
@@ -2686,7 +2928,7 @@ struct ChangePasswordView: View {
             success = true
             current = ""
             newValue = ""
-            confirm = ""
+            focus = nil
             UIAccessibility.post(notification: .announcement, argument: String(localized: "Mot de passe modifié"))
         } catch {
             self.error = error.userFacingMessage
@@ -2729,127 +2971,158 @@ private struct DeleteAccountSheet: View {
     @State private var selectedMethod: ReauthMethod?
     @State private var hasAcknowledged = false
     @State private var isBusy = false
+    @FocusState private var passwordFocused: Bool
+    @FocusState private var codeFocused: Bool
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.largeTitle)
-                        .foregroundStyle(SQColor.danger)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack {
+                    Spacer(minLength: 0)
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "settings.delete.close") {
+                        dismiss()
+                    }
+                    .disabled(isBusy)
+                }
+                Image(systemName: "trash")
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(SQColor.dangerInk)
+                    .frame(width: 48, height: 48)
+                    .background(SQColor.dangerSoft, in: Circle())
+                    .accessibilityHidden(true)
+                    .padding(.top, -SQSpace.md)
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
                     Text("Supprimer ton compte")
-                        .font(SQType.title)
-                        .sqHeader()
+                        .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
                         .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .sqHeader()
+                    Text("C’est définitif. Voici ce qui se passe pour tes données.")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
-                    if model.isDeletionPreviewLoading && model.deletionPreview == nil {
-                        HStack(spacing: SQSpace.sm) {
-                            SQSpinner().tint(SQColor.brandRed)
-                            Text("Vérification des données concernées…")
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    } else if let preview = model.deletionPreview {
-                        deletionInventory(preview)
-                        if !soleAdminGroups.isEmpty {
-                            Label(
-                                String(localized: "Tu es le seul admin de \(soleAdminGroups.count) groupe(s) chiffré(s) : leur membre le plus ancien sera nommé admin."),
-                                systemImage: "person.badge.shield.checkmark"
-                            )
-                            .font(SQType.body)
+                if model.isDeletionPreviewLoading && model.deletionPreview == nil {
+                    HStack(spacing: SQSpace.sm) {
+                        SQSpinner().tint(SQColor.brandRed)
+                        Text("Vérification des données concernées…")
                             .foregroundStyle(SQColor.labelSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        }
-                        reauthentication(preview)
-                    } else {
-                        Text("Impossible de charger le détail de la suppression. Aucun compte ne sera supprimé tant que cette vérification échoue.")
-                            .font(SQType.body)
-                            .foregroundStyle(SQColor.labelSecondary)
-                        Button {
-                            Task { await loadPreview() }
-                        } label: {
-                            Text("Réessayer")
-                                .font(SQType.button)
-                                .foregroundStyle(SQColor.label)
-                                .padding(.horizontal, SQSpace.xl)
-                                .frame(minHeight: 44)
-                                .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
-                                .sqShadowSoft()
-                        }
-                        .buttonStyle(SQPressButtonStyle())
                     }
-
-                    if let error = model.deletionError {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else if let preview = model.deletionPreview {
+                    deletionInventory(preview)
+                    if !soleAdminGroups.isEmpty {
+                        Label(
+                            String(localized: "Tu es le seul admin de \(soleAdminGroups.count) groupe(s) chiffré(s) : leur membre le plus ancien sera nommé admin."),
+                            systemImage: "person.badge.shield.checkmark"
+                        )
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    reauthentication(preview)
+                } else {
+                    SQNotice(message: String(localized: "Impossible de charger le détail de la suppression. Aucun compte ne sera supprimé tant que cette vérification échoue."),
+                             systemImage: "exclamationmark.triangle", tone: .danger)
+                    GradientButton("Réessayer", systemImage: "arrow.clockwise", style: .secondary) {
+                        Task { await loadPreview() }
                     }
                 }
-                .padding(SQSpace.xl)
-            }
-            .signalQuestBackground()
-            .navigationTitle("Suppression")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
+
+                if let error = model.deletionError {
+                    SQNotice(message: error, systemImage: "exclamationmark.triangle", tone: .danger)
                 }
             }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(.interactively)
         .task { await loadPreview() }
         .task { await loadSoleAdminGroups() }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
+        .sqSheet(background: SQColor.bg)
         .interactiveDismissDisabled(isBusy)
     }
 
     @ViewBuilder
     private func deletionInventory(_ preview: AccountDeletionPreview) -> some View {
-        Text(preview.warning)
-            .font(SQType.body)
-            .foregroundStyle(SQColor.labelSecondary)
-            .fixedSize(horizontal: false, vertical: true)
+        if !preview.warning.isEmpty {
+            Text(preview.warning)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
 
         inventoryGroup(
             title: "Sera supprimé",
-            systemImage: "trash",
-            color: SQColor.danger,
+            color: SQColor.dangerInk,
             values: preview.willBeDeleted
         )
         inventoryGroup(
             title: "Sera anonymisé et conservé",
-            systemImage: "person.crop.circle.badge.questionmark",
-            color: SQColor.warning,
+            color: SQColor.labelSecondary,
             values: preview.willBeAnonymized
         )
 
-        Toggle(isOn: $hasAcknowledged) {
-            Text("J’ai compris que cette action est irréversible et que mes contributions listées ci-dessus resteront anonymisées.")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.label)
+        Button { hasAcknowledged.toggle() } label: {
+            HStack(alignment: .top, spacing: SQSpace.sm2) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(hasAcknowledged ? SQColor.brandRed : Color.clear)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(hasAcknowledged ? SQColor.brandRed : SQColor.labelSecondary, lineWidth: 1.5)
+                    }
+                    .overlay {
+                        if hasAcknowledged {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .heavy))
+                                .foregroundStyle(SQColor.onAccent)
+                        }
+                    }
+                    .frame(width: 22, height: 22)
+                Text("J’ai compris que cette action est irréversible et que mes contributions listées ci-dessus resteront anonymisées.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.ink2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .tint(SQColor.brandRed)
+        .buttonStyle(.plain)
+        .accessibilityValue(hasAcknowledged ? Text("Cochée") : Text("Non cochée"))
+        .accessibilityAddTraits(hasAcknowledged ? .isSelected : [])
+        .accessibilityIdentifier("settings.delete.acknowledge")
     }
 
     private func inventoryGroup(
         title: LocalizedStringKey,
-        systemImage: String,
         color: Color,
         values: [String: String]
     ) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Label(title, systemImage: systemImage)
-                .font(SQType.heading)
+            Text(title)
+                .font(SQType.callout(.bold))
                 .foregroundStyle(color)
+                .sqHeader()
             ForEach(values.sorted(by: { $0.key < $1.key }), id: \.key) { item in
-                Text("• \(item.value)")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    Circle().fill(color).frame(width: 5, height: 5).accessibilityHidden(true)
+                    Text(verbatim: item.value)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
-        .padding(SQSpace.md)
+        .padding(SQSpace.md2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -2858,8 +3131,8 @@ private struct DeleteAccountSheet: View {
         if !methods.isEmpty {
             VStack(alignment: .leading, spacing: SQSpace.sm) {
                 Text("Confirmer ton identité")
-                    .font(SQType.heading)
-                    .foregroundStyle(SQColor.label)
+                    .sqKicker()
+                    .sqHeader()
 
                 if methods.count > 1 {
                     Picker("Méthode", selection: $selectedMethod) {
@@ -2890,10 +3163,13 @@ private struct DeleteAccountSheet: View {
 
     private var passwordConfirmation: some View {
         VStack(spacing: SQSpace.md) {
-            SecureField("Mot de passe", text: $password)
-                .textContentType(.password)
-                .autocorrectionDisabled()
-                .textFieldStyle(SQTextFieldStyle())
+            AuthFieldGroup {
+                AuthFieldRow("Mot de passe", isFocused: passwordFocused) {
+                    AuthPasswordInput(label: "Mot de passe", text: $password, contentType: .password,
+                                      identifier: "settings.delete.password")
+                        .focused($passwordFocused)
+                } onTap: { passwordFocused = true }
+            }
             destructiveButton(disabled: password.isEmpty) {
                 await delete(using: .password(password))
             }
@@ -2912,7 +3188,7 @@ private struct DeleteAccountSheet: View {
             }
             .signInWithAppleButtonStyle(SQOledPalette.appleButtonStyle(colorScheme))
             .frame(height: 50)
-            .clipShape(RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+            .clipShape(Capsule(style: .continuous))
             .disabled(!hasAcknowledged || isBusy)
             .opacity(hasAcknowledged && !isBusy ? 1 : 0.5)
         }
@@ -2924,14 +3200,19 @@ private struct DeleteAccountSheet: View {
             Text("Code envoyé à \(challenge.maskedEmail). Il expire dans 10 minutes et ne peut être utilisé qu’une fois.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
-            TextField("Code à 6 chiffres", text: $emailCode)
-                .keyboardType(.numberPad)
-                .textContentType(.oneTimeCode)
-                .autocorrectionDisabled()
-                .textFieldStyle(SQTextFieldStyle())
-                .onChangeCompat(of: emailCode) { _, value in
-                    emailCode = String(value.filter(\.isNumber).prefix(6))
-                }
+            AuthFieldGroup {
+                AuthFieldRow("Code à 6 chiffres", isFocused: codeFocused) {
+                    TextField("Code à 6 chiffres", text: $emailCode, prompt: Text(verbatim: ""))
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .autocorrectionDisabled()
+                        .focused($codeFocused)
+                        .accessibilityIdentifier("settings.delete.code")
+                        .onChangeCompat(of: emailCode) { _, value in
+                            emailCode = String(value.filter(\.isNumber).prefix(6))
+                        }
+                } onTap: { codeFocused = true }
+            }
             destructiveButton(disabled: emailCode.count != 6) {
                 await delete(using: .email(challengeId: challenge.challengeId, code: emailCode))
             }

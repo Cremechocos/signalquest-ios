@@ -22,12 +22,22 @@ struct PrivacySettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                SQSettingsHeader(title: "Confidentialité",
+                                 subtitle: "Ce que tes amis et la communauté voient de toi.",
+                                 backIdentifier: "privacy.back")
+            }
+            .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.md, trailing: 0))
+            .listRowBackground(Color.clear)
+
             if model.isLoadingPrivacy && !model.loaded {
                 Section { ProgressView("Chargement des partages…") }.listRowBackground(SQColor.surface)
             }
             if let error = model.privacyError {
-                Section("Partages") {
+                Section {
                     loadError(error, hasPrevious: model.loaded) { await model.loadPrivacy() }
+                } header: {
+                    Text("Partages").sqKicker()
                 }
                 .listRowBackground(SQColor.dangerSoft)
             }
@@ -36,7 +46,7 @@ struct PrivacySettingsView: View {
                 // utilisateur, jamais par `apply()` (qui écrit la @Published
                 // directement au chargement) — on n'ouvre donc la divulgation que
                 // sur une activation VOLONTAIRE (PRIV-LOC-CONSENT-01).
-                Toggle("Partager ma position en direct", isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { model.shareLiveLocationWithFriends },
                     set: { isOn in
                         model.shareLiveLocationWithFriends = isOn
@@ -44,32 +54,44 @@ struct PrivacySettingsView: View {
                         // enregistré avant « Activer le partage ».
                         if isOn { showLiveShareDisclosure = true } else { commitPrivacy() }
                     }
-                ))
-                Toggle("Partager mes données radio", isOn: committing($model.shareRadioDataWithFriends))
-                Toggle("Partager mes sessions", isOn: committing($model.shareSessionsWithFriends))
-                Toggle("Afficher mes photos sur la carte Amis", isOn: committing($model.sharePhotosOnFriendMap))
+                )) {
+                    SQSettingsRowLabel("Ma position en direct", systemImage: "location")
+                }
                 if model.shareLiveLocationWithFriends {
-                    Picker("Quand partager ma position", selection: $model.liveShareMode) {
+                    SQSettingsMenuRow("Quand partager", systemImage: "clock", selection: $model.liveShareMode,
+                                      valueLabel: model.liveShareMode.label) {
                         ForEach(LiveShareMode.allCases) { mode in
                             Text(mode.label).tag(mode)
                         }
                     }
-                    .tint(SQColor.accentInk)
+                }
+                Toggle(isOn: committing($model.shareRadioDataWithFriends)) {
+                    SQSettingsRowLabel("Mes données radio", systemImage: "antenna.radiowaves.left.and.right")
+                }
+                Toggle(isOn: committing($model.shareSessionsWithFriends)) {
+                    SQSettingsRowLabel("Mes sessions", systemImage: "point.topleft.down.curvedto.point.bottomright.up")
+                }
+                Toggle(isOn: committing($model.sharePhotosOnFriendMap)) {
+                    SQSettingsRowLabel("Mes photos sur la carte", systemImage: "photo")
                 }
             } header: {
-                Text("Carte des amis")
+                Text("Carte des amis").sqKicker()
             } footer: {
                 Text(model.shareLiveLocationWithFriends
                      ? model.liveShareMode.detail
-                     : String(localized: "Ces partages sont désactivés par défaut. Les désactiver retire aussi les données temps réel déjà publiées."))
+                     : String(localized: "Ces partages sont désactivés par défaut. Désactiver un partage retire aussi ce qui était déjà publié en direct."))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
             .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
 
             if let error = model.preferencesError {
-                Section("Préférences du compte") {
+                Section {
                     loadError(error, hasPrevious: model.preferencesLoaded) { await model.loadPreferences() }
+                } header: {
+                    Text("Préférences du compte").sqKicker()
                 }
                 .listRowBackground(SQColor.dangerSoft)
             }
@@ -77,46 +99,50 @@ struct PrivacySettingsView: View {
                 Section { ProgressView("Chargement des préférences…") }.listRowBackground(SQColor.surface)
             }
 
-            // ── Classements ──────────────────────────────────────────────────
+            // ── Profil public ────────────────────────────────────────────────
             Section {
-                Toggle(
-                    "Afficher mon identifiant plutôt que mon nom",
-                    isOn: Binding(
-                        get: { model.preferences.showHandleOnLeaderboard },
-                        set: { value in Task { await model.setShowHandleOnLeaderboard(value) } }
-                    )
-                )
-            } header: {
-                Text("Classements")
-            } footer: {
-                Text("Les classements sont publics. Ce réglage y remplace ton nom par ton @, sans te retirer du classement.")
-            }
-            .tint(SQColor.brandRed)
-            .listRowBackground(SQColor.surface)
-            .disabled(!model.preferencesLoaded || model.isLoadingPreferences || model.isSavingPreferences || !model.isSessionCurrent)
-
-            // ── Unités ───────────────────────────────────────────────────────
-            Section {
-                Picker(
-                    "Distances",
-                    selection: Binding(
-                        get: { model.preferences.unitsSystem },
-                        set: { value in Task { await model.setUnits(value) } }
-                    )
-                ) {
-                    ForEach(SQUnitsSystem.allCases, id: \.self) { system in
-                        Text(system.label).tag(system)
-                    }
+                Toggle(isOn: Binding(
+                    get: { model.preferences.showHandleOnLeaderboard },
+                    set: { value in Task { await model.setShowHandleOnLeaderboard(value) } }
+                )) {
+                    SQSettingsRowLabel("Afficher mon @", systemImage: "trophy",
+                                       subtitle: String(localized: "Au lieu de ton nom dans les classements"))
                 }
-                .tint(SQColor.accentInk)
+                .accessibilityHint("Les classements sont publics. Ce réglage y remplace ton nom par ton @, sans te retirer du classement.")
+                .disabled(!model.preferencesLoaded || model.isLoadingPreferences || model.isSavingPreferences || !model.isSessionCurrent)
+                SQSettingsMenuRow("Dernière activité visible", systemImage: "clock",
+                                  selection: committing($model.lastSeenVisibility),
+                                  valueLabel: model.lastSeenVisibility == .friends
+                                      ? String(localized: "À mes amis") : String(localized: "À personne")) {
+                    Text("À mes amis").tag(LastSeenVisibility.friends)
+                    Text("À personne").tag(LastSeenVisibility.none)
+                }
+                .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
+                SQSettingsMenuRow("Qui peut m’écrire", systemImage: "bubble.left",
+                                  selection: committing($model.messageRequestPolicy),
+                                  valueLabel: messagePolicyLabel) {
+                    Text("Tout le monde").tag(MessageRequestPolicy.everyone)
+                    Text("Mes amis uniquement").tag(MessageRequestPolicy.friendsOnly)
+                    Text("Personne").tag(MessageRequestPolicy.noOne)
+                }
+                .accessibilityHint("Ce réglage contrôle les nouvelles demandes de conversation. Les conversations existantes restent accessibles.")
+                .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
             } header: {
-                Text("Unités")
-            } footer: {
-                Text("\(model.preferences.unitsSystem.hint). Le réglage s'applique partout dans l'app et suit ton compte sur le web et Android.")
+                Text("Profil public").sqKicker()
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
-            .disabled(!model.preferencesLoaded || model.isLoadingPreferences || model.isSavingPreferences || !model.isSessionCurrent)
+
+            Section {
+                // Le statut a son propre chargement et son « Réessayer » : la
+                // désactivation de la section le grisait et le rendait inopérant.
+                PresencePreferenceControls(service: services.livePresence)
+                    .disabled(!model.isSessionCurrent)
+            } header: {
+                Text("Présence").sqKicker()
+            }
+            .tint(SQColor.brandRed)
+            .listRowBackground(SQColor.surface)
 
             // ── Zones privées ────────────────────────────────────────────────
             //
@@ -163,75 +189,56 @@ struct PrivacySettingsView: View {
                         }
                     }
                 }
-                Button {
-                    zoneEditor = PrivacyZoneEditorRoute(zone: nil)
-                } label: {
-                    Label("Créer une zone privée", systemImage: "plus.circle.fill")
-                }
-                .accessibilityIdentifier("privacy.zone.create")
-                .disabled(!model.zonesLoaded || model.isLoadingZones || model.zoneBusyId != nil || !model.isSessionCurrent)
             } header: {
-                Text("Zones privées")
+                HStack {
+                    Text("Zones privées").sqKicker()
+                    Spacer(minLength: SQSpace.sm)
+                    Button {
+                        zoneEditor = PrivacyZoneEditorRoute(zone: nil)
+                    } label: {
+                        Text("Ajouter")
+                            .font(SQType.caption(.bold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .textCase(nil)
+                    .accessibilityLabel("Créer une zone privée")
+                    .accessibilityIdentifier("privacy.zone.create")
+                    .disabled(!model.zonesLoaded || model.isLoadingZones || model.zoneBusyId != nil || !model.isSessionCurrent)
+                }
             } footer: {
                 Text("Les nouveaux speedtests sont protégés lorsqu’une zone est active et que son masquage est activé. Touche un lieu pour modifier son nom, sa position ou son rayon.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
 
             Section {
-                Label("Positions publiques exactes", systemImage: "location.fill")
+                SQSettingsRowLabel("Positions publiques exactes", systemImage: "location.fill")
             } header: {
-                Text("Mesures publiques")
+                Text("Mesures publiques").sqKicker()
             } footer: {
                 Text("Lorsqu’une mesure est publiée, sa position disponible est exacte. Les zones privées actives peuvent protéger tes nouveaux speedtests.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
-            .tint(SQColor.brandRed)
-            .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
-
-            Section("Présence") {
-                // Le statut a son propre chargement et son « Réessayer » : la
-                // désactivation de la section le grisait et le rendait inopérant.
-                PresencePreferenceControls(service: services.livePresence)
-                    .disabled(!model.isSessionCurrent)
-                Picker("Afficher ma dernière activité", selection: committing($model.lastSeenVisibility)) {
-                    Text("À mes amis").tag(LastSeenVisibility.friends)
-                    Text("À personne").tag(LastSeenVisibility.none)
-                }
-                .tint(SQColor.accentInk)
-                .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
-            }
-            .tint(SQColor.brandRed)
-            .foregroundStyle(SQColor.label)
-            .listRowBackground(SQColor.surface)
-
-            Section {
-                Picker("Qui peut me contacter", selection: committing($model.messageRequestPolicy)) {
-                    Text("Tout le monde").tag(MessageRequestPolicy.everyone)
-                    Text("Mes amis uniquement").tag(MessageRequestPolicy.friendsOnly)
-                    Text("Personne").tag(MessageRequestPolicy.noOne)
-                }
-                .tint(SQColor.accentInk)
-            } header: {
-                Text("Messages privés")
-            } footer: {
-                Text("Ce réglage contrôle les nouvelles demandes de conversation. Les conversations existantes restent accessibles.")
-            }
-            .tint(SQColor.brandRed)
-            .foregroundStyle(SQColor.label)
-            .listRowBackground(SQColor.surface)
-            .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
 
             if let error = model.errorMessage {
                 Section { Text(error).foregroundStyle(SQColor.dangerInk) }
                     .listRowBackground(SQColor.dangerSoft)
             }
         }
+        .modifier(CompactListMargins())
         .scrollContentBackground(.hidden)
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Confidentialité")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .task {
             // Le modèle propage l'unité au reste de l'app via ce miroir.
             model.unitsStore = unitsStore
@@ -269,19 +276,23 @@ struct PrivacySettingsView: View {
         }
     }
 
+    private var messagePolicyLabel: String {
+        switch model.messageRequestPolicy {
+        case .everyone: String(localized: "Tout le monde")
+        case .friendsOnly: String(localized: "Mes amis uniquement")
+        case .noOne: String(localized: "Personne")
+        }
+    }
+
     @ViewBuilder
     private func zoneRow(_ zone: PrivacyZone) -> some View {
         HStack(spacing: SQSpace.md) {
             Button { zoneEditor = PrivacyZoneEditorRoute(zone: zone) } label: {
                 HStack(spacing: SQSpace.md) {
-                    Image(systemName: zone.typeIcon)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(SQColor.brandRed)
-                        .frame(width: 28)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 1) {
+                    ProfileMenuIcon(systemImage: zone.typeIcon, tint: SQColor.labelSecondary, fill: SQColor.surfaceMuted)
+                    VStack(alignment: .leading, spacing: SQSpace.xxs) {
                         Text(zone.name)
-                            .font(SQFont.body(15, .medium))
+                            .font(SQFont.body(16, .semibold, relativeTo: .body))
                             .foregroundStyle(SQColor.label)
                             .lineLimit(2)
                         Text([zone.typeLabel == zone.name ? "" : zone.typeLabel, zone.summary]
@@ -291,7 +302,10 @@ struct PrivacySettingsView: View {
                             .lineLimit(2)
                     }
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").font(.caption).accessibilityHidden(true)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color(uiColor: .tertiaryLabel))
+                        .accessibilityHidden(true)
                 }
                 .contentShape(Rectangle())
             }
@@ -363,12 +377,13 @@ private struct PresencePreferenceControls: View {
 
     var body: some View {
         if service.presenceLoaded {
-        Picker(
-            "Mon statut",
+        SQSettingsMenuRow(
+            "Mon statut", systemImage: "person.crop.circle",
             selection: Binding(
                 get: { service.status },
                 set: { service.setPresence(status: $0, customStatus: service.customStatus) }
-            )
+            ),
+            valueLabel: service.status.label
         ) {
             ForEach(
                 [SocialPresenceStatus.online, .away, .dnd, .invisible],

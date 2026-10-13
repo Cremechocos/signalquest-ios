@@ -83,7 +83,7 @@ final class AccountSettingsQATests: XCTestCase {
         try Data(#"{"path":"/api/user/zones","mode":"503"}"#.utf8).write(to: fault, options: .atomic)
         defer { try? FileManager.default.removeItem(at: fault) }
         privacy.tap()
-        XCTAssertTrue(app.navigationBars["Confidentialité"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["privacy.back"].waitForExistence(timeout: 10))
         let retry = app.buttons["privacy.zone.retry"]
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(retry, in: app))
         XCTAssertFalse(app.staticTexts["Aucune zone privée enregistrée. Ajoute un lieu à protéger."].exists,
@@ -137,7 +137,7 @@ final class AccountSettingsQATests: XCTestCase {
             let entry = app.staticTexts[title].firstMatch
             XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(entry, in: app))
             entry.tap()
-            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.buttons["privacy.back"].waitForExistence(timeout: 10))
             let create = app.buttons["privacy.zone.create"]
             XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(create, in: app))
             let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: create)
@@ -213,7 +213,7 @@ final class AccountSettingsQATests: XCTestCase {
         let privacy = app.staticTexts[privacyTitle].firstMatch
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(privacy, in: app))
         privacy.tap()
-        XCTAssertTrue(app.navigationBars[privacyTitle].waitForExistence(timeout: 10),
+        XCTAssertTrue(app.buttons["privacy.back"].waitForExistence(timeout: 10),
                       "Le tap doit ouvrir les réglages de confidentialité, pas un lien légal")
         let create = app.buttons["privacy.zone.create"]
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(create, in: app))
@@ -315,10 +315,11 @@ final class AccountSettingsQATests: XCTestCase {
         Thread.sleep(forTimeInterval: 6)
         snap(app, "reglages-01-haut")
 
-        // Les trois sections nouvelles. On les cherche en défilant : elles sont
-        // sous les partages, qui occupent déjà un écran.
-        for header in ["Zones privées", "Classements", "Unités"] {
-            let section = app.staticTexts[header].firstMatch
+        // Les sections de compte. On les cherche en défilant : elles sont sous
+        // les partages, qui occupent déjà un écran. Les unités sont passées
+        // dans Réglages ; les intertitres s'affichent en capitales.
+        for header in ["Zones privées", "Profil public"] {
+            let section = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", header)).firstMatch
             XCTAssertTrue(
                 SignalQuestUITestSupport.scrollToHittable(section, in: app),
                 "La section « \(header) » manque"

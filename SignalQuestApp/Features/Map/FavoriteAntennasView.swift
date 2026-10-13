@@ -262,7 +262,7 @@ struct FavoriteAntennasView: View {
 /// Marges d'une liste groupée sous un en-tête maison : sans elles, la liste
 /// laisse une cinquantaine de points vides sous la barre d'état. Disponible à
 /// partir d'iOS 17 ; iOS 16 garde les marges du système.
-private struct CompactListMargins: ViewModifier {
+struct CompactListMargins: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 17.0, *) {
             content

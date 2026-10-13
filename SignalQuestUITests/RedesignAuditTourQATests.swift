@@ -114,7 +114,7 @@ final class RedesignAuditTourQATests: XCTestCase {
 
         // Éditer le profil (sheet).
         gotoTab("Profil", in: app)
-        if tapIfExists(app.buttons["Éditer le profil"], in: app) {
+        if tapIfExists(app.buttons["profile.edit"], in: app) {
             Thread.sleep(forTimeInterval: 2)
             snap(app, "b9-editer-profil")
             dismissSheet(app)

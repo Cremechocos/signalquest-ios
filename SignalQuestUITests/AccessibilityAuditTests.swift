@@ -123,10 +123,10 @@ final class AccessibilityAuditTests: XCTestCase {
                 "community.networkPulse", "feed.metadata", "feed.tag", "feed.metric.label",
                 "feed.metric.value", "feed.speedtest.subtitle",
                 "feed.story.name", "feed.hashtag", "feed.avatar.initial",
-                "settings.label.Noir intense (OLED)",
+                "settings.label.Noir intense",
                 // Aides d'Apparence en `.footnote` et pieds de section des
                 // Notifications (styles système) : faux positif iOS 27 (Lot 4g).
-                "settings.help.", "settings.footer.", "notifications.footer.", "notifications.header.",
+                "settings.help.", "settings.footer.", "settings.header.", "notifications.footer.", "notifications.header.",
                 // Lot 4b : la pastille « Drive Test » cède la place à l'icône aux
                 // grandes tailles (ViewThatFits) ; la passe AX XXL la vérifie.
                 "speedtest.driveTest.label",
@@ -342,11 +342,9 @@ final class AccessibilityAuditTests: XCTestCase {
         entry.tap()
         _ = app.switches.firstMatch.waitForExistence(timeout: 10)
         audit(app, screen: "Réglages", blocking: true)
-        let oledHelp = app.staticTexts.matching(NSPredicate(
-            format: "label BEGINSWITH %@", "En thème sombre, les fonds passent au noir pur"
-        )).firstMatch
-        // Depuis que la ligne « Appareils » est masquée (Lot 4e), l'aide peut
-        // être visible d'emblée : on défile seulement si elle ne l'est pas.
+        // L'aide OLED est le sous-titre de la ligne « Noir intense », lue avec
+        // son interrupteur : on défile jusqu'à lui s'il n'est pas visible.
+        let oledHelp = app.switches["settings.oled"].firstMatch
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(oledHelp, in: app),
                       "Aide OLED non visible après défilement")
         let dock = app.descendants(matching: .any)["main.navigation"]

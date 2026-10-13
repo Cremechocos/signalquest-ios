@@ -21,6 +21,8 @@ struct EditProfileView: View {
     @State private var avatarPreview: UIImage?
     @State private var isBusy = false
     @State private var error: String?
+    private enum Field { case name, bio }
+    @FocusState private var focus: Field?
 
     init(user: AuthUser) {
         self.user = user
@@ -31,43 +33,65 @@ struct EditProfileView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: SQSpace.xl) {
-                    avatarEditor
-                        .padding(.top, SQSpace.md)
-                        .sqFadeUp()
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack {
+                    Spacer(minLength: 0)
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "profile.edit.close") {
+                        dismiss()
+                    }
+                }
+                Text("Modifier le profil")
+                    .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .sqHeader()
 
-                    VStack(alignment: .leading, spacing: SQSpace.sm2) {
-                        Text("Identité")
-                            .font(SQType.heading)
-                            .foregroundStyle(SQColor.label)
-                        TextField("Nom", text: $name)
+                avatarEditor
+
+                AuthFieldGroup {
+                    AuthFieldRow("Nom affiché", isFocused: focus == .name) {
+                        TextField("Nom affiché", text: $name, prompt: SQFormPrompt.text("Ton nom"))
                             .textContentType(.name)
-                            .textFieldStyle(SQTextFieldStyle())
-                        Button { showHandleSheet = true } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Nom d’utilisateur")
-                                        .font(SQType.micro)
-                                        .foregroundStyle(SQColor.labelSecondary)
-                                    Text(currentHandle.isEmpty ? String(localized: "Choisir un nom d’utilisateur") : "@\(currentHandle)")
-                                        .font(SQType.body)
-                                        .foregroundStyle(SQColor.label)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(SQColor.labelTertiary)
+                            .submitLabel(.next)
+                            .focused($focus, equals: .name)
+                            .onSubmit { focus = .bio }
+                            .accessibilityLabel("Nom affiché")
+                            .accessibilityIdentifier("profile.edit.name")
+                    } onTap: { focus = .name }
+                    AuthFieldDivider()
+                    Button { showHandleSheet = true } label: {
+                        HStack(spacing: SQSpace.sm) {
+                            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                                Text("Nom d’utilisateur")
+                                    .font(SQType.caption(.bold))
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                Text(currentHandle.isEmpty ? String(localized: "Choisir un nom d’utilisateur") : "@\(currentHandle)")
+                                    .font(SQType.body)
+                                    .foregroundStyle(SQColor.label)
                             }
-                            .padding(SQSpace.md)
-                            .frame(minHeight: 44)
-                            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color(uiColor: .tertiaryLabel))
+                                .accessibilityHidden(true)
                         }
-                        .buttonStyle(.plain)
-                        TextField("Bio", text: $bio, axis: .vertical)
-                            .lineLimit(2...4)
-                            .textFieldStyle(SQTextFieldStyle())
+                        .padding(.horizontal, SQSpace.md2)
+                        .padding(.vertical, SQSpace.sm2)
+                        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("profile.edit.handle")
+                    AuthFieldDivider()
+                    AuthFieldRow("Bio", isFocused: focus == .bio,
+                                 accessory: Text(verbatim: "\(bio.count) / \(Self.bioCharacterLimit)")) {
+                        TextField("Bio", text: $bio, prompt: SQFormPrompt.text("Quelques mots sur toi"), axis: .vertical)
+                            .lineLimit(2...5)
+                            .focused($focus, equals: .bio)
+                            .accessibilityLabel("Bio")
+                            .accessibilityValue(Text("\(bio.count) caractères sur \(Self.bioCharacterLimit)"))
+                            .accessibilityIdentifier("profile.edit.bio")
                             // Limite + compteur côté client (EDITPROFILE-AVATAR-BIO-07) :
                             // évite qu'une bio trop longue soit rejetée par le serveur
                             // sans indication.
@@ -76,56 +100,62 @@ struct EditProfileView: View {
                                     bio = String(newValue.prefix(Self.bioCharacterLimit))
                                 }
                             }
-                        Text("\(bio.count)/\(Self.bioCharacterLimit)")
-                            .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-                    .sqFadeUp()
+                    } onTap: { focus = .bio }
+                }
 
-                    if let error {
-                        Text(error)
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(SQSpace.md)
-                            .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    }
+                Text("Ton nom et ta bio sont visibles sur ton profil public et dans les classements.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, SQSpace.xs)
+                    .padding(.top, -SQSpace.xs)
 
-                    GradientButton("Enregistrer", systemImage: "checkmark.circle.fill", isBusy: isBusy) {
-                        Task { await save() }
-                    }
+                if let error {
+                    SQNotice(message: error, systemImage: "exclamationmark.triangle", tone: .danger)
                 }
-                .padding(SQSpace.lg)
-            }
-            .signalQuestBackground()
-            .navigationTitle("Éditer le profil")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
+
+                GradientButton("Enregistrer", isBusy: isBusy) {
+                    Task { await save() }
                 }
+                .disabled(!hasChanges || isBusy)
+                .accessibilityIdentifier("profile.edit.save")
             }
-            .onChangeCompat(of: avatarItem) { _, newValue in
-                guard let newValue else { return }
-                Task {
-                    // Aperçu d'avatar décodé réduit, pas en pleine taille (SOC-36).
-                    if let data = try? await newValue.loadTransferable(type: Data.self),
-                       let img = ImagePipeline.downsample(data: data, maxPixel: 600) {
-                        avatarPreview = img
-                    }
-                }
-            }
-            .sheet(isPresented: $showHandleSheet) {
-                // Le @pseudo est déjà enregistré côté serveur : l'en-tête du profil
-                // le relit sans attendre « Enregistrer » (qui peut ne jamais venir).
-                ChooseHandleSheet(onSuccess: { newHandle in
-                    currentHandle = newHandle
-                    Task { await session.refreshUser() }
-                })
-            }
-            .task { await loadProfileBio() }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .sqSheet(background: SQColor.bg)
+        .interactiveDismissDisabled(isBusy)
+        .onChangeCompat(of: avatarItem) { _, newValue in
+            guard let newValue else { return }
+            Task {
+                // Aperçu d'avatar décodé réduit, pas en pleine taille (SOC-36).
+                if let data = try? await newValue.loadTransferable(type: Data.self),
+                   let img = ImagePipeline.downsample(data: data, maxPixel: 600) {
+                    avatarPreview = img
+                }
+            }
+        }
+        .sheet(isPresented: $showHandleSheet) {
+            // Le @pseudo est déjà enregistré côté serveur : l'en-tête du profil
+            // le relit sans attendre « Enregistrer » (qui peut ne jamais venir).
+            ChooseHandleSheet(onSuccess: { newHandle in
+                currentHandle = newHandle
+                Task { await session.refreshUser() }
+            })
+        }
+        .task { await loadProfileBio() }
+    }
+
+    /// Le @pseudo s'enregistre dans sa propre feuille : seuls le nom, la bio et
+    /// la photo attendent « Enregistrer ».
+    private var hasChanges: Bool {
+        avatarPreview != nil
+            || name.trimmingCharacters(in: .whitespacesAndNewlines) != (user.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            || bio.trimmingCharacters(in: .whitespacesAndNewlines) != loadedBio.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Recharge la bio depuis le serveur pour préremplir le champ sans l'écraser.
@@ -139,29 +169,29 @@ struct EditProfileView: View {
     }
 
     private var avatarEditor: some View {
-        ZStack(alignment: .bottomTrailing) {
+        VStack(spacing: SQSpace.sm) {
             Group {
                 if let image = avatarPreview {
                     Image(uiImage: image)
                         .resizable().scaledToFill()
-                        .frame(width: 96, height: 96)
+                        .frame(width: 84, height: 84)
                         .clipShape(Circle())
                 } else {
-                    SQAvatar(url: user.avatarUrl, name: user.displayName, size: 96)
+                    SQAvatar(url: user.avatarUrl, name: user.displayName, size: 84)
                 }
             }
             .accessibilityHidden(true)
             PhotosPicker(selection: $avatarItem, matching: .images) {
-                Image(systemName: "camera.fill")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(SQColor.onAccent)
-                    .frame(width: 32, height: 32)
-                    .background(SQColor.brandRed, in: Circle())
-                    .overlay { Circle().stroke(SQColor.bg, lineWidth: 2) }
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
+                Text("Changer la photo")
+                    .font(SQType.callout(.semibold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+                    .padding(.horizontal, SQSpace.sm)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("Changer la photo de profil")
+            .accessibilityIdentifier("profile.edit.photo")
+            .padding(.top, -SQSpace.xs)
         }
         .frame(maxWidth: .infinity)
     }

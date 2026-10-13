@@ -24,10 +24,10 @@ struct E2EEApprovalQRDeepLink: Identifiable {
     let id: String
 }
 
-/// Profil « Crème & Terre cuite » : en-tête centré (avatar 88 + ombre accent),
-/// carte stats 4 cellules, carte progression (niveau/points), menu en carte
-/// unique rayon 22 et déconnexion en capsule danger. Header custom scrollable
-/// (pas de titre nav système).
+/// Profil Halo : en-tête compact (photo, nom, @, « Modifier »), points, tests,
+/// validations et niveau sur une carte, tuiles Récompenses / Classements avec
+/// ce qui t'attend, sections en petites capitales, déconnexion en ligne rouge
+/// et version en pied. Header custom scrollable (pas de titre nav système).
 struct ProfileView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -46,6 +46,9 @@ struct ProfileView: View {
     @State private var progression: GamificationProfile?
     /// « À faire » de l'espace personnel (plan 3, vague 2).
     @State private var overview: UserOverview?
+    /// Rang de la semaine parmi les amis, sous la tuile Classements (même
+    /// source que le module « Ta semaine » de l'Accueil).
+    @State private var weekRank: Int?
     /// Fil de signalement à ouvrir en sheet (tap sur une notification
     /// `antenna_report_reply`), résolu depuis `router.openAntennaReportId`.
     @State private var deepLinkReport: AntennaReportDeepLink?
@@ -71,14 +74,15 @@ struct ProfileView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: SQSpace.cardPadding) {
+            VStack(spacing: SQSpace.md) {
                 profileHeader
                     .sqFadeUp()
                 if user.isEmailVerificationPending {
                     EmailVerificationCard(userID: user.id, email: user.email)
                 }
-                if let stats {
-                    statsCard(stats)
+                if stats != nil || levelProgress != nil {
+                    // Points, tests, validations et niveau sur une seule carte.
+                    statsCard(stats, progress: levelProgress)
                         .sqFadeUp()
                 } else if let statsError {
                     ErrorStateView(title: "Stats indisponibles", message: statsError) {
@@ -87,44 +91,24 @@ struct ProfileView: View {
                         .sqFadeUp()
                 }
 
-                if let progression, let level = progression.level,
-                   let goal = progression.xpToNextLevel, goal > 0 {
-                    progressionCard(level: level, points: progression.points ?? 0, goal: goal)
-                        .sqFadeUp()
-                }
-
-                // Récompenses, Classements, Territoires : juste sous le niveau
-                // et les points auxquels ils se rapportent.
+                // Récompenses et Classements : juste sous le niveau et les
+                // points auxquels ils se rapportent.
                 progressionTiles
 
-                GradientButton("Éditer le profil", systemImage: "person.crop.circle", style: .secondary) {
-                    showEdit = true
-                }
-
-                // Pas de sqFadeUp sur la carte menu : plus haute que le viewport,
-                // la scrollTransition ne l'amène jamais à l'identité → elle
-                // resterait estompée en permanence tant qu'on ne scrolle pas.
+                // Pas de sqFadeUp sur le menu : plus haut que le viewport, la
+                // scrollTransition ne l'amène jamais à l'identité → il resterait
+                // estompé en permanence tant qu'on ne scrolle pas.
                 menuCard
 
-                GradientButton("Déconnexion", systemImage: "rectangle.portrait.and.arrow.right", isBusy: isLoggingOut, style: .destructive) {
-                    confirmLogout = true
-                }
-                .disabled(isLoggingOut)
-                .confirmationDialog("Te déconnecter ?", isPresented: $confirmLogout, titleVisibility: .visible) {
-                    Button("Se déconnecter", role: .destructive) {
-                        guard !isLoggingOut else { return }
-                        isLoggingOut = true
-                        Task {
-                            await session.logout()
-                            isLoggingOut = false
-                        }
-                    }
-                    Button("Annuler", role: .cancel) {}
-                } message: {
-                    Text("Tu pourras te reconnecter à tout moment avec ton compte.")
-                }
+                logoutCard
+
+                Text(verbatim: Self.versionLine)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("profile.version")
             }
-            .padding(.horizontal, SQSpace.xl)
+            .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
@@ -301,22 +285,26 @@ struct ProfileView: View {
 
     // MARK: - En-tête
 
+    /// Photo, nom et @ sur une ligne, « Modifier » à droite. En très grand
+    /// texte, les trois s'empilent pour que le nom garde toute la largeur.
     private var profileHeader: some View {
-        VStack(spacing: SQSpace.sm2) {
-            SQAvatar(url: user.avatarUrl, name: user.displayName, size: 88)
-                .sqShadowAccent()
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.md))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: SQSpace.md2))
+        return layout {
+            SQAvatar(url: user.avatarUrl, name: user.displayName, size: 64)
                 .accessibilityHidden(true)
-            VStack(spacing: SQSpace.xxs) {
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
                 Text(user.displayName)
-                    .font(SQFont.display(26, .bold))
+                    .font(SQFont.display(22, .bold, relativeTo: .title2))
                     .foregroundStyle(SQColor.label)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(user.name == nil ? 1 : nil)
+                    .lineLimit(user.name == nil ? 1 : 2)
                     .truncationMode(.middle)
                     .accessibilityIdentifier("profile.displayName")
+                    .sqHeader()
                 if let handle = user.handle, !handle.isEmpty {
                     Text("@\(handle)")
-                        .font(SQFont.body(14, .medium))
+                        .font(SQType.callout)
                         .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -325,10 +313,9 @@ struct ProfileView: View {
                         showHandleSheet = true
                     } label: {
                         Text("Ajoute un nom d’utilisateur")
-                            .font(SQFont.body(14, .semibold))
+                            .font(SQType.callout(.semibold))
                             .foregroundStyle(SQColor.accentInk)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                            .multilineTextAlignment(.leading)
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())
                     }
@@ -336,48 +323,75 @@ struct ProfileView: View {
                     .accessibilityIdentifier("profile.chooseHandle")
                 }
             }
-            if user.twoFactorEnabled == true {
-                Text("2FA activée ✓")
-                    .font(SQFont.body(12, .semibold))
-                    .foregroundStyle(SQColor.success)
-                    .padding(.horizontal, SQSpace.md - 1)
-                    .padding(.vertical, SQSpace.xs + 1)
-                    .background(SQColor.successSoft, in: Capsule(style: .continuous))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                showEdit = true
+            } label: {
+                Label("Modifier", systemImage: "pencil")
+                    .font(SQType.callout(.bold))
+                    .foregroundStyle(SQColor.label)
+                    .padding(.horizontal, SQSpace.md2)
+                    .frame(minHeight: 36)
+                    .background(SQColor.surface, in: Capsule(style: .continuous))
+                    .overlay(Capsule(style: .continuous).stroke(SQColor.separator, lineWidth: 1))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel("Modifier le profil")
+            .accessibilityIdentifier("profile.edit")
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, SQSpace.xs)
     }
 
-    // MARK: - Stats
+    // MARK: - Stats et niveau
 
-    // Pas de cellule « Niveau » : la carte de progression juste en dessous
-    // porte déjà le niveau + la jauge (doublon signalé).
-    private func statsCard(_ stats: UserStats) -> some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: SQSpace.sm) {
-                    statCell(label: "Points", value: stats.totalPoints.map { $0.formatted() } ?? "—", accent: true)
-                    Divider().overlay(SQColor.separator)
-                    statCell(label: "Tests", value: stats.totalSpeedtests.map { $0.formatted() } ?? "—")
-                    if let validations = stats.totalValidations {
-                        Divider().overlay(SQColor.separator)
-                        statCell(label: "Validations", value: validations.formatted())
-                    }
-                }
-            } else {
-                HStack(spacing: 0) {
-                    statCell(label: "Points", value: stats.totalPoints.map { $0.formatted() } ?? "—", accent: true)
-                    statDivider
-                    statCell(label: "Tests", value: stats.totalSpeedtests.map { $0.formatted() } ?? "—")
-                    if let validations = stats.totalValidations {
-                        statDivider
-                        statCell(label: "Validations", value: validations.formatted())
+    /// Niveau et avancement dans le palier courant, quand le serveur les donne.
+    private var levelProgress: (level: Int, inLevel: Int, goal: Int)? {
+        guard let progression, let level = progression.level,
+              let goal = progression.xpToNextLevel, goal > 0 else { return nil }
+        // Même sémantique que la jauge de GamificationView : progression
+        // dans le niveau courant = points % palier.
+        return (level, (progression.points ?? 0) % goal, goal)
+    }
+
+    private func statsCard(_ stats: UserStats?, progress: (level: Int, inLevel: Int, goal: Int)?) -> some View {
+        VStack(spacing: SQSpace.md) {
+            if let stats {
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(spacing: SQSpace.sm) {
+                            statCell(label: "Points", value: stats.totalPoints.map { $0.formatted() } ?? "—", accent: true)
+                            Divider().overlay(SQColor.separator)
+                            statCell(label: "Tests", value: stats.totalSpeedtests.map { $0.formatted() } ?? "—")
+                            if let validations = stats.totalValidations {
+                                Divider().overlay(SQColor.separator)
+                                statCell(label: "Validations", value: validations.formatted())
+                            }
+                        }
+                    } else {
+                        HStack(spacing: 0) {
+                            statCell(label: "Points", value: stats.totalPoints.map { $0.formatted() } ?? "—", accent: true)
+                            statDivider
+                            statCell(label: "Tests", value: stats.totalSpeedtests.map { $0.formatted() } ?? "—")
+                            if let validations = stats.totalValidations {
+                                statDivider
+                                statCell(label: "Validations", value: validations.formatted())
+                            }
+                        }
                     }
                 }
             }
+            if let progress {
+                if stats != nil {
+                    Rectangle().fill(SQColor.separator).frame(height: 1).accessibilityHidden(true)
+                }
+                progressionRows(level: progress.level, inLevel: progress.inLevel, goal: progress.goal)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, SQSpace.lg)
+        .padding(SQSpace.lg)
         .sqCardBackground()
     }
 
@@ -407,65 +421,46 @@ struct ProfileView: View {
             .frame(width: 1, height: 34)
     }
 
-    // MARK: - Progression
-
-    private func progressionCard(level: Int, points: Int, goal: Int) -> some View {
-        // Même sémantique que la jauge de GamificationView : progression
-        // dans le niveau courant = points % palier.
-        let inLevel = points % goal
+    private func progressionRows(level: Int, inLevel: Int, goal: Int) -> some View {
         let progress = min(1, Double(inLevel) / Double(goal))
+        let levelText = Text("Niveau \(level)")
+            .font(SQType.callout(.bold))
+            .foregroundStyle(SQColor.label)
+        let pointsText = Text("\(inLevel.formatted()) / \(goal.formatted()) pts")
+            .font(SQType.callout)
+            .monospacedDigit()
+            .foregroundStyle(SQColor.label)
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        Text("Niveau \(level)")
-                            .font(SQFont.body(12.5, .medium))
-                            .foregroundStyle(SQColor.label)
-                            .accessibilityIdentifier("profile.progression.level")
-                        Text("\(inLevel.formatted()) / \(goal.formatted()) pts")
-                            .font(SQFont.body(12.5, .medium))
-                            .monospacedDigit()
-                            .foregroundStyle(SQColor.label)
-                            .accessibilityIdentifier("profile.progression.points")
-                    }
-                } else {
-                    HStack {
-                        Text("Niveau \(level)")
-                            .font(SQFont.body(12.5, .medium))
-                            .foregroundStyle(SQColor.label)
-                            .accessibilityIdentifier("profile.progression.level")
-                        Spacer()
-                        Text("\(inLevel.formatted()) / \(goal.formatted()) pts")
-                            .font(SQFont.body(12.5, .medium))
-                            .monospacedDigit()
-                            .foregroundStyle(SQColor.label)
-                            .accessibilityIdentifier("profile.progression.points")
-                    }
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    levelText.accessibilityIdentifier("profile.progression.level")
+                    pointsText.accessibilityIdentifier("profile.progression.points")
+                }
+            } else {
+                HStack {
+                    levelText.accessibilityIdentifier("profile.progression.level")
+                    Spacer()
+                    pointsText.accessibilityIdentifier("profile.progression.points")
                 }
             }
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    Capsule(style: .continuous)
                         .fill(SQColor.surfaceMuted)
                     if progress > 0 {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        Capsule(style: .continuous)
                             .fill(SQColor.brandRed)
-                            .frame(width: max(10, proxy.size.width * progress))
+                            .frame(width: max(8, proxy.size.width * progress))
                     }
                 }
             }
-            .frame(height: 10)
+            .frame(height: 8)
             .accessibilityHidden(true)
         }
-        .padding(.vertical, SQSpace.lg)
-        .padding(.horizontal, SQSpace.cardPadding)
-        .sqCardBackground()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Progression · Niveau \(level)")
         .accessibilityValue("\(inLevel) sur \(goal) points · \(Int(progress * 100)) %")
     }
-
-    // MARK: - Menu
 
     // MARK: - Menu
     //
@@ -474,28 +469,9 @@ struct ProfileView: View {
     // Carte ANFR et Statistiques ANFR dans Carte, Amis / Notifications /
     // Appels / Préférences du fil dans Communauté — et la progression est
     // remontée en tuiles sous l'en-tête, à côté du niveau qu'elle prolonge.
-    // Dix-neuf entrées à plat ne se lisaient plus.
 
     private var menuCard: some View {
         VStack(spacing: SQSpace.lg) {
-            // Remontés des Réglages (MES-21, TRX-22) : Sentinelle, l'une des
-            // rares fonctions Premium utilisées, était à cinq niveaux.
-            menuSection("Mes suivis") {
-                NavigationLink {
-                    SentinelleView(service: services.sentinelle)
-                } label: {
-                    menuRow(title: "Sentinelle", icon: "wifi.router")
-                }
-                menuSeparator
-                NavigationLink {
-                    FavoriteAntennasView(favorites: services.favoriteAntennas) { favorite in
-                        router.route(toSite: favorite.siteId)
-                    }
-                } label: {
-                    menuRow(title: "Antennes suivies", icon: "star.fill")
-                }
-            }
-
             let todos = overview?.todos ?? []
             if !todos.isEmpty {
                 menuSection("À faire") {
@@ -506,7 +482,25 @@ struct ProfileView: View {
                 }
             }
 
-            menuSection("Mes contributions") {
+            // Remontés des Réglages (MES-21, TRX-22) : Sentinelle, l'une des
+            // rares fonctions Premium utilisées, était à cinq niveaux.
+            menuSection("Suivis") {
+                NavigationLink {
+                    FavoriteAntennasView(favorites: services.favoriteAntennas) { favorite in
+                        router.route(toSite: favorite.siteId)
+                    }
+                } label: {
+                    FavoriteCountMenuRow(favorites: services.favoriteAntennas)
+                }
+                menuSeparator
+                NavigationLink {
+                    SentinelleView(service: services.sentinelle)
+                } label: {
+                    menuRow(title: "Sentinelle", icon: "wifi.router")
+                }
+            }
+
+            menuSection("Contributions") {
                 NavigationLink {
                     MyMeasurementsView(service: services.sessions)
                 } label: {
@@ -522,31 +516,31 @@ struct ProfileView: View {
                 NavigationLink {
                     AntennaReportsListView(service: services.antennaReports)
                 } label: {
-                    menuRow(title: "Mes signalements d'antenne", icon: "exclamationmark.bubble")
+                    menuRow(title: "Signalements d’antenne", icon: "exclamationmark.bubble")
                 }
                 menuSeparator
                 NavigationLink {
                     CommunityOutagesListView(service: services.communityOutages, markets: services.markets)
                 } label: {
-                    menuRow(title: "Pannes signalées", icon: "exclamationmark.triangle.fill")
+                    menuRow(title: "Pannes signalées", icon: "exclamationmark.triangle")
                 }
                 menuSeparator
                 // Territoires : plus en tuile sous le niveau (décision du 29/09).
                 NavigationLink {
                     TerritoriesView(service: services.gamification)
                 } label: {
-                    menuRow(title: "Territoires", icon: "square.grid.3x3.fill")
+                    menuRow(title: "Territoires", icon: "square.grid.3x3")
                 }
             }
 
             // Écrans nourris par l'app Android : affichés seulement si le compte
             // a de telles données, sinon une ligne dit ce qu'ils apportent.
-            menuSection("Avancé") {
+            menuSection("Avec l’app Android") {
                 if androidPresence.showsAndroidScreens {
                     NavigationLink {
                         SessionsListView(service: services.sessions)
                     } label: {
-                        menuRow(title: "Mes enregistrements de trajet", icon: "point.topleft.down.curvedto.point.bottomright.up")
+                        menuRow(title: "Enregistrements de trajet", icon: "point.topleft.down.curvedto.point.bottomright.up")
                     }
                     menuSeparator
                     NavigationLink {
@@ -582,21 +576,21 @@ struct ProfileView: View {
                     menuSeparator
                 }
                 NavigationLink {
-                    PaywallView(store: services.entitlements, entryPoint: .profile)
+                    SettingsView(userService: services.users, authService: services.auth)
                 } label: {
-                    menuRow(title: "Abonnements", icon: "creditcard.fill")
+                    menuRow(title: "Réglages", icon: "gearshape")
                 }
                 menuSeparator
                 NavigationLink {
                     PrivacySettingsView(service: services.privacy)
                 } label: {
-                    menuRow(title: "Confidentialité", icon: "hand.raised.fill")
+                    menuRow(title: "Confidentialité", icon: "hand.raised")
                 }
                 menuSeparator
                 NavigationLink {
-                    SettingsView(userService: services.users, authService: services.auth)
+                    PaywallView(store: services.entitlements, entryPoint: .profile)
                 } label: {
-                    menuRow(title: "Réglages", icon: "gearshape.fill")
+                    SubscriptionMenuRow(store: services.entitlements)
                 }
                 menuSeparator
                 NavigationLink {
@@ -609,29 +603,70 @@ struct ProfileView: View {
         }
     }
 
-    /// Sans données Android : ce que l'app Android ajoute, plutôt que trois
-    /// écrans vides.
-    private var androidHint: some View {
-        HStack(alignment: .top, spacing: SQSpace.md + 1) {
-            Image(systemName: "iphone.gen3.radiowaves.left.and.right")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(SQColor.label)
-                .frame(width: 36, height: 36)
-                .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Avec l’app Android")
-                    .font(SQFont.body(17, .medium, relativeTo: .body))
-                    .foregroundStyle(SQColor.label)
-                Text("Elle enregistre tes trajets, tient un journal des antennes captées et aide à les identifier. Ces écrans apparaissent ici dès qu’elle a envoyé des données.")
-                    .font(SQFont.body(13, relativeTo: .footnote))
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
+    /// « Se déconnecter » : une ligne rouge dans sa carte, toujours confirmée.
+    private var logoutCard: some View {
+        Button {
+            confirmLogout = true
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                if !dynamicTypeSize.isAccessibilitySize {
+                    ProfileMenuIcon(systemImage: "rectangle.portrait.and.arrow.right",
+                                    tint: SQColor.dangerInk, fill: SQColor.dangerSoft)
+                }
+                Text("Se déconnecter")
+                    .font(SQFont.body(16, .semibold, relativeTo: .body))
+                    .foregroundStyle(SQColor.dangerInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if isLoggingOut {
+                    ProgressView()
+                }
             }
-            Spacer(minLength: 0)
+            .padding(.horizontal, SQSpace.lg)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoggingOut)
+        .sqCardBackground()
+        .accessibilityIdentifier("profile.logout")
+        .confirmationDialog("Te déconnecter ?", isPresented: $confirmLogout, titleVisibility: .visible) {
+            Button("Se déconnecter", role: .destructive) {
+                guard !isLoggingOut else { return }
+                isLoggingOut = true
+                Task {
+                    await session.logout()
+                    isLoggingOut = false
+                }
+            }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Tu pourras te reconnecter à tout moment avec ton compte.")
+        }
+    }
+
+    /// « SignalQuest 1.0 (169) », comme dans les réglages d'iOS.
+    private static var versionLine: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "SignalQuest \(version) (\(build))"
+    }
+
+    /// Sans données Android : ce que l'app Android ajoute, plutôt que trois
+    /// écrans vides. Le titre de la section dit déjà « Avec l’app Android ».
+    private var androidHint: some View {
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            if !dynamicTypeSize.isAccessibilitySize {
+                ProfileMenuIcon(systemImage: "iphone.gen3.radiowaves.left.and.right")
+            }
+            Text("Elle enregistre tes trajets, tient un journal des antennes captées et aide à les identifier. Ces écrans apparaissent ici dès qu’elle a envoyé des données.")
+                .font(SQType.callout)
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, SQSpace.lg)
-        .padding(.vertical, SQSpace.md2)
+        .padding(.vertical, SQSpace.md)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("profile.android.hint")
     }
@@ -653,9 +688,7 @@ struct ProfileView: View {
         )
     }
 
-    /// Une section du menu : intertitre discret + carte. L'intertitre est en
-    /// casse normale — la DA « Crème & Terre cuite » proscrit les micro-labels
-    /// majuscules tracés (cf. `sqKicker`).
+    /// Une section du menu : surtitre Halo en petites capitales + carte.
     @ViewBuilder
     private func menuSection<Content: View>(
         _ title: String,
@@ -663,8 +696,7 @@ struct ProfileView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text(LocalizedStringKey(title))
-                .font(SQFont.body(13, .semibold))
-                .foregroundStyle(SQColor.labelSecondary)
+                .sqKicker()
                 .padding(.leading, SQSpace.xs)
                 .accessibilityAddTraits(.isHeader)
             VStack(spacing: 0) { content() }
@@ -673,10 +705,8 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Progression : les trois écrans de jeu, en tuiles sous l'en-tête plutôt
-    /// qu'en lignes de menu. Ils prolongent le niveau et les points déjà
-    /// affichés au-dessus — les ranger vingt lignes plus bas les coupait de
-    /// leur contexte.
+    /// Progression : les écrans de jeu, en tuiles sous les points. Chaque
+    /// tuile dit ce qui t'attend, quand on le sait.
     private var progressionTiles: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
@@ -689,43 +719,58 @@ struct ProfileView: View {
 
     @ViewBuilder
     private var progressionTileContent: some View {
-        progressionTile("Récompenses", icon: "rosette") {
+        progressionTile("Récompenses", icon: "rosette", subtitle: missionsSubtitle) {
             GamificationView(service: services.gamification)
         }
-        progressionTile("Classements", icon: "trophy.fill") {
+        progressionTile("Classements", icon: "trophy", subtitle: weekRank.map { String(localized: "\($0)e de tes amis") }) {
             LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
         }
+    }
+
+    private var missionsSubtitle: String? {
+        for todo in overview?.todos ?? [] {
+            if case .claimMissions(let count, _) = todo, count > 0 {
+                return String(localized: "\(count) missions à réclamer")
+            }
+        }
+        return nil
     }
 
     private func progressionTile<Destination: View>(
         _ title: String,
         icon: String,
+        subtitle: String?,
         @ViewBuilder destination: @escaping () -> Destination
     ) -> some View {
         NavigationLink {
             destination()
         } label: {
-            VStack(spacing: SQSpace.sm) {
-                Image(systemName: icon)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(SQColor.accentInk)
-                    .frame(width: 40, height: 40)
-                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                ProfileMenuIcon(systemImage: icon, tint: SQColor.accentInk, fill: SQColor.accentSoft)
+                    .padding(.bottom, SQSpace.xs)
                 Text(LocalizedStringKey(title))
-                    .font(SQFont.body(12.5, .semibold))
+                    .font(SQFont.body(15, .bold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("profile.progression.tile.label.\(title)")
+                if let subtitle {
+                    Text(verbatim: subtitle)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, SQSpace.md)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(SQSpace.md)
             .sqCardBackground(cornerRadius: SQRadius.lg)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(LocalizedStringKey(title))
+        .accessibilityValue(subtitle.map { Text(verbatim: $0) } ?? Text(verbatim: ""))
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("profile.progression.tile.\(title)")
     }
 
@@ -733,57 +778,14 @@ struct ProfileView: View {
         Rectangle()
             .fill(SQColor.separator)
             .frame(height: 1)
-            .padding(.leading, dynamicTypeSize.isAccessibilitySize ? SQSpace.lg : 65)
+            .padding(.leading, dynamicTypeSize.isAccessibilitySize ? SQSpace.lg : ProfileMenuRow.separatorInset)
             .accessibilityHidden(true)
     }
 
     /// `subtitle` : précision sous le titre ; `badge` : compteur en pastille à
     /// droite, pour que le titre ne porte jamais le chiffre sur une 2e ligne.
     private func menuRow(title: String, icon: String, subtitle: String? = nil, badge: String? = nil) -> some View {
-        HStack(spacing: SQSpace.md + 1) {
-            // En très grand texte, l'icône cède sa place au titre : « Sentinelle »
-            // se coupait en « Senti-/nelle » (tour AX5, 30/09).
-            if !dynamicTypeSize.isAccessibilitySize {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(SQColor.label)
-                    .frame(width: 36, height: 36)
-                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-                    .accessibilityHidden(true)
-            }
-            VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                Text(LocalizedStringKey(title))
-                    .font(SQFont.body(17, .medium, relativeTo: .body))
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("profile.menu.title")
-                if let subtitle {
-                    Text(verbatim: subtitle)
-                        .font(SQFont.body(13, relativeTo: .footnote))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("profile.menu.subtitle")
-                }
-            }
-            Spacer()
-            if let badge {
-                Text(verbatim: badge)
-                    .font(SQFont.body(13, .semibold, relativeTo: .footnote))
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.accentInk)
-                    .padding(.horizontal, SQSpace.sm2)
-                    .padding(.vertical, SQSpace.xs)
-                    .background(SQColor.accentSoft, in: Capsule(style: .continuous))
-                    .accessibilityIdentifier("profile.menu.badge")
-            }
-            Image(systemName: "chevron.right")
-                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
-                .foregroundStyle(SQColor.label)
-                .accessibilityHidden(true)
-        }
-        .padding(.horizontal, SQSpace.lg)
-        .padding(.vertical, SQSpace.md2)
-        .contentShape(Rectangle())
+        ProfileMenuRow(title: title, icon: icon, subtitle: subtitle, badge: badge)
     }
 
     /// Une ligne « À faire », vers l'écran où la régler.
@@ -794,22 +796,23 @@ struct ProfileView: View {
             NavigationLink {
                 GamificationView(service: services.gamification)
             } label: {
-                menuRow(title: "Missions à réclamer", icon: "gift.fill",
-                        subtitle: String(localized: "+\(rewardXp) pts"), badge: count.formatted())
+                ProfileMenuRow(title: "Missions à réclamer", icon: "gift", subtitle: String(localized: "+\(rewardXp) pts"),
+                               badge: count.formatted(), accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.missions")
         case .photosInReview(let count):
             NavigationLink {
                 PhotosView(service: services.photos, initialFilter: .pending)
             } label: {
-                menuRow(title: "Photos en vérification", icon: "hourglass", badge: count.formatted())
+                ProfileMenuRow(title: "Photos en vérification", icon: "hourglass", badge: count.formatted(), accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.photos")
         case .identificationConflicts(let count):
             NavigationLink {
                 MyIdentificationsView(service: services.identify)
             } label: {
-                menuRow(title: "Identifications en conflit", icon: "exclamationmark.triangle", badge: count.formatted())
+                ProfileMenuRow(title: "Identifications en conflit", icon: "exclamationmark.triangle", badge: count.formatted(),
+                               accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.identifications")
         }
@@ -832,8 +835,10 @@ struct ProfileView: View {
                               totalCoverageSessions: 6, totalPoints: 4250, level: 12)
             statsError = nil
             progression = .demo
+            weekRank = 3
             return
         }
+        async let weekTask = try? await services.leaderboards.pointsLeaderboard(period: "week", scope: "friends")
         // Progression (niveau / points / palier) : même source de données que
         // GamificationView (service existant) ; en cas d'échec, la carte de
         // progression est simplement omise.
@@ -845,6 +850,113 @@ struct ProfileView: View {
             statsError = error.userFacingMessage
         }
         progression = try? await profileTask
+        // Un rang n'a de sens qu'à plusieurs : seul, la tuile reste sans sous-titre.
+        if let week = await weekTask, week.entries.count > 1 {
+            weekRank = week.currentUserRank ?? week.entries.first { $0.userId == user.id }?.rank
+        }
+    }
+}
+
+/// Petite icône de ligne Halo : glyphe dans un carré arrondi de 30 pt.
+struct ProfileMenuIcon: View {
+    let systemImage: String
+    var tint: Color = SQColor.labelSecondary
+    var fill: Color = SQColor.surfaceMuted
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: 30, height: 30)
+            .background(fill, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+/// Ligne du menu Profil : icône, titre (et sous-titre), valeur ou pastille,
+/// chevron. Le titre reste aligné à gauche même sur deux lignes.
+struct ProfileMenuRow: View {
+    /// Retrait du filet : marge + icône + espacement, pour s'aligner sur le titre.
+    static let separatorInset: CGFloat = SQSpace.lg + 30 + SQSpace.md
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let title: String
+    let icon: String
+    var subtitle: String?
+    var value: String?
+    var badge: String?
+    var accentIcon = false
+
+    var body: some View {
+        HStack(spacing: SQSpace.md) {
+            // En très grand texte, l'icône cède sa place au titre : « Sentinelle »
+            // se coupait en « Senti-/nelle » (tour AX5, 30/09).
+            if !dynamicTypeSize.isAccessibilitySize {
+                ProfileMenuIcon(systemImage: icon,
+                                tint: accentIcon ? SQColor.accentInk : SQColor.labelSecondary,
+                                fill: accentIcon ? SQColor.accentSoft : SQColor.surfaceMuted)
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                Text(LocalizedStringKey(title))
+                    .font(SQFont.body(16, .semibold, relativeTo: .body))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("profile.menu.title")
+                if let subtitle {
+                    Text(verbatim: subtitle)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("profile.menu.subtitle")
+                }
+            }
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let value {
+                Text(verbatim: value)
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("profile.menu.value")
+            }
+            if let badge {
+                Text(verbatim: badge)
+                    .font(SQType.caption(.heavy))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.onAccent)
+                    .padding(.horizontal, SQSpace.xs2)
+                    .frame(minWidth: 22, minHeight: 22)
+                    .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                    .accessibilityIdentifier("profile.menu.badge")
+            }
+            Image(systemName: "chevron.right")
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.sm2)
+        .frame(minHeight: subtitle == nil ? 52 : 58)
+        .contentShape(Rectangle())
+    }
+}
+
+/// « Antennes suivies » avec leur nombre, tenu à jour par le service.
+private struct FavoriteCountMenuRow: View {
+    @ObservedObject var favorites: FavoriteAntennasService
+
+    var body: some View {
+        ProfileMenuRow(title: "Antennes suivies", icon: "star",
+                       value: favorites.hasLoaded ? favorites.favorites.count.formatted() : nil)
+    }
+}
+
+/// « Abonnements » avec la formule, seulement quand le serveur l'a confirmée.
+private struct SubscriptionMenuRow: View {
+    @ObservedObject var store: EntitlementsStore
+
+    var body: some View {
+        ProfileMenuRow(title: "Abonnements", icon: "creditcard",
+                       value: store.serverState.snapshot?.tier.displayName)
     }
 }
 

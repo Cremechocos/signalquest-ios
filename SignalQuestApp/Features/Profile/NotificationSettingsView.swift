@@ -105,10 +105,21 @@ struct NotificationSettingsView: View {
 
     var body: some View {
         Form {
-            authorizationSection
             Section {
-                preferenceToggle("Messages privés", \.notifyMessagesPush)
-                Picker(selection: Binding(
+                SQSettingsHeader(title: "Notifications",
+                                 subtitle: "Chaque réglage s’enregistre dès que tu le changes.",
+                                 backIdentifier: "notifications.back")
+            }
+            .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.md, trailing: 0))
+            .listRowBackground(Color.clear)
+
+            authorizationSection
+
+            Section {
+                preferenceToggle("Messages privés", systemImage: "bubble.left", \.notifyMessagesPush)
+                SQSettingsMenuRow("Aperçu des messages", systemImage: "eye",
+                                  subtitle: String(localized: "Conversations chiffrées"),
+                                  selection: Binding(
                     get: { e2eeNotificationPrivacy },
                     set: { value in
                         if E2EEV2NotificationPrivacyStore.set(value) {
@@ -118,79 +129,74 @@ struct NotificationSettingsView: View {
                             model.errorMessage = String(localized: "Impossible de modifier les aperçus. Réessaie ou désactive les notifications dans les Réglages iOS.")
                         }
                     }
-                )) {
+                ), valueLabel: previewLabel) {
                     Text("Contenu complet").tag(E2EEV2NotificationPrivacy.full)
                     Text("Expéditeur seulement").tag(E2EEV2NotificationPrivacy.senderOnly)
                     Text("Tout masquer").tag(E2EEV2NotificationPrivacy.hidden)
-                } label: {
-                    Text("Aperçu des messages chiffrés")
                 }
-                .pickerStyle(.menu)
-                .frame(minHeight: 48)
-                .tint(SQColor.accentInk)
                 E2EEV2NotificationPreviewNotice(showReminder: true) { e2eeNotificationPrivacy = $0 }
-                preferenceToggle("Bannière quand l’app est ouverte", \.notifyMessagesInApp)
-                preferenceToggle("Appels : ne pas déranger", \.callsDoNotDisturb)
+                preferenceToggle("Bannière dans l’app", systemImage: "app.badge", \.notifyMessagesInApp,
+                                 hint: "Une bannière s’affiche quand un message arrive pendant que l’app est ouverte.")
+                preferenceToggle("Appels : ne pas déranger", systemImage: "phone", \.callsDoNotDisturb)
             } header: {
-                Text("Messages et appels")
+                Text("Messages et appels").sqKicker()
                     .accessibilityIdentifier("notifications.header.messages")
-            } footer: {
-                Text("Chaque réglage s’enregistre dès que tu le changes.")
-                    .accessibilityIdentifier("notifications.footer.autosave")
             }
             .tint(SQColor.brandRed)
-            .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
+            .opacity(isDenied ? 0.45 : 1)
 
             Section {
                 // Le fil PUBLIC, séparé des messages privés : un seul interrupteur
                 // « Messages » coupait aussi commentaires, réponses et mentions.
-                preferenceToggle("Commentaires et réponses", \.notifySocialPush)
-                preferenceToggle("J’aime et commentaires sur mes photos", \.notifyPhotoLikesPush)
+                preferenceToggle("Commentaires et réponses", systemImage: "person.2", \.notifySocialPush)
+                preferenceToggle("J’aime sur mes photos", systemImage: "photo", \.notifyPhotoLikesPush,
+                                 subtitle: String(localized: "Commentaires compris"))
             } header: {
-                Text("Communauté")
+                Text("Communauté").sqKicker()
                     .accessibilityIdentifier("notifications.header.community")
             }
             .tint(SQColor.brandRed)
-            .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
+            .opacity(isDenied ? 0.45 : 1)
 
             Section {
-                preferenceToggle("Pannes signalées par la communauté", \.notifyCommunityOutagesPush)
+                preferenceToggle("Pannes de la communauté", systemImage: "exclamationmark.triangle",
+                                 \.notifyCommunityOutagesPush)
                 // Plan 3, vague 2 : ce qui déclenche l'alerte près de ses lieux.
                 if model.prefs.notifyCommunityOutagesPush == true {
                     NavigationLink {
                         ZoneAlertSettingsView(service: ZoneAlertService(api: services.api))
                     } label: {
-                        Label("Pannes près de mes lieux", systemImage: "mappin.and.ellipse")
+                        SQSettingsRowLabel("Pannes près de mes lieux", systemImage: "mappin.and.ellipse")
                     }
                     .accessibilityIdentifier("notifications.zoneAlerts")
                 }
-                HStack {
-                    preferenceToggle("Mises à jour ANFR", \.notifyAnfrUpdatesPush)
-                    SQInfoButton(term: .anfr)
-                }
-                preferenceToggle("Réponses à mes signalements, par e-mail", \.notifyAntennaReportsEmail)
                 NavigationLink {
                     FavoriteAntennasView(favorites: services.favoriteAntennas)
                 } label: {
-                    HStack {
-                        Label("Antennes suivies", systemImage: "star.fill")
-                        Spacer()
-                        Text("\(services.favoriteAntennas.favorites.count)")
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
+                    SQSettingsRowLabel("Antennes suivies", systemImage: "star",
+                                       value: "\(services.favoriteAntennas.favorites.count)")
                 }
+                HStack(spacing: SQSpace.sm) {
+                    preferenceToggle("Mises à jour ANFR", systemImage: "antenna.radiowaves.left.and.right",
+                                     \.notifyAnfrUpdatesPush)
+                    SQInfoButton(term: .anfr)
+                }
+                preferenceToggle("Réponses à mes signalements", systemImage: "envelope", \.notifyAntennaReportsEmail,
+                                 subtitle: String(localized: "Par e-mail"))
             } header: {
-                Text("Antennes et réseau")
+                Text("Antennes et réseau").sqKicker()
                     .accessibilityIdentifier("notifications.header.antennas")
             } footer: {
                 Text("Pour une antenne suivie, l’alerte arrive dès le premier signalement, sans attendre que la communauté confirme.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
                     .accessibilityIdentifier("notifications.footer.antennas")
             }
             .tint(SQColor.brandRed)
-            .foregroundStyle(SQColor.label)
             .listRowBackground(SQColor.surface)
+            .opacity(isDenied ? 0.45 : 1)
 
             if let error = model.errorMessage {
                 Section {
@@ -208,11 +214,14 @@ struct NotificationSettingsView: View {
                 .listRowBackground(SQColor.dangerSoft)
             }
         }
+        .modifier(CompactListMargins())
         .scrollContentBackground(.hidden)
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Notifications")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .refreshable { await model.load() }
         .task(id: PushOwnerScope.current) {
             await model.load()
@@ -226,53 +235,87 @@ struct NotificationSettingsView: View {
         }
     }
 
+    private var isDenied: Bool { authorization == .denied }
+
+    private var previewLabel: String {
+        switch e2eeNotificationPrivacy {
+        case .full: String(localized: "Contenu complet")
+        case .senderOnly: String(localized: "Expéditeur seulement")
+        case .hidden: String(localized: "Tout masquer")
+        }
+    }
+
     @ViewBuilder
     private var authorizationSection: some View {
         switch authorization {
         case .notDetermined?:
-            Section {
-                Text("SignalQuest ne peut pas encore t’envoyer de notifications. Active-les pour être prévenu des messages, des réponses et des pannes.")
-                    .font(SQType.body)
-                    .foregroundStyle(SQColor.label)
-                    .fixedSize(horizontal: false, vertical: true)
-                GradientButton("Activer les notifications", systemImage: "bell.fill") {
+            authorizationCard(
+                title: "Notifications pas encore activées", systemImage: "bell",
+                message: "SignalQuest ne peut pas encore t’envoyer de notifications. Active-les pour être prévenu des messages, des réponses et des pannes.",
+                button: GradientButton("Activer les notifications", systemImage: "bell.fill") {
                     Task {
                         await services.push.requestAuthorizationAndRegister()
                         await refreshAuthorization()
                     }
                 }
                 .accessibilityIdentifier("notifications.enable")
-            }
-            .listRowBackground(SQColor.surface)
+            )
         case .denied?:
-            Section {
-                Label("Les notifications sont désactivées pour SignalQuest. Aucune alerte n’arrivera tant qu’elles ne sont pas réactivées dans les Réglages iOS.", systemImage: "bell.slash.fill")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.warning)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Ouvrir les réglages de notification") {
+            authorizationCard(
+                title: "Notifications coupées", systemImage: "bell.slash",
+                message: "Aucune alerte n’arrive tant qu’elles sont désactivées dans les réglages de l’iPhone : messages, pannes, réponses.",
+                button: GradientButton("Ouvrir les réglages de l’iPhone") {
                     if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                         UIApplication.shared.open(url)
                     }
                 }
-                .font(SQType.caption.weight(.semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(minHeight: 44)
-            }
-            .listRowBackground(SQColor.surface)
+                .accessibilityIdentifier("notifications.openSettings")
+            )
         default:
             EmptyView()
         }
     }
 
+    /// Carte d'état en tête d'écran : sans autorisation iOS, aucun interrupteur
+    /// plus bas ne fait arriver d'alerte (UXP-02).
+    private func authorizationCard(title: LocalizedStringKey, systemImage: String, message: LocalizedStringKey,
+                                   button: some View) -> some View {
+        Section {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                HStack(spacing: SQSpace.sm2) {
+                    ProfileMenuIcon(systemImage: systemImage, tint: SQColor.accentInk, fill: SQColor.surface)
+                    Text(title)
+                        .font(SQFont.body(16, .bold, relativeTo: .body))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .sqHeader()
+                }
+                // Encre pleine : le gris secondaire manque de contraste sur le fond teinté.
+                Text(message)
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                button
+            }
+            .padding(.vertical, SQSpace.xs)
+        }
+        .listRowBackground(SQColor.accentSoft)
+    }
+
     private func preferenceToggle(
-        _ title: LocalizedStringKey,
-        _ keyPath: WritableKeyPath<NotificationPreferences, Bool?>
+        _ title: String,
+        systemImage: String,
+        _ keyPath: WritableKeyPath<NotificationPreferences, Bool?>,
+        subtitle: String? = nil,
+        hint: LocalizedStringKey? = nil
     ) -> some View {
-        Toggle(title, isOn: Binding(
+        Toggle(isOn: Binding(
             get: { model.prefs[keyPath: keyPath] ?? false },
             set: { model.setPreference(keyPath, to: $0) }
-        ))
+        )) {
+            SQSettingsRowLabel(title, systemImage: systemImage, subtitle: subtitle)
+        }
+        .accessibilityHint(hint.map { Text($0) } ?? Text(verbatim: ""))
         .disabled(!model.prefsLoaded)
     }
 

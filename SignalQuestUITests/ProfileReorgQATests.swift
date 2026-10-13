@@ -43,11 +43,10 @@ final class ProfileReorgQATests: XCTestCase {
                 "La tuile « \(tile) » manque sous l'en-tête du profil"
             )
         }
-        for section in ["Mes suivis", "Mes contributions", "Avancé", "Compte"] {
-            XCTAssertTrue(
-                app.staticTexts[section].firstMatch.exists,
-                "L'intertitre « \(section) » manque"
-            )
+        for section in ["Suivis", "Contributions", "Avec l’app Android", "Compte"] {
+            // Intertitres en capitales : comparaison sans la casse.
+            let header = app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", section)).firstMatch
+            XCTAssertTrue(header.exists, "L'intertitre « \(section) » manque")
         }
         // Ce qui est parti ne doit plus être là : une entrée laissée en double
         // serait pire que pas de refonte du tout.
