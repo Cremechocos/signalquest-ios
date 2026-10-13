@@ -52,7 +52,7 @@ final class SpeedtestMapVisibilityQATests: XCTestCase {
         XCTAssertTrue(history.waitForExistence(timeout: 15))
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(history, in: app))
         history.tap()
-        XCTAssertTrue(app.navigationBars["Détails du test"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["speedtest.detail.close"].waitForExistence(timeout: 10))
         let hide = app.buttons["speedtest.visibility.hide"]
         for _ in 0..<12 {
             if hide.exists && hide.isHittable { break }
@@ -66,7 +66,7 @@ final class SpeedtestMapVisibilityQATests: XCTestCase {
         let committed = try await fixture.state()
         XCTAssertFalse(try XCTUnwrap(committed.measurements.first { $0.id == fixture.serverID }).isVisibleOnMap)
         XCTAssertTrue(committed.events.contains { $0.method == "PATCH" && $0.status == 200 })
-        app.navigationBars.buttons["Fermer"].firstMatch.tap()
+        app.buttons["speedtest.detail.close"].firstMatch.tap()
         SignalQuestUITestSupport.tab(named: "Carte", in: app).tap()
         XCTAssertTrue(app.buttons["map.filters"].waitForExistence(timeout: 10))
         let removed = NSPredicate { _, _ in !marker.exists }

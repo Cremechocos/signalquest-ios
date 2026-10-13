@@ -9,8 +9,10 @@ struct SpeedtestDetailSheet: View {
     /// Centre la carte sur le lieu du test. `nil` masque le bouton.
     var onShowOnMap: ((Coordinates) -> Void)?
     @StateObject private var visibility: SpeedtestVisibilityViewModel
+    @State private var sharePreviewResult: SpeedtestRunResult?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
 
     init(result: SpeedtestRunResult, onShowOnMap: ((Coordinates) -> Void)? = nil,
          visibilityService: any SpeedtestVisibilityServicing, guestMode: Bool) {
@@ -23,34 +25,34 @@ struct SpeedtestDetailSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    SpeedtestDetailContent(
-                        result: result,
-                        onShowOnMap: onShowOnMap,
-                        onDismiss: { dismiss() }
-                    )
-                    SpeedtestVisibilityControls(model: visibility)
-                        .padding(.horizontal, SQSpace.lg)
-                        .padding(.bottom, SQSpace.xl)
-                }
-            }
-            .signalQuestBackground()
-            .navigationTitle("Détails du test")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(SQColor.labelSecondary)
+        ScrollView {
+            VStack(spacing: 0) {
+                HStack {
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "speedtest.detail.close") {
+                        dismiss()
                     }
-                    .frame(minWidth: 44, minHeight: 44)
-                    .accessibilityLabel("Fermer")
+                    Spacer()
+                    MapChipIconButton(systemImage: "square.and.arrow.up", label: "Partager",
+                                      identifier: "speedtest.detail.share") {
+                        sharePreviewResult = result
+                    }
                 }
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.lg)
+                // « Voir sur la carte » rejoint la carte Visibilité, à côté de
+                // « Masquer » : le contenu ne le rend donc pas une seconde fois.
+                SpeedtestDetailContent(
+                    result: result,
+                    onDismiss: { dismiss() },
+                    visibilityStatus: SpeedtestVisibilityControls.status(for: visibility)
+                )
+                SpeedtestVisibilityControls(model: visibility, onShowOnMap: showOnMapAction)
+                    .padding(.horizontal, SQSpace.lg)
+                    .padding(.bottom, SQSpace.xl)
             }
+            .sqReadableWidth()
         }
+        .signalQuestBackground()
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .task { await visibility.load() }
@@ -58,11 +60,29 @@ struct SpeedtestDetailSheet: View {
         .onChangeCompat(of: scenePhase) { _, phase in
             if phase == .active { visibility.refreshAvailability() }
         }
+        .sheet(item: $sharePreviewResult) { item in
+            SpeedtestSharePreviewSheet(result: item, theme: SQShareCardTheme.current(colorScheme: colorScheme))
+        }
+    }
+
+    private var showOnMapAction: (() -> Void)? {
+        guard let onShowOnMap, let coordinate = result.coordinate else { return nil }
+        return {
+            onShowOnMap(coordinate)
+            dismiss()
+        }
     }
 
     static func formatSpeedParts(_ mbps: Double?) -> (value: String, unit: String) {
         SpeedtestDetailContent.formatSpeedParts(mbps)
     }
+}
+
+/// Pastille de visibilité affichée sous le titre et dans la carte Visibilité.
+struct SpeedtestVisibilityStatus: Equatable {
+    enum Tone { case positive, neutral, caution }
+    let text: String
+    let tone: Tone
 }
 
 /// Corps de la fiche, hors chrome de navigation : rendable seul par
@@ -72,68 +92,70 @@ struct SpeedtestDetailContent: View {
     let result: SpeedtestRunResult
     var onShowOnMap: ((Coordinates) -> Void)?
     var onDismiss: (() -> Void)?
+    var visibilityStatus: SpeedtestVisibilityStatus? = nil
+    @State private var graphDirection: GraphDirection = .download
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    enum GraphDirection: Hashable { case download, upload }
+
     var body: some View {
-        VStack(spacing: SQSpace.lg) {
+        VStack(alignment: .leading, spacing: SQSpace.lg) {
             header
+            speedSummaryCard
             // Le verdict en mots avant les courbes ; sans comparaison de zone :
             // un test ancien ne se compare pas à l'habitude d'aujourd'hui.
             if result.downloadAverageMbps > 0 {
                 SpeedtestVerdictCard(verdict: SpeedtestVerdict(result: result),
                                      measuredMbps: result.downloadAverageMbps)
             }
-            speedCards
-            latencyGrid
-            metaCard
+            curveCard
+            latencyCard
+            measureCard
             actions
         }
         .padding(SQSpace.lg)
         .padding(.bottom, SQSpace.xl)
     }
 
-    // MARK: En-tête — génération, opérateur, commune, date
+    // MARK: En-tête — « Speedtest · Orange 5G », lieu et date, pastilles
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs) {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        if let generation { generationTitle(generation) }
-                        Text(result.createdAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                } else {
-                    HStack(spacing: SQSpace.sm) {
-                        if let generation { generationTitle(generation) }
-                        Spacer(minLength: 0)
-                        Text(result.createdAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.xs) {
+                Text(verbatim: kickerLine)
+                    .font(SQFont.body(12, .bold, relativeTo: .caption))
+                    .tracking(12 * 0.16)
+                    .textCase(.uppercase)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                // « 5G NSA » et « 5G SA » sont le seul jargon de l'en-tête : ⓘ (MES-35).
+                if result.connectionType == .cellular,
+                   result.cellularTechnology == .fiveGNSA || result.cellularTechnology == .fiveGSA {
+                    SQInfoButton(term: .fiveGModes)
                 }
             }
-            Text(contextLine)
-                .font(SQType.subhead)
-                .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(3)
+            Text(verbatim: titleLine)
+                .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                .foregroundStyle(SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// « 5G NSA » et « 5G SA » sont le seul jargon de l'en-tête : ⓘ (MES-35).
-    private func generationTitle(_ generation: String) -> some View {
-        HStack(spacing: SQSpace.xs) {
-            Text(generation)
-                .font(SQFont.display(20, .bold))
-                .foregroundStyle(SQColor.brandRed)
-            if result.connectionType == .cellular,
-               result.cellularTechnology == .fiveGNSA || result.cellularTechnology == .fiveGSA {
-                SQInfoButton(term: .fiveGModes)
+                .accessibilityAddTraits(.isHeader)
+            if visibilityStatus != nil || deviceModel != nil {
+                let pills = Group {
+                    if let visibilityStatus {
+                        SpeedtestStatusPill(status: visibilityStatus, systemImage: visibilityStatus.tone == .positive ? "eye" : nil)
+                    }
+                    if let deviceModel {
+                        SpeedtestStatusPill(status: SpeedtestVisibilityStatus(text: deviceModel, tone: .neutral))
+                    }
+                }
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: SQSpace.xs) { pills }
+                } else {
+                    HStack(spacing: SQSpace.xs) { pills }
+                }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var generation: String? {
@@ -145,39 +167,135 @@ struct SpeedtestDetailContent: View {
         }
     }
 
-    private var contextLine: String {
+    /// « Speedtest · Orange 5G SA », « Speedtest · Wi‑Fi ».
+    private var kickerLine: String {
         let op = result.networkOperatorName?.trimmedNonEmptyDetail
-            ?? (generation == nil ? result.networkShareDisplayName.trimmedNonEmptyDetail : nil)
-        let city = result.city?.trimmedNonEmptyDetail
-        return [op, city].compactMap { $0 }.joined(separator: " · ")
+        var network = [op, generation].compactMap { $0 }.joined(separator: " ")
+        if network.isEmpty { network = result.networkShareDisplayName }
+        return [String(localized: "Speedtest"), network.trimmedNonEmptyDetail].compactMap { $0 }.joined(separator: " · ")
     }
 
-    // MARK: Débits — mêmes courbes réelles que l'image de partage
+    /// « Lyon 7ᵉ — 11 oct., 14:05 » ; l'année seulement quand elle diffère.
+    private var titleLine: String {
+        let sameYear = Calendar.current.isDate(result.createdAt, equalTo: Date(), toGranularity: .year)
+        let date = sameYear
+            ? result.createdAt.formatted(.dateTime.day().month(.abbreviated).hour().minute())
+            : result.createdAt.formatted(.dateTime.day().month(.abbreviated).year().hour().minute())
+        guard let city = result.city?.trimmedNonEmptyDetail else { return date }
+        return "\(city) — \(date)"
+    }
 
-    private var speedCards: some View {
-        VStack(spacing: SQSpace.md) {
-            speedCard(
-                title: "Réception",
-                accent: SQColor.success,
-                average: result.downloadAverageMbps,
-                maxValue: result.downloadMaxMbps,
-                series: result.downloadSeriesMbps,
-                graceCount: result.downloadGraceWindowCount,
-                trace: result.measurementTrace?.phases.first { $0.phase == "download" }
-            )
-            speedCard(
-                title: "Envoi",
-                accent: SQColor.warning,
-                average: result.uploadAverageMbps,
-                maxValue: result.uploadMaxMbps,
-                series: result.uploadSeriesMbps,
-                graceCount: result.uploadGraceWindowCount,
-                trace: result.measurementTrace?.phases.first { $0.phase == "upload" }
-            )
+    private var deviceModel: String? { result.deviceModel?.trimmedNonEmptyDetail }
+
+    // MARK: Débits mesurés — jauge et trois valeurs
+
+    private var speedSummaryCard: some View {
+        detailCard("Débits mesurés") {
+            // 280 pt dans la carte ; un iPhone étroit prend la jauge réduite.
+            ViewThatFits(in: .horizontal) {
+                dial(width: 280)
+                dial(width: 240)
+            }
+            .frame(maxWidth: .infinity)
+            let metrics = Group {
+                let upload = Self.formatSpeedParts(result.uploadAverageMbps)
+                triCell("Envoi", value: upload.value, unit: upload.unit)
+                triCell("Latence", value: Self.msText(result.primaryPingMs), unit: "ms")
+                triCell("Gigue", value: Self.decimalText(result.jitterMs), unit: "ms")
+            }
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: SQSpace.sm) { metrics }
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                // Trois tuiles de même hauteur, même quand l'une passe sur deux lignes.
+                HStack(alignment: .top, spacing: SQSpace.sm) { metrics }
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
-    private func speedCard(
+    private func dial(width: CGFloat) -> some View {
+        SignatureSpeedDial(
+            value: result.downloadAverageMbps,
+            unit: SQUnits.throughputUnit(mbps: 0),
+            phaseTitle: String(localized: "Réception"),
+            phase: .finished,
+            completionLabel: nil,
+            extendsToTenGigabits: (result.downloadMaxMbps ?? 0) > 1_000,
+            width: width
+        )
+    }
+
+    private func triCell(_ title: LocalizedStringKey, value: String, unit: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(SQFont.body(11, .bold, relativeTo: .caption2))
+                .tracking(11 * 0.12)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            // La valeur ne se coupe jamais : l'unité passe dessous si la tuile
+            // est trop étroite (« 45,0 » puis « Mbit/s »).
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 3) { triValue(value, unit: unit) }
+                VStack(alignment: .leading, spacing: 0) { triValue(value, unit: unit) }
+            }
+        }
+        .padding(.horizontal, SQSpace.sm2)
+        .padding(.vertical, SQSpace.sm)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func triValue(_ value: String, unit: String) -> some View {
+        Text(verbatim: value)
+            .font(SQFont.display(20, .bold))
+            .monospacedDigit()
+            .foregroundStyle(SQColor.label)
+            .fixedSize()
+        Text(verbatim: unit)
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+    }
+
+    // MARK: Débit pendant le test — mêmes courbes réelles que l'image de partage
+
+    private var curveCard: some View {
+        detailCard("Débit pendant le test") {
+            MapSegmented(
+                selection: $graphDirection,
+                options: [(.download, String(localized: "Réception")), (.upload, String(localized: "Envoi"))],
+                identifier: "speedtest.detail.curve"
+            )
+            switch graphDirection {
+            case .download:
+                curve(
+                    title: "Réception",
+                    accent: SQColor.success,
+                    average: result.downloadAverageMbps,
+                    maxValue: result.downloadMaxMbps,
+                    series: result.downloadSeriesMbps,
+                    graceCount: result.downloadGraceWindowCount,
+                    trace: result.measurementTrace?.phases.first { $0.phase == "download" }
+                )
+            case .upload:
+                curve(
+                    title: "Envoi",
+                    accent: SQColor.warning,
+                    average: result.uploadAverageMbps,
+                    maxValue: result.uploadMaxMbps,
+                    series: result.uploadSeriesMbps,
+                    graceCount: result.uploadGraceWindowCount,
+                    trace: result.measurementTrace?.phases.first { $0.phase == "upload" }
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func curve(
         title: String,
         accent: Color,
         average: Double?,
@@ -186,107 +304,70 @@ struct SpeedtestDetailContent: View {
         graceCount: Int?,
         trace: SpeedtestPhaseTrace? = nil
     ) -> some View {
-        let parts = Self.formatSpeedParts(average)
-        return VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        speedCardHeader(title: title, accent: accent, maxValue: maxValue)
-                    }
-                } else {
-                    HStack(spacing: SQSpace.sm) {
-                        speedCardHeader(title: title, accent: accent, maxValue: maxValue)
-                    }
-                }
-            }
-            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
-                Text(parts.value)
-                    .font(SQFont.display(40, .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.label)
-                Text(parts.unit)
-                    .font(SQType.subhead)
-                    .foregroundStyle(SQColor.labelSecondary)
-            }
-            SpeedtestShareGraph(
-                series: (series ?? []).filter { $0.isFinite && $0 >= 0 },
-                averageMbps: average ?? 0,
-                graceCount: max(0, graceCount ?? 0),
-                accent: accent,
-                plotBackground: SQColor.surfaceMuted,
-                gridColor: SQColor.separator,
-                labelColor: SQColor.labelSecondary,
-                timedSeries: trace?.recentSeries,
-                timedAverageSeries: trace?.averageSeries,
-                timeOriginMs: trace?.sampleStartMs,
-                unitLabel: SQUnits.throughputUnit(mbps: 0)
-            )
-            .frame(height: 108)
-            // Alternative non visuelle (A11Y-08) : la courbe de débit n'a aucun
-            // descripteur accessible, on la résume pour VoiceOver.
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Self.graphAccessibilityLabel(title: title, average: average, maxValue: maxValue))
-            if let trace {
-                ForEach(Self.throughputSourceLabels(trace), id: \.self) { label in
-                    Text(label).font(.caption).foregroundStyle(SQColor.labelSecondary)
-                }
-                Text("Débit récent · fenêtre de 1 s · pointillés : moyenne cumulée")
-                    .font(.caption).foregroundStyle(SQColor.labelSecondary)
-                Text("Mesure : \(Double(trace.sampleDurationMs) / 1000, format: .number.precision(.fractionLength(2))) s · MAX sur \(Double(Self.maxWindowMs(trace)) / 1000, format: .number.precision(.fractionLength(2))) s")
-                    .font(.caption).foregroundStyle(SQColor.labelSecondary)
-            } else if !(series ?? []).isEmpty {
-                Text("Courbe historique sans horodatage")
-                    .font(.caption).foregroundStyle(SQColor.labelSecondary)
-            }
-        }
-        .padding(SQSpace.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground(cornerRadius: SQRadius.lg, elevation: .rest)
-    }
-
-    @ViewBuilder
-    private func speedCardHeader(title: String, accent: Color, maxValue: Double?) -> some View {
-        HStack(spacing: SQSpace.sm) {
-            Circle().fill(accent).frame(width: 8, height: 8)
-            Text(LocalizedStringKey(title))
-                .font(SQFont.body(14, .semibold))
+        SpeedtestShareGraph(
+            series: (series ?? []).filter { $0.isFinite && $0 >= 0 },
+            averageMbps: average ?? 0,
+            graceCount: max(0, graceCount ?? 0),
+            accent: accent,
+            plotBackground: SQColor.surfaceMuted,
+            gridColor: SQColor.separator,
+            labelColor: SQColor.labelSecondary,
+            timedSeries: trace?.recentSeries,
+            timedAverageSeries: trace?.averageSeries,
+            timeOriginMs: trace?.sampleStartMs,
+            unitLabel: SQUnits.throughputUnit(mbps: 0)
+        )
+        .frame(height: 120)
+        // Alternative non visuelle (A11Y-08) : la courbe de débit n'a aucun
+        // descripteur accessible, on la résume pour VoiceOver.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.graphAccessibilityLabel(title: title, average: average, maxValue: maxValue))
+        if let average, average.isFinite, average > 0, let maxValue, maxValue.isFinite, maxValue > 0 {
+            let avg = Self.formatSpeedParts(average)
+            let peak = Self.formatSpeedParts(maxValue)
+            Text("Moyenne \(avg.value) \(avg.unit) · max \(peak.value) \(peak.unit)")
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .monospacedDigit()
                 .foregroundStyle(SQColor.label)
-        }
-        if let maxValue, maxValue.isFinite, maxValue > 0 {
-            let maxParts = Self.formatSpeedParts(maxValue)
-            Text("Max \(maxParts.value) \(maxParts.unit)")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
         } else {
             Text("Mesure indisponible")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
         }
-        if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
-    }
-
-    // MARK: Latences — ping, jitter, et les deux pings en charge
-
-    private var latencyGrid: some View {
-        LazyVGrid(
-            columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
-            spacing: SQSpace.sm
-        ) {
-            // Libellés du lexique, traduits : « Ping » et « Jitter » restaient en
-            // dur, en majuscules et en 11 pt (TRX-25, TRX-12, TRX-30).
-            latencyTile(String(localized: "Latence"), value: Self.msText(result.primaryPingMs), tint: SQColor.labelSecondary, sub: pingSub)
-            latencyTile(String(localized: "Gigue"), value: Self.decimalText(result.jitterMs), tint: SQColor.labelSecondary,
-                sub: String(localized: "au repos"))
-            latencyTile(String(localized: "Latence en réception"), value: Self.msText(result.pingDlMs),
-                tint: SQColor.success, sub: gigue(result.jitterDlMs))
-            latencyTile(String(localized: "Latence en envoi"), value: Self.msText(result.pingUlMs),
-                tint: SQColor.warning, sub: gigue(result.jitterUlMs))
+        if let trace {
+            ForEach(Self.throughputSourceLabels(trace), id: \.self) { label in
+                Text(label).font(.caption).foregroundStyle(SQColor.labelSecondary)
+            }
+            Text("Débit récent · fenêtre de 1 s · pointillés : moyenne cumulée")
+                .font(.caption).foregroundStyle(SQColor.labelSecondary)
+            Text("Mesure : \(Double(trace.sampleDurationMs) / 1000, format: .number.precision(.fractionLength(2))) s · MAX sur \(Double(Self.maxWindowMs(trace)) / 1000, format: .number.precision(.fractionLength(2))) s")
+                .font(.caption).foregroundStyle(SQColor.labelSecondary)
+        } else if !(series ?? []).isEmpty {
+            Text("Courbe historique sans horodatage")
+                .font(.caption).foregroundStyle(SQColor.labelSecondary)
         }
     }
 
-    private var pingSub: String {
-        guard let minMs = result.pingMinMs, let maxMs = result.pingMaxMs else { return " " }
-        return "min \(Int(minMs.rounded())) · max \(Int(maxMs.rounded()))"
+    // MARK: Latence — au repos, gigue, et les deux latences en charge
+
+    private var latencyCard: some View {
+        detailCard("Latence") {
+            VStack(spacing: SQSpace.xxs) {
+                dotRow("Au repos", "\(Self.msText(result.primaryPingMs)) ms", trailing: result.pingProtocol?.trimmedNonEmptyDetail)
+                if let minMs = result.pingMinMs, let maxMs = result.pingMaxMs {
+                    dotRow("Min · max", "\(Int(minMs.rounded())) · \(Int(maxMs.rounded())) ms")
+                }
+                dotRow("Gigue", "\(Self.decimalText(result.jitterMs)) ms")
+                dotRow("En réception", "\(Self.msText(result.pingDlMs)) ms", trailing: gigue(result.jitterDlMs))
+                dotRow("En envoi", "\(Self.msText(result.pingUlMs)) ms", trailing: gigue(result.jitterUlMs))
+                if let average = result.pingMs {
+                    dotRow("Latence moyenne", "\(Self.msText(average)) ms")
+                }
+                if result.methodologyVersion == nil {
+                    dotRow("Mesure de latence", String(localized: "Valeur historique"))
+                }
+            }
+        }
     }
 
     private func gigue(_ jitter: Double?) -> String {
@@ -295,77 +376,52 @@ struct SpeedtestDetailContent: View {
         return "\(label) ±\(Self.decimalText(jitter))"
     }
 
-    private func latencyTile(_ label: String, value: String, tint: Color, sub: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(verbatim: label)
-                .font(SQType.micro)
-                .foregroundStyle(SQColor.label)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value)
-                    .font(SQFont.display(22, .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.label)
-                Text("ms")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+    // MARK: Mesure — réseau, serveurs, appareil, octets réellement comptés
+
+    private var measureCard: some View {
+        detailCard("Détails de la mesure") {
+            VStack(spacing: SQSpace.xxs) {
+                dotRow("Réseau", result.networkShareDisplayName)
+                if let city = result.city?.trimmedNonEmptyDetail {
+                    dotRow("Lieu", city)
+                }
+                if let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmptyDetail {
+                    dotRow("Serveur de mesure", server)
+                }
+                if let device = deviceLine {
+                    dotRow("Appareil", device)
+                }
+                if let host = result.downloadServerHost {
+                    dotRow("Serveur de réception", endpoint(host, result.downloadServerPort))
+                }
+                if let host = result.uploadServerHost {
+                    dotRow("Serveur d’envoi", endpoint(host, result.uploadServerPort))
+                }
+                if let host = result.pingServerHost {
+                    dotRow("Serveur de latence", endpoint(host, result.pingServerPort))
+                }
+                if let version = result.methodologyVersion {
+                    dotRow("Méthodologie", String(version))
+                }
+                if let source = Self.resultByteSource(result.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: result.uploadMeasurementSource) {
+                    dotRow("Comptage de l’envoi", Self.byteSourceLabel(source))
+                }
+                // Octets comptés pendant la fenêtre de mesure, avec leur source.
+                ForEach(measuredByteRows, id: \.label) { row in
+                    dotRow(row.label, row.value, localized: false)
+                }
             }
-            Text(sub)
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(SQSpace.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.md, elevation: .rest)
     }
 
-    // MARK: Méta — serveur, appareil, protocole
-
-    private var metaCard: some View {
-        VStack(spacing: 0) {
-            if let server = (result.serverName ?? result.downloadServerName)?.trimmedNonEmptyDetail {
-                metaRow("Serveur de mesure", server, icon: "server.rack")
-                Divider().overlay(SQColor.separator)
-            }
-            if let city = result.city?.trimmedNonEmptyDetail {
-                metaRow("Lieu", city, icon: "mappin.and.ellipse")
-                Divider().overlay(SQColor.separator)
-            }
-            metaRow("Réseau", result.networkShareDisplayName, icon: "antenna.radiowaves.left.and.right")
-            if let device = deviceLine {
-                Divider().overlay(SQColor.separator)
-                metaRow("Appareil", device, icon: "iphone")
-            }
-            if let host = result.downloadServerHost {
-                metaRow("Serveur de réception", endpoint(host, result.downloadServerPort), icon: "arrow.down")
-            }
-            if let host = result.uploadServerHost {
-                metaRow("Serveur d’envoi", endpoint(host, result.uploadServerPort), icon: "arrow.up")
-            }
-            if let host = result.pingServerHost {
-                metaRow("Serveur de latence", endpoint(host, result.pingServerPort), icon: "timer")
-            }
-            if let version = result.methodologyVersion {
-                metaRow("Méthodologie", String(version), icon: "info.circle")
-            }
-            if let source = Self.resultByteSource(result.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: result.uploadMeasurementSource) {
-                metaRow("Comptage de l’envoi", Self.byteSourceLabel(source), icon: "arrow.up")
-            }
-            if let average = result.pingMs {
-                metaRow("Latence moyenne", "\(Self.msText(average)) ms", icon: "timer")
-            }
-            if result.methodologyVersion == nil {
-                metaRow("Mesure de latence", String(localized: "Valeur historique"), icon: "clock")
-            }
-            if let proto = result.pingProtocol?.trimmedNonEmptyDetail {
-                Divider().overlay(SQColor.separator)
-                metaRow("Protocole de latence", proto, icon: "timer")
-            }
+    private var measuredByteRows: [(label: String, value: String)] {
+        let phases = ["download", "upload"].compactMap { name in
+            result.measurementTrace?.phases.first { $0.phase == name && $0.measuredBytes > 0 }
         }
-        .sqCardBackground(cornerRadius: SQRadius.lg, elevation: .rest)
+        return phases.map { phase in
+            (Self.byteSourceLabel(phase.byteSource),
+             ByteCountFormatter.string(fromByteCount: phase.measuredBytes, countStyle: .file))
+        }
     }
 
     static func resultByteSource(_ phase: SpeedtestPhaseTrace?, fallback: String?) -> String? {
@@ -414,58 +470,77 @@ struct SpeedtestDetailContent: View {
         return [model, os].compactMap { $0 }.joined(separator: " • ").trimmedNonEmptyDetail
     }
 
-    private func metaRow(_ label: String, _ value: String, icon: String) -> some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    metaLabel(label, icon: icon)
-                    metaValue(value, alignment: .leading)
-                }
-            } else {
-                HStack(spacing: SQSpace.md) {
-                    metaLabel(label, icon: icon)
-                    Spacer(minLength: SQSpace.sm)
-                    metaValue(value, alignment: .trailing)
-                }
+    // MARK: Briques — carte à sur-titre et ligne clé · · · valeur
+
+    private func detailCard<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            Text(title)
+                .font(SQFont.body(12, .bold, relativeTo: .caption))
+                .tracking(12 * 0.16)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.labelSecondary)
+                .sqHeader()
+            content()
+        }
+        .padding(SQSpace.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground()
+    }
+
+    /// Ligne clé · · · valeur, comme le « Diagnostic radio » du web. Les très
+    /// grands textes empilent la clé et la valeur plutôt que de les tronquer.
+    private func dotRow(_ label: String, _ value: String, trailing: String? = nil, localized: Bool = true) -> some View {
+        let valueText = HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(verbatim: value)
+                .font(SQFont.body(14, .bold, relativeTo: .subheadline))
+                .monospacedDigit()
+                .foregroundStyle(SQColor.label)
+                .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
+                .fixedSize(horizontal: false, vertical: true)
+            if let trailing {
+                Text(verbatim: trailing)
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
             }
         }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.sm2)
-    }
-
-    private func metaLabel(_ label: String, icon: String) -> some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(SQColor.labelSecondary)
-                .frame(width: 20)
-            Text(LocalizedStringKey(label))
-                .font(SQType.subhead)
-                .foregroundStyle(SQColor.labelSecondary)
+        let labelText = (localized ? Text(LocalizedStringKey(label)) : Text(verbatim: label))
+            .font(SQType.subhead(.regular))
+            .foregroundStyle(SQColor.labelSecondary)
+        return Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                    labelText
+                    valueText
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, SQSpace.xxs)
+            } else {
+                // Le libellé et la valeur passent avant les pointillés, qui
+                // remplissent seulement l'espace restant.
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    labelText
+                        .layoutPriority(1)
+                    SQDotLeader()
+                        .frame(minWidth: SQSpace.md, maxWidth: .infinity)
+                        .frame(height: 1)
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
+                    valueText
+                        .layoutPriority(1)
+                }
+                .frame(minHeight: 28)
+            }
         }
-    }
-
-    private func metaValue(_ value: String, alignment: TextAlignment) -> some View {
-        Text(value)
-            .font(SQFont.body(14, .semibold))
-            .foregroundStyle(SQColor.label)
-            .lineLimit(3)
-            .fixedSize(horizontal: false, vertical: true)
-            .multilineTextAlignment(alignment)
     }
 
     // MARK: Actions
 
     @ViewBuilder
     private var actions: some View {
-        VStack(spacing: SQSpace.sm) {
-            if let onShowOnMap, let coordinate = result.coordinate {
-                GradientButton("Voir ce lieu sur la carte", systemImage: "map.fill", style: .secondary) {
-                    onShowOnMap(coordinate)
-                    onDismiss?()
-                }
+        if let onShowOnMap, let coordinate = result.coordinate {
+            GradientButton("Voir ce lieu sur la carte", systemImage: "map.fill", style: .secondary) {
+                onShowOnMap(coordinate)
+                onDismiss?()
             }
-
         }
     }
 
@@ -535,66 +610,141 @@ private extension String {
 }
 
 
+/// Pastille de la fiche : visibilité (verte, neutre ou ambre) ou appareil.
+struct SpeedtestStatusPill: View {
+    let status: SpeedtestVisibilityStatus
+    var systemImage: String? = nil
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .bold))
+                    .accessibilityHidden(true)
+            }
+            Text(verbatim: status.text)
+                .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(foreground)
+        .padding(.horizontal, SQSpace.sm2)
+        .padding(.vertical, 5)
+        .frame(minHeight: 26)
+        .background(background, in: Capsule(style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var foreground: Color {
+        switch status.tone {
+        case .positive: return SQColor.success
+        case .caution: return SQColor.warning
+        case .neutral: return SQColor.label
+        }
+    }
+
+    private var background: Color {
+        switch status.tone {
+        case .positive: return SQColor.successSoft
+        case .caution: return SQColor.warningSoft
+        case .neutral: return SQColor.chip
+        }
+    }
+}
+
 /// État serveur et actions de cette fiche ; aucun optimisme sur la visibilité.
 struct SpeedtestVisibilityControls: View {
     @ObservedObject var model: SpeedtestVisibilityViewModel
+    /// « Voir sur la carte », à côté de « Masquer ». `nil` sans position.
+    var onShowOnMap: (() -> Void)? = nil
     @State private var publicationConfirmation: SpeedtestVisibilityViewModel.PublicationConfirmation?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            Label("Carte publique", systemImage: "map")
-                .font(SQType.subhead)
-            Text(statusText)
-                .font(SQFont.body(17, .semibold))
-                .accessibilityIdentifier("speedtest.visibility.status")
-            if model.isLoading || model.isSaving {
-                ProgressView(model.isSaving
-                             ? String(localized: "Enregistrement et vérification…")
-                             : String(localized: "Vérification de la visibilité…"))
-                    .font(SQType.caption)
-                    .accessibilityIdentifier("speedtest.visibility.progress")
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    Text("Visibilité")
+                        .font(SQFont.body(12, .bold, relativeTo: .caption))
+                        .tracking(12 * 0.16)
+                        .textCase(.uppercase)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .sqHeader()
+                    Spacer(minLength: SQSpace.xs)
+                    SpeedtestStatusPill(status: Self.status(for: model))
+                        .accessibilityIdentifier("speedtest.visibility.status")
+                }
+                if model.isLoading || model.isSaving {
+                    ProgressView(model.isSaving
+                                 ? String(localized: "Enregistrement et vérification…")
+                                 : String(localized: "Vérification de la visibilité…"))
+                        .font(SQType.caption)
+                        .accessibilityIdentifier("speedtest.visibility.progress")
+                }
+                if let explanation {
+                    Text(explanation)
+                        .font(SQType.subhead(.regular))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let error = model.errorMessage {
+                    Text(error)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .accessibilityIdentifier("speedtest.visibility.error")
+                }
+                if let message = model.confirmationMessage {
+                    Text(message)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.success)
+                        .accessibilityIdentifier("speedtest.visibility.confirmation")
+                }
+                if onShowOnMap != nil || model.canHide {
+                    let buttons = Group {
+                        if let onShowOnMap {
+                            GradientButton("Voir sur la carte", systemImage: "map", style: .secondary, action: onShowOnMap)
+                                .accessibilityIdentifier("speedtest.visibility.map")
+                        }
+                        if model.canHide {
+                            GradientButton("Masquer", systemImage: "eye.slash", style: .destructive) {
+                                Task { await model.hide() }
+                            }
+                            .accessibilityLabel("Masquer de la carte")
+                            .accessibilityIdentifier("speedtest.visibility.hide")
+                        }
+                    }
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(spacing: SQSpace.sm) { buttons }
+                    } else {
+                        HStack(spacing: SQSpace.sm) { buttons }
+                    }
+                }
+                if model.canPublish {
+                    GradientButton("Publier ce test", systemImage: "map", style: .secondary) {
+                        publicationConfirmation = model.requestPublicationConfirmation()
+                    }
+                    .accessibilityIdentifier("speedtest.visibility.publish")
+                }
+                if !model.isLoading && !model.isSaving && !model.isStateCurrent
+                    && model.availability != .guest && model.availability != .sessionChanged {
+                    GradientButton("Vérifier la visibilité", systemImage: "arrow.clockwise", style: .ghost) {
+                        Task { await model.load() }
+                    }
+                    .accessibilityIdentifier("speedtest.visibility.retry")
+                }
             }
-            if let explanation {
-                Text(explanation)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(SQSpace.cardPadding)
+            .sqCardBackground()
+
+            if showsHideFootnote {
+                Text("Masquer un test le conserve dans ton historique. Sa publication reste soumise aux critères de la carte et à tes zones privées.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
-            }
-            if let error = model.errorMessage {
-                Text(error)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.dangerInk)
-                    .accessibilityIdentifier("speedtest.visibility.error")
-            }
-            if let message = model.confirmationMessage {
-                Text(message)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.success)
-                    .accessibilityIdentifier("speedtest.visibility.confirmation")
-            }
-            if model.canHide {
-                GradientButton("Masquer de la carte", systemImage: "eye.slash", style: .secondary) {
-                    Task { await model.hide() }
-                }
-                .accessibilityIdentifier("speedtest.visibility.hide")
-            }
-            if model.canPublish {
-                GradientButton("Publier ce test", systemImage: "map", style: .secondary) {
-                    publicationConfirmation = model.requestPublicationConfirmation()
-                }
-                .accessibilityIdentifier("speedtest.visibility.publish")
-            }
-            if !model.isLoading && !model.isSaving && !model.isStateCurrent
-                && model.availability != .guest && model.availability != .sessionChanged {
-                GradientButton("Vérifier la visibilité", systemImage: "arrow.clockwise", style: .ghost) {
-                    Task { await model.load() }
-                }
-                .accessibilityIdentifier("speedtest.visibility.retry")
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, SQSpace.xs)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(SQSpace.md)
-        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
         .confirmationDialog("Publier ce test ?", isPresented: Binding(
             get: { publicationConfirmation != nil },
             set: { if !$0 { publicationConfirmation = nil } }
@@ -611,20 +761,27 @@ struct SpeedtestVisibilityControls: View {
         }
     }
 
-    private var statusText: String {
+    static func status(for model: SpeedtestVisibilityViewModel) -> SpeedtestVisibilityStatus {
         switch model.availability {
-        case .guest: return String(localized: "Test invité")
-        case .noServerReference: return String(localized: "Référence serveur indisponible")
-        case .sessionChanged: return String(localized: "Session modifiée")
+        case .guest: return .init(text: String(localized: "Test invité"), tone: .neutral)
+        case .noServerReference: return .init(text: String(localized: "Référence serveur indisponible"), tone: .caution)
+        case .sessionChanged: return .init(text: String(localized: "Session modifiée"), tone: .caution)
         case .unknown, .loaded: break
         }
         guard model.isStateCurrent, let state = model.state else {
-            return String(localized: "Visibilité à vérifier")
+            return .init(text: String(localized: "Visibilité à vérifier"), tone: .caution)
         }
-        if !state.isVisibleOnMap { return String(localized: "Masqué de la carte") }
-        if !state.isPublic { return String(localized: "Non éligible à la carte") }
-        if !state.hasMapPosition { return String(localized: "Position indisponible") }
-        return String(localized: "Visible sur la carte")
+        if !state.isVisibleOnMap { return .init(text: String(localized: "Masqué de la carte"), tone: .neutral) }
+        if !state.isPublic { return .init(text: String(localized: "Non éligible à la carte"), tone: .neutral) }
+        if !state.hasMapPosition { return .init(text: String(localized: "Position indisponible"), tone: .caution) }
+        return .init(text: String(localized: "Visible sur la carte"), tone: .positive)
+    }
+
+    /// Note générale sous la carte, quand le propriétaire peut agir.
+    private var showsHideFootnote: Bool {
+        guard model.availability == .loaded || model.availability == .unknown,
+              model.isStateCurrent, let state = model.state else { return false }
+        return state.isOwner && !(model.publicationBlockedByVPN && !state.isVisibleOnMap)
     }
 
     private var explanation: String? {
@@ -641,6 +798,9 @@ struct SpeedtestVisibilityControls: View {
         if model.publicationBlockedByVPN && !state.isVisibleOnMap {
             return String(localized: "La publication est indisponible sous VPN. Le masquage reste possible.")
         }
-        return String(localized: "Masquer un test le conserve dans ton historique. Sa publication reste soumise aux critères de la carte et à tes zones privées.")
+        if state.isVisibleOnMap && state.isPublic && state.hasMapPosition {
+            return String(localized: "Sa mesure et sa position enregistrée sont visibles sur la carte publique. Tes zones privées restent appliquées.")
+        }
+        return nil
     }
 }

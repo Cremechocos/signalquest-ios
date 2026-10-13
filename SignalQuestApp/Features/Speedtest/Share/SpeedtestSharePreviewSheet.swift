@@ -36,9 +36,13 @@ struct SpeedtestSharePreviewSheet: View {
                     preview
 
                     Text("Détails inclus")
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                        .accessibilityAddTraits(.isHeader)
+                        .font(SQFont.body(12, .bold, relativeTo: .caption))
+                        .tracking(12 * 0.16)
+                        .textCase(.uppercase)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .padding(.horizontal, SQSpace.xs)
+                        .padding(.bottom, -SQSpace.sm)
+                        .sqHeader()
 
                     VStack(spacing: 0) {
                         optionRow(
@@ -47,28 +51,28 @@ struct SpeedtestSharePreviewSheet: View {
                             systemImage: "antenna.radiowaves.left.and.right",
                             keyPath: \.includeNetworkContext
                         )
-                        Divider().padding(.leading, 48)
+                        Divider().overlay(SQColor.separator).padding(.leading, 48)
                         optionRow(
                             title: "Ville approximative",
                             description: "La commune du test, jamais les coordonnées exactes.",
                             systemImage: "location.fill",
                             keyPath: \.includeApproximateLocation
                         )
-                        Divider().padding(.leading, 48)
+                        Divider().overlay(SQColor.separator).padding(.leading, 48)
                         optionRow(
                             title: "Modèle du téléphone",
                             description: "Le nom commercial, jamais l’identifiant technique.",
                             systemImage: "iphone",
                             keyPath: \.includeDevice
                         )
-                        Divider().padding(.leading, 48)
+                        Divider().overlay(SQColor.separator).padding(.leading, 48)
                         optionRow(
                             title: "Serveur de mesure",
                             description: "Le serveur réellement utilisé par le test.",
                             systemImage: "server.rack",
                             keyPath: \.includeServerDetails
                         )
-                        Divider().padding(.leading, 48)
+                        Divider().overlay(SQColor.separator).padding(.leading, 48)
                         optionRow(
                             title: "Date et heure",
                             description: "L’horodatage local du test.",
@@ -76,14 +80,11 @@ struct SpeedtestSharePreviewSheet: View {
                             keyPath: \.includeTimestamp
                         )
                     }
-                    .padding(.horizontal, SQSpace.lg)
-                    .background(
-                        SQColor.surface,
-                        in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                    )
+                    .padding(.horizontal, SQSpace.cardPadding)
+                    .sqCardBackground()
                 }
-                .padding(.horizontal, SQSpace.xl)
-                .padding(.top, SQSpace.xl)
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.lg)
                 .padding(.bottom, SQSpace.xl)
                 .sqReadableWidth()
             }
@@ -114,16 +115,12 @@ struct SpeedtestSharePreviewSheet: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Vérifier le partage")
-                .font(SQType.title)
-                .foregroundStyle(SQColor.label)
-                .accessibilityAddTraits(.isHeader)
-            Text("Le résultat, les graphes et la latence restent visibles. Désactive les détails que tu ne souhaites pas publier.")
-                .font(SQType.body)
-                .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        MessageSheetHeader(
+            title: "Vérifier le partage",
+            subtitle: String(localized: "Le résultat, les graphes et la latence restent visibles. Désactive les détails que tu ne souhaites pas publier."),
+            closeIdentifier: "speedtest.share.close",
+            onClose: { dismiss() }
+        )
     }
 
     @ViewBuilder
@@ -157,12 +154,8 @@ struct SpeedtestSharePreviewSheet: View {
         keyPath: WritableKeyPath<SpeedtestShareOptions, Bool>
     ) -> some View {
         Toggle(isOn: optionBinding(keyPath)) {
-            HStack(alignment: .top, spacing: SQSpace.md) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 28, height: 28)
-                    .accessibilityHidden(true)
+            HStack(alignment: .top, spacing: SQSpace.sm2) {
+                SQIconPastille(systemImage: systemImage, size: 34, tint: SQColor.accentInk, fill: SQColor.accentSoft)
                 VStack(alignment: .leading, spacing: SQSpace.xs) {
                     Text(LocalizedStringKey(title))
                         .font(SQType.body.weight(.semibold))
@@ -175,6 +168,7 @@ struct SpeedtestSharePreviewSheet: View {
             }
         }
         .tint(SQColor.brandRed)
+        .padding(.vertical, SQSpace.sm)
         .frame(minHeight: 64)
         .accessibilityLabel(LocalizedStringKey(title))
         .accessibilityHint(LocalizedStringKey(description))
@@ -198,15 +192,10 @@ struct SpeedtestSharePreviewSheet: View {
                     .foregroundStyle(SQColor.danger)
                     .accessibilityLabel("Impossible de préparer le partage.")
             }
-
-            Button("Annuler") { dismiss() }
-                .font(SQType.button)
-                .foregroundStyle(SQColor.labelSecondary)
-                .frame(maxWidth: .infinity, minHeight: 48)
         }
-        .padding(.horizontal, SQSpace.xl)
+        .padding(.horizontal, SQSpace.lg)
         .padding(.top, SQSpace.md)
-        .padding(.bottom, SQSpace.sm)
+        .padding(.bottom, SQSpace.md)
         .background(SQColor.bg)
         .sqReadableWidth()
     }

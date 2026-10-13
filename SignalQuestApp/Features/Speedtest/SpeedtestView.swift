@@ -73,6 +73,9 @@ struct SpeedtestView: View {
     /// Échec du MOTEUR de test (≠ échec de synchronisation) : carte dédiée
     /// dont le bouton relance le test au lieu de re-envoyer l'historique.
     @State private var runErrorMessage: String?
+    /// Nature de `runErrorMessage` : un changement de réseau ou un Drive Test
+    /// en cours ne sont pas des échecs, leur carte le dit autrement.
+    @State private var runErrorKind: RunErrorKind = .failure
     /// Test de l'historique ouvert en fiche détaillée.
     @State private var detailResult: SpeedtestRunResult?
     /// Débit habituel de l'opérateur autour du dernier test (carte verdict).
@@ -164,6 +167,9 @@ struct SpeedtestView: View {
                 // Jauge posée sur le fond, ligne d'état, puis les trois valeurs :
                 // la mesure se lit d'un bloc, sans cadre autour.
                 VStack(spacing: SQSpace.md) {
+                    if let burstProgress {
+                        burstRunningPill(index: burstProgress.index, total: burstProgress.total)
+                    }
                     if viewportHeight > 0, viewportHeight < 640 {
                         signatureDial
                             .scaleEffect(0.82)
@@ -210,11 +216,8 @@ struct SpeedtestView: View {
                 }
 
                 if let runErrorMessage {
-                    alertCard(title: "Speedtest impossible", message: runErrorMessage, systemImage: "exclamationmark.triangle", tone: .danger, actionTitle: "Réessayer") {
-                        self.runErrorMessage = nil
-                        start()
-                    }
-                    .transition(.opacity)
+                    runErrorCard(runErrorMessage)
+                        .transition(.opacity)
                 }
 
                 // Le message brut du serveur (« not found »…) ne dit rien à
@@ -225,8 +228,8 @@ struct SpeedtestView: View {
                         message: String(localized: "Le résultat est gardé sur ton iPhone. Il partira dès que le serveur répondra."),
                         systemImage: "exclamationmark.icloud",
                         tone: .danger,
-                        detail: errorMessage,
                         actionTitle: "Réessayer",
+                        actionStyle: .secondary,
                         isBusy: isRetryingPendingSave
                     ) {
                         guard !isRetryingPendingSave else { return }
@@ -383,7 +386,8 @@ struct SpeedtestView: View {
         SignatureSpeedDial(
             value: gaugeDisplay.value,
             unit: gaugeDisplay.unit,
-            phaseTitle: liveProgress.stage == "finalizing" ? String(localized: "Finalisation") : phase.dialTitle,
+            phaseTitle: showsBurstAverage ? String(localized: "Moyenne")
+                : liveProgress.stage == "finalizing" ? String(localized: "Finalisation") : phase.dialTitle,
             phase: phase,
             completionLabel: dialCompletionLabel,
             extendsToTenGigabits: dialExtendsToTenGigabits
@@ -499,12 +503,10 @@ struct SpeedtestView: View {
     @ViewBuilder
     private var primaryAction: some View {
         VStack(spacing: SQSpace.sm) {
-            if let burstProgress {
-                burstRunningPill(index: burstProgress.index, total: burstProgress.total)
-            }
             if isRunning {
                 // L'encre reste réservée à l'action principale.
-                GradientButton("Arrêter", systemImage: "stop.fill", style: .destructive, action: stop)
+                GradientButton(burstProgress == nil ? "Arrêter" : "Arrêter la rafale",
+                               systemImage: "stop.fill", style: .destructive, action: stop)
             } else {
                 HStack(spacing: SQSpace.sm) {
                     GradientButton(primaryButtonTitle, systemImage: primaryButtonIcon, action: start)
@@ -568,11 +570,12 @@ struct SpeedtestView: View {
             .padding(.horizontal, SQSpace.md)
             .frame(minHeight: 28)
             .background(SQColor.label, in: Capsule(style: .continuous))
-            // Un segment par test : vert une fois mesuré, encre pour le test en cours.
+            // Un segment par test : vert une fois mesuré, encre pour le test en
+            // cours, teinte de la piste de la jauge pour les suivants.
             HStack(spacing: SQSpace.xs) {
                 ForEach(1...max(total, 1), id: \.self) { step in
                     Capsule(style: .continuous)
-                        .fill(step < index ? SQColor.success : step == index ? SQColor.label : SQColor.surfaceMuted)
+                        .fill(step < index ? SQColor.success : step == index ? SQColor.label : SQColor.labelTertiary.opacity(0.28))
                         .frame(width: total > 5 ? 12 : 22, height: 5)
                 }
             }
@@ -732,17 +735,57 @@ struct SpeedtestView: View {
 
     // MARK: - Alerts
 
-    enum AlertTone { case warning, danger }
+    enum AlertTone { case warning, danger, brand }
+
+    enum RunErrorKind: Equatable {
+        case failure
+        case networkChanged(from: String, to: String)
+        case driveTestRunning
+    }
+
+    @ViewBuilder
+    private func runErrorCard(_ message: String) -> some View {
+        switch runErrorKind {
+        case let .networkChanged(from, to):
+            alertCard(
+                title: "Test arrêté : réseau changé",
+                message: String(localized: "\(from) → \(to) pendant la mesure. Relance le test pour mesurer une connexion stable."),
+                systemImage: "arrow.left.arrow.right",
+                tone: .warning
+            )
+        case .driveTestRunning:
+            alertCard(
+                title: "Un Drive Test est en cours",
+                message: String(localized: "Ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple."),
+                systemImage: "point.topleft.down.to.point.bottomright.curvepath",
+                tone: .brand,
+                actionTitle: "Ouvrir le Drive Test",
+                actionIcon: nil,
+                actionStyle: .secondary
+            ) {
+                runErrorMessage = nil
+                showDriveTest = true
+            }
+        case .failure:
+            alertCard(title: "Speedtest impossible", message: message, systemImage: "exclamationmark.triangle", tone: .danger, actionTitle: "Réessayer") {
+                runErrorMessage = nil
+                start()
+            }
+        }
+    }
 
     /// Carte d'alerte Halo : ambre posée sur le fond pour un avertissement,
-    /// carte blanche à pastille rouge pour un échec, « Réessayer » en dessous.
+    /// carte blanche à pastille rouge pour un échec (carmin pour une
+    /// information), l'action en dessous. Le message brut du serveur n'y figure
+    /// pas : il reste dans les journaux de l'APIClient.
     private func alertCard(
         title: String,
         message: String,
         systemImage: String,
         tone: AlertTone,
-        detail: String? = nil,
         actionTitle: String? = nil,
+        actionIcon: String? = "arrow.clockwise",
+        actionStyle: GradientButton.Style = .primary,
         isBusy: Bool = false,
         action: (() -> Void)? = nil
     ) -> some View {
@@ -751,8 +794,8 @@ struct SpeedtestView: View {
                 SQIconPastille(
                     systemImage: systemImage,
                     size: 32,
-                    tint: tone == .danger ? SQColor.dangerInk : SQColor.warning,
-                    fill: tone == .danger ? SQColor.dangerSoft : SQColor.chip,
+                    tint: tone == .danger ? SQColor.dangerInk : tone == .brand ? SQColor.accentInk : SQColor.warning,
+                    fill: tone == .danger ? SQColor.dangerSoft : tone == .brand ? SQColor.accentSoft : SQColor.chip,
                     font: .system(size: 14, weight: .semibold)
                 )
                 Text(LocalizedStringKey(title))
@@ -764,14 +807,8 @@ struct SpeedtestView: View {
                 .font(SQType.subhead(.regular))
                 .foregroundStyle(SQColor.ink2)
                 .fixedSize(horizontal: false, vertical: true)
-            if let detail, !detail.isEmpty {
-                Text(verbatim: detail)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
             if let actionTitle, let action {
-                GradientButton(actionTitle, systemImage: "arrow.clockwise", isBusy: isBusy, style: .secondary, action: action)
+                GradientButton(actionTitle, systemImage: actionIcon, isBusy: isBusy, style: actionStyle, action: action)
                     .padding(.top, SQSpace.xxs)
             }
         }
@@ -783,7 +820,7 @@ struct SpeedtestView: View {
                     .fill(SQColor.warningSoft)
             }
         }
-        .modifier(AlertCardSurface(isCard: tone == .danger))
+        .modifier(AlertCardSurface(isCard: tone != .warning))
         .accessibilityElement(children: .contain)
     }
 
@@ -822,74 +859,93 @@ struct SpeedtestView: View {
         .sqCardBackground()
     }
 
-    private func chipButtons(
-        options: [(value: Int, label: String)],
-        accessibilityContext: String,
-        selection: Binding<Int>
-    ) -> some View {
-        ForEach(options, id: \.value) { option in
-            SQChip(
-                label: option.label, isSelected: selection.wrappedValue == option.value, restFill: SQColor.fill,
-                spokenLabel: "\(accessibilityContext), \(option.label)"
-            ) {
-                selection.wrappedValue = option.value
-            }
-        }
-    }
-
     // MARK: - Settings sheet (unchanged behaviour)
 
     private var settingsSheet: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    VStack(alignment: .leading, spacing: SQSpace.md2) {
-                        VStack(alignment: .leading, spacing: SQSpace.sm) {
-                            Text("Nombre de tests").foregroundStyle(SQColor.label)
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: SQSpace.sm) {
-                                    chipButtons(
-                                        options: [(1, "1"), (3, "3"), (5, "5"), (10, "10")],
-                                        accessibilityContext: String(localized: "Nombre de tests"),
-                                        selection: $burstCount
+                VStack(alignment: .leading, spacing: SQSpace.md) {
+                    MessageSheetHeader(title: "Réglages du test", closeIdentifier: "speedtest.settings.close") {
+                        showSettings = false
+                    }
+                    .padding(.bottom, SQSpace.xs)
+
+                    settingsKicker("Nombre de tests")
+                    MapSegmented(
+                        selection: $burstCount,
+                        options: [(1, String(localized: "1 test")), (3, "3"), (5, "5"), (10, "10")],
+                        identifier: "speedtest.settings.burst"
+                    )
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Nombre de tests")
+                    // L'option « Trajet » ouvrait le Drive Test, qui a ses propres
+                    // réglages de distance et de plafond : elle faisait doublon.
+                    settingsFootnote("Un seul test, ou plusieurs tests à la suite. Pour mesurer en roulant, utilise le Drive Test.")
+
+                    settingsKicker("Serveur et durée")
+                        .padding(.top, SQSpace.sm)
+                    VStack(spacing: 0) {
+                        NavigationLink {
+                            SpeedtestServerPage(
+                                selection: Binding(
+                                    get: { downloadTarget },
+                                    set: { downloadTargetRaw = $0.rawValue }
+                                ),
+                                libreSpeedHost: $libreSpeedHost,
+                                iperfServerId: $iperfServerId,
+                                servers: iperfCatalogServers,
+                                // Dernière position CONNUE, jamais une demande : ouvrir
+                                // le sélecteur ne doit ni déclencher le prompt système
+                                // ni attendre un fix. `nil` = tri par distance masqué.
+                                userLocation: services.location.cachedLocation().map {
+                                    Coordinates(
+                                        latitude: $0.coordinate.latitude,
+                                        longitude: $0.coordinate.longitude
                                     )
                                 }
+                            )
+                        } label: {
+                            HStack(spacing: SQSpace.md) {
+                                SQIconPastille(systemImage: "server.rack", size: 34, font: .system(size: 14, weight: .semibold))
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Serveur de test")
+                                        .font(SQFont.body(15, .semibold))
+                                        .foregroundStyle(SQColor.label)
+                                    Text(verbatim: selectedServerName)
+                                        .font(SQType.caption)
+                                        .foregroundStyle(SQColor.labelSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(SQColor.labelTertiary)
+                                    .accessibilityHidden(true)
                             }
+                            .padding(.horizontal, SQSpace.cardPadding)
+                            .padding(.vertical, SQSpace.sm2)
+                            .frame(minHeight: 56)
+                            .contentShape(Rectangle())
                         }
-                        // L'option « Trajet » ouvrait le Drive Test, qui a ses propres
-                        // réglages de distance et de plafond : elle faisait doublon.
-                        Text("Un seul test, ou plusieurs tests à la suite. Pour mesurer en roulant, utilise le Drive Test.")
-                            .font(.caption).foregroundStyle(SQColor.labelSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        DisclosureGroup("Serveur et durée") {
-                        Text("Serveur de test")
-                            .font(SQFont.archivo(15, .bold))
-                            .foregroundStyle(SQColor.label)
-                        SpeedtestServerPicker(
-                            selection: Binding(
-                                get: { downloadTarget },
-                                set: { downloadTargetRaw = $0.rawValue }
-                            ),
-                            libreSpeedHost: $libreSpeedHost,
-                            iperfServerId: $iperfServerId,
-                            servers: iperfCatalogServers,
-                            // Dernière position CONNUE, jamais une demande : ouvrir
-                            // le sélecteur ne doit ni déclencher le prompt système
-                            // ni attendre un fix. `nil` = tri par distance masqué.
-                            userLocation: services.location.cachedLocation().map {
-                                Coordinates(
-                                    latitude: $0.coordinate.latitude,
-                                    longitude: $0.coordinate.longitude
-                                )
-                            }
-                        )
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("speedtest.settings.advanced")
 
-                        VStack(alignment: .leading, spacing: SQSpace.sm) {
-                            HStack {
-                                Text("Durée").foregroundStyle(SQColor.label)
-                                Spacer()
-                                Text("\(durationSeconds) s")
-                                    .foregroundStyle(SQColor.labelSecondary)
+                        Rectangle()
+                            .fill(SQColor.separator)
+                            .frame(height: 1)
+                            .padding(.leading, SQSpace.cardPadding + 34 + SQSpace.md)
+
+                        VStack(alignment: .leading, spacing: SQSpace.xs) {
+                            HStack(spacing: SQSpace.md) {
+                                SQIconPastille(systemImage: "timer", size: 34, font: .system(size: 14, weight: .semibold))
+                                Text("Durée de chaque sens")
+                                    .font(SQFont.body(15, .semibold))
+                                    .foregroundStyle(SQColor.label)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(verbatim: "\(durationSeconds) s")
+                                    .font(SQFont.body(14, .bold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(SQColor.label)
                             }
                             Slider(
                                 value: Binding(
@@ -898,34 +954,66 @@ struct SpeedtestView: View {
                                 ),
                                 in: 5...30,
                                 step: 1
-                            )
+                            ) {
+                                Text("Durée de chaque sens")
+                            } minimumValueLabel: {
+                                Text(verbatim: "5 s").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                            } maximumValueLabel: {
+                                Text(verbatim: "30 s").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+                            }
                             .tint(SQColor.brandRed)
-                            .accessibilityLabel("Durée")
                             .accessibilityValue(String(localized: "\(durationSeconds) seconde"))
+                            .padding(.leading, 34 + SQSpace.md)
                         }
-
-                        }
-                        .accessibilityIdentifier("speedtest.settings.advanced")
-
+                        .padding(.horizontal, SQSpace.cardPadding)
+                        .padding(.vertical, SQSpace.sm2)
                     }
-                    .padding(SQSpace.lg)
+                    .padding(.vertical, 2)
                     .sqCardBackground()
+                    settingsFootnote("Tes speedtests en réseau mobile apparaissent sur la carte à l’endroit où tu les as faits, sauf dans tes zones privées.")
                 }
-                .padding(SQSpace.lg)
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.lg)
+                .padding(.bottom, SQSpace.xl)
             }
             .accessibilityIdentifier("speedtest.settings.scroll")
             .signalQuestBackground()
-            .navigationTitle("Réglages")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("OK") { showSettings = false }
-                        .tint(SQColor.brandRed)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .presentationDetents([.large, .medium])
         .presentationDragIndicator(.visible)
+    }
+
+    /// Serveur affiché sous « Serveur de test » : le POP du catalogue ou le
+    /// serveur LibreSpeed choisi, sinon le nom du moteur.
+    private var selectedServerName: String {
+        switch downloadTarget {
+        case .iperfCatalog:
+            return iperfCatalogServers.first { $0.id == iperfServerId }?.name ?? downloadTarget.displayName
+        case .libreSpeed:
+            let host = libreSpeedServers.first { $0.hostname == libreSpeedHost }?.name
+            return "\(downloadTarget.displayName) · \(host ?? String(localized: "Le plus proche"))"
+        default:
+            return downloadTarget.displayName
+        }
+    }
+
+    private func settingsKicker(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(SQFont.body(12, .bold, relativeTo: .caption))
+            .tracking(12 * 0.14)
+            .textCase(.uppercase)
+            .foregroundStyle(SQColor.labelSecondary)
+            .padding(.horizontal, SQSpace.xs)
+            .sqHeader()
+    }
+
+    private func settingsFootnote(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, SQSpace.xs)
     }
 
     // MARK: - History
@@ -1092,8 +1180,17 @@ struct SpeedtestView: View {
 
     /// Le succès de la mesure ne prouve pas sa visibilité publique : zones,
     /// éligibilité et état serveur sont vérifiés dans la fiche détaillée.
+    /// Fin de rafale : la jauge montre la moyenne des tests, pas le dernier.
+    private var showsBurstAverage: Bool {
+        guard case .finished = phase, let burstSummary else { return false }
+        return burstSummary.avgDownload > 0
+    }
+
     private var dialCompletionLabel: String? {
         guard case .finished = phase else { return nil }
+        if showsBurstAverage, let burstSummary {
+            return String(localized: "\(burstSummary.count) tests terminés ✓")
+        }
         return String(localized: "test terminé ✓")
     }
 
@@ -1143,6 +1240,7 @@ struct SpeedtestView: View {
             let value = liveProgress.downloadLiveMbps ?? liveProgress.downloadAverageMbps ?? result?.downloadAverageMbps ?? 0
             return (value, mbit)
         case .saving, .finished:
+            if showsBurstAverage, let burstSummary { return (burstSummary.avgDownload, mbit) }
             return (result?.downloadAverageMbps ?? liveMbps, mbit)
         default:
             return (0, mbit)
@@ -1157,11 +1255,13 @@ struct SpeedtestView: View {
         if services.driveTest.isRunning {
             // Ce n'est pas un échec de synchronisation (AF-MES-02).
             runErrorMessage = String(localized: "Un Drive Test est en cours : ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple.")
+            runErrorKind = .driveTestRunning
             return
         }
         // Un test lancé depuis la voiture mesure déjà (CAR-05).
         if services.speedtest.isRunning {
             runErrorMessage = SpeedtestBusyError.alreadyRunning.errorDescription
+            runErrorKind = .failure
             return
         }
         // Réseau mobile ou Mode données faibles : un test peut consommer
@@ -1370,6 +1470,7 @@ struct SpeedtestView: View {
                 guard runSessionID == sessionID else { return }
                 liveActivity.cancel()
                 runErrorMessage = error.userFacingMessage
+                runErrorKind = .failure
                 phase = .failed(error.userFacingMessage)
                 liveProgress = SpeedtestLiveProgress(phase: .failed(error.userFacingMessage))
                 Haptics.warning()
@@ -1426,6 +1527,7 @@ struct SpeedtestView: View {
                     guard runSessionID == sessionID else { return }
                     // Un test raté n'interrompt pas la rafale : on note et on continue.
                     runErrorMessage = error.userFacingMessage
+                    runErrorKind = .failure
                     Haptics.warning()
                 }
                 if index < total {
@@ -1552,6 +1654,7 @@ struct SpeedtestView: View {
         let message = String(localized: "Speedtest arrêté : changement de réseau détecté (\(previousNetwork) -> \(newNetwork)). Relance le test pour mesurer une connexion stable.")
         networkAbortMessage = message
         runErrorMessage = message
+        runErrorKind = .networkChanged(from: previousNetwork, to: newNetwork)
         keepPartialBurstSummary()
         runSessionID = nil
         runGeneration &+= 1

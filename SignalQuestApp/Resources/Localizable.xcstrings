@@ -220,6 +220,22 @@
         }
       }
     },
+    "%@ → %@ pendant la mesure. Relance le test pour mesurer une connexion stable." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ → %2$@ during the measurement. Run the test again to measure a stable connection."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ → %2$@ pendant la mesure. Relance le test pour mesurer une connexion stable."
+          }
+        }
+      }
+    },
     "%@° bas" : {
       "localizations" : {
         "en" : {
@@ -1278,6 +1294,47 @@
         }
       }
     },
+    "%lld tests terminés ✓" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld test finished ✓"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tests finished ✓"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld test terminé ✓"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tests terminés ✓"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld. %@, %lld %@, %@." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1382,6 +1439,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1 relevé écarté"
+          }
+        }
+      }
+    },
+    "1 test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 test"
           }
         }
       }
@@ -1596,6 +1669,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appareil révoqué. Les conversations concernées devront renouveler leurs clés."
+          }
+        }
+      }
+    },
+    "Arrêter la rafale" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop the burst"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêter la rafale"
+          }
+        }
+      }
+    },
+    "Au repos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At rest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au repos"
           }
         }
       }
@@ -2369,6 +2474,38 @@
         }
       }
     },
+    "Durée de chaque sens" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duration of each direction"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durée de chaque sens"
+          }
+        }
+      }
+    },
+    "Débits mesurés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured speeds"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débits mesurés"
+          }
+        }
+      }
+    },
     "Déjà vue" : {
       "localizations" : {
         "en" : {
@@ -2431,6 +2568,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En attente du réseau mobile"
+          }
+        }
+      }
+    },
+    "En envoi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While uploading"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En envoi"
+          }
+        }
+      }
+    },
+    "En réception" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While downloading"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En réception"
           }
         }
       }
@@ -2512,6 +2681,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "File terminée"
+          }
+        }
+      }
+    },
+    "Fournisseurs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Providers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fournisseurs"
           }
         }
       }
@@ -3230,6 +3415,22 @@
         }
       }
     },
+    "Le débit dépend aussi du serveur : plus il est proche, plus la mesure est juste." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed also depends on the server: the closer it is, the more accurate the measurement."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le débit dépend aussi du serveur : plus il est proche, plus la mesure est juste."
+          }
+        }
+      }
+    },
     "Le débit médian mesuré par la communauté à moins de %@ de toi, tous opérateurs confondus." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3395,6 +3596,22 @@
         }
       }
     },
+    "Masquer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer"
+          }
+        }
+      }
+    },
     "Mauvais" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3542,6 +3759,22 @@
         }
       }
     },
+    "Min · max" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Min · max"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Min · max"
+          }
+        }
+      }
+    },
     "Mise à jour recommandée" : {
       "localizations" : {
         "en" : {
@@ -3641,6 +3874,38 @@
         }
       }
     },
+    "Moyenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moyenne"
+          }
+        }
+      }
+    },
+    "Moyenne %@ %@ · max %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average %1$@ %2$@ · max %3$@ %4$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moyenne %1$@ %2$@ · max %3$@ %4$@"
+          }
+        }
+      }
+    },
     "N'afficher que" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3670,6 +3935,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouveau mot de passe de chiffrement"
+          }
+        }
+      }
+    },
+    "Ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open it to follow its measurements, or stop it before a single test."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple."
           }
         }
       }
@@ -4031,6 +4312,22 @@
         }
       }
     },
+    "Recommandé · le plus proche à chaque test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended · the nearest for each test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommandé · le plus proche à chaque test"
+          }
+        }
+      }
+    },
     "Rejeter %@ %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4209,6 +4506,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sa couverture"
+          }
+        }
+      }
+    },
+    "Sa mesure et sa position enregistrée sont visibles sur la carte publique. Tes zones privées restent appliquées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its measurement and saved position are visible on the public map. Your private zones still apply."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sa mesure et sa position enregistrée sont visibles sur la carte publique. Tes zones privées restent appliquées."
           }
         }
       }
@@ -4528,6 +4841,22 @@
         }
       }
     },
+    "Tes speedtests en réseau mobile apparaissent sur la carte à l’endroit où tu les as faits, sauf dans tes zones privées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your mobile network speedtests appear on the map where you ran them, except in your private zones."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes speedtests en réseau mobile apparaissent sur la carte à l’endroit où tu les as faits, sauf dans tes zones privées."
+          }
+        }
+      }
+    },
     "Tes tests" : {
       "localizations" : {
         "en" : {
@@ -4574,6 +4903,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Test %lld/%lld · %@"
+          }
+        }
+      }
+    },
+    "Test arrêté : réseau changé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test stopped: network changed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test arrêté : réseau changé"
           }
         }
       }
@@ -4739,6 +5084,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Type %@"
+          }
+        }
+      }
+    },
+    "Un Drive Test est en cours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Drive Test is running"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un Drive Test est en cours"
           }
         }
       }
@@ -5042,6 +5403,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "d’un ping au suivant"
+          }
+        }
+      }
+    },
+    "iPerf3 et LibreSpeed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPerf3 and LibreSpeed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPerf3 et LibreSpeed"
           }
         }
       }

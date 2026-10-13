@@ -95,11 +95,11 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
         let settings = app.buttons["speedtest.settings"]
         XCTAssertTrue(settings.isHittable)
         settings.tap()
-        XCTAssertTrue(app.navigationBars[locale == "fr" ? "Réglages" : "Settings"]
+        XCTAssertTrue(app.staticTexts[locale == "fr" ? "Réglages du test" : "Test settings"]
             .waitForExistence(timeout: 10), "Settings sheet not presented in expected language")
         // Initialiser par le vrai contrôle : un argument UserDefaults imposé
         // au lancement empêcherait ensuite AppStorage de changer de valeur.
-        app.buttons["1"].firstMatch.tap()
+        app.buttons["speedtest.settings.burst.1"].firstMatch.tap()
         capture(app, name: "publication-\(locale)-settings-top")
 
         XCTAssertFalse(app.staticTexts["speedtest.publication.info"].exists)
@@ -109,14 +109,17 @@ final class SpeedtestPublicationSettingsQATests: XCTestCase {
         // c'est le Drive Test, qui a ses propres réglages.
         XCTAssertFalse(app.buttons[locale == "fr" ? "Trajet" : "Route"].exists)
         XCTAssertFalse(app.staticTexts[locale == "fr" ? "Plafond de données" : "Data cap"].exists)
+        // Le serveur s'ouvre sur sa propre page « Serveur de test ».
         let advanced = app.buttons["speedtest.settings.advanced"].firstMatch
         XCTAssertTrue(advanced.isHittable)
         advanced.tap()
         XCTAssertTrue(app.buttons["Cloudflare"].waitForExistence(timeout: 5))
         capture(app, name: "measurement-\(locale)-advanced-settings")
+        app.buttons["speedtest.server.back"].firstMatch.tap()
 
         // Confirm normal dismissal without touching any measurement action.
-        let done = app.buttons["OK"].firstMatch
+        let done = app.buttons["speedtest.settings.close"].firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
         XCTAssertTrue(done.isHittable)
         done.tap()
         XCTAssertTrue(settings.waitForExistence(timeout: 5))

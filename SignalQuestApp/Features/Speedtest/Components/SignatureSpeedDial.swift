@@ -15,11 +15,14 @@ struct SignatureSpeedDial: View {
     /// dépassé 1 Gbit/s, pour que l'arc ne change pas d'échelle à chaque creux.
     var extendsToTenGigabits: Bool = false
 
+    /// Largeur de la jauge : 340 dans l'onglet, plus petite dans une carte
+    /// (fiche d'un test). Hauteur et rayon suivent la même proportion.
+    var width: CGFloat = 340
+
     let lineWidth: CGFloat = 16
-    let width: CGFloat = 340
-    let height: CGFloat = 176
+    var height: CGFloat { (width * 176 / 340).rounded() }
     /// Rayon de la ligne médiane de l'arc.
-    var arcRadius: CGFloat { 124 }
+    var arcRadius: CGFloat { (width * 124 / 340).rounded() }
     var labelRadius: CGFloat { arcRadius + lineWidth / 2 + 16 }
     /// Centre du demi-cercle : les extrémités de l'arc sont à sa hauteur.
     var center: CGPoint { CGPoint(x: width / 2, y: height - 14) }
@@ -176,7 +179,7 @@ struct SignatureSpeedDial: View {
                     // Sans valeur encore, le tiret reste discret : à 54 pt il se
                     // lisait comme une barre.
                     Text(formattedValue)
-                        .font(SQFont.display(hasValue ? (dynamicTypeSize.isAccessibilitySize ? 38 : 54) : 32, .bold))
+                        .font(SQFont.display(hasValue ? valueFontSize : 32, .bold))
                         .monospacedDigit()
                         .foregroundStyle(hasValue ? SQColor.label : SQColor.labelTertiary)
                         .contentTransition(.numericText())
@@ -264,6 +267,12 @@ struct SignatureSpeedDial: View {
     }
 
     var hasValue: Bool { value > 0 && value.isFinite }
+
+    /// 54 pt à pleine taille, 44 pt dans une jauge réduite, 38 pt en très grand texte.
+    var valueFontSize: CGFloat {
+        if dynamicTypeSize.isAccessibilitySize { return 38 }
+        return width < 340 ? 44 : 54
+    }
 
     /// Au-delà du gigabit, la valeur passe en Gbit/s avec deux décimales.
     var formattedValue: String {
