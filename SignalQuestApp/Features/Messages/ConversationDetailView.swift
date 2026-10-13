@@ -444,19 +444,20 @@ struct ConversationDetailView: View {
                         (isReadableV2(message) ? message.content : decryptedMessages[message.id])
                             .map { (message: message, text: $0) }
                     }
-                    : nil
+                    : nil,
+                subtitle: conversationTitle
             ) { messageId in
                 handleSearchSelection(messageId)
             }
         }
         .navigationDestination(isPresented: $showMedia) {
-            ConversationMediaView(conversation: conversation, service: service)
+            ConversationMediaView(conversation: conversation, service: service, subtitle: conversationTitle)
         }
         .navigationDestination(isPresented: $showScheduled) {
-            ScheduledMessagesView(conversation: conversation, service: service, e2ee: e2ee)
+            ScheduledMessagesView(conversation: conversation, service: service, e2ee: e2ee, subtitle: conversationTitle)
         }
         .navigationDestination(isPresented: $showReminders) {
-            RemindersView(conversation: conversation, service: service, e2ee: e2ee)
+            RemindersView(conversation: conversation, service: service, e2ee: e2ee, subtitle: conversationTitle)
         }
         .sheet(item: $threadTarget) { target in
             ThreadView(parentMessage: target, conversation: conversation, service: service, e2ee: e2ee)

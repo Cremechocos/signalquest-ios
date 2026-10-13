@@ -6,6 +6,8 @@ struct RemindersView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
     let e2ee: E2EEServicing?
+    /// Nom de la conversation, sous le titre.
+    var subtitle: String? = nil
 
     @State private var items: [MessageReminder] = []
     @State private var isLoading = true
@@ -19,38 +21,42 @@ struct RemindersView: View {
     }
 
     var body: some View {
-        Group {
-            if isLoading && items.isEmpty {
-                SQSpinner().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let errorMessage, items.isEmpty {
-                ErrorStateView(title: "Indisponible", message: errorMessage) {
-                    Task { await load() }
-                }
-                .padding()
-            } else if activeItems.isEmpty {
-                EmptyStateView(
-                    title: "Aucun rappel",
-                    message: "Ajoute un rappel depuis le menu contextuel d'un message.",
-                    systemImage: "bell.badge"
-                )
-            } else {
-                List {
-                    ForEach(activeItems) { item in
-                        row(item)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                SQSettingsHeader(title: "Rappels", subtitle: subtitle.map { LocalizedStringKey($0) }, backIdentifier: "reminders.back")
+                if isLoading && items.isEmpty {
+                    SQSpinner().frame(maxWidth: .infinity, minHeight: 200)
+                } else if let errorMessage, items.isEmpty {
+                    ErrorStateView(title: "Indisponible", message: errorMessage) {
+                        Task { await load() }
                     }
-                    .onDelete { offsets in
-                        Task { await delete(at: offsets) }
+                } else if activeItems.isEmpty {
+                    EmptyStateView(
+                        title: "Aucun rappel",
+                        message: "Ajoute un rappel depuis le menu contextuel d'un message.",
+                        systemImage: "bell.badge"
+                    )
+                } else {
+                    // Une seule carte, une ligne par rappel.
+                    VStack(spacing: 0) {
+                        ForEach(activeItems) { item in
+                            if item.id != activeItems.first?.id { Divider().padding(.leading, 64) }
+                            row(item)
+                        }
                     }
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .sqReadableWidth()
             }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         // Échec d'une suppression sur une liste remplie : dit près de la liste.
         .actionErrorBar(items.isEmpty ? nil : errorMessage)
         .navigationTitle("Rappels")
-        .toolbarTitleInlineCompat()
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
         .task { await load() }
     }
@@ -61,8 +67,8 @@ struct RemindersView: View {
             VStack(alignment: .leading, spacing: SQSpace.xs2) {
                 if let date = item.remindAt {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
-                        .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(SQColor.accentInk)
+                        .font(SQType.callout(.bold))
+                        .foregroundStyle(SQColor.label)
                 }
                 if let reason = item.reason, !reason.isEmpty {
                     Text(reason)
@@ -70,19 +76,30 @@ struct RemindersView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                 }
                 Text(content(for: item))
-                    .font(SQType.body)
-                    .foregroundStyle(SQColor.label)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(3)
             }
+            // Regroupe date + motif + contenu en un seul élément VoiceOver (A11Y-1).
+            .accessibilityElement(children: .combine)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                Task { await delete(item) }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(SQColor.chipInk)
+                    .frame(width: 28, height: 28)
+                    .background(SQColor.chip, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Supprimer le rappel")
         }
-        .padding(SQSpace.md2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground(cornerRadius: SQRadius.xl, elevation: .rest)
-        // Regroupe date + motif + contenu en un seul élément VoiceOver (A11Y-1).
-        .accessibilityElement(children: .combine)
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: SQSpace.xs2, leading: SQSpace.lg, bottom: SQSpace.xs2, trailing: SQSpace.lg))
+        .padding(.leading, SQSpace.md)
+        .padding(.trailing, SQSpace.xs)
+        .padding(.vertical, SQSpace.sm2)
     }
 
     private func content(for item: MessageReminder) -> String {
@@ -113,18 +130,15 @@ struct RemindersView: View {
         }
     }
 
-    private func delete(at offsets: IndexSet) async {
-        let targets = offsets.map { activeItems[$0] }
+    private func delete(_ target: MessageReminder) async {
         errorMessage = nil
-        for target in targets {
-            do {
-                try await service.deleteReminder(conversationId: conversation.id, reminderId: target.id)
-                items.removeAll { $0.id == target.id }
-                Haptics.success()
-            } catch {
-                errorMessage = error.userFacingMessage
-                Haptics.error()
-            }
+        do {
+            try await service.deleteReminder(conversationId: conversation.id, reminderId: target.id)
+            items.removeAll { $0.id == target.id }
+            Haptics.success()
+        } catch {
+            errorMessage = error.userFacingMessage
+            Haptics.error()
         }
     }
 }

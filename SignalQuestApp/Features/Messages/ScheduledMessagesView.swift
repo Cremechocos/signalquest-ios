@@ -8,6 +8,8 @@ struct ScheduledMessagesView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
     let e2ee: E2EEServicing?
+    /// Nom de la conversation, sous le titre.
+    var subtitle: String? = nil
 
     @State private var items: [ScheduledMessage] = []
     @State private var isLoading = true
@@ -17,38 +19,42 @@ struct ScheduledMessagesView: View {
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
 
     var body: some View {
-        Group {
-            if isLoading && items.isEmpty {
-                SQSpinner().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let errorMessage, items.isEmpty {
-                ErrorStateView(title: "Indisponible", message: errorMessage) {
-                    Task { await load() }
-                }
-                .padding()
-            } else if items.isEmpty {
-                EmptyStateView(
-                    title: "Aucun message programmé",
-                    message: "Programme un envoi depuis le « + » du composer.",
-                    systemImage: "clock.badge"
-                )
-            } else {
-                List {
-                    ForEach(items) { item in
-                        row(item)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                SQSettingsHeader(title: "Messages programmés", subtitle: subtitle.map { LocalizedStringKey($0) }, backIdentifier: "scheduled.back")
+                if isLoading && items.isEmpty {
+                    SQSpinner().frame(maxWidth: .infinity, minHeight: 200)
+                } else if let errorMessage, items.isEmpty {
+                    ErrorStateView(title: "Indisponible", message: errorMessage) {
+                        Task { await load() }
                     }
-                    .onDelete { offsets in
-                        Task { await delete(at: offsets) }
+                } else if items.isEmpty {
+                    EmptyStateView(
+                        title: "Aucun message programmé",
+                        message: "Programme un envoi depuis le « + » du composer.",
+                        systemImage: "clock.badge"
+                    )
+                } else {
+                    // Une seule carte, une ligne par envoi programmé.
+                    VStack(spacing: 0) {
+                        ForEach(items) { item in
+                            if item.id != items.first?.id { Divider().padding(.leading, 64) }
+                            row(item)
+                        }
                     }
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .sqReadableWidth()
             }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         // Échec d'une suppression sur une liste remplie : dit près de la liste.
         .actionErrorBar(items.isEmpty ? nil : errorMessage)
         .navigationTitle("Messages programmés")
-        .toolbarTitleInlineCompat()
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
         .task { await load() }
     }
@@ -63,7 +69,7 @@ struct ScheduledMessagesView: View {
                         .foregroundStyle(SQColor.accentInk)
                 }
                 Text(content(for: item))
-                    .font(SQType.body)
+                    .font(SQType.callout)
                     .foregroundStyle(SQColor.label)
                     .lineLimit(4)
                 if let status = item.status, status != "scheduled" {
@@ -72,15 +78,26 @@ struct ScheduledMessagesView: View {
                         .foregroundStyle(SQColor.warning)
                 }
             }
+            // Regroupe date + contenu + statut en un seul élément VoiceOver (A11Y-1).
+            .accessibilityElement(children: .combine)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                Task { await delete(item) }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(SQColor.chipInk)
+                    .frame(width: 28, height: 28)
+                    .background(SQColor.chip, in: Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Annuler l’envoi")
         }
-        .padding(SQSpace.md2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground(cornerRadius: SQRadius.xl, elevation: .rest)
-        // Regroupe date + contenu + statut en un seul élément VoiceOver (A11Y-1).
-        .accessibilityElement(children: .combine)
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: SQSpace.xs2, leading: SQSpace.lg, bottom: SQSpace.xs2, trailing: SQSpace.lg))
+        .padding(.leading, SQSpace.md)
+        .padding(.trailing, SQSpace.xs)
+        .padding(.vertical, SQSpace.sm2)
     }
 
     private func content(for item: ScheduledMessage) -> String {
@@ -138,18 +155,15 @@ struct ScheduledMessagesView: View {
         }
     }
 
-    private func delete(at offsets: IndexSet) async {
-        let targets = offsets.map { items[$0] }
+    private func delete(_ target: ScheduledMessage) async {
         errorMessage = nil
-        for target in targets {
-            do {
-                try await service.deleteScheduledMessage(conversationId: conversation.id, scheduledId: target.id)
-                items.removeAll { $0.id == target.id }
-                Haptics.success()
-            } catch {
-                errorMessage = error.userFacingMessage
-                Haptics.error()
-            }
+        do {
+            try await service.deleteScheduledMessage(conversationId: conversation.id, scheduledId: target.id)
+            items.removeAll { $0.id == target.id }
+            Haptics.success()
+        } catch {
+            errorMessage = error.userFacingMessage
+            Haptics.error()
         }
     }
 }

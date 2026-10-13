@@ -16,42 +16,36 @@ struct SavedMessagesView: View {
     @State private var removing: Set<String> = []
 
     var body: some View {
-        NavigationStack {
-            Group {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(title: "Messages enregistrés", closeIdentifier: "saved.close") { dismiss() }
                 if isLoading && entries.isEmpty {
                     SQSpinner()
                         .tint(SQColor.brandRed)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity, minHeight: 200)
                 } else if let errorMessage, entries.isEmpty {
                     ErrorStateView(title: "Indisponible", message: errorMessage) {
                         Task { await load() }
                     }
-                    .padding()
                 } else if entries.isEmpty {
                     emptyState
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: SQSpace.sm) {
-                            ForEach(entries) { entry in
-                                row(entry)
-                            }
+                    // Une seule carte, une ligne par message.
+                    LazyVStack(spacing: 0) {
+                        ForEach(entries) { entry in
+                            if entry.id != entries.first?.id { Divider().padding(.leading, SQSpace.md) }
+                            row(entry)
                         }
-                        .padding()
                     }
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 }
             }
-            // Échec d'un retrait sur une liste remplie : dit près de la liste.
-            .actionErrorBar(entries.isEmpty ? nil : errorMessage)
-            .navigationTitle("Messages enregistrés")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }
-                }
-            }
-            .signalQuestBackground()
-            .task { await load() }
+            .padding(SQSpace.lg)
         }
+        // Échec d'un retrait sur une liste remplie : dit près de la liste.
+        .actionErrorBar(entries.isEmpty ? nil : errorMessage)
+        .sqSheet(background: SQColor.bg)
+        .task { await load() }
     }
 
     private var emptyState: some View {
@@ -60,14 +54,19 @@ struct SavedMessagesView: View {
             message: "Touche longuement un message puis « Enregistrer » pour le retrouver ici.",
             systemImage: "bookmark"
         )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
     private func row(_ entry: SavedMessageEntry) -> some View {
         let message = entry.message
         return HStack(alignment: .top, spacing: SQSpace.sm) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: SQSpace.xs) {
+                    if let sender = message.sender?.displayName {
+                        Text(message.senderId == currentUserId ? String(localized: "Toi") : sender)
+                            .font(SQType.caption.weight(.bold))
+                            .foregroundStyle(SQColor.label)
+                    }
                     Image(systemName: entry.conversation?.isGroup == true ? "person.3.fill" : "person.fill")
                         .font(.system(size: 10))
                         .foregroundStyle(SQColor.labelTertiary)
@@ -78,45 +77,36 @@ struct SavedMessagesView: View {
                         .sqSingleLine()
                 }
                 Text(snippet(message))
-                    .font(SQType.body)
+                    .font(SQType.callout)
                     .foregroundStyle(SQColor.label)
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
-                HStack(spacing: SQSpace.xs) {
-                    if let sender = message.sender?.displayName {
-                        Text(message.senderId == currentUserId ? String(localized: "Toi") : sender)
-                            .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    if let savedAt = entry.savedAt {
-                        Text("· enregistré le \(savedAt.formatted(.dateTime.day().month(.abbreviated).hour().minute()))")
-                            .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
+                if let savedAt = entry.savedAt {
+                    Text("Enregistré le \(savedAt.formatted(.dateTime.day().month(.abbreviated).hour().minute()))")
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
             }
             // Regroupe conversation + extrait + auteur/date en un seul élément
             // VoiceOver, sans absorber le bouton « Retirer » (A11Y-1).
             .accessibilityElement(children: .combine)
-            Spacer(minLength: SQSpace.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
             Button {
                 Task { await remove(entry) }
             } label: {
-                Image(systemName: "bookmark.slash.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 36, height: 36)
-                    .background(SQColor.accentSoft, in: Circle())
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(SQColor.accentInk)
                     .frame(width: 44, height: 44)
-                    .contentShape(Circle())
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(removing.contains(message.id))
             .accessibilityLabel("Retirer des enregistrés")
         }
-        .padding(SQSpace.md2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground()
+        .padding(.leading, SQSpace.md)
+        .padding(.trailing, SQSpace.xs)
+        .padding(.vertical, SQSpace.sm2)
         .opacity(removing.contains(message.id) ? 0.4 : 1)
     }
 

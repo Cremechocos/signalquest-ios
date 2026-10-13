@@ -159,6 +159,7 @@ struct MessagesView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let service: MessagesServicing
     private let e2ee: E2EEServicing?
     @State private var showNewConversation = false
@@ -261,7 +262,8 @@ struct MessagesView: View {
                     E2EEV2NotificationPreviewNotice()
                 }
                 if !model.conversations.isEmpty {
-                    SQSearchField(text: $query, placeholder: "Rechercher une conversation")
+                    // Aux tailles d'accessibilité, l'intitulé long ne tient pas sur une ligne.
+                    SQSearchField(text: $query, placeholder: dynamicTypeSize.isAccessibilitySize ? "Rechercher" : "Rechercher une conversation")
                         .accessibilityIdentifier("messages.search")
                     filterChips
                 }
@@ -710,6 +712,16 @@ struct MessagesView: View {
         return nil
     }
 
+    private func rowDate(_ date: Date, unread: Bool) -> some View {
+        // `accentInk` : la brique n'est garantie que pour le grand texte.
+        Text(verbatim: ConversationListDate.label(for: date))
+            .font(SQType.micro(unread ? .bold : .medium))
+            .monospacedDigit()
+            .foregroundStyle(unread ? SQColor.accentInk : SQColor.labelSecondary)
+            .fixedSize()
+            .accessibilityIdentifier("messages.row.date")
+    }
+
     /// Rangée de la carte des conversations : avatar 44 et présence, nom avec
     /// cadenas, sourdine et épingle, heure (carmin si non lu), aperçu et pastille.
     private func conversationRow(_ conversation: MessageConversation, isFirst: Bool) -> some View {
@@ -734,7 +746,9 @@ struct MessagesView: View {
                     Text(title.isEmpty ? String(localized: "Conversation") : title)
                         .font(unread ? SQType.body(.bold) : SQType.rowTitle)
                         .foregroundStyle(SQColor.label)
-                        .sqSingleLine()
+                        // Aux tailles d'accessibilité, le nom passe à la ligne autant
+                        // qu'il faut : un mot plus large que la ligne n'est pas coupé.
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                         .layoutPriority(1)
                         .accessibilityIdentifier("messages.row.title")
                     // Badges de l'interlocuteur, comme dans le fil.
@@ -760,14 +774,8 @@ struct MessagesView: View {
                             .accessibilityIdentifier("messages.row.pinned")
                     }
                     Spacer(minLength: SQSpace.xs)
-                    if let date = conversation.listDate {
-                        // `accentInk` : la brique n'est garantie que pour le grand texte.
-                        Text(verbatim: ConversationListDate.label(for: date))
-                            .font(SQType.micro(unread ? .bold : .medium))
-                            .monospacedDigit()
-                            .foregroundStyle(unread ? SQColor.accentInk : SQColor.labelSecondary)
-                            .fixedSize()
-                            .accessibilityIdentifier("messages.row.date")
+                    if !dynamicTypeSize.isAccessibilitySize, let date = conversation.listDate {
+                        rowDate(date, unread: unread)
                     }
                 }
                 HStack(spacing: SQSpace.sm) {
@@ -800,6 +808,10 @@ struct MessagesView: View {
                         }
                         .accessibilityLabel("Non lu")
                     }
+                }
+                // Aux tailles d'accessibilité, l'heure laisse toute la largeur au nom.
+                if dynamicTypeSize.isAccessibilitySize, let date = conversation.listDate {
+                    rowDate(date, unread: unread)
                 }
             }
         }

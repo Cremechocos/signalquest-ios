@@ -38,9 +38,14 @@ final class ConversationMediaQATests: XCTestCase {
         let photoTiles = app.buttons.matching(identifier: "conversationMedia.photo")
         XCTAssertTrue(photoTiles.firstMatch.waitForExistence(timeout: 10), "Aucune photo dans la galerie")
         XCTAssertEqual(photoTiles.count, 3)
-        XCTAssertTrue(app.staticTexts[photos].exists)
-        XCTAssertTrue(app.staticTexts[files].exists)
-        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "conversationMedia.file").count, 1)
+        XCTAssertTrue(app.buttons[photos].firstMatch.exists, "Segment « \(photos) » absent")
+        // Les fichiers sont sur le second segment.
+        let filesSegment = app.buttons[files].firstMatch
+        XCTAssertTrue(filesSegment.waitForExistence(timeout: 5), "Segment « \(files) » absent")
+        filesSegment.tap()
+        let fileRows = app.descendants(matching: .any).matching(identifier: "conversationMedia.file")
+        XCTAssertTrue(fileRows.firstMatch.waitForExistence(timeout: 5), "Aucun fichier sur le second segment")
+        XCTAssertEqual(fileRows.count, 1)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "conversation-media-\(locale)"
         screenshot.lifetime = .keepAlways

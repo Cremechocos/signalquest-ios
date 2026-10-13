@@ -7,20 +7,29 @@ import SwiftUI
 struct ConversationMediaView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
+    /// Nom de la conversation, sous le titre.
+    var subtitle: String? = nil
 
     @EnvironmentObject private var session: AuthSessionViewModel
     @State private var messages: [MessageItem] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var imageViewerTarget: MessageImageTarget?
+    /// `nil` : l'onglet par défaut, Photos s'il y en a.
+    @State private var tab: Tab?
     @ScaledMetric(relativeTo: .body) private var tileMinimum: CGFloat = 96
 
     /// Au plus ce que la route renvoie en une fois.
     static let pageSize = 100
 
+    private enum Tab: Hashable { case photos, files }
+
+    private var selectedTab: Tab { tab ?? (photos.isEmpty && !files.isEmpty ? .files : .photos) }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.xl) {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                SQSettingsHeader(title: "Médias et fichiers", subtitle: subtitle.map { LocalizedStringKey($0) }, backIdentifier: "conversationMedia.back")
                 if isLoading && messages.isEmpty {
                     SQSpinner()
                         .frame(maxWidth: .infinity, minHeight: 200)
@@ -36,21 +45,44 @@ struct ConversationMediaView: View {
                     )
                     .frame(maxWidth: .infinity)
                 } else {
-                    if !photos.isEmpty { photosSection }
-                    if !files.isEmpty { filesSection }
+                    SQSegmentedFilter(
+                        selection: Binding(get: { selectedTab }, set: { tab = $0 }),
+                        options: [
+                            (value: Tab.photos, label: "Photos", icon: nil),
+                            (value: Tab.files, label: "Fichiers et notes vocales", icon: nil)
+                        ]
+                    )
+                    .padding(.horizontal, -SQSpace.lg)
+                    switch selectedTab {
+                    case .photos:
+                        if photos.isEmpty { emptyTab("Aucune photo dans cette conversation.") } else { photosSection }
+                    case .files:
+                        if files.isEmpty { emptyTab("Aucun fichier ni note vocale dans cette conversation.") } else { filesSection }
+                    }
                 }
             }
-            .padding(SQSpace.lg)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
         }
         .background(SQColor.bg)
         .navigationTitle("Médias et fichiers")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
         .task { await load() }
         .refreshable { await load() }
         .fullScreenCover(item: $imageViewerTarget) { target in
             MessageImageViewer(target: target)
         }
+    }
+
+    private func emptyTab(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(SQType.callout)
+            .foregroundStyle(SQColor.labelSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, SQSpace.xl)
     }
 
     private struct Entry: Identifiable {
@@ -77,15 +109,12 @@ struct ConversationMediaView: View {
     }
 
     private var photosSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            SQSectionHeader("Photos")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: tileMinimum), spacing: 2)], spacing: 2) {
-                ForEach(photos) { entry in
-                    photoTile(entry)
-                }
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: tileMinimum), spacing: 3)], spacing: 3) {
+            ForEach(photos) { entry in
+                photoTile(entry)
             }
-            .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         }
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private func photoTile(_ entry: Entry) -> some View {
@@ -99,10 +128,10 @@ struct ConversationMediaView: View {
                 .overlay {
                     if let privateImageCacheScope {
                         RemoteImage(url: entry.url, maxDimension: 240, contentMode: .fill, cacheScope: privateImageCacheScope) {
-                            Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
+                            Rectangle().fill(SQColor.chip).sqShimmer()
                         }
                     } else {
-                        Rectangle().fill(SQColor.surfaceMuted)
+                        Rectangle().fill(SQColor.chip)
                     }
                 }
                 .clipped()
@@ -120,24 +149,35 @@ struct ConversationMediaView: View {
         return String(localized: "Photo de \(author), \(date.formatted(date: .abbreviated, time: .shortened))")
     }
 
+    /// Fichiers et notes vocales en lignes sur une seule carte.
     private var filesSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            SQSectionHeader("Fichiers et notes vocales")
-            VStack(spacing: SQSpace.sm) {
-                ForEach(files) { entry in
-                    if entry.attachment.kind.uppercased() == "AUDIO" || (entry.attachment.contentType?.hasPrefix("audio/") ?? false) {
-                        // Lue dans l'app, comme dans le fil de la conversation.
+        VStack(spacing: 0) {
+            ForEach(files) { entry in
+                if entry.id != files.first?.id { Divider().padding(.leading, SQSpace.md) }
+                if entry.attachment.kind.uppercased() == "AUDIO" || (entry.attachment.contentType?.hasPrefix("audio/") ?? false) {
+                    // Lue dans l'app, comme dans le fil de la conversation.
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
                         RemoteVoiceNoteBubble(attachment: entry.attachment, remoteURL: entry.url, mine: false)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(SQSpace.sm)
-                            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                            .accessibilityIdentifier("conversationMedia.voice")
-                    } else {
-                        fileRow(entry)
+                        Text(verbatim: fileSubtitle(entry))
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
                     }
+                    .padding(SQSpace.md)
+                    .accessibilityIdentifier("conversationMedia.voice")
+                } else {
+                    fileRow(entry)
                 }
             }
         }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    /// « Camille · 12 oct. 14:40 » : qui l'a envoyé et quand.
+    private func fileSubtitle(_ entry: Entry) -> String {
+        let author = entry.message.sender?.displayName ?? String(localized: "Membre")
+        guard let date = entry.message.createdAt else { return author }
+        return "\(author) · \(date.formatted(date: .abbreviated, time: .shortened))"
     }
 
     private func fileRow(_ entry: Entry) -> some View {
@@ -150,17 +190,15 @@ struct ConversationMediaView: View {
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    if let date = entry.message.createdAt {
-                        Text(date.formatted(date: .abbreviated, time: .shortened))
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
+                    Text(verbatim: fileSubtitle(entry))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer(minLength: SQSpace.sm)
             }
-            .padding(SQSpace.md)
-            .frame(minHeight: 44)
-            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm2)
+            .frame(minHeight: 52)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -23,63 +23,70 @@ struct ThreadView: View {
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: SQSpace.md) {
-                        threadHeader
-                        Divider().overlay(SQColor.separator)
+        VStack(spacing: 0) {
+            HStack(spacing: SQSpace.sm) {
+                Text("Fil de discussion")
+                    .font(SQFont.display(22, .bold, relativeTo: .title2))
+                    .foregroundStyle(SQColor.label)
+                    .accessibilityAddTraits(.isHeader)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "thread.close") { dismiss() }
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.sm)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: SQSpace.md) {
+                    threadHeader
+                    // Les réponses en retrait, le long d'un filet.
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
                         if isLoading && replies.isEmpty {
                             SQSpinner().frame(maxWidth: .infinity).padding(.vertical, SQSpace.xl)
                         } else if replies.isEmpty {
-                            Text("Aucune réponse pour l'instant. Lance le fil.")
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, SQSpace.lg)
+                            // L'erreur de chargement, plus bas, dit déjà pourquoi c'est vide.
+                            if errorMessage == nil {
+                                Text("Aucune réponse pour l'instant. Lance le fil.")
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, SQSpace.sm)
+                            }
                         } else {
                             ForEach(replies) { reply in
                                 replyRow(reply)
                             }
                         }
-                        if let errorMessage {
-                            ErrorStateView(title: "Fil indisponible", message: errorMessage)
-                        }
                     }
-                    .padding()
+                    .padding(.leading, SQSpace.md)
+                    .overlay(alignment: .leading) {
+                        Rectangle().fill(SQColor.separator).frame(width: 2)
+                    }
+                    .padding(.leading, SQSpace.sm)
+                    if let errorMessage {
+                        ErrorStateView(title: "Fil de discussion indisponible", message: errorMessage)
+                    }
                 }
-                composer
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.vertical, SQSpace.sm)
             }
-            .navigationTitle("Fil de discussion")
-            .toolbarTitleInlineCompat()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Fermer") { dismiss() }
-                }
-            }
-            .signalQuestBackground()
-            .task { await load() }
+            composer
         }
+        .sqSheet(background: SQColor.bg)
+        .task { await load() }
     }
 
     // MARK: Sections
 
+    /// Le message d'origine en carte : auteur, texte, heure et nombre de réponses.
     private var threadHeader: some View {
         let source = parent ?? parentMessage
-        return VStack(alignment: .leading, spacing: SQSpace.xs2) {
+        return VStack(alignment: .leading, spacing: SQSpace.xs) {
             HStack(spacing: SQSpace.sm) {
-                SQAvatar(url: source.sender?.avatarUrl, name: source.sender?.displayName ?? "?", size: 30)
+                SQAvatar(url: source.sender?.avatarUrl, name: source.sender?.displayName ?? "?", size: 28)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(source.sender?.displayName ?? String(localized: "Message"))
-                        .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(SQColor.label)
-                    if let date = source.createdAt {
-                        Text(date.formatted(date: .abbreviated, time: .shortened))
-                            .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                }
+                Text(source.sender?.displayName ?? String(localized: "Message"))
+                    .font(SQType.caption.weight(.bold))
+                    .foregroundStyle(SQColor.label)
             }
             let text = displayedContent(for: source)
             if !text.isEmpty {
@@ -87,14 +94,21 @@ struct ThreadView: View {
                     .font(SQType.body)
                     .foregroundStyle(SQColor.label)
             }
-            Text("\(replies.count) réponse")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .padding(.top, SQSpace.xs)
+            HStack(spacing: SQSpace.xs) {
+                if let date = source.createdAt {
+                    Text(date.formatted(date: .abbreviated, time: .shortened))
+                }
+                if !replies.isEmpty {
+                    if source.createdAt != nil { Text(verbatim: "·") }
+                    Text("\(replies.count) réponse")
+                }
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
         }
-        .padding(SQSpace.md2)
+        .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground()
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private func replyRow(_ reply: MessageItem) -> some View {
@@ -104,7 +118,7 @@ struct ThreadView: View {
             VStack(alignment: mine ? .trailing : .leading, spacing: 2) {
                 if !mine, let name = reply.sender?.displayName {
                     Text(name)
-                        .font(SQType.micro)
+                        .font(SQType.micro.weight(.semibold))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
                 Text(displayedContent(for: reply))
@@ -114,6 +128,11 @@ struct ThreadView: View {
                     .padding(.horizontal, 15)
                     .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine))
                     .sqShadowSoft()
+                if let date = reply.createdAt {
+                    Text(date.formatted(date: .omitted, time: .shortened))
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
             }
             if !mine { Spacer(minLength: 40) }
         }
@@ -131,35 +150,38 @@ struct ThreadView: View {
         )
     }
 
+    /// Même compositeur que la conversation : champ blanc, envoi rond encre.
     private var composer: some View {
-        HStack(spacing: SQSpace.sm2) {
+        let sendable = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
+        return HStack(alignment: .bottom, spacing: SQSpace.sm) {
             TextField("Répondre dans le fil", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
-                .padding(.horizontal, SQSpace.cardPadding)
+                .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm)
                 .frame(minHeight: 44)
-                .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(SQColor.separator))
             Button {
                 Task { await sendReply() }
             } label: {
                 Image(systemName: isSending ? "hourglass" : "paperplane.fill")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(sendable ? SQColor.onInk : SQColor.labelTertiary)
                     .frame(width: 44, height: 44)
-                    .background(SQColor.brandRed, in: Circle())
-                    .foregroundStyle(SQColor.onAccent)
-                    .sqShadowAccent()
+                    .background(sendable ? SQColor.label : SQColor.chip, in: Circle())
+                    .contentShape(Circle())
             }
-            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
+            .disabled(!sendable)
+            .keyboardShortcut(.return, modifiers: .command)
             .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer la réponse")
         }
-        .padding(.horizontal, SQSpace.md2)
-        .padding(.vertical, SQSpace.sm2)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
         .background {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(SQColor.surfaceGlass)
+            SQColor.bg
+                .overlay(alignment: .top) { Rectangle().fill(SQColor.separator).frame(height: 1) }
                 .ignoresSafeArea(edges: .bottom)
         }
     }

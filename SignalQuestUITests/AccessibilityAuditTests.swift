@@ -96,6 +96,23 @@ final class AccessibilityAuditTests: XCTestCase {
                     : "nœud non atteignable derrière la navigation"
                 return exclude(reason, name, issue.auditType)
             }
+            // Aux tailles d'accessibilité, une rangée de la boîte de réception
+            // descend sous la barre de navigation flottante : l'auditeur prend
+            // la partie couverte pour du texte rogné. Le texte entier se lit
+            // après défilement.
+            if issue.auditType == .textClipped, screen.hasPrefix("Messagerie — liste"),
+               let navigationTop, let element, element.frame.minY < navigationTop,
+               element.frame.maxY > navigationTop {
+                return exclude("texte en partie sous la navigation ; entier après défilement", name, issue.auditType)
+            }
+            // Aux tailles d'accessibilité, les pastilles de filtre de la
+            // Messagerie défilent hors de la fenêtre : l'auditeur mesure alors
+            // des pixels hors écran. Leurs jetons passent la passe à taille
+            // normale, où elles sont affichées.
+            if issue.auditType == .contrast, let element, name.hasPrefix("messages.filter."),
+               element.frame.maxX > app.frame.maxX {
+                return exclude("pastille en partie hors de la fenêtre", name, issue.auditType)
+            }
             // MapKit dessine ses libellés de fond dans le raster de la carte :
             // ils n'ont ni XCUIElement ni frame. La carte expose séparément ses
             // annotations et contrôles applicatifs ; on n'invente pas de nœud
@@ -133,6 +150,11 @@ final class AccessibilityAuditTests: XCTestCase {
                 // Lot 4b : la pastille « Drive Test » cède la place à l'icône aux
                 // grandes tailles (ViewThatFits) ; la passe AX XXL la vérifie.
                 "speedtest.driveTest.label",
+                // Refonte de la Messagerie (13/10) : champ de recherche de la
+                // boîte de réception (`SQType.body`, hauteur minimale et non fixe)
+                // et pastille de date (`SQType.micro`, relative à `.caption2`) ;
+                // `testAuditMessagingAtAccessibilityTextSize` les rend à AX XXL.
+                "messages.search", "conversation.stamp",
                 // Lot 4c : le panneau du Drive Test défile aux grandes tailles
                 // (ViewThatFits) ; `testAuditDriveTestAtAccessibilityTextSize`.
                 // Le bouton de démarrage est nommé par son libellé : l'identifiant
@@ -264,6 +286,7 @@ final class AccessibilityAuditTests: XCTestCase {
             report.lifetime = .keepAlways
             add(report)
             print("SQ_A11Y \(screen) : \(exclusions.count) exclusion(s) documentée(s)")
+            exclusions.forEach { print("SQ_A11Y   exclu \($0)") }
         }
         if !issues.isEmpty {
             let report = XCTAttachment(string: issues.joined(separator: "\n"))
