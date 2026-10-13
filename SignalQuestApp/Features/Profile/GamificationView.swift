@@ -792,3 +792,167 @@ private struct GamificationEventDisplay {
         }
     }
 }
+
+// MARK: - Médaillons de badge
+
+/// Famille d'un badge, celle du catalogue serveur (`gamification-catalog.ts`) :
+/// elle donne la teinte du médaillon et le symbole de repli.
+enum GamificationBadgeFamily: String, CaseIterable {
+    case exploration, coverage, speedtest, validation, contribution, expertise, special
+
+    var title: String {
+        switch self {
+        case .exploration: return String(localized: "Exploration")
+        case .coverage: return String(localized: "Couverture")
+        case .speedtest: return String(localized: "Speedtest")
+        case .validation: return String(localized: "Validation")
+        case .contribution: return String(localized: "Contribution")
+        case .expertise: return String(localized: "Expertise")
+        case .special: return String(localized: "Spécial")
+        }
+    }
+
+    var fallbackSymbol: String {
+        switch self {
+        case .exploration: return "map.fill"
+        case .coverage: return "cellularbars"
+        case .speedtest: return "speedometer"
+        case .validation: return "checkmark.seal.fill"
+        case .contribution: return "camera.fill"
+        case .expertise: return "graduationcap.fill"
+        case .special: return "sparkles"
+        }
+    }
+
+    /// Teintes de la maquette validée, plus claires en sombre pour garder le
+    /// contraste du symbole sur son fond teinté.
+    var tint: Color {
+        switch self {
+        case .speedtest: return SQColor.accentInk
+        case .validation: return SQColor.success
+        case .contribution: return Self.dynamic(light: 0x8C6313, dark: 0xE3B65E)
+        case .exploration: return Self.dynamic(light: 0x0F766E, dark: 0x5EEAD4)
+        case .coverage: return Self.dynamic(light: 0x2563EB, dark: 0x93B4FF)
+        case .expertise: return Self.dynamic(light: 0x7C3AED, dark: 0xC4B5FD)
+        case .special: return Self.dynamic(light: 0xAC4F17, dark: 0xF08B52)
+        }
+    }
+
+    private static func dynamic(light: UInt32, dark: UInt32) -> Color {
+        Color(UIColor { traits in
+            UIColor(Color(hex: traits.userInterfaceStyle == .dark ? dark : light))
+        })
+    }
+}
+
+/// Rareté d'un badge, dite en mots.
+enum GamificationBadgeRarity: String {
+    case common, rare, epic, legendary
+
+    var title: String {
+        switch self {
+        case .common: return String(localized: "Commun")
+        case .rare: return String(localized: "Rare")
+        case .epic: return String(localized: "Épique")
+        case .legendary: return String(localized: "Légendaire")
+        }
+    }
+}
+
+extension GamificationBadge {
+    /// Symbole, famille et rareté de chaque badge du catalogue serveur, par son
+    /// identifiant stable. Des symboles SF plutôt que les emojis du serveur :
+    /// ils suivent la teinte, le mode sombre et la taille du texte.
+    private static let catalog: [String: (symbol: String, family: GamificationBadgeFamily, rarity: GamificationBadgeRarity)] = [
+        "newcomer": ("leaf.fill", .special, .common),
+        "explorer_bronze": ("map.fill", .exploration, .common),
+        "explorer_silver": ("safari.fill", .exploration, .common),
+        "explorer_gold": ("globe.europe.africa.fill", .exploration, .rare),
+        "explorer_platinum": ("binoculars.fill", .exploration, .epic),
+        "departments_10": ("mappin.and.ellipse", .exploration, .rare),
+        "all_departments": ("flag.checkered", .exploration, .legendary),
+        "coverage_bronze": ("cellularbars", .coverage, .common),
+        "coverage_silver": ("antenna.radiowaves.left.and.right", .coverage, .rare),
+        "coverage_gold": ("road.lanes", .coverage, .epic),
+        "coverage_sessions_10": ("backpack.fill", .coverage, .rare),
+        "multi_cell_hunter": ("circle.hexagongrid.fill", .coverage, .epic),
+        "tech_diversity": ("dot.radiowaves.left.and.right", .coverage, .legendary),
+        "speedtester_bronze": ("gauge.with.dots.needle.33percent", .speedtest, .common),
+        "speedtester_silver": ("gauge.with.dots.needle.67percent", .speedtest, .common),
+        "speedtester_gold": ("speedometer", .speedtest, .rare),
+        "speedtester_platinum": ("bolt.fill", .speedtest, .epic),
+        "speed_demon": ("wind", .speedtest, .legendary),
+        "validator_bronze": ("checkmark.seal", .validation, .common),
+        "validator_silver": ("checkmark.seal.fill", .validation, .common),
+        "validator_gold": ("scope", .validation, .rare),
+        "validator_platinum": ("trophy.fill", .validation, .epic),
+        "direct_identifier": ("dial.medium.fill", .validation, .rare),
+        "offline_mapper": ("wifi.slash", .validation, .epic),
+        "photographer_bronze": ("camera.fill", .contribution, .common),
+        "photographer_silver": ("camera.aperture", .contribution, .common),
+        "photographer_gold": ("photo.stack.fill", .contribution, .rare),
+        "reporter_bronze": ("wrench.and.screwdriver.fill", .contribution, .common),
+        "reporter_gold": ("magnifyingglass", .contribution, .rare),
+        "bug_hunter_bronze": ("ladybug.fill", .contribution, .common),
+        "bug_hunter_silver": ("ant.fill", .contribution, .rare),
+        "bug_hunter_gold": ("medal.fill", .contribution, .epic),
+        "expert_5g_bronze": ("book.fill", .expertise, .common),
+        "expert_5g_silver": ("flask.fill", .expertise, .rare),
+        "expert_5g_gold": ("graduationcap.fill", .expertise, .epic),
+        "expert_5g_platinum": ("crown.fill", .expertise, .legendary),
+        "streak_bronze": ("flame.fill", .special, .common),
+        "streak_silver": ("flame.fill", .special, .rare),
+        "streak_gold": ("flame.fill", .special, .epic),
+        "early_adopter": ("star.fill", .special, .legendary),
+        "grand_nord": ("snowflake", .special, .legendary)
+    ]
+
+    /// Famille : celle du catalogue, sinon celle que renvoie le serveur, sinon
+    /// déduite du préfixe de l'identifiant.
+    var family: GamificationBadgeFamily {
+        if let known = Self.catalog[id]?.family { return known }
+        if let category, let family = GamificationBadgeFamily(rawValue: category) { return family }
+        let prefixes: [(String, GamificationBadgeFamily)] = [
+            ("explorer", .exploration), ("departments", .exploration), ("coverage", .coverage),
+            ("speed", .speedtest), ("validator", .validation), ("photographer", .contribution),
+            ("reporter", .contribution), ("bug_hunter", .contribution), ("expert", .expertise)
+        ]
+        return prefixes.first { id.hasPrefix($0.0) }?.1 ?? .special
+    }
+
+    var symbol: String { Self.catalog[id]?.symbol ?? family.fallbackSymbol }
+
+    var rarityLevel: GamificationBadgeRarity? {
+        if let rarity, let level = GamificationBadgeRarity(rawValue: rarity) { return level }
+        return Self.catalog[id]?.rarity
+    }
+}
+
+/// Médaillon d'un badge : symbole SF dans un carré arrondi teinté par famille,
+/// gris quand le badge reste à débloquer.
+struct GamificationBadgeMedallion: View {
+    let badge: GamificationBadge
+    var size: CGFloat = 46
+    var isLocked = false
+
+    var body: some View {
+        let tint = badge.family.tint
+        let shape = RoundedRectangle(cornerRadius: size * 0.36, style: .continuous)
+        Image(systemName: badge.symbol)
+            .font(.system(size: size * 0.46, weight: .semibold))
+            .foregroundStyle(isLocked ? SQColor.labelTertiary : tint)
+            .frame(width: size, height: size)
+            .background {
+                if isLocked {
+                    shape.fill(SQColor.chip)
+                } else {
+                    shape.fill(LinearGradient(
+                        colors: [tint.opacity(0.22), tint.opacity(0.08)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
+                    shape.strokeBorder(tint.opacity(0.32), lineWidth: 1.5)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}

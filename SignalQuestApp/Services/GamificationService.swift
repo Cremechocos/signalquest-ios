@@ -53,10 +53,16 @@ struct GamificationBadge: Decodable, Identifiable, Equatable {
     let icon: String?
     let unlockedAt: Date?
     let tier: String?
+    /// Famille et rareté du catalogue serveur, quand la réponse les porte.
+    let category: String?
+    let rarity: String?
 
-    enum CodingKeys: String, CodingKey { case id, title, name, description, iconUrl, icon, unlockedAt, tier }
+    enum CodingKeys: String, CodingKey { case id, title, name, description, iconUrl, icon, unlockedAt, tier, category, rarity }
 
-    init(id: String, title: String?, description: String?, iconUrl: URL?, icon: String? = nil, unlockedAt: Date?, tier: String?) {
+    init(
+        id: String, title: String?, description: String?, iconUrl: URL?, icon: String? = nil,
+        unlockedAt: Date?, tier: String?, category: String? = nil, rarity: String? = nil
+    ) {
         self.id = id
         self.title = title
         self.description = description
@@ -64,6 +70,8 @@ struct GamificationBadge: Decodable, Identifiable, Equatable {
         self.icon = icon
         self.unlockedAt = unlockedAt
         self.tier = tier
+        self.category = category
+        self.rarity = rarity
     }
 
     init(from decoder: Decoder) throws {
@@ -75,6 +83,8 @@ struct GamificationBadge: Decodable, Identifiable, Equatable {
         icon = c.decodeFlexibleString(forKey: .icon)
         unlockedAt = try c.decodeIfPresent(Date.self, forKey: .unlockedAt)
         tier = c.decodeFlexibleString(forKey: .tier)
+        category = c.decodeFlexibleString(forKey: .category)
+        rarity = c.decodeFlexibleString(forKey: .rarity)
     }
 }
 

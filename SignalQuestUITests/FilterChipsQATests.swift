@@ -40,17 +40,25 @@ final class FilterChipsQATests: XCTestCase {
         capture(app, "\(locale)-anfr-filtres")
         back(app, fr: fr)
 
-        // Classements : portée « Amis ».
+        // Classements : portée « Mes amis », dans la feuille « Afficher ».
         let profile = SignalQuestUITestSupport.tab(named: fr ? "Profil" : "Profile", in: app)
         XCTAssertTrue(profile.waitForExistence(timeout: 25), "Onglet Profil absent en \(locale)")
         profile.tap()
         let tile = app.buttons["profile.progression.tile.Classements"]
         XCTAssertTrue(tile.waitForExistence(timeout: 15), "Tuile Classements absente")
         tile.tap()
-        let friends = app.buttons[fr ? "Amis" : "Friends"]
-        XCTAssertTrue(friends.waitForExistence(timeout: 15), "Pastille Amis absente en \(locale)")
+        let filters = app.buttons["leaderboards.filters"]
+        XCTAssertTrue(filters.waitForExistence(timeout: 15), "Bouton des réglages absent en \(locale)")
+        assertChip(filters)
+        filters.tap()
+        let friends = app.buttons["leaderboards.filters.scope.friends"]
+        XCTAssertTrue(friends.waitForExistence(timeout: 10), "Choix Mes amis absent en \(locale)")
+        XCTAssertEqual(friends.label, fr ? "Mes amis" : "My friends")
         assertChip(friends)
+        friends.tap()
+        XCTAssertTrue(friends.isSelected, "Le choix Mes amis est annoncé comme sélectionné")
         capture(app, "\(locale)-classements")
+        app.buttons["leaderboards.filters.close"].tap()
         back(app, fr: fr)
 
         // Mes mesures : coloration, affichée seulement s'il y a des points.

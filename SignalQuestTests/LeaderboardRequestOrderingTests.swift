@@ -53,6 +53,55 @@ final class LeaderboardRequestOrderingTests: XCTestCase {
         XCTAssertFalse(model.isLoadingPoints)
     }
 
+    func testDisplaySettingsDotFollowsDefaultsAndResetReloadsBoth() async throws {
+        let service = OrderedLeaderboardService()
+        let model = LeaderboardsViewModel(service: service)
+        XCTAssertFalse(model.hasCustomFilters)
+
+        model.scope = "friends"
+        model.category = "sessions"
+        XCTAssertTrue(model.hasCustomFilters)
+
+        model.resetFilters()
+        XCTAssertFalse(model.hasCustomFilters)
+        XCTAssertEqual([model.period, model.scope, model.category], ["week", "global", "download"])
+        try await waitForRequests(service.speed, count: 1)
+        try await waitForRequests(service.points, count: 1)
+        let speedRequests = await service.speed.signatures
+        let pointsRequests = await service.points.signatures
+        XCTAssertEqual(speedRequests, ["week/global/download"])
+        XCTAssertEqual(pointsRequests, ["week/global"])
+        await service.speed.succeed(0)
+        await service.points.succeed(0)
+    }
+
+    func testRankedValuesUseBitsPerSecondAndKeepOtherUnits() {
+        let speed = LeaderboardsView.valueText(712, unit: "Mbps")
+        XCTAssertTrue(speed.hasPrefix("712"), speed)
+        XCTAssertTrue(speed.contains("bit/s") || speed.hasSuffix("Mbps"), speed)
+        XCTAssertEqual(LeaderboardsView.valueText(12, unit: "sessions"), "12 sessions")
+    }
+
+    func testBadgeMedallionComesFromCatalogThenServerThenIdentifier() {
+        func badge(_ id: String, category: String? = nil, rarity: String? = nil) -> GamificationBadge {
+            GamificationBadge(id: id, title: nil, description: nil, iconUrl: nil, icon: "🚀",
+                              unlockedAt: nil, tier: nil, category: category, rarity: rarity)
+        }
+        let known = badge("speedtester_gold")
+        XCTAssertEqual(known.family, .speedtest)
+        XCTAssertEqual(known.symbol, "speedometer")
+        XCTAssertEqual(known.rarityLevel, .rare)
+        XCTAssertEqual(badge("speedtester_gold", rarity: "epic").rarityLevel, .epic)
+
+        let fromServer = badge("new_badge", category: "coverage")
+        XCTAssertEqual(fromServer.family, .coverage)
+        XCTAssertEqual(fromServer.symbol, GamificationBadgeFamily.coverage.fallbackSymbol)
+        XCTAssertNil(fromServer.rarityLevel)
+
+        XCTAssertEqual(badge("photographer_diamond").family, .contribution)
+        XCTAssertEqual(badge("mystery").family, .special)
+    }
+
     private func waitForRequests(_ gate: OrderedLeaderboardGate, count: Int) async throws {
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))
         while await gate.count < count {

@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "%@ au total" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ in total"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ au total"
+          }
+        }
+      }
+    },
     "%@ de « %@ »" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -656,6 +672,47 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld jours consécutifs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld jours de suite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld day in a row"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld days in a row"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld jour de suite"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld jours de suite"
                 }
               }
             }
@@ -1598,6 +1655,22 @@
         }
       }
     },
+    "Affichage : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Showing: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affichage : %@"
+          }
+        }
+      }
+    },
     "Ajouter des captures" : {
       "localizations" : {
         "en" : {
@@ -2165,6 +2238,22 @@
         }
       }
     },
+    "Ce mois-ci" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce mois-ci"
+          }
+        }
+      }
+    },
     "Ce qu'on en sait" : {
       "localizations" : {
         "en" : {
@@ -2343,6 +2432,22 @@
         }
       }
     },
+    "Change la période, la mesure ou les membres classés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes the period, the metric or who is ranked"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change la période, la mesure ou les membres classés"
+          }
+        }
+      }
+    },
     "Charger plus de publications" : {
       "localizations" : {
         "en" : {
@@ -2509,6 +2614,22 @@
         }
       }
     },
+    "Commun" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Common"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commun"
+          }
+        }
+      }
+    },
     "Compare cette empreinte sur le nouvel appareil avant d’approuver." : {
       "localizations" : {
         "en" : {
@@ -2635,6 +2756,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contributeurs"
+          }
+        }
+      }
+    },
+    "Contribution" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contribution"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contribution"
           }
         }
       }
@@ -2766,6 +2903,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Demande invalide, expirée ou incohérente avec le serveur."
+          }
+        }
+      }
+    },
+    "Depuis toujours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All time"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Depuis toujours"
           }
         }
       }
@@ -3141,6 +3294,22 @@
         }
       }
     },
+    "Expertise" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expertise"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expertise"
+          }
+        }
+      }
+    },
     "Explique ce que ça changerait pour toi…" : {
       "localizations" : {
         "en" : {
@@ -3153,6 +3322,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Explique ce que ça changerait pour toi…"
+          }
+        }
+      }
+    },
+    "Exploration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exploration"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exploration"
           }
         }
       }
@@ -4370,6 +4555,22 @@
         }
       }
     },
+    "Les plus rapides et les plus actifs de la communauté." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The fastest and most active members of the community."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les plus rapides et les plus actifs de la communauté."
+          }
+        }
+      }
+    },
     "Les relevés ANFR ne sont pas encore disponibles. Tire l'écran vers le bas pour actualiser." : {
       "localizations" : {
         "en" : {
@@ -4399,6 +4600,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lieu recherché"
+          }
+        }
+      }
+    },
+    "Légendaire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legendary"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Légendaire"
           }
         }
       }
@@ -4598,6 +4815,22 @@
         }
       }
     },
+    "Mes amis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My friends"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes amis"
+          }
+        }
+      }
+    },
     "Mes grands-parents" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4628,6 +4861,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mes parents"
+          }
+        }
+      }
+    },
+    "Mesure classée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ranked by"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mesure classée"
           }
         }
       }
@@ -5135,6 +5384,22 @@
         }
       }
     },
+    "Pas de série en cours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No streak right now"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de série en cours"
+          }
+        }
+      }
+    },
     "Pas encore de message. L'équipe te répond ici, et tu peux ajouter des précisions." : {
       "localizations" : {
         "en" : {
@@ -5275,6 +5540,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plus de détails"
+          }
+        }
+      }
+    },
+    "Points gagnés ce mois-ci ; le total depuis l’inscription est en dessous." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points earned this month; the total since sign-up is below."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points gagnés ce mois-ci ; le total depuis l’inscription est en dessous."
+          }
+        }
+      }
+    },
+    "Points gagnés cette semaine ; le total depuis l’inscription est en dessous." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points earned this week; the total since sign-up is below."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Points gagnés cette semaine ; le total depuis l’inscription est en dessous."
           }
         }
       }
@@ -5504,6 +5801,22 @@
         }
       }
     },
+    "Qui" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Who"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui"
+          }
+        }
+      }
+    },
     "RSRP moyen" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5517,6 +5830,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "RSRP moyen"
+          }
+        }
+      }
+    },
+    "Rare" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rare"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rare"
           }
         }
       }
@@ -5684,6 +6013,22 @@
         }
       }
     },
+    "Revenir aux réglages par défaut" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back to default settings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revenir aux réglages par défaut"
+          }
+        }
+      }
+    },
     "Rien d'autre n'est envoyé. L'équipe voit ton pseudo, jamais ta position exacte." : {
       "localizations" : {
         "en" : {
@@ -5745,6 +6090,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réessayer la position"
+          }
+        }
+      }
+    },
+    "Réglages d’affichage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display settings"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages d’affichage"
+          }
+        }
+      }
+    },
+    "Réglages modifiés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings changed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages modifiés"
           }
         }
       }
@@ -6141,6 +6518,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sites opérateurs opérationnels, %@"
+          }
+        }
+      }
+    },
+    "Spécial" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Special"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spécial"
           }
         }
       }
@@ -6746,6 +7139,22 @@
         }
       }
     },
+    "Uniquement pour le classement Vitesse." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only for the Speed leaderboard."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uniquement pour le classement Vitesse."
+          }
+        }
+      }
+    },
     "Upload incomplet (%lld octets)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6858,6 +7267,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Voir tous les commentaires (%lld)"
+          }
+        }
+      }
+    },
+    "Voir tout le monde" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show everyone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir tout le monde"
           }
         }
       }
@@ -7565,6 +7990,22 @@
         }
       }
     },
+    "À %@ du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ behind the %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À %1$@ du %2$@"
+          }
+        }
+      }
+    },
     "À 1 km près, pour un bug lié au lieu" : {
       "localizations" : {
         "en" : {
@@ -7642,6 +8083,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écrire une réponse…"
+          }
+        }
+      }
+    },
+    "Épique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Epic"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Épique"
           }
         }
       }
