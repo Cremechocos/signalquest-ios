@@ -88,131 +88,203 @@ struct CallHistoryView: View {
 
     var body: some View {
         List {
-            Section {
+            SQSettingsHeader(title: "Appels", backIdentifier: "calls.back")
+                .overlay(alignment: .topTrailing) {
+                    if !model.calls.isEmpty {
+                        MapChipIconButton(systemImage: "trash", label: "Effacer l'historique", identifier: "calls.clear") {
+                            confirmingClear = true
+                        }
+                    }
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.lg, bottom: SQSpace.sm, trailing: SQSpace.lg))
+
+            Group {
                 if model.isLoading && model.calls.isEmpty {
                     SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
-                        .listRowBackground(Color.clear)
                 } else if let error = model.errorMessage, model.calls.isEmpty {
                     ErrorStateView(title: "Appels indisponibles", message: error) { Task { await model.load() } }
-                        .listRowBackground(Color.clear)
                 } else if model.calls.isEmpty {
                     EmptyStateView(title: "Aucun appel", message: "Tes appels apparaîtront ici.", systemImage: "phone.badge.waveform")
-                        .listRowBackground(Color.clear)
-                }
-                ForEach(model.calls) { call in
-                    let style = directionStyle(call)
-                    HStack(spacing: SQSpace.md) {
-                        Image(systemName: style.icon)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(style.color)
-                            .frame(width: 38, height: 38)
-                            .background(style.soft, in: Circle())
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(call.displayName ?? call.participants?.joined(separator: ", ") ?? String(localized: "Conversation"))
-                                .font(SQFont.body(15, .medium))
-                                .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.label)
-                            if let date = call.createdAt {
-                                Text(date, format: .dateTime.day().month(.abbreviated).hour().minute())
-                                    .font(SQType.caption)
-                                    .foregroundStyle(SQColor.labelSecondary)
-                            }
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(statusLabel(call.status))
-                                .font(SQType.caption)
-                                .foregroundStyle(style.isMissed ? SQColor.danger : SQColor.labelSecondary)
-                            if let duration = durationText(call) {
-                                Text(duration)
-                                    .font(SQType.micro)
-                                    .monospacedDigit()
-                                    .foregroundStyle(SQColor.labelSecondary)
-                            }
-                        }
-                        Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")
-                            .font(.caption)
-                            .foregroundStyle(SQColor.labelTertiary)
-                            // Le mode (audio/vidéo) n'existait que via cette icône masquée :
-                            // on l'expose à VoiceOver (fusionné dans la ligne, CALL-HIST-C).
-                            .accessibilityLabel(call.mode == "video" ? "Appel vidéo" : "Appel audio")
-                    }
-                    .listRowBackground(SQColor.surface)
-                    .accessibilityElement(children: .combine)
-                    .onAppear {
-                        // Défilement infini : charge la page suivante à l'apparition
-                        // de la dernière ligne.
-                        if call.id == model.calls.last?.id {
-                            Task { await model.loadMore() }
-                        }
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            Task { await model.deleteEntry(call) }
-                        } label: {
-                            Label("Supprimer", systemImage: "trash")
-                        }
-                    }
-                    // Le geste ouvre la conversation, sans lancer d'appel : son bouton
-                    // d'appel applique les règles (chiffrement, groupe, réseau) ; la
-                    // ligne ne menait nulle part (SOC-44).
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        if let conversationId = call.conversationId {
-                            Button {
-                                router.route(toConversation: conversationId)
-                            } label: {
-                                Label("Ouvrir la conversation", systemImage: "bubble.left.fill")
-                            }
-                            .tint(SQColor.success)
-                        }
-                    }
-                    .contextMenu {
-                        if let conversationId = call.conversationId {
-                            Button {
-                                router.route(toConversation: conversationId)
-                            } label: {
-                                Label("Ouvrir la conversation pour rappeler", systemImage: "phone.arrow.up.right")
-                            }
-                        }
-                    }
-                }
-                if model.isLoadingMore {
-                    SQSpinner()
-                        .tint(SQColor.brandRed)
                         .frame(maxWidth: .infinity)
-                        .listRowBackground(Color.clear)
                 }
-            } header: {
-                Text("Journal")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+
+            // Groupés par jour, chaque jour sur sa carte.
+            ForEach(daySections, id: \.day) { section in
+                Text(verbatim: section.title)
+                    .sqKicker()
+                    .accessibilityAddTraits(.isHeader)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: SQSpace.md, leading: SQSpace.lg + SQSpace.xs, bottom: SQSpace.xs, trailing: SQSpace.lg))
+                ForEach(Array(section.calls.enumerated()), id: \.element.id) { index, call in
+                    callRow(call, isFirst: index == 0)
+                        .listRowBackground(
+                            MessagesCardSegment(top: index == 0, bottom: index == section.calls.count - 1)
+                                .fill(SQColor.surface)
+                                .overlay {
+                                    MessagesCardSegment(top: index == 0, bottom: index == section.calls.count - 1)
+                                        .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
+                                }
+                                .padding(.horizontal, SQSpace.lg)
+                        )
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 0, leading: SQSpace.lg, bottom: 0, trailing: SQSpace.lg))
+                        .onAppear {
+                            // Défilement infini : charge la page suivante à l'apparition
+                            // de la dernière ligne.
+                            if call.id == model.calls.last?.id {
+                                Task { await model.loadMore() }
+                            }
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                Task { await model.deleteEntry(call) }
+                            } label: {
+                                Label("Supprimer", systemImage: "trash")
+                            }
+                        }
+                        // Le geste ouvre la conversation, sans lancer d'appel : son bouton
+                        // d'appel applique les règles (chiffrement, groupe, réseau) ; la
+                        // ligne ne menait nulle part (SOC-44).
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            if let conversationId = call.conversationId {
+                                Button {
+                                    router.route(toConversation: conversationId)
+                                } label: {
+                                    Label("Ouvrir la conversation", systemImage: "bubble.left.fill")
+                                }
+                                .tint(SQColor.success)
+                            }
+                        }
+                        .contextMenu {
+                            if let conversationId = call.conversationId {
+                                Button {
+                                    router.route(toConversation: conversationId)
+                                } label: {
+                                    Label("Ouvrir la conversation pour rappeler", systemImage: "phone.arrow.up.right")
+                                }
+                            }
+                        }
+                }
+            }
+            if model.isLoadingMore {
+                SQSpinner()
+                    .tint(SQColor.brandRed)
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
         }
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .sqReadableWidth()
         .signalQuestBackground()
         // Échec d'une suppression ou de « Tout effacer » : la rangée revient, on dit pourquoi.
         .actionErrorBar(model.calls.isEmpty ? nil : model.errorMessage)
         .navigationTitle("Appels")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
         .task { await model.load() }
         .refreshable { await model.load() }
-        .toolbar {
-            if !model.calls.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(role: .destructive) { confirmingClear = true } label: {
-                        Image(systemName: "trash")
-                    }
-                    .tint(SQColor.brandRed)
-                    .accessibilityLabel("Effacer l'historique")
-                }
-            }
-        }
         .confirmationDialog("Effacer tout l'historique d'appels ?", isPresented: $confirmingClear, titleVisibility: .visible) {
             Button("Tout effacer", role: .destructive) { Task { await model.clearHistory() } }
             Button("Annuler", role: .cancel) {}
         } message: {
             Text("Ton historique sera effacé pour toi. Tes correspondants gardent le leur.")
         }
+    }
+
+    private struct DaySection {
+        let day: Date
+        let title: String
+        let calls: [CallSession]
+    }
+
+    /// Les appels par jour, dans l'ordre du serveur (le plus récent d'abord).
+    private var daySections: [DaySection] {
+        let calendar = Calendar.current
+        var sections: [DaySection] = []
+        for call in model.calls {
+            let day = call.createdAt.map { calendar.startOfDay(for: $0) } ?? .distantPast
+            if let last = sections.last, last.day == day {
+                sections[sections.count - 1] = DaySection(day: day, title: last.title, calls: last.calls + [call])
+            } else {
+                sections.append(DaySection(day: day, title: dayTitle(day, calendar: calendar), calls: [call]))
+            }
+        }
+        return sections
+    }
+
+    private func dayTitle(_ day: Date, calendar: Calendar) -> String {
+        if day == .distantPast { return String(localized: "Plus anciens") }
+        if calendar.isDateInToday(day) { return String(localized: "Aujourd’hui") }
+        if calendar.isDateInYesterday(day) { return String(localized: "Hier") }
+        let text = day.formatted(.dateTime.weekday(.wide).day().month(.wide))
+        return text.prefix(1).uppercased() + text.dropFirst()
+    }
+
+    /// Avatar, nom (rouge si manqué), issue et durée, heure, puis un rond pour
+    /// rappeler depuis la conversation.
+    private func callRow(_ call: CallSession, isFirst: Bool) -> some View {
+        let style = directionStyle(call)
+        let name = call.displayName ?? call.participants?.joined(separator: ", ") ?? String(localized: "Conversation")
+        let status = [statusLabel(call.status), durationText(call)].compactMap { $0 }.joined(separator: " · ")
+        return VStack(spacing: 0) {
+            if !isFirst { Divider().padding(.leading, 52) }
+            HStack(spacing: SQSpace.md) {
+                SQAvatar(url: nil, name: name, size: 40)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(SQType.body(.semibold))
+                        .foregroundStyle(style.isMissed ? SQColor.dangerInk : SQColor.label)
+                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        Image(systemName: style.icon)
+                            .font(.system(size: 10, weight: .bold))
+                            .accessibilityHidden(true)
+                        Text(verbatim: status)
+                    }
+                    .font(SQType.caption)
+                    .foregroundStyle(style.isMissed ? SQColor.dangerInk : SQColor.labelSecondary)
+                    // Le mode (audio/vidéo) n'existait que via une icône masquée :
+                    // on l'expose à VoiceOver (fusionné dans la ligne, CALL-HIST-C).
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text(call.mode == "video" ? "Appel vidéo" : "Appel audio") + Text(verbatim: ", \(status)"))
+                }
+                Spacer(minLength: SQSpace.sm)
+                if let date = call.createdAt {
+                    Text(date, format: .dateTime.hour().minute())
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .monospacedDigit()
+                }
+                if let conversationId = call.conversationId {
+                    Button {
+                        router.route(toConversation: conversationId)
+                    } label: {
+                        Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(SQColor.label)
+                            .frame(width: 36, height: 36)
+                            .background(SQColor.chip, in: Circle())
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Ouvrir la conversation pour rappeler")
+                }
+            }
+            .padding(.vertical, SQSpace.sm)
+            .accessibilityElement(children: .combine)
+        }
+        .padding(.leading, SQSpace.md)
+        .padding(.trailing, SQSpace.xs)
     }
 
     /// Icône + couleur selon l'ISSUE de l'appel (pas la direction : aucun champ
@@ -250,6 +322,6 @@ struct CallHistoryView: View {
         guard let duration = call.talkDuration else { return nil }
         let seconds = Int(duration)
         guard seconds > 0 else { return nil }
-        return Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond))
+        return Duration.seconds(seconds).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated))
     }
 }

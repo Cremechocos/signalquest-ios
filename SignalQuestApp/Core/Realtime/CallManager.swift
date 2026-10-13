@@ -400,6 +400,8 @@ final class CallManager: NSObject, ObservableObject {
         let conversationId: String?
         let hasVideo: Bool
         let requiresE2EE: Bool
+        /// Durée de l'appel quand quelqu'un avait décroché, dite sous le nom.
+        var duration: TimeInterval? = nil
     }
 
     @Published private(set) var activeCall: ActiveCall? {
@@ -760,6 +762,11 @@ final class CallManager: NSObject, ObservableObject {
         return failureNotice(message: message)
     }
 
+    /// Temps écoulé depuis que l'autre a décroché ; `nil` s'il n'a jamais décroché.
+    private var connectedDuration: TimeInterval? {
+        liveKit.remoteJoinedAt.map { Date().timeIntervalSince($0) }
+    }
+
     private func failureNotice(message: String) -> EndNotice? {
         guard let call = activeCall else { return nil }
         return EndNotice(
@@ -769,7 +776,8 @@ final class CallManager: NSObject, ObservableObject {
             conversationId: call.conversationId,
             hasVideo: call.hasVideo,
             // Reçu ou passé : « Rappeler » ne retire jamais le chiffrement.
-            requiresE2EE: call.requiresE2EE == true
+            requiresE2EE: call.requiresE2EE == true,
+            duration: connectedDuration
         )
     }
 
@@ -1389,7 +1397,8 @@ final class CallManager: NSObject, ObservableObject {
             handle: call.handle,
             conversationId: call.conversationId,
             hasVideo: call.hasVideo,
-            requiresE2EE: true
+            requiresE2EE: true,
+            duration: connectedDuration
         )
         // Le média s'arrête avant tout aller-retour réseau.
         Task {
@@ -1423,7 +1432,8 @@ final class CallManager: NSObject, ObservableObject {
                 handle: call.handle,
                 conversationId: call.conversationId,
                 hasVideo: call.hasVideo,
-                requiresE2EE: call.isOutgoing && call.requiresE2EE == true
+                requiresE2EE: call.isOutgoing && call.requiresE2EE == true,
+                duration: connectedDuration
             )
         }
         // Le média s'arrête avant tout aller-retour réseau.

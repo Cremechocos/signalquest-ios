@@ -50,6 +50,9 @@ struct GroupSettingsView: View {
     @State private var chainAdmins: Set<String>?
     @State private var successorNeed: E2EEV2MessagingRuntime.SuccessorNeed = .none
     @State private var showsSuccessorPicker = false
+    /// « Ajouter des membres » touché : le champ de recherche remplace la ligne.
+    @State private var showsAddField = false
+    @FocusState private var addFieldFocused: Bool
 
     init(conversation: MessageConversation, service: MessagesServicing, e2ee: E2EEServicing?,
          onRenamed: @escaping (String) -> Void = { _ in },
@@ -96,166 +99,12 @@ struct GroupSettingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    HStack(spacing: SQSpace.md) {
-                        if isAdmin {
-                            adminAvatarPicker
-                        } else {
-                            groupAvatar
-                        }
-                        TextField("Nom du groupe", text: $title)
-                            .font(SQType.body)
-                            .foregroundStyle(SQColor.label)
-                            .onSubmit { Task { await rename() } }
-                    }
-                } header: {
-                    sectionHeader("Groupe")
-                }
-                .listRowBackground(SQColor.surface)
-                .listRowSeparatorTint(SQColor.separator)
-
-                Section {
-                    ForEach(participants) { participant in
-                        HStack {
-                            SQAvatar(url: participant.user.avatarUrl, name: participant.user.displayName, size: 34)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading) {
-                                HStack(spacing: 5) {
-                                    Text(participant.user.displayName)
-                                        .font(SQType.body)
-                                        .foregroundStyle(SQColor.label)
-                                        .sqSingleLine()
-                                    // Dans un GROUPE, c'est ici que le badge a un
-                                    // sens : à côté du membre qu'il qualifie. Le
-                                    // poser à côté du nom du groupe ne dirait rien
-                                    // de personne.
-                                    SQUserBadges(badges: participant.user.badges, size: 12)
-                                }
-                                if isAdminMember(participant) {
-                                    Text("Admin")
-                                        .font(SQType.micro)
-                                        .foregroundStyle(SQColor.accentInk)
-                                }
-                            }
-                            Spacer()
-                            if isAdmin && participant.userId != currentUserId {
-                                Menu {
-                                    if canChangeRoles {
-                                        let admin = isAdminMember(participant)
-                                        Button {
-                                            Task { await changeRole(participant, to: admin ? "member" : "admin") }
-                                        } label: {
-                                            Label(
-                                                admin ? "Rétrograder" : "Promouvoir admin",
-                                                systemImage: admin ? "person.badge.minus" : "person.badge.shield.checkmark"
-                                            )
-                                        }
-                                    }
-                                    Button(role: .destructive) {
-                                        // Confirmer avant de retirer (comme « Quitter le
-                                        // groupe ») : évite un retrait accidentel d'un tap (UX-4).
-                                        participantToRemove = participant
-                                    } label: {
-                                        Label("Retirer du groupe", systemImage: "person.fill.xmark")
-                                    }
-                                } label: {
-                                    Image(systemName: "ellipsis.circle")
-                                        .foregroundStyle(SQColor.labelSecondary)
-                                        .frame(minWidth: 44, minHeight: 44)
-                                        .contentShape(Rectangle())
-                                }
-                                .accessibilityLabel("Options de \(participant.user.displayName)")
-                            }
-                        }
-                    }
-                } header: {
-                    sectionHeader(String(localized: "Membres (\(participants.count))"))
-                }
-                .listRowBackground(SQColor.surface)
-                .listRowSeparatorTint(SQColor.separator)
-
-                if isAdmin {
-                    Section {
-                        TextField("Nom, handle ou email", text: $searchQuery)
-                            .font(SQType.body)
-                            .foregroundStyle(SQColor.label)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        if isSearching {
-                            UserSearchStatusRow(isSearching: true)
-                        } else if let searchError {
-                            SQInlineError(message: searchError)
-                        } else if showsNoSearchResult {
-                            UserSearchStatusRow(isSearching: false)
-                        }
-                        ForEach(searchResults.filter { result in !participants.contains(where: { $0.userId == result.id }) }) { user in
-                            Button {
-                                Task { await add(user) }
-                            } label: {
-                                HStack {
-                                    SQAvatar(url: user.avatarUrl, name: user.displayName, size: 34)
-                                        .accessibilityHidden(true)
-                                    Text(user.displayName)
-                                        .font(SQType.body)
-                                        .foregroundStyle(SQColor.label)
-                                    Spacer()
-                                    Image(systemName: "plus.circle")
-                                        .foregroundStyle(SQColor.success)
-                                        .accessibilityHidden(true)
-                                }
-                            }
-                        }
-                    } header: {
-                        sectionHeader("Ajouter des membres")
-                    }
-                    .listRowBackground(SQColor.surface)
-                    .listRowSeparatorTint(SQColor.separator)
-                }
-
-                if successorNeed == .frozen {
-                    Section {
-                        Label("Ce groupe n’a plus d’admin : ses membres et ses rôles ne peuvent plus changer. Les messages et les appels continuent.",
-                              systemImage: "lock")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .listRowBackground(SQColor.surface)
-                }
-
-                Section {
-                    Button(role: .destructive) {
-                        // Relu au moment du départ : membres et admins ont pu changer.
-                        refreshChainRoles()
-                        if case .mustName = successorNeed {
-                            showsSuccessorPicker = true
-                        } else {
-                            confirmLeave = true
-                        }
-                    } label: {
-                        Label("Quitter le groupe", systemImage: "rectangle.portrait.and.arrow.right")
-                            .font(SQType.body.weight(.medium))
-                            .foregroundStyle(SQColor.dangerInk)
-                    }
-                }
-                .listRowBackground(SQColor.dangerSoft)
-
-                if let errorMessage {
-                    Section { Text(errorMessage).font(SQType.caption).foregroundStyle(SQColor.dangerInk) }
-                        .listRowBackground(SQColor.dangerSoft)
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .signalQuestBackground()
-            .navigationTitle("Réglages du groupe")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack {
                     // Le nom ne partait qu'avec la touche Retour : « Fermer » le
                     // perdait sans prévenir (AF-MSG-13).
-                    Button("Fermer") {
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "group.close") {
                         Task {
                             if hasPendingRename {
                                 await rename()
@@ -264,62 +113,277 @@ struct GroupSettingsView: View {
                             dismiss()
                         }
                     }
-                    .tint(SQColor.brandRed)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
+                    Spacer()
                     if isBusy { SQSpinner() }
                 }
-            }
-            .confirmationDialog("Quitter le groupe ?", isPresented: $confirmLeave, titleVisibility: .visible) {
-                Button("Quitter", role: .destructive) { Task { await leave() } }
-            }
-            .sheet(isPresented: $showsSuccessorPicker) {
-                if case .mustName(let candidates) = successorNeed {
-                    SuccessorPickerSheet(
-                        candidates: candidates.compactMap { id in participants.first { $0.userId == id } }
-                    ) { successor in
-                        showsSuccessorPicker = false
-                        Task { await leave(naming: successor) }
+
+                identityHeader
+
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text("Membres")
+                        .sqKicker()
+                        .padding(.leading, SQSpace.xs)
+                    membersCard
+                }
+
+                if successorNeed == .frozen {
+                    Label("Ce groupe n’a plus d’admin : ses membres et ses rôles ne peuvent plus changer. Les messages et les appels continuent.",
+                          systemImage: "lock")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(SQSpace.md)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                }
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                }
+
+                GradientButton(String(localized: "Quitter le groupe"), systemImage: "rectangle.portrait.and.arrow.right", style: .destructive) {
+                    // Relu au moment du départ : membres et admins ont pu changer.
+                    refreshChainRoles()
+                    if case .mustName = successorNeed {
+                        showsSuccessorPicker = true
+                    } else {
+                        confirmLeave = true
                     }
                 }
             }
-            .task { refreshChainRoles() }
-            .confirmationDialog(
-                participantToRemove.map { "Retirer \($0.user.displayName) du groupe ?" } ?? "Retirer du groupe ?",
-                isPresented: Binding(get: { participantToRemove != nil }, set: { if !$0 { participantToRemove = nil } }),
-                titleVisibility: .visible
-            ) {
-                Button("Retirer", role: .destructive) {
-                    if let participant = participantToRemove {
-                        participantToRemove = nil
-                        Task { await remove(participant) }
-                    }
+            .padding(SQSpace.lg)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .sqSheet(background: SQColor.bg)
+        .confirmationDialog("Quitter le groupe ?", isPresented: $confirmLeave, titleVisibility: .visible) {
+            Button("Quitter", role: .destructive) { Task { await leave() } }
+        }
+        .sheet(isPresented: $showsSuccessorPicker) {
+            if case .mustName(let candidates) = successorNeed {
+                SuccessorPickerSheet(
+                    candidates: candidates.compactMap { id in participants.first { $0.userId == id } }
+                ) { successor in
+                    showsSuccessorPicker = false
+                    Task { await leave(naming: successor) }
                 }
             }
-            .onChangeCompat(of: searchQuery) { _, _ in
-                // Une frappe annule la recherche précédente : sans cela, une
-                // réponse lente pour « al » pouvait remplacer celle d'« alex ».
-                searchTask?.cancel()
-                searchTask = Task {
-                    try? await Task.sleep(for: .milliseconds(350))
-                    guard !Task.isCancelled else { return }
-                    await search()
+        }
+        .task { refreshChainRoles() }
+        .confirmationDialog(
+            participantToRemove.map { "Retirer \($0.user.displayName) du groupe ?" } ?? "Retirer du groupe ?",
+            isPresented: Binding(get: { participantToRemove != nil }, set: { if !$0 { participantToRemove = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Retirer", role: .destructive) {
+                if let participant = participantToRemove {
+                    participantToRemove = nil
+                    Task { await remove(participant) }
                 }
             }
-            .onDisappear { searchTask?.cancel() }
-            .onChangeCompat(of: photoItem) { _, newValue in
-                guard let newValue else { return }
-                Task { await uploadPhoto(item: newValue) }
+        }
+        .onChangeCompat(of: searchQuery) { _, _ in
+            // Une frappe annule la recherche précédente : sans cela, une
+            // réponse lente pour « al » pouvait remplacer celle d'« alex ».
+            searchTask?.cancel()
+            searchTask = Task {
+                try? await Task.sleep(for: .milliseconds(350))
+                guard !Task.isCancelled else { return }
+                await search()
             }
+        }
+        .onDisappear { searchTask?.cancel() }
+        .onChangeCompat(of: photoItem) { _, newValue in
+            guard let newValue else { return }
+            Task { await uploadPhoto(item: newValue) }
         }
     }
 
-    /// En-tête de section : Figtree casse normale (pas de majuscules trackées).
-    private func sectionHeader(_ title: String) -> some View {
-        Text(LocalizedStringKey(title))
-            .font(SQType.subhead)
-            .foregroundStyle(SQColor.labelSecondary)
-            .textCase(nil)
+    /// La photo en grand, le nom modifiable dessous, puis le nombre de membres.
+    private var identityHeader: some View {
+        VStack(spacing: SQSpace.sm) {
+            if isAdmin {
+                adminAvatarPicker
+            } else {
+                groupAvatar
+            }
+            HStack(spacing: SQSpace.xs) {
+                // Le texte masqué donne sa largeur au champ : le crayon suit le
+                // nom au lieu de partir au bord de l'écran.
+                Text(verbatim: title.isEmpty ? String(localized: "Nom du groupe") : title)
+                    .font(SQFont.display(24, .bold, relativeTo: .title))
+                    .lineLimit(1)
+                    .padding(.trailing, 2)
+                    .hidden()
+                    .overlay {
+                        TextField("Nom du groupe", text: $title)
+                            .font(SQFont.display(24, .bold, relativeTo: .title))
+                            .foregroundStyle(SQColor.label)
+                            .multilineTextAlignment(.center)
+                            .onSubmit { Task { await rename() } }
+                    }
+                Image(systemName: "pencil")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+            }
+            Text("Groupe · \(participants.count) membres")
+                .font(SQType.callout)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Les membres sur une seule carte ; un admin ajoute depuis la dernière ligne.
+    private var membersCard: some View {
+        VStack(spacing: 0) {
+            ForEach(participants) { participant in
+                if participant.id != participants.first?.id { Divider().padding(.leading, 64) }
+                memberRow(participant)
+            }
+            if isAdmin {
+                Divider().padding(.leading, 64)
+                if showsAddField {
+                    addMembersSection
+                } else {
+                    Button {
+                        showsAddField = true
+                    } label: {
+                        HStack(spacing: SQSpace.md) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(SQColor.label)
+                                .frame(width: 36, height: 36)
+                                .background(SQColor.chip, in: Circle())
+                            Text("Ajouter des membres")
+                                .font(SQType.body(.semibold))
+                                .foregroundStyle(SQColor.label)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minHeight: 56)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("group.addMembers")
+                }
+            }
+        }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    private func memberRow(_ participant: ConversationParticipant) -> some View {
+        HStack(spacing: SQSpace.md) {
+            SQAvatar(url: participant.user.avatarUrl, name: participant.user.displayName, size: 36)
+                .accessibilityHidden(true)
+            HStack(spacing: 5) {
+                Text(participant.user.displayName)
+                    .font(SQType.body(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .sqSingleLine()
+                // Dans un GROUPE, c'est ici que le badge a un
+                // sens : à côté du membre qu'il qualifie. Le
+                // poser à côté du nom du groupe ne dirait rien
+                // de personne.
+                SQUserBadges(badges: participant.user.badges, size: 12)
+            }
+            Spacer(minLength: SQSpace.sm)
+            if isAdminMember(participant) {
+                Text("Admin")
+                    .font(SQType.micro.weight(.semibold))
+                    .foregroundStyle(SQColor.chipInk)
+                    .padding(.horizontal, SQSpace.sm)
+                    .padding(.vertical, 3)
+                    .background(SQColor.chip, in: Capsule())
+            }
+            if isAdmin && participant.userId != currentUserId {
+                Menu {
+                    if canChangeRoles {
+                        let admin = isAdminMember(participant)
+                        Button {
+                            Task { await changeRole(participant, to: admin ? "member" : "admin") }
+                        } label: {
+                            Label(
+                                admin ? "Rétrograder" : "Promouvoir admin",
+                                systemImage: admin ? "person.badge.minus" : "person.badge.shield.checkmark"
+                            )
+                        }
+                    }
+                    Button(role: .destructive) {
+                        // Confirmer avant de retirer (comme « Quitter le
+                        // groupe ») : évite un retrait accidentel d'un tap (UX-4).
+                        participantToRemove = participant
+                    } label: {
+                        Label("Retirer du groupe", systemImage: "person.fill.xmark")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Options de \(participant.user.displayName)")
+            }
+        }
+        .padding(.leading, SQSpace.md)
+        .padding(.trailing, SQSpace.xs)
+        .frame(minHeight: 56)
+    }
+
+    /// Le champ de recherche et ses résultats, à la place de la ligne « Ajouter ».
+    private var addMembersSection: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+                TextField("Nom, handle ou email", text: $searchQuery)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .focused($addFieldFocused)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 52)
+            Group {
+                if isSearching {
+                    UserSearchStatusRow(isSearching: true)
+                } else if let searchError {
+                    SQInlineError(message: searchError)
+                } else if showsNoSearchResult {
+                    UserSearchStatusRow(isSearching: false)
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.bottom, SQSpace.sm)
+            ForEach(searchResults.filter { result in !participants.contains(where: { $0.userId == result.id }) }) { user in
+                Divider().padding(.leading, 64)
+                Button {
+                    Task { await add(user) }
+                } label: {
+                    HStack(spacing: SQSpace.md) {
+                        SQAvatar(url: user.avatarUrl, name: user.displayName, size: 36)
+                            .accessibilityHidden(true)
+                        Text(user.displayName)
+                            .font(SQType.body)
+                            .foregroundStyle(SQColor.label)
+                        Spacer()
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(SQColor.success)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, SQSpace.md)
+                    .frame(minHeight: 52)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onAppear { addFieldFocused = true }
     }
 
     private func search() async {
@@ -440,11 +504,11 @@ struct GroupSettingsView: View {
             Image(uiImage: pickedPreview)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 52, height: 52)
+                .frame(width: 76, height: 76)
                 .clipShape(Circle())
                 .accessibilityHidden(true)
         } else {
-            SQAvatar(url: groupPhotoURL, name: title.isEmpty ? "Groupe" : title, size: 52)
+            SQAvatar(url: groupPhotoURL, name: title.isEmpty ? "Groupe" : title, size: 76)
                 .accessibilityHidden(true)
         }
     }
@@ -457,11 +521,12 @@ struct GroupSettingsView: View {
             groupAvatar
                 .overlay(alignment: .bottomTrailing) {
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(SQColor.label)
-                        .padding(5)
-                        .sqSurface(SQColor.surface, in: Circle())
-                        .sqShadowSoft()
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(SQColor.onInk)
+                        .frame(width: 28, height: 28)
+                        .background(SQColor.label, in: Circle())
+                        .overlay(Circle().stroke(SQColor.bg, lineWidth: 2.5))
+                        .offset(x: 4, y: 4)
                         .accessibilityHidden(true)
                 }
                 .opacity(isBusy && pickedPreview != nil ? 0.6 : 1)
@@ -534,60 +599,63 @@ struct SuccessorPickerSheet: View {
     @State private var selection: String?
 
     var body: some View {
-        NavigationStack {
-            List {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(
+                    title: "Nomme un admin avant de partir",
+                    subtitle: String(localized: "Tu es le seul admin de ce groupe chiffré. Le membre choisi pourra ajouter, retirer et nommer d’autres admins."),
+                    closeIdentifier: "group.successor.cancel"
+                ) { dismiss() }
                 if candidates.isEmpty {
                     Text("Aucun autre membre n’est disponible. Ferme cet écran et réessaie.")
                         .font(SQType.body)
                         .foregroundStyle(SQColor.labelSecondary)
-                        .listRowBackground(SQColor.surface)
-                }
-                Section {
-                    ForEach(candidates) { participant in
-                        Button {
-                            selection = participant.userId
-                        } label: {
-                            HStack(spacing: SQSpace.md) {
-                                SQAvatar(url: participant.user.avatarUrl, name: participant.user.displayName, size: 34)
-                                    .accessibilityHidden(true)
-                                Text(participant.user.displayName)
-                                    .font(SQType.body)
-                                    .foregroundStyle(SQColor.label)
-                                Spacer()
-                                if selection == participant.userId {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(SQColor.brandRed)
-                                        .accessibilityHidden(true)
-                                }
-                            }
-                            .frame(minHeight: 44)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(candidates) { participant in
+                            if participant.id != candidates.first?.id { Divider().padding(.leading, 64) }
+                            candidateRow(participant)
                         }
-                        .accessibilityAddTraits(selection == participant.userId ? .isSelected : [])
                     }
-                } footer: {
-                    Text("Tu es le seul admin de ce groupe chiffré. Le membre choisi pourra ajouter, retirer et nommer d’autres admins.")
-                        .font(SQType.caption)
-                }
-                .listRowBackground(SQColor.surface)
-            }
-            .scrollContentBackground(.hidden)
-            .signalQuestBackground()
-            .navigationTitle("Nomme un admin avant de partir")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuler") { dismiss() }
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 }
             }
-            .safeAreaInset(edge: .bottom) {
-                GradientButton(String(localized: "Nommer admin et quitter"), systemImage: "rectangle.portrait.and.arrow.right", style: .primary) {
-                    if let selection { onConfirm(selection) }
-                }
-                .disabled(selection == nil)
-                .padding(SQSpace.lg)
-                .accessibilityIdentifier("group.successor.confirm")
-            }
-            .onAppear { if selection == nil { selection = candidates.first?.userId } }
+            .padding(SQSpace.lg)
         }
+        .safeAreaInset(edge: .bottom) {
+            GradientButton(String(localized: "Nommer admin et quitter"), systemImage: "rectangle.portrait.and.arrow.right", style: .primary) {
+                if let selection { onConfirm(selection) }
+            }
+            .disabled(selection == nil)
+            .padding(SQSpace.lg)
+            .accessibilityIdentifier("group.successor.confirm")
+        }
+        .sqSheet(background: SQColor.bg)
+        .onAppear { if selection == nil { selection = candidates.first?.userId } }
+    }
+
+    private func candidateRow(_ participant: ConversationParticipant) -> some View {
+        let selected = selection == participant.userId
+        return Button {
+            selection = participant.userId
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                SQAvatar(url: participant.user.avatarUrl, name: participant.user.displayName, size: 36)
+                    .accessibilityHidden(true)
+                Text(participant.user.displayName)
+                    .font(SQType.body(.semibold))
+                    .foregroundStyle(SQColor.label)
+                Spacer()
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(selected ? SQColor.brandRed : SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

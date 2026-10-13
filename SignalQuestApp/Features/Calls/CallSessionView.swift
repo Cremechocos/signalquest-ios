@@ -33,12 +33,16 @@ struct CallScreen: View {
     private var callStage: some View {
         VStack(spacing: SQSpace.lg) {
             topBar
-            callHeader
             if callManager.activeCall?.hasVideo == true {
+                callHeader
                 videoStage
             } else {
                 Spacer(minLength: SQSpace.lg)
-                centralAvatar
+                // Le visage d'abord, puis le nom et la durée, comme sur le web.
+                VStack(spacing: SQSpace.md) {
+                    centralAvatar
+                    callHeader
+                }
                 Spacer(minLength: SQSpace.lg)
             }
             if let error = liveKit.mediaErrorMessage {
@@ -54,11 +58,13 @@ struct CallScreen: View {
                 }
             }
             controls
-            encryptionNote
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.vertical, SQSpace.xl)
     }
+
+    /// Ronds translucents de l'écran d'appel, toujours sombre.
+    private var glassFill: Color { SQColor.label.opacity(0.12) }
 
     /// Réduire : l'appel continue et un bandeau en haut de l'app permet d'y
     /// revenir. Sans ce bouton, impossible de lire un message pendant un appel.
@@ -73,14 +79,15 @@ struct CallScreen: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(SQColor.label)
                         .frame(width: 44, height: 44)
-                        .sqSurface(SQColor.surface, in: Circle())
+                        .background(glassFill, in: Circle())
                 }
                 .buttonStyle(SQPressButtonStyle())
                 .accessibilityLabel("Réduire l’appel")
                 .accessibilityHint("L’appel continue. Touche le bandeau en haut de l’écran pour revenir.")
                 .accessibilityIdentifier("call.minimize")
             }
-            Spacer()
+            Spacer(minLength: SQSpace.sm)
+            encryptionNote
         }
     }
 
@@ -91,12 +98,19 @@ struct CallScreen: View {
         let title: LocalizedStringKey = liveKit.isE2EEVerified
             ? "Appel chiffré de bout en bout"
             : "Appel non chiffré de bout en bout"
-        return HStack(spacing: 0) {
+        // En pastille en haut à droite : l'état se lit sans masquer les commandes.
+        return HStack(spacing: SQSpace.xs) {
             Label(title, systemImage: liveKit.isE2EEVerified ? "lock.fill" : "lock.open")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
+                .font(SQType.caption.weight(.semibold))
+                .foregroundStyle(SQColor.label)
+                .lineLimit(2)
             SQInfoButton(term: .endToEndEncryption)
         }
+        .padding(.leading, SQSpace.sm2)
+        .padding(.trailing, SQSpace.sm)
+        .padding(.vertical, SQSpace.xs)
+        .frame(minHeight: 32)
+        .background(glassFill, in: Capsule())
         .accessibilityIdentifier("call.encryption")
     }
 
@@ -105,19 +119,24 @@ struct CallScreen: View {
     private func endStage(_ notice: CallManager.EndNotice) -> some View {
         VStack(spacing: SQSpace.lg) {
             Spacer(minLength: SQSpace.lg)
-            SQAvatar(url: nil, name: notice.handle.isEmpty ? "?" : notice.handle, size: 120)
+            SQAvatar(url: nil, name: notice.handle.isEmpty ? "?" : notice.handle, size: 88)
                 .accessibilityHidden(true)
             VStack(spacing: SQSpace.sm) {
-                if !notice.handle.isEmpty {
-                    Text(notice.handle)
-                        .font(SQType.display)
-                        .foregroundStyle(SQColor.label)
+                Text(notice.title)
+                    .font(SQFont.display(24, .bold, relativeTo: .title))
+                    .foregroundStyle(SQColor.label)
+                // « Léa Martin · 4 min 18 s » : la durée seulement si l'appel a eu lieu.
+                let caption = [
+                    notice.handle.isEmpty ? nil : notice.handle,
+                    notice.duration.map { Duration.seconds($0.rounded()).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated)) }
+                ].compactMap { $0 }.joined(separator: " · ")
+                if !caption.isEmpty {
+                    Text(verbatim: caption)
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
-                Text(notice.title)
-                    .font(SQType.heading)
-                    .foregroundStyle(SQColor.label)
                 if let message = notice.message {
                     Text(message)
                         .font(SQType.body)
@@ -129,23 +148,25 @@ struct CallScreen: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
             .accessibilityIdentifier("call.end.notice")
-            Spacer(minLength: SQSpace.lg)
-            HStack(alignment: .top, spacing: SQSpace.xxl) {
+            HStack(alignment: .top, spacing: SQSpace.xl) {
                 labeledControl("Fermer", identifier: "call.end.close", systemImage: "xmark", tint: SQColor.label) {
                     callManager.dismissEndNotice()
                 }
                 if notice.conversationId != nil {
+                    // Crème sur nuit : l'encre inversée du mode sombre.
                     labeledControl(
                         "Rappeler",
                         identifier: "call.end.redial",
                         systemImage: notice.hasVideo ? "video.fill" : "phone.fill",
-                        tint: SQColor.onAccent,
-                        fill: SQColor.brandRed
+                        tint: SQColor.bg,
+                        fill: SQColor.label
                     ) {
                         callManager.redial()
                     }
                 }
             }
+            .padding(.top, SQSpace.lg)
+            Spacer(minLength: SQSpace.lg)
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.vertical, SQSpace.xl)
@@ -162,7 +183,7 @@ struct CallScreen: View {
         identifier: String,
         systemImage: String,
         tint: Color,
-        fill: Color = SQColor.surface,
+        fill: Color? = nil,
         action: @escaping () -> Void
     ) -> some View {
         VStack(spacing: SQSpace.xs) {
@@ -177,11 +198,27 @@ struct CallScreen: View {
         }
     }
 
+    /// Commande d'appel légendée : le nom sous le rond, masqué pour VoiceOver
+    /// qui lit déjà l'action du bouton (« Couper le micro »…).
+    private func captioned<Control: View>(_ caption: LocalizedStringKey, @ViewBuilder _ control: () -> Control) -> some View {
+        VStack(spacing: SQSpace.xs) {
+            control()
+            Text(caption)
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityHidden(true)
+        }
+        .frame(width: 76)
+    }
+
     private var callHeader: some View {
         VStack(spacing: SQSpace.sm) {
             if let handle = callManager.activeCall?.handle, !handle.isEmpty {
                 Text(handle)
-                    .font(SQType.display)
+                    .font(SQFont.display(26, .bold, relativeTo: .title))
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -204,11 +241,7 @@ struct CallScreen: View {
 
     private var centralAvatar: some View {
         let handle = callManager.activeCall?.handle
-        return SQAvatar(url: nil, name: (handle?.isEmpty == false ? handle! : "?"), size: 120)
-            .padding(6)
-            .overlay {
-                SQAvatarShape().stroke(SQColor.brandRed, lineWidth: 3)
-            }
+        return SQAvatar(url: nil, name: (handle?.isEmpty == false ? handle! : "?"), size: 104)
     }
 
     @ViewBuilder
@@ -347,66 +380,73 @@ struct CallScreen: View {
     }
 
     private var controls: some View {
-        VStack(spacing: SQSpace.md) {
-            HStack(spacing: SQSpace.lg) {
-                controlButton(systemImage: liveKit.isMicMuted ? "mic.slash.fill" : "mic.fill", tint: liveKit.isMicMuted ? SQColor.danger : SQColor.label) {
-                    callManager.setMuted(!liveKit.isMicMuted)
+        VStack(spacing: SQSpace.lg) {
+            HStack(alignment: .top, spacing: 0) {
+                captioned("Micro") {
+                    controlButton(systemImage: liveKit.isMicMuted ? "mic.slash.fill" : "mic.fill", tint: liveKit.isMicMuted ? SQColor.danger : SQColor.label) {
+                        callManager.setMuted(!liveKit.isMicMuted)
+                    }
+                    .accessibilityLabel(liveKit.isMicMuted ? "Réactiver le micro" : "Couper le micro")
                 }
-                .accessibilityLabel(liveKit.isMicMuted ? "Réactiver le micro" : "Couper le micro")
 
-                controlButton(systemImage: liveKit.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill", tint: liveKit.isSpeakerOn ? SQColor.success : SQColor.label) {
-                    liveKit.toggleSpeaker()
+                captioned("Haut-parleur") {
+                    controlButton(systemImage: liveKit.isSpeakerOn ? "speaker.wave.3.fill" : "speaker.fill", tint: liveKit.isSpeakerOn ? SQColor.success : SQColor.label) {
+                        liveKit.toggleSpeaker()
+                    }
+                    .accessibilityLabel(liveKit.isSpeakerOn ? "Désactiver le haut-parleur" : "Activer le haut-parleur")
                 }
-                .accessibilityLabel(liveKit.isSpeakerOn ? "Désactiver le haut-parleur" : "Activer le haut-parleur")
 
                 if callManager.activeCall?.hasVideo == true {
-                    controlButton(systemImage: liveKit.isCameraOn ? "video.fill" : "video.slash.fill", tint: liveKit.isCameraOn ? SQColor.success : SQColor.label) {
-                        liveKit.toggleCamera()
+                    captioned("Caméra") {
+                        controlButton(systemImage: liveKit.isCameraOn ? "video.fill" : "video.slash.fill", tint: liveKit.isCameraOn ? SQColor.success : SQColor.label) {
+                            liveKit.toggleCamera()
+                        }
+                        .accessibilityLabel(liveKit.isCameraOn ? "Couper la caméra" : "Activer la caméra")
                     }
-                    .accessibilityLabel(liveKit.isCameraOn ? "Couper la caméra" : "Activer la caméra")
                 }
 
-                // Raccrocher : danger plein, icône crème (DA Crème).
-                controlButton(systemImage: "phone.down.fill", tint: SQColor.onAccent, fill: SQColor.danger, large: true) {
-                    callManager.endActiveCall()
-                }
-                .accessibilityLabel("Raccrocher")
-            }
-
-            HStack(spacing: SQSpace.xl) {
                 // D.11 : volontaire, coupé par défaut ; seulement une fois l'appel
                 // connecté (et vérifié, s'il est chiffré).
                 let canShare = liveKit.state == .connected && (callManager.activeCall?.requiresE2EE != true || liveKit.isE2EEVerified)
                 let waitingForCellular = callManager.isSharingNetwork && callManager.isNetworkSharingWaitingForCellular
-                controlButton(
-                    systemImage: "antenna.radiowaves.left.and.right",
-                    tint: waitingForCellular ? SQColor.warning : (callManager.isSharingNetwork ? SQColor.success : SQColor.label)
-                ) {
-                    callManager.toggleNetworkSharing()
-                }
-                .disabled(!canShare && !callManager.isSharingNetwork)
-                .opacity(canShare || callManager.isSharingNetwork ? 1 : 0.4)
-                .accessibilityLabel(callManager.isSharingNetwork ? "Arrêter de partager mon réseau" : "Partager mon réseau")
-                .accessibilityValue(waitingForCellular ? "En attente du réseau mobile" : (callManager.isSharingNetwork ? "Partagé" : "Non partagé"))
-                .accessibilityIdentifier("call.shareNetwork")
-
-                if callManager.activeCall?.hasVideo == true {
-                    controlButton(systemImage: "arrow.triangle.2.circlepath.camera", tint: SQColor.label) {
-                        liveKit.switchCamera()
-                    }
-                    .disabled(!liveKit.isCameraOn || !liveKit.canSwitchCamera)
-                    .opacity(liveKit.isCameraOn && liveKit.canSwitchCamera ? 1 : 0.4)
-                    .accessibilityLabel("Changer de caméra")
-
+                captioned("Mon réseau") {
                     controlButton(
-                        systemImage: liveKit.isPictureInPictureActive ? "pip.exit" : "pip.enter",
-                        tint: liveKit.isPictureInPictureActive ? SQColor.success : SQColor.label
+                        systemImage: "antenna.radiowaves.left.and.right",
+                        tint: waitingForCellular ? SQColor.warning : (callManager.isSharingNetwork ? SQColor.success : SQColor.label)
                     ) {
-                        liveKit.togglePictureInPicture()
+                        callManager.toggleNetworkSharing()
                     }
-                    .disabled(!liveKit.canStartPictureInPicture && !liveKit.isPictureInPictureActive)
-                    .opacity(liveKit.canStartPictureInPicture || liveKit.isPictureInPictureActive ? 1 : 0.4)
-                    .accessibilityLabel(liveKit.isPictureInPictureActive ? "Quitter l’image dans l’image" : "Activer l’image dans l’image")
+                    .disabled(!canShare && !callManager.isSharingNetwork)
+                    .opacity(canShare || callManager.isSharingNetwork ? 1 : 0.4)
+                    .accessibilityLabel(callManager.isSharingNetwork ? "Arrêter de partager mon réseau" : "Partager mon réseau")
+                    .accessibilityValue(waitingForCellular ? "En attente du réseau mobile" : (callManager.isSharingNetwork ? "Partagé" : "Non partagé"))
+                    .accessibilityIdentifier("call.shareNetwork")
+                }
+            }
+
+            // Vidéo seulement : changer de caméra et l'image dans l'image.
+            if callManager.activeCall?.hasVideo == true {
+                HStack(alignment: .top, spacing: 0) {
+                    captioned("Changer de caméra") {
+                        controlButton(systemImage: "arrow.triangle.2.circlepath.camera", tint: SQColor.label) {
+                            liveKit.switchCamera()
+                        }
+                        .disabled(!liveKit.isCameraOn || !liveKit.canSwitchCamera)
+                        .opacity(liveKit.isCameraOn && liveKit.canSwitchCamera ? 1 : 0.4)
+                        .accessibilityLabel("Changer de caméra")
+                    }
+
+                    captioned("Image dans l’image") {
+                        controlButton(
+                            systemImage: liveKit.isPictureInPictureActive ? "pip.exit" : "pip.enter",
+                            tint: liveKit.isPictureInPictureActive ? SQColor.success : SQColor.label
+                        ) {
+                            liveKit.togglePictureInPicture()
+                        }
+                        .disabled(!liveKit.canStartPictureInPicture && !liveKit.isPictureInPictureActive)
+                        .opacity(liveKit.canStartPictureInPicture || liveKit.isPictureInPictureActive ? 1 : 0.4)
+                        .accessibilityLabel(liveKit.isPictureInPictureActive ? "Quitter l’image dans l’image" : "Activer l’image dans l’image")
+                    }
                 }
             }
 
@@ -420,20 +460,27 @@ struct CallScreen: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, SQSpace.lg)
             }
+
+            // Raccrocher : danger plein, plus grand, icône crème (DA Crème).
+            captioned("Raccrocher") {
+                controlButton(systemImage: "phone.down.fill", tint: SQColor.onAccent, fill: SQColor.danger, large: true) {
+                    callManager.endActiveCall()
+                }
+                .accessibilityLabel("Raccrocher")
+            }
         }
     }
 
-    private func controlButton(systemImage: String, tint: Color, fill: Color = SQColor.surface, large: Bool = false, action: @escaping () -> Void) -> some View {
+    private func controlButton(systemImage: String, tint: Color, fill: Color? = nil, large: Bool = false, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.medium()
             action()
         } label: {
             Image(systemName: systemImage)
-                .font(.system(size: large ? 26 : 21, weight: .semibold))
+                .font(.system(size: large ? 28 : 21, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: large ? 64 : 56, height: large ? 64 : 56)
-                .background(fill, in: Circle())
-                .sqShadowSoft()
+                .frame(width: large ? 68 : 56, height: large ? 68 : 56)
+                .background(fill ?? glassFill, in: Circle())
         }
         .buttonStyle(SQPressButtonStyle())
     }
@@ -446,25 +493,36 @@ struct PeerNetworkCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
-            Text(name.map { String(localized: "Réseau de \($0), en direct") } ?? String(localized: "Réseau d’un participant, en direct"))
-                .font(SQType.caption.weight(.semibold))
-                .foregroundStyle(SQColor.labelSecondary)
+            HStack(spacing: SQSpace.sm) {
+                Text(name.map { String(localized: "Réseau de \($0), en direct") } ?? String(localized: "Réseau d’un participant, en direct"))
+                    .sqKicker()
+                Spacer(minLength: SQSpace.sm)
+                // Le point vert : la carte se met à jour tant que l'autre partage.
+                Circle()
+                    .fill(SQColor.success)
+                    .frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
+            }
             ForEach(lines, id: \.label) { line in
                 HStack(spacing: SQSpace.sm) {
                     Text(line.label)
                         .foregroundStyle(SQColor.labelSecondary)
                     Spacer(minLength: SQSpace.sm)
                     Text(verbatim: line.value)
+                        .font(SQType.subhead(.bold))
                         .foregroundStyle(SQColor.label)
                         .monospacedDigit()
                 }
-                .font(SQType.caption)
+                .font(SQType.subhead)
                 .accessibilityElement(children: .combine)
             }
         }
-        .padding(SQSpace.md)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        // Translucide sur la nuit de l'écran d'appel.
+        .background(SQColor.label.opacity(0.07), in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous).stroke(SQColor.label.opacity(0.1), lineWidth: 1))
         .accessibilityIdentifier("call.peerNetwork")
     }
 

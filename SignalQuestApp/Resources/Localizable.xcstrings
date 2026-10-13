@@ -1779,6 +1779,22 @@
         }
       }
     },
+    "Caméra" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caméra"
+          }
+        }
+      }
+    },
     "Ce lien mène hors de SignalQuest, vers %@." : {
       "localizations" : {
         "en" : {
@@ -2484,6 +2500,46 @@
         }
       }
     },
+    "Groupe · %lld membres" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Group · %lld member"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Group · %lld members"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Groupe · %lld membre"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Groupe · %lld membres"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Grouper par opérateur" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2497,6 +2553,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grouper par opérateur"
+          }
+        }
+      }
+    },
+    "Haut-parleur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speaker"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haut-parleur"
           }
         }
       }
@@ -2621,6 +2693,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Il ne verra plus l’état de cette connexion."
+          }
+        }
+      }
+    },
+    "Image dans l’image" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Picture in picture"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image dans l’image"
           }
         }
       }
@@ -3292,6 +3380,22 @@
         }
       }
     },
+    "Membres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Members"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Membres"
+          }
+        }
+      }
+    },
     "Membres (%lld)" : {
       "localizations" : {
         "en" : {
@@ -3386,6 +3490,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mesure de latence"
+          }
+        }
+      }
+    },
+    "Micro" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mic"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Micro"
           }
         }
       }
@@ -3665,6 +3785,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photos en vérification"
+          }
+        }
+      }
+    },
+    "Plus anciens" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Older"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus anciens"
           }
         }
       }
