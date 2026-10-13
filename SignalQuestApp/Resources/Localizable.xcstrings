@@ -1592,6 +1592,38 @@
         }
       }
     },
+    "Autre…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre…"
+          }
+        }
+      }
+    },
+    "Avec %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avec %@"
+          }
+        }
+      }
+    },
     "Avertissement." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1703,6 +1735,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qui aide à le reconnaître"
+          }
+        }
+      }
+    },
+    "Ce soir %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tonight %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce soir %@"
           }
         }
       }
@@ -2083,6 +2131,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Créer le site ici"
+          }
+        }
+      }
+    },
+    "Dans %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans %@"
+          }
+        }
+      }
+    },
+    "Demain %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tomorrow %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demain %@"
           }
         }
       }
@@ -4096,6 +4176,22 @@
         }
       }
     },
+    "Ta position et ton réseau, en continu, dans %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your location and network, continuously, in %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta position et ton réseau, en continu, dans %@."
+          }
+        }
+      }
+    },
     "Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web." : {
       "localizations" : {
         "en" : {
@@ -4903,6 +4999,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "une passe complète représente quelques dizaines de requêtes"
+          }
+        }
+      }
+    },
+    "À %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À %@"
           }
         }
       }

@@ -502,7 +502,13 @@ struct ConversationDetailView: View {
             Text("Ta position exacte et l’adresse la plus proche seront envoyées dans \(conversationTitle).")
         }
         .sheet(isPresented: $showSchedulePicker) {
-            ScheduleMessageSheet(conversation: conversation, service: service, e2ee: e2ee, initialText: scheduleSeedText) {
+            ScheduleMessageSheet(
+                conversation: conversation,
+                service: service,
+                e2ee: e2ee,
+                initialText: scheduleSeedText,
+                subtitle: conversation.isGroup ? sheetSubtitle : String(localized: "À \(conversationTitle)")
+            ) {
                 Haptics.success()
                 // Le texte programmé restait dans le champ et le brouillon : un appui
                 // sur Envoyer le doublait aussitôt (AF-MSG-12).
@@ -516,7 +522,7 @@ struct ConversationDetailView: View {
             }
         }
         .sheet(isPresented: $showNewPoll) {
-            NewPollView(conversation: conversation, service: service, e2ee: e2ee) { message, poll in
+            NewPollView(conversation: conversation, service: service, e2ee: e2ee, subtitle: sheetSubtitle) { message, poll in
                 // Seed direct du sondage (textes d'options déjà résolus) pour un
                 // affichage immédiat, sans dépendre du parsing/déchiffrement du
                 // message optimiste.
@@ -529,12 +535,13 @@ struct ConversationDetailView: View {
                 LiveShareManagementSheet(
                     coordinator: services.liveShare,
                     conversation: conversation,
-                    currentUserId: currentUserId
+                    currentUserId: currentUserId,
+                    subtitle: String(localized: "Ta position et ton réseau, en continu, dans \(conversationTitle).")
                 )
             }
         }
         .sheet(item: $reminderTarget) { target in
-            AddReminderSheet(conversation: conversation, message: target, service: service) {
+            AddReminderSheet(conversation: conversation, message: target, service: service, subtitle: sheetSubtitle) {
                 Haptics.success()
             }
         }
@@ -2954,6 +2961,13 @@ struct ConversationDetailView: View {
     }
 
     /// Titre de la conversation sans inclure l'utilisateur courant.
+    /// « Dans Équipe terrain » (groupe) ou « Avec Léa Martin » sous le titre des feuilles.
+    private var sheetSubtitle: String {
+        conversation.isGroup
+            ? String(localized: "Dans \(conversationTitle)")
+            : String(localized: "Avec \(conversationTitle)")
+    }
+
     private var conversationTitle: String {
         if let renamedTitle, !renamedTitle.isEmpty { return renamedTitle }
         let title = conversation.displayTitle(excluding: currentUserId)
@@ -3299,6 +3313,7 @@ private struct LiveShareManagementSheet: View {
     @ObservedObject var coordinator: ConversationLiveShareCoordinator
     let conversation: MessageConversation
     let currentUserId: String
+    let subtitle: String
 
     @Environment(\.dismiss) private var dismiss
     @State private var message = ""
@@ -3309,11 +3324,13 @@ private struct LiveShareManagementSheet: View {
     init(
         coordinator: ConversationLiveShareCoordinator,
         conversation: MessageConversation,
-        currentUserId: String
+        currentUserId: String,
+        subtitle: String
     ) {
         self.coordinator = coordinator
         self.conversation = conversation
         self.currentUserId = currentUserId
+        self.subtitle = subtitle
         let targets = conversation.participants.filter { $0.userId != currentUserId }
         _mode = State(initialValue: conversation.isGroup ? "broadcast" : "targeted")
         _selectedTargetId = State(initialValue: targets.first?.userId ?? "")
@@ -3335,122 +3352,126 @@ private struct LiveShareManagementSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    disclosure
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(title: "Partage en direct", subtitle: subtitle, closeIdentifier: "liveshare.close") { dismiss() }
 
-                    if !sessions.isEmpty {
-                        VStack(alignment: .leading, spacing: SQSpace.sm) {
-                            Text("Sessions en cours")
-                                .font(SQType.heading)
-                                .foregroundStyle(SQColor.label)
-                            ForEach(sessions) { session in
-                                LiveShareSessionCard(
-                                    coordinator: coordinator,
-                                    session: session,
-                                    conversation: conversation,
-                                    currentUserId: currentUserId
-                                )
-                            }
+                if !sessions.isEmpty {
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        Text("Sessions en cours")
+                            .sqKicker()
+                            .padding(.leading, SQSpace.xs)
+                        ForEach(sessions) { session in
+                            LiveShareSessionCard(
+                                coordinator: coordinator,
+                                session: session,
+                                conversation: conversation,
+                                currentUserId: currentUserId
+                            )
                         }
-                    }
-
-                    VStack(alignment: .leading, spacing: SQSpace.md) {
-                        Text("Nouveau partage")
-                            .font(SQType.heading)
-                            .foregroundStyle(SQColor.label)
-
-                        if conversation.isGroup {
-                            Picker("Destinataires", selection: $mode) {
-                                Text("Une personne").tag("targeted")
-                                Text("Plusieurs").tag("broadcast")
-                            }
-                            .pickerStyle(.segmented)
-
-                            if mode == "targeted" {
-                                Picker("Participant", selection: $selectedTargetId) {
-                                    ForEach(targets) { participant in
-                                        Text(participant.user.displayName).tag(participant.userId)
-                                    }
-                                }
-                                .pickerStyle(.menu)
-                            } else {
-                                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                                    ForEach(targets) { participant in
-                                        Toggle(
-                                            participant.user.displayName,
-                                            isOn: binding(for: participant.userId)
-                                        )
-                                        .tint(SQColor.brandRed)
-                                    }
-                                }
-                            }
-                        }
-
-                        TextField("Message facultatif", text: $message, axis: .vertical)
-                            .lineLimit(1...3)
-                            .textFieldStyle(.roundedBorder)
-
-                        HStack(spacing: SQSpace.sm) {
-                            Button {
-                                create(offerShare: true)
-                            } label: {
-                                Label("Partager", systemImage: "dot.radiowaves.left.and.right")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(SQColor.brandRed)
-                            .foregroundStyle(SQColor.onAccent)
-
-                            Button {
-                                create(offerShare: false)
-                            } label: {
-                                Text("Demander")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(SQColor.brandRed)
-                        }
-                        .disabled(!canSubmit)
-                    }
-                    .padding(SQSpace.md)
-                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-
-                    if let error = coordinator.errorMessage {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
                     }
                 }
-                .padding()
-            }
-            .signalQuestBackground()
-            .navigationTitle("Partage en direct")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Fermer") { dismiss() }
+
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text("Nouveau partage")
+                        .sqKicker()
+                        .padding(.leading, SQSpace.xs)
+
+                    if conversation.isGroup {
+                        SQSegmentedFilter(selection: $mode, options: [
+                            (value: "targeted", label: "Une personne", icon: nil),
+                            (value: "broadcast", label: "Plusieurs", icon: nil)
+                        ])
+                        .padding(.horizontal, -SQSpace.lg)
+                        .accessibilityLabel("Destinataires")
+                        targetsCard
+                    }
+
+                    TextField("Message facultatif", text: $message, axis: .vertical)
+                        .lineLimit(1...3)
+                        .sqHaloField()
                 }
+
+                if let error = coordinator.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                }
+
+                HStack(spacing: SQSpace.sm) {
+                    GradientButton("Partager", systemImage: "dot.radiowaves.left.and.right") {
+                        create(offerShare: true)
+                    }
+                    GradientButton("Demander", style: .secondary) {
+                        create(offerShare: false)
+                    }
+                }
+                .disabled(!canSubmit)
+
+                disclosure
             }
+            .padding(SQSpace.lg)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .sqSheet(background: SQColor.bg)
         .presentationDetents([.medium, .large])
     }
 
+    /// Une personne : un seul choix (radio) ; plusieurs : une coche par membre.
+    private var targetsCard: some View {
+        VStack(spacing: 0) {
+            ForEach(targets) { participant in
+                if participant.id != targets.first?.id { Divider().padding(.leading, 64) }
+                let isSelected = mode == "targeted"
+                    ? selectedTargetId == participant.userId
+                    : selectedBroadcastIds.contains(participant.userId)
+                Button {
+                    Haptics.selection()
+                    if mode == "targeted" {
+                        selectedTargetId = participant.userId
+                    } else {
+                        binding(for: participant.userId).wrappedValue.toggle()
+                    }
+                } label: {
+                    HStack(spacing: SQSpace.md) {
+                        SQAvatar(url: participant.user.avatarUrl, name: participant.user.displayName, size: 36)
+                        Text(participant.user.displayName)
+                            .font(SQType.body(.semibold))
+                            .foregroundStyle(SQColor.label)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: mode == "targeted"
+                              ? (isSelected ? "largecircle.fill.circle" : "circle")
+                              : (isSelected ? "checkmark.circle.fill" : "circle"))
+                            .font(.system(size: 22))
+                            .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.labelTertiary)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, SQSpace.md)
+                    .frame(minHeight: 52)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    /// Ce que le partage envoie et quand : en pied de feuille, sans encadré.
     private var disclosure: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
             Label("Actif uniquement au premier plan", systemImage: "iphone.and.arrow.forward")
                 .font(SQType.caption.weight(.semibold))
-                .foregroundStyle(SQColor.label)
+                .foregroundStyle(SQColor.labelSecondary)
             Text("Sur iPhone, l’envoi se met en pause si tu verrouilles l’écran ou quittes SignalQuest. Il reprend au retour tant que la session n’a pas été arrêtée.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
             Text("iOS partage la position, la technologie et l’opérateur disponibles. Apple n’expose pas les niveaux RSRP/RSRQ à l’app.")
-                .font(SQType.micro)
+                .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
         }
-        .padding(SQSpace.md)
-        .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, SQSpace.xs)
     }
 
     private func binding(for userId: String) -> Binding<Bool> {

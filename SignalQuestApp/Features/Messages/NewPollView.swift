@@ -7,6 +7,8 @@ struct NewPollView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
     let e2ee: E2EEServicing?
+    /// « Dans Équipe terrain » sous le titre.
+    var subtitle: String? = nil
     /// Renvoie le message créé + le sondage (avec textes d'options déjà résolus,
     /// même en E2EE) pour un affichage immédiat et correct.
     let onCreated: (MessageItem, MessagePoll) -> Void
@@ -44,101 +46,112 @@ struct NewPollView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    section(title: "Question") {
-                        TextField("Pose ta question", text: $question, axis: .vertical)
-                            .lineLimit(1...3)
-                            .sqCapsuleField()
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(title: "Nouveau sondage", subtitle: subtitle, closeIdentifier: "poll.cancel") { dismiss() }
 
-                    section(title: "Options") {
-                        VStack(spacing: SQSpace.sm) {
-                            ForEach($options) { $option in
-                                HStack(spacing: SQSpace.sm) {
-                                    TextField(optionPlaceholder(for: option), text: $option.text)
-                                        .sqCapsuleField()
-                                    if options.count > 2 {
-                                        Button {
-                                            options.removeAll { $0.id == option.id }
-                                        } label: {
-                                            Image(systemName: "minus.circle.fill")
-                                                .foregroundStyle(SQColor.labelTertiary)
-                                                .frame(width: 44, height: 44)
-                                                .contentShape(Rectangle())
-                                        }
-                                        .buttonStyle(.plain)
-                                        .accessibilityLabel("Supprimer l'option \(optionPlaceholder(for: option))")
-                                    }
-                                }
-                            }
-                            if options.count < maxOptions {
-                                Button {
-                                    options.append(PollOption())
-                                } label: {
-                                    Label("Ajouter une option", systemImage: "plus.circle")
-                                        .font(SQType.caption.weight(.semibold))
-                                        .foregroundStyle(SQColor.accentInk)
-                                        .frame(minHeight: 44)
-                                        .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                    }
+                TextField("Pose ta question", text: $question, axis: .vertical)
+                    .lineLimit(1...3)
+                    .sqHaloField()
+                    .accessibilityIdentifier("poll.question")
 
-                    section(title: "Réglages") {
-                        VStack(spacing: SQSpace.sm2) {
-                            Toggle("Choix multiples", isOn: $multiSelect)
-                                .tint(SQColor.brandRed)
-                            Toggle("Échéance", isOn: $hasDeadline)
-                                .tint(SQColor.brandRed)
-                            if hasDeadline {
-                                DatePicker("Clôture le", selection: $deadline, in: Date()..., displayedComponents: [.date, .hourAndMinute])
-                                    .tint(SQColor.brandRed)
-                                    .font(SQType.caption)
-                            }
-                        }
-                        .font(SQType.body)
-                        .foregroundStyle(SQColor.label)
-                        .padding(SQSpace.md2)
-                        .sqCardBackground()
-                    }
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
-                    }
-
-                    GradientButton("Créer le sondage", systemImage: "chart.bar", isBusy: isBusy) {
-                        Task { await create() }
-                    }
-                    .disabled(!canCreate || isBusy)
-                    .opacity(canCreate ? 1 : 0.5)
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text("Options")
+                        .sqKicker()
+                        .padding(.leading, SQSpace.xs)
+                    optionsCard
                 }
-                .padding()
-            }
-            .navigationTitle("Nouveau sondage")
-            .toolbarTitleInlineCompat()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }
+
+                settingsCard
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
                 }
+
+                GradientButton("Créer le sondage", systemImage: "chart.bar", isBusy: isBusy) {
+                    Task { await create() }
+                }
+                .disabled(!canCreate || isBusy)
+                .opacity(canCreate ? 1 : 0.5)
+                .accessibilityIdentifier("poll.create")
             }
-            .signalQuestBackground()
+            .padding(SQSpace.lg)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .sqSheet(background: SQColor.bg)
     }
 
-    private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(LocalizedStringKey(title))
-                .font(SQType.subhead)
-                .foregroundStyle(SQColor.labelSecondary)
-            content()
+    /// Une option par rangée sur une carte, croix ronde pour la retirer ;
+    /// « Ajouter une option » est la dernière rangée de la même carte.
+    private var optionsCard: some View {
+        VStack(spacing: 0) {
+            ForEach($options) { $option in
+                if option.id != options.first?.id { Divider().padding(.leading, SQSpace.md) }
+                HStack(spacing: SQSpace.sm) {
+                    TextField(optionPlaceholder(for: option), text: $option.text)
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.label)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                    if options.count > 2 {
+                        Button {
+                            options.removeAll { $0.id == option.id }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(SQColor.chipInk)
+                                .frame(width: 28, height: 28)
+                                .background(SQColor.chip, in: Circle())
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Supprimer l'option \(optionPlaceholder(for: option))")
+                    }
+                }
+                .padding(.leading, SQSpace.md)
+                .padding(.trailing, SQSpace.xs)
+            }
+            if options.count < maxOptions {
+                Divider().padding(.leading, SQSpace.md)
+                Button {
+                    options.append(PollOption())
+                } label: {
+                    Label("Ajouter une option", systemImage: "plus")
+                        .font(SQType.body(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .padding(.horizontal, SQSpace.md)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("poll.addOption")
+            }
         }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    private var settingsCard: some View {
+        VStack(spacing: 0) {
+            Toggle("Choix multiples", isOn: $multiSelect)
+                .frame(minHeight: 48)
+                .padding(.horizontal, SQSpace.md)
+            Divider().padding(.leading, SQSpace.md)
+            Toggle("Échéance", isOn: $hasDeadline)
+                .frame(minHeight: 48)
+                .padding(.horizontal, SQSpace.md)
+            if hasDeadline {
+                Divider().padding(.leading, SQSpace.md)
+                DatePicker("Clôture le", selection: $deadline, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                    .frame(minHeight: 48)
+                    .padding(.horizontal, SQSpace.md)
+            }
+        }
+        .font(SQType.body(.semibold))
+        .foregroundStyle(SQColor.label)
+        .tint(SQColor.brandRed)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private func create() async {
@@ -164,18 +177,5 @@ struct NewPollView: View {
             errorMessage = error.userFacingMessage
             Haptics.error()
         }
-    }
-}
-
-/// Champ « Crème & Terre cuite » : capsule 44 SurfaceMuted, sans bordure.
-private extension View {
-    func sqCapsuleField() -> some View {
-        self
-            .font(SQType.body)
-            .foregroundStyle(SQColor.label)
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.vertical, SQSpace.sm2)
-            .frame(minHeight: 44)
-            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }
 }
