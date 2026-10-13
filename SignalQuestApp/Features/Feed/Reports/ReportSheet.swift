@@ -1273,17 +1273,14 @@ struct BugReportDetailView: View {
         }
     }
 
-    /// Équipe à gauche sur la carte, moi à droite à l'encre.
+    /// Les autres à gauche sur la carte, moi à droite à l'encre. Un membre de
+    /// l'équipe est nommé, avec la pastille « Équipe ».
     private func bubble(_ comment: BugComment) -> some View {
-        let isTeam = comment.isAdmin
+        let isTeam = !comment.isMine(currentUserId: LocalAccountScope.currentUserId)
         return HStack {
             if !isTeam { Spacer(minLength: SQSpace.xxl) }
             VStack(alignment: .leading, spacing: 3) {
-                if isTeam {
-                    Label("Équipe SignalQuest", systemImage: "checkmark.seal.fill")
-                        .font(SQFont.body(11, .bold, relativeTo: .caption2))
-                        .foregroundStyle(SQColor.accentInk)
-                }
+                if isTeam { author(comment) }
                 if !comment.content.isEmpty {
                     Text(verbatim: comment.content)
                         .font(SQType.callout)
@@ -1311,6 +1308,31 @@ struct BugReportDetailView: View {
             }
             .accessibilityElement(children: .combine)
             if isTeam { Spacer(minLength: SQSpace.xxl) }
+        }
+    }
+
+    @ViewBuilder
+    private func author(_ comment: BugComment) -> some View {
+        let name = comment.user?.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if comment.isAdmin {
+            HStack(spacing: 6) {
+                if name.isEmpty {
+                    Text("Équipe SignalQuest")
+                } else {
+                    Text(verbatim: name)
+                    Label("Équipe", systemImage: "checkmark.seal.fill")
+                        .labelStyle(.titleAndIcon)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(SQColor.accentSoft, in: Capsule())
+                }
+            }
+            .font(SQFont.body(11, .bold, relativeTo: .caption2))
+            .foregroundStyle(SQColor.accentInk)
+        } else if !name.isEmpty {
+            Text(verbatim: name)
+                .font(SQFont.body(11, .bold, relativeTo: .caption2))
+                .foregroundStyle(SQColor.labelSecondary)
         }
     }
 

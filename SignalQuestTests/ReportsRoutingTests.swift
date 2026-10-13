@@ -272,6 +272,18 @@ final class BugReportsServiceTests: XCTestCase {
         XCTAssertFalse(BugCategory.bugKinds.contains(.feature))
     }
 
+    func testAnAdminReplyingToTheirOwnReportStaysOnTheirSide() {
+        let mine = BugComment(id: "c-1", content: "Précision", isAdmin: true,
+                              user: .init(id: "u-admin", name: "Alexandre", role: "admin"))
+        let otherAdmin = BugComment(id: "c-2", content: "On regarde", isAdmin: true,
+                                    user: .init(id: "u-mod", name: "Camille", role: "admin"))
+        XCTAssertTrue(mine.isMine(currentUserId: "u-admin"))
+        XCTAssertFalse(otherAdmin.isMine(currentUserId: "u-admin"))
+        // Sans auteur ou sans compte local, le drapeau du serveur décide.
+        XCTAssertFalse(BugComment(id: "c-3", content: "x", isAdmin: true).isMine(currentUserId: "u-admin"))
+        XCTAssertTrue(BugComment(id: "c-4", content: "x").isMine(currentUserId: nil))
+    }
+
     private func report(_ id: String, status: String = "open", reply: String? = nil, updated: String) throws -> BugReport {
         var json: [String: Any] = ["id": id, "title": "t", "description": "d", "category": "ui",
                                    "severity": "low", "status": status, "updatedAt": updated]
