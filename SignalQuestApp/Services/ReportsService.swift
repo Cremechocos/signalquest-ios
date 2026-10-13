@@ -309,15 +309,10 @@ struct BugComment: Decodable, Identifiable, Equatable, Sendable {
         content = (try? c.decodeIfPresent(String.self, forKey: .content)) ?? ""
         images = (try? c.decodeIfPresent([String].self, forKey: .images)) ?? []
         user = try? c.decodeIfPresent(Author.self, forKey: .user)
-        isAdmin = ((try? c.decodeIfPresent(Bool.self, forKey: .isAdmin)) ?? false) || user?.role == "admin"
+        // Le serveur seul sait si l'auteur parlait au nom de l'équipe : un admin
+        // qui écrit sur son propre signalement depuis l'app reste l'auteur.
+        isAdmin = (try? c.decodeIfPresent(Bool.self, forKey: .isAdmin)) ?? false
         createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
-    }
-
-    /// Un admin qui répond à son propre signalement reste « moi » : l'auteur
-    /// fait foi, `isAdmin` ne sert que quand il manque.
-    func isMine(currentUserId: String?) -> Bool {
-        if let currentUserId, let authorId = user?.id { return authorId == currentUserId }
-        return !isAdmin
     }
 
     init(id: String, content: String, images: [String] = [], isAdmin: Bool = false, createdAt: Date? = nil,

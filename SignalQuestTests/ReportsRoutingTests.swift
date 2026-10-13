@@ -242,7 +242,7 @@ final class BugReportsServiceTests: XCTestCase {
     func testCommentsTellTheTeamApartAndRepliesCarryText() async throws {
         let box = BugCaptureBox()
         respond(#"""
-        [{"id":"c-1","content":"Ça arrive en 5G ?","isAdmin":false,"user":{"id":"u-9","name":"Modo","role":"admin"},"createdAt":"2026-10-12T21:14:00.000Z"},
+        [{"id":"c-1","content":"Ça arrive en 5G ?","isAdmin":true,"user":{"id":"u-9","name":"Modo","role":"admin"},"createdAt":"2026-10-12T21:14:00.000Z"},
          {"id":"c-2","content":"Oui","isAdmin":false,"user":{"id":"u-1","name":"Alex","role":"user"}}]
         """#, into: box)
         let comments = try await service.comments(bugId: "b 1")
@@ -272,16 +272,16 @@ final class BugReportsServiceTests: XCTestCase {
         XCTAssertFalse(BugCategory.bugKinds.contains(.feature))
     }
 
-    func testAnAdminReplyingToTheirOwnReportStaysOnTheirSide() {
-        let mine = BugComment(id: "c-1", content: "Précision", isAdmin: true,
-                              user: .init(id: "u-admin", name: "Alexandre", role: "admin"))
-        let otherAdmin = BugComment(id: "c-2", content: "On regarde", isAdmin: true,
-                                    user: .init(id: "u-mod", name: "Camille", role: "admin"))
-        XCTAssertTrue(mine.isMine(currentUserId: "u-admin"))
-        XCTAssertFalse(otherAdmin.isMine(currentUserId: "u-admin"))
-        // Sans auteur ou sans compte local, le drapeau du serveur décide.
-        XCTAssertFalse(BugComment(id: "c-3", content: "x", isAdmin: true).isMine(currentUserId: "u-admin"))
-        XCTAssertTrue(BugComment(id: "c-4", content: "x").isMine(currentUserId: nil))
+    func testTheServerAloneSaysWhetherACommentSpeaksForTheTeam() throws {
+        func decode(_ json: String) throws -> BugComment {
+            try JSONDecoder.signalQuest.decode(BugComment.self, from: Data(json.utf8))
+        }
+        // Un admin qui écrit sur son propre signalement depuis l'app reste l'auteur.
+        let asAuthor = try decode(#"{"id":"c-1","content":"Précision","isAdmin":false,"user":{"id":"u-a","name":"Alexandre","role":"admin"}}"#)
+        let fromAdmin = try decode(#"{"id":"c-2","content":"On regarde","isAdmin":true,"user":{"id":"u-a","name":"Alexandre","role":"admin"}}"#)
+        XCTAssertFalse(asAuthor.isAdmin)
+        XCTAssertTrue(fromAdmin.isAdmin)
+        XCTAssertEqual(fromAdmin.user?.name, "Alexandre")
     }
 
     private func report(_ id: String, status: String = "open", reply: String? = nil, updated: String) throws -> BugReport {

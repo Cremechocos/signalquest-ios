@@ -1273,10 +1273,10 @@ struct BugReportDetailView: View {
         }
     }
 
-    /// Les autres à gauche sur la carte, moi à droite à l'encre. Un membre de
+    /// L'équipe à gauche sur la carte, moi à droite à l'encre. Un membre de
     /// l'équipe est nommé, avec la pastille « Équipe ».
     private func bubble(_ comment: BugComment) -> some View {
-        let isTeam = !comment.isMine(currentUserId: LocalAccountScope.currentUserId)
+        let isTeam = comment.isAdmin
         return HStack {
             if !isTeam { Spacer(minLength: SQSpace.xxl) }
             VStack(alignment: .leading, spacing: 3) {
