@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "fr",
   "strings" : {
+    "%@ / %@ pts vers le niveau %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ / %2$@ pts to level %3$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ / %2$@ pts vers le niveau %3$lld"
+          }
+        }
+      }
+    },
     "%@ au total" : {
       "localizations" : {
         "en" : {
@@ -631,47 +647,6 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld jours"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld jours consécutifs" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld day in a row"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld days in a row"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld jour consécutif"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld jours consécutifs"
                 }
               }
             }
@@ -1449,6 +1424,22 @@
         }
       }
     },
+    "%lld à réclamer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld to claim"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld à réclamer"
+          }
+        }
+      }
+    },
     "%lld. %@, %lld %@, %@." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1585,6 +1576,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1. Ouvrir la carte · 2. …"
+          }
+        }
+      }
+    },
+    "Actualisation impossible. Tire vers le bas pour réessayer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t refresh. Pull down to try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualisation impossible. Tire vers le bas pour réessayer."
           }
         }
       }
@@ -1899,6 +1906,22 @@
         }
       }
     },
+    "Aucun badge débloqué pour l’instant. Ceux qui restent à gagner sont dans « À débloquer »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No badges unlocked yet. The ones left to earn are under “To unlock”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun badge débloqué pour l’instant. Ceux qui restent à gagner sont dans « À débloquer »."
+          }
+        }
+      }
+    },
     "Aucun fichier ni note vocale dans cette conversation." : {
       "localizations" : {
         "en" : {
@@ -2089,6 +2112,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Badge"
+          }
+        }
+      }
+    },
+    "Badges débloqués : %lld sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badges unlocked: %1$lld of %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badges débloqués : %1$lld sur %2$lld"
           }
         }
       }
@@ -3020,6 +3059,22 @@
         }
       }
     },
+    "Débloqués · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlocked · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Débloqués · %lld"
+          }
+        }
+      }
+    },
     "Décris ce que tu faisais et ce que tu as vu…" : {
       "localizations" : {
         "en" : {
@@ -3338,6 +3393,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Exploration"
+          }
+        }
+      }
+    },
+    "Famille du badge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Category"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Famille"
           }
         }
       }
@@ -3780,6 +3851,47 @@
         }
       }
     },
+    "Il y a %lld semaines" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld week ago"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld weeks ago"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a %lld semaine"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Il y a %lld semaines"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Image dans l’image" : {
       "localizations" : {
         "en" : {
@@ -3891,6 +4003,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de charger l’état de récupération."
+          }
+        }
+      }
+    },
+    "Impossible de charger ta progression pour l’instant. Vérifie ta connexion, puis réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your progress can’t be loaded right now. Check your connection, then try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger ta progression pour l’instant. Vérifie ta connexion, puis réessaie."
           }
         }
       }
@@ -4291,6 +4419,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La restauration de l’historique a échoué."
+          }
+        }
+      }
+    },
+    "La semaine dernière" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last week"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La semaine dernière"
           }
         }
       }
@@ -5189,6 +5333,22 @@
         }
       }
     },
+    "Obtenu le" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Earned on"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtenu le"
+          }
+        }
+      }
+    },
     "Oui, en 5G aussi." : {
       "localizations" : {
         "en" : {
@@ -5233,6 +5393,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouverts · %lld"
+          }
+        }
+      }
+    },
+    "Ouvre la fiche du badge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the badge details"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre la fiche du badge"
           }
         }
       }
@@ -5850,6 +6026,38 @@
         }
       }
     },
+    "Rareté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rarity"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rareté"
+          }
+        }
+      }
+    },
+    "Rareté du badge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badge rarity"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rareté du badge"
+          }
+        }
+      }
+    },
     "Rayon Fresnel max." : {
       "localizations" : {
         "en" : {
@@ -6058,6 +6266,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien d'identifié"
+          }
+        }
+      }
+    },
+    "Réclamée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claimed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réclamée"
           }
         }
       }
@@ -6857,6 +7081,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton idée en une phrase"
+          }
+        }
+      }
+    },
+    "Ton niveau, tes quêtes et tes badges." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your level, quests and badges."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton niveau, tes quêtes et tes badges."
           }
         }
       }
@@ -8018,6 +8258,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À 1 km près, pour un bug lié au lieu"
+          }
+        }
+      }
+    },
+    "À débloquer · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To unlock · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À débloquer · %lld"
           }
         }
       }
@@ -13800,17 +14056,42 @@
       }
     },
     "%lld pts" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld pts"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pts"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld pts"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pts"
+                }
+              }
+            }
           }
         }
       }
@@ -56584,22 +56865,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Succès : %@"
-          }
-        }
-      }
-    },
-    "Succès à débloquer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Achievements to unlock"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Succès à débloquer"
           }
         }
       }

@@ -97,42 +97,60 @@ final class GamificationViewModel: ObservableObject {
 struct GamificationView: View {
     @StateObject private var model: GamificationViewModel
     @EnvironmentObject private var services: AppServices
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.dismiss) private var dismiss
+    @State private var badgeFilter: BadgeFilter = .unlocked
+    @State private var openedBadge: OpenedBadge?
+
     init(service: GamificationServicing) {
         _model = StateObject(wrappedValue: GamificationViewModel(service: service))
     }
 
+    private enum BadgeFilter: Hashable { case unlocked, locked }
+
+    /// Badge ouvert dans la fiche, avec son état : un badge du catalogue reste
+    /// à débloquer même si le serveur lui donne une date.
+    private struct OpenedBadge: Identifiable {
+        let badge: GamificationBadge
+        let isUnlocked: Bool
+        var id: String { badge.id }
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.lg) {
+            VStack(alignment: .leading, spacing: SQSpace.xl) {
                 // Pas de sqFadeUp sur les grands blocs (badges/quêtes/activité) :
                 // plus hauts que le viewport, la scrollTransition ne les amène
                 // jamais à l'identité → sections estompées en permanence (même
                 // piège que le menu Profil).
+                header
                 // Rien de chargé : l'erreur tient lieu d'écran, avec de quoi réessayer.
-                if model.profile == nil, let error = model.errorMessage {
-                    ErrorStateView(title: "Récompenses indisponibles", message: error) {
+                if model.profile == nil, model.errorMessage != nil {
+                    ErrorStateView(title: "Récompenses indisponibles", message: friendlyError) {
                         Task { await model.load() }
                     }
                 }
                 levelBlock
                     .sqFadeUp()
                 questsBlock
-                if !badgeList.isEmpty { badgesGrid }
-                if !lockedBadges.isEmpty { lockedAchievementsSection }
-                if !model.events.isEmpty { eventsList }
-                if model.profile != nil, let error = model.errorMessage {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.dangerInk)
+                if !badgeList.isEmpty || !lockedBadges.isEmpty { badgesSection }
+                if !model.events.isEmpty { eventsSection }
+                if model.profile != nil, model.errorMessage != nil {
+                    SQInlineError(message: String(localized: "Actualisation impossible. Tire vers le bas pour réessayer."))
                 }
             }
-            .padding(18)
+            .padding(.horizontal, SQSpace.xl)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQDock.floatingContentInset)
             .sqReadableWidth()
         }
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : UIKit coupe le balayage retour, rétabli ici.
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
         .navigationTitle("Récompenses")
-        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $openedBadge) { opened in
+            GamificationBadgeSheet(badge: opened.badge, isUnlocked: opened.isUnlocked)
+        }
         .task {
             model.configureQuests(services.gamificationV2)
             async let base: Void = model.load()
@@ -144,6 +162,31 @@ struct GamificationView: View {
             async let quests: Void = model.loadQuests()
             _ = await (base, quests)
         }
+    }
+
+    /// Le message du serveur peut être technique (et en anglais) : l'écran dit
+    /// ce qui se passe et quoi faire, sauf hors ligne, qui a son propre état.
+    private var friendlyError: String {
+        if model.errorMessage == SQOfflineText.message { return SQOfflineText.message }
+        return String(localized: "Impossible de charger ta progression pour l’instant. Vérifie ta connexion, puis réessaie.")
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "rewards.back") { dismiss() }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Récompenses")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("rewards.title")
+                Text("Ton niveau, tes quêtes et tes badges.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -183,61 +226,77 @@ struct GamificationView: View {
         .accessibilityLabel("Chargement de la progression")
     }
 
+    private var level: Int { model.profile?.level ?? 0 }
+    private var points: Int { model.profile?.points ?? 0 }
+
     private var levelCard: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md2) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Niveau \(model.profile?.level ?? 0)")
-                    .font(SQType.title)
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                Text("Niveau \(level)")
+                    .font(SQFont.display(17, .bold, relativeTo: .headline))
                     .foregroundStyle(SQColor.label)
-                Spacer()
-                HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
-                    Text("\(model.profile?.points ?? 0)")
-                        .font(SQFont.display(30, .black))
-                        .monospacedDigit()
-                        .foregroundStyle(SQColor.brandRed)
-                        .contentTransition(.numericText())
-                    Text("pts")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                Spacer(minLength: SQSpace.sm)
+                Text(points.formatted())
+                    .font(SQFont.display(26, .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.accentInk)
+                    .contentTransition(.numericText())
+                Text("pts")
+                    .font(SQType.caption(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            progressBar(xpProgress, height: 8)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: SQSpace.sm) {
+                    levelProgressText
+                    Spacer(minLength: SQSpace.xs)
+                    streakText
+                }
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    levelProgressText
+                    streakText
                 }
             }
-            xpBar
-            Text(streakLabel)
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
         }
         .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .sqCardBackground()
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Niveau \(model.profile?.level ?? 0)")
-        .accessibilityValue("\(model.profile?.points ?? 0) points · progression \(Int(xpProgress * 100)) %")
+        .accessibilityLabel("Niveau \(level)")
+        .accessibilityValue("\(points) points · progression \(Int(xpProgress * 100)) %")
     }
 
-    private var xpBar: some View {
+    @ViewBuilder
+    private var levelProgressText: some View {
+        if let next = model.profile?.xpToNextLevel, next > 0 {
+            Text("\((points % next).formatted()) / \(next.formatted()) pts vers le niveau \(level + 1)")
+                .font(SQType.caption)
+                .monospacedDigit()
+                .foregroundStyle(SQColor.ink2)
+        }
+    }
+
+    private var streakText: some View {
+        Label(streakLabel, systemImage: "flame.fill")
+            .font(SQType.caption(.semibold))
+            .foregroundStyle(SQColor.labelSecondary)
+            .labelStyle(.titleAndIcon)
+            .sqSingleLine()
+    }
+
+    private func progressBar(_ progress: Double, height: CGFloat, tint: Color = SQColor.brandRed) -> some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule().fill(SQColor.surfaceMuted)
-                if xpProgress > 0 {
+                Capsule().fill(SQColor.chip)
+                if progress > 0 {
                     Capsule()
-                        .fill(SQColor.brandRed)
-                        .frame(width: max(8, proxy.size.width * xpProgress))
+                        .fill(tint)
+                        .frame(width: max(height, proxy.size.width * min(1, progress)))
                 }
             }
         }
-        .frame(height: 8)
+        .frame(height: height)
         .accessibilityHidden(true)
-    }
-
-    private var badgesGrid: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm2) {
-            Text("Badges").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.md), count: 3), spacing: SQSpace.md) {
-                ForEach(badgeList) { badge in
-                    badgeTile(badge)
-                }
-            }
-        }
     }
 
     private var badgeList: [GamificationBadge] { model.profile?.badges ?? [] }
@@ -269,18 +328,27 @@ struct GamificationView: View {
     }
 
     private func questsSection(_ quests: [GamificationV2Quest]) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm2) {
-            Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
+        let claimable = quests.filter(\.isClaimable).count
+        return VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            SQSectionHeader("Quêtes") {
+                if claimable > 0 {
+                    Text("\(claimable) à réclamer")
+                        .font(SQType.micro(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.onAccent)
+                        .padding(.horizontal, SQSpace.sm)
+                        .frame(minHeight: 22)
+                        .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                        .sqSingleLine()
+                }
+            }
             if let claimError = model.claimError {
-                Label(claimError, systemImage: "exclamationmark.triangle")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.dangerInk)
-                    .fixedSize(horizontal: false, vertical: true)
+                SQInlineError(message: claimError)
             }
             ForEach(questGroups(quests), id: \.cadence) { group in
                 // sqFadeUp par groupe (hauteur < viewport) — JAMAIS sur le bloc
                 // entier, sinon la section reste estompée en permanence.
-                questGroupRow(cadence: group.cadence, quests: group.quests)
+                questGroup(cadence: group.cadence, quests: group.quests)
                     .sqFadeUp()
             }
         }
@@ -295,177 +363,316 @@ struct GamificationView: View {
         }
     }
 
-    private func questGroupRow(cadence: QuestCadenceGroup, quests: [GamificationV2Quest]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+    /// Une cadence : son intitulé, puis ses quêtes en liste dans une carte. Le
+    /// carrousel horizontal cachait la moitié des quêtes hors de l'écran.
+    private func questGroup(cadence: QuestCadenceGroup, quests: [GamificationV2Quest]) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs + 2) {
+                Image(systemName: cadence.icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .accessibilityHidden(true)
                 Text(cadence.title)
-                    .font(SQFont.body(13.5, .semibold))
-                    .foregroundStyle(SQColor.label)
+                    .font(SQType.caption(.bold))
                 if cadence == .seasonal, let name = model.season?.name, !name.isEmpty {
                     Text(name)
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             }
+            .foregroundStyle(SQColor.ink2)
+            .padding(.horizontal, SQSpace.xs)
+            .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: SQSpace.md) {
-                    ForEach(quests) { quest in
-                        QuestCardView(
-                            quest: quest,
-                            cadence: cadence,
-                            isClaiming: model.claimingQuestIds.contains(quest.id),
-                            onClaim: { Task { await model.claim(quest) } }
-                        )
-                    }
+            VStack(spacing: 0) {
+                ForEach(Array(quests.enumerated()), id: \.element.id) { index, quest in
+                    QuestRowView(
+                        quest: quest,
+                        cadence: cadence,
+                        isClaiming: model.claimingQuestIds.contains(quest.id),
+                        onClaim: { Task { await model.claim(quest) } }
+                    )
+                    .mapRowDivider(index > 0)
                 }
-                // Respiration pour l'ombre de carte (rayon 9, y 4), sinon le
-                // ScrollView horizontal la rogne.
-                .padding(.horizontal, 4)
-                .padding(.top, SQSpace.sm)
-                .padding(.bottom, SQSpace.lg)
             }
+            .sqCardBackground()
         }
     }
 
     private var questsSkeleton: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm2) {
-            Text("Quêtes").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: SQSpace.md) {
-                    questCardSkeleton
-                    questCardSkeleton
-                }
-                .padding(.horizontal, 4)
-                .padding(.bottom, SQSpace.lg)
+            SQSectionHeader("Quêtes")
+            VStack(spacing: 0) {
+                questRowSkeleton
+                questRowSkeleton
             }
-            .padding(.top, SQSpace.xs)
+            .sqCardBackground()
+            .sqShimmer()
         }
         .accessibilityElement()
         .accessibilityLabel("Quêtes, chargement en cours")
     }
 
-    private var questCardSkeleton: some View {
+    private var questRowSkeleton: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(spacing: SQSpace.md) {
                 Circle().fill(SQColor.fill).frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: SQSpace.xs2) {
-                    SkeletonBlock(width: 96, height: 12)
-                    SkeletonBlock(width: 130, height: 9)
+                    SkeletonBlock(width: 120, height: 12)
+                    SkeletonBlock(width: 180, height: 9)
                 }
+                Spacer(minLength: 0)
             }
-            SkeletonBlock(height: 8, radius: 4)
-            SkeletonBlock(width: 64, height: 9)
+            SkeletonBlock(height: 6, radius: 3)
         }
-        .padding(SQSpace.lg)
-        .frame(width: QuestCardLayout.width(for: dynamicTypeSize), alignment: .leading)
-        .sqCardBackground()
-        .sqShimmer()
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.vertical, SQSpace.md)
     }
 
-    // MARK: - Succès (badges verrouillés legacy)
+    // MARK: - Badges
 
-    private var lockedAchievementsSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm2) {
-            Text("Succès à débloquer").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
-            ForEach(lockedBadges) { badge in
-                HStack(spacing: SQSpace.md) {
-                    Group {
-                        if let icon = badge.icon {
-                            Text(icon).font(.title3)
-                        } else {
-                            Image(systemName: "lock.fill")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
-                    }
-                    .frame(width: 36, height: 36)
-                    .sqSurface(SQColor.surfaceMuted, in: Circle())
-                    .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(badge.title ?? String(localized: "Badge"))
-                            .font(SQType.subhead)
-                            .foregroundStyle(SQColor.label)
-                        if let desc = badge.description {
-                            Text(desc)
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                                .lineLimit(2)
-                        }
-                    }
-                    Spacer()
+    private var totalBadges: Int { badgeList.count + lockedBadges.count }
+
+    private var badgesSection: some View {
+        let showsLocked = badgeFilter == .locked && !lockedBadges.isEmpty
+        return VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            SQSectionHeader("Badges") {
+                Text("\(badgeList.count) / \(totalBadges)")
+                    .font(SQType.subhead(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityLabel(Text("Badges débloqués : \(badgeList.count) sur \(totalBadges)"))
+            }
+            progressBar(totalBadges > 0 ? Double(badgeList.count) / Double(totalBadges) : 0, height: 6)
+            if !lockedBadges.isEmpty {
+                MapSegmented(
+                    selection: $badgeFilter,
+                    options: [
+                        (.unlocked, String(localized: "Débloqués · \(badgeList.count)")),
+                        (.locked, String(localized: "À débloquer · \(lockedBadges.count)"))
+                    ],
+                    identifier: "rewards.badges.filter"
+                )
+            }
+            if showsLocked {
+                lockedList
+            } else if badgeList.isEmpty {
+                Text("Aucun badge débloqué pour l’instant. Ceux qui restent à gagner sont dans « À débloquer ».")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, SQSpace.xs)
+            } else {
+                badgesGrid
+                rarityLegend
+            }
+        }
+    }
+
+    private var badgesGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 3), spacing: SQSpace.sm) {
+            ForEach(badgeList) { badge in
+                Button {
+                    Haptics.selection()
+                    openedBadge = OpenedBadge(badge: badge, isUnlocked: true)
+                } label: {
+                    badgeTile(badge)
                 }
-                .padding(SQSpace.sm2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Succès : \(badge.title ?? String(localized: "Badge"))")
-                .accessibilityValue(badge.description ?? String(localized: "À débloquer"))
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityIdentifier("rewards.badge.\(badge.id)")
             }
         }
     }
 
     private func badgeTile(_ badge: GamificationBadge) -> some View {
-        VStack(spacing: SQSpace.sm) {
-            RemoteImage(url: badge.iconUrl, maxDimension: 52, contentMode: .fit) {
-                if let icon = badge.icon {
-                    Text(icon)
-                        .font(.largeTitle)
-                } else {
-                    Image(systemName: "rosette")
-                        .font(.title)
-                        .foregroundStyle(SQColor.brandRed)
-                }
-            }
-            .frame(width: 52, height: 52)
-            .background(SQColor.accentSoft, in: Circle())
-            .accessibilityHidden(true)
+        VStack(spacing: SQSpace.xs + 2) {
+            GamificationBadgeMedallion(badge: badge)
             Text(badge.title ?? String(localized: "Badge"))
-                .font(SQType.micro)
+                .font(SQFont.body(12.5, .bold, relativeTo: .footnote))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(SQColor.label)
                 .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(SQSpace.sm2)
-        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
-    }
-
-    private var eventsList: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm2) {
-            Text("Activité").font(SQType.title).foregroundStyle(SQColor.label).sqHeader()
-            ForEach(model.events) { event in
-                let display = GamificationEventDisplay(kind: event.kind)
-                HStack(spacing: SQSpace.md) {
-                    Image(systemName: display.icon)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(display.tint)
-                        .frame(width: 36, height: 36)
-                        .background(display.tintSoft, in: Circle())
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(display.title)
-                            .font(SQType.subhead)
-                            .foregroundStyle(SQColor.label)
-                        if let date = event.createdAt {
-                            Text(date, format: .relative(presentation: .named))
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
-                    }
-                    Spacer()
-                    if let delta = event.pointsDelta {
-                        Text("\(delta > 0 ? "+" : "")\(delta) pts")
-                            .font(SQFont.archivo(13, .bold, relativeTo: .footnote))
-                            .monospacedDigit()
-                            .foregroundStyle(delta >= 0 ? SQColor.success : SQColor.danger)
-                    }
-                }
-                .padding(SQSpace.sm2)
-                .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
-                .accessibilityElement(children: .combine)
+                .frame(minHeight: 30)
+            if let rarity = badge.rarityLevel {
+                GamificationRarityPill(rarity: rarity)
             }
         }
+        .padding(.horizontal, SQSpace.xs + 2)
+        .padding(.top, SQSpace.md)
+        .padding(.bottom, SQSpace.sm2)
+        .frame(maxWidth: .infinity)
+        .sqCardBackground(cornerRadius: 18)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Ouvre la fiche du badge")
+    }
+
+    private var rarityLegend: some View {
+        let pills = HStack(spacing: SQSpace.xs + 2) {
+            ForEach([GamificationBadgeRarity.common, .rare, .epic, .legendary], id: \.self) { rarity in
+                GamificationRarityPill(rarity: rarity)
+            }
+        }
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: SQSpace.sm) {
+                pills
+                Text("Rareté du badge").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
+            }
+            pills
+        }
+        .padding(.horizontal, SQSpace.xs)
+        .accessibilityHidden(true)
+    }
+
+    private var lockedList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(lockedBadges.enumerated()), id: \.element.id) { index, badge in
+                Button {
+                    Haptics.selection()
+                    openedBadge = OpenedBadge(badge: badge, isUnlocked: false)
+                } label: {
+                    HStack(spacing: SQSpace.md) {
+                        GamificationBadgeMedallion(badge: badge, size: 40, isLocked: true)
+                        VStack(alignment: .leading, spacing: 3) {
+                            // Nom et rareté sur une ligne s'ils tiennent, sinon la
+                            // rareté passe dessous plutôt que de couper le nom.
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: SQSpace.xs + 2) {
+                                    lockedTitle(badge).fixedSize()
+                                    lockedRarity(badge)
+                                }
+                                VStack(alignment: .leading, spacing: 3) {
+                                    lockedTitle(badge)
+                                    lockedRarity(badge)
+                                }
+                            }
+                            if let desc = badge.description {
+                                Text(desc)
+                                    .font(SQType.caption)
+                                    .foregroundStyle(SQColor.ink2)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                        Spacer(minLength: SQSpace.sm)
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(SQColor.labelTertiary)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, SQSpace.md2)
+                    .padding(.vertical, SQSpace.sm)
+                    .frame(minHeight: 62)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .mapRowDivider(index > 0)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Succès : \(badge.title ?? String(localized: "Badge"))")
+                .accessibilityValue(badge.description ?? String(localized: "À débloquer"))
+                .accessibilityIdentifier("rewards.locked.\(badge.id)")
+            }
+        }
+        .sqCardBackground()
+    }
+
+    private func lockedTitle(_ badge: GamificationBadge) -> some View {
+        Text(badge.title ?? String(localized: "Badge"))
+            .font(SQType.body(.bold))
+            .foregroundStyle(SQColor.label)
+            .multilineTextAlignment(.leading)
+    }
+
+    @ViewBuilder
+    private func lockedRarity(_ badge: GamificationBadge) -> some View {
+        if let rarity = badge.rarityLevel {
+            GamificationRarityPill(rarity: rarity)
+        }
+    }
+
+    // MARK: - Activité
+
+    /// Activité groupée par semaine, la plus récente en tête.
+    private var eventGroups: [(title: String, events: [GamificationEvent])] {
+        let calendar = Calendar.current
+        let thisWeek = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+        var groups: [(title: String, events: [GamificationEvent])] = []
+        for event in model.events {
+            let title: String
+            if let date = event.createdAt, let start = calendar.dateInterval(of: .weekOfYear, for: date)?.start {
+                let weeks = max(0, calendar.dateComponents([.weekOfYear], from: start, to: thisWeek).weekOfYear ?? 0)
+                switch weeks {
+                case 0: title = String(localized: "Cette semaine")
+                case 1: title = String(localized: "La semaine dernière")
+                default: title = String(localized: "Il y a \(weeks) semaines")
+                }
+            } else {
+                title = String(localized: "Plus ancien")
+            }
+            if let last = groups.indices.last, groups[last].title == title {
+                groups[last].events.append(event)
+            } else {
+                groups.append((title, [event]))
+            }
+        }
+        return groups
+    }
+
+    private var eventsSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            SQSectionHeader("Activité")
+            ForEach(eventGroups, id: \.title) { group in
+                VStack(alignment: .leading, spacing: SQSpace.xs + 2) {
+                    Text(group.title)
+                        .font(SQType.caption(.bold))
+                        .foregroundStyle(SQColor.ink2)
+                        .padding(.horizontal, SQSpace.xs)
+                        .accessibilityAddTraits(.isHeader)
+                    VStack(spacing: 0) {
+                        ForEach(Array(group.events.enumerated()), id: \.element.id) { index, event in
+                            eventRow(event)
+                                .mapRowDivider(index > 0)
+                        }
+                    }
+                    .sqCardBackground()
+                }
+            }
+        }
+    }
+
+    private func eventRow(_ event: GamificationEvent) -> some View {
+        let display = GamificationEventDisplay(kind: event.kind)
+        return HStack(spacing: SQSpace.md) {
+            SQIconPastille(systemImage: display.icon, size: 36, tint: display.tint, fill: display.tintSoft)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(display.title)
+                    .font(SQType.body(.semibold))
+                    .foregroundStyle(SQColor.label)
+                if let date = event.createdAt {
+                    Text(date, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            Spacer(minLength: SQSpace.sm)
+            if let delta = event.pointsDelta {
+                Text(Self.pointsDeltaText(delta))
+                    .font(SQType.callout(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(delta > 0 ? SQColor.success : delta < 0 ? SQColor.dangerInk : SQColor.labelSecondary)
+                    .sqSingleLine()
+            }
+        }
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.vertical, SQSpace.xs + 2)
+        .frame(minHeight: 56)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// « +6 pts », « +1 pt », « 0 pt », « −3 pts » : accord et vrai signe moins.
+    static func pointsDeltaText(_ delta: Int) -> String {
+        let amount = String(localized: "\(abs(delta)) pts")
+        if delta > 0 { return "+\(amount)" }
+        if delta < 0 { return "−\(amount)" }
+        return amount
     }
 
     private var xpProgress: Double {
@@ -474,12 +681,13 @@ struct GamificationView: View {
         return min(1, inLevel / Double(next))
     }
 
-    /// « 1 jour consécutif » / « 3 jours consécutifs » — accord singulier/pluriel.
+    /// « 1 jour de suite » / « 3 jours de suite », « Pas de série en cours » à zéro.
     private var streakLabel: String {
         let days = model.profile?.consecutiveDays ?? 0
-        return String(localized: "\(days) jours consécutifs")
+        return days > 0 ? String(localized: "\(days) jours de suite") : String(localized: "Pas de série en cours")
     }
 }
+
 
 /// Présentation d'une cadence de quête (contrat Android : `daily` / `weekly` /
 /// `seasonal` / `event`, plus `local` et inconnus regroupés en « Autres »).
@@ -549,16 +757,10 @@ enum QuestCadenceGroup: CaseIterable, Hashable {
     }
 }
 
-private enum QuestCardLayout {
-    static func width(for size: DynamicTypeSize) -> CGFloat {
-        size.isAccessibilitySize ? 300 : 270
-    }
-}
-
-/// Carte de quête v2 — DA Crème : surface douce rayon 22 + ombre carte,
-/// pastille de cadence, jauge 8 pt (brique, olive à 100 %), bouton « Réclamer »
-/// seulement quand la récompense est encaissable.
-private struct QuestCardView: View {
+/// Quête v2 en rangée : pastille de cadence, titre et consigne, jauge 6 pt
+/// (brique, verte une fois atteinte), progression et gain, et à droite
+/// « Réclamer » quand la récompense est encaissable ou « Réclamée ».
+private struct QuestRowView: View {
     let quest: GamificationV2Quest
     let cadence: QuestCadenceGroup
     let isClaiming: Bool
@@ -566,105 +768,113 @@ private struct QuestCardView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            VStack(alignment: .leading, spacing: SQSpace.md) {
-                header
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .top, spacing: SQSpace.md) {
+                summary
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(accessibilitySummary)
+                    .accessibilityValue(accessibilityProgress)
+                Spacer(minLength: 0)
+                trailing
+            }
+            Group {
                 progressBar
                 metricsRow
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(accessibilitySummary)
-            .accessibilityValue(accessibilityProgress)
-            if quest.isClaimable {
-                claimButton
-            }
+            .accessibilityHidden(true)
         }
-        .padding(SQSpace.lg)
-        .frame(width: QuestCardLayout.width(for: dynamicTypeSize), alignment: .leading)
-        .sqCardBackground()
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.vertical, SQSpace.md)
     }
 
-    private var header: some View {
+    private var summary: some View {
         HStack(alignment: .top, spacing: SQSpace.md) {
-            Image(systemName: cadence.icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(cadence.tint)
-                .frame(width: 36, height: 36)
-                .background(cadence.tintSoft, in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
+            SQIconPastille(systemImage: cadence.icon, size: 36, tint: cadence.tint, fill: cadence.tintSoft)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(quest.title ?? String(localized: "Quête"))
-                    .font(SQFont.display(15.5, .semibold))
+                    .font(SQType.body(.bold))
                     .foregroundStyle(SQColor.label)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.leading)
-                Text(quest.description ?? " ")
-                    .font(SQFont.body(12.5))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.leading)
+                if let description = quest.description, !description.isEmpty {
+                    Text(description)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.ink2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
             }
-            Spacer(minLength: 0)
-            if quest.isClaimed {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(SQColor.success)
-                    .accessibilityHidden(true)
-            }
+        }
+    }
+
+    @ViewBuilder
+    private var trailing: some View {
+        if quest.isClaimable {
+            claimButton
+        } else if quest.isClaimed {
+            Label("Réclamée", systemImage: "checkmark")
+                .font(SQType.caption(.bold))
+                .foregroundStyle(SQColor.success)
+                .labelStyle(.titleAndIcon)
+                .sqSingleLine()
+                .padding(.top, SQSpace.xs)
         }
     }
 
     private var progressBar: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule().fill(SQColor.surfaceMuted)
+                Capsule().fill(SQColor.chip)
                 if quest.progress > 0 {
                     Capsule()
                         .fill(quest.progress >= 1 ? SQColor.success : SQColor.brandRed)
-                        .frame(width: max(8, proxy.size.width * quest.progress))
+                        .frame(width: max(6, proxy.size.width * min(1, quest.progress)))
                 }
             }
         }
-        .frame(height: 8)
-        .accessibilityHidden(true)
+        .frame(height: 6)
     }
 
     private var metricsRow: some View {
         HStack(alignment: .firstTextBaseline) {
             Text("\(quest.progressValue) / \(quest.targetValue)")
-                .font(SQFont.body(12, .medium))
+                .font(SQType.caption(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(SQColor.labelSecondary)
             Spacer()
             if quest.rewardXp > 0 {
-                Text("+\(quest.rewardXp) pts")
-                    .font(SQFont.body(12, .semibold))
+                Text(GamificationView.pointsDeltaText(quest.rewardXp))
+                    .font(SQType.caption(.bold))
                     .monospacedDigit()
-                    .foregroundStyle(SQColor.warning)
+                    .foregroundStyle(GamificationBadgeFamily.contribution.tint)
             }
         }
     }
 
+    /// Bouton encre de 36 pt, dans une zone de toucher de 44 pt.
     private var claimButton: some View {
         Button(action: onClaim) {
             HStack(spacing: SQSpace.xs2) {
                 if isClaiming {
                     SQSpinner()
                         .controlSize(.small)
-                        .tint(SQColor.onAccent)
+                        .tint(SQColor.onInk)
                 }
                 Text(isClaiming ? "Réclamation…" : "Réclamer")
-                    .font(SQFont.display(14.5, .semibold))
+                    .font(SQType.subhead(.bold))
+                    .sqSingleLine()
             }
-            .foregroundStyle(SQColor.onAccent)
-            .padding(.horizontal, SQSpace.cardPadding)
-            .frame(minHeight: 44)
-            .background(SQColor.brandRed, in: Capsule())
+            .foregroundStyle(SQColor.onInk)
+            .padding(.horizontal, SQSpace.md2)
+            .frame(minHeight: 36)
+            .background(SQColor.label, in: Capsule(style: .continuous))
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SQPressButtonStyle())
         .disabled(isClaiming)
+        .padding(.vertical, -4)
         .accessibilityLabel("Réclamer la récompense de la quête \(quest.title ?? "")")
     }
 
@@ -685,6 +895,7 @@ private struct QuestCardView: View {
         return parts.joined(separator: ", ")
     }
 }
+
 
 /// Présentation des événements de gamification : le backend renvoie des types
 /// techniques (`validation`, `daily_login`, `badge_earned`…) — on les traduit
@@ -954,5 +1165,92 @@ struct GamificationBadgeMedallion: View {
                 }
             }
             .accessibilityHidden(true)
+    }
+}
+
+extension GamificationBadgeRarity {
+    /// Commun reste neutre ; plus le badge est rare, plus la pastille se teinte.
+    var tint: Color {
+        switch self {
+        case .common: return SQColor.ink2
+        case .rare: return GamificationBadgeFamily.coverage.tint
+        case .epic: return GamificationBadgeFamily.expertise.tint
+        case .legendary: return GamificationBadgeFamily.contribution.tint
+        }
+    }
+}
+
+/// Rareté écrite en toutes lettres dans une petite pastille teintée.
+struct GamificationRarityPill: View {
+    let rarity: GamificationBadgeRarity
+
+    var body: some View {
+        Text(rarity.title)
+            .font(SQFont.body(11, .bold, relativeTo: .caption2))
+            .foregroundStyle(rarity.tint)
+            .padding(.horizontal, 7)
+            .frame(minHeight: 20)
+            .background(rarity == .common ? SQColor.chip : rarity.tint.opacity(0.14), in: Capsule(style: .continuous))
+            .sqSingleLine()
+            .fixedSize()
+    }
+}
+
+/// Fiche d'un badge : médaillon, nom, rareté, ce qu'il faut faire pour
+/// l'obtenir et, s'il est débloqué, la date.
+struct GamificationBadgeSheet: View {
+    let badge: GamificationBadge
+    let isUnlocked: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.xl) {
+                HStack {
+                    Spacer()
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "rewards.badge.close") { dismiss() }
+                }
+                VStack(spacing: SQSpace.md) {
+                    GamificationBadgeMedallion(badge: badge, size: 88, isLocked: !isUnlocked)
+                    Text(badge.title ?? String(localized: "Badge"))
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                        .multilineTextAlignment(.center)
+                        .sqHeader()
+                    if let rarity = badge.rarityLevel {
+                        GamificationRarityPill(rarity: rarity)
+                    }
+                    if let description = badge.description, !description.isEmpty {
+                        Text(description)
+                            .font(SQType.callout)
+                            .foregroundStyle(SQColor.ink2)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                VStack(spacing: SQSpace.xs) {
+                    if isUnlocked, let date = badge.unlockedAt {
+                        SQFactRow(label: String(localized: "Obtenu le"), value: date.formatted(date: .long, time: .omitted))
+                    } else if !isUnlocked {
+                        SQFactRow(label: String(localized: "État"), value: String(localized: "À débloquer"))
+                    }
+                    SQFactRow(label: String(localized: "Famille du badge"), value: badge.family.title)
+                    if let rarity = badge.rarityLevel {
+                        SQFactRow(label: String(localized: "Rareté"), value: rarity.title)
+                    }
+                }
+                .padding(SQSpace.lg)
+                .sqCardBackground()
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
+        }
+        .background(SQColor.surface.ignoresSafeArea())
+        // Pas de détent moyen : iOS 26 y réduit la feuille à 96 % et les
+        // cibles de 44 pt tombent à 42.
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
     }
 }

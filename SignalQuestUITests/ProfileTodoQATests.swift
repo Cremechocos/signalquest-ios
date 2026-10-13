@@ -34,6 +34,9 @@ final class ProfileTodoQATests: XCTestCase {
         add(screenshot)
 
         missionsLink.tap()
-        XCTAssertTrue(app.navigationBars[rewards].waitForExistence(timeout: 10), "Les missions s'ouvrent dans Récompenses")
+        // En-tête Halo : la barre de navigation est masquée, le titre porte l'identifiant.
+        let title = app.descendants(matching: .any)["rewards.title"].firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "Les missions s'ouvrent dans Récompenses")
+        XCTAssertEqual(title.label, rewards)
     }
 }

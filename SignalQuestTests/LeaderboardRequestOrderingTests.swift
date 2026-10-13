@@ -102,6 +102,14 @@ final class LeaderboardRequestOrderingTests: XCTestCase {
         XCTAssertEqual(badge("mystery").family, .special)
     }
 
+    func testActivityPointsCarryTheirSignAndAgreement() {
+        XCTAssertEqual(GamificationView.pointsDeltaText(6), "+" + String(localized: "\(6) pts"))
+        XCTAssertEqual(GamificationView.pointsDeltaText(-3), "−" + String(localized: "\(3) pts"))
+        XCTAssertEqual(GamificationView.pointsDeltaText(0), String(localized: "\(0) pts"))
+        // Accord : « 1 pt », pas « 1 pts ».
+        XCTAssertFalse(GamificationView.pointsDeltaText(1).hasSuffix("pts"))
+    }
+
     private func waitForRequests(_ gate: OrderedLeaderboardGate, count: Int) async throws {
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))
         while await gate.count < count {
