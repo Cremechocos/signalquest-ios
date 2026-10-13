@@ -599,6 +599,14 @@ struct ProfileView: View {
                     menuRow(title: "Aide et glossaire", icon: "questionmark.circle")
                 }
                 .accessibilityIdentifier("profile.glossary")
+                menuSeparator
+                NavigationLink {
+                    BugReportsListView()
+                } label: {
+                    menuRow(title: "Bugs et idées", icon: "ladybug",
+                            subtitle: String(localized: "Signaler un problème, proposer une amélioration"))
+                }
+                .accessibilityIdentifier("profile.bugs")
             }
         }
     }

@@ -122,6 +122,163 @@ final class ReportsRoutingTests: XCTestCase {
     }
 }
 
+/// « Bugs et idées » parle à `/api/bugs`, comme le web et Android : mêmes
+/// champs, mêmes limites, et un décodage qui ne perd pas un signalement.
+final class BugReportsServiceTests: XCTestCase {
+
+    private var service: BugReportsService!
+
+    override func setUp() {
+        super.setUp()
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        service = BugReportsService(
+            api: APIClient(
+                config: .test,
+                credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                session: URLSession(configuration: config)
+            )
+        )
+    }
+
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        service = nil
+        super.tearDown()
+    }
+
+    private func respond(status: Int = 200, _ json: String, into box: BugCaptureBox) {
+        MockURLProtocol.requestHandler = { request in
+            box.request = request
+            box.body = request.httpBodyData
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: status,
+                httpVersion: nil, headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(json.utf8))
+        }
+    }
+
+    private let device = BugReportDevice(model: "iPhone 17 Pro", osVersion: "iOS 26.1", appVersion: "1.0 (170)",
+                                         build: "170", network: "Wi‑Fi", screenSize: "402x874")
+
+    func testSubmissionSendsDeviceInTheBodyAndOnlyTheContextTheAuthorChose() async throws {
+        let box = BugCaptureBox()
+        respond(status: 201, #"{"id":"b-1","title":"Carte blanche","description":"d","category":"ui","severity":"high","status":"open","createdAt":"2026-10-13T08:00:00.000Z"}"#, into: box)
+        let submissionID = UUID()
+        let submission = BugReportSubmission(
+            category: .ui, title: "  Carte blanche  ", description: "La carte reste blanche.", severity: .high,
+            steps: "   ", expectedResult: "La carte s'affiche", images: [], device: device, speedtest: nil,
+            location: BugReportContext.Location(latitude: 45.18764, longitude: 5.72449)
+        )
+        let report = try await service.submit(submission, submissionID: submissionID)
+
+        XCTAssertEqual(report.id, "b-1")
+        XCTAssertEqual(report.category, .ui)
+        XCTAssertEqual(box.request?.httpMethod, "POST")
+        XCTAssertEqual(box.request?.url?.path, "/api/bugs")
+        XCTAssertEqual(box.request?.value(forHTTPHeaderField: "Idempotency-Key"), "bug-report-\(submissionID.uuidString)")
+        let json = try XCTUnwrap(box.json)
+        XCTAssertEqual(json["title"] as? String, "Carte blanche")
+        XCTAssertEqual(json["category"] as? String, "ui")
+        XCTAssertEqual(json["severity"] as? String, "high")
+        XCTAssertEqual(json["deviceModel"] as? String, "iPhone 17 Pro")
+        XCTAssertEqual(json["deviceBrand"] as? String, "Apple")
+        XCTAssertEqual(json["osVersion"] as? String, "iOS 26.1")
+        XCTAssertEqual(json["appVersion"] as? String, "1.0 (170)")
+        XCTAssertEqual(json["expectedResult"] as? String, "La carte s'affiche")
+        XCTAssertNil(json["steps"], "Un champ blanc n'est pas envoyé")
+        XCTAssertNil(json["images"], "Sans capture, pas de tableau vide")
+        let context = try XCTUnwrap(json["context"] as? [String: Any])
+        XCTAssertEqual(context["platform"] as? String, "ios")
+        XCTAssertEqual(context["build"] as? String, "170")
+        XCTAssertNil(context["speedtest"], "Le dernier speedtest ne part que s'il est coché")
+        let location = try XCTUnwrap(context["location"] as? [String: Any])
+        XCTAssertEqual(location["latitude"] as? Double, 45.19)
+        XCTAssertEqual(location["longitude"] as? Double, 5.72)
+        XCTAssertEqual(location["approx"] as? Bool, true)
+    }
+
+    func testSubmissionIsClippedToTheServerLimits() {
+        let submission = BugReportSubmission(
+            category: .feature, title: String(repeating: "a", count: 250), description: String(repeating: "b", count: 6000),
+            severity: .medium, steps: nil, expectedResult: nil, images: Array(repeating: "data:image/jpeg;base64,AA", count: 7),
+            device: device, speedtest: nil, location: nil
+        )
+        XCTAssertEqual(submission.title.count, 200)
+        XCTAssertEqual(submission.description.count, 5000)
+        XCTAssertEqual(submission.images?.count, 5)
+        XCTAssertEqual(submission.category, "feature")
+        XCTAssertNil(submission.context.location)
+    }
+
+    func testMyReportsKeepsValidItemsAndToleratesUnknownValues() async throws {
+        let box = BugCaptureBox()
+        respond(#"""
+        [
+          {"id":"b-1","title":"Carte","description":"d","category":"ui","severity":"critical","status":"in_progress","adminResponse":"Merci","updatedAt":"2026-10-12T08:00:00.000Z"},
+          {"title":"sans identifiant"},
+          {"id":"b-2","title":"Idée","description":"d","category":"feature","status":"wont_fix","images":["https://cdn.example/a.jpg"]},
+          {"id":"b-3","title":"Inconnu","category":"quantum","severity":"extreme","status":"archived"}
+        ]
+        """#, into: box)
+        let reports = try await service.myReports()
+
+        XCTAssertEqual(box.request?.url?.path, "/api/bugs")
+        XCTAssertEqual(box.request?.url?.query, "myBugs=true")
+        XCTAssertEqual(reports.map(\.id), ["b-1", "b-2", "b-3"])
+        XCTAssertEqual(reports[0].status, .inProgress)
+        XCTAssertEqual(reports[0].severity, .critical)
+        XCTAssertNotNil(reports[0].updatedAt)
+        XCTAssertTrue(reports[1].isIdea)
+        XCTAssertEqual(reports[1].status, .wontFix)
+        XCTAssertFalse(reports[1].status.acceptsReplies)
+        XCTAssertEqual(reports[1].images.count, 1)
+        XCTAssertEqual(reports[2].category, .other)
+        XCTAssertEqual(reports[2].severity, .medium)
+        XCTAssertEqual(reports[2].status, .open)
+    }
+
+    func testCommentsTellTheTeamApartAndRepliesCarryText() async throws {
+        let box = BugCaptureBox()
+        respond(#"""
+        [{"id":"c-1","content":"Ça arrive en 5G ?","isAdmin":false,"user":{"id":"u-9","name":"Modo","role":"admin"},"createdAt":"2026-10-12T21:14:00.000Z"},
+         {"id":"c-2","content":"Oui","isAdmin":false,"user":{"id":"u-1","name":"Alex","role":"user"}}]
+        """#, into: box)
+        let comments = try await service.comments(bugId: "b 1")
+        XCTAssertEqual(box.request?.url?.absoluteString.hasSuffix("/api/bugs/b%201/comments"), true,
+                       "L'identifiant est encodé une seule fois : \(box.request?.url?.absoluteString ?? "-")")
+        XCTAssertEqual(comments.map(\.isAdmin), [true, false])
+
+        respond(status: 201, #"{"id":"c-3","content":"Toujours là","isAdmin":false}"#, into: box)
+        let reply = try await service.addComment(bugId: "b-1", content: "Toujours là", images: [])
+        XCTAssertEqual(reply.id, "c-3")
+        XCTAssertEqual(box.request?.httpMethod, "POST")
+        XCTAssertEqual(box.json?["content"] as? String, "Toujours là")
+        XCTAssertNil(box.json?["images"])
+    }
+
+    func testDeleteAndRepliesFollowTheServerRules() async throws {
+        let box = BugCaptureBox()
+        respond(#"{"success":true}"#, into: box)
+        try await service.delete(bugId: "b-1")
+        XCTAssertEqual(box.request?.httpMethod, "DELETE")
+        XCTAssertEqual(box.request?.url?.path, "/api/bugs/b-1")
+
+        XCTAssertTrue(BugStatus.resolved.acceptsReplies, "Une réponse rouvre un signalement résolu")
+        XCTAssertFalse(BugStatus.closed.acceptsReplies)
+        XCTAssertEqual(Set(BugCategory.allCases.map(\.rawValue)),
+                       ["crash", "ui", "network", "performance", "feature", "data", "other"])
+        XCTAssertFalse(BugCategory.bugKinds.contains(.feature))
+    }
+}
+
+private final class BugCaptureBox: @unchecked Sendable {
+    var request: URLRequest?
+    var body: Data?
+    var json: [String: Any]? { (try? JSONSerialization.jsonObject(with: body ?? Data())) as? [String: Any] }
+}
+
 /// Boîte de capture non isolée : `MockURLProtocol.requestHandler` est appelé
 /// depuis la queue de l'URLSession.
 private final class CaptureBox: @unchecked Sendable {

@@ -1475,6 +1475,22 @@
         }
       }
     },
+    "1. Ouvrir la carte · 2. …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1. Open the map · 2. …"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1. Ouvrir la carte · 2. …"
+          }
+        }
+      }
+    },
     "Actualisation impossible. Vérifie ta connexion puis réessaie." : {
       "localizations" : {
         "en" : {
@@ -1537,6 +1553,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adresses surveillées"
+          }
+        }
+      }
+    },
+    "Ajouter des captures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add screenshots"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter des captures"
           }
         }
       }
@@ -1689,6 +1721,38 @@
         }
       }
     },
+    "Application" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Application"
+          }
+        }
+      }
+    },
+    "Après 5 min de veille, la carte reste blanche jusqu'à ce que je change d'onglet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After 5 min of sleep, the map stays blank until I switch tabs."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Après 5 min de veille, la carte reste blanche jusqu'à ce que je change d'onglet."
+          }
+        }
+      }
+    },
     "Arrêter la rafale" : {
       "localizations" : {
         "en" : {
@@ -1749,6 +1813,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun itinéraire trouvé vers cette destination."
+          }
+        }
+      }
+    },
+    "Aucun signalement dans ce filtre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No reports in this filter."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun signalement dans ce filtre."
+          }
+        }
+      }
+    },
+    "Aucun signalement pour l'instant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No reports yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun signalement pour l'instant"
+          }
+        }
+      }
+    },
+    "Aucun test sur cet iPhone pour l'instant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No test on this iPhone yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun test sur cet iPhone pour l'instant"
           }
         }
       }
@@ -1900,6 +2012,54 @@
         }
       }
     },
+    "Bloquante" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blocking"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloquante"
+          }
+        }
+      }
+    },
+    "Bug · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bug · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bug · %@"
+          }
+        }
+      }
+    },
+    "Bugs et idées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bugs and ideas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bugs et idées"
+          }
+        }
+      }
+    },
     "Caméra" : {
       "localizations" : {
         "en" : {
@@ -1912,6 +2072,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Caméra"
+          }
+        }
+      }
+    },
+    "Capture jointe, toucher pour agrandir" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attached screenshot, tap to enlarge"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture jointe, toucher pour agrandir"
+          }
+        }
+      }
+    },
+    "Captures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screenshots"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Captures"
           }
         }
       }
@@ -1964,6 +2156,22 @@
         }
       }
     },
+    "Ce que tu attendais" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What you expected"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que tu attendais"
+          }
+        }
+      }
+    },
     "Ce qui aide à le reconnaître" : {
       "localizations" : {
         "en" : {
@@ -1976,6 +2184,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qui aide à le reconnaître"
+          }
+        }
+      }
+    },
+    "Ce qui ne va pas" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What's wrong"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui ne va pas"
+          }
+        }
+      }
+    },
+    "Ce signalement est clos, les réponses sont fermées. Tu peux en ouvrir un nouveau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This report is closed to replies. You can open a new one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce signalement est clos, les réponses sont fermées. Tu peux en ouvrir un nouveau."
           }
         }
       }
@@ -2309,6 +2549,22 @@
         }
       }
     },
+    "Connecte-toi pour envoyer un signalement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to send a report"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi pour envoyer un signalement"
+          }
+        }
+      }
+    },
     "Contributeur" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2338,6 +2594,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contributeurs"
+          }
+        }
+      }
+    },
+    "Corrigé : la session reprend toute seule après le changement de cellule. Merci pour les étapes, elles ont tout débloqué." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fixed: the session now resumes on its own after a cell change. Thanks for the steps, they unblocked everything."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corrigé : la session reprend toute seule après le changement de cellule. Merci pour les étapes, elles ont tout débloqué."
+          }
+        }
+      }
+    },
+    "Corrigé dans" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fixed in"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corrigé dans"
           }
         }
       }
@@ -2538,6 +2826,22 @@
         }
       }
     },
+    "Décris ce que tu faisais et ce que tu as vu…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe what you were doing and what you saw…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décris ce que tu faisais et ce que tu as vu…"
+          }
+        }
+      }
+    },
     "Déjà vue" : {
       "localizations" : {
         "en" : {
@@ -2620,6 +2924,22 @@
         }
       }
     },
+    "En cours · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In progress · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours · %lld"
+          }
+        }
+      }
+    },
     "En envoi" : {
       "localizations" : {
         "en" : {
@@ -2648,6 +2968,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En pause · %@"
+          }
+        }
+      }
+    },
+    "En quoi ce serait utile ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How would it help?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En quoi ce serait utile ?"
           }
         }
       }
@@ -2700,6 +3036,102 @@
         }
       }
     },
+    "Envoyer l'idée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send the idea"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer l'idée"
+          }
+        }
+      }
+    },
+    "Ex. Comparer deux speedtests côte à côte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E.g. Compare two speed tests side by side"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ex. Comparer deux speedtests côte à côte"
+          }
+        }
+      }
+    },
+    "Ex. La carte reste blanche après la veille" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E.g. The map stays blank after sleep"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ex. La carte reste blanche après la veille"
+          }
+        }
+      }
+    },
+    "Ex. La carte s'affiche" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E.g. The map shows up"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ex. La carte s'affiche"
+          }
+        }
+      }
+    },
+    "Explique ce que ça changerait pour toi…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explain what it would change for you…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explique ce que ça changerait pour toi…"
+          }
+        }
+      }
+    },
+    "Fermé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Closed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermé"
+          }
+        }
+      }
+    },
     "Fichier" : {
       "localizations" : {
         "en" : {
@@ -2745,6 +3177,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "File terminée"
+          }
+        }
+      }
+    },
+    "Forte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forte"
           }
         }
       }
@@ -2818,6 +3266,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grouper par opérateur"
+          }
+        }
+      }
+    },
+    "Gêne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impact"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gêne"
+          }
+        }
+      }
+    },
+    "Gêne bloquante" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blocking"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gêne bloquante"
+          }
+        }
+      }
+    },
+    "Gêne faible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low impact"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gêne faible"
+          }
+        }
+      }
+    },
+    "Gêne forte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High impact"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gêne forte"
+          }
+        }
+      }
+    },
+    "Gêne moyenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium impact"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gêne moyenne"
           }
         }
       }
@@ -2946,6 +3474,38 @@
         }
       }
     },
+    "Idée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idea"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idée"
+          }
+        }
+      }
+    },
+    "Il disparaît aussi du site, et l'équipe ne pourra plus te répondre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It also disappears from the website, and the team won't be able to reply."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il disparaît aussi du site, et l'équipe ne pourra plus te répondre."
+          }
+        }
+      }
+    },
     "Il ne verra plus l’état de cette connexion." : {
       "localizations" : {
         "en" : {
@@ -2991,6 +3551,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Image illisible."
+          }
+        }
+      }
+    },
+    "Images" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Images"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Images"
+          }
+        }
+      }
+    },
+    "Impossible de charger ce signalement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load this report."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger ce signalement."
           }
         }
       }
@@ -3298,6 +3890,22 @@
         }
       }
     },
+    "Joint au signalement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attached to the report"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joint au signalement"
+          }
+        }
+      }
+    },
     "Journal horodaté" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3327,6 +3935,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "J’ai retrouvé mon mot de passe"
+          }
+        }
+      }
+    },
+    "L'équipe te répond ici et par notification. Un bug confirmé te rapporte des points." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The team replies here and by notification. A confirmed bug earns you points."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'équipe te répond ici et par notification. Un bug confirmé te rapporte des points."
+          }
+        }
+      }
+    },
+    "La carte reste blanche après le retour de veille" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The map stays blank after waking from sleep"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La carte reste blanche après le retour de veille"
           }
         }
       }
@@ -3397,6 +4037,22 @@
         }
       }
     },
+    "La session s'arrête dès que l'iPhone change de cellule." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The session stops as soon as the iPhone changes cell."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session s'arrête dès que l'iPhone change de cellule."
+          }
+        }
+      }
+    },
     "Latence minimale" : {
       "localizations" : {
         "en" : {
@@ -3409,6 +4065,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Latence minimale"
+          }
+        }
+      }
+    },
+    "Le Drive Test s'arrêtait au changement d'antenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Drive Test stopped when switching cell sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Drive Test s'arrêtait au changement d'antenne"
           }
         }
       }
@@ -3544,6 +4216,22 @@
         }
       }
     },
+    "Le problème revient ? Réponds ici…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problem back? Reply here…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le problème revient ? Réponds ici…"
+          }
+        }
+      }
+    },
     "Le résultat est gardé sur ton iPhone. Il partira dès que le serveur répondra." : {
       "localizations" : {
         "en" : {
@@ -3573,6 +4261,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le signal médian mesuré par la communauté à moins de %@ de toi, tous opérateurs confondus."
+          }
+        }
+      }
+    },
+    "Lenteur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slowness"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lenteur"
+          }
+        }
+      }
+    },
+    "Les idées sont lues par l'équipe ; tu es prévenu si elle est retenue." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The team reads every idea; you'll be notified if it's planned."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les idées sont lues par l'équipe ; tu es prévenu si elle est retenue."
           }
         }
       }
@@ -3757,6 +4477,22 @@
         }
       }
     },
+    "Merci ! On reproduit le problème sur iOS 26.1, un correctif est prévu dans la prochaine version." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thanks! We can reproduce it on iOS 26.1; a fix is planned for the next version."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merci ! On reproduit le problème sur iOS 26.1, un correctif est prévu dans la prochaine version."
+          }
+        }
+      }
+    },
     "Merci ! Ton abonnement finance le développement ; tout ce qui est gratuit le reste." : {
       "localizations" : {
         "en" : {
@@ -3769,6 +4505,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Merci ! Ton abonnement finance le développement ; tout ce qui est gratuit le reste."
+          }
+        }
+      }
+    },
+    "Merci, c'est envoyé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thanks, it's sent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merci, c'est envoyé"
           }
         }
       }
@@ -3903,6 +4655,22 @@
         }
       }
     },
+    "Modération et données personnelles, par e-mail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moderation and personal data, by email"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modération et données personnelles, par e-mail"
+          }
+        }
+      }
+    },
     "Mon association" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3933,6 +4701,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mon bureau"
+          }
+        }
+      }
+    },
+    "Mon dernier speedtest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My last speed test"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mon dernier speedtest"
           }
         }
       }
@@ -4019,6 +4803,22 @@
         }
       }
     },
+    "Non retenu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not planned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non retenu"
+          }
+        }
+      }
+    },
     "Nouveau mot de passe de chiffrement" : {
       "localizations" : {
         "en" : {
@@ -4035,6 +4835,22 @@
         }
       }
     },
+    "Nouveau signalement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New report"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau signalement"
+          }
+        }
+      }
+    },
     "Nouveau trajet" : {
       "localizations" : {
         "en" : {
@@ -4047,6 +4863,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouveau trajet"
+          }
+        }
+      }
+    },
+    "Oui, en 5G aussi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yes, on 5G too."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oui, en 5G aussi."
+          }
+        }
+      }
+    },
+    "Ouvert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvert"
+          }
+        }
+      }
+    },
+    "Ouverts · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouverts · %lld"
           }
         }
       }
@@ -4166,6 +5030,38 @@
         }
       }
     },
+    "Pas de connexion. Réessaie quand le réseau revient : ton texte reste ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No connection. Try again when the network is back: your text stays here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de connexion. Réessaie quand le réseau revient : ton texte reste ici."
+          }
+        }
+      }
+    },
+    "Pas encore de message. L'équipe te répond ici, et tu peux ajouter des précisions." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No messages yet. The team replies here, and you can add details."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore de message. L'équipe te répond ici, et tu peux ajouter des précisions."
+          }
+        }
+      }
+    },
     "Pas encore vue" : {
       "localizations" : {
         "en" : {
@@ -4246,6 +5142,22 @@
         }
       }
     },
+    "Plantage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crash"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plantage"
+          }
+        }
+      }
+    },
     "Plus anciens" : {
       "localizations" : {
         "en" : {
@@ -4262,6 +5174,54 @@
         }
       }
     },
+    "Plus de détails" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More details"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus de détails"
+          }
+        }
+      }
+    },
+    "Position approximative" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approximate location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position approximative"
+          }
+        }
+      }
+    },
+    "Position indisponible pour l'instant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location unavailable for now"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position indisponible pour l'instant"
+          }
+        }
+      }
+    },
     "Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction. Les appels y dépendent de la conversation : ils peuvent être indisponibles, ou partir après confirmation, sans chiffrement de bout en bout." : {
       "localizations" : {
         "en" : {
@@ -4274,6 +5234,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction. Les appels y dépendent de la conversation : ils peuvent être indisponibles, ou partir après confirmation, sans chiffrement de bout en bout."
+          }
+        }
+      }
+    },
+    "Pour voir si le changement de forfait a vraiment amélioré le débit au même endroit." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To see whether changing plans really improved the speed at the same place."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour voir si le changement de forfait a vraiment amélioré le débit au même endroit."
+          }
+        }
+      }
+    },
+    "Pouvoir comparer deux speedtests côte à côte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare two speed tests side by side"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pouvoir comparer deux speedtests côte à côte"
           }
         }
       }
@@ -4403,6 +5395,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "QR indisponible. Crée une nouvelle demande."
+          }
+        }
+      }
+    },
+    "Que s'est-il passé ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What happened?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Que s'est-il passé ?"
           }
         }
       }
@@ -4555,6 +5563,22 @@
         }
       }
     },
+    "Retirer la capture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove screenshot"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer la capture"
+          }
+        }
+      }
+    },
     "Retirer l’emoji" : {
       "localizations" : {
         "en" : {
@@ -4567,6 +5591,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer l’emoji"
+          }
+        }
+      }
+    },
+    "Rien d'autre n'est envoyé. L'équipe voit ton pseudo, jamais ta position exacte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing else is sent. The team sees your username, never your exact location."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien d'autre n'est envoyé. L'équipe voit ton pseudo, jamais ta position exacte."
           }
         }
       }
@@ -4616,6 +5656,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réessayer la position"
+          }
+        }
+      }
+    },
+    "Répondre rouvre le signalement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replying reopens the report."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Répondre rouvre le signalement."
+          }
+        }
+      }
+    },
+    "Réponse de l'équipe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Team reply"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse de l'équipe"
+          }
+        }
+      }
+    },
+    "Résolus · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resolved · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Résolus · %lld"
           }
         }
       }
@@ -4837,6 +5925,38 @@
         }
       }
     },
+    "Signalement indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement indisponible"
+          }
+        }
+      }
+    },
+    "Signaler un problème, proposer une amélioration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report a problem, suggest an improvement"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signaler un problème, proposer une amélioration"
+          }
+        }
+      }
+    },
     "Site ajouté" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4953,6 +6073,38 @@
         }
       }
     },
+    "Suppression impossible. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't delete. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suppression impossible. Réessaie."
+          }
+        }
+      }
+    },
+    "Supprimer ce signalement ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this report?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ce signalement ?"
+          }
+        }
+      }
+    },
     "Supprimer le rappel" : {
       "localizations" : {
         "en" : {
@@ -4965,6 +6117,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer le rappel"
+          }
+        }
+      }
+    },
+    "Supprimer le signalement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete report"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le signalement"
+          }
+        }
+      }
+    },
+    "Système" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Système"
           }
         }
       }
@@ -4997,6 +6181,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web."
+          }
+        }
+      }
+    },
+    "Tes signalements et les réponses de l'équipe, sur l'app comme sur le site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your reports and the team's replies, in the app and on the website."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes signalements et les réponses de l'équipe, sur l'app comme sur le site."
           }
         }
       }
@@ -5099,6 +6299,22 @@
         }
       }
     },
+    "Titre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Title"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titre"
+          }
+        }
+      }
+    },
     "Ton ancien mot de passe ne se retrouve pas. Une nouvelle clé remplace l’ancienne : chaque conversation chiffrée redevient lisible quand un autre participant la rouvre, son app te renvoyant la clé. Tes autres appareils se déverrouilleront avec le nouveau mot de passe." : {
       "localizations" : {
         "en" : {
@@ -5127,6 +6343,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton compte a été supprimé."
+          }
+        }
+      }
+    },
+    "Ton compte permet à l'équipe de te répondre et de te prévenir quand c'est corrigé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your account lets the team reply and let you know when it's fixed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton compte permet à l'équipe de te répondre et de te prévenir quand c'est corrigé."
+          }
+        }
+      }
+    },
+    "Ton idée en une phrase" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your idea in one sentence"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton idée en une phrase"
           }
         }
       }
@@ -5176,6 +6424,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Toucher pour arrêter la lecture"
+          }
+        }
+      }
+    },
+    "Tous · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous · %lld"
           }
         }
       }
@@ -5263,6 +6527,22 @@
         }
       }
     },
+    "Tu peux confirmer avec la 168 ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can you confirm with 168?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu peux confirmer avec la 168 ?"
+          }
+        }
+      }
+    },
     "Type %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5313,6 +6593,38 @@
         }
       }
     },
+    "Un bug" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A bug"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un bug"
+          }
+        }
+      }
+    },
+    "Un bug, un écran qui gêne, une idée ? Chaque signalement est lu par l'équipe, et tu suis sa réponse ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A bug, an annoying screen, an idea? The team reads every report, and you can follow its reply here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un bug, un écran qui gêne, une idée ? Chaque signalement est lu par l'équipe, et tu suis sa réponse ici."
+          }
+        }
+      }
+    },
     "Un pylône partagé compte une fois par opérateur." : {
       "localizations" : {
         "en" : {
@@ -5325,6 +6637,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un pylône partagé compte une fois par opérateur."
+          }
+        }
+      }
+    },
+    "Une idée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An idea"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une idée"
           }
         }
       }
@@ -5396,6 +6724,22 @@
         }
       }
     },
+    "Voir mon signalement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View my report"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir mon signalement"
+          }
+        }
+      }
+    },
     "Voir plus de commentaires" : {
       "localizations" : {
         "en" : {
@@ -5462,6 +6806,54 @@
         }
       }
     },
+    "bug.context.connection" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion"
+          }
+        }
+      }
+    },
+    "bug.severity.low" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faible"
+          }
+        }
+      }
+    },
+    "bug.severity.medium" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moyenne"
+          }
+        }
+      }
+    },
     "cette famille seule" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5475,6 +6867,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "cette famille seule"
+          }
+        }
+      }
+    },
+    "clos le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "closed on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "clos le %@"
           }
         }
       }
@@ -5615,6 +7023,70 @@
         }
       }
     },
+    "envoyé le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sent on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "envoyé le %@"
+          }
+        }
+      }
+    },
+    "envoyée le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sent on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "envoyée le %@"
+          }
+        }
+      }
+    },
+    "facultatif" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "optional"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "facultatif"
+          }
+        }
+      }
+    },
+    "facultatif, 5 au plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "optional, up to 5"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "facultatif, 5 au plus"
+          }
+        }
+      }
+    },
     "iPerf3 et LibreSpeed" : {
       "localizations" : {
         "en" : {
@@ -5712,6 +7184,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "meilleure famille"
+          }
+        }
+      }
+    },
+    "mis à jour %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "updated %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mis à jour %@"
           }
         }
       }
@@ -5856,6 +7344,22 @@
         }
       }
     },
+    "résolu le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "resolved on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "résolu le %@"
+          }
+        }
+      }
+    },
     "sans limite" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5972,6 +7476,22 @@
         }
       }
     },
+    "À 1 km près, pour un bug lié au lieu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Within 1 km, for a location-related bug"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À 1 km près, pour un bug lié au lieu"
+          }
+        }
+      }
+    },
     "À envoyer" : {
       "localizations" : {
         "en" : {
@@ -6001,6 +7521,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À qui appartient cette connexion"
+          }
+        }
+      }
+    },
+    "Ça arrive aussi en données mobiles ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Does it also happen on mobile data?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ça arrive aussi en données mobiles ?"
+          }
+        }
+      }
+    },
+    "Écrire une réponse…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write a reply…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrire une réponse…"
+          }
+        }
+      }
+    },
+    "Étapes pour reproduire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steps to reproduce"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étapes pour reproduire"
           }
         }
       }

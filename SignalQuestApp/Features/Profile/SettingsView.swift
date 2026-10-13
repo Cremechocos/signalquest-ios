@@ -2321,9 +2321,18 @@ struct SettingsView: View {
                     SQSettingsRowLabel("Aide et glossaire", systemImage: "questionmark.circle")
                 }
                 .accessibilityIdentifier("settings.glossary")
+                NavigationLink {
+                    BugReportsListView()
+                } label: {
+                    SQSettingsRowLabel("Bugs et idées", systemImage: "ladybug",
+                                       subtitle: String(localized: "Signaler un problème, proposer une amélioration"))
+                }
+                .accessibilityIdentifier("settings.bugs")
                 if let contact = AppConfig.current.contactMailtoURL {
                     Link(destination: contact) {
-                        SQSettingsRowLabel("Contact et signalement", systemImage: "envelope", showsChevron: true)
+                        SQSettingsRowLabel("Contact et signalement", systemImage: "envelope",
+                                           subtitle: String(localized: "Modération et données personnelles, par e-mail"),
+                                           showsChevron: true)
                     }
                 }
                 Button {
