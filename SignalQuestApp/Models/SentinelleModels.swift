@@ -269,6 +269,23 @@ struct SentinelleHop: Decodable, Identifiable, Sendable {
         case points, alwaysQuiet, collapsed
     }
 
+    /// Lecture tolérante : un champ absent ou nul sur UN saut ne doit pas faire
+    /// tomber tout le relevé de chemin. Le serveur peut enrichir les sauts ;
+    /// seules l'adresse et les points comptent pour l'affichage.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let idx = (try? container.decodeIfPresent(Int.self, forKey: .idx)) ?? 0
+        let host = try? container.decodeIfPresent(String.self, forKey: .host)
+        self.idx = idx
+        self.host = host
+        self.hostname = try? container.decodeIfPresent(String.self, forKey: .hostname)
+        self.operatorName = try? container.decodeIfPresent(String.self, forKey: .operatorName)
+        self.points = (try? container.decodeIfPresent([SentinelleHopPoint].self, forKey: .points)) ?? []
+        self.alwaysQuiet = (try? container.decodeIfPresent(Bool.self, forKey: .alwaysQuiet)) ?? false
+        self.collapsed = max(1, (try? container.decodeIfPresent(Int.self, forKey: .collapsed)) ?? 1)
+        self.key = (try? container.decodeIfPresent(String.self, forKey: .key)) ?? "\(idx)-\(host ?? "?")"
+    }
+
     var id: String { key }
 
     /// Nom lisible. L'opérateur prime sur le nom inverse, qui prime sur
@@ -294,6 +311,13 @@ struct SentinelleDiagnostic: Decodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case familyRaw = "family"
         case windowHours, hops
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        familyRaw = try? container.decodeIfPresent(String.self, forKey: .familyRaw)
+        windowHours = try? container.decodeIfPresent(Int.self, forKey: .windowHours)
+        hops = (try? container.decodeIfPresent([SentinelleHop].self, forKey: .hops)) ?? []
     }
 
     var family: SentinelleFamily? { familyRaw.flatMap(SentinelleFamily.init(rawValue:)) }

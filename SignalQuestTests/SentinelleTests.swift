@@ -471,6 +471,49 @@ final class SentinelleIpv6Tests: XCTestCase {
     }
 }
 
+/// Un relevé de chemin se lit même quand un saut arrive incomplet : un champ
+/// absent ou nul ne doit pas vider tout l'écran de diagnostic.
+final class SentinelleDiagnosticDecodingTests: XCTestCase {
+
+    private func diagnostic(_ json: String) throws -> SentinelleDiagnostic {
+        try JSONDecoder.signalQuest.decode(SentinelleDiagnostic.self, from: Data(json.utf8))
+    }
+
+    func testUnSautCompletSeLitTelQuel() throws {
+        let result = try diagnostic("""
+        {"family":"v4","windowHours":24,"hops":[
+          {"key":"1-192.0.2.1","idx":1,"host":"192.0.2.1","hostname":null,"operator":"SFR",
+           "points":[{"t":1,"avgMs":4.2,"lossPct":0}],"alwaysQuiet":false,"collapsed":1}
+        ]}
+        """)
+        XCTAssertEqual(result.family, .v4)
+        XCTAssertEqual(result.hops.count, 1)
+        XCTAssertEqual(result.hops[0].label, "SFR")
+        XCTAssertEqual(result.hops[0].lastMs, 4.2)
+    }
+
+    func testDesChampsAbsentsOuNulsNeFontPasTomberLeReleve() throws {
+        let result = try diagnostic("""
+        {"family":"v6","hops":[
+          {"idx":2,"host":"2001:db8::1"},
+          {"key":null,"idx":null,"host":null,"points":null,"alwaysQuiet":null,"collapsed":null},
+          {"idx":4,"host":"198.51.100.7","points":[{"t":1,"avgMs":null,"lossPct":null}],"hopIndex":4}
+        ]}
+        """)
+        XCTAssertEqual(result.hops.count, 3)
+        XCTAssertEqual(result.hops[0].key, "2-2001:db8::1")
+        XCTAssertTrue(result.hops[0].points.isEmpty)
+        XCTAssertFalse(result.hops[0].alwaysQuiet)
+        XCTAssertEqual(result.hops[0].collapsed, 1)
+        XCTAssertEqual(result.hops[1].label, "—")
+        XCTAssertNil(result.hops[2].lastMs, "Un saut muet se lit « — », jamais 0 ms")
+    }
+
+    func testSansSautsLeReleveEstVide() throws {
+        XCTAssertTrue(try diagnostic(#"{"family":"v4"}"#).hops.isEmpty)
+    }
+}
+
 /// Ce que ces tests protègent : la panne que le modèle box → adresse doit rendre
 /// visible. Une IPv6 morte pendant que l'IPv4 répond ne doit ni disparaître dans
 /// la moyenne de la box, ni se confondre avec « pas encore de mesure ».
