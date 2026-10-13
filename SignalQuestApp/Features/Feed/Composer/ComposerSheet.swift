@@ -405,6 +405,13 @@ final class ComposerViewModel: ObservableObject {
     }
 }
 
+/// Pièce jointe choisie avant d'ouvrir le composer (ligne « Quoi de neuf ? »
+/// du fil).
+enum ComposerStartAttachment: String {
+    case photo
+    case speedtest
+}
+
 struct ComposerSheet: View {
     @EnvironmentObject private var services: AppServices
     @StateObject private var model: ComposerViewModel
@@ -413,13 +420,18 @@ struct ComposerSheet: View {
     /// Éditeur « Flouter » de la photo jointe (plan 3, vague 1).
     @State private var showBlurEditor = false
     @FocusState private var isInputFocused: Bool
+    private let startingWith: ComposerStartAttachment?
+    /// Photothèque ouverte d'emblée quand on arrive par le bouton Photo du fil.
+    @State private var showStartPhotoPicker = false
 
     /// `editing` bascule le composer en édition et précharge le post.
     init(
         service: SocialFeedServicing,
         userService: UserServicing? = nil,
-        editing: UnifiedSocialFeedItem? = nil
+        editing: UnifiedSocialFeedItem? = nil,
+        startingWith: ComposerStartAttachment? = nil
     ) {
+        self.startingWith = editing == nil ? startingWith : nil
         // Créé une seule fois, dans l'autoclosure : la vue parente réévalue
         // cet init à chaque rendu, et un modèle neuf relit puis réécrit le
         // brouillon à chaque fois.
@@ -656,9 +668,17 @@ struct ComposerSheet: View {
             .task {
                 await model.loadUserProfile()
             }
-            .onAppear {
-                isInputFocused = true
+            .task {
+                if startingWith == .speedtest { await model.attachLatestSpeedtest() }
             }
+            .onAppear {
+                if startingWith == .photo {
+                    showStartPhotoPicker = true
+                } else {
+                    isInputFocused = true
+                }
+            }
+            .photosPicker(isPresented: $showStartPhotoPicker, selection: $model.selectedItem, matching: .images)
         }
     }
 

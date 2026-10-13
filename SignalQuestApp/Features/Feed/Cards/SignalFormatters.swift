@@ -163,25 +163,51 @@ struct CardHeader: View {
     let kindColor: Color
     var onAuthorTap: (() -> Void)? = nil
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.feedCardMenu) private var menu
 
     var body: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
-                    authorContent
+                    HStack(alignment: .top) {
+                        authorContent
+                        Spacer(minLength: 0)
+                        menuButton
+                    }
                     if let kindBadge {
                         SQEditorialTag(text: LocalizedStringKey(kindBadge), color: kindColor)
                     }
                 }
             } else {
-                HStack(spacing: SQSpace.md) {
+                HStack(spacing: SQSpace.sm) {
                     authorContent
-                    Spacer()
+                    Spacer(minLength: SQSpace.xs)
                     if let kindBadge {
                         SQEditorialTag(text: LocalizedStringKey(kindBadge), color: kindColor)
                     }
+                    menuButton
                 }
             }
+        }
+    }
+
+    /// ⋯ visible : le même menu que l'appui long, qu'on ne trouvait pas.
+    @ViewBuilder
+    private var menuButton: some View {
+        if let menu {
+            Menu {
+                menu
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Plus d’actions")
+            .accessibilityIdentifier("feed.card.menu")
+            .padding(.trailing, -SQSpace.sm2)
+            .padding(.vertical, -SQSpace.sm)
         }
     }
 
@@ -279,7 +305,9 @@ struct CardActionsBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: 0) {
+        // J'aime, Commenter, Repartager à gauche ; Enregistrer et Partager à
+        // droite. Plus de fond gris : la carte suffit à les regrouper.
+        HStack(spacing: SQSpace.xs) {
             likeButton
             actionButton(
                 count: item.commentsCount,
@@ -290,15 +318,16 @@ struct CardActionsBar: View {
             actionButton(
                 count: item.repostsCount,
                 systemImage: item.repostedByMe ? "arrow.2.squarepath.circle.fill" : "arrow.2.squarepath",
-                tint: item.repostedByMe ? SQColor.success : SQColor.labelSecondary,
+                tint: item.repostedByMe ? SQColor.success : SQColor.chipInk,
                 label: "Repartager",
                 action: onRepost
             )
             .accessibilityAddTraits(item.repostedByMe ? .isSelected : [])
+            Spacer(minLength: 0)
             Button(action: onFavorite) {
                 Image(systemName: item.favoritedByMe ? "bookmark.fill" : "bookmark")
-                    .foregroundStyle(item.favoritedByMe ? SQColor.brandRed : SQColor.labelSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .foregroundStyle(item.favoritedByMe ? SQColor.brandRed : SQColor.chipInk)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .accessibilityLabel(item.favoritedByMe ? "Retirer des favoris" : "Ajouter aux favoris")
@@ -306,19 +335,16 @@ struct CardActionsBar: View {
             .sqLikePop(trigger: item.favoritedByMe)
             Button(action: onShare) {
                 Image(systemName: "paperplane")
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .foregroundStyle(SQColor.chipInk)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .accessibilityLabel("Partager")
         }
-        .padding(.horizontal, 4)
-        .background(
-            SQColor.surfaceMuted,
-            in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-        )
+        .padding(.horizontal, -SQSpace.sm)
+        .padding(.vertical, -SQSpace.xs)
         .buttonStyle(.plain)
-        .font(SQType.body(.medium))
+        .font(SQType.subhead(.semibold))
         .overlay(alignment: .topLeading) {
             if showReactionPicker {
                 ReactionPicker { emoji in
@@ -341,11 +367,13 @@ struct CardActionsBar: View {
             if reactionCount > 0 {
                 Text(SignalFormatters.count(reactionCount))
                     .contentTransition(.numericText())
+                    .accessibilityIdentifier("feed.action.count")
             }
         }
-        .foregroundStyle(item.likedByMe ? SQColor.like : SQColor.labelSecondary)
+        .foregroundStyle(item.likedByMe ? SQColor.like : SQColor.chipInk)
         .sqLikePop(trigger: item.likedByMe)
-        .frame(maxWidth: .infinity, minHeight: 44)
+        .padding(.horizontal, SQSpace.sm)
+        .frame(minWidth: 44, minHeight: 44)
         .contentShape(Rectangle())
         .onTapGesture {
             if showReactionPicker { dismissPicker() } else { onLike() }
@@ -385,21 +413,157 @@ struct CardActionsBar: View {
 
     private var reactionCount: Int { item.reactions.reduce(0) { $0 + $1.count } }
 
-    private func actionButton(count: Int, systemImage: String, tint: Color = SQColor.labelSecondary, label: String, action: @escaping () -> Void) -> some View {
+    private func actionButton(count: Int, systemImage: String, tint: Color = SQColor.chipInk, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
                 if count > 0 {
                     Text(SignalFormatters.count(count))
                         .contentTransition(.numericText())
+                        .accessibilityIdentifier("feed.action.count")
                 }
             }
             .foregroundStyle(tint)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, SQSpace.sm)
+            .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
         }
         .accessibilityLabel(LocalizedStringKey(label))
         .accessibilityValue(count > 0 ? "\(count)" : "")
+    }
+}
+
+// MARK: - Contexte posé par l'écran du fil
+
+private struct FeedCardMenuKey: EnvironmentKey {
+    static var defaultValue: AnyView? { nil }
+}
+
+private struct FeedHashtagActionKey: EnvironmentKey {
+    static var defaultValue: ((String) -> Void)? { nil }
+}
+
+extension EnvironmentValues {
+    /// Contenu du menu ⋯ des cartes. Seul l'écran qui le pose sait quelles
+    /// actions offrir ; ailleurs, la carte n'affiche pas de ⋯.
+    var feedCardMenu: AnyView? {
+        get { self[FeedCardMenuKey.self] }
+        set { self[FeedCardMenuKey.self] = newValue }
+    }
+
+    /// Filtre le fil sur un hashtag touché dans une carte. Sans action, les
+    /// hashtags restent du texte.
+    var feedHashtagAction: ((String) -> Void)? {
+        get { self[FeedHashtagActionKey.self] }
+        set { self[FeedHashtagActionKey.self] = newValue }
+    }
+}
+
+/// Hashtags d'une publication, touchables quand l'écran sait filtrer.
+struct CardHashtags: View {
+    let tags: [String]
+    @Environment(\.feedHashtagAction) private var onTap
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SQSpace.xs) {
+                ForEach(tags, id: \.self) { tag in
+                    if let onTap {
+                        Button {
+                            onTap(tag)
+                        } label: {
+                            label(tag)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Filtre le fil sur ce hashtag")
+                        .accessibilityIdentifier("feed.hashtag.\(tag)")
+                    } else {
+                        label(tag)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, onTap == nil ? 0 : -SQSpace.sm2)
+    }
+
+    private func label(_ tag: String) -> some View {
+        Text(verbatim: "#\(tag)")
+            .font(SQType.subhead(.semibold))
+            .foregroundStyle(SQColor.accentInk)
+            .padding(.trailing, SQSpace.xs)
+    }
+}
+
+/// Bloc de mesure d'un speedtest : grand débit de réception, puis envoi,
+/// latence, opérateur et technologie sur une ligne.
+struct FeedMeasureBlock: View {
+    let signal: SocialSignalSummary?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            // Surtitre à l'encre forte : le gris secondaire de `sqKicker` manque
+            // de contraste en 11 pt sur la tuile.
+            Text("Speedtest · réception")
+                .font(SQFont.body(11, .bold, relativeTo: .caption2))
+                .tracking(11 * 0.18)
+                .textCase(.uppercase)
+                .foregroundStyle(SQColor.ink2)
+                .accessibilityIdentifier("feed.measure.kicker")
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                Text(verbatim: download.map { SQUnits.throughputValue(mbps: $0) } ?? "—")
+                    .font(SQFont.display(26, .heavy, relativeTo: .title))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.label)
+                Text(verbatim: SQUnits.throughputUnit(mbps: download ?? 0))
+                    .font(SQType.subhead(.bold))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            if !details.isEmpty {
+                Text(verbatim: details)
+                    .font(SQType.subhead)
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("feed.measure.details")
+            }
+        }
+        .padding(.horizontal, SQSpace.md2)
+        .padding(.vertical, SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Speedtest"))
+        .accessibilityValue(Text(spoken))
+        .accessibilityIdentifier("feed.speedtest.measure")
+    }
+
+    private var download: Double? { signal?.downloadMbps }
+
+    private var operatorAndTech: String? {
+        let parts = [signal?.servingOperator ?? signal?.operator, signal?.technology].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    /// « ↑ 64 Mbit/s · 18 ms · SFR 5G », plus la SIM quand elle voyage.
+    private var details: String {
+        var parts: [String] = []
+        if let upload = signal?.uploadMbps { parts.append("↑ " + SignalFormatters.speed(upload)) }
+        if let ping = signal?.pingMs { parts.append(SignalFormatters.ms(ping)) }
+        if let operatorAndTech { parts.append(operatorAndTech) }
+        if signal?.isRoaming == true, let sim = signal?.simOperator {
+            parts.append(String(localized: "SIM \(sim)"))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var spoken: String {
+        var parts = [String(localized: "réception \(SignalFormatters.speed(download))")]
+        if let upload = signal?.uploadMbps { parts.append(String(localized: "envoi \(SignalFormatters.speed(upload))")) }
+        if let ping = signal?.pingMs { parts.append(String(localized: "latence \(SignalFormatters.ms(ping))")) }
+        if let operatorAndTech { parts.append(operatorAndTech) }
+        return parts.joined(separator: ", ")
     }
 }
 

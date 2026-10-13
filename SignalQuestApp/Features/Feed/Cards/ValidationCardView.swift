@@ -25,7 +25,7 @@ struct ValidationCardView: View {
                     author: item.author,
                     place: signal?.city ?? item.placeLabel,
                     createdAt: item.createdAt,
-                    kindBadge: "Validation",
+                    kindBadge: nil,
                     kindColor: SQColor.success,
                     onAuthorTap: onAuthorTap
                 )

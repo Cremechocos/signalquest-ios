@@ -27,7 +27,7 @@ struct RatingCardView: View {
                     author: item.author,
                     place: signal?.city ?? item.placeLabel,
                     createdAt: item.createdAt,
-                    kindBadge: "Évaluation",
+                    kindBadge: nil,
                     kindColor: SQColor.warning,
                     onAuthorTap: onAuthorTap
                 )

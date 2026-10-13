@@ -20,19 +20,17 @@ struct PhotoCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            // DA Crème : header d'abord, média encadré (rayon 14) dans la carte,
-            // tag « Photo » olive. Le double-tap sur le média like toujours.
-            VStack(alignment: .leading, spacing: SQSpace.md2) {
+            // En-tête, légende, puis la photo avec son opérateur et son support
+            // en surimpression. Le double-tap sur le média like toujours.
+            VStack(alignment: .leading, spacing: SQSpace.md) {
                 CardHeader(
                     author: item.author,
                     place: item.signal?.city ?? item.placeLabel,
                     createdAt: item.createdAt,
-                    kindBadge: "Photo",
+                    kindBadge: "Photo d’antenne",
                     kindColor: SQColor.success,
                     onAuthorTap: onAuthorTap
                 )
-
-                heroImage
 
                 if !item.text.isEmpty {
                     Text(item.text)
@@ -42,16 +40,12 @@ struct PhotoCardView: View {
                         .lineLimit(3)
                 }
 
-                if let signal = item.signal, signal.siteLabel != nil || signal.operator != nil {
-                    HStack(spacing: SQSpace.sm) {
-                        if let site = signal.siteLabel {
-                            SQEditorialTag(text: site, color: SQColor.label)
-                        }
-                        if let op = signal.operator {
-                            SQEditorialTag(text: op, color: SQBrand.operatorColor(op))
-                        }
-                    }
+                if !item.hashtags.isEmpty {
+                    CardHashtags(tags: item.hashtags)
                 }
+
+                heroImage
+                    .overlay(alignment: .bottomLeading) { siteCaption }
 
                 CardActionsBar(
                     item: item,
@@ -89,10 +83,10 @@ struct PhotoCardView: View {
                     .transition(.scale.combined(with: .opacity))
             }
         }
-        .frame(height: 180)
+        .frame(height: 200)
         .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
         .onTapGesture(count: 2) {
             Haptics.medium()
             // Le double-tap ne fait qu'aimer : sur une photo déjà aimée, il
@@ -104,6 +98,27 @@ struct PhotoCardView: View {
             }
         }
         .accessibilityLabel(photoAccessibilityLabel)
+    }
+
+    /// « Orange · support 1552054 » sur un voile sombre, lisible sur toute photo.
+    @ViewBuilder
+    private var siteCaption: some View {
+        let parts = [item.signal?.operator, item.signal?.siteLabel].compactMap { $0 }.filter { !$0.isEmpty }
+        if !parts.isEmpty {
+            HStack(spacing: SQSpace.xs) {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text(verbatim: parts.joined(separator: " · "))
+                    .font(SQType.caption(.semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, SQSpace.xs)
+            .background(Color.black.opacity(0.62), in: Capsule(style: .continuous))
+            .padding(SQSpace.sm2)
+        }
     }
 
     /// Décrit la photo pour VoiceOver à partir de la légende du post ou du lieu,

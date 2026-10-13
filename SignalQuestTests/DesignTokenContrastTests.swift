@@ -57,6 +57,8 @@ final class DesignTokenContrastTests: XCTestCase {
     func testBodyTextTokensMeetAA() {
         assertMinimum(UIColor(SQColor.label), named: "label", atLeast: 4.5)
         assertMinimum(UIColor(SQColor.labelSecondary), named: "labelSecondary", atLeast: 4.5)
+        assertMinimum(UIColor(SQColor.ink2), named: "ink2", atLeast: 4.5)
+        assertMinimum(UIColor(SQColor.chipInk), named: "chipInk", atLeast: 4.5)
     }
 
     /// Si Sora n'est pas encore enregistrée, le repli SF doit suivre
@@ -157,7 +159,8 @@ final class DesignTokenContrastTests: XCTestCase {
     func testInkTokensAreReadableOnTheirOwnPastille() {
         let cases: [(String, Color, Color)] = [
             ("accentInk sur accentSoft", SQColor.accentInk, SQColor.accentSoft),
-            ("dangerInk sur dangerSoft", SQColor.dangerInk, SQColor.dangerSoft)
+            ("dangerInk sur dangerSoft", SQColor.dangerInk, SQColor.dangerSoft),
+            ("chipInk sur chip", SQColor.chipInk, SQColor.chip)
         ]
         for (name, ink, soft) in cases {
             for style in [UIUserInterfaceStyle.light, .dark] {

@@ -44,7 +44,7 @@ struct CoverageCardView: View {
                     author: item.author,
                     place: signal?.city ?? item.placeLabel,
                     createdAt: item.createdAt,
-                    kindBadge: hasSessionAggregate ? "Couverture" : "Mesure",
+                    kindBadge: nil,
                     kindColor: SQColor.brandRed,
                     onAuthorTap: onAuthorTap
                 )

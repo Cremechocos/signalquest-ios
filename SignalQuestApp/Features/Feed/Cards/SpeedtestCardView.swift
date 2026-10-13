@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Specialised feed card for `kind = speedtest`. Mirrors the Android layout:
-/// Réception / Envoi / Ping / RSRP dans une grille 2×2 lisible avec unités.
+/// Specialised feed card for `kind = speedtest` : texte, hashtags, puis le
+/// bloc de mesure partagé avec la publication ouverte.
 struct SpeedtestCardView: View {
     let item: UnifiedSocialFeedItem
     var onTap: () -> Void
@@ -13,50 +13,21 @@ struct SpeedtestCardView: View {
     var onAuthorTap: (() -> Void)? = nil
     /// Réaction emoji (appui long sur ❤️). Repli sur onLike si absent.
     var onReact: ((String) -> Void)? = nil
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var signal: SocialSignalSummary? { item.signal }
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: SQSpace.md2) {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                // Plus de badge « Speedtest » : le bloc de mesure le dit déjà.
                 CardHeader(
                     author: item.author,
                     place: signal?.city ?? item.placeLabel,
                     createdAt: item.createdAt,
-                    kindBadge: "Speedtest",
+                    kindBadge: nil,
                     kindColor: SQColor.brandRed,
                     onAuthorTap: onAuthorTap
                 )
-
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(SQColor.label)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("feed.speedtest.subtitle")
-                }
-
-                // Deux colonnes : quatre tuiles serrées rendaient les libellés
-                // et unités illisibles sur iPhone. Une mesure reste toujours
-                // compréhensible hors contexte et par VoiceOver.
-                LazyVGrid(columns: gridColumns, spacing: SQSpace.sm) {
-                    SQMetricTile.wrapping(label: "Réception", value: SignalFormatters.speed(signal?.downloadMbps), highlight: true)
-                    SQMetricTile.wrapping(label: "Envoi", value: SignalFormatters.speed(signal?.uploadMbps))
-                    SQMetricTile.wrapping(label: "Latence", value: SignalFormatters.ms(signal?.pingMs))
-                    SQMetricTile.wrapping(
-                        label: signal?.rsrp == nil ? "Technologie" : "RSRP",
-                        value: signal?.rsrp == nil ? (signal?.technology ?? "—") : SignalFormatters.dbm(signal?.rsrp)
-                    )
-                }
-
-                if let footer = footer {
-                    Text(footer)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.label)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
 
                 if !item.text.isEmpty {
                     Text(item.text)
@@ -66,6 +37,15 @@ struct SpeedtestCardView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("feed.post.text")
                 }
+
+                if !item.hashtags.isEmpty {
+                    CardHashtags(tags: item.hashtags)
+                }
+
+                // Un seul bloc : le débit de réception en grand, le reste sur
+                // une ligne. Les détails (appareil, gigue, serveur) sont dans
+                // la publication ouverte.
+                FeedMeasureBlock(signal: signal)
 
                 CardActionsBar(
                     item: item,
@@ -81,26 +61,5 @@ struct SpeedtestCardView: View {
             .sqEditorialCard()
         }
         .buttonStyle(SQPressButtonStyle())
-    }
-
-    private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
-    }
-
-    private var subtitle: String {
-        [
-            signal?.servingOperator ?? signal?.operator,
-            signal?.isRoaming == true ? signal?.simOperator.map { String(localized: "SIM \($0)") } : nil,
-            signal?.deviceModel,
-        ]
-            .compactMap { $0 }
-            .joined(separator: " · ")
-    }
-
-    private var footer: String? {
-        var parts: [String] = []
-        if let jitter = signal?.jitterMs { parts.append(String(localized: "Jitter \(Int(jitter)) ms")) }
-        if let server = signal?.serverName { parts.append(String(localized: "Serveur \(server)")) }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }

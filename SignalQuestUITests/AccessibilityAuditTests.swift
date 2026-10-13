@@ -123,6 +123,9 @@ final class AccessibilityAuditTests: XCTestCase {
                 "community.networkPulse", "feed.metadata", "feed.tag", "feed.metric.label",
                 "feed.metric.value", "feed.speedtest.subtitle",
                 "feed.story.name", "feed.hashtag", "feed.avatar.initial",
+                // Refonte du Fil (13/10) : surtitre et ligne du bloc de mesure,
+                // en styles relatifs (`.caption2`, `subhead`).
+                "feed.measure.",
                 "settings.label.Noir intense",
                 // Aides d'Apparence en `.footnote` et pieds de section des
                 // Notifications (styles système) : faux positif iOS 27 (Lot 4g).
@@ -187,7 +190,16 @@ final class AccessibilityAuditTests: XCTestCase {
                 // (`label` sur `surface`, `onAccent` sur brique), titres de carte et
                 // légendes du détail (`label`/`labelSecondary` sur `surface`).
                 // Mesuré sur les pixels de l'audit le 01/10 : 5,12 à 13,48:1.
-                "anfr.bands."
+                "anfr.bands.",
+                // Refonte du Fil (13/10) : pastilles d'onglet et initiale d'avatar
+                // (`chipInk` sur `chip`, `testInkTokensAreReadableOnTheirOwnPastille`),
+                // surtitre et ligne du bloc de mesure (`ink2` sur `surfaceMuted`,
+                // `testBodyTextTokensMeetAA`, plus de 9:1).
+                "feed.tab.", "feed.avatar.initial", "feed.measure.",
+                // Invite « Quoi de neuf ? » et compteurs de la barre d'actions,
+                // `chipInk` : mesurés sur les pixels de l'audit le 13/10, 7,2:1
+                // sur `surfaceMuted` et 8,0:1 sur la carte.
+                "feed.compose.prompt", "feed.action.count"
             ]
             if issue.auditType == .contrast,
                provenContrastIdentifiers.contains(where: name.hasPrefix) {

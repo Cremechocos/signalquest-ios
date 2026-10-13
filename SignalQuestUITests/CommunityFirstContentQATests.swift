@@ -48,20 +48,22 @@ final class CommunityFirstContentQATests: XCTestCase {
         XCTAssertTrue(pulseToggle.waitForExistence(timeout: 15))
         XCTAssertTrue(pulseToggle.isHittable, "Pouls réseau replié inaccessible en AX XXL")
 
+        // Les stories ouvrent l'écran, juste sous le titre : lisibles sans défiler.
+        let dock = app.descendants(matching: .any)["main.navigation"]
+        let storyNames = app.staticTexts.matching(identifier: "feed.story.name").allElementsBoundByIndex
+        XCTAssertFalse(storyNames.isEmpty, "Libellés des stories introuvables")
+        for name in storyNames where name.frame.minX < app.frame.maxX {
+            XCTAssertTrue(name.isHittable, "Story illisible en AX XXL")
+            if dock.exists {
+                XCTAssertLessThan(name.frame.maxY, dock.frame.minY,
+                                  "Libellé de story sous la navigation")
+            }
+        }
+
         app.scrollViews.firstMatch.swipeUp()
         let firstPost = app.descendants(matching: .any)["feed.item.demo-post-1"]
         XCTAssertTrue(firstPost.waitForExistence(timeout: 10))
         XCTAssertTrue(firstPost.isHittable, "Premier post inaccessible après un défilement AX XXL")
-        let dock = app.descendants(matching: .any)["main.navigation"]
-        let storyNames = app.staticTexts.matching(identifier: "feed.story.name").allElementsBoundByIndex
-        XCTAssertFalse(storyNames.isEmpty, "Libellés des stories introuvables après défilement")
-        for name in storyNames {
-            XCTAssertTrue(name.isHittable, "Story illisible après défilement AX XXL")
-            if dock.exists {
-                XCTAssertLessThan(name.frame.maxY, dock.frame.minY,
-                                  "Libellé de story encore sous la navigation")
-            }
-        }
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "community-first-post-accessibility-xxl"
         screenshot.lifetime = .keepAlways

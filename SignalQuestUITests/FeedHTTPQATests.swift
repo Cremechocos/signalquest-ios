@@ -30,8 +30,12 @@ final class FeedHTTPQATests: XCTestCase {
         try await waitEvent("sent", key: "old")
         XCTAssertFalse(card("old", in: app).exists)
 
+        // Les hashtags se touchent dans la carte ; la pastille du filtre en sort
+        // pendant que la réponse « alpha » traîne encore.
         tap("feed.hashtag.alpha", in: app)
         try await waitEvent("received", key: "alpha")
+        tap("feed.hashtag.clear", in: app)
+        XCTAssertTrue(card("recent", in: app).waitForExistence(timeout: 20))
         tap("feed.hashtag.beta", in: app)
         XCTAssertTrue(card("beta", in: app).waitForExistence(timeout: 20))
         try await waitEvent("sent", key: "alpha")

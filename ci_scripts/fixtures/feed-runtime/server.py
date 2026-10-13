@@ -14,11 +14,11 @@ lock = threading.Lock()
 state = {"live": False, "epoch": 0, "connections": 0, "events": []}
 
 
-def item(identifier, text):
+def item(identifier, text, hashtags=()):
     return {"id": identifier, "kind": "post", "text": text,
             "author": {"id": "qa-author", "name": "Recette", "badges": []},
             "visibility": "public", "status": "published", "isMine": False,
-            "attachments": [], "hashtags": [], "reactions": []}
+            "attachments": [], "hashtags": list(hashtags), "reactions": []}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -78,7 +78,9 @@ class Handler(BaseHTTPRequestHandler):
             state["events"].append({"kind": "received", "key": key, "time": time.time()})
         if key in ("old", "alpha"):
             time.sleep(5)
-        posts = [item("qa-feed-" + key, "RECETTE " + key.upper())]
+        # Les hashtags se touchent dans les cartes : la carte récente porte les deux.
+        tags = ("alpha", "beta") if key == "recent" else ()
+        posts = [item("qa-feed-" + key, "RECETTE " + key.upper(), tags)]
         if live and key == "beta":
             posts.append(item("qa-feed-new", "NOUVELLE RECETTE BETA"))
         try:

@@ -527,6 +527,8 @@ struct FeedView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @EnvironmentObject private var session: AuthSessionViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private static let topAnchor = "feed.top"
 
     @State private var presentedSheet: FeedSheet?
     /// Post en attente de confirmation de suppression. La suppression est
@@ -540,7 +542,12 @@ struct FeedView: View {
     /// Auteurs dont les stories sont masquées sur cet appareil.
     @State private var hiddenStoryAuthorIds = HiddenStoryAuthorsStore.hiddenIds()
     @State private var showStoryComposer = false
-    @State private var showComposer = false
+    /// Composer ouvert, avec la pièce jointe choisie depuis la ligne « Quoi de
+    /// neuf ? ». Porté par la présentation : lu dans une feuille `isPresented`,
+    /// l'état voisin arrivait encore à son ancienne valeur.
+    @State private var composerRequest: ComposerRequest?
+    /// Remonte en tête du fil (filtre par hashtag touché plus bas).
+    @State private var scrollTopRequest = UUID()
     @State private var showExplore = false
     @State private var showMessages = false
     // Destinations reprises du menu Profil : elles relèvent de la communauté,
@@ -584,6 +591,11 @@ struct FeedView: View {
         var id: String { item.id }
     }
 
+    private struct ComposerRequest: Identifiable {
+        let id = UUID()
+        let start: ComposerStartAttachment?
+    }
+
     private struct RoutedPost: Identifiable, Hashable {
         let item: UnifiedSocialFeedItem
         var id: String { item.id }
@@ -596,38 +608,41 @@ struct FeedView: View {
     }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: SQSpace.lg) {
+            LazyVStack(alignment: .leading, spacing: SQSpace.md) {
                 header
+                    .id(Self.topAnchor)
+                // Rail visible dès que la page est chargée, même sans story
+                // amie : « Ta story » reste le point d'entrée de création.
+                if let stories = visibleStories {
+                    StoriesBar(
+                        stories: stories,
+                        currentUser: currentUser,
+                        onCompose: { showStoryComposer = true },
+                        onSelect: { story in
+                            if let idx = stories.firstIndex(where: { $0.id == story.id }) {
+                                presentedStoryStart = idx
+                            }
+                        },
+                        onHide: { hideStories(of: $0) }
+                    )
+                    // Rail débordant : annule le padding écran pour que le
+                    // scroll fuie sous les bords (1re bulle alignée à 20 pt).
+                    .padding(.horizontal, -SQSpace.lg)
+                }
+                composerPrompt
                 feedTabs
-                hashtags
-                if model.pendingCount > 0 { newPostsPill }
+                if let tag = model.selectedHashtag { hashtagFilter(tag) }
 
                 if model.page == nil && model.errorMessage == nil {
                     LoadingSkeleton()
                         .sqShimmer()
                 } else {
-                    if let pulse = model.pulse {
-                        pulseDisclosure(pulse)
-                    }
-                    // Rail visible dès que la page est chargée, même sans story
-                    // amie (fidèle au prototype : « Ta story » reste le point
-                    // d'entrée de création).
-                    if let stories = visibleStories {
-                        StoriesBar(
-                            stories: stories,
-                            currentUser: currentUser,
-                            onCompose: { showStoryComposer = true },
-                            onSelect: { story in
-                                if let idx = stories.firstIndex(where: { $0.id == story.id }) {
-                                    presentedStoryStart = idx
-                                }
-                            },
-                            onHide: { hideStories(of: $0) }
-                        )
-                        // Rail débordant : annule le padding écran pour que le
-                        // scroll fuie sous les bords (1re bulle alignée à 20 pt).
-                        .padding(.horizontal, -SQSpace.lg)
+                    // Le pouls décrit la zone, pas un filtre : il n'ouvre que
+                    // « Pour toi ».
+                    if let pulse = model.pulse, model.tab == .forYou, model.selectedHashtag == nil {
+                        pulseCard(pulse)
                     }
                     if let error = model.errorMessage {
                         ErrorStateView(title: "Fil indisponible", message: error) {
@@ -664,10 +679,28 @@ struct FeedView: View {
                     }
                 }
             }
-            .padding(.horizontal, SQSpace.xl)
+            .padding(.horizontal, SQSpace.lg)
             .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
+        }
+        // Les nouveautés flottent au-dessus de la lecture : les insérer dans la
+        // liste déplacerait ce que l'on regarde.
+        .overlay(alignment: .top) {
+            if model.pendingCount > 0 {
+                newPostsPill {
+                    withAnimation(SQMotion.resolve(SQMotion.smooth, reduceMotion)) {
+                        proxy.scrollTo(Self.topAnchor, anchor: .top)
+                    }
+                }
+                .padding(.top, SQSpace.sm)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .sqAnimation(SQMotion.snappy, value: model.pendingCount > 0)
+        .onChangeCompat(of: scrollTopRequest) { _, _ in
+            proxy.scrollTo(Self.topAnchor, anchor: .top)
+        }
         }
         // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
         .sqDockAutoMinimize()
@@ -903,10 +936,11 @@ struct FeedView: View {
             }
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showComposer) {
-            ComposerSheet(service: services.feed, userService: services.users)
+        .sheet(item: $composerRequest) { request in
+            ComposerSheet(service: services.feed, userService: services.users, startingWith: request.start)
                 .onDisappear { Task { await model.load() } }
         }
+        .sheet(isPresented: $isPulseExpanded) { pulseSheet }
         .onReceive(NotificationCenter.default.publisher(for: HiddenStoryAuthorsStore.didChange)) { _ in
             hiddenStoryAuthorIds = HiddenStoryAuthorsStore.hiddenIds()
         }
@@ -1021,7 +1055,7 @@ struct FeedView: View {
     private func openComposerIfRequested() {
         guard router.openPostComposer else { return }
         router.openPostComposer = false
-        showComposer = true
+        composerRequest = ComposerRequest(start: nil)
     }
 
     private func presentMessagesIfNeeded() {
@@ -1066,59 +1100,122 @@ struct FeedView: View {
         guard session.isCurrent else { throw CancellationError() }
     }
 
-    // MARK: Header custom — titre, menu secondaire, actions nommées
+    // MARK: Header custom — titre, actions rondes, menu secondaire
 
-    private func pulseDisclosure(_ pulse: NetworkPulse) -> some View {
-        VStack(spacing: SQSpace.sm) {
-            Button {
-                Haptics.selection()
-                isPulseExpanded.toggle()
-            } label: {
-                HStack(spacing: SQSpace.sm) {
-                    Image(systemName: "waveform.path.ecg")
-                        .foregroundStyle(SQColor.brandRed)
-                    Text("Pouls réseau · autour de toi")
-                        .font(.subheadline.weight(.semibold))
+    /// « Autour de toi » : une ligne de chiffres, le détail dans une feuille.
+    private func pulseCard(_ pulse: NetworkPulse) -> some View {
+        Button {
+            Haptics.selection()
+            isPulseExpanded = true
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                SQIconPastille(systemImage: "waveform.path.ecg", size: 36,
+                               tint: SQColor.accentInk, fill: SQColor.accentSoft)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Autour de toi · \(pulse.windowDays) jours")
+                        .font(SQType.subhead(.semibold))
                         .foregroundStyle(SQColor.label)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: SQSpace.xs)
-                    Image(systemName: isPulseExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityIdentifier("community.networkPulse.title")
+                    if !pulseSummary(pulse).isEmpty {
+                        Text(pulseSummary(pulse))
+                            .font(SQType.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("community.networkPulse.summary")
+                    }
                 }
-                .padding(.horizontal, SQSpace.md)
-                .frame(minHeight: 48)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .sqSurface(SQColor.surface,
-                            in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                Spacer(minLength: SQSpace.xs)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
             }
-            .buttonStyle(SQPressButtonStyle())
-            .accessibilityIdentifier("community.networkPulse.toggle")
-            .accessibilityValue(isPulseExpanded ? String(localized: "Développé") : String(localized: "Réduit"))
-
-            if isPulseExpanded {
-                NetworkPulseHero(pulse: pulse)
-                    .sqFadeUp()
-            }
+            .padding(.horizontal, SQSpace.md2)
+            .padding(.vertical, SQSpace.md)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .sqSoftCard()
         }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Pouls réseau · autour de toi")
+        .accessibilityValue(pulseSummary(pulse))
+        .accessibilityHint("Ouvre le détail")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("community.networkPulse.toggle")
+    }
+
+    /// Débit médian · mesures · opérateur en tête ; chaque élément absent se tait.
+    private func pulseSummary(_ pulse: NetworkPulse) -> String {
+        var parts: [String] = []
+        if let median = pulse.medianDownloadMbps {
+            parts.append(String(localized: "\(median) Mbit/s médian"))
+        }
+        parts.append(String(localized: "\(pulse.measurementsCount) mesures"))
+        if let best = pulse.bestOperator, !best.isEmpty {
+            parts.append(String(localized: "\(best) en tête"))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var pulseSheet: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Pouls réseau")
+                        .font(SQType.display)
+                        .foregroundStyle(SQColor.label)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: SQSpace.sm)
+                    Button { isPulseExpanded = false } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(SQColor.label)
+                            .frame(width: 44, height: 44)
+                            .sqSurface(SQColor.chip, in: Circle())
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityLabel("Fermer")
+                }
+                if let pulse = model.pulse {
+                    NetworkPulseHero(pulse: pulse)
+                }
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xxl)
+        }
+        .signalQuestBackground()
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            HStack(spacing: SQSpace.md) {
-                headerTitle(singleLine: true)
-                Spacer(minLength: SQSpace.sm)
-                communityMenu
+        HStack(spacing: SQSpace.sm) {
+            headerTitle(singleLine: true)
+            Spacer(minLength: SQSpace.xs)
+            headerRoundButton(identifier: "explore", systemImage: "magnifyingglass",
+                              label: "Explorer") {
+                showExplore = true
             }
-            headerActions
+            headerRoundButton(identifier: "messages", systemImage: "bubble.left.and.bubble.right",
+                              label: "Messages", badgeCount: services.unreadConversations) {
+                showMessages = true
+            }
+            .accessibilityValue(services.unreadConversations == 0
+                                ? "Aucun message non lu"
+                                : "\(services.unreadConversations) conversation non lue")
+            communityMenu
         }
+        .padding(.top, SQSpace.xs)
         .accessibilityElement(children: .contain)
     }
 
     /// Titre sur une ligne, qui se réduit plutôt que de sortir de l'écran en
-    /// très grand texte et de pousser le menu (UI-15).
+    /// très grand texte et de pousser les boutons (UI-15).
     private func headerTitle(singleLine: Bool) -> some View {
         Text("Communauté")
-            .font(SQType.display)
+            .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
             .foregroundStyle(SQColor.label)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
@@ -1126,38 +1223,93 @@ struct FeedView: View {
             .accessibilityIdentifier("feed.header")
     }
 
-    private var headerActions: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: SQSpace.sm) { primaryHeaderActions }
-            VStack(spacing: SQSpace.sm) { primaryHeaderActions }
+    /// Bouton rond de l'en-tête, comme la cloche de l'Accueil.
+    private func headerRoundButton(
+        identifier: String,
+        systemImage: String,
+        label: String,
+        badgeCount: Int = 0,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 44, height: 44)
+                .sqSurface(SQColor.surface, in: Circle())
+                .sqShadowSoft()
+                .overlay(alignment: .topTrailing) {
+                    if badgeCount > 0 {
+                        SQCountBadge(count: badgeCount)
+                            .offset(x: 4, y: -4)
+                            .accessibilityHidden(true)
+                    }
+                }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(LocalizedStringKey(label))
+        .accessibilityIdentifier("community.header.action.\(identifier)")
     }
 
-    @ViewBuilder
-    private var primaryHeaderActions: some View {
-        headerActionButton(
-            identifier: "messages",
-            systemImage: "bubble.left.and.bubble.right",
-            title: "Messages",
-            badgeCount: services.unreadConversations
-        ) {
-            showMessages = true
+    /// « Quoi de neuf ? » : la publication commence ici, en une ligne. Photo
+    /// et Speedtest ouvrent la même feuille, la pièce jointe déjà choisie.
+    private var composerPrompt: some View {
+        HStack(spacing: SQSpace.sm2) {
+            Button {
+                Haptics.light()
+                composerRequest = ComposerRequest(start: nil)
+            } label: {
+                HStack(spacing: SQSpace.sm2) {
+                    SQAvatar(url: currentUser?.avatarUrl, name: currentUser?.displayName ?? "", size: 36)
+                        .accessibilityHidden(true)
+                    // Encre de puce : le gris secondaire manque de contraste au rendu.
+                    Text("Quoi de neuf ?")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.chipInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("feed.compose.prompt")
+                        .padding(.vertical, SQSpace.xs)
+                        .padding(.horizontal, SQSpace.md2)
+                        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+                        .background(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Créer une publication")
+            .accessibilityIdentifier("community.header.action.publish")
+            composerAttachmentButton(.photo, systemImage: "photo", label: "Ajouter une photo")
+            composerAttachmentButton(.speedtest, systemImage: "speedometer", label: "Joindre un speedtest")
         }
-        .accessibilityValue(services.unreadConversations == 0
-                            ? "Aucun message non lu"
-                            : "\(services.unreadConversations) conversation non lue")
-        headerActionButton(identifier: "explore", systemImage: "magnifyingglass", title: "Explorer") {
-            showExplore = true
+        .padding(.leading, SQSpace.sm2)
+        .padding(.trailing, SQSpace.xs)
+        .padding(.vertical, SQSpace.xs)
+        .sqSoftCard()
+    }
+
+    private func composerAttachmentButton(
+        _ attachment: ComposerStartAttachment,
+        systemImage: String,
+        label: String
+    ) -> some View {
+        Button {
+            Haptics.light()
+            composerRequest = ComposerRequest(start: attachment)
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(SQColor.chipInk)
+                .frame(width: 38, height: 38)
+                .background(SQColor.chip, in: Circle())
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
-        headerActionButton(
-            identifier: "publish",
-            systemImage: "square.and.pencil",
-            title: "Publier",
-            accessibilityLabel: "Créer une publication"
-        ) {
-            showComposer = true
-        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(LocalizedStringKey(label))
+        .accessibilityIdentifier("community.compose.\(attachment.rawValue)")
     }
 
     /// L'onglet « Photos », en galerie.
@@ -1239,6 +1391,11 @@ struct FeedView: View {
             Button { showFeedPreferences = true } label: {
                 Label("Préférences du fil", systemImage: "slider.horizontal.3")
             }
+            Button {
+                Task { await model.select(.saved) }
+            } label: {
+                Label("Enregistrés", systemImage: "bookmark")
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 17, weight: .medium))
@@ -1248,48 +1405,6 @@ struct FeedView: View {
                 .sqShadowSoft()
         }
         .accessibilityLabel("Plus")
-    }
-
-    /// Actions principales nommées : plus découvrables que quatre cercles
-    /// anonymes et capables de se disposer verticalement avec Dynamic Type.
-    private func headerActionButton(
-        identifier: String,
-        systemImage: String,
-        title: String,
-        accessibilityLabel: String? = nil,
-        badgeCount: Int = 0,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
-            Haptics.light()
-            action()
-        } label: {
-            HStack(spacing: SQSpace.xs + 1) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 15, weight: .semibold))
-                // Se réduit un peu avant de se couper : « Messa… » dès le XXL (UI-15).
-                Text(LocalizedStringKey(title))
-                    .font(SQType.subhead(.semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .accessibilityIdentifier("community.header.action.\(identifier).label")
-                if badgeCount > 0 {
-                    Text("\(min(badgeCount, 99))")
-                        .font(SQType.micro(.bold))
-                        .foregroundStyle(SQColor.onAccent)
-                        .frame(minWidth: 18, minHeight: 18)
-                        .background(SQColor.brandRed, in: Circle())
-                }
-            }
-            .foregroundStyle(SQColor.label)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .padding(.horizontal, SQSpace.md)
-            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
-            .sqShadowSoft()
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .accessibilityLabel(LocalizedStringKey(accessibilityLabel ?? title))
-        .accessibilityIdentifier("community.header.action.\(identifier)")
     }
 
     // MARK: Hashtags — capsules pleines/douces
@@ -1333,35 +1448,11 @@ struct FeedView: View {
             },
             onPollVote: { option in model.votePoll(item, option: option) }
         )
-        .contextMenu {
-            // Réservé à l'auteur. Le serveur revérifie et répond
-            // 403 : ce masquage évite d'offrir une action vouée
-            // à échouer, il ne fait pas autorité.
-            if item.canManage {
-                Button { editingPost = item } label: {
-                    Label("Modifier", systemImage: "pencil")
-                }
-                Button { model.togglePin(item) } label: {
-                    Label(item.isPinned ? "Désépingler" : "Épingler",
-                          systemImage: item.isPinned ? "pin.slash" : "pin")
-                }
-                Button(role: .destructive) { pendingDeletion = item } label: {
-                    Label("Supprimer", systemImage: "trash")
-                }
-            }
-            Button { model.muteNotifications(item) } label: {
-                // Ternaires sortis en variables : imbriqués dans
-                // le `Label`, ils faisaient saturer le
-                // vérificateur de types de ce bloc devenu long.
-                let muted = item.notificationsMutedByMe == true
-                let title: LocalizedStringKey = muted ? "Réactiver notifs" : "Couper notifs"
-                let icon = muted ? "bell" : "bell.slash"
-                Label(title, systemImage: icon)
-            }
-            Button(role: .destructive) { presentedSheet = .report(item) } label: {
-                Label("Signaler", systemImage: "flag")
-            }
-        }
+        .contextMenu { postMenu(for: item) }
+        // Même menu derrière le ⋯ de la carte.
+        .environment(\.feedCardMenu, AnyView(postMenu(for: item)))
+        .environment(\.feedHashtagAction, { filter(byHashtag: $0) })
+        .accessibilityAction(named: Text("Signaler")) { presentedSheet = .report(item) }
         .sqFadeUp()
         .accessibilityIdentifier("feed.item.\(item.id)")
         .onAppear {
@@ -1378,6 +1469,38 @@ struct FeedView: View {
         }
     }
 
+    /// Actions d'une publication : appui long et bouton ⋯ de la carte.
+    @ViewBuilder
+    private func postMenu(for item: UnifiedSocialFeedItem) -> some View {
+        // Réservé à l'auteur. Le serveur revérifie et répond
+        // 403 : ce masquage évite d'offrir une action vouée
+        // à échouer, il ne fait pas autorité.
+        if item.canManage {
+            Button { editingPost = item } label: {
+                Label("Modifier", systemImage: "pencil")
+            }
+            Button { model.togglePin(item) } label: {
+                Label(item.isPinned ? "Désépingler" : "Épingler",
+                      systemImage: item.isPinned ? "pin.slash" : "pin")
+            }
+            Button(role: .destructive) { pendingDeletion = item } label: {
+                Label("Supprimer", systemImage: "trash")
+            }
+        }
+        Button { model.muteNotifications(item) } label: {
+            // Ternaires sortis en variables : imbriqués dans
+            // le `Label`, ils faisaient saturer le
+            // vérificateur de types de ce bloc devenu long.
+            let muted = item.notificationsMutedByMe == true
+            let title: LocalizedStringKey = muted ? "Réactiver notifs" : "Couper notifs"
+            let icon = muted ? "bell" : "bell.slash"
+            Label(title, systemImage: icon)
+        }
+        Button(role: .destructive) { presentedSheet = .report(item) } label: {
+            Label("Signaler", systemImage: "flag")
+        }
+    }
+
     /// Signal d'engagement du classement « Pour toi », avec l'identifiant brut
     /// du post : le serveur indexe ses signaux par `post.id`, et l'identifiant
     /// du fil (« post-… ») ne comptait pour rien (SOC-19).
@@ -1389,107 +1512,117 @@ struct FeedView: View {
     ///
     /// Annoncer plutôt qu'insérer : faire remonter la liste pendant que
     /// l'utilisateur lit déplacerait ce qu'il regarde. Il décide du moment.
-    private var newPostsPill: some View {
+    private func newPostsPill(onTap: @escaping () -> Void) -> some View {
         Button {
             Haptics.selection()
+            onTap()
             Task { await model.applyPending() }
         } label: {
             HStack(spacing: SQSpace.xs + 1) {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .accessibilityHidden(true)
                 Text("\(model.pendingCount) nouveauté")
                     .font(SQType.subhead(.semibold))
             }
-            .foregroundStyle(SQColor.onAccent)
-            .padding(.horizontal, SQSpace.md)
-            .padding(.vertical, SQSpace.sm)
-            .background(SQColor.brandRed, in: Capsule(style: .continuous))
-            .sqShadowSoft()
+            .foregroundStyle(SQColor.onInk)
+            .padding(.horizontal, SQSpace.lg)
+            .frame(minHeight: 40)
+            .background(SQColor.label, in: Capsule(style: .continuous))
+            .sqShadowDock()
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
-        .frame(maxWidth: .infinity)
         .accessibilityHint("Affiche les publications reçues")
         .accessibilityIdentifier("feed.pending")
     }
 
-    /// Barre d'onglets du fil.
+    /// Onglets visibles. « Enregistrés » vit dans le menu ⋯ et ne rejoint la
+    /// rangée que tant qu'il est ouvert, pour qu'on sache où l'on est.
+    private var visibleTabs: [FeedTab] {
+        FeedTab.allCases.filter { $0 != .saved || model.tab == .saved }
+    }
+
+    /// Barre d'onglets du fil : pastilles, l'active pleine encre.
     ///
     /// Défilante horizontalement : à Dynamic Type élevé, six capsules ne tiennent
     /// pas sur une largeur d'iPhone, et une barre segmentée les tronquerait.
     private var feedTabs: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                ForEach(FeedTab.allCases) { tab in
+                ForEach(visibleTabs) { tab in
                     let selected = model.tab == tab
                     Button {
                         Haptics.selection()
                         Task { await model.select(tab) }
                     } label: {
-                        HStack(spacing: SQSpace.xs + 1) {
-                            Image(systemName: tab.systemImage)
-                                .font(.system(size: 11, weight: .semibold))
-                                .accessibilityHidden(true)
-                            Text(LocalizedStringKey(tab.title))
-                                .font(SQType.subhead(.semibold))
-                                .sqSingleLine()
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .padding(.horizontal, SQSpace.md)
-                        .padding(.vertical, SQSpace.sm)
-                        .foregroundStyle(selected ? SQColor.onAccent : SQColor.labelSecondary)
-                        .background(
-                            selected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                            in: Capsule(style: .continuous)
-                        )
+                        Text(LocalizedStringKey(tab.title))
+                            .font(SQType.subhead(.semibold))
+                            .sqSingleLine()
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, SQSpace.md2)
+                            .frame(minHeight: 34)
+                            .foregroundStyle(selected ? SQColor.onInk : SQColor.chipInk)
+                            .background(selected ? SQColor.label : SQColor.chip,
+                                        in: Capsule(style: .continuous))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                     }
-                    .buttonStyle(SQPressButtonStyle())
+                    .buttonStyle(SQPressButtonStyle(scale: 0.97))
                     // `.isSelected` plutôt qu'un libellé « sélectionné » ajouté au
                     // texte : VoiceOver l'annonce déjà, et le rotor s'en sert.
                     .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
                     .accessibilityIdentifier("feed.tab.\(tab.rawValue)")
                 }
             }
-            .padding(.horizontal, SQSpace.xl)
+            .padding(.horizontal, SQSpace.lg)
         }
         // Le rail déborde volontairement des marges de l'écran, comme celui des
-        // stories : la première capsule reste alignée à 20 pt.
-        .padding(.horizontal, -SQSpace.xl)
+        // stories : la première pastille reste alignée sur la marge.
+        .padding(.horizontal, -SQSpace.lg)
     }
 
-    private var hashtags: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm) {
-                ForEach(model.trendingHashtags) { tag in
-                    let isOn = tag.tag == model.selectedHashtag
-                    Button {
-                        Haptics.selection()
-                        model.selectedHashtag = isOn ? nil : tag.tag
-                        Task { await model.load() }
-                    } label: {
-                        Text("#\(tag.tag)")
-                            .font(.body.weight(.semibold))
-                            .padding(.horizontal, SQSpace.md + 1)
-                            .padding(.vertical, SQSpace.sm)
-                            .frame(minHeight: 44)
-                            .background(
-                                isOn ? AnyShapeStyle(SQColor.accentTextSurface) : AnyShapeStyle(SQColor.surface),
-                                in: Capsule(style: .continuous)
-                            )
-                            .foregroundStyle(isOn ? SQColor.onAccent : SQColor.label)
-                            .sqShadowSoft()
-                            .accessibilityIdentifier("feed.hashtag")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(isOn ? .isSelected : [])
-                    .accessibilityIdentifier("feed.hashtag.\(tag.tag)")
+    /// Filtre par hashtag actif : la pastille le nomme et le retire.
+    private func hashtagFilter(_ tag: String) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            Button {
+                Haptics.selection()
+                model.selectedHashtag = nil
+                Task { await model.load() }
+            } label: {
+                HStack(spacing: SQSpace.xs2) {
+                    Text("#\(tag)")
+                        .font(SQType.subhead(.semibold))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .accessibilityHidden(true)
                 }
+                .foregroundStyle(SQColor.onInk)
+                .padding(.horizontal, SQSpace.md2)
+                .frame(minHeight: 34)
+                .background(SQColor.label, in: Capsule(style: .continuous))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, SQSpace.xl)
-            .padding(.vertical, SQSpace.xs)
+            .buttonStyle(SQPressButtonStyle(scale: 0.97))
+            .accessibilityLabel(Text("Retirer le filtre #\(tag)"))
+            .accessibilityIdentifier("feed.hashtag.clear")
+            if let count = model.trendingHashtags.first(where: { $0.tag == tag })?.postCount {
+                Text("\(count) publications")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
         }
-        // Déborde du padding écran pour ne pas rogner les ombres au scroll.
-        .padding(.horizontal, -SQSpace.xl)
+    }
+
+    /// Filtre le fil sur un hashtag touché dans une carte.
+    private func filter(byHashtag tag: String) {
+        guard model.selectedHashtag != tag else { return }
+        Haptics.selection()
+        model.selectedHashtag = tag
+        Task { await model.load() }
+        scrollTopRequest = UUID()
     }
 }
 

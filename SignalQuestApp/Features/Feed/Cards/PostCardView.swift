@@ -18,7 +18,7 @@ struct PostCardView: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: SQSpace.md2) {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
                 CardHeader(
                     author: item.author,
                     place: item.placeLabel,
@@ -60,15 +60,7 @@ struct PostCardView: View {
                 }
 
                 if !item.hashtags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: SQSpace.sm) {
-                            ForEach(item.hashtags, id: \.self) { tag in
-                                Text("#\(tag)")
-                                    .font(SQType.micro)
-                                    .foregroundStyle(SQColor.brandRed)
-                            }
-                        }
-                    }
+                    CardHashtags(tags: item.hashtags)
                 }
 
                 if let signal = item.signal, signal.rsrp != nil || signal.technology != nil {

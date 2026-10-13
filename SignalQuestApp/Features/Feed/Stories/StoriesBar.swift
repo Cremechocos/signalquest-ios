@@ -13,7 +13,7 @@ struct StoriesBar: View {
             // LazyHStack : ne matérialise que les bulles visibles du rail (les stories
             // hors écran ne sont pas construites) — cf. PERF-RING-01.
             // Alignés en haut : un prénom sur deux lignes ne décale pas les cercles.
-            LazyHStack(alignment: .top, spacing: SQSpace.md2) {
+            LazyHStack(alignment: .top, spacing: SQSpace.sm) {
                 composeBubble
                 ForEach(stories) { story in
                     Button {
@@ -44,49 +44,53 @@ struct StoriesBar: View {
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
-    /// « Ta story » : avatar 60 sur la puce, initiale (ou +) en encre de puce,
-    /// badge « + » carmin 21 pt cerclé de la couleur du fond.
+    /// « Ta story » : anneau pointillé et « + » encre, comme une place libre
+    /// dans le rail plutôt qu'une story de plus.
     private var composeBubble: some View {
         Button {
             Haptics.light()
             onCompose()
         } label: {
-            VStack(spacing: SQSpace.sm - 1) {
+            VStack(spacing: SQSpace.xs2) {
                 ZStack {
                     SQAvatarShape().fill(SQColor.chip)
                     if let initial = currentUser?.displayName.first {
                         Text(String(initial).uppercased())
-                            .font(SQFont.display(22, .bold, relativeTo: .title2))
+                            .font(SQFont.display(20, .bold, relativeTo: .title2))
                             .foregroundStyle(SQColor.chipInk)
                             .accessibilityHidden(true)
                             .accessibilityIdentifier("feed.avatar.initial")
                     } else {
                         Image(systemName: "plus")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(SQColor.chipInk)
                     }
                 }
-                .frame(width: 60, height: 60)
-                .padding(3)
+                .frame(width: StoryBubble.avatarSize, height: StoryBubble.avatarSize)
+                .padding(StoryBubble.ringGap)
+                .overlay {
+                    SQAvatarShape().strokeBorder(SQColor.dots, style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
+                }
                 .overlay(alignment: .bottomTrailing) {
                     Circle()
-                        .fill(SQColor.brandRed)
-                        .frame(width: 21, height: 21)
+                        .fill(SQColor.label)
+                        .frame(width: 20, height: 20)
                         .overlay(
                             Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(SQColor.onAccent)
+                                .font(.system(size: 10, weight: .heavy))
+                                .foregroundStyle(SQColor.onInk)
                         )
                         .overlay(Circle().stroke(SQColor.bg, lineWidth: 2))
+                        .offset(x: 3, y: 3)
                 }
                 Text("Ta story")
-                    .font(.footnote)
-                    .foregroundStyle(SQColor.label)
+                    .font(SQType.caption(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(width: 72)
+                    .frame(width: 68)
                     .accessibilityIdentifier("feed.story.name")
             }
         }
@@ -99,30 +103,34 @@ struct StoryBubble: View {
     let story: SocialStory
     var viewed: Bool? = nil
 
+    /// Avatar 52 pt dans un anneau décollé de 4 pt : 60 pt de bulle.
+    static let avatarSize: CGFloat = 52
+    static let ringGap: CGFloat = 4
+
     var body: some View {
         let isViewed = viewed ?? (story.viewedByMe == true)
-        VStack(spacing: SQSpace.sm - 1) {
-            // Anneau décollé de 3 pt : carmin 3 pt (non vue) / encre 25 % 1,5 pt (vue).
-            SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 60)
-                .padding(3)
+        VStack(spacing: SQSpace.xs2) {
+            // Carmin 2,5 pt tant qu'elle n'est pas vue, filet gris ensuite.
+            SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: Self.avatarSize)
+                .padding(Self.ringGap)
                 .overlay {
                     if isViewed {
-                        SQAvatarShape().strokeBorder(SQColor.label.opacity(0.25), lineWidth: 1.5)
+                        SQAvatarShape().strokeBorder(SQColor.separator, lineWidth: 2)
                     } else {
-                        SQStoryRing(lineWidth: 3)
+                        SQStoryRing(lineWidth: 2.5)
                     }
                 }
             // Largeur du cercle : en très grand texte, les prénoms débordaient et
             // se chevauchaient (UI-15). Deux lignes centrées et une réduction
             // modérée plutôt qu'une troncature ; VoiceOver lit le nom entier.
             Text(story.author.displayName)
-                .font(.footnote)
-                .foregroundStyle(SQColor.label)
+                .font(SQType.caption(.semibold))
+                .foregroundStyle(isViewed ? SQColor.labelSecondary : SQColor.label)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(width: 72)
+                .frame(width: 68)
                 .accessibilityIdentifier("feed.story.name")
         }
         .accessibilityElement(children: .combine)
