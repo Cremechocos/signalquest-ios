@@ -29,21 +29,21 @@ struct RemoteVoiceNoteBubble: View {
         HStack(spacing: SQSpace.md) {
             ZStack {
                 Circle()
-                    .fill(mine ? SQColor.onAccent : SQColor.brandRed)
+                    .fill(mine ? SQColor.onInk : SQColor.brandRed)
                     .frame(width: 34, height: 34)
                 if failed {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(mine ? SQColor.brandRed : SQColor.onAccent)
+                        .foregroundStyle(mine ? SQColor.label : SQColor.onAccent)
                 } else {
                     SQSpinner()
                         .controlSize(.small)
-                        .tint(mine ? SQColor.brandRed : SQColor.onAccent)
+                        .tint(mine ? SQColor.label : SQColor.onAccent)
                 }
             }
             Text(failed ? "Note vocale indisponible" : "Note vocale")
                 .font(SQType.subhead(.semibold))
-                .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
         }
         .frame(minWidth: 180, minHeight: 44, alignment: .leading)
         .contentShape(Rectangle())

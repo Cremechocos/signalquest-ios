@@ -40,37 +40,52 @@ struct VoiceNoteRecordingBar: View {
     let onStop: () -> Void
 
     var body: some View {
-        HStack(spacing: SQSpace.md) {
+        // Corbeille ronde, capsule rouge avec le niveau et la durée, puis la
+        // coche encre qui termine l'enregistrement.
+        HStack(spacing: SQSpace.sm) {
             Button(action: onCancel) {
                 Image(systemName: "trash")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(SQColor.dangerInk)
                     .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .sqSurface(SQColor.chip, in: Circle())
+                    .contentShape(Circle())
             }
             .accessibilityLabel("Annuler l'enregistrement")
 
-            VoiceWaveform(levels: VoiceNoteRecorder.waveform(from: recorder.levels))
-                .frame(height: 28)
-
-            Text(VoiceNotePlayer.formatted(recorder.duration))
-                .font(SQType.subhead(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(SQColor.labelSecondary)
+            HStack(spacing: SQSpace.sm) {
+                Circle()
+                    .fill(SQColor.dangerInk)
+                    .frame(width: 9, height: 9)
+                    .accessibilityHidden(true)
+                VoiceWaveform(
+                    levels: VoiceNoteRecorder.waveform(from: recorder.levels),
+                    tint: SQColor.dangerInk,
+                    inactive: SQColor.dangerInk.opacity(0.7)
+                )
+                .frame(height: 24)
+                Text(VoiceNotePlayer.formatted(recorder.duration))
+                    .font(SQType.subhead(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.dangerInk)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 44)
+            .background(SQColor.dangerSoft, in: Capsule(style: .continuous))
 
             Button(action: onStop) {
-                Image(systemName: "stop.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(SQColor.brandRed)
+                Image(systemName: "checkmark")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(SQColor.onInk)
                     .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .background(SQColor.label, in: Circle())
+                    .contentShape(Circle())
             }
             .accessibilityLabel("Terminer l’enregistrement")
             .accessibilityIdentifier("voiceNote.stop")
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
-        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
         // Un enregistrement en cours DOIT être annoncé : sans cela, un
         // utilisateur de VoiceOver ne saurait pas que le micro est ouvert.
         .accessibilityElement(children: .contain)
@@ -154,9 +169,9 @@ struct VoiceNoteBubble: View {
             } label: {
                 Image(systemName: player.isPlaying(url) ? "stop.fill" : "play.fill")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(mine ? SQColor.brandRed : SQColor.onAccent)
+                    .foregroundStyle(mine ? SQColor.label : SQColor.onAccent)
                     .frame(width: 34, height: 34)
-                    .background(mine ? SQColor.onAccent : SQColor.brandRed, in: Circle())
+                    .background(mine ? SQColor.onInk : SQColor.brandRed, in: Circle())
                     // Zone tactile de 44 pt autour du rond de 34 pt, sans agrandir la bulle.
                     .padding(5)
                     .contentShape(Rectangle())
@@ -167,15 +182,15 @@ struct VoiceNoteBubble: View {
             VoiceWaveform(
                 levels: levels,
                 progress: player.isPlaying(url) ? player.progress : 0,
-                tint: mine ? SQColor.onAccent : SQColor.brandRed,
-                inactive: mine ? SQColor.onAccent.opacity(0.35) : SQColor.labelTertiary
+                tint: mine ? SQColor.onInk : SQColor.brandRed,
+                inactive: mine ? SQColor.onInk.opacity(0.35) : SQColor.labelTertiary
             )
             .frame(height: 26)
 
             Text(VoiceNotePlayer.formatted(player.isPlaying(url) ? player.duration : duration))
                 .font(SQType.micro)
                 .monospacedDigit()
-                .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
         }
         .frame(minWidth: 180)
         // Annoncé d'un bloc : « Note vocale, 0:14 ». Balayer la forme d'onde

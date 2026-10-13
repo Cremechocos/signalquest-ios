@@ -109,10 +109,10 @@ struct ThreadView: View {
                 }
                 Text(displayedContent(for: reply))
                     .font(SQType.body)
-                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
                     .padding(.vertical, 11)
                     .padding(.horizontal, 15)
-                    .background(mine ? SQColor.brandRed : SQColor.surface, in: bubbleShape(mine: mine))
+                    .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine))
                     .sqShadowSoft()
             }
             if !mine { Spacer(minLength: 40) }

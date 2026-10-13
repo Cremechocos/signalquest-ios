@@ -22,17 +22,17 @@ struct PollBubble: View {
             HStack(alignment: .top, spacing: SQSpace.sm) {
                 Image(systemName: "chart.bar.fill")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.brandRed)
                     .frame(width: 36, height: 36)
-                    .background(mine ? SQColor.onAccent.opacity(0.18) : SQColor.accentSoft, in: Circle())
+                    .background(mine ? SQColor.onInk.opacity(0.18) : SQColor.accentSoft, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(poll.question.isEmpty ? String(localized: "Sondage") : poll.question)
                         .font(SQType.heading)
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
                     Text(metaLine)
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                 }
                 Spacer(minLength: 0)
                 if effectivelyClosed {
@@ -40,8 +40,8 @@ struct PollBubble: View {
                         .font(SQType.micro)
                         .padding(.horizontal, SQSpace.sm)
                         .padding(.vertical, 3)
-                        .background((mine ? SQColor.onAccent.opacity(0.18) : SQColor.surfaceMuted), in: Capsule())
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                        .background((mine ? SQColor.onInk.opacity(0.18) : SQColor.surfaceMuted), in: Capsule())
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
@@ -60,7 +60,7 @@ struct PollBubble: View {
                 } label: {
                     Label("Clôturer le sondage", systemImage: "lock")
                         .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.brandRed)
                 }
                 .buttonStyle(.plain)
             }
@@ -82,7 +82,7 @@ struct PollBubble: View {
     private func optionRow(_ option: PollOption) -> some View {
         let votedByMe = poll.votesByMe.contains(option.id)
         let ratio = Double(option.count) / Double(totalVotes)
-        let fillColor = mine ? SQColor.onAccent.opacity(0.26) : SQColor.accentSoft
+        let fillColor = mine ? SQColor.onInk.opacity(0.26) : SQColor.accentSoft
         return Button {
             guard !effectivelyClosed else { return }
             Haptics.selection()
@@ -97,22 +97,22 @@ struct PollBubble: View {
                 HStack(spacing: SQSpace.sm) {
                     Image(systemName: votedByMe ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(votedByMe ? (mine ? SQColor.onAccent : SQColor.brandRed) : (mine ? SQColor.onAccent.opacity(0.7) : SQColor.labelTertiary))
+                        .foregroundStyle(votedByMe ? (mine ? SQColor.onInk : SQColor.brandRed) : (mine ? SQColor.onInk.opacity(0.7) : SQColor.labelTertiary))
                         .accessibilityHidden(true)
                     Text(option.text.isEmpty ? option.id : option.text)
                         .font(SQType.caption.weight(votedByMe ? .semibold : .regular))
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
                         .lineLimit(2)
                     Spacer(minLength: SQSpace.sm)
                     Text("\(option.count)")
                         .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                 }
                 .padding(.horizontal, SQSpace.sm2)
                 .padding(.vertical, SQSpace.sm)
                 .frame(minHeight: 44)
             }
-            .background((mine ? SQColor.onAccent.opacity(0.10) : SQColor.surfaceMuted), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .background((mine ? SQColor.onInk.opacity(0.10) : SQColor.surfaceMuted), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         }
         .buttonStyle(.plain)

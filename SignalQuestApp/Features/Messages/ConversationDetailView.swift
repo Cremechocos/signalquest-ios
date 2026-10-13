@@ -291,8 +291,11 @@ struct ConversationDetailView: View {
                             VStack(spacing: 0) {
                                 if let stamp {
                                     Text(stamp)
-                                        .font(SQType.caption)
-                                        .foregroundStyle(SQColor.labelSecondary)
+                                        .font(SQType.micro)
+                                        .foregroundStyle(SQColor.chipInk)
+                                        .padding(.horizontal, SQSpace.sm2)
+                                        .padding(.vertical, 4)
+                                        .background(SQColor.chip, in: Capsule(style: .continuous))
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, SQSpace.sm)
                                         .accessibilityIdentifier("conversation.stamp")
@@ -709,40 +712,34 @@ struct ConversationDetailView: View {
 
     /// Barre haute custom (glass) : retour 38 pt, avatar 42, nom + « en ligne »,
     /// appel + menu d'options — remplace la barre de navigation système.
+    /// Barre du haut Halo : retour rond, avatar et nom avec le statut, puis
+    /// Appeler et ⋯ en boutons ronds, sur le fond de page avec un filet.
     private var topBar: some View {
-        HStack(spacing: SQSpace.md) {
-            Button {
-                Haptics.light()
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(SQColor.label)
-                    .frame(width: 38, height: 38)
-                    .sqSurface(SQColor.surface, in: Circle())
-                    .sqShadowSoft()
-            }
-            .buttonStyle(.plain)
-            .frame(width: 44, height: 44)
-            .accessibilityLabel("Retour")
+        HStack(spacing: SQSpace.sm2) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "conversation.back") { dismiss() }
 
             // Avatar, nom et statut forment un seul élément VoiceOver : seule,
             // l'initiale masquée de l'avatar restait un texte non exposé. En
             // conversation chiffrée, le double-tap ouvre l'explication.
-            HStack(spacing: SQSpace.md) {
-                SQAvatar(
-                    url: conversation.groupPhotoUrl ?? otherParticipantAvatarURL,
-                    name: conversationTitle,
-                    size: 42
-                )
-                .accessibilityHidden(true)
+            HStack(spacing: SQSpace.sm2) {
+                ConversationAvatar(conversation: conversation, currentUserId: currentUserId, size: 38)
+                    .overlay(alignment: .bottomTrailing) {
+                        if otherIsOnline {
+                            Circle()
+                                .fill(SQColor.brandGreen)
+                                .frame(width: 12, height: 12)
+                                .overlay { Circle().stroke(SQColor.bg, lineWidth: 2.5) }
+                                .offset(x: 2, y: 2)
+                        }
+                    }
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
                         // Deux lignes, puis réduction : en très grand texte, le nom
                         // était coupé.
                         Text(conversationTitle)
-                            .font(SQType.rowTitle)
+                            .font(SQType.body(.semibold))
                             .foregroundStyle(SQColor.label)
                             .lineLimit(2)
                             .minimumScaleFactor(0.6)
@@ -752,15 +749,22 @@ struct ConversationDetailView: View {
                             size: 12
                         )
                     }
-                    if otherIsOnline || isE2EE {
+                    if otherIsOnline || isE2EE || conversation.isGroup {
                         HStack(spacing: 4) {
                             if otherIsOnline {
                                 Text("en ligne")
-                                    .font(SQType.micro(.regular))
+                                    .font(SQType.micro)
                                     .foregroundStyle(SQColor.success)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.6)
                                     .accessibilityIdentifier("conversation.status")
+                            } else if conversation.isGroup && !isE2EE {
+                                Text("\(conversation.participants.count) membres")
+                                    .font(SQType.micro(.regular))
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
+                                    .accessibilityIdentifier("conversation.members")
                             }
                             // La limite du chiffrement reste visible dans la conversation
                             // même, et s'explique au toucher (SOC-07).
@@ -803,10 +807,11 @@ struct ConversationDetailView: View {
                     }
                 } label: {
                     Image(systemName: "phone")
-                        .font(.system(size: 17, weight: .medium))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(networkPath.isOnline ? SQColor.label : SQColor.labelTertiary)
                         .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                        .sqSurface(SQColor.chip, in: Circle())
+                        .contentShape(Circle())
                 }
                 // CALL-OFFLINE-21 : grisé + désactivé hors-ligne (un appel
                 // lancé sans réseau échouerait et ferait flasher l'écran).
@@ -861,19 +866,19 @@ struct ConversationDetailView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .sqSurface(SQColor.chip, in: Circle())
+                    .contentShape(Circle())
             }
             .accessibilityLabel("Plus d’options")
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.vertical, SQSpace.sm)
         .background {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(SQColor.surfaceGlass)
+            SQColor.bg
+                .overlay(alignment: .bottom) { Rectangle().fill(SQColor.separator).frame(height: 1) }
                 .ignoresSafeArea(edges: .top)
         }
     }
@@ -955,9 +960,8 @@ struct ConversationDetailView: View {
             )
         }
         .background {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(SQColor.surfaceGlass)
+            SQColor.bg
+                .overlay(alignment: .top) { Rectangle().fill(SQColor.separator).frame(height: 1) }
                 .ignoresSafeArea(edges: .bottom)
         }
     }
@@ -969,8 +973,10 @@ struct ConversationDetailView: View {
         return "Répondre au message"
     }
 
+    /// Citation au-dessus du champ (réponse ou modification) : carte avec un
+    /// liseré carmin et une croix ronde.
     private func quoteBar(title: LocalizedStringKey, text: String, onClose: @escaping () -> Void) -> some View {
-        HStack(spacing: SQSpace.sm) {
+        HStack(spacing: SQSpace.sm2) {
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(SQColor.brandRed)
                 .frame(width: 3, height: 32)
@@ -983,16 +989,23 @@ struct ConversationDetailView: View {
                     .foregroundStyle(SQColor.labelSecondary)
                     .sqSingleLine()
             }
-            Spacer()
+            Spacer(minLength: SQSpace.sm)
             Button { onClose() } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(SQColor.labelTertiary)
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 28, height: 28)
+                    .background(SQColor.chip, in: Circle())
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Fermer")
         }
-        .padding(.horizontal)
+        .padding(.leading, SQSpace.sm2)
+        .padding(.vertical, 2)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .padding(.horizontal, SQSpace.md)
         .padding(.top, SQSpace.sm)
     }
 
@@ -1004,9 +1017,10 @@ struct ConversationDetailView: View {
         let photoOnly = isPhotoOnlyMessage(message)
         return HStack(alignment: .bottom, spacing: SQSpace.sm) {
             if mine { Spacer(minLength: 72) }
-            // Avatar de groupe : uniquement sur le DERNIER message d'une série
-            // entrante ; les autres bulles réservent la largeur pour l'alignement.
-            if !mine && conversation.isGroup {
+            // Avatar de l'expéditeur : uniquement sur le DERNIER message d'une
+            // série entrante ; les autres bulles réservent la largeur pour
+            // l'alignement.
+            if !mine {
                 if isGroupEnd {
                     SQAvatar(url: message.sender?.avatarUrl, name: message.sender?.displayName ?? "?", size: 26)
                         .accessibilityHidden(true)
@@ -1015,7 +1029,7 @@ struct ConversationDetailView: View {
                 }
             }
             VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs) {
-                bubbleBody(for: message, mine: mine, isGroupStart: isGroupStart, photoOnly: photoOnly, reactions: reactions)
+                bubbleBody(for: message, mine: mine, isGroupStart: isGroupStart, isGroupEnd: isGroupEnd, photoOnly: photoOnly, reactions: reactions)
                 if sendStatus[message.id] == .failed {
                     failedRetryRow(for: message)
                 }
@@ -1030,14 +1044,14 @@ struct ConversationDetailView: View {
     /// EST la bulle — pas de cadre brique/surface autour), avec les réactions
     /// posées en capsules qui chevauchent légèrement le bas de la bulle.
     @ViewBuilder
-    private func bubbleBody(for message: MessageItem, mine: Bool, isGroupStart: Bool, photoOnly: Bool, reactions: [MessageReactionSummary]) -> some View {
+    private func bubbleBody(for message: MessageItem, mine: Bool, isGroupStart: Bool, isGroupEnd: Bool, photoOnly: Bool, reactions: [MessageReactionSummary]) -> some View {
         Group {
             if photoOnly {
                 attachmentsView(for: message, mine: mine, standalone: true)
             } else if let embed = sharedPostEmbedTarget(for: message) {
                 standaloneSharedPostEmbed(message: message, card: embed.card, postId: embed.postId, mine: mine, isGroupStart: isGroupStart)
             } else {
-                classicBubble(for: message, mine: mine, isGroupStart: isGroupStart)
+                classicBubble(for: message, mine: mine, isGroupStart: isGroupStart, isGroupEnd: isGroupEnd)
             }
         }
         .sqShadowSoft()
@@ -1102,7 +1116,7 @@ struct ConversationDetailView: View {
         }
     }
 
-    private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool) -> some View {
+    private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool, isGroupEnd: Bool) -> some View {
             let card = shareCard(for: message)
             // Contenu interactif dans la bulle (embed de publication, photo
             // tappable) : on garde les éléments d'accessibilité séparés
@@ -1129,7 +1143,7 @@ struct ConversationDetailView: View {
                             RoundedRectangle(cornerRadius: 2, style: .continuous)
                                 // 0,6 donnait 2,82:1 : sous le seuil de 3:1 que
                                 // WCAG 1.4.11 impose aux objets graphiques.
-                                .fill(mine ? SQColor.onAccent.opacity(0.7) : SQColor.brandRed)
+                                .fill(mine ? SQColor.onInk.opacity(0.7) : SQColor.brandRed)
                                 .frame(width: 3)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(quoted.sender?.displayName ?? String(localized: "Message"))
@@ -1141,7 +1155,7 @@ struct ConversationDetailView: View {
                         }
                         .opacity(0.75)
                         .padding(SQSpace.xs2)
-                        .background((mine ? SQColor.onAccent.opacity(0.14) : SQColor.surfaceMuted.opacity(0.6)), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                        .background((mine ? SQColor.onInk.opacity(0.14) : SQColor.surfaceMuted.opacity(0.6)), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -1150,7 +1164,7 @@ struct ConversationDetailView: View {
                 if message.deletedAt != nil {
                     Text("Message supprimé")
                         .font(SQType.caption.italic())
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                 } else if let shareCard = card {
                     // Partage envoyé par Android (publication / signal / speedtest / session…).
                     // La publication (`social_post`) est testée EN PREMIER car elle peut
@@ -1195,7 +1209,7 @@ struct ConversationDetailView: View {
                     if !text.isEmpty {
                         Text(text)
                             .font(SQType.body)
-                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                            .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
                             .accessibilityIdentifier("message.text")
                         // Aperçu lu par le serveur : jamais dans une conversation chiffrée.
                         if !isE2EE, message.deletedAt == nil, text.contains("http") {
@@ -1212,19 +1226,19 @@ struct ConversationDetailView: View {
                     if let created = message.createdAt {
                         Text(created, format: .dateTime.hour().minute())
                             .font(SQType.micro(.regular))
-                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                            .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                             .accessibilityIdentifier("message.time")
                     }
                     if message.expiresAt != nil && message.deletedAt == nil {
                         Image(systemName: "timer")
                             .font(.system(size: 11))
-                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                            .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                             .accessibilityLabel("Message éphémère")
                     }
                     if message.editedAt != nil && message.deletedAt == nil {
                         Text("modifié")
                             .font(SQType.micro(.regular))
-                            .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                            .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                             .accessibilityIdentifier("message.time.edited")
                     }
                     sendStatusIndicator(for: message)
@@ -1232,11 +1246,11 @@ struct ConversationDetailView: View {
             }
             .padding(.vertical, 11)
             .padding(.horizontal, 15)
-            .background(mine ? SQColor.brandRed : SQColor.surface, in: bubbleShape(mine: mine))
+            .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine, first: isGroupStart, last: isGroupEnd))
             // En OLED, bulle reçue et fond sont noirs : le liseré des cartes
             // la détache (SOC-26). Transparent hors OLED.
             .overlay {
-                if !mine { bubbleShape(mine: false).stroke(SQOledPalette.cardStroke, lineWidth: 1) }
+                if !mine { bubbleShape(mine: false, first: isGroupStart, last: isGroupEnd).stroke(SQOledPalette.cardStroke, lineWidth: 1) }
             }
             .modifier(SpokenBubble(summary: spokenSummary, interactive: hasInteractiveContent))
     }
@@ -1288,12 +1302,12 @@ struct ConversationDetailView: View {
                         .padding(.vertical, 4)
                         .background {
                             // Base opaque `surface` (la capsule chevauche la bulle) ;
-                            // ma réaction reçoit la teinte accentSoft par-dessus.
+                            // ma réaction est cerclée de carmin.
                             Capsule(style: .continuous)
                                 .fill(SQColor.surface)
                                 .overlay(
                                     Capsule(style: .continuous)
-                                        .fill(reaction.mine ? SQColor.accentSoft : Color.clear)
+                                        .strokeBorder(reaction.mine ? SQColor.brandRed : SQColor.separator, lineWidth: 1)
                                 )
                         }
                         .sqShadowSoft()
@@ -1317,13 +1331,13 @@ struct ConversationDetailView: View {
 
     /// Statut d'envoi optimiste dans la ligne méta (MSG-API-01). En cours :
     /// spinner discret (la bulle passe aussi à 0.7 d'opacité). L'échec est porté
-    /// par `failedRetryRow`, SOUS la bulle (le danger sur fond brique serait illisible).
+    /// par `failedRetryRow`, SOUS la bulle (le danger sur fond encre serait illisible).
     @ViewBuilder
     private func sendStatusIndicator(for message: MessageItem) -> some View {
         if sendStatus[message.id] == .sending {
             SQSpinner()
                 .controlSize(.mini)
-                .tint(SQColor.onAccent.opacity(0.8))
+                .tint(SQColor.onInk.opacity(0.8))
                 .accessibilityLabel("Envoi en cours")
         }
     }
@@ -1378,18 +1392,15 @@ struct ConversationDetailView: View {
                 threadTarget = message
             } label: {
                 HStack(spacing: SQSpace.xs) {
-                    Image(systemName: "bubble.left.and.bubble.right.fill")
-                        .font(.system(size: 11))
+                    Image(systemName: "bubble.left.and.bubble.right")
+                        .font(.system(size: 12, weight: .semibold))
                         .accessibilityHidden(true)
                     Text("\(count) réponse")
                         .font(SQType.micro)
-                        .foregroundStyle(SQColor.accentInk)
                 }
-                .padding(.horizontal, SQSpace.sm)
+                .foregroundStyle(SQColor.accentInk)
+                .padding(.horizontal, SQSpace.xs)
                 .padding(.vertical, 4)
-                .sqSurface(SQColor.surface, in: Capsule())
-                .sqShadowSoft()
-                .foregroundStyle(SQColor.brandRed)
                 // Zone tactile de 44 pt sans changer la hauteur du badge.
                 .padding(.vertical, 11)
                 .contentShape(Rectangle())
@@ -1404,23 +1415,26 @@ struct ConversationDetailView: View {
         HStack(alignment: .top, spacing: SQSpace.xs2) {
             Image(systemName: "waveform")
                 .font(.system(size: 11))
-                .foregroundStyle(mine ? SQColor.onAccent.opacity(0.75) : SQColor.labelSecondary)
+                .foregroundStyle(mine ? SQColor.onInk.opacity(0.75) : SQColor.labelSecondary)
                 .accessibilityHidden(true)
             Text(text)
                 .font(SQType.caption.italic())
-                .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
         }
         .padding(.top, SQSpace.xs)
     }
 
     /// Coins asymétriques DA : le coin bas côté émetteur est plus petit,
-    /// comme une « pointe » de bulle.
-    private func bubbleShape(mine: Bool) -> UnevenRoundedRectangle {
-        UnevenRoundedRectangle(
-            topLeadingRadius: SQRadius.xl,
-            bottomLeadingRadius: mine ? SQRadius.xl : 6,
-            bottomTrailingRadius: mine ? 6 : SQRadius.xl,
-            topTrailingRadius: SQRadius.xl,
+    /// comme une « pointe » de bulle. Dans une série du même auteur, les coins
+    /// côté émetteur se resserrent entre deux bulles.
+    private func bubbleShape(mine: Bool, first: Bool = true, last: Bool = true) -> UnevenRoundedRectangle {
+        let top: CGFloat = first ? SQRadius.xl : 8
+        let bottom: CGFloat = last ? 6 : 8
+        return UnevenRoundedRectangle(
+            topLeadingRadius: mine ? SQRadius.xl : top,
+            bottomLeadingRadius: mine ? SQRadius.xl : bottom,
+            bottomTrailingRadius: mine ? bottom : SQRadius.xl,
+            topTrailingRadius: mine ? top : SQRadius.xl,
             style: .continuous
         )
     }
@@ -1702,31 +1716,31 @@ struct ConversationDetailView: View {
             HStack(spacing: SQSpace.sm) {
                 Image(systemName: "doc.fill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.brandRed)
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.brandRed)
                     .frame(width: 36, height: 36)
-                    .background(mine ? SQColor.onAccent.opacity(0.16) : SQColor.accentSoft, in: Circle())
+                    .background(mine ? SQColor.onInk.opacity(0.16) : SQColor.accentSoft, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(attachment.fileName ?? String(localized: "Pièce jointe"))
                         .font(SQType.subhead(.semibold))
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
                         .lineLimit(1)
                             .truncationMode(.middle)
                         .truncationMode(.middle)
                     Text(fileMetaLine(attachment))
                         .font(SQType.micro)
-                        .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                         .lineLimit(2)
                 }
                 Spacer(minLength: SQSpace.sm)
                 Image(systemName: "arrow.down.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundStyle(mine ? SQColor.onAccent.opacity(0.9) : SQColor.brandRed)
+                    .foregroundStyle(mine ? SQColor.onInk.opacity(0.9) : SQColor.brandRed)
                     .accessibilityHidden(true)
             }
             .padding(SQSpace.sm)
             .frame(minWidth: 200, alignment: .leading)
-            .background(mine ? SQColor.onAccent.opacity(0.10) : SQColor.surfaceMuted,
+            .background(mine ? SQColor.onInk.opacity(0.10) : SQColor.surfaceMuted,
                         in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             .contentShape(Rectangle())
         }
@@ -1758,36 +1772,36 @@ struct ConversationDetailView: View {
                 scrollTargetId = pinned.messageId
                 Haptics.selection()
             } label: {
-                HStack(spacing: SQSpace.sm) {
+                HStack(spacing: SQSpace.sm2) {
                     Image(systemName: "pin.fill")
-                        .font(.system(size: 11))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SQColor.brandRed)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(pinnedMessages.count > 1 ? "\(pinnedMessages.count) messages épinglés" : "Message épinglé")
                             .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .foregroundStyle(SQColor.accentInk)
                         Text(pinnedSnippet(pinned))
-                            .font(SQType.caption)
+                            .font(SQType.subhead(.regular))
                             .foregroundStyle(SQColor.label)
                             .sqSingleLine()
                     }
-                    Spacer()
+                    Spacer(minLength: SQSpace.sm)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(SQColor.labelTertiary)
                         .accessibilityHidden(true)
                 }
                 .padding(.horizontal, SQSpace.md)
-                .padding(.vertical, SQSpace.sm)
-                .frame(maxWidth: .infinity)
-                .background(SQColor.surface)
-                .overlay(alignment: .bottom) { Divider().overlay(SQColor.separator) }
-                .overlay(alignment: .leading) {
-                    Rectangle().fill(SQColor.brandRed).frame(width: 3)
-                }
+                .padding(.vertical, SQSpace.sm2)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.top, SQSpace.sm)
+            .accessibilityIdentifier("conversation.pinned")
         }
     }
 
@@ -1808,11 +1822,28 @@ struct ConversationDetailView: View {
                 receipt.userId != currentUserId && (receipt.lastReadAt ?? .distantPast) >= lastDate
             }
             if !seenBy.isEmpty {
-                Text("Vu par \(seenBy.compactMap { $0.name }.joined(separator: ", "))")
-                    .font(SQType.micro)
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.top, SQSpace.xs)
+                // À deux : « Lu » et la double coche ; en groupe : qui a vu.
+                Group {
+                    if conversation.isGroup {
+                        Text("Vu par \(seenBy.compactMap { $0.name }.joined(separator: ", "))")
+                    } else {
+                        HStack(spacing: 4) {
+                            ZStack(alignment: .leading) {
+                                Image(systemName: "checkmark")
+                                Image(systemName: "checkmark").offset(x: 5)
+                            }
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.trailing, 5)
+                            .accessibilityHidden(true)
+                            Text("Lu")
+                        }
+                    }
+                }
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.top, SQSpace.xs)
+                .accessibilityIdentifier("conversation.readReceipt")
             }
         }
     }

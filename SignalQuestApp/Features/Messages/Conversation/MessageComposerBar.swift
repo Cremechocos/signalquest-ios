@@ -114,8 +114,10 @@ struct MessageComposerBar: View {
         }
     }
 
+    /// « + » rond, champ blanc avec le trombone dedans, puis micro rond ou
+    /// envoi encre dès qu'il y a du texte.
     private var inputRow: some View {
-        HStack(spacing: SQSpace.sm2) {
+        HStack(alignment: .bottom, spacing: SQSpace.sm) {
             Menu {
                 if canSchedule {
                     Button { onSchedule(text) } label: {
@@ -141,51 +143,53 @@ struct MessageComposerBar: View {
                 }
             } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .medium))
-                    .frame(width: 36, height: 36)
-                    .sqSurface(SQColor.surfaceMuted, in: Circle())
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(SQColor.label)
                     .frame(width: 44, height: 44)
+                    .sqSurface(SQColor.chip, in: Circle())
                     .contentShape(Circle())
             }
             .disabled(!canSend || isSending || isSharingLocation)
             .accessibilityLabel("Plus d'actions")
 
-            if !isE2EE {
-                PhotosPicker(selection: $pickerItem, matching: .images) {
-                    Image(systemName: "paperclip")
-                        .font(.system(size: 15, weight: .medium))
-                        .frame(width: 36, height: 36)
-                        .sqSurface(SQColor.surfaceMuted, in: Circle())
-                        .foregroundStyle(SQColor.label)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Circle())
-                }
-                .disabled(!canSend || isSending)
-                .accessibilityLabel("Joindre une photo")
-            }
+            HStack(alignment: .bottom, spacing: 0) {
+                TextField(canSend ? "Message…" : "Chiffrement à déverrouiller", text: $text, axis: .vertical)
+                    .lineLimit(1...4)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .focused($fieldFocused)
+                    .padding(.leading, SQSpace.cardPadding)
+                    .padding(.trailing, isE2EE ? SQSpace.cardPadding : SQSpace.xs)
+                    .padding(.vertical, SQSpace.sm)
+                    .frame(minHeight: 44)
+                    .disabled(!canSend)
+                    .accessibilityIdentifier("composer.field")
 
-            TextField(canSend ? "Message…" : "Chiffrement à déverrouiller", text: $text, axis: .vertical)
-                .lineLimit(1...4)
-                .font(SQType.body)
-                .foregroundStyle(SQColor.label)
-                .focused($fieldFocused)
-                .padding(.horizontal, SQSpace.cardPadding)
-                .padding(.vertical, SQSpace.sm)
-                .frame(minHeight: 44)
-                // Toute la capsule ouvre le clavier, pas seulement la ligne de
-                // texte qu'elle entoure : le fond reçoit les touchers autour.
-                .background {
-                    RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                        .fill(SQColor.surfaceMuted)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous)
-                                .strokeBorder(SQOledPalette.fieldStroke, lineWidth: 1)
-                        }
-                        .onTapGesture { if canSend { fieldFocused = true } }
+                // Le trombone vit dans le champ ; la photo part avec le texte
+                // déjà tapé en légende.
+                if !isE2EE {
+                    PhotosPicker(selection: $pickerItem, matching: .images) {
+                        Image(systemName: "paperclip")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .disabled(!canSend || isSending)
+                    .accessibilityLabel("Joindre une photo")
                 }
-                .disabled(!canSend)
-                .accessibilityIdentifier("composer.field")
+            }
+            // Toute la capsule ouvre le clavier, pas seulement la ligne de
+            // texte qu'elle entoure : le fond reçoit les touchers autour.
+            .background {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(SQColor.surface)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .strokeBorder(SQColor.separator, lineWidth: 1)
+                    }
+                    .onTapGesture { if canSend { fieldFocused = true } }
+            }
 
             // Micro OU envoi, selon qu'il y a du texte : c'est la convention de
             // toutes les messageries, et ça évite un bouton de plus dans une
@@ -195,33 +199,35 @@ struct MessageComposerBar: View {
                     Haptics.selection()
                     Task { await recorder.start() }
                 } label: {
-                    Image(systemName: "mic.fill")
+                    Image(systemName: "mic")
                         .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(SQColor.label)
                         .frame(width: 44, height: 44)
-                        .sqSurface(SQColor.surfaceMuted, in: Circle())
-                        .foregroundStyle(SQColor.brandRed)
+                        .sqSurface(SQColor.chip, in: Circle())
+                        .contentShape(Circle())
                 }
                 .disabled(!canSend)
                 .accessibilityLabel("Enregistrer une note vocale")
             } else {
+            let sendable = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending && canSend
             Button {
                 onSend(text)
             } label: {
                 Image(systemName: isSending ? "hourglass" : "paperplane.fill")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(sendable ? SQColor.onInk : SQColor.labelTertiary)
                     .frame(width: 44, height: 44)
-                    .background(SQColor.brandRed, in: Circle())
-                    .foregroundStyle(SQColor.onAccent)
-                    .sqShadowAccent()
+                    .background(sendable ? SQColor.label : SQColor.chip, in: Circle())
+                    .contentShape(Circle())
             }
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending || !canSend)
+            .disabled(!sendable)
             // ⌘↩ au clavier de l'iPad ; Retour seul garde le saut de ligne.
             .keyboardShortcut(.return, modifiers: .command)
             .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer le message")
             }
         }
-        .padding(.horizontal, SQSpace.md2)
-        .padding(.vertical, SQSpace.sm2)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
         .onChangeCompat(of: text) { _, newValue in
             onTyping(newValue)
             refreshMentions()
@@ -252,7 +258,7 @@ struct MessageComposerBar: View {
                         }
                         .padding(.horizontal, SQSpace.md)
                         .frame(minHeight: 44)
-                        .sqSurface(SQColor.surfaceMuted, in: Capsule())
+                        .sqSurface(SQColor.chip, in: Capsule())
                         .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)

@@ -91,20 +91,20 @@ struct MessageLinkPreview: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(verbatim: title)
                 .font(SQType.subhead(.semibold))
-                .foregroundStyle(mine ? SQColor.onAccent : SQColor.label)
+                .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             if !source.isEmpty {
                 Text(verbatim: source)
                     .font(SQType.micro(.regular))
-                    .foregroundStyle(mine ? SQColor.onAccent : SQColor.labelSecondary)
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
                     .sqSingleLine()
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .background(mine ? SQColor.onAccent.opacity(0.14) : SQColor.surfaceMuted,
+        .background(mine ? SQColor.onInk.opacity(0.14) : SQColor.surfaceMuted,
                     in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         // En OLED, fond atténué et bulle sont noirs : le liseré des cartes la détache.
         .overlay {

@@ -710,36 +710,6 @@ struct MessagesView: View {
         return nil
     }
 
-    /// L'autre participant d'une 1:1 (pour l'avatar/nom), sinon nil (groupe).
-    private func otherParticipant(_ conversation: MessageConversation) -> ConversationParticipant? {
-        guard !conversation.isGroup else { return nil }
-        return conversation.participants.first { $0.userId != currentUserId }
-            ?? conversation.participants.first
-    }
-
-    /// Avatar de la rangée : la photo du groupe ou de l'interlocuteur ; un groupe
-    /// sans photo montre deux de ses membres superposés.
-    @ViewBuilder
-    private func rowAvatar(_ conversation: MessageConversation, title: String) -> some View {
-        let others = conversation.participants.filter { $0.userId != currentUserId }
-        if conversation.isGroup, conversation.groupPhotoUrl == nil, others.count >= 2 {
-            ZStack(alignment: .topLeading) {
-                SQAvatar(url: others[0].user.avatarUrl, name: others[0].user.displayName, size: 30)
-                SQAvatar(url: others[1].user.avatarUrl, name: others[1].user.displayName, size: 30)
-                    .padding(2)
-                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                    .offset(x: 12, y: 12)
-            }
-            .frame(width: 44, height: 44, alignment: .topLeading)
-        } else {
-            SQAvatar(
-                url: conversation.groupPhotoUrl ?? otherParticipant(conversation)?.user.avatarUrl,
-                name: title.isEmpty ? "Conversation" : title,
-                size: 44
-            )
-        }
-    }
-
     /// Rangée de la carte des conversations : avatar 44 et présence, nom avec
     /// cadenas, sourdine et épingle, heure (carmin si non lu), aperçu et pastille.
     private func conversationRow(_ conversation: MessageConversation, isFirst: Bool) -> some View {
@@ -747,7 +717,7 @@ struct MessagesView: View {
         let title = conversation.displayTitle(excluding: currentUserId)
         let unreadCount = conversation.e2eeV2?.unreadCount ?? 0
         return HStack(spacing: SQSpace.md) {
-            rowAvatar(conversation, title: title)
+            ConversationAvatar(conversation: conversation, currentUserId: currentUserId, size: 44)
                 .accessibilityHidden(true)
                 .overlay(alignment: .bottomTrailing) {
                     if isOnline(conversation) {
@@ -1433,5 +1403,38 @@ struct MessagesCardSegment: InsettableShape {
         var shape = self
         shape.insetAmount += amount
         return shape
+    }
+}
+
+/// Avatar d'une conversation : la photo du groupe ou de l'interlocuteur ; un
+/// groupe sans photo montre deux de ses membres superposés. Partagé par la
+/// liste et la barre du haut de la conversation.
+struct ConversationAvatar: View {
+    let conversation: MessageConversation
+    let currentUserId: String?
+    var size: CGFloat = 44
+
+    var body: some View {
+        let others = conversation.participants.filter { $0.userId != currentUserId }
+        if conversation.isGroup, conversation.groupPhotoUrl == nil, others.count >= 2 {
+            let small = (size * 0.68).rounded()
+            ZStack(alignment: .topLeading) {
+                SQAvatar(url: others[0].user.avatarUrl, name: others[0].user.displayName, size: small)
+                SQAvatar(url: others[1].user.avatarUrl, name: others[1].user.displayName, size: small)
+                    .padding(2)
+                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: small * 0.36, style: .continuous))
+                    .offset(x: size - small - 2, y: size - small - 2)
+            }
+            .frame(width: size, height: size, alignment: .topLeading)
+        } else {
+            let title = conversation.displayTitle(excluding: currentUserId)
+            // À deux : la photo de l'interlocuteur ; en groupe : seulement celle du groupe.
+            let personal = conversation.isGroup ? nil : (others.first ?? conversation.participants.first)?.user.avatarUrl
+            SQAvatar(
+                url: conversation.groupPhotoUrl ?? personal,
+                name: title.isEmpty ? "Conversation" : title,
+                size: size
+            )
+        }
     }
 }
