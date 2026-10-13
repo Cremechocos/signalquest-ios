@@ -2,9 +2,8 @@ import XCTest
 
 /// Tour de captures sur l'en-tête « carte de visite » du profil public.
 ///
-/// Tourne en `--demo-data` : la composition à vérifier (identité centrée, bio,
-/// barre empilée des réseaux, trois mesures, Suivre + Message) ne dépend pas du
-/// compte. Le profil démo porte volontairement deux réseaux qui ne totalisent
+/// Tourne en `--demo-data` : la composition à vérifier (identité, bio, Suivre +
+/// Message, carte des mesures, une barre par réseau) ne dépend pas du compte. Le profil démo porte volontairement deux réseaux qui ne totalisent
 /// PAS 100 %, pour que la piste résiduelle de la barre soit exercée.
 @MainActor
 final class ProfileCardQATests: XCTestCase {
@@ -28,19 +27,23 @@ final class ProfileCardQATests: XCTestCase {
 
         // Identité : le pseudo et le pays sur la même ligne.
         XCTAssertTrue(app.staticTexts["@camille"].waitForExistence(timeout: 10), "Pseudo absent")
+        // Abonnés / abonnements n'ont pas disparu : ils suivent l'identité,
+        // en haut de l'écran — vérifiés avant de faire défiler.
+        XCTAssertTrue(app.staticTexts["128 abonnés"].exists, "« abonnés » manque — la refonte ne doit rien retirer")
 
         // Réseaux mesurés : le libellé de section et la légende chiffrée.
         // ⚠️ Le libellé ne doit JAMAIS dire « opérateur » : la répartition des
         // mesures n'établit pas un abonnement.
         XCTAssertTrue(
-            SignalQuestUITestSupport.scrollToHittable(app.staticTexts["Réseaux mesurés"], in: app),
+            // Titre de section en petites capitales : exposé en majuscules.
+            SignalQuestUITestSupport.scrollToHittable(app.staticTexts["Réseaux mesurés".uppercased()], in: app),
             "Section « Réseaux mesurés » absente"
         )
         XCTAssertFalse(
             app.staticTexts["Opérateur"].exists,
             "Un libellé « Opérateur » s'est glissé dans l'en-tête"
         )
-        // Chaque pastille de légende est un élément d'accessibilité FUSIONNÉ :
+        // Chaque ligne de réseau est un élément d'accessibilité FUSIONNÉ :
         // son `accessibilityLabel` remplace le texte affiché, donc on interroge
         // ce libellé et non « Orange 52 % ».
         //
@@ -65,11 +68,11 @@ final class ProfileCardQATests: XCTestCase {
         ] {
             XCTAssertTrue(
                 app.otherElements[legend].exists || app.staticTexts[legend].exists,
-                "Légende « \(legend) » absente de la barre empilée"
+                "Réseau « \(legend) » absent"
             )
         }
 
-        // Les trois mesures de contribution.
+        // Les mesures de contribution, sur la carte.
         for label in ["Points", "Tests", "Validations"] {
             XCTAssertTrue(app.staticTexts[label].exists, "Mesure « \(label) » absente")
         }
@@ -84,11 +87,6 @@ final class ProfileCardQATests: XCTestCase {
             "Bouton Message absent"
         )
 
-        // Abonnés / abonnements n'ont pas disparu : ils sont passés en pastilles.
-        XCTAssertTrue(
-            SignalQuestUITestSupport.scrollToHittable(app.staticTexts["128 abonnés"], in: app),
-            "La pastille « abonnés » manque — la refonte ne doit rien retirer"
-        )
         snap(app, "profil-02-pastilles")
     }
 

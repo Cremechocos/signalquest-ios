@@ -55,7 +55,7 @@ final class RecentlyViewedQATests: XCTestCase {
         let clearField = app.buttons[clearSearch]
         XCTAssertTrue(clearField.waitForExistence(timeout: 10))
         clearField.tap()
-        XCTAssertTrue(app.staticTexts[header].waitForExistence(timeout: 5), "Section « \(header) » absente")
+        XCTAssertTrue(app.staticTexts[header.uppercased()].waitForExistence(timeout: 5), "Section « \(header) » absente")
         XCTAssertTrue(recent.waitForExistence(timeout: 5), "Le profil consulté manque aux récents")
         XCTAssertEqual(recent.label, profile)
         capture(app, name: "explore-recents-\(locale)")
@@ -69,10 +69,12 @@ final class RecentlyViewedQATests: XCTestCase {
     }
 
     private func leaveProfile(named name: String, in app: XCUIApplication) {
-        let bar = app.navigationBars[name]
-        XCTAssertTrue(bar.waitForExistence(timeout: 10), "Profil de \(name) non ouvert")
-        bar.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(bar.waitForNonExistence(timeout: 10))
+        // Profil Halo : barre de navigation masquée, retour par le bouton rond.
+        let title = app.staticTexts["profile.member.name"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "Profil de \(name) non ouvert")
+        XCTAssertEqual(title.label, name)
+        app.buttons["profile.member.back"].tap()
+        XCTAssertTrue(title.waitForNonExistence(timeout: 10))
     }
 
     private func runMap(locale: String, tab: String, header: String, clearRecents: String) throws {

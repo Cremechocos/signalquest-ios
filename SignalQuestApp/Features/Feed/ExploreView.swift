@@ -125,6 +125,8 @@ final class ExploreViewModel: ObservableObject {
             async let people = service.suggestedUsers()
             trending = try await trends
             suggestions = try await people
+            // Les tendances portent « Suivre » : il faut savoir lesquelles le sont.
+            if followedHashtags == nil { await loadFollowedHashtags() }
         } catch {
             errorMessage = error.userFacingMessage
         }
@@ -325,6 +327,7 @@ final class ExploreViewModel: ObservableObject {
             SocialFeedAuthor(id: "u2", name: "Nora", handle: "nora", avatarUrl: nil, isFriend: false, isFollowing: false, liveRadio: nil),
             SocialFeedAuthor(id: "u3", name: "Mehdi", handle: "mehdi", avatarUrl: nil, isFriend: false, isFollowing: true, liveRadio: nil)
         ]
+        followedHashtags = ["5g"]
         errorMessage = nil
     }
 
@@ -372,7 +375,8 @@ struct ExploreView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.xl) {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                SQSettingsHeader(title: "Explorer", backIdentifier: "explore.back")
                 SQSearchField(text: $model.searchText, placeholder: "Membre, publication, lieu ou antenne") {
                     model.scheduleSearch()
                 }
@@ -396,13 +400,13 @@ struct ExploreView: View {
                 } else if model.isLoading && model.trending.isEmpty && model.suggestions.isEmpty {
                     LoadingSkeleton().sqShimmer()
                 } else {
-                    if model.selectedHashtag == nil, !recentProfiles.isEmpty {
-                        recentProfilesSection
-                    }
-                    trendingSection
                     if model.selectedHashtag != nil {
                         hashtagFeedSection
                     } else {
+                        if !recentProfiles.isEmpty {
+                            recentProfilesSection
+                        }
+                        trendingSection
                         suggestionsSection
                     }
                 }
@@ -413,7 +417,9 @@ struct ExploreView: View {
             .sqReadableWidth()
         }
         .navigationTitle("Explorer")
-        .toolbarTitleLargeCompat()
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
         .task {
             if model.trending.isEmpty && model.suggestions.isEmpty { await model.load() }
@@ -488,13 +494,13 @@ struct ExploreView: View {
     /// Profils consultés récemment, le plus récent d'abord.
     private var recentProfilesSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            SQSectionHeader("Récents") {
+            sectionTitle("Récents") {
                 Button("Effacer") {
                     Haptics.selection()
                     RecentlyViewedStore.clear([.profile])
                 }
-                .font(SQType.caption)
-                .tint(SQColor.brandRed)
+                .font(SQType.caption(.bold))
+                .tint(SQColor.accentInk)
                 .frame(minHeight: 44)
                 .accessibilityLabel("Effacer les récents")
                 .accessibilityIdentifier("explore.recents.clear")
@@ -515,9 +521,9 @@ struct ExploreView: View {
                             )
                         } label: {
                             VStack(spacing: SQSpace.xs) {
-                                SQAvatar(url: item.avatarURL, name: item.title, size: 52)
+                                SQAvatar(url: item.avatarURL, name: item.title, size: 48)
                                 Text(item.title)
-                                    .font(SQType.caption)
+                                    .font(SQType.caption(.semibold))
                                     .foregroundStyle(SQColor.label)
                                     .lineLimit(2)
                                     .multilineTextAlignment(.center)
@@ -711,43 +717,98 @@ struct ExploreView: View {
 
     // MARK: Tendances
 
+    /// Tendances en lignes : nombre de publications et « Suivre ». C'est ici
+    /// que vivent les hashtags retirés du fil.
+    @ViewBuilder
     private var trendingSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            SQSectionHeader("À la une")
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: SQSpace.sm) {
-                    ForEach(model.trending) { tag in
-                        let isOn = tag.tag == model.selectedHashtag
-                        Button {
-                            Haptics.selection()
-                            model.selectHashtag(tag.tag)
-                        } label: {
-                            HStack(spacing: SQSpace.xs2) {
-                                Text("#\(tag.tag)")
-                                    .font(SQType.subhead(.semibold))
-                                Text(SignalFormatters.count(tag.postCount))
-                                    .font(SQType.micro)
-                                    .opacity(0.8)
-                            }
-                            .padding(.horizontal, SQSpace.md + 1)
-                            .padding(.vertical, SQSpace.sm)
-                            .background(
-                                isOn ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                                in: Capsule(style: .continuous)
-                            )
-                            .foregroundStyle(isOn ? SQColor.onAccent : SQColor.label)
-                            .sqShadowSoft()
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(isOn ? .isSelected : [])
+        if !model.trending.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                sectionTitle("Tendances")
+                VStack(spacing: 0) {
+                    ForEach(Array(model.trending.enumerated()), id: \.element.id) { index, tag in
+                        if index > 0 { Divider().padding(.leading, 62) }
+                        trendingRow(tag)
                     }
                 }
-                .padding(.horizontal, SQSpace.xxs)
-                .padding(.vertical, SQSpace.xs)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             }
         }
+    }
+
+    private func trendingRow(_ tag: TrendingHashtag) -> some View {
+        HStack(spacing: SQSpace.md) {
+            Button {
+                Haptics.selection()
+                model.selectHashtag(tag.tag)
+            } label: {
+                HStack(spacing: SQSpace.md) {
+                    Image(systemName: "number")
+                        .font(SQFont.body(16, .bold, relativeTo: .body))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(width: 38, height: 38)
+                        .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                        Text(verbatim: "#\(tag.tag)")
+                            .font(SQType.body(.bold))
+                            .foregroundStyle(SQColor.label)
+                        Text("\(tag.postCount) publications")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("explore.trend.\(tag.tag)")
+
+            if model.followedHashtags != nil {
+                let following = model.isFollowing(hashtag: tag.tag)
+                followButton(isOn: following, onTitle: String(localized: "Suivi"), offTitle: String(localized: "Suivre")) {
+                    Task { await model.toggleHashtagFollow(tag.tag) }
+                }
+                .disabled(model.isTogglingHashtagFollow)
+                .accessibilityLabel(following
+                    ? String(localized: "Ne plus suivre #\(tag.tag)")
+                    : String(localized: "Suivre #\(tag.tag)"))
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs2)
+    }
+
+    /// « Suivre » à l'encre ; une fois suivi, bouton secondaire.
+    private func followButton(isOn: Bool, onTitle: String, offTitle: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(verbatim: isOn ? onTitle : offTitle)
+                .font(SQType.subhead(.bold))
+                .foregroundStyle(isOn ? SQColor.label : SQColor.onInk)
+                .padding(.horizontal, SQSpace.md2)
+                .frame(minHeight: 32)
+                .background(isOn ? SQColor.chip : SQColor.label, in: Capsule(style: .continuous))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .sqLikePop(trigger: isOn)
+    }
+
+    /// Titre de section en petites capitales, action facultative à droite.
+    private func sectionTitle<Trailing: View>(
+        _ title: LocalizedStringKey,
+        @ViewBuilder trailing: () -> Trailing = { EmptyView() }
+    ) -> some View {
+        HStack(alignment: .center) {
+            Text(title)
+                .sqKicker()
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            trailing()
+        }
+        .padding(.leading, SQSpace.xs)
+        .frame(minHeight: 24)
     }
 
     // MARK: Flux hashtag
@@ -832,8 +893,8 @@ struct ExploreView: View {
 
     @ViewBuilder
     private var suggestionsSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.md) {
-            SQSectionHeader("Suggestions")
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            sectionTitle("Suggestions")
             if model.suggestions.isEmpty {
                 EmptyStateView(
                     title: "Aucune suggestion",
@@ -841,11 +902,14 @@ struct ExploreView: View {
                     systemImage: "person.2"
                 )
             } else {
-                VStack(spacing: SQSpace.sm) {
-                    ForEach(model.suggestions) { author in
+                // Une seule carte, une ligne par profil.
+                VStack(spacing: 0) {
+                    ForEach(Array(model.suggestions.enumerated()), id: \.element.id) { index, author in
+                        if index > 0 { Divider().padding(.leading, 58) }
                         suggestionRow(author)
                     }
                 }
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             }
         }
     }
@@ -858,44 +922,33 @@ struct ExploreView: View {
                 profileAuthor = author
             } label: {
                 HStack(spacing: SQSpace.md) {
-                    SQAvatar(url: author.avatarUrl, name: author.displayName, size: 44)
-                    VStack(alignment: .leading, spacing: 2) {
+                    SQAvatar(url: author.avatarUrl, name: author.displayName, size: 34)
+                    VStack(alignment: .leading, spacing: SQSpace.xxs) {
                         Text(author.displayName)
-                            .font(SQType.heading)
+                            .font(SQType.body(.bold))
                             .foregroundStyle(SQColor.label)
+                            .lineLimit(1)
                         if let handle = author.handle {
-                            Text("@\(handle)")
+                            Text(verbatim: "@\(handle)")
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
+                                .lineLimit(1)
                         }
                     }
+                    Spacer(minLength: 0)
                 }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Voir le profil de \(author.displayName)")
 
-            Spacer()
-
-            Button {
+            followButton(isOn: followed, onTitle: String(localized: "Abonné"), offTitle: String(localized: "Suivre")) {
                 model.toggleFollow(author)
-            } label: {
-                Text(followed ? "Abonné" : "Suivre")
-                    .font(SQType.subhead(.semibold))
-                    .padding(.horizontal, SQSpace.md2)
-                    .padding(.vertical, SQSpace.sm)
-                    .background(
-                        followed ? AnyShapeStyle(SQColor.surfaceMuted) : AnyShapeStyle(SQColor.brandRed),
-                        in: Capsule(style: .continuous)
-                    )
-                    .foregroundStyle(followed ? SQColor.label : SQColor.onAccent)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .sqLikePop(trigger: followed)
             .disabled(model.followBusyIds.contains(author.id))
         }
-        .padding(SQSpace.md)
-        .sqEditorialCard()
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.xs2)
     }
 }
