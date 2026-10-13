@@ -36,72 +36,93 @@ struct ReportSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MapChipIconButton(systemImage: "xmark", label: "Annuler", identifier: "report.cancel") { dismiss() }
+
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text("Signaler")
+                        .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                        .foregroundStyle(SQColor.label)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Choisis ce qui ne va pas.")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+
                 if let notice {
-                    Section {
-                        Label(notice, systemImage: "lock")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .accessibilityIdentifier("report.notice")
-                    }
+                    Label(notice, systemImage: "lock")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("report.notice")
                 }
-                Section("Motif") {
-                    Picker("Raison", selection: $reason) {
-                        ForEach(reasons) { value in
-                            Text(value.label).tag(value)
-                        }
-                    }
-                    .pickerStyle(.inline)
-                    // La section « Motif » nomme déjà la liste ; VoiceOver garde
-                    // le libellé.
-                    .labelsHidden()
-                }
+
+                reasonsCard
+
                 if allowsComment {
-                    Section("Précisions (optionnel)") {
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        Text("Précisions (optionnel)")
+                            .sqKicker()
+                            .padding(.leading, SQSpace.xs)
                         TextField("Décris ce qui te pose problème", text: $note, axis: .vertical)
+                            .font(SQType.body)
                             .lineLimit(3...6)
+                            .padding(SQSpace.md)
+                            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                             .accessibilityIdentifier("report.comment")
                     }
                 }
+
                 if let error {
-                    Section {
-                        Text(error)
-                            .foregroundStyle(SQColor.dangerInk)
-                            .accessibilityIdentifier("report.error")
-                    }
-                }
-                Section {
-                    Button(role: .destructive) {
-                        Task { await send() }
-                    } label: {
-                        HStack {
-                            if isBusy {
-                                SQSpinner().tint(SQColor.dangerInk)
-                            } else {
-                                Text("Envoyer le signalement")
-                                    .font(SQType.button)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
+                    Text(error)
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.dangerInk)
-                    }
-                    .disabled(isBusy)
-                    .listRowBackground(SQColor.dangerSoft)
-                    .accessibilityIdentifier("report.send")
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("report.error")
                 }
+
+                GradientButton(String(localized: "Envoyer le signalement"), isBusy: isBusy) {
+                    Task { await send() }
+                }
+                .disabled(isBusy)
+                .accessibilityIdentifier("report.send")
             }
-            .scrollContentBackground(.hidden)
-            .signalQuestBackground()
-            .navigationTitle("Signaler")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }
-                        .tint(SQColor.brandRed)
+            .padding(SQSpace.lg)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .sqSheet(background: SQColor.bg)
+    }
+
+    /// Motifs en boutons radio sur une carte : un seul choix, visible d'un coup d'œil.
+    private var reasonsCard: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(reasons.enumerated()), id: \.element.id) { index, value in
+                if index > 0 { Divider().padding(.leading, SQSpace.md) }
+                let isSelected = value == reason
+                Button {
+                    reason = value
+                } label: {
+                    HStack(spacing: SQSpace.md) {
+                        Text(value.label)
+                            .font(SQType.body(.semibold))
+                            .foregroundStyle(SQColor.label)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                            .font(.system(size: 22))
+                            .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.labelTertiary)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, SQSpace.md)
+                    .frame(minHeight: 48)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityIdentifier("report.reason.\(value.rawValue)")
             }
         }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
     private func send() async {

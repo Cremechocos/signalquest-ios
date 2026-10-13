@@ -1642,85 +1642,148 @@ struct PostShareSheet: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var busyConversationId: String?
+    @State private var query = ""
+    @State private var showsSystemShare = false
+
+    /// Recherche locale : la liste vient déjà entière du serveur.
+    private var visibleConversations: [MessageConversation] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return conversations }
+        return conversations.filter { $0.displayTitle.localizedCaseInsensitiveContains(needle) }
+    }
+
+    /// Lien web de la publication, seulement si elle est publique : un lien vers
+    /// une publication réservée aux amis mènerait les autres sur un refus.
+    private var publicLink: URL? {
+        guard post.visibility == nil || post.visibility == "public" else { return nil }
+        return AppConfig.current.appBaseURL
+            .appendingPathComponent("posts")
+            .appendingPathComponent(post.backendPostId)
+    }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Text(post.text)
-                        .font(.footnote)
-                        .lineLimit(3)
-                        .foregroundStyle(SQColor.labelSecondary)
-                } header: {
-                    Text("Publication")
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                HStack(alignment: .center) {
+                    Text("Envoyer à")
+                        .font(SQFont.display(22, .bold, relativeTo: .title2))
+                        .foregroundStyle(SQColor.label)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "post.share.close") { dismiss() }
                 }
 
-                Section("Partager vers") {
-                    if isLoading {
-                        SQSpinner()
-                    } else if conversations.isEmpty, errorMessage == nil {
-                        Text("Aucune conversation active")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    ForEach(conversations) { conversation in
-                        // Le partage de publication est inséré en CLAIR (aperçu texte,
-                        // auteur, image) côté serveur : on ne le propose donc PAS vers
-                        // une conversation chiffrée, pour ne pas briser la promesse
-                        // E2EE sous un badge « Chiffrée » (SEC-1).
-                        let isE2EE = conversation.e2eeEnabled == true
-                        Button {
-                            Task { await share(conversation) }
-                        } label: {
-                            HStack(spacing: SQSpace.md) {
-                                SQAvatar(url: conversation.groupPhotoUrl ?? conversation.participants.first?.user.avatarUrl, name: conversation.displayTitle, size: 40)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(conversation.displayTitle.isEmpty ? "Conversation" : conversation.displayTitle)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(SQColor.label)
-                                    Text(isE2EE ? "Chiffrée · partage indisponible" : "Conversation")
-                                        .font(.caption)
-                                        .foregroundStyle(SQColor.labelSecondary)
-                                }
-                                Spacer()
-                                if busyConversationId == conversation.id {
-                                    SQSpinner().tint(SQColor.brandRed)
-                                } else {
-                                    Image(systemName: isE2EE ? "lock.slash" : "paperplane.fill")
-                                        .foregroundStyle(isE2EE ? SQColor.labelTertiary : SQColor.brandRed)
-                                        .accessibilityHidden(true)
-                                }
-                            }
+                if !post.text.isEmpty {
+                    Text(post.text)
+                        .font(SQType.caption)
+                        .lineLimit(2)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityLabel(Text("Publication : \(post.text)"))
+                }
+
+                SQSearchField(text: $query, placeholder: "Rechercher une conversation")
+
+                if isLoading {
+                    SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity).padding(.vertical, SQSpace.lg)
+                } else if conversations.isEmpty, errorMessage == nil {
+                    Text("Aucune conversation active")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                } else if !visibleConversations.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(Array(visibleConversations.enumerated()), id: \.element.id) { index, conversation in
+                            if index > 0 { Divider().padding(.leading, 62) }
+                            conversationRow(conversation)
                         }
-                        .disabled(busyConversationId != nil || isE2EE)
-                        .accessibilityIdentifier("post.share.conversation.\(conversation.id)")
                     }
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 }
 
                 if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .foregroundStyle(SQColor.dangerInk)
-                            .accessibilityIdentifier("post.share.error")
-                        if conversations.isEmpty {
-                            Button("Réessayer") { Task { await load() } }
-                                .accessibilityIdentifier("post.share.retry")
-                        }
+                    Text(errorMessage)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .accessibilityIdentifier("post.share.error")
+                    if conversations.isEmpty {
+                        Button("Réessayer") { Task { await load() } }
+                            .font(SQType.subhead(.semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .accessibilityIdentifier("post.share.retry")
                     }
                 }
-            }
-            .scrollContentBackground(.hidden)
-            .signalQuestBackground()
-            .navigationTitle("Partager")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
+
+                if publicLink != nil {
+                    GradientButton(String(localized: "Partager hors de l’app"), systemImage: "square.and.arrow.up", style: .secondary) {
+                        showsSystemShare = true
+                    }
+                    .accessibilityIdentifier("post.share.external")
                 }
             }
-            .task { await load() }
+            .padding(SQSpace.lg)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .task { await load() }
+        .sheet(isPresented: $showsSystemShare) {
+            if let publicLink { ShareSheet(items: [publicLink]) }
         }
         .presentationDetents([.medium, .large])
+        .sqSheet(background: SQColor.bg)
+    }
+
+    /// Une conversation : avatar, nom, puis « Envoyer ». Une conversation
+    /// chiffrée reste visible mais grisée, avec la raison.
+    private func conversationRow(_ conversation: MessageConversation) -> some View {
+        // Le partage de publication est inséré en CLAIR (aperçu texte,
+        // auteur, image) côté serveur : on ne le propose donc PAS vers
+        // une conversation chiffrée, pour ne pas briser la promesse
+        // E2EE sous un badge « Chiffrée » (SEC-1).
+        let isE2EE = conversation.e2eeEnabled == true
+        let subtitle: String? = isE2EE
+            ? String(localized: "Conversation chiffrée · pas de partage de publication")
+            : (conversation.isGroup ? String(localized: "\(conversation.participants.count) membres") : nil)
+        return Button {
+            Task { await share(conversation) }
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                SQAvatar(url: conversation.groupPhotoUrl ?? conversation.participants.first?.user.avatarUrl, name: conversation.displayTitle, size: 36)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(conversation.displayTitle.isEmpty ? "Conversation" : conversation.displayTitle)
+                        .font(SQType.body(.bold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
+                    if let subtitle {
+                        HStack(spacing: 4) {
+                            if isE2EE {
+                                Image(systemName: "lock.fill").font(.system(size: 10)).accessibilityHidden(true)
+                            }
+                            Text(subtitle)
+                        }
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if busyConversationId == conversation.id {
+                    SQSpinner().tint(SQColor.brandRed)
+                } else if !isE2EE {
+                    Text("Envoyer")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(SQColor.label)
+                        .padding(.horizontal, 13)
+                        .frame(height: 32)
+                        .background(SQColor.chip, in: Capsule())
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+            .opacity(isE2EE ? 0.5 : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(busyConversationId != nil || isE2EE)
+        .accessibilityIdentifier("post.share.conversation.\(conversation.id)")
     }
 
     private func load() async {
