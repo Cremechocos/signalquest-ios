@@ -64,6 +64,9 @@ final class AppRouter: ObservableObject {
     /// (tap sur une notification `antenna_report_reply`). Consommé par ProfileView,
     /// racine de l'onglet Profil qui héberge « Mes signalements d'antenne ».
     @Published var openAntennaReportId: String?
+    /// Signalement « Bugs et idées » à ouvrir (tap sur une notification `bug_*`),
+    /// consommé par ProfileView comme les signalements d'antenne.
+    @Published var openBugId: String?
     /// Demande E2EE v2 validée issue d'une notification. L'identifiant opaque est
     /// consommé par ProfileView, puis revérifié côté serveur avant toute approbation.
     @Published var openE2EEDeviceApprovalId: String?
@@ -141,7 +144,7 @@ final class AppRouter: ObservableObject {
     var hasPendingContentRoute: Bool {
         openConversationId != nil || openMessagesInbox || openPostId != nil
             || openUserProfileId != nil || openSiteId != nil || openCommunityOutage != nil
-            || openCommunityOutageId != nil || openAntennaReportId != nil
+            || openCommunityOutageId != nil || openAntennaReportId != nil || openBugId != nil
             || openE2EEDeviceApprovalId != nil || openE2EEApprovalQR != nil || openE2EEIdentityReset
             || openSentinelleTargetId != nil
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
@@ -213,7 +216,8 @@ final class AppRouter: ObservableObject {
         reportId: String? = nil,
         targetId: String? = nil,
         outageId: String? = nil,
-        e2eeDeviceApprovalId: String? = nil
+        e2eeDeviceApprovalId: String? = nil,
+        bugId: String? = nil
     ) {
         switch rawType?.lowercased() {
         // Types réellement émis par le serveur : préfixés `message_*` et
@@ -245,6 +249,10 @@ final class AppRouter: ObservableObject {
             route(toUserProfile: userId)
         case "antenna_report_reply", "antenna_report", "site_report":
             route(toAntennaReport: reportId)
+        // Bugs et idées : statut, réponse, commentaire de l'équipe ou récompense,
+        // tous avec `bugId`. Avant ce cas, le repli ne savait rien en faire.
+        case "bug_status_change", "bug_response", "bug_comment", "bug_resolved_reward":
+            route(toBug: bugId)
         case "site", "antenna", "validation":
             route(toSite: siteId)
         // Panne communautaire : le fan-out serveur (`lib/outages/fanout.ts`) envoie
@@ -371,6 +379,11 @@ final class AppRouter: ObservableObject {
     func route(toAntennaReport id: String?) {
         selectedTab = .profile
         if let id { openAntennaReportId = id }
+    }
+
+    func route(toBug id: String?) {
+        selectedTab = .profile
+        if let id, !id.isEmpty { openBugId = id }
     }
 
     func route(toE2EEDeviceApproval id: String?) {

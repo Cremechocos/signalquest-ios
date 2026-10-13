@@ -412,7 +412,8 @@ struct NotificationsCenterView: View {
             // serveur). C'est ce qui envoie sur la FEUILLE de panne plutôt que sur la fiche du
             // site — et le seul chemin qui atteigne une panne déjà rétablie, qu'aucune liste ne
             // rend plus.
-            outageId: metaString(meta, "outageId", "outage_id")
+            outageId: metaString(meta, "outageId", "outage_id"),
+            bugId: metaString(meta, "bugId", "bug_id")
         )
     }
 

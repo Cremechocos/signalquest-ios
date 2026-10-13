@@ -152,6 +152,7 @@ final class AppServices: ObservableObject {
             { [weak self] in await self?.messages.retryPendingTextMessages() },
             { [weak self] in await self?.messages.retryPendingAttachments() },
             { [weak self] in await self?.customSites.retryPending() },
+            { [weak self] in await self?.bugReports.retryPending() },
         ])
     }
 

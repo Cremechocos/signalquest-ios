@@ -49,9 +49,13 @@ struct ProfileView: View {
     /// Rang de la semaine parmi les amis, sous la tuile Classements (même
     /// source que le module « Ta semaine » de l'Accueil).
     @State private var weekRank: Int?
+    /// Signalements « Bugs et idées » où l'équipe a bougé depuis la dernière lecture.
+    @State private var unseenBugReplies = 0
     /// Fil de signalement à ouvrir en sheet (tap sur une notification
     /// `antenna_report_reply`), résolu depuis `router.openAntennaReportId`.
     @State private var deepLinkReport: AntennaReportDeepLink?
+    /// Signalement « Bugs et idées » à ouvrir en sheet (notification `bug_*`).
+    @State private var deepLinkBug: AntennaReportDeepLink?
     /// Écran Sentinelle à ouvrir en sheet (tap sur une notification de coupure).
     @State private var deepLinkSentinelle: SentinelleDeepLink?
     /// Box partagée ouverte depuis un lien universel.
@@ -134,6 +138,12 @@ struct ProfileView: View {
                 )
             }
         }
+        .sheet(item: $deepLinkBug) { link in
+            NavigationStack {
+                BugReportDetailView(service: services.bugReports, reportId: link.id,
+                                    onClose: { deepLinkBug = nil })
+            }
+        }
         // Sentinelle vit dans les réglages, eux-mêmes sous l'onglet Profil : une
         // sheet évite d'avoir à dérouler cette pile pour arriver à la box.
         .sheet(item: $deepLinkSentinelle) { link in
@@ -205,6 +215,7 @@ struct ProfileView: View {
         }
         .onAppear {
             consumeAntennaReportDeepLink()
+            consumeBugDeepLink()
             consumeSentinelleDeepLink()
             consumeShareDeepLink()
             consumeE2EEApprovalDeepLink()
@@ -216,6 +227,7 @@ struct ProfileView: View {
         .onChangeCompat(of: router.openNotificationSettings) { _, _ in consumeNotificationSettingsDeepLink() }
         .onChangeCompat(of: router.openSentinelleShareSlug) { _, _ in consumeShareDeepLink() }
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
+        .onChangeCompat(of: router.openBugId) { _, _ in consumeBugDeepLink() }
         .onChangeCompat(of: router.openSentinelle) { _, _ in consumeSentinelleDeepLink() }
         .onChangeCompat(of: router.openE2EEDeviceApprovalId) { _, _ in consumeE2EEApprovalDeepLink() }
         .onChangeCompat(of: router.openE2EEApprovalQR) { _, _ in consumeE2EEApprovalQRDeepLink() }
@@ -253,6 +265,12 @@ struct ProfileView: View {
         guard let id = router.openAntennaReportId else { return }
         router.openAntennaReportId = nil
         deepLinkReport = AntennaReportDeepLink(id: id)
+    }
+
+    private func consumeBugDeepLink() {
+        guard let id = router.openBugId else { return }
+        router.openBugId = nil
+        deepLinkBug = AntennaReportDeepLink(id: id)
     }
 
     private func consumeNotificationSettingsDeepLink() {
@@ -604,7 +622,8 @@ struct ProfileView: View {
                     BugReportsListView()
                 } label: {
                     menuRow(title: "Bugs et idées", icon: "ladybug",
-                            subtitle: String(localized: "Signaler un problème, proposer une amélioration"))
+                            subtitle: String(localized: "Signaler un problème, proposer une amélioration"),
+                            badge: unseenBugReplies > 0 ? unseenBugReplies.formatted() : nil)
                 }
                 .accessibilityIdentifier("profile.bugs")
             }
@@ -832,6 +851,9 @@ struct ProfileView: View {
         // Un échec laisse simplement la section absente : rien d'autre n'en dépend.
         if let value = try? await UserOverviewService(api: services.api).overview() {
             overview = value
+        }
+        if let reports = try? await services.bugReports.myReports() {
+            unseenBugReplies = BugReportsSeenStore.unseenCount(in: reports)
         }
     }
 

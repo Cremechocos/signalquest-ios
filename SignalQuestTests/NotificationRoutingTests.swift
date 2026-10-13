@@ -74,4 +74,20 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertEqual(router.selectedTab, .community)
         XCTAssertNil(router.openPostId)
     }
+
+    /// Bugs et idées : chaque notification de l'équipe ouvre le signalement.
+    func testBugNotificationsOpenTheReport() {
+        for type in ["bug_status_change", "bug_response", "bug_comment", "bug_resolved_reward"] {
+            let router = AppRouter()
+            router.selectedTab = .map
+            router.handle(type: type, conversationId: nil, postId: nil, bugId: "bug-1")
+            XCTAssertEqual(router.selectedTab, .profile, type)
+            XCTAssertEqual(router.openBugId, "bug-1", type)
+            XCTAssertTrue(router.hasPendingContentRoute, type)
+        }
+        let router = AppRouter()
+        router.handle(type: "bug_response", conversationId: nil, postId: nil)
+        XCTAssertEqual(router.selectedTab, .profile)
+        XCTAssertNil(router.openBugId, "Sans identifiant, la liste reste à portée dans le Profil")
+    }
 }

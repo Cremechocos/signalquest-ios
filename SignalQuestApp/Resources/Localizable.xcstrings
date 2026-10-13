@@ -1105,6 +1105,47 @@
         }
       }
     },
+    "%lld signalement en attente du réseau" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld report waiting for a connection"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld reports waiting for a connection"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld signalement en attente du réseau"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld signalements en attente du réseau"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld site identifié" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3213,6 +3254,38 @@
         }
       }
     },
+    "Gardé sur l'iPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kept on this iPhone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gardé sur l'iPhone"
+          }
+        }
+      }
+    },
+    "Gardé sur l'iPhone : l'envoi se fait tout seul au retour de la connexion." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kept on this iPhone: it sends by itself when the connection is back."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gardé sur l'iPhone : l'envoi se fait tout seul au retour de la connexion."
+          }
+        }
+      }
+    },
     "Groupe · %lld membres" : {
       "localizations" : {
         "en" : {
@@ -5026,6 +5099,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Parcours radio"
+          }
+        }
+      }
+    },
+    "Pas de connexion pour l'instant. Ton signalement part tout seul au retour du réseau, puis apparaît dans ta liste." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No connection right now. Your report sends by itself when the network is back, then shows up in your list."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de connexion pour l'instant. Ton signalement part tout seul au retour du réseau, puis apparaît dans ta liste."
           }
         }
       }

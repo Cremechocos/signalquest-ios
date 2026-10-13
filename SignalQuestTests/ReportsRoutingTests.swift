@@ -271,6 +271,89 @@ final class BugReportsServiceTests: XCTestCase {
                        ["crash", "ui", "network", "performance", "feature", "data", "other"])
         XCTAssertFalse(BugCategory.bugKinds.contains(.feature))
     }
+
+    private func report(_ id: String, status: String = "open", reply: String? = nil, updated: String) throws -> BugReport {
+        var json: [String: Any] = ["id": id, "title": "t", "description": "d", "category": "ui",
+                                   "severity": "low", "status": status, "updatedAt": updated]
+        if let reply { json["adminResponse"] = reply }
+        return try JSONDecoder.signalQuest.decode(BugReport.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+
+    func testProfileBadgeCountsOnlyTeamActivityNotYetSeen() throws {
+        let suite = "bugs-seen-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let scope = "user:u-1"
+        let old = try report("b-1", status: "resolved", reply: "Corrigé", updated: "2026-10-01T08:00:00.000Z")
+        let mine = try report("b-2", updated: "2026-10-02T08:00:00.000Z")
+        // Première lecture du compte : point de départ, rien ne s'allume.
+        XCTAssertEqual(BugReportsSeenStore.unseenCount(in: [old, mine], ownerScopeId: scope, defaults: defaults), 0)
+
+        let answered = try report("b-2", status: "in_progress", reply: "On regarde", updated: "2026-10-03T08:00:00.000Z")
+        let newOne = try report("b-3", status: "in_progress", updated: "2026-10-04T08:00:00.000Z")
+        let untouched = try report("b-4", updated: "2026-10-05T08:00:00.000Z")
+        XCTAssertEqual(BugReportsSeenStore.unseenCount(in: [old, answered, newOne, untouched],
+                                                       ownerScopeId: scope, defaults: defaults), 2)
+        BugReportsSeenStore.markSeen(answered, ownerScopeId: scope, defaults: defaults)
+        XCTAssertEqual(BugReportsSeenStore.unseenCount(in: [old, answered, newOne, untouched],
+                                                       ownerScopeId: scope, defaults: defaults), 1)
+        XCTAssertEqual(BugReportsSeenStore.unseenCount(in: [newOne], ownerScopeId: "guest", defaults: defaults), 0)
+    }
+
+    func testOfflineReportIsSealedPerAccountAndSentOnceTheNetworkIsBack() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bug-outbox-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let outbox = BugReportOutboxStore(rootURL: root, keyStore: InMemoryTokenStore())
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let service = BugReportsService(
+            api: APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                           session: URLSession(configuration: config)),
+            outbox: outbox,
+            currentUserId: { "u-1" }
+        )
+        let id = UUID()
+        let submission = BugReportSubmission(
+            category: .network, title: "Pas de 5G", description: "Seulement de la 4G ici.", severity: .medium,
+            steps: nil, expectedResult: nil, images: [], device: device, speedtest: nil,
+            location: BugReportContext.Location(latitude: 45.18764, longitude: 5.72449)
+        )
+        try await service.stage(submission, submissionID: id)
+        try await service.stage(submission, submissionID: id)
+        var pending = await service.pendingCount()
+        XCTAssertEqual(pending, 1, "Un second appui garde un seul signalement")
+
+        // Scellé : le titre ne se lit pas sur le disque, et un autre compte ne voit rien.
+        let files = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? [])
+            .filter { $0.pathExtension == "enc" }
+        XCTAssertEqual(files.count, 1)
+        XCTAssertNil(try Data(contentsOf: files[0]).range(of: Data("Pas de 5G".utf8)))
+        let otherAccount = try await outbox.pending(userId: "u-2")
+        XCTAssertTrue(otherAccount.isEmpty)
+        let mine = try await outbox.pending(userId: "u-1")
+        XCTAssertEqual(mine.first?.submission, submission)
+
+        // Serveur indisponible : rien n'est perdu.
+        MockURLProtocol.requestHandler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 502, httpVersion: nil, headerFields: nil)!, Data())
+        }
+        await service.retryPending()
+        pending = await service.pendingCount()
+        XCTAssertEqual(pending, 1)
+
+        let box = BugCaptureBox()
+        respond(status: 201, #"{"id":"b-9","title":"Pas de 5G","description":"d","category":"network","severity":"medium","status":"open"}"#, into: box)
+        await service.retryPending()
+        pending = await service.pendingCount()
+        XCTAssertEqual(pending, 0)
+        XCTAssertEqual(box.request?.url?.path, "/api/bugs")
+        XCTAssertEqual(box.request?.value(forHTTPHeaderField: "Idempotency-Key"), "bug-report-\(id.uuidString)")
+        XCTAssertEqual(box.json?["title"] as? String, "Pas de 5G")
+        let context = try XCTUnwrap(box.json?["context"] as? [String: Any])
+        XCTAssertEqual((context["location"] as? [String: Any])?["latitude"] as? Double, 45.19)
+        XCTAssertTrue(files.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) }, "File vide = fichier effacé")
+    }
 }
 
 private final class BugCaptureBox: @unchecked Sendable {

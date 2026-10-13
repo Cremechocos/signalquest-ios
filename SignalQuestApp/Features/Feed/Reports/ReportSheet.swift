@@ -243,6 +243,8 @@ struct BugReportsListView: View {
     /// Ouvert par « Voir mon signalement », une fois le formulaire refermé.
     @State private var pendingOpen: BugReport?
     @State private var opened: BugReport?
+    /// Écrits hors connexion, pas encore partis.
+    @State private var pendingCount = 0
 
     private var isSignedOut: Bool {
         if case .loggedOut = session.state { return true }
@@ -260,6 +262,7 @@ struct BugReportsListView: View {
                 } else {
                     GradientButton(String(localized: "Nouveau signalement"), systemImage: "plus") { showComposer = true }
                         .accessibilityIdentifier("bugs.new")
+                    if pendingCount > 0 { pendingCard }
                     content
                 }
             }
@@ -276,6 +279,7 @@ struct BugReportsListView: View {
         .sheet(isPresented: $showComposer, onDismiss: {
             opened = pendingOpen
             pendingOpen = nil
+            Task { pendingCount = await services.bugReports.pendingCount() }
         }) {
             BugReportComposerSheet(onSent: { report in
                 reports.removeAll { $0.id == report.id }
@@ -445,9 +449,32 @@ struct BugReportsListView: View {
         .sqCardBackground()
     }
 
+    private var pendingCard: some View {
+        HStack(spacing: SQSpace.md) {
+            SQIconPastille(systemImage: "tray.and.arrow.up", size: 40, tint: SQColor.warning, fill: SQColor.warningSoft)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(pendingCount) signalement en attente du réseau")
+                    .font(SQType.rowTitle)
+                    .foregroundStyle(SQColor.label)
+                Text("Gardé sur l'iPhone : l'envoi se fait tout seul au retour de la connexion.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(SQSpace.md)
+        .sqCardBackground()
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("bugs.pending")
+    }
+
     private func load() async {
         isLoading = true
         defer { isLoading = false }
+        // Ce qui attendait part d'abord : la liste le montre aussitôt.
+        if services.networkPath.isOnline { await services.bugReports.retryPending() }
+        pendingCount = await services.bugReports.pendingCount()
         do {
             reports = try await services.bugReports.myReports()
                 .sorted { ($0.updatedAt ?? $0.createdAt ?? .distantPast) > ($1.updatedAt ?? $1.createdAt ?? .distantPast) }
@@ -491,6 +518,8 @@ struct BugReportComposerSheet: View {
     @State private var isSending = false
     @State private var error: String?
     @State private var sent: BugReport?
+    /// Écrit hors connexion : gardé sur l'iPhone, il part au retour du réseau.
+    @State private var queued = false
     /// Créée une fois par formulaire : un renvoi reste un seul signalement.
     @State private var submissionID = UUID()
 
@@ -508,12 +537,14 @@ struct BugReportComposerSheet: View {
         Group {
             if let sent {
                 success(sent)
+            } else if queued {
+                queuedConfirmation
             } else {
                 form
             }
         }
         .sqSheet(background: SQColor.bg)
-        .interactiveDismissDisabled(sent == nil && hasDraft)
+        .interactiveDismissDisabled(sent == nil && !queued && hasDraft)
         .task {
             device = .current(network: services.networkPath.status.displayName)
             lastSpeedtest = await services.speedtest.history().first
@@ -819,6 +850,29 @@ struct BugReportComposerSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var queuedConfirmation: some View {
+        VStack(spacing: SQSpace.lg) {
+            Spacer(minLength: SQSpace.xl)
+            SQIconPastille(systemImage: "tray.and.arrow.up", size: 72, tint: SQColor.warning, fill: SQColor.warningSoft,
+                           font: .system(size: 28, weight: .bold))
+            Text("Gardé sur l'iPhone")
+                .font(SQFont.display(26, .bold, relativeTo: .title))
+                .foregroundStyle(SQColor.label)
+                .multilineTextAlignment(.center)
+                .sqHeader()
+            Text("Pas de connexion pour l'instant. Ton signalement part tout seul au retour du réseau, puis apparaît dans ta liste.")
+                .font(SQType.callout)
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: SQSpace.xl)
+            GradientButton(String(localized: "Fermer")) { dismiss() }
+                .accessibilityIdentifier("bugs.composer.queuedDone")
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private func processPicked() async {
         let items = pickerItems
         pickerItems = []
@@ -856,6 +910,19 @@ struct BugReportComposerSheet: View {
             speedtest: speedtest,
             location: includeLocation ? approximateLocation : nil
         )
+        // Hors connexion, la requête ne partirait pas : le signalement attend,
+        // chiffré, et la file l'envoie au retour du réseau avec la même clé.
+        if !services.networkPath.isOnline, !AppEnvironment.usesDemoData {
+            do {
+                try await services.bugReports.stage(submission, submissionID: submissionID)
+                Haptics.success()
+                withAnimation(SQMotion.resolve(SQMotion.snappy, UIAccessibility.isReduceMotionEnabled)) { queued = true }
+            } catch {
+                Haptics.error()
+                self.error = String(localized: "Pas de connexion. Réessaie quand le réseau revient : ton texte reste ici.")
+            }
+            return
+        }
         do {
             let report = try await services.bugReports.submit(submission, submissionID: submissionID)
             Haptics.success()
@@ -907,7 +974,10 @@ final class BugReportDetailViewModel: ObservableObject {
         defer { isLoading = false }
         async let fetchedReport = try? service.report(id: reportId)
         async let fetchedComments = try? service.comments(bugId: reportId)
-        if let value = await fetchedReport { report = value }
+        if let value = await fetchedReport {
+            report = value
+            BugReportsSeenStore.markSeen(value)
+        }
         if let value = await fetchedComments {
             comments = value.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
         }
@@ -935,8 +1005,12 @@ final class BugReportDetailViewModel: ObservableObject {
             draft = ""
             pendingImages = []
             Haptics.success()
-            // Une réponse rouvre un signalement résolu : le statut affiché suit.
-            if report?.status == .resolved, let refreshed = try? await service.report(id: reportId) { report = refreshed }
+            // Une réponse rouvre un signalement résolu : le statut affiché suit,
+            // et sa propre activité n'allume pas le badge du Profil.
+            if let refreshed = try? await service.report(id: reportId) {
+                report = refreshed
+                BugReportsSeenStore.markSeen(refreshed)
+            }
         } catch {
             errorMessage = String(localized: "Échec de l'envoi. Réessaie.")
             Haptics.error()

@@ -888,6 +888,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         // Panne communautaire : le fan-out serveur envoie `outageId` à côté de `siteId`. Sans
         // cette extraction, le tap ouvrait la fiche du SITE — la panne, elle, restait à retrouver.
         let outageId = Self.string(info, "outageId", "outage_id")
+        let bugId = Self.string(info, "bugId", "bug_id")
         let e2eeDeviceApprovalId = Self.e2eeDeviceApprovalID(info)
         if type?.lowercased() == "e2ee_v2_device_approval", e2eeDeviceApprovalId == nil {
             center.removeDeliveredNotifications(withIdentifiers: [identifier])
@@ -920,7 +921,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
                     reportId: reportId,
                     targetId: targetId,
                     outageId: outageId,
-                    e2eeDeviceApprovalId: e2eeDeviceApprovalId
+                    e2eeDeviceApprovalId: e2eeDeviceApprovalId,
+                    bugId: bugId
                 )
                 UNUserNotificationCenter.current().setBadgeCountCompat(0)
             }
