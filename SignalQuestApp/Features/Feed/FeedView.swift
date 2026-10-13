@@ -875,6 +875,7 @@ struct FeedView: View {
                     postId: item.backendPostId,
                     profileService: services.feed,
                     reports: services.reports,
+                    commentsCount: item.commentsCount,
                     onCommentPosted: { recordSignal("comment", for: item) }
                 )
             case .report(let item):

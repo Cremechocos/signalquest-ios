@@ -151,6 +151,7 @@ struct PostDetailView: View {
                 postId: actions.item.backendPostId,
                 profileService: feedService,
                 reports: reportsService,
+                commentsCount: actions.item.commentsCount,
                 // Le compteur du bouton « Voir tous les commentaires » suit les nouveaux commentaires.
                 onCommentPosted: { actions.update { $0.commentsCount += 1 } }
             )

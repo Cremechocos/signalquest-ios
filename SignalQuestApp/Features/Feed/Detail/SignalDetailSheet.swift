@@ -1,9 +1,9 @@
 import SwiftUI
 import MapKit
 
-/// Bottom sheet displayed when the user taps a feed card. Mirrors the Android
-/// `SignalDetailBottomSheet`: rich header, every available metric, a mini map,
-/// and quick actions.
+/// Publication ouverte depuis une carte du fil : en-tête de la carte, texte,
+/// bloc de mesure, toutes les valeurs connues en lignes clé-valeur, mini-carte,
+/// actions, puis le premier commentaire.
 struct SignalDetailSheet: View {
     let item: UnifiedSocialFeedItem
     var onLike: () -> Void = {}
@@ -22,224 +22,282 @@ struct SignalDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var speedtestDetail: SpeedtestDetail?
     @State private var detailError: String?
+    /// Premier commentaire, montré sous les actions : la conversation se lit
+    /// sans ouvrir une deuxième feuille.
+    @State private var firstComment: SocialComment?
 
     private var signal: SocialSignalSummary? { item.signal }
     private var accent: Color { TechAccent.color(for: signal?.technology) }
+    private var isSpeedtest: Bool { item.kind.lowercased() == "speedtest" }
+    private var place: String? { signal?.city ?? item.placeLabel }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.cardPadding) {
-                    header
-                        .padding(SQSpace.lg)
-                        .sqEditorialCard()
-                    if let actionError {
-                        Label(actionError, systemImage: "exclamationmark.triangle")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
-                            .padding(.horizontal, SQSpace.lg)
-                            .accessibilityIdentifier("signal.detail.actionError")
-                    }
-                    if actionBusy {
-                        ProgressView("En cours")
-                            .tint(SQColor.brandRed)
-                            .padding(.horizontal, SQSpace.lg)
-                    }
-                    if let signal {
-                        metricsGrid(for: signal)
-                        extraMetrics(for: signal)
-                    }
-                    map
-                    if !item.text.isEmpty {
-                        Text(item.text)
-                            .font(SQType.body)
-                            .foregroundStyle(SQColor.label)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(SQSpace.lg)
-                            .sqEditorialCard()
-                    }
-                    actionsRow
-                    if !item.hashtags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: SQSpace.sm) {
-                                ForEach(item.hashtags, id: \.self) { tag in
-                                    Text("#\(tag)")
-                                        .font(SQType.micro)
-                                        .foregroundStyle(SQColor.brandRed)
-                                }
-                            }
-                        }
-                    }
-                    Spacer(minLength: SQSpace.xxl)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                topBar
+                CardHeader(
+                    author: item.author,
+                    place: place,
+                    createdAt: item.createdAt,
+                    kindBadge: kindTag,
+                    kindColor: accent,
+                    onAuthorTap: onAuthorTap.map { tap in { dismiss(); tap() } }
+                )
+                if let actionError {
+                    Label(actionError, systemImage: "exclamationmark.triangle")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .accessibilityIdentifier("signal.detail.actionError")
                 }
-                .padding(SQSpace.xl)
+                if actionBusy {
+                    ProgressView("En cours")
+                        .tint(SQColor.brandRed)
+                }
+                if !item.text.isEmpty {
+                    Text(item.text)
+                        .font(SQFont.body(16, .regular, relativeTo: .body))
+                        .lineSpacing(4)
+                        .foregroundStyle(SQColor.label)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if !item.hashtags.isEmpty {
+                    CardHashtags(tags: item.hashtags)
+                }
+                if isSpeedtest {
+                    FeedMeasureBlock(signal: signal)
+                }
+                detailsSection
+                map
+                CardActionsBar(
+                    item: item,
+                    onLike: onLike,
+                    onRepost: onRepost,
+                    onComment: onComment,
+                    onFavorite: onFavorite,
+                    onShare: onShare
+                )
+                commentsPreview
             }
-            .signalQuestBackground()
-            .navigationTitle(sheetTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(SQColor.label)
-                            .frame(width: 34, height: 34)
-                            .sqSurface(SQColor.surfaceMuted, in: Circle())
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("Fermer")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        // Pas de `dismiss()` ici : le parent remplace la fiche par
-                        // le signalement ; fermer en plus annulait cette présentation (AF-FIL-02).
-                        Button(role: .destructive) { onReport() } label: {
-                            Label("Signaler", systemImage: "flag")
-                        }
-                        Button { onMute() } label: {
-                            Label(
-                                item.notificationsMutedByMe == true ? "Réactiver les notifications" : "Couper les notifications",
-                                systemImage: item.notificationsMutedByMe == true ? "bell" : "bell.slash"
-                            )
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .tint(SQColor.brandRed)
-                    }
-                    .accessibilityLabel("Plus d’options")
-                }
-            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.md)
+            .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
         }
         .task(id: item.sourceId) { await loadSpeedtestDetailIfNeeded() }
+        .task(id: item.id) { await loadFirstCommentIfNeeded() }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-
-    private var sheetTitle: String {
-        switch item.kind.lowercased() {
-        case "speedtest": return String(localized: "Speedtest partagé")
-        case "coverage", "session", "drive_test": return String(localized: "Mesure partagée")
-        case "outage": return String(localized: "Panne signalée")
-        case "photo", "antenna_photo": return String(localized: "Photo partagée")
-        default: return String(localized: "Publication")
-        }
+        .sqSheet()
     }
 
     // MARK: Header
 
-    private var header: some View {
-        HStack(spacing: SQSpace.md2) {
-            if let onAuthorTap {
-                Button {
-                    Haptics.light()
-                    dismiss()
-                    onAuthorTap()
-                } label: {
-                    authorBlock
+    /// Fermer à gauche, ⋯ à droite, sans titre : l'auteur ouvre la feuille.
+    private var topBar: some View {
+        HStack {
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "signal.detail.close") {
+                dismiss()
+            }
+            Spacer(minLength: 0)
+            Menu {
+                // Pas de `dismiss()` ici : le parent remplace la fiche par
+                // le signalement ; fermer en plus annulait cette présentation (AF-FIL-02).
+                Button(role: .destructive) { onReport() } label: {
+                    Label("Signaler", systemImage: "flag")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Voir le profil de \(item.author.displayName)")
-            } else {
-                authorBlock
+                Button { onMute() } label: {
+                    Label(
+                        item.notificationsMutedByMe == true ? "Réactiver les notifications" : "Couper les notifications",
+                        systemImage: item.notificationsMutedByMe == true ? "bell" : "bell.slash"
+                    )
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 44, height: 44)
+                    .sqSurface(SQColor.chip, in: Circle())
+                    .contentShape(Circle())
             }
-            Spacer()
-            if let tag = signal?.technology ?? kindTag {
-                SQEditorialTag(text: tag, color: accent)
-            }
+            .accessibilityLabel("Plus d’options")
+            .accessibilityIdentifier("signal.detail.more")
         }
     }
 
-    /// Nature de la publication, en mots : jamais le type brut (« DRIVE_TEST »,
-    /// TRX-26). Une publication simple n'a pas d'étiquette, comme sur les
-    /// cartes du fil.
+    /// Badge réservé aux photos d'antenne et aux pannes, comme sur les cartes
+    /// du fil ; jamais le type brut (« DRIVE_TEST », TRX-26).
     private var kindTag: String? {
         switch item.kind.lowercased() {
-        case "speedtest": return String(localized: "Speedtest")
-        case "coverage", "session", "drive_test": return String(localized: "Couverture")
         case "outage": return String(localized: "Panne")
-        case "photo", "antenna_photo": return String(localized: "Photo")
+        case "photo", "antenna_photo": return String(localized: "Photo d’antenne")
         default: return nil
         }
     }
 
-    private var authorBlock: some View {
-        HStack(spacing: SQSpace.md2) {
-            SQAvatar(url: item.author.avatarUrl, name: item.author.displayName, size: 56)
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text(item.author.displayName)
-                    .font(SQType.title)
-                    .foregroundStyle(SQColor.label)
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 6) { sheetMetadataItems(includeSeparator: true) }
-                    VStack(alignment: .leading, spacing: 3) { sheetMetadataItems() }
-                }
-                .font(.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .accessibilityElement(children: .combine)
-            }
-        }
-    }
+    // MARK: Details
 
+    /// Toutes les valeurs connues en lignes clé-valeur sur une seule carte.
     @ViewBuilder
-    private func sheetMetadataItems(includeSeparator: Bool = false) -> some View {
-        if let place = signal?.city ?? item.placeLabel {
-            Text(place).lineLimit(1)
-        }
-        if let date = item.createdAt {
-            if includeSeparator, (signal?.city ?? item.placeLabel) != nil {
-                Text("·").accessibilityHidden(true)
+    private var detailsSection: some View {
+        let pairs = detailPairs
+        if !pairs.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text("Détails")
+                    .sqKicker()
+                    .accessibilityAddTraits(.isHeader)
+                VStack(alignment: .leading, spacing: SQSpace.sm2) {
+                    ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
+                        SQFactRow(label: pair.0, value: pair.1)
+                    }
+                }
+                .padding(SQSpace.lg)
+                .background(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .accessibilityIdentifier("signal.detail.facts")
             }
-            Text(date, format: .dateTime.day().month(.abbreviated).hour().minute())
-                .sqSingleLine()
+        }
+        if let detailError {
+            Label(detailError, systemImage: "exclamationmark.triangle")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.dangerInk)
         }
     }
 
-    // MARK: Metrics
-
-    private func metricsGrid(for signal: SocialSignalSummary) -> some View {
-        let tiles = metricTiles(for: signal)
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-            ForEach(Array(tiles.enumerated()), id: \.offset) { _, tile in
-                tile
-            }
+    private var detailPairs: [(String, String)] {
+        var pairs: [(String, String)] = []
+        if let signal {
+            pairs += metricPairs(for: signal)
+            pairs += [
+                ("EARFCN", signal.earfcn.map(String.init) ?? ""),
+                ("ARFCN", signal.arfcn.map(String.init) ?? ""),
+                ("Secteurs", signal.sectors?.prefix(4).map(String.init).joined(separator: " · ") ?? ""),
+                ("Appareil", signal.deviceModel ?? "")
+            ]
+        }
+        pairs += speedtestPairs
+        pairs.append(("Lieu", place ?? ""))
+        // Une clé n'apparaît qu'une fois : le détail serveur et le résumé du
+        // post se recoupent (appareil, opérateur).
+        var seen = Set<String>()
+        return pairs.filter { pair in
+            guard !pair.1.isEmpty, pair.1 != "—", !seen.contains(pair.0) else { return false }
+            seen.insert(pair.0)
+            return true
         }
     }
 
-    private func metricTiles(for signal: SocialSignalSummary) -> [SQMetricTile] {
-        var tiles: [SQMetricTile] = []
-        let kind = item.kind.lowercased()
-
-        switch kind {
+    private func metricPairs(for signal: SocialSignalSummary) -> [(String, String)] {
+        switch item.kind.lowercased() {
         case "speedtest":
             let detail = speedtestDetail
-            tiles.append(.wrapping(label: "Réception", value: SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg ?? signal.downloadMbps), highlight: true))
-            tiles.append(.wrapping(label: "Envoi", value: SignalFormatters.speed(detail?.uploadAvg ?? signal.uploadMbps)))
-            tiles.append(.wrapping(label: "Latence min", value: SignalFormatters.ms(detail?.pingMin ?? detail?.ping ?? signal.pingMs)))
-            tiles.append(.wrapping(label: "Gigue", value: SignalFormatters.ms(detail?.jitter ?? signal.jitterMs)))
+            return [
+                // Le bloc de mesure affiche la réception du résumé ; le détail
+                // serveur la complète quand le résumé ne l'a pas.
+                ("Réception", signal.downloadMbps == nil
+                    ? SignalFormatters.speed(detail?.averageSpeed ?? detail?.downloadAvg) : ""),
+                ("Opérateur", signal.servingOperator ?? signal.operator ?? detail?.mobileOperator ?? ""),
+                ("SIM", signal.isRoaming == true ? signal.simOperator ?? "" : ""),
+                ("Technologie", signal.technology ?? detail?.networkType ?? ""),
+                ("Latence min", SignalFormatters.ms(detail?.pingMin ?? detail?.ping ?? signal.pingMs)),
+                ("Gigue", SignalFormatters.ms(detail?.jitter ?? signal.jitterMs))
+            ]
         case "validation":
-            tiles.append(.wrapping(label: "Identifiant", value: signal.identifierValue ?? "—", highlight: true))
-            tiles.append(.wrapping(label: "Type", value: signal.identifierType?.uppercased() ?? "—"))
-            tiles.append(.wrapping(label: "PCI", value: signal.pci.map(String.init) ?? "—"))
-            tiles.append(.wrapping(label: "Cell", value: signal.cellId ?? "—"))
-            tiles.append(.wrapping(label: "Bande", value: signal.band ?? "—"))
-            tiles.append(.wrapping(label: "Fréquence", value: signal.frequency ?? "—"))
+            return [
+                ("Identifiant", signal.identifierValue ?? ""),
+                ("Type", signal.identifierType?.uppercased() ?? ""),
+                ("PCI", signal.pci.map(String.init) ?? ""),
+                ("Cell", signal.cellId ?? ""),
+                ("Bande", signal.band ?? ""),
+                ("Fréquence", signal.frequency ?? "")
+            ]
         case "coverage", "session", "drive_test":
-            tiles.append(.wrapping(label: "Distance", value: SignalFormatters.meters(signal.distanceMeters), highlight: true))
-            tiles.append(.wrapping(label: "Durée", value: SignalFormatters.duration(signal.durationSeconds)))
-            tiles.append(.wrapping(label: "Points", value: signal.pointsCount.map(String.init) ?? "—"))
-            tiles.append(.wrapping(label: "Signal moy.", value: SignalFormatters.dbm(signal.averageSignalDbm)))
-            tiles.append(.wrapping(label: "Min / Max", value: rangeText(signal: signal)))
-            tiles.append(.wrapping(label: "Techs", value: signal.detectedTechs.prefix(3).joined(separator: " / ").nonEmptyOrDash))
+            return [
+                ("Distance", SignalFormatters.meters(signal.distanceMeters)),
+                ("Durée", SignalFormatters.duration(signal.durationSeconds)),
+                ("Points", signal.pointsCount.map(String.init) ?? ""),
+                ("Signal moy.", SignalFormatters.dbm(signal.averageSignalDbm)),
+                ("Min / Max", rangeText(signal: signal)),
+                ("Techs", signal.detectedTechs.prefix(3).joined(separator: " / "))
+            ]
         default:
-            tiles.append(.wrapping(label: "RSRP", value: SignalFormatters.dbm(signal.rsrp), highlight: true))
-            tiles.append(.wrapping(label: "RSRQ", value: SignalFormatters.db(signal.rsrq)))
-            tiles.append(.wrapping(label: "SINR", value: SignalFormatters.db(signal.sinr)))
-            tiles.append(.wrapping(label: "Bande", value: signal.band ?? "—"))
-            tiles.append(.wrapping(label: "Opérateur", value: signal.operator ?? "—"))
-            tiles.append(.wrapping(label: "Cell", value: signal.cellId ?? "—"))
+            return [
+                ("Opérateur", signal.operator ?? ""),
+                ("RSRP", SignalFormatters.dbm(signal.rsrp)),
+                ("RSRQ", SignalFormatters.db(signal.rsrq)),
+                ("SINR", SignalFormatters.db(signal.sinr)),
+                ("Bande", signal.band ?? ""),
+                ("Cell", signal.cellId ?? "")
+            ]
         }
-        return tiles
+    }
+
+    private var speedtestPairs: [(String, String)] {
+        guard let detail = speedtestDetail else { return [] }
+        let uploadSource = SpeedtestDetailContent.resultByteSource(
+            detail.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: detail.uploadMeasurementSource)
+        return [
+            ("Réseau", [detail.connectionType, detail.networkType].compactMap { $0 }.joined(separator: " / ")),
+            ("Appareil", [detail.deviceType, detail.deviceModel].compactMap { $0 }.joined(separator: " ")),
+            ("Durée", SignalFormatters.duration(detail.testDuration)),
+            ("Latence moyenne", SignalFormatters.ms(detail.pingAvg)),
+            ("Latence médiane", SignalFormatters.ms(detail.pingMedian)),
+            ("Latence max", SignalFormatters.ms(detail.pingMax)),
+            ("Octets envoi", uploadSource == "tcp-acknowledged"
+                ? SpeedtestDetailContent.byteSourceLabel("tcp-acknowledged") : ""),
+            ("Position", coordinatesText(lat: detail.latitude, lon: detail.longitude))
+        ]
+    }
+
+    // MARK: Comments
+
+    /// Premier commentaire et lien vers la conversation, ou une invitation à
+    /// commenter quand il n'y en a pas encore.
+    private var commentsPreview: some View {
+        let count = item.commentsCount
+        return VStack(alignment: .leading, spacing: SQSpace.md) {
+            Divider().overlay(SQColor.separator)
+            Button {
+                Haptics.light()
+                onComment()
+            } label: {
+                VStack(alignment: .leading, spacing: SQSpace.sm2) {
+                    if let comment = firstComment {
+                        HStack(alignment: .top, spacing: SQSpace.sm2) {
+                            SQAvatar(url: comment.author.avatarUrl, name: comment.author.displayName, size: 30)
+                            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                                HStack(spacing: SQSpace.xs) {
+                                    Text(comment.author.displayName)
+                                        .font(SQType.caption(.bold))
+                                        .foregroundStyle(SQColor.label)
+                                    if let created = comment.createdAt {
+                                        Text(verbatim: "·").accessibilityHidden(true)
+                                        Text(created, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                                    }
+                                }
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                Text(comment.text)
+                                    .font(SQType.subhead)
+                                    .foregroundStyle(SQColor.label)
+                                    .lineLimit(3)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                    }
+                    Text(count > 0 ? "Voir les \(count) commentaires" : "Ajouter un commentaire")
+                        .font(SQType.subhead(.bold))
+                        .foregroundStyle(SQColor.accentInk)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("signal.detail.comments")
+        }
+    }
+
+    private func loadFirstCommentIfNeeded() async {
+        guard item.commentsCount > 0 else { return }
+        // Silencieux en cas d'échec : le lien vers les commentaires reste.
+        firstComment = try? await services.comments.list(postId: item.backendPostId, cursor: nil).comments.first
     }
 
     private func rangeText(signal: SocialSignalSummary) -> String {
@@ -255,59 +313,6 @@ struct SignalDetailSheet: View {
         }
     }
 
-    @ViewBuilder
-    private func extraMetrics(for signal: SocialSignalSummary) -> some View {
-        let speedtestPairs: [(String, String)] = speedtestDetail.map { detail in
-            let uploadSource = SpeedtestDetailContent.resultByteSource(
-                detail.measurementTrace?.phases.first(where: { $0.phase == "upload" }), fallback: detail.uploadMeasurementSource)
-            return [
-                ("Réseau", [detail.connectionType, detail.networkType].compactMap { $0 }.joined(separator: " / ")),
-                ("Réseau utilisé", signal.servingOperator ?? signal.operator ?? detail.mobileOperator ?? ""),
-                ("SIM", signal.isRoaming == true ? signal.simOperator ?? "" : ""),
-                ("Appareil", [detail.deviceType, detail.deviceModel].compactMap { $0 }.joined(separator: " ")),
-                ("Durée", SignalFormatters.duration(detail.testDuration)),
-                ("Latence moyenne", SignalFormatters.ms(detail.pingAvg)),
-                ("Latence médiane", SignalFormatters.ms(detail.pingMedian)),
-                ("Latence max", SignalFormatters.ms(detail.pingMax)),
-                ("Octets envoi", uploadSource == "tcp-acknowledged"
-                    ? SpeedtestDetailContent.byteSourceLabel("tcp-acknowledged") : ""),
-                ("Position", coordinatesText(lat: detail.latitude, lon: detail.longitude))
-            ].filter { !$0.1.isEmpty && $0.1 != "—" }
-        } ?? []
-        let pairs: [(String, String)] = speedtestPairs + [
-            ("EARFCN", signal.earfcn.map(String.init) ?? ""),
-            ("ARFCN", signal.arfcn.map(String.init) ?? ""),
-            ("Secteurs", signal.sectors?.prefix(4).map(String.init).joined(separator: " · ") ?? ""),
-            ("Appareil", signal.deviceModel ?? "")
-        ].filter { !$0.1.isEmpty }
-        if !pairs.isEmpty {
-            VStack(alignment: .leading, spacing: SQSpace.sm) {
-                Text("Détails techniques")
-                    .font(SQType.heading)
-                    .foregroundStyle(SQColor.label)
-                ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
-                    HStack {
-                        // Clé traduite à l'affichage : le libellé passait tel quel (TRX-06).
-                        Text(LocalizedStringKey(pair.0)).foregroundStyle(SQColor.labelSecondary)
-                        Spacer()
-                        Text(pair.1).foregroundStyle(SQColor.label)
-                    }
-                    .font(SQType.caption)
-                }
-            }
-            .padding(SQSpace.lg)
-            .sqEditorialCard()
-        }
-        if let detailError {
-            Label(detailError, systemImage: "exclamationmark.triangle")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.dangerInk)
-                .padding(SQSpace.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .sqEditorialCard()
-        }
-    }
-
     // MARK: Map
 
     @ViewBuilder
@@ -319,16 +324,12 @@ struct SignalDetailSheet: View {
             SQRegionMap(region: .constant(region), items: [SQMapPin(coordinate: center)]) { pin in
                 MapMarker(coordinate: pin.coordinate, tint: accent)
             }
-            .frame(height: 180)
+            .frame(height: 160)
             .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-            .sqShadowCard()
         } else if item.kind.lowercased() == "speedtest" {
             Label("Localisation non partagée", systemImage: "location.slash")
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
-                .padding(SQSpace.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .sqEditorialCard()
         }
     }
 
@@ -352,55 +353,5 @@ struct SignalDetailSheet: View {
             }
         }
     }
-
-    // MARK: Actions row
-
-    private var actionsRow: some View {
-        HStack(spacing: SQSpace.sm) {
-            actionButton(systemImage: item.likedByMe ? "heart.fill" : "heart", tint: item.likedByMe ? SQColor.like : SQColor.label, active: item.likedByMe, pop: item.likedByMe) { onLike() }
-                .accessibilityLabel("J’aime")
-                .accessibilityAddTraits(item.likedByMe ? .isSelected : [])
-            actionButton(systemImage: "bubble.right", tint: SQColor.label, active: false) { onComment() }
-                .accessibilityLabel("Commenter")
-            actionButton(systemImage: item.repostedByMe ? "arrow.2.squarepath.circle.fill" : "arrow.2.squarepath", tint: item.repostedByMe ? SQColor.success : SQColor.label, active: item.repostedByMe) { onRepost() }
-                .accessibilityLabel("Repartager")
-                .accessibilityAddTraits(item.repostedByMe ? .isSelected : [])
-            actionButton(systemImage: item.favoritedByMe ? "bookmark.fill" : "bookmark", tint: item.favoritedByMe ? SQColor.brandRed : SQColor.label, active: item.favoritedByMe) { onFavorite() }
-                .accessibilityLabel(item.favoritedByMe ? "Retirer des favoris" : "Ajouter aux favoris")
-                .accessibilityAddTraits(item.favoritedByMe ? .isSelected : [])
-            actionButton(systemImage: "paperplane", tint: SQColor.label, active: false) { onShare() }
-                .accessibilityLabel("Partager")
-        }
-        .frame(maxWidth: .infinity)
-        .padding(4)
-        .background(
-            SQColor.surface,
-            in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-        )
-        .sqShadowSoft()
-    }
-
-    /// Une seule barre porte les cinq actions. Les boutons n'empilent plus cinq
-    /// capsules et cinq ombres concurrentes ; seul l'état actif reçoit un fond.
-    private func actionButton(systemImage: String, tint: Color, active: Bool, pop: Bool = false, action: @escaping () -> Void) -> some View {
-        let shape = Capsule(style: .continuous)
-        return Button {
-            Haptics.light()
-            action()
-        } label: {
-            Image(systemName: systemImage)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(tint)
-                .sqLikePop(trigger: pop)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-                .background(active ? AnyShapeStyle(tint.opacity(0.12)) : AnyShapeStyle(Color.clear), in: shape)
-                .sqAnimation(SQMotion.fast, value: active)
-        }
-        .buttonStyle(SQPressButtonStyle())
-    }
 }
 
-private extension String {
-    var nonEmptyOrDash: String { isEmpty ? "—" : self }
-}

@@ -148,6 +148,11 @@ struct AppRootView: View {
         await services.callManager.reconcilePendingIncomingCall()
     }
 
+    private var signedInUser: AuthUser? {
+        if case .authenticated(let user) = session.state { return user }
+        return nil
+    }
+
     private func authenticatedUserID(in state: AuthSessionViewModel.State) -> String? {
         guard case .authenticated(let user) = state else { return nil }
         return user.id
@@ -178,6 +183,7 @@ struct AppRootView: View {
             .environmentObject(services.versionPolicy)
             .environmentObject(appLock)
             .environmentObject(inAppNotifications)
+            .environment(\.signedInUser, signedInUser)
             .environment(\.legibilityWeight, fieldMode ? .bold : nil)
             .controlSize(fieldMode ? .large : .regular)
             .background(PasswordResetPresentation(route: passwordResetRoute,

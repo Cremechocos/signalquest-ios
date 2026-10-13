@@ -422,7 +422,8 @@ struct UserProfileView: View {
                 )
             case .comments(let item):
                 CommentsSheet(service: services.comments, postId: item.backendPostId,
-                              profileService: services.feed, reports: services.reports)
+                              profileService: services.feed, reports: services.reports,
+                              commentsCount: item.commentsCount)
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
             case .share(let item):

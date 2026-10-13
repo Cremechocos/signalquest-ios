@@ -443,6 +443,10 @@ private struct FeedHashtagActionKey: EnvironmentKey {
     static var defaultValue: ((String) -> Void)? { nil }
 }
 
+private struct SignedInUserKey: EnvironmentKey {
+    static var defaultValue: AuthUser? { nil }
+}
+
 extension EnvironmentValues {
     /// Contenu du menu ⋯ des cartes. Seul l'écran qui le pose sait quelles
     /// actions offrir ; ailleurs, la carte n'affiche pas de ⋯.
@@ -456,6 +460,14 @@ extension EnvironmentValues {
     var feedHashtagAction: ((String) -> Void)? {
         get { self[FeedHashtagActionKey.self] }
         set { self[FeedHashtagActionKey.self] = newValue }
+    }
+
+    /// Compte connecté, posé à la racine. Une feuille qui n'en montre que
+    /// l'avatar le lit ici : sans session injectée (rendu isolé, invité),
+    /// elle reçoit `nil` au lieu de s'arrêter.
+    var signedInUser: AuthUser? {
+        get { self[SignedInUserKey.self] }
+        set { self[SignedInUserKey.self] = newValue }
     }
 }
 

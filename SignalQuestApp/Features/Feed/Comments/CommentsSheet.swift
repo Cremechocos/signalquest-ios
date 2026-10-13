@@ -14,6 +14,8 @@ final class CommentsViewModel: ObservableObject {
     @Published var replyTo: SocialComment?
     @Published var expandedParentIDs: Set<String> = []
     @Published var repliesByParent: [String: ReplyPage] = [:]
+    /// Commentaires publiés depuis l'ouverture : le titre de la feuille les compte.
+    @Published var postedCount = 0
     /// Commentaire publié : nourrit le classement « Pour toi » après réussite,
     /// plus à la simple ouverture de la feuille (SOC-19).
     var onCommentPosted: (() -> Void)?
@@ -165,6 +167,7 @@ final class CommentsViewModel: ObservableObject {
                 replyTo = nil
             }
             Haptics.success()
+            postedCount += 1
             onCommentPosted?()
             if let parentID, repliesByParent[parentID]?.hasLoaded != true {
                 Task { await loadReplies(for: parentID, cursor: nil) }
@@ -258,6 +261,10 @@ struct CommentsSheet: View {
 
     @State private var reportedComment: SocialComment?
     @State private var pendingCommentDeletion: SocialComment?
+    @Environment(\.signedInUser) private var currentUser
+    /// Nombre connu à l'ouverture (celui de la publication), affiché dans le
+    /// titre. Figé : le parent peut déjà compter les commentaires envoyés ici.
+    @State private var commentsCount: Int?
 
     /// Repli pour les anciens appels sans service de profil injecté.
     private let onAuthorTap: ((SocialFeedAuthor) -> Void)?
@@ -269,6 +276,7 @@ struct CommentsSheet: View {
          profileService: SocialFeedServicing? = nil,
          reports: ReportsServicing? = nil,
          onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil,
+         commentsCount: Int? = nil,
          onCommentPosted: (() -> Void)? = nil) {
         let model = CommentsViewModel(service: service, postId: postId)
         model.onCommentPosted = onCommentPosted
@@ -276,20 +284,24 @@ struct CommentsSheet: View {
         self.profileService = profileService
         self.reports = reports
         self.onAuthorTap = onAuthorTap
+        _commentsCount = State(initialValue: commentsCount)
     }
 
     init(model: CommentsViewModel, profileService: SocialFeedServicing? = nil,
          reports: ReportsServicing? = nil,
-         onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil) {
+         onAuthorTap: ((SocialFeedAuthor) -> Void)? = nil,
+         commentsCount: Int? = nil) {
         _model = StateObject(wrappedValue: model)
         self.profileService = profileService
         self.reports = reports
         self.onAuthorTap = onAuthorTap
+        _commentsCount = State(initialValue: commentsCount)
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                header
                 content
                 if let error = model.errorMessage, model.hasLoaded || !model.comments.isEmpty {
                     errorBanner(error)
@@ -297,15 +309,9 @@ struct CommentsSheet: View {
                 composer
             }
             .sqAnimation(SQMotion.snappy, value: model.errorMessage)
-            .signalQuestBackground()
+            .background(SQColor.surface.ignoresSafeArea())
             .navigationTitle("Commentaires")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }
-                        .tint(SQColor.brandRed)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestinationItemCompat($profileAuthor) { author in
                 if let profileService {
                     UserProfileView(userId: author.id, prefill: author, service: profileService)
@@ -335,8 +341,35 @@ struct CommentsSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .sqSheet()
         .task { if !model.hasLoaded { await model.load() } }
+    }
+
+    /// Titre avec le nombre, fermeture ronde : pas de barre de navigation.
+    private var header: some View {
+        let total = (commentsCount ?? 0) + model.postedCount
+        return HStack(spacing: SQSpace.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs2) {
+                Text("Commentaires")
+                    .foregroundStyle(SQColor.label)
+                if total > 0 {
+                    Text(verbatim: "\(total)")
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .font(SQFont.display(18, .heavy, relativeTo: .headline))
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("comments.title")
+            Spacer(minLength: 0)
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "comments.close") {
+                dismiss()
+            }
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.top, SQSpace.lg)
+        .padding(.bottom, SQSpace.sm)
     }
 
     @ViewBuilder
@@ -360,7 +393,7 @@ struct CommentsSheet: View {
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: SQSpace.md) {
+                    LazyVStack(alignment: .leading, spacing: SQSpace.lg) {
                         ForEach(model.comments) { comment in
                             commentThread(comment)
                                 .id(comment.id)
@@ -397,11 +430,15 @@ struct CommentsSheet: View {
         }
     }
 
+    /// Retrait des réponses : elles s'alignent sur le texte du commentaire parent.
+    private static let replyIndent: CGFloat = 34 + SQSpace.sm2
+
     private func commentThread(_ comment: SocialComment) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
             commentRow(comment)
             HStack(spacing: SQSpace.lg) {
                 Button("Répondre") { model.beginReply(to: comment) }
+                    .foregroundStyle(SQColor.labelSecondary)
                     .frame(minHeight: 44)
                 let page = model.repliesByParent[comment.id]
                 let count = max(comment.repliesCount ?? 0,
@@ -410,18 +447,24 @@ struct CommentsSheet: View {
                     Button {
                         Task { await model.toggleReplies(for: comment) }
                     } label: {
-                        // « 21 réponses » (pluriel du catalogue) plutôt que « Réponses 21 ».
-                        Text("\(count) réponse")
-                            .monospacedDigit()
-                            .frame(minHeight: 44)
+                        Group {
+                            if model.expandedParentIDs.contains(comment.id) {
+                                Text("Masquer les réponses")
+                            } else {
+                                Text("Voir \(count) réponses")
+                            }
+                        }
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(minHeight: 44)
                     }
                     .accessibilityIdentifier("comments.replies.\(comment.id)")
                 }
             }
-            .font(SQType.caption)
-            .foregroundStyle(SQColor.labelSecondary)
+            .font(SQType.caption(.bold))
             .buttonStyle(.plain)
-            .padding(.leading, 44)
+            .padding(.leading, Self.replyIndent)
+            .padding(.top, -SQSpace.sm)
             if model.expandedParentIDs.contains(comment.id) {
                 replies(for: comment)
             }
@@ -431,69 +474,66 @@ struct CommentsSheet: View {
     @ViewBuilder
     private func replies(for parent: SocialComment) -> some View {
         let page = model.repliesByParent[parent.id] ?? CommentsViewModel.ReplyPage()
-        if page.isLoading && page.comments.isEmpty {
-            SQSpinner().tint(SQColor.brandRed).padding(.leading, SQSpace.xl)
+        Group {
+            if page.isLoading && page.comments.isEmpty {
+                SQSpinner().tint(SQColor.brandRed)
+            }
+            ForEach(page.comments) { reply in
+                commentRow(reply, isReply: true).id(reply.id)
+            }
+            ForEach(page.sentComments) { reply in
+                commentRow(reply, isReply: true).id(reply.id)
+            }
+            if page.hasLoaded && page.comments.isEmpty && page.sentComments.isEmpty && page.errorMessage == nil {
+                Text("Aucune réponse")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            if page.nextCursor != nil && !page.isLoading && page.errorMessage == nil {
+                Button("Charger la suite") { Task { await model.loadMoreReplies(for: parent.id) } }
+                    .font(SQType.caption(.bold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("comments.replies.loadMore.\(parent.id)")
+            }
         }
-        ForEach(page.comments) { reply in
-            commentRow(reply).padding(.leading, SQSpace.xl).id(reply.id)
-        }
-        ForEach(page.sentComments) { reply in
-            commentRow(reply).padding(.leading, SQSpace.xl).id(reply.id)
-        }
-        if page.hasLoaded && page.comments.isEmpty && page.sentComments.isEmpty && page.errorMessage == nil {
-            Text("Aucune réponse")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-                .padding(.leading, SQSpace.xl)
-        }
-        if page.nextCursor != nil && !page.isLoading && page.errorMessage == nil {
-            Button("Charger la suite") { Task { await model.loadMoreReplies(for: parent.id) } }
-                .padding(.leading, SQSpace.xl)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("comments.replies.loadMore.\(parent.id)")
-        }
+        .padding(.leading, Self.replyIndent)
         if let error = page.errorMessage {
             errorBanner(error)
             Button("Réessayer") { Task { await model.retryReplies(for: parent.id) } }
-                .padding(.leading, SQSpace.xl)
+                .padding(.leading, Self.replyIndent)
                 .frame(minHeight: 44)
         }
     }
 
-    /// Rangée « Crème » : avatar + bulle douce `SurfaceMuted` rayon 14, sans
-    /// bordure ; le like se pose sous la bulle.
-    private func commentRow(_ comment: SocialComment) -> some View {
+    /// Commentaire sans bulle : avatar, nom et temps, texte ; le cœur et son
+    /// compteur dans la colonne de droite.
+    private func commentRow(_ comment: SocialComment, isReply: Bool = false) -> some View {
         HStack(alignment: .top, spacing: SQSpace.sm2) {
             authorButton(comment) {
-                SQAvatar(url: comment.author.avatarUrl, name: comment.author.displayName, size: 36)
+                SQAvatar(url: comment.author.avatarUrl, name: comment.author.displayName, size: isReply ? 28 : 34)
             }
-            VStack(alignment: .leading, spacing: SQSpace.xs2) {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    HStack {
-                        authorButton(comment) {
-                            Text(comment.author.displayName)
-                                .font(SQType.body(.semibold))
-                                .foregroundStyle(SQColor.label)
-                        }
-                        Spacer()
-                        if let created = comment.createdAt {
-                            Text(created, format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
+            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                HStack(spacing: SQSpace.xs) {
+                    authorButton(comment) {
+                        Text(comment.author.displayName)
+                            .font(SQType.caption(.bold))
+                            .foregroundStyle(SQColor.label)
                     }
-                    Text(comment.text)
-                        .font(SQType.body)
-                        .foregroundStyle(SQColor.label)
+                    if let created = comment.createdAt {
+                        Text(verbatim: "·").accessibilityHidden(true)
+                        Text(created, format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                    }
                 }
-                .padding(SQSpace.md)
-                .background(
-                    SQColor.surfaceMuted,
-                    in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
-                )
-                likeButton(comment)
-                    .padding(.leading, SQSpace.xs)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                Text(comment.text)
+                    .font(SQFont.body(14.5, .regular, relativeTo: .subheadline))
+                    .lineSpacing(2)
+                    .foregroundStyle(SQColor.label)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            likeButton(comment)
         }
         .contextMenu { commentMenu(comment) }
     }
@@ -525,17 +565,18 @@ struct CommentsSheet: View {
         return Button {
             model.toggleLike(comment)
         } label: {
-            HStack(spacing: SQSpace.xs + 1) {
+            VStack(spacing: SQSpace.xxs) {
                 Image(systemName: isLiked ? "heart.fill" : "heart")
+                    .font(.system(size: 15, weight: .semibold))
                     .sqLikePop(trigger: isLiked)
                     .accessibilityHidden(true)
                 if count > 0 {
                     Text("\(count)").monospacedDigit()
                 }
             }
-            .font(.caption.weight(.semibold))
+            .font(SQType.caption(.semibold))
             .foregroundStyle(isLiked ? SQColor.like : SQColor.labelSecondary)
-            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            .frame(minWidth: 44, minHeight: 44, alignment: .top)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -594,37 +635,46 @@ struct CommentsSheet: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .accessibilityIdentifier("comments.replyTarget")
             }
-            HStack(spacing: SQSpace.sm2) {
-                // Champ capsule « Crème » : SurfaceMuted, sans bordure, 44 pt mini.
+            HStack(spacing: SQSpace.sm) {
+                SQAvatar(url: currentUser?.avatarUrl, name: currentUser?.displayName ?? "", size: 30)
+                    .accessibilityHidden(true)
                 TextField(model.replyTo == nil
-                    ? LocalizedStringKey("Ajoute un commentaire")
+                    ? LocalizedStringKey("Ajouter un commentaire…")
                     : LocalizedStringKey("Répondre…"), text: $model.draft, axis: .vertical)
                     .font(SQType.body)
                     .foregroundStyle(SQColor.label)
                     .lineLimit(1...4)
-                    .padding(.horizontal, SQSpace.lg)
+                    .padding(.horizontal, SQSpace.md2)
                     .padding(.vertical, SQSpace.sm2)
                     .frame(minHeight: 44)
                     .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
+                    .accessibilityIdentifier("comments.input")
+                // Envoi rond à l'encre, comme dans la visionneuse photo.
                 Button {
                     Task { await model.send() }
                 } label: {
                     Image(systemName: model.isSending ? "ellipsis" : "paperplane.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(SQColor.onAccent)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(SQColor.onInk)
                         .frame(width: 44, height: 44)
-                        .background(SQColor.brandRed, in: Circle())
-                        .opacity(isDisabled ? 0.45 : 1)
+                        .background(SQColor.label, in: Circle())
+                        .opacity(isDisabled ? 0.35 : 1)
                         .sqAnimation(SQMotion.fast, value: isDisabled)
                 }
                 .buttonStyle(SQPressButtonStyle())
                 .accessibilityLabel("Envoyer le commentaire")
+                .accessibilityIdentifier("comments.send")
                 .disabled(isDisabled)
             }
         }
-        .padding(SQSpace.md)
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.sm2)
         .background(SQColor.surface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(SQColor.separator).frame(height: 1 / UIScreen.main.scale)
+        }
     }
+
 }
 
 #if DEBUG && targetEnvironment(simulator)

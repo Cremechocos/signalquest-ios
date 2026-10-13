@@ -230,10 +230,12 @@ final class SignalQuestUITests: XCTestCase {
 
         postText.tap()
 
-        XCTAssertTrue(app.navigationBars["Speedtest partagé"].waitForExistence(timeout: 8))
-        XCTAssertTrue(app.buttons["Fermer"].exists)
-        XCTAssertTrue(app.staticTexts["Réception"].exists)
-        XCTAssertTrue(app.staticTexts["Envoi"].exists)
+        // Feuille Halo : fermeture ronde, bloc de mesure, détails clé-valeur et
+        // lien vers les commentaires.
+        XCTAssertTrue(app.buttons["signal.detail.close"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["signal.detail.more"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["signal.detail.facts"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["signal.detail.comments"].exists)
 
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "community-post-detail-readable"
