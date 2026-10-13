@@ -184,288 +184,305 @@ struct StoryComposer: View {
     }
 
     var body: some View {
-        let previewImage = model.previewImage
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.cardPadding) {
-                    PhotosPicker(selection: $model.selectedItem, matching: .images) {
-                        ZStack {
-                            if let image = previewImage {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                            } else {
-                                Rectangle()
-                                    .fill(SQColor.surfaceMuted)
-                                VStack(spacing: SQSpace.sm) {
-                                    Image(systemName: "photo.badge.plus")
-                                        .font(.system(size: 40))
-                                        .accessibilityHidden(true)
-                                    Text("Ajouter un média")
-                                        .font(SQType.subhead)
-                                }
-                                .foregroundStyle(SQColor.labelSecondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 280)
-                        .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                        .sqShadowCard()
-                    }
-                    .buttonStyle(SQPressButtonStyle())
-                    // Posé sur le sélecteur, pas dans son étiquette : un bouton
-                    // imbriqué n'y recevrait pas le toucher.
-                    .overlay(alignment: .topLeading) {
-                        if previewImage != nil {
-                            PhotoBlurButton { showBlurEditor = true }
-                                .accessibilityIdentifier("story.blur")
-                        }
-                    }
-                    .onChangeCompat(of: model.selectedItem) { _, _ in
-                        Task { await model.loadPickerImage() }
-                    }
-                    .sheet(isPresented: $showBlurEditor) {
-                        if let image = model.previewImage {
-                            PhotoBlurEditor(image: image) { blurred, _ in model.applyBlurredImage(blurred) }
-                        }
-                    }
-
-                    // Champ capsule « Crème » : SurfaceMuted, sans bordure.
-                    TextField("Une légende ?", text: $model.text, axis: .vertical)
-                        .lineLimit(2...6)
-                        .font(SQType.body)
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack(spacing: SQSpace.sm) {
+                    Text("Nouvelle story")
+                        .font(SQFont.display(22, .heavy, relativeTo: .title2))
                         .foregroundStyle(SQColor.label)
-                        .padding(.horizontal, SQSpace.lg)
-                        .padding(.vertical, SQSpace.sm2)
-                        .frame(minHeight: 44)
-                        .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
-
-                    audienceSection
-                    hideSection
-                    signalSection
-                    ttlSection
-                    durationRow
-
-                    if let error = model.errorMessage {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
-                            .foregroundStyle(SQColor.dangerInk)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 0)
+                    MapChipIconButton(systemImage: "xmark", label: "Annuler", identifier: "story.composer.close") {
+                        dismiss()
                     }
+                }
 
-                    GradientButton("Publier", systemImage: "paperplane.fill", isBusy: model.isSending) {
-                        Task {
-                            await model.publish()
-                            if model.didPublish {
-                                if let story = model.publishedStory { onPublished(story) }
-                                dismiss()
-                            }
+                mediaAndCaption
+
+                segmentGroup("Qui la voit") {
+                    ForEach([StoryAudience.friends, .publicAll, .closeFriends]) { audience in
+                        segment(audience.label, isSelected: model.audience == audience) {
+                            model.audience = audience
                         }
                     }
-                    // Story vide : le bouton est grisé plutôt que sans effet.
-                    .disabled(!model.canPublish)
                 }
-                .padding(SQSpace.xl)
-            }
-            .signalQuestBackground()
-            .navigationTitle("Nouvelle story")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }
-                        .tint(SQColor.brandRed)
-                }
-            }
-            .task {
-                await model.loadAudience()
-                await services.entitlements.refreshBackendSnapshot()
-            }
-            .sheet(isPresented: $model.showHideEditor) {
-                FriendMultiSelectSheet(title: "Masquer à…", friends: model.friends, selected: $model.hiddenUserIds)
-            }
-            // Enregistré à toute fermeture, « OK » ou glissement : seul « OK »
-            // enregistrait, et le serveur gardait l'ancienne liste (AF-FIL-14).
-            .sheet(isPresented: $model.showCloseFriendsEditor, onDismiss: {
-                Task { await model.saveCloseFriends() }
-            }) {
-                FriendMultiSelectSheet(title: "Amis proches", friends: model.friends, selected: $model.closeFriendIds) {}
-            }
-            .sheet(isPresented: $showPremiumPaywall) {
-                NavigationStack {
-                    PaywallView(
-                        store: services.entitlements,
-                        entryPoint: .premiumFeature("Durée personnalisée des stories")
-                    )
-                }
-                .presentationDetents([.large])
-            }
-        }
-    }
-
-    /// Story typée « signal ».
-    private var signalSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.xs) {
-            Toggle(isOn: $model.attachRadio) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Joindre mon relevé réseau")
-                        .font(SQType.body(.medium))
-                    Text("Techno, opérateur et qualité au moment du partage.")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-            }
-            .tint(SQColor.brandRed)
-        }
-        .padding(SQSpace.md)
-        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-    }
-
-    private var audienceSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Audience").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-            // Segments capsules « Crème » : actif brique, inactif surface + ombre repos.
-            HStack(spacing: SQSpace.sm) {
-                ForEach(StoryAudience.allCases) { audience in
-                    let selected = model.audience == audience
-                    Button {
-                        Haptics.selection()
-                        model.audience = audience
-                    } label: {
-                        Text(audience.label)
-                            .font(SQType.subhead(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .frame(minHeight: 44)
-                            .background(
-                                selected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                                in: Capsule(style: .continuous)
-                            )
-                            .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
-                            .sqShadowSoft()
+                segmentGroup("Disparaît après") { ttlSegments }
+                segmentGroup("Affichage") {
+                    ForEach([5, 10, 15], id: \.self) { seconds in
+                        segment(String(localized: "\(seconds) s"), isSelected: model.displayDuration == seconds) {
+                            model.displayDuration = seconds
+                        }
+                        .accessibilityLabel("Durée d'affichage \(seconds) secondes")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+
+                optionsCard
+
+                if let error = model.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(SQColor.dangerInk)
+                }
+
+                GradientButton("Publier la story", isBusy: model.isSending) {
+                    Task {
+                        await model.publish()
+                        if model.didPublish {
+                            if let story = model.publishedStory { onPublished(story) }
+                            dismiss()
+                        }
+                    }
+                }
+                // Story vide : le bouton est grisé plutôt que sans effet.
+                .disabled(!model.canPublish)
+                .accessibilityIdentifier("story.publish")
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xxl)
+        }
+        .onChangeCompat(of: model.selectedItem) { _, _ in
+            Task { await model.loadPickerImage() }
+        }
+        .sheet(isPresented: $showBlurEditor) {
+            if let image = model.previewImage {
+                PhotoBlurEditor(image: image) { blurred, _ in model.applyBlurredImage(blurred) }
+            }
+        }
+        .task {
+            await model.loadAudience()
+            await services.entitlements.refreshBackendSnapshot()
+        }
+        .sheet(isPresented: $model.showHideEditor) {
+            FriendMultiSelectSheet(title: "Masquer à…", friends: model.friends, selected: $model.hiddenUserIds)
+        }
+        // Enregistré à toute fermeture, « OK » ou glissement : seul « OK »
+        // enregistrait, et le serveur gardait l'ancienne liste (AF-FIL-14).
+        .sheet(isPresented: $model.showCloseFriendsEditor, onDismiss: {
+            Task { await model.saveCloseFriends() }
+        }) {
+            FriendMultiSelectSheet(title: "Amis proches", friends: model.friends, selected: $model.closeFriendIds) {}
+        }
+        .sheet(isPresented: $showPremiumPaywall) {
+            NavigationStack {
+                PaywallView(
+                    store: services.entitlements,
+                    entryPoint: .premiumFeature("Durée personnalisée des stories")
+                )
+            }
+            .presentationDetents([.large])
+        }
+        .sqSheet(background: SQColor.bg)
+    }
+
+    /// Aperçu du média et légende côte à côte.
+    private var mediaAndCaption: some View {
+        let previewImage = model.previewImage
+        return HStack(alignment: .top, spacing: SQSpace.md) {
+            PhotosPicker(selection: $model.selectedItem, matching: .images) {
+                ZStack {
+                    if let image = previewImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Rectangle().fill(SQColor.chip)
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 28))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .frame(width: 112, height: 198)
+                .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel(previewImage == nil ? "Ajouter un média" : "Changer le média")
+            // Posé sur le sélecteur, pas dans son étiquette : un bouton
+            // imbriqué n'y recevrait pas le toucher.
+            .overlay(alignment: .topLeading) {
+                if previewImage != nil {
+                    PhotoBlurButton { showBlurEditor = true }
+                        .accessibilityIdentifier("story.blur")
                 }
             }
+
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text("Ta légende")
+                    .font(SQType.caption(.bold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                TextField("Une légende ?", text: $model.text, axis: .vertical)
+                    .lineLimit(3...7)
+                    .font(SQFont.body(15, .regular, relativeTo: .body))
+                    .foregroundStyle(SQColor.label)
+                    .textFieldStyle(.plain)
+                    .accessibilityIdentifier("story.caption")
+                Spacer(minLength: 0)
+                PhotosPicker(selection: $model.selectedItem, matching: .images) {
+                    Text(previewImage == nil ? "Ajouter un média" : "Changer le média")
+                        .font(SQType.subhead(.bold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .frame(maxWidth: .infinity, minHeight: 198, alignment: .topLeading)
+        }
+    }
+
+    /// 24 h pour tous ; 12 h et 6 h en segments, les autres durées dans « Plus ».
+    /// Toute durée autre que 24 h est réservée à Premium.
+    @ViewBuilder
+    private var ttlSegments: some View {
+        ForEach([24, 12, 6], id: \.self) { hours in
+            segment(String(localized: "\(hours) h"), isSelected: model.ttlHours == hours, locked: hours != 24 && !isPremium) {
+                selectTTL(hours)
+            }
+            .accessibilityHint(hours == 24 ? "Disponible pour tous" : "Réservé à Premium")
+        }
+        let others = [1, 48, 72]
+        let otherSelected = others.contains(model.ttlHours)
+        Menu {
+            ForEach(others, id: \.self) { hours in
+                Button {
+                    selectTTL(hours)
+                } label: {
+                    if model.ttlHours == hours {
+                        Label("\(hours) h", systemImage: "checkmark")
+                    } else if !isPremium {
+                        Label("\(hours) h", systemImage: "lock.fill")
+                    } else {
+                        Text("\(hours) h")
+                    }
+                }
+            }
+        } label: {
+            segmentLabel(otherSelected ? String(localized: "\(model.ttlHours) h") : String(localized: "Plus"),
+                         isSelected: otherSelected, locked: false, showsChevron: true)
+        }
+        .accessibilityLabel("Autres durées")
+        .accessibilityValue(otherSelected ? Text("\(model.ttlHours) h") : Text(""))
+    }
+
+    private var isPremium: Bool { services.entitlements.confirmedServerTier == .premium }
+
+    private func selectTTL(_ hours: Int) {
+        if hours == 24 || isPremium {
+            Haptics.selection()
+            model.ttlHours = hours
+        } else {
+            showPremiumPaywall = true
+        }
+    }
+
+    /// Relevé réseau, puis « Masquer à… » (et les amis proches), sur une carte.
+    private var optionsCard: some View {
+        VStack(spacing: 0) {
+            SQListRow(
+                String(localized: "Joindre mon relevé réseau"),
+                subtitle: String(localized: "Techno, opérateur et qualité au moment du partage."),
+                systemImage: "antenna.radiowaves.left.and.right"
+            ) {
+                Toggle("Joindre mon relevé réseau", isOn: $model.attachRadio)
+                    .labelsHidden()
+                    .tint(SQColor.success)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+
+            Divider().padding(.leading, 62)
+
+            optionRow(systemImage: "hand.raised", title: String(localized: "Masquer à…"), value: hiddenValue) {
+                model.showHideEditor = true
+            }
+
             if model.audience == .closeFriends {
-                menuRow(
-                    systemImage: "star.fill",
-                    title: String(localized: "Gérer mes amis proches (\(model.closeFriendIds.count))")
-                ) {
+                Divider().padding(.leading, 62)
+                optionRow(systemImage: "star", title: String(localized: "Amis proches"),
+                          value: String(localized: "\(model.closeFriendIds.count)")) {
                     model.showCloseFriendsEditor = true
                 }
             }
         }
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
     }
 
-    private var hideSection: some View {
-        menuRow(
-            systemImage: "eye.slash",
-            title: model.hiddenUserIds.isEmpty
-                ? String(localized: "Masquer à…")
-                : model.hiddenUserIds.count == 1
-                    ? String(localized: "Masqué à 1 personne")
-                    : String(localized: "Masqué à \(model.hiddenUserIds.count) personnes")
-        ) {
-            model.showHideEditor = true
+    private var hiddenValue: String {
+        switch model.hiddenUserIds.count {
+        case 0: return String(localized: "Personne")
+        case 1: return String(localized: "1 personne")
+        default: return String(localized: "\(model.hiddenUserIds.count) personnes")
         }
     }
 
-    /// Rangée de menu « Crème » : pastille icône 36 rayon 12 `accentSoft`,
-    /// libellé Figtree 500 15.5, chevron tertiaire — sur petite tuile surface.
-    private func menuRow(systemImage: String, title: String, action: @escaping () -> Void) -> some View {
+    private func optionRow(systemImage: String, title: String, value: String, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.light()
             action()
         } label: {
-            HStack(spacing: SQSpace.md) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 36, height: 36)
-                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.iconTile, style: .continuous))
-                    .accessibilityHidden(true)
-                Text(LocalizedStringKey(title))
-                    .font(SQType.body(.medium))
-                    .foregroundStyle(SQColor.label)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
-                    .accessibilityHidden(true)
+            SQListRow(title, systemImage: systemImage) {
+                HStack(spacing: SQSpace.xs2) {
+                    Text(verbatim: value)
+                        .font(SQType.subhead(.medium))
+                        .foregroundStyle(SQColor.labelSecondary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .accessibilityHidden(true)
+                }
             }
-            .padding(SQSpace.sm2)
-            .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
         }
         .buttonStyle(SQPressButtonStyle())
+        .accessibilityValue(Text(verbatim: value))
     }
 
-    private var ttlSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Durée de vie").font(SQType.caption).foregroundStyle(SQColor.labelSecondary)
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: 3),
-                spacing: SQSpace.sm
-            ) {
-                ForEach([1, 6, 12, 24, 48, 72], id: \.self) { hours in
-                    let selected = model.ttlHours == hours
-                    Button {
-                        if hours == 24 || services.entitlements.confirmedServerTier == .premium {
-                            model.ttlHours = hours
-                        } else {
-                            showPremiumPaywall = true
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("\(hours) h")
-                            if hours != 24 { Image(systemName: "lock.fill").font(.system(size: 9)) }
-                        }
-                        .font(SQType.subhead(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, SQSpace.sm)
-                        .background(
-                            selected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                            in: Capsule(style: .continuous)
-                        )
-                        .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
-                        .sqShadowSoft()
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                    .accessibilityHint(hours == 24 ? "Disponible pour tous" : "Réservé à Premium")
-                }
-            }
-        }
-    }
-
-    private var durationRow: some View {
-        HStack(spacing: SQSpace.sm) {
-            Label("Affichage", systemImage: "timer")
-                .font(SQType.subhead)
+    /// Titre discret puis piste de segments égaux (langage `Segmented` Halo).
+    private func segmentGroup<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            Text(title)
+                .font(SQType.caption(.bold))
                 .foregroundStyle(SQColor.labelSecondary)
-            Spacer()
-            HStack(spacing: SQSpace.xs2) {
-                ForEach([5, 10, 15], id: \.self) { seconds in
-                    let selected = model.displayDuration == seconds
-                    Button {
-                        Haptics.selection()
-                        model.displayDuration = seconds
-                    } label: {
-                        Text("\(seconds)s")
-                            .font(SQType.subhead(.semibold))
-                            .padding(.horizontal, SQSpace.md)
-                            .frame(minHeight: 44)
-                            .background(
-                                selected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surface),
-                                in: Capsule(style: .continuous)
-                            )
-                            .foregroundStyle(selected ? SQColor.onAccent : SQColor.label)
-                            .sqShadowSoft()
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                    .accessibilityLabel("Durée d'affichage \(seconds) secondes")
-                }
+                .padding(.leading, SQSpace.xs)
+            HStack(spacing: 3) { content() }
+                .padding(SQSpace.xs)
+                .background(SQColor.segTrack, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        }
+    }
+
+    private func segment(_ title: String, isSelected: Bool, locked: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            segmentLabel(title, isSelected: isSelected, locked: locked, showsChevron: false)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func segmentLabel(_ title: String, isSelected: Bool, locked: Bool, showsChevron: Bool) -> some View {
+        HStack(spacing: SQSpace.xs) {
+            Text(verbatim: title)
+                .lineLimit(1)
+            if locked {
+                Image(systemName: "lock.fill").font(.system(size: 9)).accessibilityHidden(true)
+            }
+            if showsChevron {
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).accessibilityHidden(true)
             }
         }
+        .font(SQType.subhead(.bold))
+        .foregroundStyle(isSelected ? SQColor.label : SQColor.ink2)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 44)
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(SQColor.segThumb)
+                    .shadow(color: SQColor.shadowSoft, radius: 2, y: 1)
+            }
+        }
+        .contentShape(Rectangle())
     }
 }
 

@@ -70,7 +70,8 @@ struct StoryViewer: View {
     @State private var viewers: [StoryViewerEntry] = []
     @State private var viewersError: String?
     @State private var loadingViewers = false
-    @State private var showDeleteConfirm = false
+    /// Nombre de vues de ta story, chargé à l'ouverture (« Vu par N »).
+    @State private var viewersCount: Int?
     @State private var showUnencryptedConfirm = false
     @State private var channelConsent = StoryReplyChannelConsent()
     @State private var reportedStory: SocialStory?
@@ -97,10 +98,17 @@ struct StoryViewer: View {
                     .transition(.opacity)
                     .id(story.id)
             }
-            // Bottom scrim for caption + reply affordance legibility.
-            LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
+            // Voiles haut et bas : barres, auteur, légende et réponse restent
+            // lisibles sur toute photo.
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.black.opacity(0.55), .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 180)
+                Spacer(minLength: 0)
+                LinearGradient(colors: [.clear, .black.opacity(0.78)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 300)
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
             VStack {
                 // PERF-STORY-01 : la barre se remplit via TimelineView (recalcul
                 // scopé aux seules barres, pas de mutation @State réévaluant tout
@@ -110,6 +118,9 @@ struct StoryViewer: View {
                 }
                 header
                 Spacer()
+                if let story = currentStory {
+                    storyDetails(for: story)
+                }
                 if currentStory?.isMine == true {
                     ownerFooter
                 } else {
@@ -126,12 +137,6 @@ struct StoryViewer: View {
             if let reports {
                 ReportSheet(target: .story(story.id), service: reports)
             }
-        }
-        .confirmationDialog("Supprimer cette story ?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-            Button("Supprimer", role: .destructive) {
-                if let story = currentStory { onDelete(story); dismiss() }
-            }
-            Button("Annuler", role: .cancel) {}
         }
         .alert("Réponse privée sans chiffrement de bout en bout", isPresented: $showUnencryptedConfirm) {
             Button("Envoyer sans chiffrement de bout en bout") { confirmUnencryptedReply() }
@@ -178,6 +183,7 @@ struct StoryViewer: View {
         .accessibilityAction(named: Text("Story suivante")) { forward() }
         .accessibilityAction(named: Text("Story précédente")) { back() }
         .onAppear { startStory() }
+        .task(id: currentStory?.id) { await loadViewersCount() }
         .onChange(of: index) { _ in
             channelConsent.cancelPending()
             showUnencryptedConfirm = false
@@ -236,8 +242,8 @@ struct StoryViewer: View {
                 GeometryReader { proxy in
                     Capsule().fill(Color.white.opacity(0.30))
                         .overlay(alignment: .leading) {
-                            // Jauge au langage Crème : remplissage brique uni.
-                            Capsule().fill(SQColor.brandRed)
+                            // Jauge crème, comme sur le web.
+                            Capsule().fill(Color(red: 0.957, green: 0.949, blue: 0.925))
                                 .frame(width: proxy.size.width * fillRatio(for: i, now: now))
                         }
                 }
@@ -259,12 +265,12 @@ struct StoryViewer: View {
                     HStack(spacing: SQSpace.sm2) {
                         SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 36)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(story.author.displayName)
-                                .font(.subheadline.weight(.semibold))
+                            Text(story.isMine == true ? String(localized: "Ta story") : story.author.displayName)
+                                .font(SQFont.body(14, .bold, relativeTo: .subheadline))
                                 .foregroundStyle(.white)
                             if let date = story.createdAt {
                                 Text(date, format: .relative(presentation: .named))
-                                    .font(SQType.micro(.regular))
+                                    .font(SQFont.body(12, .regular, relativeTo: .caption))
                                     .foregroundStyle(.white.opacity(0.78))
                             }
                         }
@@ -276,7 +282,7 @@ struct StoryViewer: View {
             Spacer()
             // Feuille d'actions plutôt qu'un menu : son ouverture se voit, et la
             // story reste en pause pendant le choix.
-            if let story = currentStory, story.isMine != true, reports != nil || onHideAuthor != nil {
+            if let story = currentStory, story.isMine == true || reports != nil || onHideAuthor != nil {
                 Button {
                     showStoryActions = true
                 } label: {
@@ -289,10 +295,18 @@ struct StoryViewer: View {
                 .accessibilityLabel("Plus d’options")
                 .accessibilityIdentifier("story.more")
                 .confirmationDialog("Story de \(story.author.displayName)", isPresented: $showStoryActions, titleVisibility: .hidden) {
-                    if let onHideAuthor {
+                    if story.isMine == true {
+                        // La feuille d'actions vaut confirmation, comme dans Photos.
+                        Button("Supprimer la story", role: .destructive) {
+                            Haptics.medium()
+                            onDelete(story)
+                            dismiss()
+                        }
+                    }
+                    if story.isMine != true, let onHideAuthor {
                         Button("Masquer les stories de \(story.author.displayName)") { onHideAuthor(story) }
                     }
-                    if reports != nil {
+                    if story.isMine != true, reports != nil {
                         Button("Signaler la story", role: .destructive) { reportedStory = story }
                     }
                     Button("Annuler", role: .cancel) {}
@@ -311,10 +325,47 @@ struct StoryViewer: View {
         .padding(.top, SQSpace.xs2)
     }
 
-    private let quickReactions = ["❤️", "🔥", "👏", "😮", "😢", "🙌"]
+    private let quickReactions = ["❤️", "🔥", "👏"]
+
+    /// Légende d'une story photo, puis le relevé réseau joint en pastilles.
+    @ViewBuilder
+    private func storyDetails(for story: SocialStory) -> some View {
+        let caption = story.mediaUrl == nil ? nil : story.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pills = StorySignalSummary(metadata: story.metadata)?.pills ?? []
+        if (caption?.isEmpty == false) || !pills.isEmpty {
+            VStack(alignment: .leading, spacing: SQSpace.md) {
+                if let caption, !caption.isEmpty {
+                    Text(caption)
+                        .font(SQFont.body(16, .semibold, relativeTo: .body))
+                        .lineSpacing(3)
+                        .foregroundStyle(.white)
+                        .lineLimit(4)
+                }
+                if !pills.isEmpty {
+                    HStack(spacing: SQSpace.xs2) {
+                        ForEach(pills, id: \.self) { pill in
+                            Text(verbatim: pill)
+                                .font(SQType.caption(.bold))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .padding(.horizontal, SQSpace.sm2)
+                                .frame(minHeight: 26)
+                                .background(.white.opacity(0.16), in: Capsule(style: .continuous))
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("story.signal")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.bottom, SQSpace.md)
+            .allowsHitTesting(false)
+        }
+    }
 
     private var replyAffordance: some View {
-        VStack(spacing: SQSpace.sm2) {
+        VStack(spacing: SQSpace.sm) {
             if replySubmission.sentStoryID == currentStory?.id {
                 Label("Envoyé", systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.bold))
@@ -339,39 +390,38 @@ struct StoryViewer: View {
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("story.reply.sending")
             }
-            Text("Réponse privée sans chiffrement de bout en bout")
-                .font(SQType.caption)
-                .foregroundStyle(.white.opacity(0.85))
-                .accessibilityIdentifier("story.reply.channel")
-            // Réactions rapides — envoyées comme message privé à l'auteur.
-            HStack(spacing: SQSpace.md) {
-                ForEach(quickReactions, id: \.self) { emoji in
-                    Button {
-                        Haptics.light()
-                        submitReply(emoji, clearDraftOnSuccess: false)
-                    } label: {
-                        Text(emoji).font(.system(size: 30))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Réagir avec \(emoji)")
-                    .disabled(replySubmission.isSending)
-                }
-            }
-            // Champ de réponse texte.
+            // Réponse et réactions sur une ligne : message privé à l'auteur.
             HStack(spacing: SQSpace.sm) {
-                TextField("", text: $replySubmission.draft, prompt: Text("Répondre…").foregroundColor(.white.opacity(0.7)))
+                TextField("", text: $replySubmission.draft, prompt: Text(replyPrompt).foregroundColor(.white.opacity(0.75)))
                     .focused($replyFocused)
                     .accessibilityIdentifier("story.reply.input")
                     .disabled(replySubmission.isSending)
+                    .font(SQFont.body(14, .regular, relativeTo: .body))
                     .foregroundStyle(.white)
                     .tint(.white)
                     .submitLabel(.send)
                     .onSubmit(sendReply)
-                    .padding(.horizontal, SQSpace.md)
-                    .padding(.vertical, SQSpace.sm2)
+                    .padding(.horizontal, SQSpace.lg)
                     .frame(minHeight: 44)
-                    .background(.ultraThinMaterial, in: Capsule())
-                if !replySubmission.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    .overlay {
+                        Capsule(style: .continuous).strokeBorder(.white.opacity(0.32), lineWidth: 1)
+                    }
+                if replySubmission.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ForEach(quickReactions, id: \.self) { emoji in
+                        Button {
+                            Haptics.light()
+                            submitReply(emoji, clearDraftOnSuccess: false)
+                        } label: {
+                            Text(emoji)
+                                .font(.system(size: 24))
+                                .frame(width: 36, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Réagir avec \(emoji)")
+                        .disabled(replySubmission.isSending)
+                    }
+                } else {
                     Button(action: sendReply) {
                         Image(systemName: "paperplane.fill")
                             .font(.system(size: 17, weight: .semibold))
@@ -385,6 +435,11 @@ struct StoryViewer: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
+            Text("Réponse privée sans chiffrement de bout en bout")
+                .font(SQFont.body(11, .regular, relativeTo: .caption2))
+                .foregroundStyle(.white.opacity(0.72))
+                .multilineTextAlignment(.center)
+                .accessibilityIdentifier("story.reply.channel")
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.bottom, SQSpace.lg)
@@ -392,36 +447,48 @@ struct StoryViewer: View {
         .sqAnimation(SQMotion.snappy, value: replySubmission.sentStoryID)
     }
 
-    /// Pied affiché sur ses PROPRES stories : « Vu par… » + suppression.
+    private var replyPrompt: String {
+        guard let name = currentStory?.author.displayName, !name.isEmpty else { return String(localized: "Répondre…") }
+        return String(localized: "Répondre à \(name)…")
+    }
+
+    /// Pied de ta propre story : « Vu par N » ; la suppression passe par ⋯.
     private var ownerFooter: some View {
-        HStack(spacing: SQSpace.md) {
+        HStack {
             Button {
                 Task { await loadViewers() }
                 showViewers = true
             } label: {
-                Label("Vu par…", systemImage: "eye")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, SQSpace.md)
-                    .padding(.vertical, SQSpace.sm)
-                    .background(.ultraThinMaterial, in: Capsule())
+                Label {
+                    if let viewersCount {
+                        Text("Vu par \(viewersCount)")
+                    } else {
+                        Text("Vu par…")
+                    }
+                } icon: {
+                    Image(systemName: "eye")
+                }
+                .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                .foregroundStyle(.white)
+                .padding(.horizontal, SQSpace.lg)
+                .frame(minHeight: 44)
+                .background(.ultraThinMaterial, in: Capsule())
             }
             .accessibilityLabel("Voir qui a vu la story")
+            .accessibilityIdentifier("story.viewers")
             Spacer()
-            Button {
-                Haptics.medium()
-                showDeleteConfirm = true
-            } label: {
-                Image(systemName: "trash")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .accessibilityLabel("Supprimer la story")
         }
         .padding(.horizontal, SQSpace.lg)
         .padding(.bottom, SQSpace.lg)
+    }
+
+    /// Nombre de vues de ta story ; un échec laisse « Vu par… ».
+    private func loadViewersCount() async {
+        viewersCount = nil
+        guard let story = currentStory, story.isMine == true else { return }
+        if let entries = try? await viewersProvider(story), !Task.isCancelled {
+            viewersCount = entries.count
+        }
     }
 
     private func loadViewers() async {
@@ -430,6 +497,7 @@ struct StoryViewer: View {
         viewersError = nil
         do {
             viewers = try await viewersProvider(story)
+            viewersCount = viewers.count
         } catch {
             if !error.isCancellation { viewersError = error.userFacingMessage }
         }
@@ -486,7 +554,7 @@ struct StoryViewer: View {
     private var shouldPause: Bool {
         replyFocused || replySubmission.isSending
             || replySubmission.failedStoryID == currentStory?.id
-            || showViewers || showDeleteConfirm || showUnencryptedConfirm || voiceOverOn
+            || showViewers || showUnencryptedConfirm || voiceOverOn
             || isHolding || reportedStory != nil || showStoryActions
     }
 
@@ -550,6 +618,50 @@ struct StoryViewer: View {
     }
     private func back() {
         if index > 0 { index -= 1 }
+    }
+}
+
+/// Relevé réseau joint à une story (`metadata.signal`, sinon à plat), en
+/// pastilles : « SFR · 5G », puis la qualité du signal.
+struct StorySignalSummary: Equatable {
+    let operatorName: String?
+    let technology: String?
+    let rsrp: Double?
+
+    init?(metadata: [String: JSONValue]?) {
+        guard let metadata else { return nil }
+        var fields = metadata
+        if case .object(let nested)? = metadata["signal"] { fields = nested }
+        else if case .object(let nested)? = metadata["radioSnapshot"] { fields = nested }
+        func string(_ key: String) -> String? {
+            guard case .string(let value)? = fields[key] else { return nil }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        operatorName = string("operator")
+        technology = (string("technology") ?? string("networkType"))?.uppercased()
+        if case .number(let value)? = fields["rsrp"] { rsrp = value } else { rsrp = nil }
+        if operatorName == nil, technology == nil, rsrp == nil { return nil }
+    }
+
+    var pills: [String] {
+        var result: [String] = []
+        let network = [operatorName, technology].compactMap { $0 }.joined(separator: " · ")
+        if !network.isEmpty { result.append(network) }
+        if let quality { result.append(quality) }
+        return result
+    }
+
+    private var quality: String? {
+        switch SQQualityScale.Signal(dbm: rsrp, technology: technology) {
+        case .excellent: return String(localized: "Signal excellent")
+        case .good: return String(localized: "Signal bon")
+        case .fair: return String(localized: "Signal moyen")
+        case .weak: return String(localized: "Signal faible")
+        case .poor: return String(localized: "Signal très faible")
+        case .noService: return String(localized: "Sans réseau")
+        case .unknown: return nil
+        }
     }
 }
 

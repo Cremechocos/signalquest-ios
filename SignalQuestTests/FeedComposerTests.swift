@@ -99,6 +99,25 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertFalse(premium.contains("journal radio"))
     }
 
+    /// Le relevé joint à une story se lit sous `signal` (forme du serveur), sous
+    /// `radioSnapshot` ou à plat ; sans opérateur, techno ni RSRP, pas de pastille.
+    func testStorySignalPillsReadTheServerShapes() {
+        let nested = StorySignalSummary(metadata: [
+            "signal": .object(["operator": .string("SFR"), "technology": .string("5g"), "rsrp": .number(-88)])
+        ])
+        XCTAssertEqual(nested?.pills.first, "SFR · 5G")
+        XCTAssertEqual(nested?.pills.count, 2, "La qualité du signal manque")
+
+        let snapshot = StorySignalSummary(metadata: ["radioSnapshot": .object(["networkType": .string("4G")])])
+        XCTAssertEqual(snapshot?.pills, ["4G"])
+
+        let flat = StorySignalSummary(metadata: ["operator": .string("Orange")])
+        XCTAssertEqual(flat?.pills, ["Orange"])
+
+        XCTAssertNil(StorySignalSummary(metadata: nil))
+        XCTAssertNil(StorySignalSummary(metadata: ["signal": .object(["city": .string("Lyon")])]))
+    }
+
     /// Profil réglé sur « personne » : état « Profil privé », sans erreur ni
     /// « Réessayer » (403 PROFILE_PRIVATE, en prod depuis le 30/09).
     func testPrivateProfileShowsACalmStateInsteadOfAnError() async {
