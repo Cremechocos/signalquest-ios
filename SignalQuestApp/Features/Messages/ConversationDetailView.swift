@@ -198,17 +198,32 @@ struct ConversationDetailView: View {
             if EncryptedConversationSurfaces.showsLegacyUnlockBanner(
                 isEncrypted: isE2EE, v2Resolved: v2Resolved, isV2: conversationIsV2, legacyUnlocked: isE2EEUnlocked
             ) {
-                Button {
-                    showUnlockSheet = true
-                } label: {
-                    Label("Chiffrée — déverrouille pour lire", systemImage: "lock.shield")
-                        .font(SQType.caption.weight(.semibold))
-                        .padding(SQSpace.sm2)
-                        .frame(maxWidth: .infinity)
-                        .background(SQColor.warningSoft)
+                // Carte au-dessus des messages : bouclier, une phrase, et le
+                // bouton qui ouvre la feuille de déverrouillage.
+                VStack(spacing: SQSpace.sm) {
+                    Image(systemName: "lock.shield")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(SQColor.success)
+                        .frame(width: 44, height: 44)
+                        .background(SQColor.successSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .accessibilityHidden(true)
+                    Text("Conversation chiffrée")
+                        .font(SQType.body(.semibold))
                         .foregroundStyle(SQColor.label)
+                    Text("Déverrouille le chiffrement pour lire et écrire. Tes messages restent illisibles en dehors de tes appareils.")
+                        .font(SQType.subhead(.regular))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    GradientButton("Déverrouiller", systemImage: "lock.open") { showUnlockSheet = true }
+                        .fixedSize()
+                        .accessibilityIdentifier("conversation.unlock")
                 }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .padding(SQSpace.lg)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .padding(.horizontal, SQSpace.md)
+                .padding(.top, SQSpace.sm)
             } else if needsKeyResync {
                 // E2EE-UX-04 : la clé a tourné côté autre plateforme.
                 Button {
@@ -219,13 +234,15 @@ struct ConversationDetailView: View {
                         isResyncingKey ? "Resynchronisation…" : "Clé mise à jour — appuie pour resynchroniser",
                         systemImage: isResyncingKey ? "arrow.triangle.2.circlepath" : "key.viewfinder"
                     )
-                    .font(SQType.caption.weight(.semibold))
-                    .padding(SQSpace.sm2)
-                    .frame(maxWidth: .infinity)
-                    .background(SQColor.warningSoft)
+                    .font(SQType.subhead(.semibold))
+                    .padding(SQSpace.md)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                     .foregroundStyle(SQColor.label)
                 }
                 .buttonStyle(.plain)
+                .padding(.horizontal, SQSpace.md)
+                .padding(.top, SQSpace.sm)
                 .disabled(isResyncingKey)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -535,7 +552,8 @@ struct ConversationDetailView: View {
                             peerName: peer.name ?? String(localized: "Ce membre"),
                             ownUserId: access.ownUserId,
                             ownAccountKey: access.ownAccountKey,
-                            trust: access.trust
+                            trust: access.trust,
+                            onClose: { safetyNumberPeer = nil }
                         )
                     } else {
                         // Sans accès aux clés, la feuille dit pourquoi elle est vide.

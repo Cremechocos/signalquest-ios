@@ -69116,6 +69116,38 @@
           }
         }
       }
+    },
+    "Ce mot de passe ne quitte jamais ton appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This password never leaves your device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce mot de passe ne quitte jamais ton appareil."
+          }
+        }
+      }
+    },
+    "Déverrouille le chiffrement pour lire et écrire. Tes messages restent illisibles en dehors de tes appareils." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock encryption to read and write. Your messages stay unreadable outside your devices."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouille le chiffrement pour lire et écrire. Tes messages restent illisibles en dehors de tes appareils."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

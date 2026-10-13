@@ -184,14 +184,18 @@ enum E2EEV2SafetyNumberQR {
 
 struct E2EEV2SafetyNumberView: View {
     @StateObject private var model: E2EEV2SafetyNumberViewModel
+    /// Fermeture de la feuille : une croix ronde en tête, à la place de la barre.
+    private let onClose: (() -> Void)?
 
     init(
         peerUserId: String,
         peerName: String,
         ownUserId: String,
         ownAccountKey: @escaping () -> P256.Signing.PublicKey?,
-        trust: any E2EEV2SafetyNumberTrusting
+        trust: any E2EEV2SafetyNumberTrusting,
+        onClose: (() -> Void)? = nil
     ) {
+        self.onClose = onClose
         // Modèle créé dans l'autoclosure : jamais un modèle neuf à chaque rendu du parent.
         _model = StateObject(wrappedValue: E2EEV2SafetyNumberViewModel(
             peerUserId: peerUserId, peerName: peerName, ownUserId: ownUserId,
@@ -201,7 +205,14 @@ struct E2EEV2SafetyNumberView: View {
 
     var body: some View {
         ScrollView {
-            Group {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                if let onClose {
+                    MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "safetyNumber.close") { onClose() }
+                }
+                Text("Numéro de sécurité")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .accessibilityAddTraits(.isHeader)
                 switch model.state {
                 case .loading:
                     SQSpinner()
@@ -234,9 +245,8 @@ struct E2EEV2SafetyNumberView: View {
             .padding(.vertical, SQSpace.lg)
             .sqReadableWidth()
         }
-        .signalQuestBackground()
-        .navigationTitle(Text("Numéro de sécurité"))
-        .navigationBarTitleDisplayMode(.inline)
+        .background(SQColor.bg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
         .task { await model.load() }
     }
 }
@@ -252,6 +262,10 @@ struct E2EEV2SafetyNumberContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.lg) {
+            Text("Compare ces chiffres avec ceux qui s’affichent chez \(content.peerName), en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges.")
+                .font(SQType.callout)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
             if case .changed(let wasVerified) = content.status {
                 changedNotice(wasVerified: wasVerified)
             }
@@ -308,8 +322,7 @@ struct E2EEV2SafetyNumberContent: View {
     }
 
     private var numberCard: some View {
-        VStack(alignment: .leading, spacing: SQSpace.lg) {
-            statusPill
+        VStack(spacing: SQSpace.lg) {
             ViewThatFits(in: .horizontal) {
                 digitsGrid(columns: 4)
                 digitsGrid(columns: 3)
@@ -326,20 +339,18 @@ struct E2EEV2SafetyNumberContent: View {
                     .interpolation(.none)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: 200)
+                    .frame(maxWidth: 160)
                     .padding(SQSpace.md)
                     // Le QR reste noir sur blanc dans tous les thèmes, pour être lu.
                     .background(Color.white, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
                     .frame(maxWidth: .infinity)
                     .accessibilityLabel(Text("Code QR du numéro de sécurité"))
             }
-            Text("Compare ces chiffres avec ceux qui s’affichent chez \(content.peerName), en personne ou en vous appelant. S’ils sont identiques, personne ne s’interpose entre vous. S’ils diffèrent, ne marque pas ce numéro comme vérifié : quelqu’un pourrait lire vos échanges.")
-                .font(SQType.body)
-                .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            statusPill
         }
+        .frame(maxWidth: .infinity)
         .padding(SQSpace.cardPadding)
-        .sqCardBackground()
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
     }
 
     @ViewBuilder
@@ -367,7 +378,7 @@ struct E2EEV2SafetyNumberContent: View {
             .foregroundStyle(SQColor.labelSecondary)
             .padding(.horizontal, SQSpace.md)
             .padding(.vertical, SQSpace.xs2)
-            .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+            .background(SQColor.chip, in: Capsule(style: .continuous))
             .accessibilityIdentifier("safetyNumber.status.unverified")
         }
     }

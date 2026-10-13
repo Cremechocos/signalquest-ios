@@ -144,7 +144,9 @@ struct MessageComposerBar: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(SQColor.label)
+                    // Grisé tant que le chiffrement est verrouillé : la couleur
+                    // imposée masquait l'état désactivé du menu.
+                    .foregroundStyle(canSend && !isSending && !isSharingLocation ? SQColor.label : SQColor.labelTertiary)
                     .frame(width: 44, height: 44)
                     .sqSurface(SQColor.chip, in: Circle())
                     .contentShape(Circle())
