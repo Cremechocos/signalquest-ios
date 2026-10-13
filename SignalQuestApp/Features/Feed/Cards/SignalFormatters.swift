@@ -511,7 +511,31 @@ struct CardHashtags: View {
 /// Bloc de mesure d'un speedtest : grand débit de réception, puis envoi,
 /// latence, opérateur et technologie sur une ligne.
 struct FeedMeasureBlock: View {
-    let signal: SocialSignalSummary?
+    private let download: Double?
+    private let upload: Double?
+    private let ping: Double?
+    private let operatorAndTech: String?
+    /// SIM d'origine, montrée seulement quand elle voyage.
+    private let roamingSim: String?
+
+    init(signal: SocialSignalSummary?) {
+        download = signal?.downloadMbps
+        upload = signal?.uploadMbps
+        ping = signal?.pingMs
+        let parts = [signal?.servingOperator ?? signal?.operator, signal?.technology].compactMap { $0 }
+        operatorAndTech = parts.isEmpty ? nil : parts.joined(separator: " ")
+        roamingSim = signal?.isRoaming == true ? signal?.simOperator : nil
+    }
+
+    /// Speedtest joint au compositeur : même bloc que dans le fil.
+    init(speedtest: SocialShareableSpeedtest) {
+        download = speedtest.averageSpeed ?? speedtest.downloadSpeed
+        upload = speedtest.uploadSpeed
+        ping = speedtest.ping
+        let parts = [speedtest.mobileOperator, speedtest.networkType].compactMap { $0 }
+        operatorAndTech = parts.isEmpty ? nil : parts.joined(separator: " ")
+        roamingSim = nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -551,29 +575,22 @@ struct FeedMeasureBlock: View {
         .accessibilityIdentifier("feed.speedtest.measure")
     }
 
-    private var download: Double? { signal?.downloadMbps }
-
-    private var operatorAndTech: String? {
-        let parts = [signal?.servingOperator ?? signal?.operator, signal?.technology].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: " ")
-    }
-
     /// « ↑ 64 Mbit/s · 18 ms · SFR 5G », plus la SIM quand elle voyage.
     private var details: String {
         var parts: [String] = []
-        if let upload = signal?.uploadMbps { parts.append("↑ " + SignalFormatters.speed(upload)) }
-        if let ping = signal?.pingMs { parts.append(SignalFormatters.ms(ping)) }
+        if let upload { parts.append("↑ " + SignalFormatters.speed(upload)) }
+        if let ping { parts.append(SignalFormatters.ms(ping)) }
         if let operatorAndTech { parts.append(operatorAndTech) }
-        if signal?.isRoaming == true, let sim = signal?.simOperator {
-            parts.append(String(localized: "SIM \(sim)"))
+        if let roamingSim {
+            parts.append(String(localized: "SIM \(roamingSim)"))
         }
         return parts.joined(separator: " · ")
     }
 
     private var spoken: String {
         var parts = [String(localized: "réception \(SignalFormatters.speed(download))")]
-        if let upload = signal?.uploadMbps { parts.append(String(localized: "envoi \(SignalFormatters.speed(upload))")) }
-        if let ping = signal?.pingMs { parts.append(String(localized: "latence \(SignalFormatters.ms(ping))")) }
+        if let upload { parts.append(String(localized: "envoi \(SignalFormatters.speed(upload))")) }
+        if let ping { parts.append(String(localized: "latence \(SignalFormatters.ms(ping))")) }
         if let operatorAndTech { parts.append(operatorAndTech) }
         return parts.joined(separator: ", ")
     }

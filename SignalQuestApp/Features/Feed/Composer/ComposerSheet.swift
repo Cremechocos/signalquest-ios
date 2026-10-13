@@ -448,6 +448,7 @@ struct ComposerSheet: View {
             TextField("Ta question (optionnel)", text: $model.pollQuestion)
                 .font(SQType.body(.medium))
                 .submitLabel(.next)
+                .padding(.trailing, 36)
 
             ForEach($model.pollOptions) { $option in
                 let position = (model.pollOptions.firstIndex { $0.id == option.id } ?? 0) + 1
@@ -519,379 +520,347 @@ struct ComposerSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.md) {
-                    if selectedMode == .edit {
-                        VStack(alignment: .leading, spacing: SQSpace.md) {
-                            TextField("Quoi de neuf sur le réseau ?", text: $model.text, axis: .vertical)
-                                .lineLimit(6...20)
-                                .font(SQType.body)
-                                .textFieldStyle(.plain)
-                                .focused($isInputFocused)
-                                .accessibilityIdentifier("feed.composer.text")
-
-                            if !model.mentionSuggestions.isEmpty {
-                                mentionSuggestions
-                            }
-
-                            if model.pollEnabled { pollEditor }
-                            
-                            if let image = model.previewImage {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(maxHeight: 260)
-                                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                                    .overlay(alignment: .topTrailing) {
-                                        Button {
-                                            model.removeImage()
-                                            Haptics.medium()
-                                        } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.title2)
-                                                .foregroundStyle(.white, .black.opacity(0.55))
-                                                .padding(SQSpace.sm)
-                                        }
-                                        .buttonStyle(SQPressButtonStyle())
-                                        .accessibilityLabel("Retirer l’image")
-                                    }
-                                    .overlay(alignment: .topLeading) {
-                                        PhotoBlurButton { showBlurEditor = true }
-                                            .accessibilityIdentifier("composer.blur")
-                                    }
-                                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                            }
-                            
-                            if let speedtest = model.attachedSpeedtest {
-                                attachedSpeedtestChip(speedtest)
-                            }
-                            
-                            quickHashtagsBar
-                        }
-                        .padding(.horizontal, SQSpace.lg)
-                        .padding(.top, SQSpace.md)
-                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                    } else {
-                        // Preview Mode
-                        let author = model.previewAuthor
-                        PostPreviewCard(
-                            author: author,
-                            text: model.text,
-                            image: model.previewImage,
-                            speedtest: model.attachedSpeedtest,
-                            visibility: model.visibility
-                        )
-                        .padding(.horizontal, SQSpace.lg)
-                        .padding(.top, SQSpace.md)
-                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                    }
-
-                    if model.isQueued {
-                        Label("Envoi en attente : ta publication partira automatiquement dès que possible.",
-                              systemImage: "clock.arrow.circlepath")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .padding(.horizontal, SQSpace.lg)
-                            .accessibilityIdentifier("composer.queued")
-                    }
-                    if let error = model.errorMessage {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
-                            .padding(.horizontal, SQSpace.lg)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                }
-                .padding(.bottom, SQSpace.xxl)
-                .sqAnimation(SQMotion.smooth, value: selectedMode)
-                .sqAnimation(SQMotion.snappy, value: model.errorMessage)
-            }
-            .signalQuestBackground()
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(model.isQueued ? "Fermer" : "Annuler") { dismiss() }
-                        .tint(SQColor.brandRed)
-                }
-                
-                ToolbarItem(placement: .principal) {
-                    Picker("", selection: $selectedMode) {
-                        Text("Rédiger").tag(ComposerMode.edit)
-                        Text("Aperçu").tag(ComposerMode.preview)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 160)
-                }
-                
-                ToolbarItem(placement: .topBarTrailing) {
-                    // Capsule accent compacte : l'unique surface brique de l'écran.
-                    Button {
-                        isInputFocused = false
-                        Task {
-                            // Même bouton pour les deux modes : l'action change,
-                            // pas la place ni le geste.
-                            let isNewPost = !model.isEditing
-                            if model.isEditing { await model.saveEdit() } else { await model.publish() }
-                            guard model.didPublish else { return }
-                            dismiss()
-                            // Premier post : proposer d'être prévenu des réactions
-                            // (TRX-01) ; la feuille attend la fermeture du compositeur.
-                            if isNewPost {
-                                Task { await services.notificationPriming.considerPriming(after: .postPublished) }
-                            }
-                        }
-                    } label: {
-                        Group {
-                            if model.isBusy {
-                                SQSpinner().controlSize(.mini).tint(SQColor.onAccent)
-                            } else {
-                                Text(model.isEditing ? "Enregistrer" : "Publier")
-                                    .font(SQType.callout(.semibold))
-                            }
-                        }
-                        .foregroundStyle(SQColor.onAccent)
-                        .padding(.horizontal, SQSpace.md2)
-                        .padding(.vertical, SQSpace.sm - 1)
-                        .background(SQColor.brandRed, in: Capsule(style: .continuous))
-                        .opacity(model.canPublish ? 1 : 0.45)
-                    }
-                    .buttonStyle(SQPressButtonStyle())
-                    .disabled(!model.canPublish)
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                topBar
+                if selectedMode == .edit { authorRow }
                 if selectedMode == .edit {
-                    bottomToolbar
-                }
-            }
-            .task {
-                await model.loadUserProfile()
-            }
-            .task {
-                if startingWith == .speedtest { await model.attachLatestSpeedtest() }
-            }
-            .onAppear {
-                if startingWith == .photo {
-                    showStartPhotoPicker = true
+                    VStack(alignment: .leading, spacing: SQSpace.md) {
+                        TextField("Quoi de neuf sur le réseau ?", text: $model.text, axis: .vertical)
+                            .lineLimit(4...20)
+                            .font(SQFont.body(17, .regular, relativeTo: .body))
+                            .textFieldStyle(.plain)
+                            .focused($isInputFocused)
+                            .accessibilityIdentifier("feed.composer.text")
+
+                        if !model.mentionSuggestions.isEmpty {
+                            mentionSuggestions
+                        }
+
+                        if model.pollEnabled {
+                            pollEditor
+                                .overlay(alignment: .topTrailing) {
+                                    removeButton(label: "Retirer le sondage") {
+                                        Haptics.selection()
+                                        model.pollEnabled = false
+                                    }
+                                }
+                        }
+
+                        if let image = model.previewImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(maxHeight: 260)
+                                .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                                .overlay(alignment: .topTrailing) {
+                                    removeButton(label: "Retirer l’image") {
+                                        model.removeImage()
+                                        Haptics.medium()
+                                    }
+                                }
+                                .overlay(alignment: .topLeading) {
+                                    PhotoBlurButton { showBlurEditor = true }
+                                        .accessibilityIdentifier("composer.blur")
+                                }
+                                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        }
+
+                        // Même bloc de mesure que dans le fil, avec sa croix.
+                        if let speedtest = model.attachedSpeedtest {
+                            FeedMeasureBlock(speedtest: speedtest)
+                                .overlay(alignment: .topTrailing) {
+                                    removeButton(label: "Retirer le speedtest") { model.detachSpeedtest() }
+                                }
+                        }
+
+                        quickHashtagsBar
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 } else {
-                    isInputFocused = true
+                    PostPreviewCard(
+                        author: model.previewAuthor,
+                        text: model.text,
+                        image: model.previewImage,
+                        speedtest: model.attachedSpeedtest,
+                        visibility: model.visibility
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                }
+
+                if model.isQueued {
+                    Label("Envoi en attente : ta publication partira automatiquement dès que possible.",
+                          systemImage: "clock.arrow.circlepath")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityIdentifier("composer.queued")
+                }
+                if let error = model.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
-            .photosPicker(isPresented: $showStartPhotoPicker, selection: $model.selectedItem, matching: .images)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.md)
+            .padding(.bottom, SQSpace.xxl)
+            .sqAnimation(SQMotion.smooth, value: selectedMode)
+            .sqAnimation(SQMotion.snappy, value: model.errorMessage)
+        }
+        .safeAreaInset(edge: .bottom) {
+            if selectedMode == .edit {
+                bottomToolbar
+            }
+        }
+        .task {
+            await model.loadUserProfile()
+        }
+        .task {
+            if startingWith == .speedtest { await model.attachLatestSpeedtest() }
+        }
+        .onAppear {
+            if startingWith == .photo {
+                showStartPhotoPicker = true
+            } else {
+                isInputFocused = true
+            }
+        }
+        .photosPicker(isPresented: $showStartPhotoPicker, selection: $model.selectedItem, matching: .images)
+        .onChangeCompat(of: model.selectedItem) { _, _ in
+            Task { await model.loadPickerImage() }
+        }
+        .sheet(isPresented: $showBlurEditor) {
+            if let image = model.previewImage {
+                PhotoBlurEditor(image: image) { blurred, _ in model.applyBlurredImage(blurred) }
+            }
+        }
+        .sqSheet()
+    }
+
+    /// Fermer à gauche ; « Aperçu » et « Publier » à droite.
+    private var topBar: some View {
+        HStack(spacing: SQSpace.sm) {
+            MapChipIconButton(systemImage: "xmark", label: model.isQueued ? "Fermer" : "Annuler",
+                              identifier: "composer.close") {
+                dismiss()
+            }
+            if !model.text.isEmpty {
+                MapChipIconButton(systemImage: "trash", label: "Supprimer le brouillon",
+                                  identifier: "composer.clearDraft") {
+                    model.clearDraft()
+                    Haptics.medium()
+                }
+            }
+            Spacer(minLength: 0)
+            Button {
+                Haptics.selection()
+                isInputFocused = false
+                selectedMode = selectedMode == .edit ? .preview : .edit
+            } label: {
+                Text(selectedMode == .edit ? "Aperçu" : "Rédiger")
+                    .font(SQType.subhead(.bold))
+                    .foregroundStyle(SQColor.ink2)
+                    .padding(.horizontal, SQSpace.sm)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("composer.preview")
+            publishButton
         }
     }
 
+    /// Encre pleine, grisé tant qu'il n'y a rien à publier.
+    private var publishButton: some View {
+        Button {
+            isInputFocused = false
+            Task {
+                // Même bouton pour les deux modes : l'action change,
+                // pas la place ni le geste.
+                let isNewPost = !model.isEditing
+                if model.isEditing { await model.saveEdit() } else { await model.publish() }
+                guard model.didPublish else { return }
+                dismiss()
+                // Premier post : proposer d'être prévenu des réactions
+                // (TRX-01) ; la feuille attend la fermeture du compositeur.
+                if isNewPost {
+                    Task { await services.notificationPriming.considerPriming(after: .postPublished) }
+                }
+            }
+        } label: {
+            Group {
+                if model.isBusy {
+                    SQSpinner().controlSize(.mini).tint(SQColor.onInk)
+                } else {
+                    Text(model.isEditing ? "Enregistrer" : "Publier")
+                        .font(SQType.subhead(.bold))
+                }
+            }
+            .foregroundStyle(model.canPublish ? SQColor.onInk : SQColor.labelSecondary)
+            .padding(.horizontal, SQSpace.lg)
+            .frame(minHeight: 36)
+            .background(model.canPublish ? SQColor.label : SQColor.chip, in: Capsule(style: .continuous))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+            .sqAnimation(SQMotion.fast, value: model.canPublish)
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .disabled(!model.canPublish)
+        .accessibilityIdentifier("composer.publish")
+    }
+
+    /// Ton nom et l'audience, avant d'écrire : on sait qui lira.
+    private var authorRow: some View {
+        let author = model.previewAuthor
+        return HStack(spacing: SQSpace.sm2) {
+            SQAvatar(url: author.avatarUrl, name: author.displayName, size: 36)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(author.displayName)
+                    .font(SQType.subhead(.bold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                Menu {
+                    Picker("Visibilité", selection: $model.visibility) {
+                        ForEach(SocialVisibility.allCases) { value in
+                            Label(value.label, systemImage: value.icon).tag(value)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: SQSpace.xs) {
+                        Image(systemName: model.visibility.icon)
+                            .font(.system(size: 11, weight: .bold))
+                        Text(model.visibility.label)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .font(SQType.caption(.bold))
+                    .foregroundStyle(SQColor.chipInk)
+                    .padding(.horizontal, SQSpace.sm2)
+                    .padding(.vertical, SQSpace.xs)
+                    .background(SQColor.chip, in: Capsule(style: .continuous))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Visibilité")
+                .accessibilityValue(model.visibility.label)
+                .accessibilityIdentifier("composer.visibility")
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Croix ronde posée sur une pièce jointe (cible de 44 pt).
+    private func removeButton(label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 28, height: 28)
+                .sqSurface(SQColor.chip, in: Circle())
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
+    }
+
     private var bottomToolbar: some View {
-        HStack(spacing: SQSpace.md) {
+        HStack(spacing: SQSpace.sm) {
             // Modifier un post ne change que son texte et sa visibilité : ces
             // ajouts étaient proposés puis ignorés (AF-FIL-05).
             if !model.isEditing {
-            // Bascule sondage : même gabarit que les autres actions de la barre.
+                // Libellés tant qu'ils tiennent ; icônes seules sinon.
+                ViewThatFits(in: .horizontal) {
+                    attachmentTools(showsLabels: true)
+                    attachmentTools(showsLabels: false)
+                }
+                .layoutPriority(1)
+            }
+            Spacer(minLength: 0)
+            characterCounter
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.xs)
+        .background(SQColor.surface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(SQColor.separator).frame(height: 1 / UIScreen.main.scale)
+        }
+    }
+
+    /// Photo, Speedtest et Sondage, avec leur nom ; plein encre quand actifs.
+    private func attachmentTools(showsLabels: Bool) -> some View {
+        HStack(spacing: SQSpace.xs2) {
+            PhotosPicker(selection: $model.selectedItem, matching: .images) {
+                ComposerToolChip(title: "Photo", systemImage: "photo", isOn: model.previewImage != nil, showsLabel: showsLabels)
+            }
+            .accessibilityLabel("Ajouter une photo")
+
+            Button {
+                if model.attachedSpeedtest == nil {
+                    Task { await model.attachLatestSpeedtest() }
+                } else {
+                    model.detachSpeedtest()
+                }
+            } label: {
+                ComposerToolChip(title: "Speedtest", systemImage: "speedometer", isOn: model.attachedSpeedtest != nil,
+                                 showsLabel: showsLabels, isLoading: model.isLoadingSpeedtest)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(model.attachedSpeedtest == nil ? "Joindre un speedtest" : "Retirer le speedtest")
+            .disabled(model.isLoadingSpeedtest)
+
             Button {
                 Haptics.selection()
                 model.pollEnabled.toggle()
             } label: {
-                Image(systemName: "chart.bar.xaxis")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(model.pollEnabled ? SQColor.onAccent : SQColor.brandRed)
-                    .frame(width: 44, height: 44)
-                    .background(model.pollEnabled ? SQColor.brandRed : SQColor.surface, in: Circle())
-                    .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-                    .sqShadowSoft()
+                ComposerToolChip(title: "Sondage", systemImage: "chart.bar.xaxis", isOn: model.pollEnabled, showsLabel: showsLabels)
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Sondage")
             .accessibilityAddTraits(model.pollEnabled ? [.isButton, .isSelected] : .isButton)
-
-            // Photos Picker — bouton circulaire 40, surface + ombre repos.
-            PhotosPicker(selection: $model.selectedItem, matching: .images) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 44, height: 44)
-                    .sqSurface(SQColor.surface, in: Circle())
-                    .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-                    .sqShadowSoft()
-            }
-            .accessibilityLabel("Ajouter une photo")
-            .sheet(isPresented: $showBlurEditor) {
-                if let image = model.previewImage {
-                    PhotoBlurEditor(image: image) { blurred, _ in model.applyBlurredImage(blurred) }
-                }
-            }
-            .onChangeCompat(of: model.selectedItem) { _, _ in
-                Task { await model.loadPickerImage() }
-            }
-
-            // Speedtest attachment
-            if model.attachedSpeedtest == nil {
-                Button {
-                    Task { await model.attachLatestSpeedtest() }
-                } label: {
-                    Group {
-                        if model.isLoadingSpeedtest {
-                            SQSpinner()
-                                .controlSize(.mini)
-                                .tint(SQColor.brandRed)
-                        } else {
-                            Image(systemName: "speedometer")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(SQColor.brandRed)
-                        }
-                    }
-                    .frame(width: 44, height: 44)
-                    .sqSurface(SQColor.surface, in: Circle())
-                    .overlay { Circle().strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-                    .sqShadowSoft()
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Joindre un speedtest")
-                .disabled(model.isLoadingSpeedtest)
-            }
-            }
-
-            // Visibility button — capsule surface + ombre repos, sans bordure.
-            Menu {
-                Picker("Visibilité", selection: $model.visibility) {
-                    ForEach(SocialVisibility.allCases) { value in
-                        Label(value.label, systemImage: value.icon).tag(value)
-                    }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: model.visibility.icon)
-                        .font(.caption)
-                    Text(model.visibility.label)
-                        .font(SQType.subhead(.semibold))
-                    Image(systemName: "chevron.down")
-                        .font(.caption2)
-                }
-                .foregroundStyle(SQColor.labelSecondary)
-                .padding(.horizontal, SQSpace.md)
-                .padding(.vertical, 10)
-                .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
-                .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-                .sqShadowSoft()
-            }
-
-            Spacer()
-
-            // Trash draft button
-            if !model.text.isEmpty {
-                Button {
-                    model.clearDraft()
-                    Haptics.medium()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.body)
-                        .foregroundStyle(SQColor.danger)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Supprimer le brouillon")
-            }
-
-            // Character counter
-            characterCounter
         }
-        .padding(.horizontal, SQSpace.lg)
-        .padding(.vertical, SQSpace.sm)
-        .background(SQColor.surfaceGlass)
-        .background(.ultraThinMaterial)
     }
 
+    /// Caractères restants, à l'encre secondaire ; ambre puis rouge à l'approche de la limite.
     private var characterCounter: some View {
-        let charCount = model.text.count
         let limit = 500
-        let progress = min(Double(charCount) / Double(limit), 1.0)
-        let isClose = charCount >= 400
-        let isOver = charCount > limit
-        
-        return HStack(spacing: 6) {
-            if charCount > 0 {
-                if isClose {
-                    Text("\(limit - charCount)")
-                        .font(SQType.micro)
-                        .foregroundStyle(isOver ? SQColor.dangerInk : SQColor.warning)
-                        .contentTransition(.numericText())
-                }
-
-                Circle()
-                    .stroke(SQColor.surfaceMuted, lineWidth: 2.5)
-                    .frame(width: 20, height: 20)
-                    .overlay {
-                        Circle()
-                            .trim(from: 0, to: progress)
-                            .stroke(
-                                isOver ? SQColor.danger : (isClose ? SQColor.warning : SQColor.brandRed),
-                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
-                            )
-                            .rotationEffect(.degrees(-90))
-                    }
-            }
-        }
-        .sqAnimation(SQMotion.snappy, value: charCount)
+        let remaining = limit - model.text.count
+        return Text(verbatim: remaining.formatted())
+            .font(SQType.caption(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(remaining < 0 ? SQColor.dangerInk : (remaining <= 100 ? SQColor.warning : SQColor.labelSecondary))
+            .contentTransition(.numericText())
+            .sqAnimation(SQMotion.snappy, value: remaining)
+            .accessibilityLabel(Text("\(remaining) caractères restants"))
+            .accessibilityIdentifier("composer.remaining")
     }
 
+    /// Suggestions de hashtags en petites pastilles discrètes.
     private var quickHashtagsBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.xs2) {
                 ForEach(["#speedtest", "#5G", "#4G", "#signalquest", "#coverage", "#anfr"], id: \.self) { tag in
                     Button {
                         let space = model.text.isEmpty || model.text.hasSuffix(" ") ? "" : " "
                         model.text += "\(space)\(tag) "
                         Haptics.light()
                     } label: {
-                        Text(tag)
-                            .font(SQType.subhead(.semibold))
-                            .foregroundStyle(SQColor.accentInk)
-                            .padding(.horizontal, SQSpace.md)
-                            .padding(.vertical, SQSpace.sm)
-                            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
-                            .overlay { Capsule(style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
-                            .sqShadowSoft()
+                        Text(verbatim: tag)
+                            .font(SQType.caption(.semibold))
+                            .foregroundStyle(SQColor.chipInk)
+                            .padding(.horizontal, SQSpace.sm2)
+                            .frame(minHeight: 30)
+                            .background(SQColor.chip, in: Capsule(style: .continuous))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Ajouter \(tag)"))
                 }
             }
-            .padding(.vertical, SQSpace.xs)
         }
-    }
-
-    private func attachedSpeedtestChip(_ speedtest: SocialShareableSpeedtest) -> some View {
-        HStack(spacing: SQSpace.md) {
-            // Pastille circulaire teintée : icône brique sur accentSoft.
-            SQIconPastille(systemImage: "speedometer", size: 40, font: .system(size: 17, weight: .semibold))
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Speedtest joint")
-                    .font(SQType.subhead(.semibold))
-                    .foregroundStyle(SQColor.label)
-                HStack(spacing: SQSpace.sm) {
-                    if let down = speedtest.downloadSpeed {
-                        Text("↓ \(SignalFormatters.speed(down))")
-                    }
-                    if let ping = speedtest.ping {
-                        Text("\(Int(ping)) ms")
-                    }
-                    if let tech = speedtest.networkType {
-                        Text(tech)
-                    }
-                }
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.labelSecondary)
-            }
-            Spacer()
-            Button {
-                model.detachSpeedtest()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(SQColor.labelTertiary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Retirer le speedtest")
-        }
-        .padding(SQSpace.md)
-        .sqEditorialCard()
     }
 }
 
@@ -923,10 +892,6 @@ struct PostPreviewCard: View {
                     .foregroundStyle(SQColor.labelSecondary)
                 }
                 Spacer()
-                // Comme dans le fil : badge pour un speedtest, rien pour un post.
-                if speedtest != nil {
-                    SQEditorialTag(text: "Speedtest", color: SQColor.brandRed)
-                }
             }
 
             // Body text
@@ -954,41 +919,9 @@ struct PostPreviewCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
 
-            // Speedtest metrics
+            // Même bloc de mesure que dans le fil.
             if let speedtest {
-                HStack(spacing: SQSpace.sm) {
-                    if let down = speedtest.downloadSpeed {
-                        SQMetricTile.wrapping(
-                            label: "Réception",
-                            value: SignalFormatters.speed(down),
-                            highlight: true
-                        )
-                    }
-                    if let ping = speedtest.ping {
-                        SQMetricTile.wrapping(
-                            label: "Latence",
-                            value: SignalFormatters.ms(ping)
-                        )
-                    }
-                    if let tech = speedtest.networkType {
-                        SQMetricTile.wrapping(
-                            label: "Réseau",
-                            value: tech
-                        )
-                    }
-                }
-                
-                if let op = speedtest.mobileOperator {
-                    HStack(spacing: 4) {
-                        Image(systemName: "antenna.radiowaves.left.and.right")
-                            .font(.caption2)
-                            .accessibilityHidden(true)
-                        Text(op)
-                            .font(SQType.caption)
-                    }
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .padding(.top, -2)
-                }
+                FeedMeasureBlock(speedtest: speedtest)
             }
 
             // Actions Bar
@@ -1016,5 +949,40 @@ struct PostPreviewCard: View {
         }
         .padding(SQSpace.lg)
         .sqEditorialCard()
+    }
+}
+
+/// Outil de la barre du compositeur : nom visible, plein encre quand actif.
+private struct ComposerToolChip: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let isOn: Bool
+    let showsLabel: Bool
+    var isLoading = false
+
+    var body: some View {
+        HStack(spacing: SQSpace.xs2) {
+            if isLoading {
+                SQSpinner().controlSize(.mini).tint(SQColor.label)
+            } else {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            if showsLabel {
+                Text(title)
+                    .font(SQType.subhead(.semibold))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        }
+        .foregroundStyle(isOn ? SQColor.onInk : SQColor.label)
+        .padding(.horizontal, SQSpace.sm2)
+        .frame(minHeight: 36)
+        .background(isOn ? SQColor.label : SQColor.surface, in: Capsule(style: .continuous))
+        .overlay {
+            Capsule(style: .continuous).strokeBorder(isOn ? Color.clear : SQColor.separator, lineWidth: 1)
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
