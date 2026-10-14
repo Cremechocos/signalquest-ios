@@ -93,6 +93,12 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         }
     }
 
+    /// « Orange » plutôt que la clé serveur « ORANGE » ; hors France, le nom reçu.
+    var operatorDisplayName: String? {
+        guard let operatorName, !operatorName.isEmpty else { return nil }
+        return AntennaLeaderReport.key(operatorName).map(AntennaLeaderReport.displayName) ?? operatorName
+    }
+
     /// Génération réseau déduite (5G si gNB, sinon le champ `tech`, sinon 4G).
     var techLabel: String {
         if let t = tech, !t.isEmpty { return t.uppercased() }
@@ -142,8 +148,8 @@ struct IdentifiedNodeGroup: Identifiable, Equatable {
     }
     var subtitle: String {
         let count = cells.count
-        let cellPart = count == 0 ? String(localized: "aucune cellule") : "\(count) PCI/CI"
-        return "\(representative.operatorName ?? String(localized: "Opérateur inconnu")) · \(representative.techLabel) · \(cellPart)"
+        let cellPart = count == 0 ? String(localized: "aucune cellule") : String(localized: "\(count) cellules")
+        return "\(representative.operatorDisplayName ?? String(localized: "Opérateur inconnu")) · \(representative.techLabel) · \(cellPart)"
     }
 
     static func group(_ items: [MyIdentification]) -> [IdentifiedNodeGroup] {

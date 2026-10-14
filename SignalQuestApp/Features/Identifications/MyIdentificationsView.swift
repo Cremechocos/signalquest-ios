@@ -24,7 +24,9 @@ final class MyIdentificationsViewModel: ObservableObject {
     private let service: IdentifyServicing
     init(service: IdentifyServicing) { self.service = service }
 
-    var filtered: [MyIdentification] {
+    var filtered: [MyIdentification] { items(for: filter) }
+
+    private func items(for filter: Filter) -> [MyIdentification] {
         switch filter {
         case .all: return items
         case .lte: return items.filter { $0.kind == .enb || $0.techLabel == "4G" }
@@ -41,10 +43,15 @@ final class MyIdentificationsViewModel: ObservableObject {
     /// le lisent).
     @Published private(set) var filteredGroups: [IdentifiedNodeGroup] = []
     @Published private(set) var conflictCount = 0
+    /// Nombre d'antennes par filtre, affiché dans le segment (« 4G · 9 »).
+    @Published private(set) var counts: [Filter: Int] = [:]
 
     private func rebuild() {
         filteredGroups = IdentifiedNodeGroup.group(filtered)
         conflictCount = items.filter(\.conflict).count
+        counts = Dictionary(uniqueKeysWithValues: Filter.allCases.map { filter in
+            (filter, IdentifiedNodeGroup.group(items(for: filter)).count)
+        })
     }
 
     func load() async {
@@ -102,7 +109,7 @@ final class MyIdentificationsViewModel: ObservableObject {
             if result.success {
                 await load()
                 toast = (result.deleted == 0 && result.softWithdrawn > 0)
-                    ? String(localized: "Retirée (des cellules sont confirmées par d'autres)")
+                    ? String(localized: "Retirée : des cellules sont confirmées par d’autres")
                     : String(localized: "Identification supprimée")
                 Haptics.success()
             } else {
@@ -120,6 +127,7 @@ final class MyIdentificationsViewModel: ObservableObject {
 /// (compte partagé : inclut celles faites sur Android). Consultation + retrait.
 struct MyIdentificationsView: View {
     @StateObject private var model: MyIdentificationsViewModel
+    @Environment(\.dismiss) private var dismiss
     @State private var pendingWithdraw: MyIdentification?
     @State private var selected: MyIdentification?
 
@@ -130,24 +138,27 @@ struct MyIdentificationsView: View {
     var body: some View {
         List {
             Section {
+                header
+                    .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                    .listRowBackground(Color.clear)
                 SQSegmentedFilter(
                     selection: $model.filter,
-                    options: MyIdentificationsViewModel.Filter.allCases.map { (value: $0, label: $0.label, icon: String?.none) }
+                    options: MyIdentificationsViewModel.Filter.allCases.map { filter in
+                        (value: filter, label: segmentLabel(filter), icon: String?.none)
+                    }
                 )
-                .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.sm, trailing: 0))
+                .accessibilityIdentifier("identifications.filter")
+                // Le segment ajoute sa propre marge latérale de 16 pt : on la compense.
+                .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: -SQSpace.lg, bottom: SQSpace.xs, trailing: -SQSpace.lg))
                 .listRowBackground(Color.clear)
-            }
 
-            if model.conflictCount > 0 {
-                Label("\(model.conflictCount) en conflit — un autre site est majoritaire sur cette antenne. Vérifie ou retire.", systemImage: "exclamationmark.triangle.fill")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.warning)
-                    .padding(SQSpace.md)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
-                    .listRowBackground(Color.clear)
+                if model.conflictCount > 0 {
+                    conflictNote
+                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                        .listRowBackground(Color.clear)
+                }
             }
+            .listRowSeparator(.hidden)
 
             if model.filteredGroups.isEmpty && !model.isLoading, let errorMessage = model.errorMessage {
                 // Un échec n'est pas une liste vide : « Aucune identification »
@@ -158,7 +169,9 @@ struct MyIdentificationsView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
             } else if model.filteredGroups.isEmpty && !model.isLoading {
-                emptyState.listRowBackground(Color.clear)
+                emptyState
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
             } else {
                 ForEach(model.filteredGroups) { group in
                     Section {
@@ -172,8 +185,10 @@ struct MyIdentificationsView: View {
                             }
                                 .buttonStyle(.plain)
                                 .listRowBackground(SQColor.surface)
+                                .listRowSeparatorTint(SQColor.separator)
                                 .contentShape(Rectangle())
                                 .accessibilityHint("Ouvre le détail de cette identification")
+                                .accessibilityIdentifier("identifications.node.\(group.id)")
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     Button(role: .destructive) {
                                         pendingWithdraw = group.representative
@@ -187,12 +202,18 @@ struct MyIdentificationsView: View {
                             Button {
                                 selected = cell.source
                             } label: {
-                                IdentificationCellRow(cell: cell, isWithdrawing: model.withdrawingId == cell.source.id)
+                                IdentificationCellRow(
+                                    cell: cell,
+                                    isWithdrawing: model.withdrawingId == cell.source.id,
+                                    indented: group.kind != .unassigned
+                                )
                             }
                                 .buttonStyle(.plain)
                                 .listRowBackground(SQColor.surface)
+                                .listRowSeparatorTint(SQColor.separator)
                                 .contentShape(Rectangle())
                                 .accessibilityHint("Ouvre le détail de cette cellule")
+                                .accessibilityIdentifier("identifications.cell.\(cell.id)")
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     Button(role: .destructive) {
                                         pendingWithdraw = cell.source
@@ -206,12 +227,13 @@ struct MyIdentificationsView: View {
                             Text("Aucun identifiant de cellule (PCI/CI) associé à cette antenne.")
                                 .font(SQType.caption)
                                 .foregroundStyle(SQColor.labelSecondary)
+                                .padding(.leading, IdentificationNodeRow.textInset)
                                 .listRowBackground(SQColor.surface)
                         }
                     } header: {
-                        Text(group.title)
-                            .font(SQFont.body(12, .semibold))
-                            .foregroundStyle(SQColor.labelSecondary)
+                        if group.kind == .unassigned {
+                            Text(group.title).sqKicker()
+                        }
                     }
                 }
             }
@@ -224,11 +246,14 @@ struct MyIdentificationsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .modifier(CompactListMargins())
         .scrollContentBackground(.hidden)
         .sqReadableWidth()
-        .background(SQColor.bg.ignoresSafeArea())
+        .signalQuestBackground()
         .navigationTitle("Mes identifications")
-        .toolbarTitleInlineCompat()
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .refreshable { await model.load() }
         .overlay {
             if model.isLoading && model.items.isEmpty { SQSpinner().tint(SQColor.brandRed) }
@@ -244,7 +269,7 @@ struct MyIdentificationsView: View {
             }
             Button("Annuler", role: .cancel) { pendingWithdraw = nil }
         } message: { item in
-            Text("« \(item.nodeLabel) » ne te sera plus attribuée. Les lignes liées sont rechargées depuis le serveur après retrait.")
+            Text("« \(item.nodeLabel) » ne te sera plus attribuée. Tu pourras la ré-identifier.")
         }
         .sheet(item: $selected) { item in
             IdentificationDetailSheet(
@@ -277,6 +302,7 @@ struct MyIdentificationsView: View {
                     .background(SQColor.label, in: Capsule(style: .continuous))
                     .sqShadowCard()
                     .padding(.bottom, SQSpace.lg)
+                    .accessibilityIdentifier("identifications.toast")
                     .task {
                         try? await Task.sleep(nanoseconds: 2_200_000_000)
                         model.toast = nil
@@ -285,12 +311,93 @@ struct MyIdentificationsView: View {
         }
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "identifications.back") { dismiss() }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Mes identifications")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("identifications.title")
+                Text("Les antennes que tu as reliées à un site, ici et sur Android.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// « Toutes · 14 » : le nombre n'apparaît qu'une fois la liste chargée.
+    private func segmentLabel(_ filter: MyIdentificationsViewModel.Filter) -> String {
+        guard let count = model.counts[filter] else { return filter.label }
+        return "\(filter.label) · \(count.formatted())"
+    }
+
+    private var conflictNote: some View {
+        HStack(alignment: .top, spacing: SQSpace.sm) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(OutageTint.degradedInk)
+                .accessibilityHidden(true)
+            // AttributedString : le gras d'une variante plurielle n'est pas interprété par Text.
+            Text(AttributedString(localized: "**\(model.conflictCount) identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifie-la ou retire-la."))
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("identifications.conflicts")
+    }
+
     private var emptyState: some View {
         EmptyStateView(
             title: "Aucune identification",
-            message: "Identifie une antenne depuis une session ou la carte. Tes identifications — y compris depuis Android — apparaîtront ici.",
+            message: "Identifie une antenne depuis une session ou la carte. Tes identifications, y compris depuis Android, apparaîtront ici.",
             systemImage: "checkmark.seal"
         )
+    }
+}
+
+/// Pastille de génération (« 4G », « 5G ») aux couleurs de la carte et des fiches.
+private struct GenerationTile: View {
+    let label: String
+    var size: CGFloat = 44
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var color: Color { SQBrand.techColor(label == "5G" ? "5G" : "4G") }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                .fill(color)
+            Text(label)
+                .font(SQFont.display(size > 48 ? 14 : 12, .bold))
+                .foregroundStyle(SQBrand.operatorBadgeForeground(for: color, colorScheme: colorScheme))
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Pastille « Conflit » : point de couleur et mot, comme les statuts du lot.
+private struct ConflictPill: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(SQColor.warning).frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text("Conflit")
+        }
+        .font(SQFont.body(12, .bold, relativeTo: .caption))
+        .foregroundStyle(OutageTint.degradedInk)
+        .padding(.horizontal, SQSpace.sm)
+        .padding(.vertical, 3)
+        .background(SQColor.warning.opacity(0.14), in: Capsule(style: .continuous))
+        .fixedSize()
     }
 }
 
@@ -298,94 +405,105 @@ private struct IdentificationNodeRow: View {
     let group: IdentifiedNodeGroup
     let isWithdrawing: Bool
 
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var is5G: Bool { group.kind == .gnb }
-    /// Couleur de génération de la DA (la même que la carte et les fiches).
-    private var generationColor: Color { SQBrand.techColor(is5G ? "5G" : "4G") }
+    /// Retrait des cellules : leur pastille s'aligne sur le texte du nœud.
+    static let textInset: CGFloat = 44 + SQSpace.md
 
     var body: some View {
         HStack(spacing: SQSpace.md) {
-            ZStack {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .fill(generationColor)
-                Text(is5G ? "5G" : "4G")
-                    .font(SQFont.display(12, .bold))
-                    .foregroundStyle(SQBrand.operatorBadgeForeground(for: generationColor, colorScheme: colorScheme))
-            }
-            .frame(width: 44, height: 44)
+            GenerationTile(label: group.kind == .gnb ? "5G" : "4G")
 
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: SQSpace.sm) {
                     Text(group.title)
-                        .font(SQFont.body(14, .semibold))
+                        .font(SQFont.body(15, .semibold))
                         .monospacedDigit()
                         .foregroundStyle(SQColor.label)
                         .sqSingleLine()
-                    if group.conflict {
-                        Text("conflit")
-                            .font(SQType.micro)
-                            .padding(.horizontal, SQSpace.xs2).padding(.vertical, SQSpace.xxs)
-                            .background(SQColor.warningSoft, in: Capsule(style: .continuous))
-                            .foregroundStyle(SQColor.warning)
-                    }
+                    if group.conflict { ConflictPill() }
                 }
                 Text(group.subtitle)
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .lineLimit(2)
-                HStack(spacing: SQSpace.sm) {
-                    Label("validée \(group.validations)×", systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(SQColor.success)
+                HStack(spacing: SQSpace.md) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.seal.fill").accessibilityHidden(true)
+                        Text("Validée \(group.validations) fois")
+                    }
+                    .foregroundStyle(OutageTint.resolvedInk)
                     if !group.sectorsUnion.isEmpty {
-                        Label("\(group.sectorsUnion.count) secteur", systemImage: "dot.radiowaves.right")
+                        HStack(spacing: 4) {
+                            Image(systemName: "dot.radiowaves.right").accessibilityHidden(true)
+                            Text("\(group.sectorsUnion.count) secteurs")
+                        }
                     }
                 }
                 .font(SQType.micro)
                 .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             }
-            Spacer()
+            Spacer(minLength: 0)
             if isWithdrawing { SQSpinner() }
-            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelTertiary)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(SQColor.labelTertiary)
+                .accessibilityHidden(true)
         }
         .padding(.vertical, SQSpace.xs)
+        .accessibilityElement(children: .combine)
     }
 }
 
 private struct IdentificationCellRow: View {
     let cell: IdentifiedCell
     let isWithdrawing: Bool
+    var indented = true
+
+    /// « Secteur 2 · CI 160466202 » ; plusieurs secteurs restent listés.
+    private var detail: Text? {
+        var parts: [Text] = []
+        if cell.sectors.count == 1, let sector = cell.sectors.first {
+            parts.append(Text("Secteur \(sector)"))
+        } else if !cell.sectors.isEmpty {
+            parts.append(Text("Secteurs \(cell.sectors.map(String.init).joined(separator: ", "))"))
+        }
+        if let ci = cell.ci { parts.append(Text(verbatim: "CI \(ci)").monospacedDigit()) }
+        guard var line = parts.first else { return nil }
+        for part in parts.dropFirst() { line = line + Text(verbatim: " · ") + part }
+        return line
+    }
 
     var body: some View {
-        HStack(spacing: SQSpace.md) {
+        HStack(spacing: SQSpace.sm2) {
             Image(systemName: "dot.radiowaves.right")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(SQColor.brandRed)
-                .frame(width: 36, height: 36)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(SQColor.accentInk)
+                .frame(width: 30, height: 30)
                 .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(cell.label)
                     .font(SQFont.body(14, .semibold))
                     .monospacedDigit()
                     .foregroundStyle(SQColor.label)
-                HStack(spacing: SQSpace.sm) {
-                    if let ci = cell.ci {
-                        Text("CI \(ci)")
-                    }
-                    if !cell.sectors.isEmpty {
-                        Text("Secteurs \(cell.sectors.map(String.init).joined(separator: ", "))")
-                    }
+                if let detail {
+                    detail
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(2)
                 }
-                .font(SQType.micro)
-                .foregroundStyle(SQColor.labelSecondary)
-                .lineLimit(2)
             }
-            Spacer()
+            Spacer(minLength: 0)
             if isWithdrawing { SQSpinner() }
-            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelTertiary)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(SQColor.labelTertiary)
+                .accessibilityHidden(true)
         }
-        .padding(.vertical, SQSpace.xs)
+        .padding(.leading, indented ? IdentificationNodeRow.textInset : 0)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -399,7 +517,6 @@ private struct IdentificationDetailSheet: View {
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
     @State private var confirmingWithdraw = false
     @State private var confirmingDelete = false
     @State private var showRemap = false
@@ -408,106 +525,113 @@ private struct IdentificationDetailSheet: View {
     @State private var adoptError: String?
 
     private var is5G: Bool { item.kind == .gnb || item.techLabel == "5G" }
-    /// Couleur de génération de la DA (la même que la carte et les fiches).
-    private var generationColor: Color { SQBrand.techColor(is5G ? "5G" : "4G") }
     /// Ré-attribution de site : seulement pour les nœuds eNB/gNB.
     private var canRemapSite: Bool { (item.kind == .enb || item.kind == .gnb) && (item.enb != nil || item.gnb != nil) }
     /// Correction de secteur : pour les cellules (PCI/CellID).
     private var canEditSector: Bool { item.kind == .pci || item.kind == .cellid }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: SQSpace.lg) {
-                    header
-                    if item.conflict {
-                        conflictSection
-                    }
-                    detailsCard
-                    editSection
-                    withdrawButton
-                    deleteButton
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MapSheetHeader(title: "Identification", closeIdentifier: "identification.close") { dismiss() }
+                header
+                if item.conflict {
+                    conflictSection
                 }
-                .padding()
+                detailsCard
+                editSection
+                withdrawBlock
+                dangerZone
             }
-            .background(SQColor.bg.ignoresSafeArea())
-            .navigationTitle("Identification")
-            .toolbarTitleInlineCompat()
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { dismiss() }.tint(SQColor.brandRed)
-                }
-            }
-            .sheet(isPresented: $showRemap) {
-                SiteRemapSheet(
-                    item: item,
-                    antennas: services.antennas,
-                    identify: services.identify,
-                    location: services.location,
-                    onDone: { onChanged(); dismiss() }
-                )
-            }
-            .sheet(isPresented: $showSector) {
-                SectorEditSheet(
-                    item: item,
-                    antennas: services.antennas,
-                    identify: services.identify,
-                    onDone: { onChanged(); dismiss() }
-                )
-            }
+            .padding(SQSpace.lg)
+        }
+        .background(SQColor.bg.ignoresSafeArea())
+        .sheet(isPresented: $showRemap) {
+            SiteRemapSheet(
+                item: item,
+                antennas: services.antennas,
+                identify: services.identify,
+                location: services.location,
+                onDone: { onChanged(); dismiss() }
+            )
+        }
+        .sheet(isPresented: $showSector) {
+            SectorEditSheet(
+                item: item,
+                antennas: services.antennas,
+                identify: services.identify,
+                onDone: { onChanged(); dismiss() }
+            )
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
-    /// Conflit de consensus (MYID-TELECOM-02) : avertissement + bloc « Site communautaire
-    /// (consensus) » avec bouton « Adopter le site communautaire » (parité Android).
+    /// Conflit de consensus (MYID-TELECOM-02) : avertissement + bloc « Site communautaire »
+    /// avec bouton « Adopter ce site » (parité Android).
     @ViewBuilder
     private var conflictSection: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Label("Conflit : un autre site a plus de validations sur cette antenne.", systemImage: "exclamationmark.triangle.fill")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.warning)
-            if let consensusId = item.conflictSiteId {
-                VStack(alignment: .leading, spacing: SQSpace.xs) {
-                    Text("Site communautaire (consensus)")
-                        .font(SQType.micro)
+        // L'icône a sa colonne : le site communautaire et le bouton s'alignent sur le texte.
+        HStack(alignment: .top, spacing: SQSpace.sm) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(OutageTint.degradedInk)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text(AttributedString(localized: "**Conflit** : un autre site a plus de validations sur cette antenne."))
+                    .font(SQType.subhead(.regular))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let consensusId = item.conflictSiteId {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Site communautaire · \(consensusId)")
+                            .font(SQFont.body(14, .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.label)
+                        if let line = consensusLine {
+                            Text(line)
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                    }
+                    Button {
+                        Haptics.medium()
+                        Task { await adoptConsensus(toSiteId: consensusId) }
+                    } label: {
+                        HStack(spacing: SQSpace.xs2) {
+                            if adoptBusy { SQSpinner().tint(SQColor.onAccent) } else { Image(systemName: "checkmark.seal.fill") }
+                            Text("Adopter ce site").font(SQFont.body(13, .semibold))
+                        }
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minHeight: 44)
+                        .foregroundStyle(SQColor.onAccent)
+                        .background(SQColor.brandRed, in: Capsule(style: .continuous))
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .disabled(adoptBusy)
+                    .accessibilityIdentifier("identification.adopt")
+                    if let adoptError {
+                        Text(adoptError).font(SQType.micro).foregroundStyle(SQColor.dangerInk)
+                    }
+                } else {
+                    Text("Retire cette identification si elle est erronée.")
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                    Text(item.conflictSiteAddress ?? String(localized: "Site \(consensusId)"))
-                        .font(SQFont.body(14, .semibold))
-                        .foregroundStyle(SQColor.label)
-                    if let v = item.conflictSiteValidations {
-                        Text("\(v) validation")
-                            .font(SQType.micro)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
                 }
-                Button {
-                    Haptics.medium()
-                    Task { await adoptConsensus(toSiteId: consensusId) }
-                } label: {
-                    HStack(spacing: SQSpace.xs2) {
-                        if adoptBusy { SQSpinner().tint(SQColor.onAccent) } else { Image(systemName: "checkmark.seal.fill") }
-                        Text("Adopter le site communautaire").font(SQFont.body(13, .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 44)
-                    .foregroundStyle(SQColor.onAccent)
-                    .background(SQColor.success, in: Capsule(style: .continuous))
-                }
-                .buttonStyle(SQPressButtonStyle())
-                .disabled(adoptBusy)
-                if let adoptError {
-                    Text(adoptError).font(SQType.micro).foregroundStyle(SQColor.danger)
-                }
-            } else {
-                Text("Retire cette identification si elle est erronée.")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
             }
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .accessibilityIdentifier("identification.conflict")
+    }
+
+    /// « Quai Claude-Bernard · 6 validations ».
+    private var consensusLine: String? {
+        let parts = [
+            item.conflictSiteAddress,
+            item.conflictSiteValidations.map { String(localized: "\($0) validations") }
+        ].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private func adoptConsensus(toSiteId: String) async {
@@ -536,58 +660,63 @@ private struct IdentificationDetailSheet: View {
     @ViewBuilder
     private var editSection: some View {
         if canRemapSite || canEditSector {
-            VStack(spacing: SQSpace.sm) {
-                if canRemapSite {
-                    editRow(
-                        title: "Corriger le site",
-                        subtitle: "Choisir le bon site sur la carte",
-                        icon: "mappin.and.ellipse"
-                    ) { showRemap = true }
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text("Corriger").sqKicker().accessibilityAddTraits(.isHeader)
+                VStack(spacing: 0) {
+                    if canRemapSite {
+                        editRow(
+                            title: "Corriger le site",
+                            subtitle: "Choisir le bon site sur la carte",
+                            icon: "mappin.and.ellipse",
+                            identifier: "identification.remap"
+                        ) { showRemap = true }
+                    }
+                    if canRemapSite && canEditSector {
+                        Divider().overlay(SQColor.separator).padding(.leading, 64)
+                    }
+                    if canEditSector {
+                        editRow(
+                            title: "Corriger le secteur",
+                            subtitle: "Toucher le bon secteur sur le radar",
+                            icon: "dot.radiowaves.right",
+                            identifier: "identification.sector"
+                        ) { showSector = true }
+                    }
                 }
-                if canEditSector {
-                    editRow(
-                        title: "Corriger le secteur",
-                        subtitle: "Sélectionner le bon secteur sur le radar",
-                        icon: "dot.radiowaves.right"
-                    ) { showSector = true }
-                }
+                .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
             }
         }
     }
 
-    private func editRow(title: String, subtitle: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func editRow(title: LocalizedStringKey, subtitle: LocalizedStringKey, icon: String,
+                         identifier: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: SQSpace.md) {
-                Image(systemName: icon)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 36, height: 36)
-                    .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                SQIconPastille(systemImage: icon, size: 36, tint: SQColor.accentInk, fill: SQColor.accentSoft)
                 VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                    Text(LocalizedStringKey(title)).font(SQFont.body(15.5, .medium)).foregroundStyle(SQColor.label)
-                    Text(LocalizedStringKey(subtitle)).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
+                    Text(title).font(SQFont.body(15, .semibold)).foregroundStyle(SQColor.label)
+                    Text(subtitle).font(SQType.micro).foregroundStyle(SQColor.labelSecondary)
                 }
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(SQColor.labelTertiary)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
             }
-            .padding(SQSpace.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
+        .accessibilityIdentifier(identifier)
     }
 
     private var header: some View {
         HStack(spacing: SQSpace.md) {
-            ZStack {
-                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                    .fill(generationColor)
-                Text(item.techLabel).font(SQFont.display(14, .bold))
-                    .foregroundStyle(SQBrand.operatorBadgeForeground(for: generationColor, colorScheme: colorScheme))
-            }
-            .frame(width: 52, height: 52)
+            GenerationTile(label: is5G ? "5G" : "4G", size: 52)
             VStack(alignment: .leading, spacing: SQSpace.xxs) {
-                Text(item.operatorName ?? String(localized: "Opérateur inconnu"))
+                Text(item.operatorDisplayName ?? String(localized: "Opérateur inconnu"))
                     .font(SQFont.display(20, .bold))
                     .foregroundStyle(SQColor.label)
                 Text(item.nodeLabel)
@@ -597,26 +726,28 @@ private struct IdentificationDetailSheet: View {
             }
             Spacer()
         }
+        .accessibilityElement(children: .combine)
     }
 
     private var detailsCard: some View {
-        VStack(spacing: 0) {
-            infoRow("Validations", "\(item.validations)×")
+        VStack(spacing: SQSpace.sm) {
+            SQFactRow(label: "Validations", value: item.validations.formatted())
             if !item.sectors.isEmpty {
-                infoRow("Secteurs", item.sectors.map(String.init).joined(separator: ", "))
+                SQFactRow(label: "Secteurs", value: item.sectors.map(String.init).joined(separator: ", "))
             }
-            if let band = item.band { infoRow("Bande", SQUnits.band(band, technology: item.tech ?? (item.type == "gnb" ? "NR" : nil))) }
-            if let ci = item.ci { infoRow("CI / ECI", ci) }
-            if let mcc = mccMnc { infoRow("MCC / MNC", mcc) }
-            if let market = item.marketCode { infoRow("Marché", market) }
-            if let source = item.source { infoRow("Source", source) }
-            infoRow("Identifiant site", item.siteId, mono: true)
-            if let created = item.createdAt { infoRow("Créée le", created.formatted(date: .abbreviated, time: .shortened)) }
-            if let validated = item.lastValidated { infoRow("Dernière validation", validated.formatted(date: .abbreviated, time: .shortened)) }
+            if let band = item.band { SQFactRow(label: "Bande", value: SQUnits.band(band, technology: item.tech ?? (item.type == "gnb" ? "NR" : nil))) }
+            if let ci = item.ci { SQFactRow(label: "CI / ECI", value: ci) }
+            if let mcc = mccMnc { SQFactRow(label: "MCC / MNC", value: mcc) }
+            if let market = item.marketCode { SQFactRow(label: "Marché", value: market) }
+            if let source = sourceLabel { SQFactRow(label: "Source", value: source) }
+            SQFactRow(label: "Identifiant site", value: item.siteId)
+            if let created = item.createdAt { SQFactRow(label: "Créée le", value: created.formatted(date: .abbreviated, time: .shortened)) }
+            if let validated = item.lastValidated { SQFactRow(label: "Dernière validation", value: validated.formatted(date: .abbreviated, time: .shortened)) }
         }
         .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.xs)
-        .sqCardBackground()
+        .padding(.vertical, SQSpace.md)
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
+        .accessibilityIdentifier("identification.details")
     }
 
     private var mccMnc: String? {
@@ -626,64 +757,79 @@ private struct IdentificationDetailSheet: View {
         return "\(mcc) / \(mnc)"
     }
 
-    private var withdrawButton: some View {
-        GradientButton(
-            "Retirer cette identification",
-            systemImage: "trash",
-            isBusy: isWithdrawing,
-            style: .destructive
-        ) {
-            confirmingWithdraw = true
-        }
-        .confirmationDialog("Retirer cette identification ?", isPresented: $confirmingWithdraw) {
-            Button("Retirer", role: .destructive, action: onWithdraw)
-            Button("Annuler", role: .cancel) {}
-        } message: {
-            Text("« \(item.nodeLabel) » ne te sera plus attribuée. Réversible en ré-identifiant.")
+    /// « iPhone » / « Android » plutôt que la valeur brute du serveur.
+    private var sourceLabel: String? {
+        guard let source = item.source, !source.isEmpty else { return nil }
+        switch source.lowercased() {
+        case "ios", "iphone": return "iPhone"
+        case "android": return "Android"
+        default: return source
         }
     }
 
-    /// Action secondaire (moins proéminente que le retrait) : hard delete owner-scoped.
-    /// Contrairement au retrait, c'est irréversible ; le serveur n'efface que les lignes
-    /// solo et retire en soft celles confirmées par d'autres.
-    private var deleteButton: some View {
-        Button {
-            confirmingDelete = true
-        } label: {
-            HStack(spacing: SQSpace.xs2) {
-                if isWithdrawing {
-                    SQSpinner().tint(SQColor.danger)
-                } else {
-                    Image(systemName: "trash.slash")
+    private var withdrawBlock: some View {
+        VStack(spacing: SQSpace.xs) {
+            GradientButton(
+                "Retirer cette identification",
+                systemImage: "trash",
+                isBusy: isWithdrawing,
+                style: .destructive
+            ) {
+                confirmingWithdraw = true
+            }
+            .accessibilityIdentifier("identification.withdraw")
+            .confirmationDialog("Retirer cette identification ?", isPresented: $confirmingWithdraw) {
+                Button("Retirer", role: .destructive, action: onWithdraw)
+                Button("Annuler", role: .cancel) {}
+            } message: {
+                Text("« \(item.nodeLabel) » ne te sera plus attribuée. Tu pourras la ré-identifier.")
+            }
+            Text("Réversible : tu peux ré-identifier ce site.")
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    /// Geste irréversible (hard delete owner-scoped), à part du retrait : le serveur
+    /// n'efface que les lignes solo et retire en soft celles confirmées par d'autres.
+    private var dangerZone: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Zone sensible").sqKicker().accessibilityAddTraits(.isHeader)
+            Button {
+                confirmingDelete = true
+            } label: {
+                HStack(spacing: SQSpace.md) {
+                    SQIconPastille(systemImage: "trash.slash", size: 36, tint: SQColor.dangerInk, fill: SQColor.danger.opacity(0.12))
+                    VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                        Text("Supprimer définitivement")
+                            .font(SQFont.body(15, .semibold))
+                            .foregroundStyle(SQColor.dangerInk)
+                        Text("Irréversible. Les cellules confirmées par d’autres sont seulement retirées.")
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    if isWithdrawing { SQSpinner().tint(SQColor.danger) }
                 }
-                Text("Supprimer définitivement").font(SQFont.body(14, .semibold))
+                .padding(.horizontal, SQSpace.md)
+                .padding(.vertical, SQSpace.sm)
+                .frame(minHeight: 56)
+                .contentShape(Rectangle())
+                .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
             }
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 44)
-            .foregroundStyle(SQColor.danger)
-        }
-        .buttonStyle(SQPressButtonStyle())
-        .disabled(isWithdrawing)
-        .confirmationDialog("Supprimer définitivement ?", isPresented: $confirmingDelete) {
-            Button("Supprimer définitivement", role: .destructive, action: onDelete)
-            Button("Annuler", role: .cancel) {}
-        } message: {
-            Text("« \(item.nodeLabel) » sera effacée définitivement (irréversible). Les cellules confirmées par d'autres seront seulement retirées.")
-        }
-    }
-
-    private func infoRow(_ label: String, _ value: String, mono: Bool = false) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(LocalizedStringKey(label)).font(SQType.subhead).foregroundStyle(SQColor.labelSecondary)
-                Spacer()
-                Text(value)
-                    .font(mono ? .subheadline.monospaced() : SQFont.body(14, .semibold))
-                    .foregroundStyle(SQColor.label)
-                    .multilineTextAlignment(.trailing)
-                    .lineLimit(2)
+            .buttonStyle(SQPressButtonStyle())
+            .disabled(isWithdrawing)
+            .accessibilityIdentifier("identification.delete")
+            .confirmationDialog("Supprimer définitivement ?", isPresented: $confirmingDelete) {
+                Button("Supprimer définitivement", role: .destructive, action: onDelete)
+                Button("Annuler", role: .cancel) {}
+            } message: {
+                Text("« \(item.nodeLabel) » sera effacée définitivement. Les cellules confirmées par d’autres seront seulement retirées.")
             }
-            .padding(.vertical, SQSpace.sm)
         }
+        .padding(.top, SQSpace.md)
     }
 }

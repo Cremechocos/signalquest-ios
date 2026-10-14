@@ -54,7 +54,7 @@ final class SectorEditViewModel: ObservableObject {
         // SECTOR-UX-04 : en France le secteur est imposé par le PCI — on l'annonce
         // AVANT l'édition (et non plus après l'appel réseau, façon Android).
         if market == "FR", !unique.isEmpty {
-            infoMessage = String(localized: "En France, le secteur est déterminé automatiquement à partir du PCI. La sélection ci-dessous est indicative.")
+            infoMessage = String(localized: "En France, le secteur se déduit du PCI. Ton choix ici est indicatif.")
         }
         if unique.isEmpty {
             errorMessage = String(localized: "Ce site n'expose pas d'azimuts de secteur.")
@@ -91,8 +91,8 @@ final class SectorEditViewModel: ObservableObject {
                 // En France le secteur est imposé par le PCI : on l'affiche honnêtement.
                 let derived = result.sectors.map(String.init).joined(separator: ", ")
                 infoMessage = derived.isEmpty
-                    ? String(localized: "En France, le secteur est déterminé automatiquement à partir du PCI.")
-                    : String(localized: "En France, le secteur est déterminé automatiquement à partir du PCI : secteur \(derived).")
+                    ? String(localized: "En France, le secteur se déduit du PCI.")
+                    : String(localized: "En France, le secteur se déduit du PCI : secteur \(derived).")
                 if let d = result.sectors.first,
                    let index = SectorNumbering.index(forStoredValue: d, azimuthCount: azimuths.count, operatorName: item.operatorName) {
                     self.selectedIndex = index
@@ -122,75 +122,89 @@ struct SectorEditSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: SQSpace.lg) {
-                    Text("Touche le secteur réellement desservi par \(model.item.nodeLabel).")
-                        .font(SQType.subhead)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
+        ScrollView {
+            VStack(spacing: SQSpace.lg) {
+                MapSheetHeader(
+                    title: "Corriger le secteur",
+                    subtitle: String(localized: "Touche le secteur qui dessert vraiment \(model.item.nodeLabel)."),
+                    closeIdentifier: "sector.cancel"
+                ) { dismiss() }
 
-                    if model.isLoading {
-                        SQSpinner().tint(SQColor.brandRed).frame(height: 260)
-                    } else if model.azimuths.isEmpty {
-                        EmptyStateView(
-                            title: "Aucun secteur",
-                            message: model.errorMessage ?? "Ce site n'expose pas d'azimuts.",
-                            systemImage: "dot.radiowaves.right"
-                        )
-                    } else {
-                        SelectableSectorRadar(
-                            azimuths: model.azimuths,
-                            selectedIndex: $model.selectedIndex,
-                            color: SQBrand.techColor(model.item.kind == .gnb ? "5G" : "4G"),
-                            displayNumber: { model.sectorLabel(forIndex: $0) }
-                        )
-                        .frame(height: 280)
-                        .padding(SQSpace.md)
+                if model.isLoading {
+                    SQSpinner().tint(SQColor.brandRed).frame(height: 260)
+                } else if model.azimuths.isEmpty {
+                    EmptyStateView(
+                        title: "Aucun secteur",
+                        message: model.errorMessage ?? "Ce site n'expose pas d'azimuts.",
+                        systemImage: "dot.radiowaves.right"
+                    )
+                } else {
+                    SelectableSectorRadar(
+                        azimuths: model.azimuths,
+                        selectedIndex: $model.selectedIndex,
+                        displayNumber: { model.sectorLabel(forIndex: $0) }
+                    )
+                    .frame(width: 260, height: 260)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("sector.radar")
 
-                        if let index = model.selectedIndex {
-                            Text("Secteur \(model.sectorLabel(forIndex: index)) · azimut \(Int(model.azimuths[index].rounded()))°")
-                                .font(SQFont.body(14, .semibold))
-                                .foregroundStyle(SQColor.label)
-                        } else {
-                            Text("Aucun secteur sélectionné")
-                                .font(SQType.subhead)
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
-                    }
+                    selectionPill
+                }
 
-                    if let info = model.infoMessage {
-                        Label(info, systemImage: "info.circle.fill")
+                if let info = model.infoMessage {
+                    HStack(alignment: .top, spacing: SQSpace.sm) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .accessibilityHidden(true)
+                        Text(info)
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.label)
-                            .padding(SQSpace.md)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    if let error = model.errorMessage, !model.azimuths.isEmpty {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .font(SQType.caption).foregroundStyle(SQColor.warning)
-                    }
+                    .padding(SQSpace.md)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("sector.info")
+                }
+                if let error = model.errorMessage, !model.azimuths.isEmpty {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(SQType.caption).foregroundStyle(OutageTint.degradedInk)
+                }
 
-                    saveButton
-                }
-                .padding()
+                saveButton
             }
-            .background(SQColor.bg.ignoresSafeArea())
-            .navigationTitle("Corriger le secteur")
-            .toolbarTitleInlineCompat()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
-                }
-            }
-            .task { await model.load() }
-            .onChangeCompat(of: model.done) { _, done in
-                if done { onDone(); dismiss() }
-            }
+            .padding(SQSpace.lg)
+        }
+        .background(SQColor.bg.ignoresSafeArea())
+        .task { await model.load() }
+        .onChangeCompat(of: model.done) { _, done in
+            if done { onDone(); dismiss() }
         }
         .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    /// « Secteur 2 · 120° » : le numéro suit la convention de l'opérateur.
+    @ViewBuilder
+    private var selectionPill: some View {
+        if let index = model.selectedIndex, index < model.azimuths.count {
+            HStack(spacing: SQSpace.xs) {
+                Image(systemName: "dot.radiowaves.right").accessibilityHidden(true)
+                Text("Secteur \(model.sectorLabel(forIndex: index)) · \(Int(model.azimuths[index].rounded()))°")
+                    .monospacedDigit()
+            }
+            .font(SQFont.body(14, .semibold))
+            .foregroundStyle(SQColor.accentInk)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.xs2)
+            .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+            .accessibilityIdentifier("sector.selection")
+        } else {
+            Text("Aucun secteur sélectionné")
+                .font(SQType.subhead)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
     }
 
     @ViewBuilder
@@ -206,6 +220,7 @@ struct SectorEditSheet: View {
             }
             .disabled(model.selectedIndex == nil || model.isSubmitting)
             .opacity(model.selectedIndex == nil ? 0.5 : 1)
+            .accessibilityIdentifier("sector.save")
         }
     }
 }
@@ -215,7 +230,7 @@ struct SectorEditSheet: View {
 struct SelectableSectorRadar: View {
     let azimuths: [Double]
     @Binding var selectedIndex: Int?
-    var color: Color = SQColor.brandOrange
+    var color: Color = SQColor.brandRed
     /// Numéro de secteur affiché pour un index (convention opérateur). 1-based par défaut.
     var displayNumber: (Int) -> Int = { $0 + 1 }
 
@@ -229,23 +244,29 @@ struct SelectableSectorRadar: View {
 
             ZStack {
                 Circle()
-                    .stroke(SQColor.separator.opacity(0.5), lineWidth: 1)
+                    .fill(SQColor.surfaceMuted)
+                    .overlay(Circle().stroke(SQColor.separator, lineWidth: 1.5))
                     .frame(width: radius * 2, height: radius * 2)
+                    .position(center)
                 Circle()
-                    .stroke(SQColor.separator.opacity(0.3), lineWidth: 1)
-                    .frame(width: radius, height: radius)
+                    .stroke(SQColor.separator, style: StrokeStyle(lineWidth: 1, dash: [3, 5]))
+                    .frame(width: radius * 1.1, height: radius * 1.1)
+                    .position(center)
 
                 ForEach(Array(azimuths.enumerated()), id: \.offset) { index, azimuth in
                     let isSelected = index == selectedIndex
-                    SectorWedge(azimuth: azimuth, halfBeam: halfBeam, radius: radius, center: center)
-                        .fill(color.opacity(isSelected ? 0.55 : 0.16))
-                    SectorWedge(azimuth: azimuth, halfBeam: halfBeam, radius: radius, center: center)
-                        .stroke(color.opacity(isSelected ? 1 : 0.4), lineWidth: isSelected ? 2.5 : 1)
+                    SectorWedge(azimuth: azimuth, halfBeam: halfBeam, radius: radius - 4, center: center)
+                        .fill(isSelected ? color.opacity(0.55) : SQColor.labelTertiary.opacity(0.18))
+                    if isSelected {
+                        SectorWedge(azimuth: azimuth, halfBeam: halfBeam, radius: radius - 4, center: center)
+                            .stroke(color, lineWidth: 2.5)
+                    }
                     Text("\(displayNumber(index))")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(isSelected ? .white : color)
-                        .padding(5)
-                        .background(isSelected ? color : Color.clear, in: Circle())
+                        .font(SQFont.display(14, .heavy))
+                        .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
+                        .frame(width: 28, height: 28)
+                        .background(isSelected ? color : SQColor.surface, in: Circle())
+                        .overlay(Circle().stroke(SQColor.separator, lineWidth: isSelected ? 0 : 1))
                         .position(labelPosition(azimuth: azimuth, center: center, radius: radius))
                         // SECTOR-A11Y-03 : chaque secteur est un élément accessible
                         // sélectionnable (le radar tactile est sinon invisible à VoiceOver).
@@ -259,11 +280,13 @@ struct SelectableSectorRadar: View {
                 }
 
                 Text("N")
-                    .font(.system(size: 11, weight: .heavy))
+                    .font(SQFont.display(12, .heavy))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .position(x: center.x, y: center.y - radius - 6)
+                    .position(x: center.x, y: center.y - radius - 8)
+                    .accessibilityHidden(true)
 
-                Circle().fill(color).frame(width: 12, height: 12).position(center)
+                Circle().fill(SQColor.label).frame(width: 10, height: 10).position(center)
+                    .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
             .gesture(
@@ -280,7 +303,7 @@ struct SelectableSectorRadar: View {
 
     private func labelPosition(azimuth: Double, center: CGPoint, radius: CGFloat) -> CGPoint {
         let screen = (azimuth - 90) * .pi / 180
-        let r = radius * 0.62
+        let r = radius * 0.72
         return CGPoint(x: center.x + r * cos(screen), y: center.y + r * sin(screen))
     }
 

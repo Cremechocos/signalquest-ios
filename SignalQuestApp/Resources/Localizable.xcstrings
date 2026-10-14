@@ -1226,7 +1226,7 @@
         }
       }
     },
-    "%lld secteur" : {
+    "%lld secteurs" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -1554,6 +1554,47 @@
         }
       }
     },
+    "%lld validations" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld validation"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld validations"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld validation"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld validations"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld à réclamer" : {
       "localizations" : {
         "en" : {
@@ -1615,6 +1656,63 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "(vide)"
+          }
+        }
+      }
+    },
+    "**%lld identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifie-la ou retire-la." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%lld identification in conflict**: another site has more validations on this antenna. Check it or remove it."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%lld identifications in conflict**: other sites have more validations on these antennas. Check them or remove them."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%lld identification en conflit** : un autre site a plus de validations sur cette antenne. Vérifie-la ou retire-la."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "**%lld identifications en conflit** : d’autres sites ont plus de validations sur ces antennes. Vérifie-les ou retire-les."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "**Conflit** : un autre site a plus de validations sur cette antenne." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Conflict**: another site has more validations on this antenna."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**Conflit** : un autre site a plus de validations sur cette antenne."
           }
         }
       }
@@ -1802,6 +1900,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Actualisation impossible. Vérifie ta connexion puis réessaie."
+          }
+        }
+      }
+    },
+    "Adopter ce site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adopt this site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adopter ce site"
           }
         }
       }
@@ -2276,6 +2390,22 @@
         }
       }
     },
+    "Autres sites" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autres sites"
+          }
+        }
+      }
+    },
     "Autre…" : {
       "localizations" : {
         "en" : {
@@ -2434,6 +2564,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bugs et idées"
+          }
+        }
+      }
+    },
+    "CI / ECI" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CI / ECI"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CI / ECI"
           }
         }
       }
@@ -2991,6 +3137,22 @@
         }
       }
     },
+    "Conflit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conflict"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conflit"
+          }
+        }
+      }
+    },
     "Connecte-toi pour envoyer un signalement" : {
       "localizations" : {
         "en" : {
@@ -3068,6 +3230,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Correction proposée · facultatif"
+          }
+        }
+      }
+    },
+    "Corriger" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correct"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriger"
           }
         }
       }
@@ -3380,6 +3558,38 @@
         }
       }
     },
+    "Déplacer ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer ici"
+          }
+        }
+      }
+    },
+    "Désélectionner" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deselect"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désélectionner"
+          }
+        }
+      }
+    },
     "En %@, sur %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3397,19 +3607,50 @@
         }
       }
     },
-    "En France, le secteur est déterminé automatiquement à partir du PCI : secteur %@." : {
-      "extractionState" : "manual",
+    "En France, le secteur se déduit du PCI : secteur %@." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "In France, the sector is determined automatically from the PCI: sector %@."
+            "value" : "In France, the sector is derived from the PCI: sector %@."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En France, le secteur est déterminé automatiquement à partir du PCI : secteur %@."
+            "value" : "En France, le secteur se déduit du PCI : secteur %@."
+          }
+        }
+      }
+    },
+    "En France, le secteur se déduit du PCI." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In France, the sector is derived from the PCI."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En France, le secteur se déduit du PCI."
+          }
+        }
+      }
+    },
+    "En France, le secteur se déduit du PCI. Ton choix ici est indicatif." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In France, the sector is derived from the PCI. Your choice here is a hint."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En France, le secteur se déduit du PCI. Ton choix ici est indicatif."
           }
         }
       }
@@ -4050,6 +4291,22 @@
         }
       }
     },
+    "Identifie une antenne depuis une session ou la carte. Tes identifications, y compris depuis Android, apparaîtront ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identify an antenna from a session or from the map. Your identifications, including those from Android, will appear here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifie une antenne depuis une session ou la carte. Tes identifications, y compris depuis Android, apparaîtront ici."
+          }
+        }
+      }
+    },
     "Identifier %lld site à la suite" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4508,6 +4765,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Indisponibilité"
+          }
+        }
+      }
+    },
+    "Irréversible. Les cellules confirmées par d’autres sont seulement retirées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Irreversible. Cells confirmed by others are only removed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Irréversible. Les cellules confirmées par d’autres sont seulement retirées."
           }
         }
       }
@@ -5084,6 +5357,22 @@
         }
       }
     },
+    "Les antennes que tu as reliées à un site, ici et sur Android." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The antennas you linked to a site, here and on Android."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les antennes que tu as reliées à un site, ici et sur Android."
+          }
+        }
+      }
+    },
     "Les erreurs que tu as signalées sur une fiche d’antenne, et les réponses de l’équipe." : {
       "localizations" : {
         "en" : {
@@ -5257,6 +5546,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Légende par signal"
+          }
+        }
+      }
+    },
+    "MCC / MNC" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MCC / MNC"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MCC / MNC"
           }
         }
       }
@@ -6878,6 +7183,22 @@
         }
       }
     },
+    "Retirée : des cellules sont confirmées par d’autres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed: some cells are confirmed by others"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirée : des cellules sont confirmées par d’autres"
+          }
+        }
+      }
+    },
     "Revenir aux réglages par défaut" : {
       "localizations" : {
         "en" : {
@@ -7051,6 +7372,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Résolus · %lld"
+          }
+        }
+      }
+    },
+    "Réversible : tu peux ré-identifier ce site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reversible: you can identify this site again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réversible : tu peux ré-identifier ce site."
           }
         }
       }
@@ -7368,6 +7705,22 @@
         }
       }
     },
+    "Site actuel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current site"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site actuel"
+          }
+        }
+      }
+    },
     "Site ajouté" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7381,6 +7734,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Site ajouté"
+          }
+        }
+      }
+    },
+    "Site communautaire · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Community site · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site communautaire · %@"
           }
         }
       }
@@ -7838,6 +8207,22 @@
         }
       }
     },
+    "Ton choix" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your choice"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton choix"
+          }
+        }
+      }
+    },
     "Ton compte a été supprimé." : {
       "localizations" : {
         "en" : {
@@ -7950,6 +8335,38 @@
         }
       }
     },
+    "Touche le bon site pour y déplacer %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the right site to move %@ there."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touche le bon site pour y déplacer %@."
+          }
+        }
+      }
+    },
+    "Touche le secteur qui dessert vraiment %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the sector that actually serves %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touche le secteur qui dessert vraiment %@."
+          }
+        }
+      }
+    },
     "Touche un carré pour voir son détail" : {
       "localizations" : {
         "en" : {
@@ -7978,6 +8395,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Touche un opérateur pour l’afficher ou le masquer"
+          }
+        }
+      }
+    },
+    "Toucher le bon secteur sur le radar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the right sector on the radar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toucher le bon secteur sur le radar"
           }
         }
       }
@@ -8310,6 +8743,47 @@
         }
       }
     },
+    "Validée %lld fois" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Validated %lld time"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Validated %lld times"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Validée %lld fois"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Validée %lld fois"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Voir mon signalement" : {
       "localizations" : {
         "en" : {
@@ -8404,6 +8878,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wi-Fi"
+          }
+        }
+      }
+    },
+    "Zone sensible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danger zone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zone sensible"
           }
         }
       }
@@ -9170,6 +9660,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "une passe complète représente quelques dizaines de requêtes"
+          }
+        }
+      }
+    },
+    "« %@ » ne te sera plus attribuée. Tu pourras la ré-identifier." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” will no longer be credited to you. You can identify it again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » ne te sera plus attribuée. Tu pourras la ré-identifier."
+          }
+        }
+      }
+    },
+    "« %@ » sera effacée définitivement. Les cellules confirmées par d’autres seront seulement retirées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” will be permanently deleted. Cells confirmed by others will only be removed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » sera effacée définitivement. Les cellules confirmées par d’autres seront seulement retirées."
           }
         }
       }
@@ -14465,22 +14987,6 @@
         }
       }
     },
-    "%lld en conflit — un autre site est majoritaire sur cette antenne. Vérifie ou retire." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld in conflict — another site is dominant on this antenna. Check or remove."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld en conflit — un autre site est majoritaire sur cette antenne. Vérifie ou retire."
-          }
-        }
-      }
-    },
     "%lld faisceaux hertziens" : {
       "localizations" : {
         "en" : {
@@ -17679,22 +18185,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Admin"
-          }
-        }
-      }
-    },
-    "Adopter le site communautaire" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adopt the community site"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adopter le site communautaire"
           }
         }
       }
@@ -25959,22 +26449,6 @@
         }
       }
     },
-    "Choisir le bon site" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose the right site"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choisir le bon site"
-          }
-        }
-      }
-    },
     "Choisir le bon site sur la carte" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -32324,39 +32798,6 @@
         }
       }
     },
-    "En France, le secteur est déterminé automatiquement à partir du PCI." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In France, the sector is determined automatically from the PCI."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En France, le secteur est déterminé automatiquement à partir du PCI."
-          }
-        }
-      }
-    },
-    "En France, le secteur est déterminé automatiquement à partir du PCI. La sélection ci-dessous est indicative." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In France, the sector is determined automatically from the PCI. The selection below is indicative."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En France, le secteur est déterminé automatiquement à partir du PCI. La sélection ci-dessous est indicative."
-          }
-        }
-      }
-    },
     "En appel" : {
       "localizations" : {
         "en" : {
@@ -35251,23 +35692,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identification supprimée"
-          }
-        }
-      }
-    },
-    "Identifie une antenne depuis une session ou la carte. Tes identifications — y compris depuis Android — apparaîtront ici." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identify an antenna from a session or from the map. Your identifications — including from Android — will appear here."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Identifie une antenne depuis une session ou la carte. Tes identifications — y compris depuis Android — apparaîtront ici."
           }
         }
       }
@@ -52472,23 +52896,6 @@
         }
       }
     },
-    "Retirée (des cellules sont confirmées par d'autres)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Removed (some cells are confirmed by others)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retirée (des cellules sont confirmées par d'autres)"
-          }
-        }
-      }
-    },
     "Retour" : {
       "localizations" : {
         "en" : {
@@ -52762,23 +53169,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien à proximité"
-          }
-        }
-      }
-    },
-    "Ré-identifier ici" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Re-identify here"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ré-identifier ici"
           }
         }
       }
@@ -55158,22 +55548,6 @@
         }
       }
     },
-    "Secteur %lld · azimut %lld°" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sector %lld · azimuth %lld°"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Secteur %1$lld · azimut %2$lld°"
-          }
-        }
-      }
-    },
     "Secteur %lld, azimut %lld degrés" : {
       "localizations" : {
         "en" : {
@@ -56668,22 +57042,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Site communautaire"
-          }
-        }
-      }
-    },
-    "Site communautaire (consensus)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Community site (consensus)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Site communautaire (consensus)"
           }
         }
       }
@@ -58810,23 +59168,6 @@
         }
       }
     },
-    "Sélectionner le bon secteur sur le radar" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select the right sector on the radar"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sélectionner le bon secteur sur le radar"
-          }
-        }
-      }
-    },
     "Série" : {
       "localizations" : {
         "en" : {
@@ -60201,22 +60542,6 @@
         }
       }
     },
-    "Touche le bon site pour y ré-attribuer %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap the right site to reassign %@ to it"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Touche le bon site pour y ré-attribuer %@"
-          }
-        }
-      }
-    },
     "Touche le marque-page d'une publication pour la retrouver ici." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -60230,22 +60555,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Touche le marque-page d'une publication pour la retrouver ici."
-          }
-        }
-      }
-    },
-    "Touche le secteur réellement desservi par %@." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap the sector actually served by %@."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Touche le secteur réellement desservi par %@."
           }
         }
       }
@@ -64898,22 +65207,6 @@
         }
       }
     },
-    "conflit" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "conflict"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "conflit"
-          }
-        }
-      }
-    },
     "correct" : {
       "localizations" : {
         "en" : {
@@ -67744,22 +68037,6 @@
         }
       }
     },
-    "validée %lld×" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "confirmed %lld×"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "validée %lld×"
-          }
-        }
-      }
-    },
     "vendredi" : {
       "localizations" : {
         "en" : {
@@ -67852,54 +68129,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "« %@ » fait partie de Premium. Compare les offres sans perdre ce que tu étais en train de faire."
-          }
-        }
-      }
-    },
-    "« %@ » ne te sera plus attribuée. Les lignes liées sont rechargées depuis le serveur après retrait." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@” will no longer be credited to you. The linked rows are reloaded from the server after removal."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "« %@ » ne te sera plus attribuée. Les lignes liées sont rechargées depuis le serveur après retrait."
-          }
-        }
-      }
-    },
-    "« %@ » ne te sera plus attribuée. Réversible en ré-identifiant." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@” will no longer be credited to you. Reversible by identifying again."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "« %@ » ne te sera plus attribuée. Réversible en ré-identifiant."
-          }
-        }
-      }
-    },
-    "« %@ » sera effacée définitivement (irréversible). Les cellules confirmées par d'autres seront seulement retirées." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@” will be permanently deleted (irreversible). Cells confirmed by others will only be removed."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "« %@ » sera effacée définitivement (irréversible). Les cellules confirmées par d'autres seront seulement retirées."
           }
         }
       }

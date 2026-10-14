@@ -115,94 +115,113 @@ struct SiteRemapSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .bottom) {
-                if let center = model.initialCenter {
-                    AntennaPickerMapView(
-                        sites: model.sites,
-                        selectedId: model.selected?.id,
-                        currentSiteId: model.item.siteId,
-                        initialCenter: center,
-                        onRegionChange: { bbox in model.load(bbox: bbox) },
-                        onSelect: { site in
-                            model.selected = site
-                            Haptics.selection()
-                        }
-                    )
-                    .ignoresSafeArea(edges: .bottom)
-                } else {
-                    SQSpinner().tint(SQColor.brandRed)
-                }
-
-                VStack(spacing: SQSpace.sm) {
-                    instructionBanner
-                    Spacer()
-                    if let errorMessage = model.errorMessage {
-                        Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .font(SQType.caption).foregroundStyle(SQColor.onAccent)
-                            .padding(SQSpace.sm)
-                            .background(SQColor.danger, in: Capsule(style: .continuous))
+        ZStack {
+            if let center = model.initialCenter {
+                AntennaPickerMapView(
+                    sites: model.sites,
+                    selectedId: model.selected?.id,
+                    currentSiteId: model.item.siteId,
+                    initialCenter: center,
+                    onRegionChange: { bbox in model.load(bbox: bbox) },
+                    onSelect: { site in
+                        model.selected = site
+                        Haptics.selection()
                     }
-                    selectionBar
+                )
+                .ignoresSafeArea()
+            } else {
+                SQColor.bg.ignoresSafeArea()
+                SQSpinner().tint(SQColor.brandRed)
+            }
+
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                MapFloatingIconButton(systemImage: "xmark", label: "Annuler", identifier: "remap.cancel") { dismiss() }
+                instructionCard
+                Spacer(minLength: 0)
+                if let errorMessage = model.errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .font(SQType.caption).foregroundStyle(SQColor.onAccent)
+                        .padding(.horizontal, SQSpace.md).padding(.vertical, SQSpace.sm)
+                        .background(SQColor.danger, in: Capsule(style: .continuous))
+                        .frame(maxWidth: .infinity)
                 }
-                .padding()
+                selectionCard
             }
-            .navigationTitle("Choisir le bon site")
-            .toolbarTitleInlineCompat()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
-                }
-            }
-            .task {
-                await model.prepareCenter()
-            }
-            .onChangeCompat(of: model.done) { _, done in
-                if done { onDone(); dismiss() }
-            }
+            .padding(SQSpace.md)
+        }
+        .task {
+            await model.prepareCenter()
+        }
+        .onChangeCompat(of: model.done) { _, done in
+            if done { onDone(); dismiss() }
         }
     }
 
-    private var instructionBanner: some View {
-        HStack(spacing: SQSpace.sm) {
-            SQIconPastille(systemImage: "hand.tap.fill", size: 28, font: Font.footnote.weight(.semibold))
-            Text("Touche le bon site pour y ré-attribuer \(model.item.nodeLabel)")
-                .font(SQFont.body(12.5, .semibold))
-                .foregroundStyle(SQColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-            if model.isLoading { SQSpinner().controlSize(.mini) }
+    /// Consigne et légende des couleurs des repères.
+    private var instructionCard: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                Text("Touche le bon site pour y déplacer \(model.item.nodeLabel).")
+                    .font(SQFont.body(14, .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                if model.isLoading { SQSpinner().controlSize(.mini) }
+            }
+            HStack(spacing: SQSpace.md) {
+                legendItem(SQColor.danger, "Site actuel")
+                legendItem(SQColor.brandGreen, "Ton choix")
+                legendItem(SQColor.labelSecondary, "Autres sites")
+            }
+            .font(SQType.micro)
+            .foregroundStyle(SQColor.labelSecondary)
         }
-        .padding(SQSpace.sm)
+        .padding(SQSpace.sm2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground(cornerRadius: SQRadius.md)
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("remap.instructions")
+    }
+
+    private func legendItem(_ color: Color, _ label: LocalizedStringKey) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 9, height: 9)
+            Text(label).lineLimit(1)
+        }
     }
 
     @ViewBuilder
-    private var selectionBar: some View {
+    private var selectionCard: some View {
         if let selected = model.selected {
-            VStack(spacing: SQSpace.sm) {
-                HStack(spacing: SQSpace.sm) {
-                    Circle().fill(SQColor.success).frame(width: 10, height: 10)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(selected.siteId ?? selected.id)
-                            .font(SQFont.body(14, .semibold))
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                HStack(alignment: .top, spacing: SQSpace.sm) {
+                    Circle().fill(SQColor.brandGreen).frame(width: 10, height: 10)
+                        .padding(.top, 5)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Site \(selected.siteId ?? selected.id)")
+                            .font(SQFont.body(15, .semibold))
                             .monospacedDigit()
                             .foregroundStyle(SQColor.label)
                             .sqSingleLine()
                         if let address = selected.address, !address.isEmpty {
-                            Text(address).font(SQType.micro).foregroundStyle(SQColor.labelSecondary).lineLimit(1)
+                            Text(address).font(SQType.caption).foregroundStyle(SQColor.labelSecondary).lineLimit(2)
                         }
                     }
-                    Spacer()
+                    Spacer(minLength: 0)
+                    MapChipIconButton(systemImage: "xmark", label: "Désélectionner", identifier: "remap.deselect") {
+                        model.selected = nil
+                    }
                 }
                 GradientButton(
-                    "Ré-identifier ici",
+                    "Déplacer ici",
                     systemImage: "arrow.triangle.swap",
                     isBusy: model.isSubmitting,
                     style: .primary
                 ) {
                     confirmsRemap = true
                 }
+                .accessibilityIdentifier("remap.move")
                 .confirmationDialog(
                     "Déplacer ce nœud ?",
                     isPresented: $confirmsRemap,
@@ -217,14 +236,15 @@ struct SiteRemapSheet: View {
                 }
             }
             .padding(SQSpace.md)
-            .sqCardBackground()
+            .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
+            .accessibilityIdentifier("remap.selection")
         }
     }
 }
 
 /// Carte MapKit de sélection d'antenne : marqueurs des sites de l'opérateur,
 /// re-fetch par zone (debounce), tap → callback. Le site ACTUEL (à corriger) est
-/// rouge, le site sélectionné vert, les autres orange.
+/// rouge, le site sélectionné vert, les autres gris.
 private struct AntennaPickerMapView: UIViewRepresentable {
     let sites: [AntennaSite]
     let selectedId: String?
@@ -285,7 +305,8 @@ private struct AntennaPickerMapView: UIViewRepresentable {
             let site = annotationsById[id]?.site
             if site?.siteId == parent.currentSiteId || id == parent.currentSiteId { return UIColor(SQColor.danger) }
             if id == parent.selectedId { return UIColor(SQColor.brandGreen) }
-            return UIColor(SQColor.brandOrange)
+            // Gris neutre : la teinte de marque se confondait avec le rouge du site actuel.
+            return UIColor(SQColor.labelSecondary)
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {

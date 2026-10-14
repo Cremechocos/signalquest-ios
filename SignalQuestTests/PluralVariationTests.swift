@@ -133,7 +133,7 @@ extension PluralVariationTests {
             ("\(1) lieu détecté automatiquement", "\(2) lieu détecté automatiquement", "1 lieu détecté automatiquement", "2 lieux détectés automatiquement", "1 automatically detected place", "2 automatically detected places"),
             ("\(1) masqué sur la carte", "\(2) masqué sur la carte", "1 masqué sur la carte", "2 masqués sur la carte", "1 hidden on the map", "2 hidden on the map"),
             ("\(1) cellule", "\(2) cellule", "1 cellule", "2 cellules", "1 cell", "2 cells"),
-            ("\(1) secteur", "\(3) secteur", "1 secteur", "3 secteurs", "1 sector", "3 sectors"),
+            ("\(1) secteurs", "\(3) secteurs", "1 secteur", "3 secteurs", "1 sector", "3 sectors"),
             ("\(0) site identifié", "\(2) site identifié", "0 site identifié", "2 sites identifiés", "0 sites identified", "2 sites identified"),
             ("\(1) visite", "\(4) visite", "1 visite", "4 visites", "1 visit", "4 visits"),
             ("+ \(1) autre session", "+ \(2) autre session", "+ 1 autre session", "+ 2 autres sessions", "+ 1 other session", "+ 2 other sessions"),
