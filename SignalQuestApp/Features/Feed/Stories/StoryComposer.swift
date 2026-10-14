@@ -91,11 +91,13 @@ final class StoryComposerViewModel: ObservableObject {
         guard let item = selectedItem else { return }
         do {
             // Aperçu décodé réduit, pas en pleine taille (SOC-36).
-            if let data = try await item.loadTransferable(type: Data.self),
-               let image = ImagePipeline.downsample(data: data, maxPixel: 1600) {
-                previewImage = image
-                pickedImageData = data
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = ImagePipeline.downsample(data: data, maxPixel: 1600) else {
+                errorMessage = String(localized: "Photo illisible")
+                return
             }
+            previewImage = image
+            pickedImageData = data
         } catch {
             errorMessage = error.userFacingMessage
         }

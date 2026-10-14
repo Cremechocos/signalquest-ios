@@ -195,7 +195,11 @@ struct OnboardingView: View {
                     choices
                 } else {
                     if reservingChoices { choices.hidden() }
-                    OnboardingCTA { goTo(page + 1) }
+                    // Même bouton primaire que les choix de la dernière page : Halo ne
+                    // remplit jamais un bouton de carmin.
+                    GradientButton(OnboardingCopy.next.localized(locale), systemImage: "arrow.right", allowsMultiline: true) {
+                        goTo(page + 1)
+                    }
                 }
             }
         }
@@ -755,39 +759,5 @@ private struct OnboardingPageIndicator: View {
             }
         }
         .animation(reduceMotion ? .easeOut(duration: 0.15) : SQMotion.snappy, value: current)
-    }
-}
-
-// MARK: - CTA
-
-/// Bouton principal du pager. Même capsule et même hauteur que `GradientButton`,
-/// en brique. Il n'existe que sur les pages d'introduction : la dernière page
-/// porte ses trois choix à la place.
-private struct OnboardingCTA: View {
-    @Environment(\.locale) private var locale
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            Haptics.medium()
-            action()
-        } label: {
-            label(.next, systemImage: "arrow.right")
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: SQSpace.primaryActionHeight)
-                .foregroundStyle(SQColor.onAccent)
-                .background(SQColor.brandRed, in: Capsule(style: .continuous))
-        }
-        .buttonStyle(SQPressButtonStyle())
-    }
-
-    private func label(_ title: OnboardingCopy, systemImage: String) -> some View {
-        HStack(spacing: SQSpace.sm2) {
-            Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .bold))
-            Text(verbatim: title.localized(locale))
-                .font(SQType.button)
-                .sqSingleLine()
-        }
     }
 }

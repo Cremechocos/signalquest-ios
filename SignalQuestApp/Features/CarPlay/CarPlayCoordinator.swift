@@ -287,6 +287,9 @@ final class CarPlayCoordinator {
         loadedLayers = CarPlayLayerController.Layers()
         outagesById.removeAll()
         plannedById.removeAll()
+        // Nouveau compte : la nouvelle carte doit recharger même si le véhicule n'a
+        // pas bougé (`installMap` relance le premier chargement).
+        lastLoadedCenter = nil
         installRoot()
     }
 
@@ -430,16 +433,29 @@ final class CarPlayCoordinator {
 
             let coordinate = location.coordinate
             let delta = 0.045
-            guard let sites = try? await services.antennas.list(
-                bbox: BoundingBox(north: coordinate.latitude + delta,
-                                  south: coordinate.latitude - delta,
-                                  east: coordinate.longitude + delta,
-                                  west: coordinate.longitude - delta),
-                market: MapMarketStore.initialMarketCode(),
-                operatorName: MapMarketStore.initialOperatorKey(),
-                technologies: []
-            ) else { return }
+            let fetched: [AntennaSite]?
+            do {
+                fetched = try await services.antennas.list(
+                    bbox: BoundingBox(north: coordinate.latitude + delta,
+                                      south: coordinate.latitude - delta,
+                                      east: coordinate.longitude + delta,
+                                      west: coordinate.longitude - delta),
+                    market: MapMarketStore.initialMarketCode(),
+                    operatorName: MapMarketStore.initialOperatorKey(),
+                    technologies: []
+                )
+            } catch {
+                fetched = nil
+            }
             guard !Task.isCancelled, isCurrent(.poi, generation) else { return }
+            // Échec ≠ vide : on le dit, avec un bouton pour recommencer.
+            guard let sites = fetched else {
+                poiTemplate.setPointsOfInterest(
+                    [CarPlayPOIBuilder.failurePoint(at: coordinate) { [weak self] in self?.loadPOI(around: center) }],
+                    selectedIndex: NSNotFound
+                )
+                return
+            }
 
             let update = {
                 let payloads = sites.compactMap { Self.payload(for: $0) }
@@ -611,6 +627,10 @@ final class CarPlayCoordinator {
             )
             guard !Task.isCancelled, isCurrent(.layers, generation),
                   let controller = mapController else { return }
+            // Un échec n'est pas « aucune donnée ici » : on garde la carte affichée
+            // et on oublie la zone pour retenter au prochain déplacement.
+            if loaded.failedLayers > 0 { lastLoadedCenter = nil }
+            if loaded.allFailed { return }
             loadedLayers = loaded
             outagesById = loaded.outageSources
             plannedById = loaded.plannedSources
@@ -1364,12 +1384,18 @@ final class CarPlayCoordinator {
                 // Même intention que dans l’app : publication exacte demandée.
                 // Le service garde le VPN privé ; le serveur applique les zones
                 // privées et l’éligibilité du réseau.
-                try? await services.speedtest.save(
-                    result,
-                    streams: SpeedtestRunSettings.androidDefault.streams,
-                    publishToMap: true,
-                    shareExactLocation: true
-                )
+                do {
+                    try await services.speedtest.save(
+                        result,
+                        streams: SpeedtestRunSettings.androidDefault.streams,
+                        publishToMap: true,
+                        shareExactLocation: true
+                    )
+                } catch {
+                    // Le résultat reste affiché, mais on ne laisse pas croire qu'il est sauvegardé.
+                    guard !Task.isCancelled, case .finished = speedtestState else { return }
+                    updateSpeedtest(state: .finishedUnsaved(result))
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 updateSpeedtest(state: .failed(error.userFacingMessage))

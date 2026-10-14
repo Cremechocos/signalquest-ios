@@ -279,7 +279,7 @@ struct SharedPostEmbedBubble: View {
     private func media(_ item: UnifiedSocialFeedItem) -> some View {
         let attachment = item.attachments.first
         if let url = attachment?.thumbnailUrl ?? attachment?.url ?? card.imageUrl {
-            RemoteImage(url: url, maxDimension: 600, contentMode: .fill) {
+            RemoteImage(url: url, maxDimension: 600, contentMode: .fill, showsFailureUI: true) {
                 Rectangle()
                     .fill(SQColor.surfaceMuted)
                     .sqShimmer()

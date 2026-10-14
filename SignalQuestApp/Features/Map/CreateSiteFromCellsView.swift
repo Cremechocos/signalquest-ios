@@ -73,7 +73,15 @@ struct CreateSiteFromCellsView: View {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
                 header
                 positionPicker
-                field(String(localized: "Nom du site"), text: $name, placeholder: String(localized: "Pylône rue des Lilas"))
+                // Le bouton reste grisé tant que le nom n'a pas 2 caractères : on le dit sous le champ
+                // plutôt que de laisser deviner, et la saisie est bornée comme le backend.
+                field(
+                    String(localized: "Nom du site"),
+                    text: $name,
+                    placeholder: String(localized: "Pylône rue des Lilas"),
+                    help: String(localized: "Minimum 2 caractères."),
+                    maxLength: CustomSiteDraft.nameLengthRange.upperBound
+                )
                 typePicker
                 field(String(localized: "Note (facultatif)"), text: $note, placeholder: String(localized: "Ce qui aide à le reconnaître"))
                 radioSummary
@@ -244,7 +252,13 @@ struct CreateSiteFromCellsView: View {
     }
 
     @ViewBuilder
-    private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
+    private func field(
+        _ label: String,
+        text: Binding<String>,
+        placeholder: String,
+        help: String? = nil,
+        maxLength: Int? = nil
+    ) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text(LocalizedStringKey(label))
                 .font(SQType.callout(.bold))
@@ -255,6 +269,16 @@ struct CreateSiteFromCellsView: View {
                 .padding(.horizontal, SQSpace.md)
                 .padding(.vertical, SQSpace.sm2)
                 .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .onChangeCompat(of: text.wrappedValue) { _, newValue in
+                    if let maxLength, newValue.count > maxLength {
+                        text.wrappedValue = String(newValue.prefix(maxLength))
+                    }
+                }
+            if let help {
+                Text(verbatim: help)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
         }
     }
 }

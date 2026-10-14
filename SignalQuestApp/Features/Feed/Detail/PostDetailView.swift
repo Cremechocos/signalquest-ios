@@ -62,15 +62,7 @@ struct PostDetailView: View {
                     onShare: { showShareSheet = true },
                     onAuthorTap: { profileAuthor = actions.item.author },
                     // Sans ce vote, le sondage disparaissait du détail (AF-FIL-06).
-                    onPollVote: { option in
-                        Task {
-                            guard actions.item.poll?.isOpen == true,
-                                  let poll = try? await feedService.votePoll(
-                                      postId: actions.item.id, optionId: option.id, removing: option.votedByMe
-                                  ) else { return }
-                            actions.applyPoll(poll)
-                        }
-                    }
+                    onPollVote: { option in Task { await vote(option) } }
                 )
                 GradientButton(
                     String(localized: "Voir tous les commentaires (\(actions.item.commentsCount))"),
@@ -84,7 +76,7 @@ struct PostDetailView: View {
             .sqReadableWidth()
         }
         .signalQuestBackground()
-        .navigationTitle("Post")
+        .navigationTitle("Publication")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -102,8 +94,18 @@ struct PostDetailView: View {
                             Label("Supprimer", systemImage: "trash")
                         }
                     }
-                    Button(role: .destructive) { showReportSheet = true } label: {
-                        Label("Signaler", systemImage: "flag")
+                    // On ne signale pas sa propre publication ; la sourdine, elle,
+                    // reste proposée comme dans la feuille de détail.
+                    if !actions.item.canManage {
+                        Button(role: .destructive) { showReportSheet = true } label: {
+                            Label("Signaler", systemImage: "flag")
+                        }
+                    }
+                    Button { Task { await toggleMute() } } label: {
+                        Label(
+                            actions.item.notificationsMutedByMe == true ? "Réactiver les notifications" : "Couper les notifications",
+                            systemImage: actions.item.notificationsMutedByMe == true ? "bell" : "bell.slash"
+                        )
                     }
                 } label: { Image(systemName: "ellipsis.circle").tint(SQColor.brandRed) }
                 .accessibilityLabel("Plus d’options")
@@ -138,6 +140,7 @@ struct PostDetailView: View {
                                       showReportSheet = true
                                   }
                               },
+                              onPollVote: { option in Task { await vote(option) } },
                               onAuthorTap: {
                                   showSignalSheet = false
                                   pushProfileAfterDismiss(actions.item.author)
@@ -183,6 +186,21 @@ struct PostDetailView: View {
         }
         .navigationDestinationItemCompat($profileAuthor) { author in
             UserProfileView(userId: author.id, prefill: author, service: feedService)
+        }
+    }
+
+    /// Vote (ou retrait de vote) sur le sondage ; l'échec remonte à l'écran
+    /// au lieu d'être avalé.
+    private func vote(_ option: FeedPoll.Option) async {
+        guard actions.item.poll?.isOpen == true else { return }
+        do {
+            if let poll = try await feedService.votePoll(
+                postId: actions.item.id, optionId: option.id, removing: option.votedByMe
+            ) {
+                actions.applyPoll(poll)
+            }
+        } catch {
+            if !error.isCancellation { actions.fail(error) }
         }
     }
 
@@ -316,7 +334,7 @@ final class PostDetailActions: ObservableObject {
             Haptics.success()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = String(localized: "Une erreur est survenue. Réessaie.")
+            errorMessage = error.userFacingMessage
             Haptics.error()
         }
     }

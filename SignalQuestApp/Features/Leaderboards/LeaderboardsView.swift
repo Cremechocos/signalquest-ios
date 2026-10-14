@@ -368,7 +368,8 @@ struct LeaderboardsView: View {
                         rank: entry.rank,
                         name: entry.user.displayName,
                         avatarUrl: entry.user.avatarUrl,
-                        valueText: Self.valueText(entry.value, unit: entry.unit)
+                        valueText: Self.valueText(entry.value, unit: entry.unit),
+                        onOpen: { profileAuthor = entry.user }
                     )
                 },
                 podiumID: "speed-\(model.speedStamp)",
@@ -396,6 +397,19 @@ struct LeaderboardsView: View {
                         SpeedRowMeta(city: entry.city, tech: entry.tech, isProbablyIOS: entry.isProbablyIOS)
                     }
                 }
+            }
+        }
+    }
+
+    /// Ouvre le profil d'une entrée de points (podium comme rangées) ; `nil` sans identifiant serveur.
+    private func openProfile(for entry: PointsLeaderboardEntry) -> (() -> Void)? {
+        entry.userId.map { userId -> () -> Void in
+            {
+                profileAuthor = SocialFeedAuthor(
+                    id: userId, name: entry.displayName, handle: nil,
+                    avatarUrl: entry.avatarUrl, isFriend: nil, isFollowing: nil,
+                    liveRadio: nil
+                )
             }
         }
     }
@@ -433,7 +447,8 @@ struct LeaderboardsView: View {
                         rank: entry.rank,
                         name: entry.displayName,
                         avatarUrl: entry.avatarUrl,
-                        valueText: "\(entry.score(for: model.period).formatted()) pts"
+                        valueText: "\(entry.score(for: model.period).formatted()) pts",
+                        onOpen: openProfile(for: entry)
                     )
                 },
                 podiumID: "points-\(model.pointsStamp)",
@@ -459,15 +474,7 @@ struct LeaderboardsView: View {
                         },
                         isMe: isMe(entry),
                         showsDivider: index > 0,
-                        onOpen: entry.userId.map { userId -> () -> Void in
-                            {
-                                profileAuthor = SocialFeedAuthor(
-                                    id: userId, name: entry.displayName, handle: nil,
-                                    avatarUrl: entry.avatarUrl, isFriend: nil, isFollowing: nil,
-                                    liveRadio: nil
-                                )
-                            }
-                        }
+                        onOpen: openProfile(for: entry)
                     ) {
                         PointsRowMeta(level: entry.level, stats: entry.stats)
                     }
@@ -883,8 +890,14 @@ private struct PodiumEntryData: Identifiable, Equatable {
     let name: String
     let avatarUrl: URL?
     let valueText: String
+    /// Ouvre le profil du membre ; `nil` quand le serveur ne donne pas son identifiant.
+    var onOpen: (() -> Void)? = nil
 
     var id: Int { rank }
+
+    static func == (lhs: PodiumEntryData, rhs: PodiumEntryData) -> Bool {
+        lhs.rank == rhs.rank && lhs.name == rhs.name && lhs.avatarUrl == rhs.avatarUrl && lhs.valueText == rhs.valueText
+    }
 }
 
 private struct LeaderboardPodiumView: View {
@@ -899,7 +912,17 @@ private struct LeaderboardPodiumView: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: SQSpace.sm) {
             ForEach(ordered) { entry in
-                PodiumColumn(entry: entry, delay: delay(for: entry.rank))
+                if let onOpen = entry.onOpen {
+                    // Même geste que les rangées : le podium ouvre aussi le profil.
+                    Button(action: onOpen) {
+                        PodiumColumn(entry: entry, delay: delay(for: entry.rank))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Ouvre son profil")
+                    .accessibilityIdentifier("leaderboard.row.\(entry.rank)")
+                } else {
+                    PodiumColumn(entry: entry, delay: delay(for: entry.rank))
+                }
             }
         }
     }

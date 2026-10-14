@@ -112,20 +112,20 @@ enum SQShareCardBuilder {
             download: .init(
                 label: String(localized: "Download"),
                 value: formatMbps(result.downloadAverageMbps, locale: locale),
-                unit: result.downloadAverageMbps >= 1000 ? "Gbps" : "Mbps",
+                unit: SQUnits.throughputUnit(mbps: result.downloadAverageMbps),
                 maxValue: formatMbps(result.downloadMaxMbps, locale: locale),
                 labelColor: downloadGraph.accentColor,
                 graph: downloadGraph,
-                maxUnit: result.downloadMaxMbps >= 1000 ? "Gbps" : "Mbps"
+                maxUnit: SQUnits.throughputUnit(mbps: result.downloadMaxMbps)
             ),
             upload: .init(
                 label: String(localized: "Upload"),
                 value: result.uploadAverageMbps.map { formatMbps($0, locale: locale) } ?? "—",
-                unit: uploadAverage >= 1000 ? "Gbps" : "Mbps",
+                unit: SQUnits.throughputUnit(mbps: uploadAverage),
                 maxValue: result.uploadMaxMbps.map { formatMbps($0, locale: locale) } ?? "—",
                 labelColor: uploadGraph.accentColor,
                 graph: uploadGraph,
-                maxUnit: (result.uploadMaxMbps ?? uploadAverage) >= 1000 ? "Gbps" : "Mbps"
+                maxUnit: SQUnits.throughputUnit(mbps: result.uploadMaxMbps ?? uploadAverage)
             ),
             latencyLabel: String(localized: "Latence"),
             latencyValueText: result.primaryPingMs.map { "\(Int($0.rounded()))" } ?? "—",

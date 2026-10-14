@@ -201,7 +201,7 @@ struct SpeedtestDetailContent: View {
                 let upload = Self.formatSpeedParts(result.uploadAverageMbps)
                 triCell("Envoi", value: upload.value, unit: upload.unit)
                 triCell("Latence", value: Self.msText(result.primaryPingMs), unit: "ms")
-                triCell("Gigue", value: Self.decimalText(result.jitterMs), unit: "ms")
+                triCell("Gigue", value: Self.jitterText(result.jitterMs), unit: "ms")
             }
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: SQSpace.sm) { metrics }
@@ -353,15 +353,15 @@ struct SpeedtestDetailContent: View {
     private var latencyCard: some View {
         detailCard("Latence") {
             VStack(spacing: SQSpace.xxs) {
-                dotRow("Au repos", "\(Self.msText(result.primaryPingMs)) ms", trailing: result.pingProtocol?.trimmedNonEmptyDetail)
+                dotRow("Au repos", Self.msLabel(result.primaryPingMs), trailing: result.pingProtocol?.trimmedNonEmptyDetail)
                 if let minMs = result.pingMinMs, let maxMs = result.pingMaxMs {
                     dotRow("Min · max", "\(Int(minMs.rounded())) · \(Int(maxMs.rounded())) ms")
                 }
-                dotRow("Gigue", "\(Self.decimalText(result.jitterMs)) ms")
-                dotRow("En réception", "\(Self.msText(result.pingDlMs)) ms", trailing: gigue(result.jitterDlMs))
-                dotRow("En envoi", "\(Self.msText(result.pingUlMs)) ms", trailing: gigue(result.jitterUlMs))
+                dotRow("Gigue", Self.msLabel(result.jitterMs, jitter: true))
+                dotRow("En réception", Self.msLabel(result.pingDlMs), trailing: gigue(result.jitterDlMs))
+                dotRow("En envoi", Self.msLabel(result.pingUlMs), trailing: gigue(result.jitterUlMs))
                 if let average = result.pingMs {
-                    dotRow("Latence moyenne", "\(Self.msText(average)) ms")
+                    dotRow("Latence moyenne", Self.msLabel(average))
                 }
                 if result.methodologyVersion == nil {
                     dotRow("Mesure de latence", String(localized: "Valeur historique"))
@@ -373,7 +373,7 @@ struct SpeedtestDetailContent: View {
     private func gigue(_ jitter: Double?) -> String {
         let label = String(localized: "gigue")
         guard let jitter, jitter.isFinite else { return "\(label) —" }
-        return "\(label) ±\(Self.decimalText(jitter))"
+        return "\(label) ±\(Self.jitterText(jitter))"
     }
 
     // MARK: Mesure — réseau, serveurs, appareil, octets réellement comptés
@@ -596,9 +596,16 @@ struct SpeedtestDetailContent: View {
         return "\(Int(value.rounded()))"
     }
 
-    private static func decimalText(_ value: Double?) -> String {
+    /// Le nombre d'une gigue, selon la règle unique de `SQUnits`.
+    private static func jitterText(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return SQUnits.jitterValue(value)
+    }
+
+    /// « 24 ms », ou un simple tiret : une unité sans valeur n'a rien à dire.
+    private static func msLabel(_ value: Double?, jitter: Bool = false) -> String {
         guard let value, value.isFinite else { return "—" }
-        return decimal(value, digits: 1)
+        return jitter ? SQUnits.jitter(value) : "\(Int(value.rounded())) ms"
     }
 }
 

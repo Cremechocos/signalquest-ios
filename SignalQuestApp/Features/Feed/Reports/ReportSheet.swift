@@ -312,6 +312,8 @@ struct BugReportsListView: View {
                 .padding(.top, SQSpace.lg)
                 .accessibilityIdentifier("bugs.empty")
         } else {
+            // Un rafraîchissement raté garde la liste affichée : on le dit au lieu de l'avaler.
+            if let loadError { SQInlineError(message: loadError) }
             filterChips
             let visible = reports.filter(matches)
             if visible.isEmpty {
@@ -347,7 +349,7 @@ struct BugReportsListView: View {
                 chip(.all, String(localized: "Tous · \(reports.count)"))
                 chip(.open, String(localized: "Ouverts · \(count(.open))"))
                 chip(.inProgress, String(localized: "En cours · \(count(.inProgress))"))
-                chip(.finished, String(localized: "Résolus · \(count(.finished))"))
+                chip(.finished, String(localized: "Terminés · \(count(.finished))"))
             }
         }
     }
@@ -948,6 +950,9 @@ final class BugReportDetailViewModel: ObservableObject {
     @Published var comments: [BugComment] = []
     @Published var isLoading = false
     @Published var loadFailed = false
+    /// Le signalement est déjà affiché mais son rafraîchissement ou celui de la
+    /// conversation a échoué : sans ce drapeau, « Pas encore de message » mentirait.
+    @Published var refreshFailed = false
     @Published var errorMessage: String?
     @Published var draft = ""
     @Published var pendingImages: [PendingReportImage] = []
@@ -974,22 +979,29 @@ final class BugReportDetailViewModel: ObservableObject {
         defer { isLoading = false }
         async let fetchedReport = try? service.report(id: reportId)
         async let fetchedComments = try? service.comments(bugId: reportId)
-        if let value = await fetchedReport {
+        let loadedReport = await fetchedReport
+        let loadedComments = await fetchedComments
+        if let value = loadedReport {
             report = value
             BugReportsSeenStore.markSeen(value)
         }
-        if let value = await fetchedComments {
+        if let value = loadedComments {
             comments = value.sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
         }
         if Task.isCancelled { return }
         loadFailed = report == nil
+        refreshFailed = report != nil && (loadedReport == nil || loadedComments == nil)
     }
 
     func processPickedItems() async {
         let items = pickerItems
         pickerItems = []
         for item in items where pendingImages.count < Self.maxImages {
-            if let prepared = await PendingReportImage.prepare(item) { pendingImages.append(prepared) }
+            if let prepared = await PendingReportImage.prepare(item) {
+                pendingImages.append(prepared)
+            } else {
+                errorMessage = String(localized: "Image illisible.")
+            }
         }
     }
 
@@ -1260,7 +1272,15 @@ struct BugReportDetailView: View {
     private var conversation: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             Text("Conversation").sqKicker()
-            if model.comments.isEmpty {
+            if model.refreshFailed {
+                SQInlineError(message: String(localized: "Impossible d'actualiser ce signalement. Vérifie ta connexion."))
+                Button("Réessayer") { Task { await model.load() } }
+                    .font(SQFont.body(14, .semibold, relativeTo: .callout))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44, alignment: .leading)
+                    .accessibilityIdentifier("bugs.detail.retry")
+            }
+            if model.comments.isEmpty && !model.refreshFailed {
                 Text("Pas encore de message. L'équipe te répond ici, et tu peux ajouter des précisions.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -1471,6 +1491,11 @@ struct AdminBugsView: View {
     @State private var isLoading = false
     @State private var isLoadingMore = false
     @State private var loadError: String?
+    /// « Voir plus » a échoué : « Réessayer » relance cette page, pas toute la liste.
+    @State private var loadMoreFailed = false
+    /// Un statut ou un assigné a changé dans le détail : la ligne a pu changer de
+    /// segment. On recharge au retour sur la liste, pas pendant que le détail est ouvert.
+    @State private var needsRefresh = false
     @State private var search = ""
 
     var body: some View {
@@ -1503,6 +1528,11 @@ struct AdminBugsView: View {
             filters.query = search
         }
         .refreshable { await load() }
+        .onAppear {
+            guard needsRefresh else { return }
+            needsRefresh = false
+            Task { await load() }
+        }
     }
 
     private var header: some View {
@@ -1621,12 +1651,30 @@ struct AdminBugsView: View {
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("admin.bugs.empty")
         } else {
+            // Une liste déjà affichée garde ses lignes quand un rafraîchissement ou « Voir plus » échoue : on le dit.
+            if let loadError {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    SQInlineError(message: loadError)
+                    Button("Réessayer") {
+                        Task { if loadMoreFailed { await loadMore() } else { await load() } }
+                    }
+                    .font(SQFont.body(14, .semibold, relativeTo: .callout))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44, alignment: .leading)
+                    .accessibilityIdentifier("admin.bugs.retry")
+                }
+            }
             VStack(spacing: 0) {
                 ForEach(Array(bugs.enumerated()), id: \.element.id) { index, bug in
                     if index > 0 { Divider() }
                     NavigationLink {
                         AdminBugDetailView(service: service, bug: bug, onChange: { updated in
-                            if let position = bugs.firstIndex(where: { $0.id == updated.id }) { bugs[position] = updated }
+                            guard let position = bugs.firstIndex(where: { $0.id == updated.id }) else { return }
+                            let previous = bugs[position]
+                            bugs[position] = updated
+                            if previous.report.status != updated.report.status || previous.assignee?.id != updated.assignee?.id {
+                                needsRefresh = true
+                            }
                         })
                     } label: {
                         row(bug)
@@ -1717,6 +1765,7 @@ struct AdminBugsView: View {
     private func load() async {
         isLoading = true
         loadError = nil
+        loadMoreFailed = false
         defer { isLoading = false }
         // Un autre segment ou d'autres filtres : la liste d'avant ne doit pas rester à l'écran.
         if loadedFilters != filters { bugs = [] }
@@ -1735,6 +1784,8 @@ struct AdminBugsView: View {
     private func loadMore() async {
         guard let page, page.hasMore, !isLoadingMore else { return }
         isLoadingMore = true
+        loadError = nil
+        loadMoreFailed = false
         defer { isLoadingMore = false }
         do {
             let next = try await service.list(filters, page: page.currentPage + 1)
@@ -1744,6 +1795,7 @@ struct AdminBugsView: View {
         } catch {
             guard !error.isCancellation else { return }
             loadError = error.userFacingMessage
+            loadMoreFailed = true
         }
     }
 }
@@ -1858,6 +1910,14 @@ struct AdminBugDetailView: View {
 
     private static let statuses: [BugStatus] = [.open, .inProgress, .resolved, .closed, .wontFix]
 
+    /// Même forme que la version envoyée avec un signalement, avec celle de l'app en cours.
+    private static var currentVersionExample: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = info?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
+    }
+
     init(service: AdminBugsServicing, bug: AdminBug? = nil, bugId: String? = nil,
          onClose: (() -> Void)? = nil, onChange: ((AdminBug) -> Void)? = nil) {
         _model = StateObject(wrappedValue: AdminBugDetailModel(service: service, bug: bug,
@@ -1938,7 +1998,7 @@ struct AdminBugDetailView: View {
             AntennaReportImageViewer(image: image)
         }
         .sheet(isPresented: $editingResponse) {
-            AdminBugResponseSheet(initial: model.bug?.report.adminResponse ?? "") { text in
+            AdminBugResponseSheet(initial: model.bug?.report.adminResponse ?? "", errorMessage: model.actionError) { text in
                 await model.apply(AdminBugPatch(adminResponse: text))
             }
         }
@@ -2014,7 +2074,10 @@ struct AdminBugDetailView: View {
                 Divider()
                 fixVersionRow
                 Divider()
-                Button { editingResponse = true } label: {
+                Button {
+                    model.actionError = nil
+                    editingResponse = true
+                } label: {
                     triageRow("Réponse affichée",
                               value: report.adminResponse.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Aucune"),
                               icon: "checkmark.seal",
@@ -2078,7 +2141,7 @@ struct AdminBugDetailView: View {
                 Text("Corrigé dans")
                     .font(SQFont.body(13, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.ink2)
-                TextField("1.0 (171)", text: $model.fixVersionDraft)
+                TextField(Self.currentVersionExample, text: $model.fixVersionDraft)
                     .font(SQType.callout)
                     .keyboardType(.numbersAndPunctuation)
                     .foregroundStyle(SQColor.label)
@@ -2320,6 +2383,8 @@ struct AdminBugDetailView: View {
 /// La réponse affichée en tête du signalement, sur l'app et sur le site.
 private struct AdminBugResponseSheet: View {
     let initial: String
+    /// L'échec d'enregistrement se lit ici : la barre d'erreur de la page est cachée derrière la feuille.
+    let errorMessage: String?
     let save: (String) async -> Bool
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
@@ -2351,6 +2416,10 @@ private struct AdminBugResponseSheet: View {
                 .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 .accessibilityLabel("Réponse affichée")
                 .accessibilityIdentifier("admin.response.field")
+            if let errorMessage {
+                SQInlineError(message: errorMessage)
+                    .accessibilityIdentifier("admin.response.error")
+            }
             GradientButton(String(localized: "Enregistrer"), systemImage: "checkmark") {
                 Task {
                     isSaving = true

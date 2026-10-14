@@ -74,7 +74,6 @@ struct NewPollView: View {
                     Task { await create() }
                 }
                 .disabled(!canCreate || isBusy)
-                .opacity(canCreate ? 1 : 0.5)
                 .accessibilityIdentifier("poll.create")
             }
             .padding(SQSpace.lg)

@@ -68,9 +68,47 @@ enum SQUnits {
         }
     }
 
+    /// Distance ronde d'un rayon ou d'un seuil : « 5 km », « 1 km », « 250 m »,
+    /// « 3,1 mi ». Les entiers restent entiers (`distance(meters:)` écrirait
+    /// « 5,0 km »), et la préférence d'unités s'applique comme partout.
+    static func distanceCompact(meters: Double, system: SQUnitsSystem = current, locale: Locale = .current) -> String {
+        guard meters.isFinite else { return "—" }
+        let upToOneDecimal = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...1)).locale(locale)
+        switch system {
+        case .metric:
+            return meters >= 1000
+                ? "\((meters / 1000).formatted(upToOneDecimal)) km"
+                : "\(Int(meters.rounded())) m"
+        case .imperial:
+            let miles = meters / metersPerMile
+            return miles >= 0.1
+                ? "\(miles.formatted(upToOneDecimal)) mi"
+                : "\(Int((meters / metersPerFoot).rounded())) ft"
+        }
+    }
+
     /// Distance depuis des KILOMÈTRES — la forme que renvoient les sessions.
     static func distance(kilometers: Double, system: SQUnitsSystem = current) -> String {
         distance(meters: kilometers * 1000, system: system)
+    }
+
+    /// Repère de position sur un trajet : « km 2,1 » en métrique, « mi 1,3 » en
+    /// impérial. L'abscisse du trajet reste en kilomètres ; seul le libellé suit la
+    /// préférence.
+    static func routeMarker(
+        kilometers: Double, fractionDigits: ClosedRange<Int> = 1...1,
+        system: SQUnitsSystem = current, locale: Locale = .current
+    ) -> String {
+        guard kilometers.isFinite else { return "—" }
+        let style = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(fractionDigits)).locale(locale)
+        switch system {
+        case .metric:
+            let value = kilometers.formatted(style)
+            return String(localized: "km \(value)")
+        case .imperial:
+            let value = (kilometers * 1000 / metersPerMile).formatted(style)
+            return String(localized: "mi \(value)")
+        }
     }
 
     /// Rayon d'une zone, toujours court : on ne bascule pas en unité longue.
@@ -112,6 +150,22 @@ enum SQUnits {
     static func milliseconds(_ value: Double) -> String {
         guard value.isFinite, value >= 0 else { return "—" }
         return "\(Int(value.rounded())) ms"
+    }
+
+    /// Le nombre d'une gigue : une décimale sous 10 ms (« 4,2 »), entier au-delà
+    /// (« 12 »). Une seule règle pour le test en direct, le détail et le Drive
+    /// Test : l'une affichait « 4 », l'autre « 4,2 » pour la même mesure.
+    static func jitterValue(_ ms: Double, locale: Locale = .current) -> String {
+        guard ms.isFinite, ms >= 0 else { return "—" }
+        let tenth = (ms * 10).rounded() / 10
+        guard tenth < 10 else { return "\(Int(ms.rounded()))" }
+        return tenth.formatted(.number.precision(.fractionLength(1)).locale(locale))
+    }
+
+    /// Gigue avec son unité : « 4,2 ms », « 12 ms ».
+    static func jitter(_ ms: Double, locale: Locale = .current) -> String {
+        guard ms.isFinite, ms >= 0 else { return "—" }
+        return "\(jitterValue(ms, locale: locale)) ms"
     }
 
     /// Bande radio : « n78 » en 5G, « B20 » en 4G (TRX-27). Sans technologie

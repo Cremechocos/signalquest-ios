@@ -167,7 +167,8 @@ struct OutageCardView: View {
                     createdAt: item.createdAt,
                     kindBadge: kindBadge,
                     kindColor: ink,
-                    onAuthorTap: onAuthorTap
+                    onAuthorTap: onAuthorTap,
+                    isPinned: item.isPinned
                 )
 
                 hero

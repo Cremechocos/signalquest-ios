@@ -25,16 +25,20 @@ struct FriendLiveSheet: View {
                 metaRow
                 actions
             }
-            .padding(SQSpace.lg)
-            .padding(.top, SQSpace.sm)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
         }
-        .background(SQColor.bg)
+        .background(SQColor.bg.ignoresSafeArea())
+        .sqSheet(background: SQColor.bg)
     }
 
     // MARK: En-tête
 
+    /// En-tête Halo, comme `ObservedCellSheet` : petites capitales, titre, ligne de statut et
+    /// bouton rond « Fermer ». L'avatar garde sa pastille de présence, le texte du statut la dit.
     private var header: some View {
-        HStack(spacing: SQSpace.md) {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
             SQAvatar(url: friend.avatarUrl, name: friend.name ?? "Ami", size: 60)
                 .overlay(alignment: .bottomTrailing) {
                     Circle()
@@ -42,25 +46,25 @@ struct FriendLiveSheet: View {
                         .frame(width: 16, height: 16)
                         .overlay(Circle().strokeBorder(SQColor.bg, lineWidth: 2.5))
                 }
-            VStack(alignment: .leading, spacing: SQSpace.xxs) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Ami en direct").sqKicker()
                 Text(friend.name ?? String(localized: "Ami"))
-                    .font(SQFont.display(22, .bold))
+                    .font(SQType.title)
                     .foregroundStyle(SQColor.label)
-                    .sqSingleLine()
-                Text(statusLine)
-                    .font(SQFont.body(14))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .sqHeader()
+                HStack(spacing: SQSpace.xs2) {
+                    if let technology = friend.radio?.technology, !technology.isEmpty {
+                        MapTechTag(technology: technology, label: technology.uppercased())
+                    }
+                    Text(statusLine)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(2)
+                }
             }
-            Spacer(minLength: 0)
-            if let technology = friend.radio?.technology, !technology.isEmpty {
-                Text(technology.uppercased())
-                    .font(SQFont.archivo(12, .bold))
-                    .foregroundStyle(SQColor.onAccent)
-                    .padding(.horizontal, SQSpace.sm + 1)
-                    .padding(.vertical, SQSpace.xs + 1)
-                    .background(SQColor.brandRed, in: Capsule())
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "friendLive.close") { dismiss() }
         }
     }
 
@@ -157,16 +161,11 @@ struct FriendLiveSheet: View {
         guard let userLocation, let location = friend.location else { return nil }
         let target = CLLocation(latitude: location.lat, longitude: location.lng)
         let meters = userLocation.distance(from: target)
-        if meters < 1000 { return String(localized: "à \(Int(meters.rounded())) m") }
         // Une seule chaîne localisable, et non un préfixe concaténé : en français
         // la distance se PRÉFIXE (« à 1,5 km »), en anglais elle se SUFFIXE
-        // (« 1.5 km away »). Un « à » traduit séparément ne peut pas rendre les
-        // deux. Le séparateur décimal suit aussi la locale, au lieu d'être
-        // forcé à la virgule.
-        let kilometers = Measurement(value: meters, unit: UnitLength.meters)
-            .converted(to: .kilometers).value
-        let formatted = kilometers.formatted(.number.precision(.fractionLength(1)))
-        return String(localized: "à \(formatted) km")
+        // (« 1.5 km away »). La distance elle-même vient de `SQUnits`, qui suit la
+        // préférence métrique/impériale et la locale.
+        return String(localized: "à \(SQUnits.distance(meters: meters))")
     }
 
     private var freshnessText: String? {

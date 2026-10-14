@@ -25,7 +25,8 @@ struct PostCardView: View {
                     createdAt: item.createdAt,
                     kindBadge: nil,
                     kindColor: SQColor.label,
-                    onAuthorTap: onAuthorTap
+                    onAuthorTap: onAuthorTap,
+                    isPinned: item.isPinned
                 )
 
                 if !item.text.isEmpty {
@@ -45,18 +46,36 @@ struct PostCardView: View {
                     FeedPollView(poll: poll, onVote: onPollVote)
                 }
 
-                if let attachment = item.attachments.first,
+                // Images seulement : une vidéo ou un audio n'a rien à faire dans un
+                // chargeur d'image. Les autres photos sont signalées par une pastille.
+                let images = item.imageAttachments
+                if let attachment = images.first,
                    let url = attachment.thumbnailUrl ?? attachment.url {
-                    RemoteImage(url: url, maxDimension: 440, contentMode: .fill) {
+                    RemoteImage(url: url, maxDimension: 440, contentMode: .fill, showsFailureUI: true) {
                         Rectangle().fill(SQColor.surfaceMuted)
                     }
                     .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    .overlay(alignment: .topTrailing) {
+                        if images.count > 1 {
+                            Text(verbatim: "1/\(images.count)")
+                                .font(SQType.caption(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, SQSpace.sm2)
+                                .padding(.vertical, SQSpace.xs)
+                                .background(Color.black.opacity(0.62), in: Capsule(style: .continuous))
+                                .padding(SQSpace.sm2)
+                                .accessibilityHidden(true)
+                        }
+                    }
                     .onTapGesture(count: 2) {
                         Haptics.medium()
                         // Double-tap = aimer, jamais retirer un like (SOC-16).
                         if !item.likedByMe { onLike() }
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(attachment.trimmedAltText ?? String(localized: "Photo de la publication"))
+                    .accessibilityValue(images.count > 1 ? String(localized: "\(images.count) photos") : "")
                 }
 
                 if !item.hashtags.isEmpty {

@@ -184,8 +184,8 @@ final class SentinelleViewModel: ObservableObject {
         }
     }
 
-    func followedSeries(_ box: SentinelleFollowedBox, window: SentinelleWindow) async -> [SentinelleSeriesPoint] {
-        (try? await service.followedSeries(followId: box.followId, window: window))?.points ?? []
+    func followedSeries(_ box: SentinelleFollowedBox, window: SentinelleWindow) async throws -> [SentinelleSeriesPoint] {
+        try await service.followedSeries(followId: box.followId, window: window).points
     }
 
     /// Suivre ne demande aucun abonnement (c'est le propriétaire qui paie) :
@@ -647,7 +647,7 @@ struct SentinelleView: View {
                             SentinelleFollowedCard(
                                 box: followed,
                                 onUnfollow: { Task { await model.unfollow(followed) } },
-                                loadSeries: { window in await model.followedSeries(followed, window: window) }
+                                loadSeries: { window in try await model.followedSeries(followed, window: window) }
                             )
                         }
                     }

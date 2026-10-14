@@ -125,7 +125,7 @@ struct MapAdvancedFilterSheet: View {
                         draft.technologies.removeAll()
                     } label: {
                         Text("Tout").font(SQType.caption.weight(.semibold)).foregroundStyle(SQColor.ink2)
-                            .frame(minWidth: 44, minHeight: 32)
+                            .frame(minWidth: 44, minHeight: 44)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

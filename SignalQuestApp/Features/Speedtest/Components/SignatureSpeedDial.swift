@@ -274,16 +274,12 @@ struct SignatureSpeedDial: View {
         return width < 340 ? 44 : 54
     }
 
-    /// Au-delà du gigabit, la valeur passe en Gbit/s avec deux décimales.
+    /// Un débit suit la règle commune (`SQUnits`) : au-delà du gigabit la valeur passe en
+    /// Gbit/s, avec la même précision que le résultat et l'historique.
     var formattedValue: String {
         guard value > 0, value.isFinite else { return "—" }
-        if !isLatency, value >= 1_000 {
-            return (value / 1_000).formatted(.number.precision(.fractionLength(2)))
-        }
-        if isLatency || value >= 100 {
-            return "\(Int(value.rounded()))"
-        }
-        return value.formatted(.number.precision(.fractionLength(1)))
+        if !isLatency { return SQUnits.throughputValue(mbps: value) }
+        return "\(Int(value.rounded()))"
     }
 
     var displayUnit: String {

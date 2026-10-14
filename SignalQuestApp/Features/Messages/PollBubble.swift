@@ -12,6 +12,9 @@ struct PollBubble: View {
     let onVote: (_ optionIds: [String]) -> Void
     let onClose: () -> Void
 
+    /// La clôture est définitive : elle se confirme avant de partir.
+    @State private var confirmsClose = false
+
     private var totalVotes: Int { max(1, poll.totalVotes) }
     /// POLL-UX-01 : un sondage dont l'échéance est dépassée est traité comme clos.
     private var isExpired: Bool { poll.endsAt.map { $0 < Date() } ?? false }
@@ -56,13 +59,21 @@ struct PollBubble: View {
             if canClose && !effectivelyClosed {
                 Button {
                     Haptics.light()
-                    onClose()
+                    confirmsClose = true
                 } label: {
                     Label("Clôturer le sondage", systemImage: "lock")
                         .font(SQType.caption.weight(.semibold))
                         .foregroundStyle(mine ? SQColor.onInk : SQColor.brandRed)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .confirmationDialog("Clôturer ce sondage ?", isPresented: $confirmsClose, titleVisibility: .visible) {
+                    Button("Clôturer", role: .destructive) { onClose() }
+                    Button("Garder ouvert", role: .cancel) {}
+                } message: {
+                    Text("Plus aucun vote ne sera possible. Cette action est définitive.")
+                }
             }
         }
         .frame(maxWidth: 280, alignment: .leading)

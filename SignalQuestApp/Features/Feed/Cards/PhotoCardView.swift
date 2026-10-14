@@ -29,7 +29,8 @@ struct PhotoCardView: View {
                     createdAt: item.createdAt,
                     kindBadge: "Photo d’antenne",
                     kindColor: SQColor.success,
-                    onAuthorTap: onAuthorTap
+                    onAuthorTap: onAuthorTap,
+                    isPinned: item.isPinned
                 )
 
                 if !item.text.isEmpty {
@@ -65,9 +66,10 @@ struct PhotoCardView: View {
 
     @ViewBuilder
     private var heroImage: some View {
-        let url = item.attachments.first?.url ?? item.attachments.first?.thumbnailUrl
+        let first = item.imageAttachments.first
+        let url = first?.url ?? first?.thumbnailUrl
         ZStack {
-            RemoteImage(url: url, maxDimension: 460, contentMode: .fill) {
+            RemoteImage(url: url, maxDimension: 460, contentMode: .fill, showsFailureUI: true) {
                 Rectangle().fill(SQColor.surfaceMuted)
                     .overlay(
                         Image(systemName: "antenna.radiowaves.left.and.right")
@@ -124,8 +126,10 @@ struct PhotoCardView: View {
     /// Décrit la photo pour VoiceOver à partir de la légende du post ou du lieu,
     /// au lieu d'un générique « Photo du site » (A11Y-12).
     private var photoAccessibilityLabel: String {
+        // Le texte alternatif de l'auteur décrit mieux la photo que sa légende.
+        if let alt = item.imageAttachments.first?.trimmedAltText { return alt }
         let caption = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !caption.isEmpty { return "Photo. \(caption)" }
+        if !caption.isEmpty { return String(localized: "Photo. \(caption)") }
         if let place = (item.signal?.city ?? item.placeLabel), !place.isEmpty {
             return String(localized: "Photo à \(place)")
         }

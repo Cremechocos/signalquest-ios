@@ -170,7 +170,10 @@ final class AntennaReportThreadViewModel: ObservableObject {
             // La réponse d'un signaleur rouvre un ticket clos côté serveur : on
             // rafraîchit le statut affiché pour rester cohérent.
             if let status = report?.status, status != .pending {
-                report = try? await service.myReports().first { $0.id == reportId }
+                // Un échec de relecture garde l'en-tête affiché plutôt que de l'effacer.
+                if let fresh = try? await service.myReports().first(where: { $0.id == reportId }) {
+                    report = fresh
+                }
             }
         } catch {
             if let index = outgoing.firstIndex(where: { $0.id == id }) { outgoing[index].failed = true }
@@ -270,6 +273,8 @@ struct AntennaReportThreadView: View {
                 .padding(.vertical, SQSpace.sm)
                 .sqReadableWidth()
             }
+            // Tirer pour voir une réponse de la modération arrivée entre-temps.
+            .refreshable { await model.load() }
             .onChangeCompat(of: model.comments.count + model.outgoing.count) { _, _ in
                 let last = model.outgoing.last.map { AnyHashable($0.id) } ?? model.comments.last.map { AnyHashable($0.id) }
                 guard let last else { return }

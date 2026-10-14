@@ -131,6 +131,8 @@ struct SentinelleField: View {
     @Binding var text: String
     /// Phrase d'aide, souvent dynamique (elle dépend de ce que le serveur a vu).
     var hint: String?
+    /// Adresse ou lien : clavier URL, sans majuscule ni correction. `false` pour un nom libre.
+    var isURL = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.xs2) {
@@ -140,9 +142,9 @@ struct SentinelleField: View {
             TextField(LocalizedStringKey(placeholder), text: $text)
                 .font(SQType.body)
                 .foregroundStyle(SQColor.label)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(.URL)
+                .textInputAutocapitalization(isURL ? .never : .words)
+                .autocorrectionDisabled(isURL)
+                .keyboardType(isURL ? .URL : .default)
                 .padding(.horizontal, SQSpace.lg)
                 .frame(minHeight: 48)
                 .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
@@ -298,7 +300,7 @@ struct SentinelleCreateSheet: View {
             title: String(localized: "Nouvelle connexion"),
             subtitle: String(localized: "Sentinelle l’interrogera chaque minute depuis nos serveurs — téléphone éteint compris.")
         ) {
-            SentinelleField(title: "Nom", placeholder: "Ma box", text: $label)
+            SentinelleField(title: "Nom", placeholder: "Ma box", text: $label, isURL: false)
 
             // L'attribution sert à parler juste sur le lien partagé : « Votre
             // connexion » y est faux, celui qui lit regarde la connexion de

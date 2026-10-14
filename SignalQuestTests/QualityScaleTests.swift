@@ -73,6 +73,33 @@ final class QualityScaleTests: XCTestCase {
         XCTAssertEqual(SQUnits.distance(meters: 2_414, system: .imperial, locale: fr), "1,5 mi")
     }
 
+    /// Un rayon rond ne prend pas de décimale inutile (« 5 km », pas « 5,0 km »),
+    /// et suit la préférence métrique ou impériale.
+    func testCompactDistanceKeepsRoundRadiiRound() {
+        let fr = Locale(identifier: "fr_FR")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: 5_000, system: .metric, locale: fr), "5 km")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: 1_500, system: .metric, locale: fr), "1,5 km")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: 250, system: .metric, locale: fr), "250 m")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: 1_609.344, system: .imperial, locale: fr), "1 mi")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: 5_000, system: .imperial, locale: fr), "3,1 mi")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: 30, system: .imperial, locale: fr), "98 ft")
+        XCTAssertEqual(SQUnits.distanceCompact(meters: .nan, system: .metric, locale: fr), "—")
+    }
+
+    /// Une seule règle de gigue pour le test, son détail et le Drive Test :
+    /// une décimale sous 10 ms, entière au-delà.
+    func testJitterHasOneDecimalUnderTenMilliseconds() {
+        let fr = Locale(identifier: "fr_FR"), en = Locale(identifier: "en_US")
+        XCTAssertEqual(SQUnits.jitterValue(4.24, locale: fr), "4,2")
+        XCTAssertEqual(SQUnits.jitterValue(4.24, locale: en), "4.2")
+        XCTAssertEqual(SQUnits.jitterValue(0, locale: fr), "0,0")
+        XCTAssertEqual(SQUnits.jitterValue(9.96, locale: fr), "10", "9,96 s'arrondit à 10 : plus de décimale")
+        XCTAssertEqual(SQUnits.jitterValue(12.4, locale: fr), "12")
+        XCTAssertEqual(SQUnits.jitter(12.4, locale: fr), "12 ms")
+        XCTAssertEqual(SQUnits.jitter(.nan, locale: fr), "—")
+        XCTAssertEqual(SQUnits.jitterValue(-1, locale: fr), "—")
+    }
+
     /// Le lexique veut « Mbps » en anglais ; les unités manquaient au catalogue,
     /// l'anglais affichait donc « Mbit/s ». Lu dans le fichier compilé : cette
     /// suite tourne en français.

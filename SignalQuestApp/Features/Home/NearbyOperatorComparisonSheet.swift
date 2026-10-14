@@ -70,6 +70,12 @@ struct NearbyOperatorComparisonSheet: View {
     }
 
     private func load() async {
+        // Changer de métrique ne laisse pas les anciens chiffres sous la nouvelle unité
+        // (Mbit/s lus en dBm le temps de la requête) : retour au chargement.
+        stats = []
+        loaded = false
+        loadFailed = false
+        animate = false
         if AppEnvironment.usesDemoData {
             // Tours de captures : un classement plausible, sans réseau.
             stats = metric == .download
@@ -260,6 +266,6 @@ struct NearbyOperatorComparisonSheet: View {
     }
 
     private var radiusText: String {
-        radiusMeters >= 1000 ? "\(radiusMeters / 1000) km" : "\(radiusMeters) m"
+SQUnits.distanceCompact(meters: Double(radiusMeters))
     }
 }

@@ -354,7 +354,7 @@ final class ServingAntennaAnnotation: NSObject, MKAnnotation {
     init(_ antenna: ServingAntenna) { self.antenna = antenna }
 
     var coordinate: CLLocationCoordinate2D { antenna.coordinate }
-    var title: String? { antenna.operatorDisplayName ?? antenna.displayName ?? "Antenne" }
+    var title: String? { antenna.operatorDisplayName ?? antenna.displayName ?? String(localized: "Antenne") }
     var subtitle: String? {
         var parts: [String] = [antenna.status.label]
         if let d = antenna.distanceKm, d > 0 {
@@ -446,8 +446,12 @@ final class SessionSpeedtestAnnotation: NSObject, MKAnnotation {
     }
 
     var title: String? {
-        let down = speedtest.downloadMbps.map { "↓ \(Int($0.rounded())) \(String(localized: "Mbit/s"))" } ?? "↓ —"
-        let up = speedtest.uploadMbps.map { "↑ \(Int($0.rounded()))" } ?? "↑ —"
+        func rate(_ arrow: String, _ mbps: Double?) -> String {
+            guard let mbps, mbps > 0 else { return "\(arrow) —" }
+            return "\(arrow) \(SQUnits.throughput(mbps: mbps))"
+        }
+        let down = rate("↓", speedtest.downloadMbps)
+        let up = rate("↑", speedtest.uploadMbps)
         return "\(down) · \(up)"
     }
     var subtitle: String? {
@@ -471,8 +475,9 @@ final class SessionSpeedtestAnnotation: NSObject, MKAnnotation {
     /// point de mesure. Mise en cache par valeur, couleur et thème.
     @MainActor
     static func pill(for st: SessionSpeedtest, traits: UITraitCollection) -> (image: UIImage, centerOffset: CGPoint) {
-        let value = st.downloadMbps.map { "\(Int($0.rounded()))" } ?? "—"
-        let unit = String(localized: "Mbit/s")
+        let measured = (st.downloadMbps ?? 0) > 0 ? st.downloadMbps : nil
+        let value = measured.map { SQUnits.throughputValue(mbps: $0) } ?? "—"
+        let unit = SQUnits.throughputUnit(mbps: measured ?? 0)
         let fill = SessionSpeedColor.ui(st.downloadMbps).resolvedColor(with: traits)
         let key = "\(value)|\(unit)|\(fill.description)|\(traits.userInterfaceStyle.rawValue)"
         if let hit = pillCache[key] { return hit }

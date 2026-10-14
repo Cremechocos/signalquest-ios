@@ -23,7 +23,7 @@ struct SocialComment: Decodable, Identifiable, Equatable {
         postId = c.decodeFlexibleString(forKey: .postId)
         parentId = c.decodeFlexibleString(forKey: .parentId)
         author = (try? c.decode(SocialFeedAuthor.self, forKey: .author))
-            ?? SocialFeedAuthor(id: "?", name: "Utilisateur", handle: nil, avatarUrl: nil, isFriend: nil, isFollowing: nil, liveRadio: nil)
+            ?? SocialFeedAuthor(id: "?", name: String(localized: "Utilisateur"), handle: nil, avatarUrl: nil, isFriend: nil, isFollowing: nil, liveRadio: nil)
         text = (try? c.decode(String.self, forKey: .text))
             ?? (try? c.decode(String.self, forKey: .content))
             ?? (try? c.decode(String.self, forKey: .body))

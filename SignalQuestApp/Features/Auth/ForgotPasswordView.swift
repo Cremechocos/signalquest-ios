@@ -76,6 +76,7 @@ struct ForgotPasswordView: View {
                                 .foregroundStyle(SQColor.dangerInk)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("auth.recovery.error")
+                                .sqAnnounce(error)
                         }
                     }
                     .sqAuthAppear(appeared, delay: 0.08)
@@ -93,7 +94,11 @@ struct ForgotPasswordView: View {
         .scrollDismissesKeyboard(.interactively)
         .signalQuestHeroBackground()
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { appeared = true }
+        .onAppear {
+            appeared = true
+            // Erreur globale à la session : on repart d'un écran sans reste d'une autre saisie.
+            session.errorMessage = nil
+        }
         .mobileChallenge(using: challenge)
         .onDisappear { cancelSubmission() }
         .onChangeCompat(of: session.state) { _, state in

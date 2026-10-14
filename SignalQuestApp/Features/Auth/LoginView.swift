@@ -299,6 +299,7 @@ struct LoginView: View {
                         .foregroundStyle(SQColor.dangerInk)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("login.twoFactor.error")
+                        .sqAnnounce(error)
                 }
             }
             GradientButton("Valider", isBusy: session.isBusy, action: submitCode)
@@ -713,7 +714,7 @@ struct AuthPasswordInput: View {
                 Image(systemName: revealed ? "eye.slash" : "eye")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(SQColor.labelSecondary)
-                    .frame(width: 44, height: 32)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

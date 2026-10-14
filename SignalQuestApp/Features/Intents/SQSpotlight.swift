@@ -7,9 +7,13 @@ import Foundation
 enum SQSpotlight {
     static func donateLastSpeedtest(_ snapshot: SpeedtestWidgetSnapshot) {
         let attributes = CSSearchableItemAttributeSet(contentType: .text)
-        attributes.title = String(localized: "Dernier Speedtest — \(Int(snapshot.downloadMbps.rounded())) Mbps")
-        let ul = snapshot.uploadMbps.map { " · \(Int($0.rounded())) Mbps UL" } ?? ""
-        attributes.contentDescription = "\(snapshot.network) · \(Int(snapshot.downloadMbps.rounded())) Mbps DL\(ul)"
+        let download = rate(snapshot.downloadMbps)
+        attributes.title = String(localized: "Dernier Speedtest — \(download)")
+        if let upload = snapshot.uploadMbps {
+            attributes.contentDescription = String(localized: "\(snapshot.network) · \(download) en réception · \(rate(upload)) en envoi")
+        } else {
+            attributes.contentDescription = String(localized: "\(snapshot.network) · \(download) en réception")
+        }
         attributes.keywords = ["speedtest", "débit", "signalquest", "réseau"]
         let item = CSSearchableItem(
             uniqueIdentifier: "sq.speedtest.last",
@@ -17,6 +21,10 @@ enum SQSpotlight {
             attributeSet: attributes
         )
         CSSearchableIndex.default().indexSearchableItems([item])
+    }
+
+    private static func rate(_ mbps: Double) -> String {
+        "\(Int(mbps.rounded())) \(SQUnits.throughputUnit(mbps: mbps))"
     }
 
     /// Retire les éléments indexés par l'app. Appelé à la déconnexion : le

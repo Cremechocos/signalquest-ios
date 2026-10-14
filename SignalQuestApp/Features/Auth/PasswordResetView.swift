@@ -110,6 +110,7 @@ private struct PasswordResetForm: View {
                     Text(error).font(SQType.caption).foregroundStyle(SQColor.dangerInk)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("auth.reset.error")
+                        .sqAnnounce(error)
                 }
                 GradientButton("Mettre à jour", systemImage: "checkmark.shield", isBusy: submissionID != nil) { submit() }
                     .disabled(!canSubmit)

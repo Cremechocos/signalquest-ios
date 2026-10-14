@@ -144,8 +144,9 @@ struct RadioLogIdentifyChainView: View {
                             showsConfirmation = true
                         }
                     }
-                    // Rien à identifier tant que les antennes de CE site arrivent.
-                    .disabled(picker.isLoading)
+                    // Rien à identifier tant que les antennes de CE site arrivent, ni
+                    // sur un site bloqué : la bannière dit déjà pourquoi, « Passer » reste.
+                    .disabled(picker.isLoading || RadioLogIdentifyPicker.blockingReason(for: site) != nil)
                     .frame(maxWidth: .infinity)
                     .accessibilityIdentifier("radioLogs.chain.identify")
                 }

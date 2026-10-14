@@ -168,7 +168,16 @@ struct WeeklyRecapSheet: View {
     private func actions(for stats: WeeklyRecapStats) -> some View {
         VStack(spacing: SQSpace.sm) {
             GradientButton(String(localized: "Partager mon bilan"), systemImage: "square.and.arrow.up") {
-                Task { shareURL = await WeeklyRecapImageRenderer.render(stats) }
+                Task {
+                    // Un rendu raté ne doit pas laisser le bouton sans effet.
+                    if let url = await WeeklyRecapImageRenderer.render(stats) {
+                        publishNotice = nil
+                        shareURL = url
+                    } else {
+                        publishNotice = String(localized: "Impossible de préparer l’image du bilan. Réessaie.")
+                        Haptics.error()
+                    }
+                }
             }
             GradientButton(String(localized: "Publier en story"), isBusy: isPublishing, style: .secondary) {
                 Task { await publish() }

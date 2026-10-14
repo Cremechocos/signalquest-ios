@@ -10,6 +10,7 @@ struct FollowedAntennaEntity: AppEntity {
     /// Clé du favori (« FR:37199 ») : un même site peut être suivi dans deux marchés.
     let id: String
     let siteId: String
+    let market: String
     let title: String
     let subtitle: String
 
@@ -21,6 +22,7 @@ struct FollowedAntennaEntity: AppEntity {
     init(_ favorite: FavoriteAntenna) {
         id = favorite.id
         siteId = favorite.siteId
+        market = favorite.market
         title = favorite.displayName
         subtitle = [favorite.operator, favorite.market]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -69,6 +71,6 @@ struct OpenFollowedAntennaIntent: AppIntent {
 
     @MainActor
     static func open(_ antenna: FollowedAntennaEntity, with router: AppRouter) {
-        router.route(toSite: antenna.siteId)
+        router.route(toSite: antenna.siteId, market: antenna.market)
     }
 }

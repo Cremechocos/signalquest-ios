@@ -40,9 +40,10 @@ final class GamificationViewModel: ObservableObject {
             async let e = service.events()
             async let c = service.catalog()
             profile = try await p
+            // Catalogue tolérant, lu avant l'activité : un échec d'`events` ne doit pas
+            // laisser le catalogue sans valeur, et un échec ici garde le précédent.
+            if let freshCatalog = try? await c { catalog = freshCatalog }
             events = try await e
-            // Catalogue tolérant : un échec ici ne masque pas profil/activité.
-            catalog = (try? await c) ?? []
             errorMessage = nil
         } catch {
             // Un rafraîchissement interrompu n'est pas un échec à afficher.

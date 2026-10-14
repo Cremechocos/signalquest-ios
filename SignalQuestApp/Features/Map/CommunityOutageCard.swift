@@ -15,6 +15,8 @@ struct OutageArbitrationBlock: View {
     let outage: CommunityOutage
     /// `nil` = lecture seule (aucun bouton, aucune phrase de position).
     var onVote: ((String, String) -> Void)?
+    /// Une voix est en vol pour CETTE panne : les boutons se désactivent et l'un d'eux tourne.
+    var isVoting = false
 
     var body: some View {
         let tint = OutageTint.of(outage.severity)
@@ -29,7 +31,7 @@ struct OutageArbitrationBlock: View {
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
-            OutageVoteRow(outage: outage, onVote: onVote)
+            OutageVoteRow(outage: outage, onVote: onVote, isVoting: isVoting)
         }
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -98,6 +100,10 @@ struct OutageConfirmationGauge: View {
 struct OutageVoteRow: View {
     let outage: CommunityOutage
     var onVote: ((String, String) -> Void)?
+    /// Voix en vol : sans retour visuel, on ne savait pas si l'appui avait été pris en compte.
+    var isVoting = false
+    /// La voix que CET appui a lancée, pour ne faire tourner que son bouton.
+    @State private var pendingKind: String?
 
     var body: some View {
         if let onVote {
@@ -105,11 +111,13 @@ struct OutageVoteRow: View {
                 HStack(spacing: SQSpace.sm) {
                     voteButton(
                         title: String(localized: "Oui, c'est HS"),
-                        action: { onVote(outage.id, "confirm") }
+                        kind: "confirm",
+                        action: { pendingKind = "confirm"; onVote(outage.id, "confirm") }
                     )
                     voteButton(
                         title: String(localized: "Non, ça marche"),
-                        action: { onVote(outage.id, "dispute") }
+                        kind: "dispute",
+                        action: { pendingKind = "dispute"; onVote(outage.id, "dispute") }
                     )
                 }
             } else {
@@ -138,22 +146,30 @@ struct OutageVoteRow: View {
     ///
     /// `selection()` et non `success()` : se prononcer est un choix, pas une réussite — et
     /// « réussite » n'a de sens que pour l'une des deux réponses.
-    private func voteButton(title: String, action: @escaping () -> Void) -> some View {
+    private func voteButton(title: String, kind: String, action: @escaping () -> Void) -> some View {
         Button(action: {
             Haptics.selection()
             action()
         }) {
-            Text(title)
-                .font(SQFont.body(13, .semibold))
-                .foregroundStyle(SQColor.label)
-                // 44 pt : le minimum d'Apple, et le geste se fait dehors, à une main.
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(
-                    SQColor.fill,
-                    in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
-                )
+            // Le spinner REMPLACE le libellé du seul bouton pressé : même hauteur, rien ne saute.
+            Group {
+                if isVoting, pendingKind == kind {
+                    SQSpinner()
+                } else {
+                    Text(title)
+                }
+            }
+            .font(SQFont.body(13, .semibold))
+            .foregroundStyle(SQColor.label)
+            // 44 pt : le minimum d'Apple, et le geste se fait dehors, à une main.
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(
+                SQColor.fill,
+                in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+            )
         }
         .buttonStyle(.plain)
+        .disabled(isVoting)
         .accessibilityLabel(title)
     }
 }
@@ -222,6 +238,8 @@ struct CommunityOutageCard: View {
     var onClose: ((CommunityOutage) -> Void)?
     /// Identifiant de la panne dont la fermeture est en vol, porté par l'hôte.
     var closingOutageId: String?
+    /// Identifiant de la panne dont une voix est en vol, porté par l'hôte.
+    var votingOutageId: String?
 
     /// La panne en cours — il ne peut y en avoir qu'UNE dans cette liste.
     ///
@@ -270,7 +288,7 @@ struct CommunityOutageCard: View {
                 Spacer(minLength: 0)
             }
 
-            OutageArbitrationBlock(outage: outage, onVote: onVote)
+            OutageArbitrationBlock(outage: outage, onVote: onVote, isVoting: votingOutageId == outage.id)
 
             // `canClose` est arbitré par le serveur — vrai pour le seul auteur d'une panne encore
             // ouverte. Le redéduire ici afficherait un bouton qui rend 403.

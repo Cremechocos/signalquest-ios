@@ -9,7 +9,7 @@ enum NearbyOperatorMetric: Equatable, Sendable {
 
     var unit: String {
         switch self {
-        case .download: return "Mbps"
+        case .download: return String(localized: "Mbit/s")
         case .signal: return "dBm"
         }
     }

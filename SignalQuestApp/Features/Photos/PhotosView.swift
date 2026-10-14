@@ -844,14 +844,18 @@ struct PhotoDetailView: View {
                 Button { showNativeShare = true } label: {
                     Label("Partager ailleurs…", systemImage: "square.and.arrow.up")
                 }
-                Divider()
+                // On ne signale pas sa propre photo.
                 if ownsPhoto, operatorChoices.count > 1 {
+                    Divider()
                     Button { showOperatorPicker = true } label: {
                         Label("Modifier le réseau", systemImage: "antenna.radiowaves.left.and.right")
                     }
                 }
-                Button(role: .destructive) { showReport = true } label: {
-                    Label("Signaler la photo", systemImage: "flag")
+                if !ownsPhoto {
+                    Divider()
+                    Button(role: .destructive) { showReport = true } label: {
+                        Label("Signaler la photo", systemImage: "flag")
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -906,7 +910,8 @@ struct PhotoDetailView: View {
         VStack(alignment: .leading, spacing: SQSpace.xl) {
             photoMeta
             actionsRow
-            if let cap = photo.caption ?? photo.description, !cap.isEmpty {
+            // Le titre reprend déjà la légende : on n'ajoute que ce qu'il ne dit pas.
+            if let cap = [photo.caption, photo.description].compactMap({ $0 }).first(where: { !$0.isEmpty && $0 != photo.displayCaption }) {
                 Text(cap)
                     .font(SQType.body)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -971,6 +976,8 @@ struct PhotoDetailView: View {
                         .foregroundStyle(SQColor.label)
                         .contentTransition(.numericText())
                 }
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel(isLiked ? String(localized: "Retirer le like") : String(localized: "Liker"))
@@ -986,6 +993,8 @@ struct PhotoDetailView: View {
                         .foregroundStyle(SQColor.label)
                         .contentTransition(.numericText())
                 }
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel("Commenter")
@@ -1004,6 +1013,8 @@ struct PhotoDetailView: View {
                 Image(systemName: "paperplane")
                     .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(SQColor.labelSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(SQPressButtonStyle())
             .accessibilityLabel("Partager")
@@ -1447,7 +1458,7 @@ struct PhotoShareSheet: View {
                                 .foregroundStyle(SQColor.label)
                                 .lineLimit(2)
                             if let op = photo.operator {
-                                Text(op)
+                                Text(verbatim: PhotosView.operatorLabel(op))
                                     .font(SQType.caption)
                                     .foregroundStyle(SQColor.labelSecondary)
                             }

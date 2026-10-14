@@ -244,7 +244,7 @@ struct SpeedtestSharePreviewSheet: View {
             let url = try SQShareCardBuilder.writePNG(preview.image)
             temporaryShareURL = url
             let text = SpeedtestShareImageRenderer.shareText(for: result, options: options)
-            let title = String(localized: "Speedtest SignalQuest — \(Int(result.downloadAverageMbps.rounded())) Mbps")
+            let title = String(localized: "Speedtest SignalQuest — \(SQUnits.throughput(mbps: result.downloadAverageMbps))")
             sharePayload = PreviewSharePayload(
                 items: [ImageAndTextShareItem(fileURL: url, text: text, title: title), text]
             )

@@ -130,6 +130,8 @@ final class CarPlayDashboardSceneDelegate: UIResponder, CPTemplateApplicationDas
                 operatorKey: MapMarketStore.initialOperatorKey()
             )
             guard !Task.isCancelled, let controller else { return }
+            // Échec réseau : on garde la vignette affichée et on retentera au prochain déplacement.
+            if loaded.allFailed { self?.lastLoadedCenter = nil; return }
             controller.apply(payloads: loaded.annotations)
         }
     }

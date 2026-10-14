@@ -7,8 +7,12 @@ struct SavedMessagesView: View {
     let service: MessagesServicing
     let currentUserId: String?
     var e2ee: E2EEServicing? = nil
+    /// Conversation ouverte derrière la feuille : toucher un enregistré qui en
+    /// vient ferme juste la feuille, sans rouvrir la même conversation.
+    var currentConversationId: String? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var router: AppRouter
     @State private var entries: [SavedMessageEntry] = []
     @State private var decrypted: [String: String] = [:]
     @State private var isLoading = true
@@ -59,38 +63,50 @@ struct SavedMessagesView: View {
 
     private func row(_ entry: SavedMessageEntry) -> some View {
         let message = entry.message
-        return HStack(alignment: .top, spacing: SQSpace.sm) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: SQSpace.xs) {
-                    if let sender = message.sender?.displayName {
-                        Text(message.senderId == currentUserId ? String(localized: "Toi") : sender)
-                            .font(SQType.caption.weight(.bold))
-                            .foregroundStyle(SQColor.label)
-                    }
-                    Image(systemName: entry.conversation?.isGroup == true ? "person.3.fill" : "person.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(SQColor.labelTertiary)
-                        .accessibilityHidden(true)
-                    Text(conversationLabel(entry))
-                        .font(SQType.micro)
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .sqSingleLine()
+        let info = VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: SQSpace.xs) {
+                if let sender = message.sender?.displayName {
+                    Text(message.senderId == currentUserId ? String(localized: "Toi") : sender)
+                        .font(SQType.caption.weight(.bold))
+                        .foregroundStyle(SQColor.label)
                 }
-                Text(snippet(message))
-                    .font(SQType.callout)
-                    .foregroundStyle(SQColor.label)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                if let savedAt = entry.savedAt {
-                    Text("Enregistré le \(savedAt.formatted(.dateTime.day().month(.abbreviated).hour().minute()))")
-                        .font(SQType.micro)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
+                Image(systemName: entry.conversation?.isGroup == true ? "person.3.fill" : "person.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+                Text(conversationLabel(entry))
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .sqSingleLine()
             }
+            Text(snippet(message))
+                .font(SQType.callout)
+                .foregroundStyle(SQColor.label)
+                .lineLimit(3)
+                .multilineTextAlignment(.leading)
+            if let savedAt = entry.savedAt {
+                Text("Enregistré le \(savedAt.formatted(.dateTime.day().month(.abbreviated).hour().minute()))")
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
             // Regroupe conversation + extrait + auteur/date en un seul élément
             // VoiceOver, sans absorber le bouton « Retirer » (A11Y-1).
             .accessibilityElement(children: .combine)
             .frame(maxWidth: .infinity, alignment: .leading)
+        return HStack(alignment: .top, spacing: SQSpace.sm) {
+            // Le message mène à sa conversation quand le serveur la renseigne.
+            if let conversationId = entry.conversation?.id, !conversationId.isEmpty {
+                Button {
+                    open(conversationId)
+                } label: {
+                    info.contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Ouvrir la conversation")
+            } else {
+                info
+            }
             Button {
                 Task { await remove(entry) }
             } label: {
@@ -108,6 +124,14 @@ struct SavedMessagesView: View {
         .padding(.trailing, SQSpace.xs)
         .padding(.vertical, SQSpace.sm2)
         .opacity(removing.contains(message.id) ? 0.4 : 1)
+    }
+
+    private func open(_ conversationId: String) {
+        Haptics.light()
+        dismiss()
+        if conversationId != currentConversationId {
+            router.route(toConversation: conversationId)
+        }
     }
 
     private func conversationLabel(_ entry: SavedMessageEntry) -> String {

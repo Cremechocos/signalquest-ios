@@ -74,10 +74,15 @@ struct LastSpeedtestResultIntent: AppIntent {
         return .result(value: answer, dialog: IntentDialog(stringLiteral: answer))
     }
 
+    /// Débit arrondi à l'entier (lu à voix haute) avec l'unité du design system.
+    private static func rate(_ mbps: Double) -> String {
+        "\(Int(mbps.rounded())) \(SQUnits.throughputUnit(mbps: mbps))"
+    }
+
     static func summary(of snapshot: SpeedtestWidgetSnapshot, now: Date) -> String {
-        var measures = [String(localized: "\(Int(snapshot.downloadMbps.rounded())) Mbps en réception")]
+        var measures = [String(localized: "\(rate(snapshot.downloadMbps)) en réception")]
         if let upload = snapshot.uploadMbps {
-            measures.append(String(localized: "\(Int(upload.rounded())) Mbps en envoi"))
+            measures.append(String(localized: "\(rate(upload)) en envoi"))
         }
         if let ping = snapshot.pingMs {
             measures.append(String(localized: "latence \(Int(ping.rounded())) ms"))

@@ -262,10 +262,13 @@ struct RadioLogSiteCard: View {
                 RadioLogStatePill(state: state, checkable: site.isCheckable)
                     .padding(.leading, actionInset)
                 HStack(spacing: M.ctaGap) {
+                    // Le site dans le libellé VoiceOver : la liste en répète des centaines.
                     RadioLogActionButton(label: "Identifier", action: onIdentify)
+                        .accessibilityLabel(Text("Identifier \(site.nodeLabel)"))
                         .accessibilityIdentifier("radioLogs.site.identify")
                     if site.hasCoordinate {
                         RadioLogActionButton(label: "Carte", ghost: true, systemImage: "map", action: onOpenMap)
+                            .accessibilityLabel(Text("Voir \(site.nodeLabel) sur la carte"))
                             .accessibilityIdentifier("radioLogs.site.map")
                     }
                     Spacer(minLength: 0)

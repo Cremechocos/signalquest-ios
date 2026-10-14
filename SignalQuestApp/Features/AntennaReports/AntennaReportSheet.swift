@@ -267,8 +267,10 @@ struct AntennaReportSheet: View {
             let result = try await service.submit(
                 siteId: siteId,
                 reportType: reportType,
-                currentValue: isLeaderReport ? leaderReport?.currentLeader : currentValue,
-                suggestedValue: isLeaderReport ? suggestedLeader : suggestedValue,
+                // Les valeurs saisies sous un autre type restent dans les champs
+                // cachés : seules celles du type choisi partent.
+                currentValue: isLeaderReport ? leaderReport?.currentLeader : (reportType.suggestsValues ? currentValue : nil),
+                suggestedValue: isLeaderReport ? suggestedLeader : (reportType.suggestsValues ? suggestedValue : nil),
                 reason: reason,
                 sector: sector,
                 submissionID: submissionID

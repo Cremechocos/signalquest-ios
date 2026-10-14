@@ -56,7 +56,7 @@ struct SocialFeedAuthor: Codable, Identifiable, Equatable {
     let badges: [SocialUserBadge]
 
     var displayName: String {
-        name ?? handle.map { "@\($0)" } ?? "Utilisateur"
+        name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur")
     }
 
     enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, isFriend, isFollowing, liveRadio, badges }
@@ -128,6 +128,29 @@ struct SocialPostAttachment: Codable, Identifiable, Equatable {
     let thumbnailUrl: URL?
     let altText: String?
     let metadata: [String: JSONValue]?
+}
+
+extension SocialPostAttachment {
+    /// Image affichable : ni vidéo ni audio, avec au moins une URL. Les cartes
+    /// du fil et la feuille de détail s'appuient toutes sur cette règle, pour
+    /// qu'une vidéo ne parte jamais dans un chargeur d'image.
+    var isDisplayableImage: Bool {
+        let lowered = kind.lowercased()
+        return !lowered.contains("video") && !lowered.contains("audio") && (url != nil || thumbnailUrl != nil)
+    }
+
+    /// Texte alternatif saisi par l'auteur, nil s'il est vide.
+    var trimmedAltText: String? {
+        let alt = altText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return alt.isEmpty ? nil : alt
+    }
+}
+
+extension UnifiedSocialFeedItem {
+    /// Pièces jointes qui sont des images, dans l'ordre du serveur.
+    var imageAttachments: [SocialPostAttachment] {
+        attachments.filter(\.isDisplayableImage)
+    }
 }
 
 struct CreatePostAttachment: Codable, Equatable, Sendable {
@@ -600,7 +623,7 @@ struct SocialUserProfile: Codable, Equatable {
     let stats: SocialUserProfileStats?
 
     var displayName: String {
-        name ?? handle.map { "@\($0)" } ?? "Utilisateur"
+        name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur")
     }
 
     enum CodingKeys: String, CodingKey {
@@ -786,7 +809,7 @@ struct SocialUserSearchResult: Codable, Identifiable, Equatable {
     let isFriend: Bool?
 
     var displayName: String {
-        name ?? handle.map { "@\($0)" } ?? "Utilisateur"
+        name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur")
     }
 
     enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, isFriend }

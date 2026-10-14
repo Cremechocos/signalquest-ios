@@ -70,7 +70,7 @@ enum DriveShareCardBuilder {
     }
 
     private static func mbps(_ value: Double) -> String {
-        String(localized: "\(Int(value.rounded())) Mbps")
+        SQUnits.throughput(mbps: value)
     }
 
     private static func durationText(from start: Date, to end: Date) -> String? {

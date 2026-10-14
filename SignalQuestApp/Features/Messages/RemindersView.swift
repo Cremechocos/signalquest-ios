@@ -13,6 +13,8 @@ struct RemindersView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var decrypted: [String: String] = [:]
+    /// Rappel dont la suppression attend confirmation (irréversible).
+    @State private var deletionTarget: MessageReminder?
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
     /// On masque les rappels déjà rejetés / déclenchés pour ne montrer que les actifs.
@@ -58,6 +60,20 @@ struct RemindersView: View {
         .toolbar(.hidden, for: .navigationBar)
         .sqKeepsSwipeBack()
         .signalQuestBackground()
+        .confirmationDialog(
+            "Supprimer ce rappel ?",
+            isPresented: Binding(get: { deletionTarget != nil }, set: { if !$0 { deletionTarget = nil } }),
+            titleVisibility: .visible,
+            presenting: deletionTarget
+        ) { item in
+            Button("Supprimer le rappel", role: .destructive) {
+                deletionTarget = nil
+                Task { await delete(item) }
+            }
+            Button("Annuler", role: .cancel) { deletionTarget = nil }
+        } message: { _ in
+            Text("Tu ne seras plus rappelé de ce message.")
+        }
         .task { await load() }
     }
 
@@ -84,7 +100,7 @@ struct RemindersView: View {
             .accessibilityElement(children: .combine)
             .frame(maxWidth: .infinity, alignment: .leading)
             Button {
-                Task { await delete(item) }
+                deletionTarget = item
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .bold))

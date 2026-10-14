@@ -395,7 +395,7 @@ struct SpeedtestServerPicker: View {
     /// Sous les 10 km la précision au kilomètre a un sens ; au-delà elle est du
     /// bruit — la position vient d'un dernier point connu, pas d'un fix frais.
     func distanceText(_ km: Double) -> String {
-        km < 10 ? SQUnits.distance(kilometers: km) : "\(Int(km.rounded())) km"
+        km < 10 ? SQUnits.distance(kilometers: km) : SQUnits.distanceCompact(meters: km.rounded() * 1000)
     }
 
     func catalogServerRow(_ server: IPerfPublicServer) -> some View {

@@ -20,7 +20,8 @@ struct SignalQuestHomeView: View {
 
     @State private var latestMeasurement: SpeedtestRunResult?
     @State private var networkStatus: NetworkPathStatus = .unknown
-    @State private var nearbyMeasures: [AndroidSpeedtestMarker] = []
+    /// `nil` = pas encore chargées ; vide = rien d'assez récent à moins d'un kilomètre.
+    @State private var nearbyMeasures: [AndroidSpeedtestMarker]?
     @State private var userLocation: CLLocation?
     /// Verdict de qualité réseau (opérateur identifié, données communautaires).
     /// `nil` = pas encore chargé ou zone sans mesures : la ligne du verdict se tait.
@@ -34,6 +35,11 @@ struct SignalQuestHomeView: View {
     /// Pannes ouvertes à moins de 5 km, la plus proche d'abord. `nil` = pas encore chargées.
     @State private var nearbyOutages: [CommunityOutage]?
     @State private var showOutages = false
+    /// Échecs des modules de zone : sans eux, un fix de position manqué ou une requête en erreur
+    /// laisserait le squelette affiché indéfiniment. Remis à faux à chaque nouvelle tentative.
+    @State private var locationFixFailed = false
+    @State private var outagesFailed = false
+    @State private var evolutionsFailed = false
     /// Sites prévus ou en cours d'activation à moins de 5 km. `nil` = pas encore chargés.
     @State private var evolutions: [PlannedSiteLive]?
     @State private var lastEvolutionsRefreshAt: Date = .distantPast
@@ -398,6 +404,24 @@ struct SignalQuestHomeView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    /// Module de zone dont le chargement a échoué : une ligne sobre et, tant qu'on peut
+    /// relancer, un bouton pour réessayer (jamais un squelette qui ne finit pas).
+    private func moduleFailure() -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            moduleMessage("Indisponible pour l’instant")
+            Button {
+                Haptics.selection()
+                Task { await refreshNearby(forceFresh: true) }
+            } label: {
+                Text("Réessayer")
+                    .font(SQType.callout(.bold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private func loadingRows(_ count: Int = 2) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             ForEach(0..<count, id: \.self) { _ in
@@ -643,7 +667,7 @@ struct SignalQuestHomeView: View {
     private var outagesModule: some View {
         moduleCard {
             moduleHeader("Pannes près de toi", systemImage: "exclamationmark.triangle") {
-                Text(verbatim: "5 km")
+                Text(verbatim: SQUnits.distanceCompact(meters: Self.wideRadiusMeters))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.ink2)
             }
@@ -676,6 +700,8 @@ struct SignalQuestHomeView: View {
                 }
             } else if needsLocation {
                 moduleMessage("Active la localisation pour voir les pannes autour de toi.")
+            } else if locationFixFailed || outagesFailed {
+                moduleFailure()
             } else {
                 loadingRows()
             }
@@ -753,7 +779,7 @@ struct SignalQuestHomeView: View {
     private var displayedMeasurement: DisplayedMeasurement? {
         let local = latestMeasurement.map {
             DisplayedMeasurement(date: $0.createdAt, downloadMbps: $0.downloadAverageMbps,
-                                 latencyMs: $0.pingMinMs ?? $0.pingMs, technology: measurementTech($0),
+                                 latencyMs: $0.primaryPingMs, technology: measurementTech($0),
                                  operatorName: $0.networkOperatorName)
         }
         let account = accountLatest.flatMap { test -> DisplayedMeasurement? in
@@ -812,8 +838,13 @@ struct SignalQuestHomeView: View {
                         measurement.date.map { $0.formatted(.relative(presentation: .named)) },
                     ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
                     HStack(alignment: .firstTextBaseline) {
-                        bigValue(SQUnits.throughputValue(mbps: measurement.downloadMbps),
-                                 unit: SQUnits.throughputUnit(mbps: measurement.downloadMbps))
+                        // Un débit nul est un test sans mesure : « — », pas « 0,0 Mbit/s ».
+                        if measurement.downloadMbps > 0 {
+                            bigValue(SQUnits.throughputValue(mbps: measurement.downloadMbps),
+                                     unit: SQUnits.throughputUnit(mbps: measurement.downloadMbps))
+                        } else {
+                            bigValue("—", unit: nil)
+                        }
                         if size == .large, let latency = measurement.latencyMs {
                             Spacer(minLength: SQSpace.sm)
                             Text(verbatim: SQUnits.milliseconds(latency))
@@ -888,6 +919,8 @@ struct SignalQuestHomeView: View {
                 }
             } else if needsLocation {
                 moduleMessage("Active la localisation pour voir les sites qui évoluent autour de toi.")
+            } else if locationFixFailed || evolutionsFailed {
+                moduleFailure()
             } else {
                 loadingRows()
             }
@@ -1071,7 +1104,7 @@ struct SignalQuestHomeView: View {
     private var operatorsModule: some View {
         moduleCard {
             moduleHeader("Opérateurs ici", systemImage: "chart.bar") {
-                Text(verbatim: "1 km")
+                Text(verbatim: SQUnits.distanceCompact(meters: Double(Self.nearbyRadiusMeters)))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.ink2)
             }
@@ -1125,6 +1158,8 @@ struct SignalQuestHomeView: View {
                 }
             } else if needsLocation {
                 moduleMessage("Active la localisation pour comparer les opérateurs autour de toi.")
+            } else if locationFixFailed {
+                moduleFailure()
             } else {
                 loadingRows(3)
             }
@@ -1137,16 +1172,20 @@ struct SignalQuestHomeView: View {
     private var nearbyMeasuresModule: some View {
         moduleCard {
             moduleHeader("Mesures autour de toi", systemImage: "mappin.and.ellipse")
-            if nearbyMeasures.isEmpty {
-                if needsLocation {
-                    moduleMessage("Active la localisation pour voir les mesures autour de toi.")
-                } else {
+            if let measures = nearbyMeasures {
+                if measures.isEmpty {
                     moduleMessage("Aucune mesure récente à moins d’un kilomètre.")
+                } else {
+                    ForEach(measures) { measure in
+                        nearbyMeasureRow(measure)
+                    }
                 }
+            } else if needsLocation {
+                moduleMessage("Active la localisation pour voir les mesures autour de toi.")
+            } else if locationFixFailed {
+                moduleFailure()
             } else {
-                ForEach(nearbyMeasures) { measure in
-                    nearbyMeasureRow(measure)
-                }
+                loadingRows()
             }
         }
         .accessibilityIdentifier("home.module.nearbyMeasures")
@@ -1434,7 +1473,11 @@ struct SignalQuestHomeView: View {
         // est déjà connu.
         let status = services.location.authorizationStatus
         guard Self.isAuthorized(status) || services.location.lastLocation != nil else { return }
-        guard let location = await services.location.currentLocation(timeoutSeconds: 6) else { return }
+        locationFixFailed = false
+        guard let location = await services.location.currentLocation(timeoutSeconds: 6) else {
+            locationFixFailed = true
+            return
+        }
         userLocation = location
         lastNearbyRefreshAt = Date()
         let lat = location.coordinate.latitude
@@ -1469,11 +1512,15 @@ struct SignalQuestHomeView: View {
         if wantsNetwork { networkQuality = await qualityTask }
         if let recent = await recentTask { nearbyMeasures = recent }
         if wantsOperators { operatorStats = await rankingTask ?? [] }
-        if let outages = await outagesTask { nearbyOutages = outages }
-        if let sites = await evolutionsTask {
+        let outages = await outagesTask
+        if let outages { nearbyOutages = outages }
+        outagesFailed = wantsOutages && outages == nil && nearbyOutages == nil
+        let sites = await evolutionsTask
+        if let sites {
             evolutions = sites
             lastEvolutionsRefreshAt = Date()
         }
+        evolutionsFailed = wantsEvolutions && sites == nil && evolutions == nil
     }
 
     /// Démo (`--demo-data`, tours de captures) : modules de zone remplis sans réseau, à Lyon.
@@ -1623,7 +1670,7 @@ private struct HomeFollowedSitesModule: View {
                 }
                 if favorites.favorites.count > shown.count {
                     NavigationLink {
-                        FavoriteAntennasView(favorites: favorites) { router.route(toSite: $0.siteId) }
+                        FavoriteAntennasView(favorites: favorites) { router.route(toSite: $0.siteId, market: $0.market) }
                     } label: {
                         Text("Voir les \(favorites.favorites.count) antennes")
                             .font(SQType.callout(.bold))
@@ -1652,7 +1699,7 @@ private struct HomeFollowedSitesModule: View {
         }()
         return Button {
             Haptics.selection()
-            router.route(toSite: favorite.siteId)
+            router.route(toSite: favorite.siteId, market: favorite.market)
         } label: {
             HStack(spacing: SQSpace.sm2) {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)

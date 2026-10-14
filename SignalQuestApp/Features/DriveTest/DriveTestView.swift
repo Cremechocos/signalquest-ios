@@ -954,7 +954,7 @@ final class DriveTestViewModel: ObservableObject {
                 return true
             case .waitForDistance(let meters):
                 setStationaryPause(false)
-                statusLabel = String(localized: "Prochain test dans \(meters) m")
+                statusLabel = String(localized: "Prochain test dans \(SQUnits.distance(meters: Double(meters)))")
             case .waitForSpacing(let seconds), .waitForTime(let seconds):
                 setStationaryPause(false)
                 statusLabel = String(localized: "Prochain test dans \(seconds) s")
@@ -1968,15 +1968,10 @@ struct DriveTestView: View {
         Self.distanceText(model.distanceMeters)
     }
 
+    /// Par `SQUnits` : le panneau suit la préférence métrique ou impériale, comme le reste
+    /// de l'app (un `MeasurementFormatter` suivait la région, et descendait en millimètres).
     private static func distanceText(_ meters: Double) -> String {
-        let formatter = MeasurementFormatter()
-        formatter.numberFormatter.maximumFractionDigits = meters < 1_000 ? 0 : 1
-        // `.naturalScale` choisit l'unité selon l'ordre de grandeur — et descend en
-        // MILLIMÈTRES sous le mètre : au démarrage d'une session le panneau
-        // affichait « 0 mm ». On garde l'unité fournie tant qu'on n'a pas parcouru
-        // au moins un mètre.
-        formatter.unitOptions = meters < 1 ? .providedUnit : .naturalScale
-        return formatter.string(from: Measurement(value: meters, unit: UnitLength.meters))
+        SQUnits.distance(meters: meters)
     }
 
     /// Bandeau « en pause Wi-Fi » (reprise auto en cellulaire) : ambre teinté.

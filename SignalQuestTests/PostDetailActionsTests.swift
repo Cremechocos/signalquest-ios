@@ -9,6 +9,26 @@ final class PostDetailActionsTests: XCTestCase {
         return try JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: data)
     }
 
+    /// La feuille de détail montre chaque image jointe, en pleine résolution
+    /// d'abord, avec son texte alternatif ; une vidéo n'y entre pas.
+    func testDetailSheetShowsEveryImageAttachment() throws {
+        let json = #"""
+        {"id":"post-2","kind":"post","author":{"id":"author","name":"Camille"},"text":"Pylône",
+         "attachments":[
+           {"id":"a1","kind":"image","url":"https://cdn.example/full.jpg","thumbnailUrl":"https://cdn.example/thumb.jpg","altText":"Pylône au coucher du soleil"},
+           {"id":"a2","kind":"image","thumbnailUrl":"https://cdn.example/only-thumb.jpg"},
+           {"id":"a3","kind":"video","url":"https://cdn.example/clip.mp4"}
+         ]}
+        """#
+        let post = try JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: Data(json.utf8))
+        let images = SignalDetailSheet.images(of: post)
+        XCTAssertEqual(images.map { $0.id }, ["a1", "a2"])
+        XCTAssertEqual(images.first?.url.absoluteString, "https://cdn.example/full.jpg")
+        XCTAssertEqual(images.first?.label, "Pylône au coucher du soleil")
+        XCTAssertEqual(images.last?.url.absoluteString, "https://cdn.example/only-thumb.jpg")
+        XCTAssertTrue(SignalDetailSheet.images(of: try item()).isEmpty)
+    }
+
     func testServerReactionReceiptUpdatesAllVisibleCounters() throws {
         let json = #"{"reactions":[{"emoji":"❤️","count":2,"reactedByMe":true}],"favorited":true,"favoritesCount":3,"reposted":true,"repostsCount":4}"#
         let response = try JSONDecoder().decode(ReactionResponse.self, from: Data(json.utf8))

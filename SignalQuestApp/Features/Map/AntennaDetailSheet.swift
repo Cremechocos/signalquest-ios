@@ -18,6 +18,8 @@ final class AntennaDetailViewModel: ObservableObject {
         do {
             details = try await service.details(id: id, market: market, operatorName: operatorName, anfrCode: anfrCode)
         } catch {
+            // Un chargement remplacé (changement d'opérateur) n'est pas un échec à afficher.
+            guard !error.isCancellation else { return }
             self.error = error.userFacingMessage
         }
     }
@@ -104,6 +106,9 @@ struct AntennaDetailSheet: View {
     var onIsolateCoverage: ((AntennaCoverageFocus) -> Void)?
     /// Fermeture du panneau latéral iPad : hors présentation, `dismiss` ne fait rien.
     var onClose: (() -> Void)?
+    /// Appelé après un signalement, une voix ou une fermeture de panne réussis : la carte doit
+    /// recharger sa région, sinon le marqueur garderait l'état d'avant.
+    var onOutageChanged: (() -> Void)?
     /// Opérateur dont on affiche la fiche. Modifiable in-situ pour les sites
     /// partagés (multi-opérateurs) : l'utilisateur passe de l'un à l'autre sans
     /// rouvrir la carte.
@@ -172,7 +177,8 @@ struct AntennaDetailSheet: View {
         customSite: AndroidCustomSiteMarker? = nil,
         sightOrigin: AntennaSightOrigin = .device,
         onIsolateCoverage: ((AntennaCoverageFocus) -> Void)? = nil,
-        onClose: (() -> Void)? = nil
+        onClose: (() -> Void)? = nil,
+        onOutageChanged: (() -> Void)? = nil
     ) {
         self.site = site
         self.market = market
@@ -180,6 +186,7 @@ struct AntennaDetailSheet: View {
         self.sightOrigin = sightOrigin
         self.onIsolateCoverage = onIsolateCoverage
         self.onClose = onClose
+        self.onOutageChanged = onOutageChanged
         // Aucun repli SFR : un site étranger ou communautaire ne doit jamais être
         // ouvert sous une facette française inventée. On conserve le choix reçu
         // lorsqu'il existe réellement, sinon la première facette connue du site ;
@@ -224,9 +231,15 @@ struct AntennaDetailSheet: View {
             .task(id: selectedOperator) {
                 model.details = nil
                 model.error = nil
+                // Les pannes sont scopées à l'opérateur : si leur relecture échoue, celles de la
+                // facette précédente ne doivent pas rester affichées sous la nouvelle.
+                outages = []
+                operatorIncidents = []
+                // En parallèle de la fiche : les pannes n'ont pas à attendre `details`.
+                async let outagesLoad: Void = loadOutages()
                 await model.load(id: site.siteId ?? site.id, market: market, operatorName: selectedOperator, anfrCode: site.anfrCode)
                 await loadMarketEntry()
-                await loadOutages()
+                await outagesLoad
                 // Sans cette lecture, l'étoile s'affiche éteinte sur un site pourtant suivi, et
                 // un appui écrirait une liste incomplète — le service refuse d'ailleurs d'écrire
                 // avant d'avoir chargé.
@@ -297,7 +310,10 @@ struct AntennaDetailSheet: View {
                 siteBands: outageBandOptions,
                 siteSectors: reportSectors,
                 service: services.communityOutages,
-                onSubmitted: { _ in Task { await loadOutages() } }
+                onSubmitted: { _ in
+                    Task { await loadOutages() }
+                    onOutageChanged?()
+                }
             )
         }
         .sheet(isPresented: $showReportSheet) {
@@ -728,7 +744,8 @@ struct AntennaDetailSheet: View {
                 // Décision produit n° 12 : la fiche antenne est le quatrième chemin vers une panne,
                 // et le seul qui n'offrait pas « La panne est terminée ».
                 onClose: { pendingCloseOutage = $0 },
-                closingOutageId: closingOutageId
+                closingOutageId: closingOutageId,
+                votingOutageId: votingOutageId
             )
             if let outageError {
                 SQNotice(message: outageError, tone: .warning)
@@ -924,6 +941,7 @@ struct AntennaDetailSheet: View {
                 longitude: here?.coordinate.longitude,
                 accuracyMeters: here.flatMap { $0.horizontalAccuracy > 0 ? $0.horizontalAccuracy : nil }
             )
+            onOutageChanged?()
         } catch {
             // Une annulation n'est pas un refus : elle survient quand la fiche recharge sous nos
             // pieds (changement d'opérateur), et l'afficher accuserait l'utilisateur d'un échec
@@ -946,6 +964,7 @@ struct AntennaDetailSheet: View {
         defer { closingOutageId = nil }
         do {
             _ = try await services.communityOutages.close(outageId: outage.id)
+            onOutageChanged?()
         } catch {
             if !error.isCancellation { outageError = OutageWriteError.message(for: error) }
         }
@@ -971,28 +990,31 @@ struct AntennaDetailSheet: View {
         let outageService = services.communityOutages
         let mapService = services.map
 
-        async let community = try? await outageService.outages(
+        // `nil` = lecture ratée : on garde alors ce qui est affiché plutôt que de le vider, sinon
+        // une panne en cours disparaîtrait de la fiche (et l'invitation à la signaler
+        // réapparaîtrait) sur un simple accroc réseau.
+        async let community: [CommunityOutage]? = try? await outageService.outages(
             forSiteId: outageSiteId,
             targetKind: kind,
             marketCode: market,
             operatorKey: operatorKey
         )
-        async let operatorSide: SiteOperatorIncidentsResponse? = {
+        async let operatorSide: [SiteOperatorIncident]? = {
             // La route exige la position du site : c'est la seule chose qui rapproche vraiment le
             // référentiel de l'opérateur de celui de l'ANFR (les codes de site ne concordent pas).
-            guard let latitude, let longitude else { return nil }
-            return try? await mapService.operatorIncidents(
+            guard let latitude, let longitude else { return [] }
+            return (try? await mapService.operatorIncidents(
                 forSiteId: siteId,
                 market: market,
                 operatorName: operatorKey,
                 latitude: latitude,
                 longitude: longitude,
                 territory: nil
-            )
+            ))?.incidents
         }()
 
-        outages = await community ?? []
-        operatorIncidents = await operatorSide?.incidents ?? []
+        if let loaded = await community { outages = loaded }
+        if let loaded = await operatorSide { operatorIncidents = loaded }
     }
 
     /// Le registre du marché, pour nommer l'opérateur d'un incident.
@@ -1588,7 +1610,7 @@ struct AntennaDetailSheet: View {
                             Color.clear
                                 .aspectRatio(1, contentMode: .fit)
                                 .overlay {
-                                    RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 240, contentMode: .fill) {
+                                    RemoteImage(url: photo.thumbnailUrl ?? photo.imageUrl, maxDimension: 240, contentMode: .fill, showsFailureUI: true) {
                                         SQColor.surfaceMuted
                                     }
                                 }

@@ -88,6 +88,17 @@ private extension NotificationPreferences {
     }
 }
 
+/// « Antennes suivies » avec leur nombre : le service est observé, et le compteur reste
+/// masqué tant que les favoris ne sont pas chargés (sinon il affichait « 0 »).
+private struct FavoriteCountSettingsRow: View {
+    @ObservedObject var favorites: FavoriteAntennasService
+
+    var body: some View {
+        SQSettingsRowLabel("Antennes suivies", systemImage: "star",
+                           value: favorites.hasLoaded ? favorites.favorites.count.formatted() : nil)
+    }
+}
+
 /// Écran « Notifications » : l'autorisation iOS d'abord, puis ce que l'app
 /// peut envoyer, groupé par usage. Ouvert depuis Réglages et par le lien
 /// « Réglages de notifications » d'iOS, qui renvoyait vers iOS (TRX-21).
@@ -112,6 +123,23 @@ struct NotificationSettingsView: View {
             }
             .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.md, trailing: 0))
             .listRowBackground(Color.clear)
+
+            // En tête : en bas de liste, l'erreur d'un interrupteur restait hors écran.
+            if let error = model.errorMessage {
+                Section {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(SQColor.dangerInk)
+                        .accessibilityIdentifier("notifications.error")
+                    // Préférences jamais chargées : interrupteurs grisés sans
+                    // issue, il fallait quitter l'écran (AF-PROF-07).
+                    if !model.prefsLoaded {
+                        Button("Réessayer") { Task { await model.load() } }
+                            .foregroundStyle(SQColor.accentInk)
+                            .accessibilityIdentifier("notifications.retry")
+                    }
+                }
+                .listRowBackground(SQColor.dangerSoft)
+            }
 
             authorizationSection
 
@@ -175,8 +203,7 @@ struct NotificationSettingsView: View {
                 NavigationLink {
                     FavoriteAntennasView(favorites: services.favoriteAntennas)
                 } label: {
-                    SQSettingsRowLabel("Antennes suivies", systemImage: "star",
-                                       value: "\(services.favoriteAntennas.favorites.count)")
+                    FavoriteCountSettingsRow(favorites: services.favoriteAntennas)
                 }
                 HStack(spacing: SQSpace.sm) {
                     preferenceToggle("Mises à jour ANFR", systemImage: "antenna.radiowaves.left.and.right",
@@ -197,22 +224,6 @@ struct NotificationSettingsView: View {
             .tint(SQColor.brandRed)
             .listRowBackground(SQColor.surface)
             .opacity(isDenied ? 0.45 : 1)
-
-            if let error = model.errorMessage {
-                Section {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(SQColor.dangerInk)
-                        .accessibilityIdentifier("notifications.error")
-                    // Préférences jamais chargées : interrupteurs grisés sans
-                    // issue, il fallait quitter l'écran (AF-PROF-07).
-                    if !model.prefsLoaded {
-                        Button("Réessayer") { Task { await model.load() } }
-                            .foregroundStyle(SQColor.accentInk)
-                            .accessibilityIdentifier("notifications.retry")
-                    }
-                }
-                .listRowBackground(SQColor.dangerSoft)
-            }
         }
         .modifier(CompactListMargins())
         .scrollContentBackground(.hidden)

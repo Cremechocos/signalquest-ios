@@ -13,6 +13,8 @@ struct SignalDetailSheet: View {
     var onShare: () -> Void = {}
     var onMute: () -> Void = {}
     var onReport: () -> Void = {}
+    /// Vote sur le sondage de la publication. Sans lui, le sondage n'est pas montré.
+    var onPollVote: ((FeedPoll.Option) -> Void)? = nil
     /// Tap sur l'auteur — le parent ferme le sheet et pousse le profil.
     var onAuthorTap: (() -> Void)? = nil
     var actionError: String? = nil
@@ -25,6 +27,8 @@ struct SignalDetailSheet: View {
     /// Premier commentaire, montré sous les actions : la conversation se lit
     /// sans ouvrir une deuxième feuille.
     @State private var firstComment: SocialComment?
+    /// Photo de la publication ouverte en plein écran.
+    @State private var viewerImage: MessageImageTarget?
 
     private var signal: SocialSignalSummary? { item.signal }
     private var accent: Color { TechAccent.color(for: signal?.technology) }
@@ -40,8 +44,9 @@ struct SignalDetailSheet: View {
                     place: place,
                     createdAt: item.createdAt,
                     kindBadge: kindTag,
-                    kindColor: accent,
-                    onAuthorTap: onAuthorTap.map { tap in { dismiss(); tap() } }
+                    kindColor: kindColor,
+                    onAuthorTap: onAuthorTap.map { tap in { dismiss(); tap() } },
+                    isPinned: item.isPinned
                 )
                 if let actionError {
                     Label(actionError, systemImage: "exclamationmark.triangle")
@@ -60,9 +65,13 @@ struct SignalDetailSheet: View {
                         .foregroundStyle(SQColor.label)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                if let poll = item.poll, let onPollVote {
+                    FeedPollView(poll: poll, onVote: onPollVote)
+                }
                 if !item.hashtags.isEmpty {
                     CardHashtags(tags: item.hashtags)
                 }
+                media
                 if isSpeedtest {
                     FeedMeasureBlock(signal: signal)
                 }
@@ -87,6 +96,9 @@ struct SignalDetailSheet: View {
         .task(id: item.id) { await loadFirstCommentIfNeeded() }
         .presentationDetents([.medium, .large])
         .sqSheet()
+        .fullScreenCover(item: $viewerImage) { target in
+            MessageImageViewer(target: target)
+        }
     }
 
     // MARK: Header
@@ -101,8 +113,11 @@ struct SignalDetailSheet: View {
             Menu {
                 // Pas de `dismiss()` ici : le parent remplace la fiche par
                 // le signalement ; fermer en plus annulait cette présentation (AF-FIL-02).
-                Button(role: .destructive) { onReport() } label: {
-                    Label("Signaler", systemImage: "flag")
+                // On ne signale pas sa propre publication.
+                if !item.canManage {
+                    Button(role: .destructive) { onReport() } label: {
+                        Label("Signaler", systemImage: "flag")
+                    }
                 }
                 Button { onMute() } label: {
                     Label(
@@ -127,10 +142,87 @@ struct SignalDetailSheet: View {
     /// du fil ; jamais le type brut (« DRIVE_TEST », TRX-26).
     private var kindTag: String? {
         switch item.kind.lowercased() {
-        case "outage": return String(localized: "Panne")
+        // Même état que la carte du fil (Rétabli / Dégradé / Panne), lu dans la metadata.
+        case "outage": return OutageFeedBadge.label(severity: metaString("outageSeverity"), state: metaString("outageState"))
         case "photo", "antenna_photo": return String(localized: "Photo d’antenne")
         default: return nil
         }
+    }
+
+    private var kindColor: Color {
+        item.kind.lowercased() == "outage"
+            ? OutageFeedBadge.ink(severity: metaString("outageSeverity"), state: metaString("outageState"))
+            : accent
+    }
+
+    // MARK: Metadata
+
+    private func metaString(_ key: String) -> String? {
+        guard case .string(let value)? = item.metadata?[key], !value.isEmpty else { return nil }
+        return value
+    }
+
+    private func metaInt(_ key: String) -> Int? {
+        guard case .number(let value)? = item.metadata?[key] else { return nil }
+        return Int(value)
+    }
+
+    private func metaFlag(_ key: String) -> Bool {
+        guard case .bool(let value)? = item.metadata?[key] else { return false }
+        return value
+    }
+
+    // MARK: Media
+
+    /// Photos de la publication, en entier : la carte du fil les recadre, la
+    /// publication complète les montre telles quelles. Un toucher ouvre le plein écran.
+    static func images(of item: UnifiedSocialFeedItem) -> [(id: String, url: URL, label: String)] {
+        // La règle « image seulement » vit sur `UnifiedSocialFeedItem.imageAttachments`,
+        // partagée avec les cartes du fil.
+        item.imageAttachments.compactMap { attachment in
+            guard let url = attachment.url ?? attachment.thumbnailUrl else { return nil }
+            return (attachment.id, url, attachment.trimmedAltText ?? String(localized: "Photo de la publication"))
+        }
+    }
+
+    @ViewBuilder
+    private var media: some View {
+        let images = Self.images(of: item)
+        if images.count == 1, let image = images.first {
+            mediaImage(id: image.id, url: image.url, label: image.label)
+        } else if images.count > 1 {
+            TabView {
+                ForEach(images, id: \.id) { image in
+                    mediaImage(id: image.id, url: image.url, label: image.label)
+                        .padding(.bottom, SQSpace.xl)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .always))
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+            .frame(height: 380)
+        }
+    }
+
+    private func mediaImage(id: String, url: URL, label: String) -> some View {
+        Button {
+            Haptics.light()
+            viewerImage = MessageImageTarget(id: id, url: url, accountSession: nil)
+        } label: {
+            RemoteImage(url: url, maxDimension: 1200, contentMode: .fit, showsFailureUI: true) {
+                Rectangle()
+                    .fill(SQColor.surfaceMuted)
+                    .frame(height: 240)
+                    .overlay(SQSpinner())
+            }
+            .frame(maxWidth: .infinity, maxHeight: 440)
+            .background(SQColor.surfaceMuted)
+            .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
+        .accessibilityHint(String(localized: "Ouvre la photo en plein écran"))
+        .accessibilityIdentifier("signal.detail.photo")
     }
 
     // MARK: Details
@@ -172,6 +264,7 @@ struct SignalDetailSheet: View {
                 ("Appareil", signal.deviceModel ?? "")
             ]
         }
+        pairs += outagePairs
         pairs += speedtestPairs
         pairs.append(("Lieu", place ?? ""))
         // Une clé n'apparaît qu'une fois : le détail serveur et le résumé du
@@ -208,6 +301,11 @@ struct SignalDetailSheet: View {
                 ("Bande", signal.band ?? ""),
                 ("Fréquence", signal.frequency ?? "")
             ]
+        case "outage":
+            // Une panne n'a pas de mesure radio : ses valeurs viennent de la metadata (`outagePairs`).
+            return []
+        case "rating":
+            return ratingPairs(for: signal) + radioPairs(for: signal)
         case "coverage", "session", "drive_test":
             return [
                 ("Distance", SignalFormatters.meters(signal.distanceMeters)),
@@ -218,15 +316,68 @@ struct SignalDetailSheet: View {
                 ("Techs", signal.detectedTechs.prefix(3).joined(separator: " / "))
             ]
         default:
-            return [
-                ("Opérateur", signal.operator ?? ""),
-                ("RSRP", SignalFormatters.dbm(signal.rsrp)),
-                ("RSRQ", SignalFormatters.db(signal.rsrq)),
-                ("SINR", SignalFormatters.db(signal.sinr)),
-                ("Bande", signal.band ?? ""),
-                ("Cell", signal.cellId ?? "")
-            ]
+            return radioPairs(for: signal)
         }
+    }
+
+    private func radioPairs(for signal: SocialSignalSummary) -> [(String, String)] {
+        [
+            ("Opérateur", signal.operator ?? ""),
+            ("RSRP", SignalFormatters.dbm(signal.rsrp)),
+            ("RSRQ", SignalFormatters.db(signal.rsrq)),
+            ("SINR", SignalFormatters.db(signal.sinr)),
+            ("Bande", signal.band ?? ""),
+            ("Cell", signal.cellId ?? "")
+        ]
+    }
+
+    /// Note en étoiles et tendance, comme la carte d'évaluation du fil.
+    private func ratingPairs(for signal: SocialSignalSummary) -> [(String, String)] {
+        let trend: String
+        switch signal.ratingTrend?.lowercased() {
+        case "improved": trend = String(localized: "En hausse")
+        case "degraded": trend = String(localized: "En baisse")
+        case "same": trend = String(localized: "Stable")
+        default: trend = ""
+        }
+        return [
+            ("Note", signal.ratingStars.map { "\(max(0, min(5, $0))) / 5" } ?? ""),
+            ("Tendance", trend)
+        ]
+    }
+
+    /// Gravité, état, services touchés et confirmations d'une panne, lus dans la
+    /// metadata du post exactement comme `OutageCardView`.
+    private var outagePairs: [(String, String)] {
+        guard item.kind.lowercased() == "outage" else { return [] }
+        let severity = OutageSeverity(rawServerValue: metaString("outageSeverity"))
+        let state = OutageState(rawServerValue: metaString("outageState"))
+        let stateText: String
+        if metaFlag("outageOperatorConfirmed") {
+            stateText = String(localized: "Confirmée par l'opérateur")
+        } else {
+            switch state {
+            case .resolved: stateText = String(localized: "Rétablie")
+            case .confirmed: stateText = String(localized: "Confirmée")
+            case .reported: stateText = String(localized: "À confirmer")
+            default: stateText = ""
+            }
+        }
+        var services = OutageServices.label(
+            data: metaFlag("outageAffectsData"),
+            voice: metaFlag("outageAffectsVoice"),
+            sms: metaFlag("outageAffectsSms")
+        )
+        // Posts antérieurs aux drapeaux : la phrase du serveur sert de repli.
+        if services.isEmpty { services = metaString("outageServices") ?? "" }
+        let confirmations = metaInt("outageConfirmCount").flatMap { $0 > 0 ? String($0) : nil } ?? ""
+        return [
+            ("Opérateur", metaString("operator") ?? metaString("operatorKey") ?? ""),
+            ("Gravité", severity == .degraded ? String(localized: "Réseau dégradé") : String(localized: "Plus de réseau")),
+            ("État", stateText),
+            ("Touché", OutageTechnologies.detail(services: services, csv: metaString("outageTechnologies"))),
+            ("Confirmations", confirmations)
+        ]
     }
 
     private var speedtestPairs: [(String, String)] {

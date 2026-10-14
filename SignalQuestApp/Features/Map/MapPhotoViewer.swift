@@ -101,6 +101,10 @@ struct MapPhotoViewer: View {
     @State private var commentDraft = ""
     @State private var sendingComment = false
     @State private var commentError: String?
+    /// Lecture des commentaires ratée : on le dit au lieu d'écrire « Commente en premier ».
+    @State private var commentsFailed = false
+    /// Réaction refusée ou perdue : le cœur revient, et il faut dire pourquoi.
+    @State private var likeError: String?
     @State private var commentsExpanded = false
     @State private var photoZoomed = false
     @State private var pagerDrag: CGFloat = 0
@@ -293,6 +297,9 @@ struct MapPhotoViewer: View {
             siteBlock
             Divider().overlay(SQColor.separator)
             photoRow
+            if let likeError {
+                SQInlineError(message: likeError)
+            }
             if commentsExpanded {
                 commentsSection
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -445,7 +452,7 @@ struct MapPhotoViewer: View {
     }
 
     private var commentTotal: Int {
-        isLoading ? max(comments.count, current?.commentCount ?? 0) : comments.count
+        isLoading || commentsFailed ? max(comments.count, current?.commentCount ?? 0) : comments.count
     }
 
     private var photoRow: some View {
@@ -515,6 +522,18 @@ struct MapPhotoViewer: View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             if isLoading {
                 SQSpinner().tint(SQColor.label).frame(maxWidth: .infinity)
+            } else if commentsFailed {
+                SQInlineError(message: String(localized: "Impossible de charger les commentaires."))
+                Button {
+                    Task { await load() }
+                } label: {
+                    Text("Réessayer")
+                        .font(SQFont.body(13, .semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(SQPressButtonStyle())
             } else if comments.isEmpty {
                 Text("Commente en premier")
                     .font(SQFont.body(13, .regular))
@@ -620,20 +639,23 @@ struct MapPhotoViewer: View {
         let id = currentId
         isLoading = true
         comments = []
+        commentsFailed = false
         commentError = nil
+        likeError = nil
         likeCount = details[id].map { $0.likeCount ?? $0.likes ?? 0 } ?? current?.likeCount ?? 0
         liked = details[id].map { $0.isLikedByMe ?? $0.likedByCurrentUser ?? false } ?? false
         async let detail = try? service.photo(id: id)
-        async let loadedComments = try? service.comments(photoId: id)
+        async let loadedComments: [PhotoComment]? = try? service.comments(photoId: id)
         let photoResult = await detail
-        let commentsResult = await loadedComments ?? []
+        let commentsResult = await loadedComments
         guard !Task.isCancelled, id == currentId else { return }
         if let photoResult {
             details[id] = photoResult
             likeCount = photoResult.likeCount ?? photoResult.likes ?? 0
             liked = photoResult.isLikedByMe ?? photoResult.likedByCurrentUser ?? false
         }
-        comments = commentsResult
+        comments = commentsResult ?? []
+        commentsFailed = commentsResult == nil
         isLoading = false
     }
 
@@ -641,6 +663,10 @@ struct MapPhotoViewer: View {
         guard !likeBusy else { return }
         likeBusy = true
         defer { likeBusy = false }
+        likeError = nil
+        // La photo visée est figée AVANT l'await : si l'utilisateur glisse vers la voisine pendant
+        // l'appel, la réponse ne doit pas écrire le cœur de l'une sur l'autre.
+        let id = currentId
         // Optimisme : bascule immédiate puis réconciliation serveur.
         let previousLiked = liked
         let previousCount = likeCount
@@ -650,15 +676,18 @@ struct MapPhotoViewer: View {
         }
         Haptics.light()
         do {
-            let response = try await service.toggleLike(photoId: photoId, reaction: "❤️")
+            let response = try await service.toggleLike(photoId: id, reaction: "❤️")
             await MainActor.run {
+                guard id == currentId else { return }
                 if let serverLiked = response.liked { liked = serverLiked }
                 if let serverLikes = response.likes { likeCount = serverLikes }
             }
         } catch {
             await MainActor.run {
+                guard id == currentId else { return }
                 liked = previousLiked
                 likeCount = previousCount
+                if !error.isCancellation { likeError = error.userFacingMessage }
             }
         }
     }
@@ -679,17 +708,21 @@ struct MapPhotoViewer: View {
         commentError = nil
         defer { sendingComment = false }
         commentFocused = false
+        // Photo figée avant l'await : le commentaire est parti sur celle-ci, même si l'on a glissé.
+        let id = currentId
         do {
-            if let created = try await service.addComment(photoId: photoId, content: content) {
+            if let created = try await service.addComment(photoId: id, content: content) {
                 await MainActor.run {
-                    withAnimation(SQMotion.resolve(.default, reduceMotion)) { comments.append(created) }
+                    if id == currentId {
+                        withAnimation(SQMotion.resolve(.default, reduceMotion)) { comments.append(created) }
+                    }
                     commentDraft = ""
                 }
             } else {
                 // Réponse sans corps : on recharge la liste pour rester cohérent.
-                let refreshed = (try? await service.comments(photoId: photoId)) ?? comments
+                let refreshed = try? await service.comments(photoId: id)
                 await MainActor.run {
-                    comments = refreshed
+                    if id == currentId { comments = refreshed ?? comments }
                     commentDraft = ""
                 }
             }

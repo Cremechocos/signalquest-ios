@@ -8,6 +8,8 @@ struct PlannedDetailSheet: View {
     let operatorLabel: String
     let operatorAccent: Color
 
+    @Environment(\.dismiss) private var dismiss
+
     private var status: PlannedActivationStatus { site.activation?.status ?? .planned }
 
     var body: some View {
@@ -18,33 +20,42 @@ struct PlannedDetailSheet: View {
                 if !plannedTechs.isEmpty { technologiesSection }
                 infoSection
             }
-            .padding()
-            .padding(.top, SQSpace.sm)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
         }
+        .background(SQColor.bg.ignoresSafeArea())
         .presentationDetents([.height(460), .medium, .large])
-        .presentationDragIndicator(.visible)
-        .presentationBackgroundCompat(SQColor.bg)
+        .sqSheet(background: SQColor.bg)
     }
 
+    /// En-tête Halo, comme `ObservedCellSheet` : l'opérateur en petites capitales, le code du
+    /// site, puis le statut ; la fermeture est un bouton rond de 44 pt.
     private var header: some View {
-        HStack(alignment: .top, spacing: SQSpace.md) {
-            Image(systemName: "calendar.badge.clock")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(SQColor.onAccent)
-                .frame(width: 46, height: 46)
-                .background(operatorAccent, in: Circle())
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                // La pastille de l'opérateur accompagne son nom : la couleur ne le porte pas seule.
+                HStack(spacing: SQSpace.xs2) {
+                    Circle().fill(operatorAccent).frame(width: 8, height: 8).accessibilityHidden(true)
+                    Text(verbatim: operatorLabel).sqKicker()
+                }
                 Text(site.codeSite ?? site.idStation ?? String(localized: "Site prévisionnel"))
-                    .font(SQFont.display(20, .bold))
+                    .font(SQType.title)
                     .foregroundStyle(SQColor.label)
-                Text(statusLabel)
-                    .font(SQFont.body(14.5, .semibold))
-                    .foregroundStyle(statusColor)
-                Text(operatorLabel)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .sqHeader()
+                HStack(spacing: SQSpace.xs) {
+                    Image(systemName: statusGlyph)
+                        .font(.footnote.weight(.semibold))
+                        .accessibilityHidden(true)
+                    Text(statusLabel)
+                        .font(SQFont.body(14.5, .semibold))
+                }
+                // L'encre, pas le hex du marqueur : l'ambre posé en texte tombe à ~2:1.
+                .foregroundStyle(statusInk)
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "planned.detail.close") { dismiss() }
         }
     }
 
@@ -52,7 +63,8 @@ struct PlannedDetailSheet: View {
         HStack(spacing: SQSpace.sm) {
             Image(systemName: statusGlyph)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(statusColor)
+                .foregroundStyle(statusInk)
+                .accessibilityHidden(true)
             Text(statusDescription)
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.label)
@@ -71,29 +83,42 @@ struct PlannedDetailSheet: View {
                 .foregroundStyle(SQColor.label)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 8)], alignment: .leading, spacing: 8) {
                 ForEach(plannedTechs, id: \.self) { tech in
-                    Text(tech)
-                        .font(SQFont.body(12, .semibold))
-                        .foregroundStyle(techColor(tech))
-                        .sqSingleLine()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background(techColor(tech).opacity(0.14), in: Capsule(style: .continuous))
+                    let state = techState(tech)
+                    // Symbole ET valeur d'accessibilité : l'état d'une technologie ne tient plus à
+                    // la seule couleur.
+                    HStack(spacing: 4) {
+                        Image(systemName: state.symbol)
+                            .font(.caption2.weight(.bold))
+                            .accessibilityHidden(true)
+                        Text(tech)
+                    }
+                    .font(SQFont.body(12, .semibold))
+                    .foregroundStyle(state.color)
+                    .sqSingleLine()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(state.color.opacity(0.14), in: Capsule(style: .continuous))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityValue(state.label)
                 }
             }
             HStack(spacing: SQSpace.md) {
-                legendDot(SQColor.success, String(localized: "En service"))
-                legendDot(SQColor.warning, String(localized: "En attente"))
-                legendDot(SQColor.labelSecondary, String(localized: "Prévue"))
+                legendItem(.inService)
+                legendItem(.pending)
+                legendItem(.planned)
             }
             .font(SQType.micro)
             .foregroundStyle(SQColor.labelSecondary)
         }
     }
 
-    private func legendDot(_ color: Color, _ label: String) -> some View {
+    private func legendItem(_ state: TechState) -> some View {
         HStack(spacing: 4) {
-            Circle().fill(color).frame(width: 7, height: 7)
-            Text(LocalizedStringKey(label))
+            Image(systemName: state.symbol)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(state.color)
+                .accessibilityHidden(true)
+            Text(verbatim: state.label)
         }
     }
 
@@ -105,7 +130,7 @@ struct PlannedDetailSheet: View {
             infoRow("Commune", site.commune?.capitalized)
             infoRow("Département", site.departement)
             infoRow("Activation 5G prévue", formattedDate(site.date5g))
-            infoRow("Distance antenne", site.activation?.distanceM.map { "\(Int($0)) m" })
+            infoRow("Distance antenne", site.activation?.distanceM.map { SQUnits.distance(meters: $0) })
             infoRow(String(localized: "Mise en service"), formattedDate(site.activation?.lastInServiceDate))
         }
         .padding(.vertical, SQSpace.xs)
@@ -138,13 +163,41 @@ struct PlannedDetailSheet: View {
         return planned.isEmpty ? site.technologies : planned
     }
 
-    private func techColor(_ tech: String) -> Color {
+    private enum TechState {
+        case inService, pending, planned
+
+        var color: Color {
+            switch self {
+            case .inService: return SQColor.success
+            case .pending: return SQColor.warning
+            case .planned: return SQColor.labelSecondary
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .inService: return "checkmark.circle.fill"
+            case .pending: return "clock.fill"
+            case .planned: return "calendar"
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .inService: return String(localized: "En service")
+            case .pending: return String(localized: "En attente")
+            case .planned: return String(localized: "Prévue")
+            }
+        }
+    }
+
+    private func techState(_ tech: String) -> TechState {
         let active = site.activation?.activeTechnologies ?? []
         let confirmed = site.activation?.confirmedTechnologies ?? []
         let pending = site.activation?.pendingTechnologies ?? []
-        if active.contains(tech) || confirmed.contains(tech) { return SQColor.success }
-        if pending.contains(tech) { return SQColor.warning }
-        return SQColor.labelSecondary
+        if active.contains(tech) || confirmed.contains(tech) { return .inService }
+        if pending.contains(tech) { return .pending }
+        return .planned
     }
 
     private var statusLabel: String {
@@ -159,6 +212,8 @@ struct PlannedDetailSheet: View {
     // Même source de vérité que la pastille sur la carte → fiche et marqueur
     // affichent toujours la même couleur de statut (déclaré = bleu, pas gris).
     private var statusColor: Color { MapExplorerView.plannedStatusColor(status) }
+    /// La même lecture en version encre, pour le texte et les pictogrammes.
+    private var statusInk: Color { MapExplorerView.plannedStatusInk(status) }
 
     private var statusGlyph: String {
         switch status {

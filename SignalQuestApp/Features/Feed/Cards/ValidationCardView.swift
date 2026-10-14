@@ -27,7 +27,8 @@ struct ValidationCardView: View {
                     createdAt: item.createdAt,
                     kindBadge: nil,
                     kindColor: SQColor.success,
-                    onAuthorTap: onAuthorTap
+                    onAuthorTap: onAuthorTap,
+                    isPinned: item.isPinned
                 )
 
                 Group {

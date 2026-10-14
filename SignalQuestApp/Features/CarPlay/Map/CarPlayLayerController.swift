@@ -30,6 +30,12 @@ final class CarPlayLayerController {
         var outageSources: [String: OutageSiteLive] = [:]
         var plannedSources: [String: PlannedSiteLive] = [:]
 
+        /// Couches demandées et couches dont le chargement a échoué : un échec
+        /// réseau ne doit pas passer pour « aucune donnée ici ».
+        var requestedLayers = 0
+        var failedLayers = 0
+        var allFailed: Bool { requestedLayers > 0 && failedLayers == requestedLayers }
+
         /// Tous les marqueurs-vues, dans l'ordre d'empilement voulu : les
         /// antennes en dessous, les incidents au-dessus.
         var annotations: [MapAnnotationPayload] { antennas + planned + outages }
@@ -49,33 +55,43 @@ final class CarPlayLayerController {
               filters: Set<MapDisplayItem.Kind>,
               market: String,
               operatorKey: String) async -> Layers {
-        async let antennaTiles = filters.contains(.antenna)
+        // `nil` = la couche demandée a échoué ; `[]` = vide, ou non demandée.
+        async let antennaTiles: [AndroidAntennaTileResponse]? = filters.contains(.antenna)
             ? (try? await map.antennaTiles(bounds: bounds, zoom: zoom, market: market,
-                                           operatorName: operatorKey, withAzimuth: true, bands: [])) ?? []
+                                           operatorName: operatorKey, withAzimuth: true, bands: []))
             : []
-        async let coverageTiles = filters.contains(.coverage)
+        async let coverageTiles: [AndroidCoverageTileResponse]? = filters.contains(.coverage)
             ? (try? await map.coverageTiles(bounds: bounds, zoom: zoom, market: market,
-                                            operatorName: operatorKey, days: 90, bands: [], maxAge: nil)) ?? []
+                                            operatorName: operatorKey, days: 90, bands: [], maxAge: nil))
             : []
-        async let speedtestTiles = filters.contains(.speedtest)
+        async let speedtestTiles: [AndroidSpeedtestTileResponse]? = filters.contains(.speedtest)
             ? (try? await map.speedtestTiles(bounds: bounds, zoom: zoom, market: market,
-                                             operatorName: operatorKey, days: 90, bands: [], maxAge: nil)) ?? []
+                                             operatorName: operatorKey, days: 90, bands: [], maxAge: nil))
             : []
-        async let outages = filters.contains(.outage)
+        async let outages: [OutageSiteLive]? = filters.contains(.outage)
             ? (try? await map.outageSites(market: market, operatorName: operatorKey,
-                                          territory: nil, bands: [])) ?? []
+                                          territory: nil, bands: []))
             : []
-        async let planned = filters.contains(.planned)
+        async let planned: [PlannedSiteLive]? = filters.contains(.planned)
             ? (try? await map.plannedSites(market: market, operatorName: operatorKey,
-                                           territory: nil, bands: [])) ?? []
+                                           territory: nil, bands: []))
             : []
 
         var layers = Layers()
-        layers.antennas = Self.antennaPayloads(from: await antennaTiles, zoom: zoom)
-        layers.coverage = Self.coverageFeatures(from: await coverageTiles)
-        layers.speedtests = Self.speedtestFeatures(from: await speedtestTiles)
-        let loadedOutages = await outages
-        let loadedPlanned = await planned
+        let loadable: [MapDisplayItem.Kind] = [.antenna, .coverage, .speedtest, .outage, .planned]
+        layers.requestedLayers = loadable.filter { filters.contains($0) }.count
+        let antennaResult = await antennaTiles
+        let coverageResult = await coverageTiles
+        let speedtestResult = await speedtestTiles
+        let outageResult = await outages
+        let plannedResult = await planned
+        layers.failedLayers = [antennaResult == nil, coverageResult == nil, speedtestResult == nil,
+                               outageResult == nil, plannedResult == nil].filter { $0 }.count
+        layers.antennas = Self.antennaPayloads(from: antennaResult ?? [], zoom: zoom)
+        layers.coverage = Self.coverageFeatures(from: coverageResult ?? [])
+        layers.speedtests = Self.speedtestFeatures(from: speedtestResult ?? [])
+        let loadedOutages = outageResult ?? []
+        let loadedPlanned = plannedResult ?? []
         layers.outages = Self.outagePayloads(from: loadedOutages, within: bounds)
         layers.planned = Self.plannedPayloads(from: loadedPlanned, within: bounds)
         layers.outageSources = Dictionary(loadedOutages.map { ("outage-\($0.id)", $0) },

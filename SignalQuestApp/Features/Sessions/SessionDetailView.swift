@@ -828,10 +828,13 @@ struct SessionDetailView: View {
                     // Lexique : Réception / Envoi / Latence, unité selon la langue (valeurs en Mbit/s).
                     // Couleurs de la fiche d'une mesure (TRX-11), portées par l'icône.
                     let stats = Group {
-                        speedStat("Réception moy.", sum.avgDown, String(localized: "Mbit/s"), "arrow.down",
+                        let down = Self.throughputParts(sum.avgDown)
+                        let up = Self.throughputParts(sum.avgUp)
+                        speedStat("Réception moy.", down.value, down.unit, "arrow.down",
                                   Color(uiColor: SessionSpeedColor.ui(sum.avgDown)))
-                        speedStat("Envoi moy.", sum.avgUp, String(localized: "Mbit/s"), "arrow.up", SQColor.success)
-                        speedStat("Latence moy.", sum.avgPing, "ms", "bolt.horizontal", SQColor.warning)
+                        speedStat("Envoi moy.", up.value, up.unit, "arrow.up", SQColor.success)
+                        speedStat("Latence moy.", sum.avgPing.map { "\(Int($0.rounded()))" } ?? "—", "ms",
+                                  "bolt.horizontal", SQColor.warning)
                     }
                     Group {
                         // Trois tuiles étroites coupaient « Réception » au milieu du mot
@@ -863,11 +866,18 @@ struct SessionDetailView: View {
     }
 
     /// Valeur à l'encre : la couleur du débit ne tenait pas 4,5:1 sur la tuile.
-    private func speedStat(_ label: String, _ value: Double?, _ unit: String, _ icon: String, _ color: Color) -> some View {
+    private func speedStat(_ label: String, _ value: String, _ unit: String, _ icon: String, _ color: Color) -> some View {
         SQMetricTile(
-            label: label, value: value.map { "\(Int($0.rounded()))" } ?? "—", unit: unit, icon: icon, iconTint: color,
+            label: label, value: value, unit: unit, icon: icon, iconTint: color,
             fillsHeight: true
         )
+    }
+
+    /// Débit et unité au format de l'app (une décimale sous 100, Gbit/s au-delà de 1 000),
+    /// ou un tiret quand la mesure manque.
+    private static func throughputParts(_ mbps: Double?) -> (value: String, unit: String) {
+        guard let mbps, mbps.isFinite, mbps > 0 else { return ("—", SQUnits.throughputUnit(mbps: 0)) }
+        return (SQUnits.throughputValue(mbps: mbps), SQUnits.throughputUnit(mbps: mbps))
     }
 
     /// « 10:05 · km 2,1 » : l'heure, et la position sur le trajet d'un Drive Test.
@@ -875,7 +885,7 @@ struct SessionDetailView: View {
         var parts: [String] = []
         if let t = st.timestamp { parts.append(t.formatted(.dateTime.hour().minute())) }
         if model.session.isDriveTest, let coordinate = st.coordinate, let km = model.kilometer(near: coordinate) {
-            parts.append(String(localized: "km \(km.formatted(.number.precision(.fractionLength(1))))"))
+            parts.append(SQUnits.routeMarker(kilometers: km))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
@@ -927,10 +937,11 @@ struct SessionDetailView: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(SQColor.labelSecondary)
                         .accessibilityHidden(true)
-                    Text(st.downloadMbps.map { "\(Int($0.rounded()))" } ?? "—")
+                    let down = Self.throughputParts(st.downloadMbps)
+                    Text(verbatim: down.value)
                         .font(SQFont.body(15, .bold, relativeTo: .subheadline))
                         .foregroundStyle(SQColor.label)
-                    Text("Mbit/s")
+                    Text(verbatim: down.unit)
                         .font(SQFont.body(11, .semibold, relativeTo: .caption2))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -938,7 +949,8 @@ struct SessionDetailView: View {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 10, weight: .bold))
                         .accessibilityHidden(true)
-                    Text(verbatim: "\(st.uploadMbps.map { "\(Int($0.rounded()))" } ?? "—") \(String(localized: "Mbit/s")) · \(st.pingMs.map { "\(Int($0.rounded()))" } ?? "—") ms")
+                    let up = Self.throughputParts(st.uploadMbps)
+                    Text(verbatim: "\(up.value) \(up.unit) · \(st.pingMs.map { "\(Int($0.rounded())) ms" } ?? "—")")
                 }
                 .font(SQFont.body(12, relativeTo: .caption2))
                 .foregroundStyle(SQColor.labelSecondary)
@@ -1097,8 +1109,7 @@ struct SessionDetailView: View {
     // MARK: Helpers
 
     static func formatKm(_ km: Double) -> String {
-        if km < 1 { return "\(Int((km * 1000).rounded())) m" }
-        return SQUnits.distance(kilometers: km)
+        SQUnits.distance(kilometers: km)
     }
 
     static func statusColor(_ s: ServingStatus) -> Color {
@@ -1210,7 +1221,7 @@ private struct SessionSignalChart: View {
         case .time:
             return (start ?? Date()).addingTimeInterval(value).formatted(.dateTime.hour().minute())
         case .distance:
-            return String(localized: "km \(value.formatted(.number.precision(.fractionLength(0...1))))")
+            return SQUnits.routeMarker(kilometers: value, fractionDigits: 0...1)
         }
     }
 
@@ -1326,7 +1337,7 @@ private struct SessionSignalReading: View {
         var when: [String] = []
         if let t = sample.point.timestamp { when.append(t.formatted(.dateTime.hour().minute())) }
         if showsKilometer {
-            when.append(String(localized: "km \(sample.km.formatted(.number.precision(.fractionLength(1))))"))
+            when.append(SQUnits.routeMarker(kilometers: sample.km))
         }
         var cell: [String] = []
         if let tech = sample.point.tech, !tech.isEmpty { cell.append(tech) }
@@ -1587,7 +1598,7 @@ private struct SessionTraceFullScreen: View {
         var facts: [String] = []
         if let t = point.timestamp { facts.append(t.formatted(.dateTime.hour().minute())) }
         if model.session.isDriveTest, let km = model.kilometer(at: point) {
-            facts.append(String(localized: "km \(km.formatted(.number.precision(.fractionLength(1))))"))
+            facts.append(SQUnits.routeMarker(kilometers: km))
         }
         var cell: [String] = []
         if let pci = point.pci, !pci.isEmpty { cell.append("PCI \(pci)") }
@@ -1630,7 +1641,7 @@ private struct SessionTraceFullScreen: View {
                     if !facts.isEmpty { Text(verbatim: facts.joined(separator: " · ")) }
                     if !cell.isEmpty {
                         Text(verbatim: cell.joined(separator: " · "))
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(.system(.caption, design: .monospaced))
                     }
                 }
                 .font(SQType.caption)

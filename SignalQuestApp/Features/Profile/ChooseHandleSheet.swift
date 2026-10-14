@@ -60,7 +60,7 @@ struct ChooseHandleSheet: View {
                     if let errorText {
                         Text(errorText)
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.danger)
+                            .foregroundStyle(SQColor.dangerInk)
                     }
 
                     GradientButton("Continuer", systemImage: "checkmark.circle.fill", isBusy: isBusy) {
@@ -97,7 +97,7 @@ struct ChooseHandleSheet: View {
 
     private var messageColor: Color {
         if status == .available { return SQColor.success }
-        if isNegative { return SQColor.danger }
+        if isNegative { return SQColor.dangerInk }
         return SQColor.labelSecondary
     }
 

@@ -51,6 +51,8 @@ final class AppRouter: ObservableObject {
     @Published var openFriendRequests = false
     /// Set to request opening a site sheet on the Map tab (deep link carte).
     @Published var openSiteId: String?
+    /// Marché où chercher ce site (favori d'un autre pays) ; nil = marché affiché.
+    var openSiteMarket: String?
     /// Panne communautaire dont la feuille doit s'ouvrir sur la carte, posée par la page
     /// « Pannes signalées ». L'objet ENTIER et non son identifiant : cette page est paginée sans
     /// tenir compte de l'emprise, donc la carte n'a en général pas chargé la panne demandée et
@@ -370,9 +372,12 @@ final class AppRouter: ObservableObject {
         if let id { openUserProfileId = id }
     }
 
-    func route(toSite id: String?) {
+    func route(toSite id: String?, market: String? = nil) {
         selectedTab = .map
-        if let id { openSiteId = id }
+        guard let id else { return }
+        // Posé avant l'identifiant, que la carte observe.
+        openSiteMarket = market
+        openSiteId = id
     }
 
     /// Une ligne de « Pannes signalées » renvoie à la carte, cadrée sur le site, feuille ouverte.

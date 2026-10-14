@@ -118,6 +118,9 @@ struct ProfileView: View {
             .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
         }
+        // Navigation par valeur : une destination construite dans le corps de la
+        // vue était recréée à chaque rendu du Profil, ce qu'iOS 16 supporte mal.
+        .navigationDestination(for: ProfileDestination.self) { destination(for: $0) }
         // Directement sur le ScrollView (avant le ZStack de signalQuestBackground).
         .sqDockAutoMinimize()
         .toolbar(.hidden, for: .navigationBar)
@@ -530,50 +533,34 @@ struct ProfileView: View {
             // Remontés des Réglages (MES-21, TRX-22) : Sentinelle, l'une des
             // rares fonctions Premium utilisées, était à cinq niveaux.
             menuSection("Suivis") {
-                NavigationLink {
-                    FavoriteAntennasView(favorites: services.favoriteAntennas) { favorite in
-                        router.route(toSite: favorite.siteId)
-                    }
-                } label: {
+                NavigationLink(value: ProfileDestination.favorites) {
                     FavoriteCountMenuRow(favorites: services.favoriteAntennas)
                 }
                 menuSeparator
-                NavigationLink {
-                    SentinelleView(service: services.sentinelle)
-                } label: {
+                NavigationLink(value: ProfileDestination.sentinelle) {
                     menuRow(title: "Sentinelle", icon: "wifi.router")
                 }
             }
 
             menuSection("Contributions") {
-                NavigationLink {
-                    MyMeasurementsView(service: services.sessions)
-                } label: {
+                NavigationLink(value: ProfileDestination.measurements) {
                     menuRow(title: "Mes mesures", icon: "mappin.and.ellipse")
                 }
                 menuSeparator
-                NavigationLink {
-                    PhotosView(service: services.photos)
-                } label: {
+                NavigationLink(value: ProfileDestination.photos) {
                     menuRow(title: "Photos", icon: "photo.stack")
                 }
                 menuSeparator
-                NavigationLink {
-                    AntennaReportsListView(service: services.antennaReports)
-                } label: {
+                NavigationLink(value: ProfileDestination.antennaReports) {
                     menuRow(title: "Signalements d’antenne", icon: "exclamationmark.bubble")
                 }
                 menuSeparator
-                NavigationLink {
-                    CommunityOutagesListView(service: services.communityOutages, markets: services.markets)
-                } label: {
+                NavigationLink(value: ProfileDestination.outages) {
                     menuRow(title: "Pannes signalées", icon: "exclamationmark.triangle")
                 }
                 menuSeparator
                 // Territoires : plus en tuile sous le niveau (décision du 29/09).
-                NavigationLink {
-                    TerritoriesView(service: services.gamification)
-                } label: {
+                NavigationLink(value: ProfileDestination.territories) {
                     menuRow(title: "Territoires", icon: "square.grid.3x3")
                 }
             }
@@ -582,25 +569,15 @@ struct ProfileView: View {
             // a de telles données, sinon une ligne dit ce qu'ils apportent.
             menuSection("Avec l’app Android") {
                 if androidPresence.showsAndroidScreens {
-                    NavigationLink {
-                        SessionsListView(service: services.sessions)
-                    } label: {
+                    NavigationLink(value: ProfileDestination.sessions) {
                         menuRow(title: "Enregistrements de trajet", icon: "point.topleft.down.curvedto.point.bottomright.up")
                     }
                     menuSeparator
-                    NavigationLink {
-                        RadioLogsView(
-                            service: services.radioLogs,
-                            antennas: services.antennas,
-                            networkPath: services.networkPath
-                        )
-                    } label: {
+                    NavigationLink(value: ProfileDestination.radioLogs) {
                         menuRow(title: "Logs antennes", icon: "antenna.radiowaves.left.and.right")
                     }
                     menuSeparator
-                    NavigationLink {
-                        MyIdentificationsView(service: services.identify)
-                    } label: {
+                    NavigationLink(value: ProfileDestination.identifications) {
                         menuRow(title: "Mes identifications", icon: "checkmark.seal")
                     }
                 } else {
@@ -620,34 +597,24 @@ struct ProfileView: View {
                     .accessibilityIdentifier("profile.updateRecommended")
                     menuSeparator
                 }
-                NavigationLink {
-                    SettingsView(userService: services.users, authService: services.auth)
-                } label: {
+                NavigationLink(value: ProfileDestination.settings) {
                     menuRow(title: "Réglages", icon: "gearshape")
                 }
                 menuSeparator
-                NavigationLink {
-                    PrivacySettingsView(service: services.privacy)
-                } label: {
+                NavigationLink(value: ProfileDestination.privacy) {
                     menuRow(title: "Confidentialité", icon: "hand.raised")
                 }
                 menuSeparator
-                NavigationLink {
-                    PaywallView(store: services.entitlements, entryPoint: .profile)
-                } label: {
+                NavigationLink(value: ProfileDestination.subscription) {
                     SubscriptionMenuRow(store: services.entitlements)
                 }
                 menuSeparator
-                NavigationLink {
-                    SQGlossaryView()
-                } label: {
+                NavigationLink(value: ProfileDestination.glossary) {
                     menuRow(title: "Aide et glossaire", icon: "questionmark.circle")
                 }
                 .accessibilityIdentifier("profile.glossary")
                 menuSeparator
-                NavigationLink {
-                    BugReportsListView()
-                } label: {
+                NavigationLink(value: ProfileDestination.bugs) {
                     menuRow(title: "Bugs et idées", icon: "ladybug",
                             subtitle: String(localized: "Signaler un problème, proposer une amélioration"),
                             badge: unseenBugReplies > 0 ? unseenBugReplies.formatted() : nil)
@@ -656,9 +623,7 @@ struct ProfileView: View {
                 // Réservé aux administrateurs ; le serveur refuse de toute façon les autres comptes.
                 if case .authenticated(let user) = session.state, user.role == "admin" {
                     menuSeparator
-                    NavigationLink {
-                        AdminBugsView(service: services.adminBugs)
-                    } label: {
+                    NavigationLink(value: ProfileDestination.adminBugs) {
                         menuRow(title: "Admin · bugs et retours", icon: "wrench.and.screwdriver",
                                 subtitle: String(localized: "Trier et répondre à tous les signalements"))
                     }
@@ -784,12 +749,9 @@ struct ProfileView: View {
 
     @ViewBuilder
     private var progressionTileContent: some View {
-        progressionTile("Récompenses", icon: "rosette", subtitle: missionsSubtitle) {
-            GamificationView(service: services.gamification)
-        }
-        progressionTile("Classements", icon: "trophy", subtitle: weekRank.map { String(localized: "\($0)e de tes amis") }) {
-            LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
-        }
+        progressionTile("Récompenses", icon: "rosette", subtitle: missionsSubtitle, destination: .rewards)
+        progressionTile("Classements", icon: "trophy", subtitle: weekRank.map { String(localized: "\($0)e de tes amis") },
+                        destination: .leaderboards)
     }
 
     private var missionsSubtitle: String? {
@@ -801,15 +763,13 @@ struct ProfileView: View {
         return nil
     }
 
-    private func progressionTile<Destination: View>(
+    private func progressionTile(
         _ title: String,
         icon: String,
         subtitle: String?,
-        @ViewBuilder destination: @escaping () -> Destination
+        destination: ProfileDestination
     ) -> some View {
-        NavigationLink {
-            destination()
-        } label: {
+        NavigationLink(value: destination) {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
                 ProfileMenuIcon(systemImage: icon, tint: SQColor.accentInk, fill: SQColor.accentSoft)
                     .padding(.bottom, SQSpace.xs)
@@ -858,28 +818,51 @@ struct ProfileView: View {
     private func todoLink(_ todo: UserOverview.Todo) -> some View {
         switch todo {
         case .claimMissions(let count, let rewardXp):
-            NavigationLink {
-                GamificationView(service: services.gamification)
-            } label: {
+            NavigationLink(value: ProfileDestination.rewards) {
                 ProfileMenuRow(title: "Missions à réclamer", icon: "gift", subtitle: String(localized: "+\(rewardXp) pts"),
                                badge: count.formatted(), accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.missions")
         case .photosInReview(let count):
-            NavigationLink {
-                PhotosView(service: services.photos, initialFilter: .pending)
-            } label: {
+            NavigationLink(value: ProfileDestination.pendingPhotos) {
                 ProfileMenuRow(title: "Photos en vérification", icon: "hourglass", badge: count.formatted(), accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.photos")
         case .identificationConflicts(let count):
-            NavigationLink {
-                MyIdentificationsView(service: services.identify)
-            } label: {
+            NavigationLink(value: ProfileDestination.identifications) {
                 ProfileMenuRow(title: "Identifications en conflit", icon: "exclamationmark.triangle", badge: count.formatted(),
                                accentIcon: true)
             }
             .accessibilityIdentifier("profile.todo.identifications")
+        }
+    }
+
+    @ViewBuilder
+    private func destination(for destination: ProfileDestination) -> some View {
+        switch destination {
+        case .favorites:
+            FavoriteAntennasView(favorites: services.favoriteAntennas) { favorite in
+                router.route(toSite: favorite.siteId, market: favorite.market)
+            }
+        case .sentinelle: SentinelleView(service: services.sentinelle)
+        case .measurements: MyMeasurementsView(service: services.sessions)
+        case .photos: PhotosView(service: services.photos)
+        case .pendingPhotos: PhotosView(service: services.photos, initialFilter: .pending)
+        case .antennaReports: AntennaReportsListView(service: services.antennaReports)
+        case .outages: CommunityOutagesListView(service: services.communityOutages, markets: services.markets)
+        case .territories: TerritoriesView(service: services.gamification)
+        case .sessions: SessionsListView(service: services.sessions)
+        case .radioLogs:
+            RadioLogsView(service: services.radioLogs, antennas: services.antennas, networkPath: services.networkPath)
+        case .identifications: MyIdentificationsView(service: services.identify)
+        case .settings: SettingsView(userService: services.users, authService: services.auth)
+        case .privacy: PrivacySettingsView(service: services.privacy)
+        case .subscription: PaywallView(store: services.entitlements, entryPoint: .profile)
+        case .glossary: SQGlossaryView()
+        case .bugs: BugReportsListView()
+        case .adminBugs: AdminBugsView(service: services.adminBugs)
+        case .rewards: GamificationView(service: services.gamification)
+        case .leaderboards: LeaderboardsView(service: services.leaderboards, gamification: services.gamification, user: user)
         }
     }
 
@@ -923,6 +906,14 @@ struct ProfileView: View {
             weekRank = week.currentUserRank ?? week.entries.first { $0.userId == user.id }?.rank
         }
     }
+}
+
+/// Écrans ouverts depuis le Profil, poussés par valeur.
+private enum ProfileDestination: Hashable {
+    case favorites, sentinelle, measurements, photos, pendingPhotos, antennaReports, outages, territories
+    case sessions, radioLogs, identifications
+    case settings, privacy, subscription, glossary, bugs, adminBugs
+    case rewards, leaderboards
 }
 
 /// Petite icône de ligne Halo : glyphe dans un carré arrondi de 30 pt.

@@ -8,6 +8,9 @@ final class FriendsViewModel: ObservableObject {
     @Published var blocked: [BlockedUser] = []
     @Published var errorMessage: String?
     @Published var isLoading = false
+    /// Demandes dont l'action (accepter, refuser, annuler) est en cours : leur
+    /// rangée est désactivée, un second appui ne part pas en double requête.
+    @Published private(set) var busyRequestIds: Set<String> = []
 
     private let service: FriendsServicing
     init(service: FriendsServicing) { self.service = service }
@@ -53,16 +56,23 @@ final class FriendsViewModel: ObservableObject {
     }
 
     func accept(_ request: FriendRequest) async {
-        await perform { try await self.service.accept(requestId: request.id) }
+        await performOnRequest(request) { try await self.service.accept(requestId: request.id) }
     }
 
     func decline(_ request: FriendRequest) async {
-        await perform { try await self.service.decline(requestId: request.id) }
+        await performOnRequest(request) { try await self.service.decline(requestId: request.id) }
     }
 
     /// Annule une demande que j'ai envoyée.
     func cancel(_ request: FriendRequest) async {
-        await perform { try await self.service.cancelRequest(requestId: request.id) }
+        await performOnRequest(request) { try await self.service.cancelRequest(requestId: request.id) }
+    }
+
+    private func performOnRequest(_ request: FriendRequest, _ action: @escaping () async throws -> Void) async {
+        guard !busyRequestIds.contains(request.id) else { return }
+        busyRequestIds.insert(request.id)
+        defer { busyRequestIds.remove(request.id) }
+        await perform(action)
     }
 
     func remove(_ friend: Friend) async {
@@ -121,6 +131,18 @@ struct FriendsListView: View {
 
     var body: some View {
         List {
+            // Chargement partiel ou action en échec : ce qui est là reste, l'erreur
+            // se dit en tête de liste pour ne pas rester hors de l'écran.
+            if let error = model.errorMessage, !isEverythingEmpty {
+                Section {
+                    SQInlineError(message: error)
+                        .padding(SQSpace.md2)
+                        .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
+                }
+            }
             if model.isLoading && model.friends.isEmpty && model.receivedRequests.isEmpty {
                 SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
@@ -160,7 +182,9 @@ struct FriendsListView: View {
                     sectionHeader("Demandes envoyées")
                 }
             }
-            if !(isEverythingEmpty && model.errorMessage != nil) {
+            // Pas de « Amis (0) » sous l'état vide ou le spinner : la section n'existe
+            // que s'il y a des amis.
+            if !model.friends.isEmpty {
             Section {
                 ForEach(model.friends) { friend in
                     Button {
@@ -188,6 +212,7 @@ struct FriendsListView: View {
                         }
                     }
                     .accessibilityHint("Ouvre le profil de \(friend.displayName)")
+                    .accessibilityValue(friend.presence?.isOnline == true ? Text("En ligne") : Text(verbatim: ""))
                 }
             } header: {
                 sectionHeader(String(localized: "Amis (\(model.friends.count))"))
@@ -222,20 +247,6 @@ struct FriendsListView: View {
                     }
                 } header: {
                     sectionHeader("Bloqués")
-                }
-            }
-            // Chargement partiel : ce qui est là reste, l'échec se dit en bas.
-            if let error = model.errorMessage, !isEverythingEmpty {
-                Section {
-                    Text(error)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.dangerInk)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(SQSpace.md2)
-                        .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
                 }
             }
         }
@@ -321,9 +332,12 @@ struct FriendsListView: View {
             }
             .font(SQType.button)
             .foregroundStyle(SQColor.labelSecondary)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
             .accessibilityLabel("Annuler la demande envoyée à \(name)")
         }
+        .disabled(model.busyRequestIds.contains(request.id))
     }
 
     /// En-tête de section Figtree, casse normale (plus de MAJUSCULES système).
@@ -366,6 +380,7 @@ struct FriendsListView: View {
             compactButton("Refuser", accented: false) { Task { await model.decline(request) } }
         }
         .padding(.vertical, SQSpace.xs)
+        .disabled(model.busyRequestIds.contains(request.id))
     }
 
     /// Petits boutons capsule des rangées : accepter = brique pleine,

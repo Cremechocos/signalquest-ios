@@ -31,6 +31,9 @@ final class CommunityOutagesListViewModel: ObservableObject {
     @Published private(set) var outages: [CommunityOutage] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isLoadingMore = false
+    /// Vrai une fois une première lecture terminée (réussie ou non) : avant, une liste vide
+    /// n'est pas « aucune panne », c'est « pas encore chargé » — l'état vide clignotait.
+    @Published private(set) var hasLoaded = false
     /// Pannes dont le vote est en cours.
     @Published private(set) var votingOutageIds: Set<String> = []
     @Published private(set) var hasMore = false
@@ -63,7 +66,7 @@ final class CommunityOutagesListViewModel: ObservableObject {
 
     private func clearContext() {
         loadRevision = UUID(); closeRevision = nil
-        outages = []; nextOffset = 0; hasMore = false
+        outages = []; nextOffset = 0; hasMore = false; hasLoaded = false
         isLoading = false; isLoadingMore = false; closingId = nil; errorMessage = nil
     }
 
@@ -183,9 +186,11 @@ final class CommunityOutagesListViewModel: ObservableObject {
             nextOffset = offset + page.outages.count
             hasMore = page.hasMore && !page.outages.isEmpty
             displayedContext = requestedContext
+            hasLoaded = true
         } catch {
             guard context == requestedContext, loadRevision == request, !Task.isCancelled, !error.isCancellation else { return }
             errorMessage = error.userFacingMessage
+            hasLoaded = true
         }
     }
 }
@@ -234,7 +239,7 @@ struct CommunityOutagesListView: View {
                     // Seule ligne de sa section : le séparateur ne séparait rien (UI-18).
                     .listRowSeparator(.hidden)
                 }
-            } else if !model.isLoading, model.outages.isEmpty {
+            } else if model.hasLoaded, !model.isLoading, model.outages.isEmpty {
                 Section {
                     EmptyStateView(
                         title: model.scope == .mine ? "Rien signalé pour l'instant" : "Aucune panne signalée",
@@ -387,7 +392,8 @@ struct CommunityOutagesListView: View {
                     outage: outage,
                     onVote: { id, kind in
                         Task { await model.vote(outageId: id, kind: kind, location: services.location.cachedLocation()) }
-                    }
+                    },
+                    isVoting: model.votingOutageIds.contains(outage.id)
                 )
             } else {
                 // Panne close — « Les miennes » les garde en mémoire. Le bloc d'arbitrage ne

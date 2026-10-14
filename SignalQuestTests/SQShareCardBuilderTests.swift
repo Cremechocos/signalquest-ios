@@ -81,7 +81,8 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertEqual(card.download.maxValue, "812,4")
         XCTAssertEqual(card.upload.value, "126,4")
         XCTAssertEqual(card.upload.maxValue, "131,0")
-        XCTAssertEqual(card.download.unit, "Mbps")
+        // Même unité que le reste de l’app (« Mbit/s » en français).
+        XCTAssertEqual(card.download.unit, SQUnits.throughputUnit(mbps: 770.2))
     }
 
     /// Latence héros : min ?: médiane ?: moyenne — convention partagée avec

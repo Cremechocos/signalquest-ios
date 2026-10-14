@@ -61,6 +61,8 @@ final class RadioLogsViewModel: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var syncReceived = 0
     @Published private(set) var isScanning = false
+    /// Balayage suspendu par l'utilisateur : la carte garde « Reprendre » visible.
+    @Published private(set) var isPaused = false
     @Published var errorMessage: String?
     @Published var premiumMessage: String?
     @Published var toast: String?
@@ -71,7 +73,11 @@ final class RadioLogsViewModel: ObservableObject {
     /// Le balayage n'a lieu que si le réseau le permet. Le refuser en données
     /// mobiles n'est pas cosmétique : une passe complète, c'est une trentaine de
     /// requêtes qui rejouent la résolution côté serveur.
-    @Published var scanOnCellular = true
+    @Published var scanOnCellular = UserDefaults.standard.object(forKey: RadioLogsViewModel.scanOnCellularKey) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(scanOnCellular, forKey: Self.scanOnCellularKey) }
+    }
+    /// Le choix « vérifier en données mobiles » survit à la fermeture de l'écran.
+    nonisolated static let scanOnCellularKey = "radioLogs.scanOnCellular"
     @Published var searchText = "" { didSet { rebuild() } }
     @Published var expandedSiteId: String?
 
@@ -359,6 +365,7 @@ final class RadioLogsViewModel: ObservableObject {
     private func startScan(of pending: [RadioLogSite]) {
         guard !pending.isEmpty else { return }
         isScanning = true
+        isPaused = false
         // Le flux est créé hors de la tâche et `self` est ré-obtenu à chaque
         // fenêtre : un `guard let self` en tête retiendrait le modèle pendant
         // tout le balayage, même une fois l'écran fermé.
@@ -384,7 +391,13 @@ final class RadioLogsViewModel: ObservableObject {
     func toggleScan() {
         if isScanning {
             stopScan()
+            isPaused = true
         } else {
+            isPaused = false
+            guard scanIsAllowedOnCurrentNetwork else {
+                toast = String(localized: "Balayage désactivé en données mobiles.")
+                return
+            }
             Task { await startScanIfNeeded() }
         }
     }
@@ -468,7 +481,9 @@ final class RadioLogsViewModel: ObservableObject {
             toast = String(localized: "Journal radio supprimé.")
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            // En toast : la bannière d'erreur propose « Réessayer », qui resynchronise
+            // le journal au lieu de relancer la suppression.
+            toast = error.userFacingMessage
             Haptics.error()
         }
     }

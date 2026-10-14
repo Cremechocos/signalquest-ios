@@ -555,7 +555,7 @@ private struct SessionRow: View {
                     if let date = session.startTime {
                         Text(date, format: .dateTime.day().month().hour().minute())
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelTertiary)
+                            .foregroundStyle(SQColor.labelSecondary)
                             .sqSingleLine()
                     }
                 }

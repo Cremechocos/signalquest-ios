@@ -689,11 +689,11 @@ struct SpeedtestView: View {
                     detailItem(label: "Envoi (moyenne)", value: speed(result.uploadAverageMbps))
                     detailItem(label: "Envoi (pic)", value: speed(result.uploadMaxMbps))
                     detailItem(label: "Latence", value: ms(result.primaryPingMs), trailing: result.pingProtocol)
-                    detailItem(label: "Gigue", value: ms(result.jitterMs))
+                    detailItem(label: "Gigue", value: jitterLabel(result.jitterMs))
                     detailItem(label: "Latence en réception", value: ms(result.pingDlMs))
-                    detailItem(label: "Gigue en réception", value: ms(result.jitterDlMs))
+                    detailItem(label: "Gigue en réception", value: jitterLabel(result.jitterDlMs))
                     detailItem(label: "Latence en envoi", value: ms(result.pingUlMs))
-                    detailItem(label: "Gigue en envoi", value: ms(result.jitterUlMs))
+                    detailItem(label: "Gigue en envoi", value: jitterLabel(result.jitterUlMs))
                     detailItem(label: "Réseau", value: result.networkShareDisplayName)
                     // Le ping ET le download sont mesurés contre la même source (le CDN
                     // sélectionné, AWS CloudFront par défaut). On affiche donc ce serveur
@@ -871,7 +871,8 @@ struct SpeedtestView: View {
                 detailItem(label: "Réception (moyenne)", value: speed(s.avgDownload), highlight: true)
                 detailItem(label: "Réception (pic)", value: speed(s.maxDownload), highlight: true)
                 detailItem(label: "Envoi (moyenne)", value: speed(s.avgUpload))
-                detailItem(label: "Latence (minimum)", value: ms(s.minPing))
+                // Aucun ping valide dans la rafale : le cumul vaut 0, pas « 0 ms ».
+                detailItem(label: "Latence (minimum)", value: ms(s.minPing > 0 ? s.minPing : nil))
             }
         }
         .padding(SQSpace.cardPadding)
@@ -1818,6 +1819,12 @@ private func speed(_ value: Double?) -> String {
 private func ms(_ value: Double?) -> String {
     guard let value, value.isFinite, value >= 0 else { return "—" }
     return SQUnits.milliseconds(value)
+}
+
+/// Gigue : la règle de `SQUnits` (une décimale sous 10 ms), la même qu'au détail du test.
+private func jitterLabel(_ value: Double?) -> String {
+    guard let value else { return "—" }
+    return SQUnits.jitter(value)
 }
 
 // MARK: - Phase extensions

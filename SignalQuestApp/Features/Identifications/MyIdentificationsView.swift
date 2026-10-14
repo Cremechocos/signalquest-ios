@@ -87,7 +87,9 @@ final class MyIdentificationsViewModel: ObservableObject {
                 Haptics.error()
             }
         } catch {
-            errorMessage = error.userFacingMessage
+            // En toast, visible à la fermeture de la fiche : la ligne d'erreur en
+            // bas de liste passait inaperçue et laissait croire au retrait.
+            toast = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -117,7 +119,9 @@ final class MyIdentificationsViewModel: ObservableObject {
                 Haptics.error()
             }
         } catch {
-            errorMessage = error.userFacingMessage
+            // En toast, visible à la fermeture de la fiche : la ligne d'erreur en
+            // bas de liste passait inaperçue et laissait croire au retrait.
+            toast = error.userFacingMessage
             Haptics.error()
         }
     }

@@ -30,14 +30,19 @@ final class ANFRMapViewModel: ObservableObject {
     @Published private(set) var filteredSites: [ANFRMapSite] = []
 
     private func recomputeFilteredSites() {
-        filteredSites = sites.filter { site in
-            // Au moins une antenne dont l'opérateur, la génération et le type
-            // de modif passent les filtres actifs.
-            site.antennas.contains { antenna in
+        // Au moins une antenne dont l'opérateur et le type de modif passent les
+        // filtres actifs. Le repère ne garde que ces antennes : un site Orange +
+        // Free filtré sur Free s'affichait en Orange. La fiche relit le site entier.
+        filteredSites = sites.compactMap { site in
+            let kept = site.antennas.filter { antenna in
                 let opOK = antenna.operator.map(operatorFilters.contains) ?? false
                 let modOK = selectedModTypes.contains(antenna.modType)
                 return opOK && modOK
             }
+            guard !kept.isEmpty else { return nil }
+            guard kept.count != site.antennas.count else { return site }
+            return ANFRMapSite(supId: site.supId, latitude: site.latitude, longitude: site.longitude,
+                               city: site.city, antennas: kept)
         }
     }
 
@@ -67,16 +72,20 @@ final class ANFRMapViewModel: ObservableObject {
             return
         }
         #endif
+        // Une réponse arrivée après le choix d'une autre date est ignorée : elle
+        // aurait affiché les sites de la date A sous le libellé de la date B.
+        let date = selectedDate
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer { if date == selectedDate { isLoading = false } }
         do {
-            let snapshot = try await service.mapSnapshot(date: selectedDate)
+            let snapshot = try await service.mapSnapshot(date: date)
+            guard date == selectedDate else { return }
             sites = snapshot.sites
             lastUpdate = snapshot.lastUpdate
             hasLoadedSnapshot = true
         } catch {
-            if !error.isCancellation { errorMessage = error.userFacingMessage }
+            if !error.isCancellation, date == selectedDate { errorMessage = error.userFacingMessage }
         }
     }
 
@@ -173,7 +182,7 @@ struct ANFRMapView: View {
             zoom: $mapZoom,
             onSelectSite: { site in
                 Haptics.light()
-                selectedSite = site
+                selectedSite = model.sites.first { $0.supId == site.supId } ?? site
             }
         )
         .ignoresSafeArea(edges: .bottom)
@@ -337,6 +346,8 @@ struct ANFRMapView: View {
                 Label("Réessayer", systemImage: "arrow.clockwise")
                     .font(SQFont.body(13, .semibold))
                     .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
@@ -557,7 +568,7 @@ final class ANFRSiteAnnotationMK: NSObject, MKAnnotation {
     let site: ANFRMapSite
     let style: ANFRMarkerStyle
     var coordinate: CLLocationCoordinate2D { site.coordinate }
-    var title: String? { site.city }
+    var title: String? { site.city.isEmpty ? String(localized: "Support \(site.supId)") : site.city }
     init(site: ANFRMapSite) {
         self.site = site
         self.style = ANFRMarkerStyle(site: site)
@@ -627,7 +638,9 @@ struct ANFRMapKitView: UIViewRepresentable {
 
         func sync(_ sites: [ANFRMapSite], on map: MKMapView) {
             var hasher = Hasher(); hasher.combine(sites.count)
-            for s in sites.prefix(600) { hasher.combine(s.supId) }
+            // Le nombre d'antennes retenues change avec les filtres : le style des
+            // repères doit alors être recalculé.
+            for s in sites.prefix(600) { hasher.combine(s.supId); hasher.combine(s.antennas.count) }
             let sig = hasher.finalize()
             guard sig != lastSig else { return }
             lastSig = sig

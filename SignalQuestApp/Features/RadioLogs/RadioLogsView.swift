@@ -256,7 +256,8 @@ struct RadioLogsView: View {
     /// récupération ou la vérification, la carte porte aussi la tâche en cours et
     /// de quoi la suspendre.
     private var summaryCard: some View {
-        let isWorking = model.isScanning || model.isSyncing
+        // Une pause garde la carte : sans elle, « Reprendre » disparaissait avec le bloc.
+        let isWorking = model.isScanning || model.isSyncing || model.isPaused
         return VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(alignment: .top, spacing: SQSpace.md) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -336,7 +337,9 @@ struct RadioLogsView: View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.md) {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(model.isSyncing ? String(localized: "Récupération du journal") : String(localized: "Vérification du catalogue"))
+                    Text(model.isSyncing ? String(localized: "Récupération du journal")
+                         : model.isPaused ? String(localized: "Vérification en pause")
+                         : String(localized: "Vérification du catalogue"))
                         .font(SQFont.body(12, .bold))
                         .foregroundStyle(OutageTint.degradedInk)
                     Text(scanSubtitle)

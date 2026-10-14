@@ -162,10 +162,29 @@ struct CardHeader: View {
     let kindBadge: String?
     let kindColor: Color
     var onAuthorTap: (() -> Void)? = nil
+    /// Publication épinglée sur le profil de son auteur : une pastille le dit.
+    var isPinned: Bool = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.feedCardMenu) private var menu
 
     var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            if isPinned { pinnedTag }
+            headerRow
+        }
+    }
+
+    private var pinnedTag: some View {
+        Label("Épinglé", systemImage: "pin.fill")
+            .font(SQType.caption(.semibold))
+            .foregroundStyle(SQColor.chipInk)
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, SQSpace.xs)
+            .background(SQColor.chip, in: Capsule(style: .continuous))
+            .accessibilityIdentifier("feed.pinned")
+    }
+
+    private var headerRow: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
@@ -369,8 +388,15 @@ struct CardActionsBar: View {
                     .contentTransition(.numericText())
                     .accessibilityIdentifier("feed.action.count")
             }
+            // Les autres emojis posés sur la publication, du plus fréquent au
+            // moins fréquent : le total seul cachait les réactions non ❤️.
+            if !topOtherEmojis.isEmpty {
+                Text(verbatim: topOtherEmojis.joined())
+                    .font(SQType.caption)
+                    .accessibilityIdentifier("feed.action.emojis")
+            }
         }
-        .foregroundStyle(item.likedByMe ? SQColor.like : SQColor.chipInk)
+        .foregroundStyle(item.likedByMe ? SQColor.like : (reactedByMe ? SQColor.accentInk : SQColor.chipInk))
         .sqLikePop(trigger: item.likedByMe)
         .padding(.horizontal, SQSpace.sm)
         .frame(minWidth: 44, minHeight: 44)
@@ -386,8 +412,8 @@ struct CardActionsBar: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("J’aime")
-        .accessibilityValue(reactionCount > 0 ? "\(reactionCount)" : "")
-        .accessibilityAddTraits(item.likedByMe ? [.isButton, .isSelected] : .isButton)
+        .accessibilityValue(Text(verbatim: spokenReactions))
+        .accessibilityAddTraits(reactedByMe ? [.isButton, .isSelected] : .isButton)
         .accessibilityHint(onReact == nil ? "" : "Appui long pour choisir une réaction")
         .accessibilityAction { onLike() }
         // Le sélecteur d'emojis se déclenche à l'appui long, introuvable au lecteur
@@ -399,6 +425,29 @@ struct CardActionsBar: View {
                 }
             }
         }
+    }
+
+    /// Réaction quelconque posée par l'utilisateur (❤️ ou un autre emoji).
+    private var reactedByMe: Bool {
+        item.likedByMe || item.reactions.contains { $0.reactedByMe == true }
+    }
+
+    private var topOtherEmojis: [String] {
+        item.reactions
+            .filter { $0.count > 0 && !$0.emoji.hasPrefix("❤") }
+            .sorted { $0.count > $1.count }
+            .prefix(3)
+            .map(\.emoji)
+    }
+
+    /// « 12, 👍 3, 😂 2 » : le total puis le détail, lu par VoiceOver.
+    private var spokenReactions: String {
+        guard reactionCount > 0 else { return "" }
+        let detail = item.reactions
+            .filter { $0.count > 0 }
+            .sorted { $0.count > $1.count }
+            .map { "\($0.emoji) \($0.count)" }
+        return ([String(reactionCount)] + detail).joined(separator: ", ")
     }
 
     private func dismissPicker() {

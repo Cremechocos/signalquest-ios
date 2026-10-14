@@ -15,6 +15,8 @@ struct ScheduledMessagesView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var decrypted: [String: String] = [:]
+    /// Envoi programmé dont l'annulation attend confirmation (irréversible).
+    @State private var deletionTarget: ScheduledMessage?
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
 
@@ -56,6 +58,20 @@ struct ScheduledMessagesView: View {
         .toolbar(.hidden, for: .navigationBar)
         .sqKeepsSwipeBack()
         .signalQuestBackground()
+        .confirmationDialog(
+            "Annuler cet envoi programmé ?",
+            isPresented: Binding(get: { deletionTarget != nil }, set: { if !$0 { deletionTarget = nil } }),
+            titleVisibility: .visible,
+            presenting: deletionTarget
+        ) { item in
+            Button("Annuler l’envoi", role: .destructive) {
+                deletionTarget = nil
+                Task { await delete(item) }
+            }
+            Button("Garder", role: .cancel) { deletionTarget = nil }
+        } message: { _ in
+            Text("Le message ne sera pas envoyé.")
+        }
         .task { await load() }
     }
 
@@ -82,7 +98,7 @@ struct ScheduledMessagesView: View {
             .accessibilityElement(children: .combine)
             .frame(maxWidth: .infinity, alignment: .leading)
             Button {
-                Task { await delete(item) }
+                deletionTarget = item
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .bold))

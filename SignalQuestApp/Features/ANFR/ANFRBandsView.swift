@@ -55,7 +55,9 @@ final class ANFRBandsViewModel: ObservableObject {
     private func reload() async {
         let operatorKey = operatorKey, generation = generation
         isLoading = true
-        defer { isLoading = false }
+        // Seule la requête du choix courant éteint l'indicateur : une réponse
+        // périmée le coupait pendant que la suivante chargeait encore.
+        defer { if operatorKey == self.operatorKey, generation == self.generation { isLoading = false } }
         do {
             async let overview = stats(weeks: 1, generation: nil, operatorKey: operatorKey)
             async let detail = stats(weeks: Self.weeks, generation: generation, operatorKey: operatorKey)

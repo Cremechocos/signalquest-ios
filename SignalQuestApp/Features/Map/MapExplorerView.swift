@@ -1765,7 +1765,8 @@ struct MapExplorerView: View {
                         photoSiteAntenna = nil
                         selectedPhoto = nil
                         isolateCoverage(focus)
-                    }
+                    },
+                    onOutageChanged: { Task { await reloadCurrentRegion() } }
                 )
             }
         }
@@ -3266,16 +3267,28 @@ struct MapExplorerView: View {
     private func openSiteFromRouterIfNeeded() {
         guard let siteId = router.openSiteId else { return }
         router.openSiteId = nil
-        if let site = model.antennas.first(where: { $0.id == siteId || $0.siteId == siteId }) {
+        // Un favori d'un autre pays se cherche dans son marché, pas dans celui affiché.
+        let market = router.openSiteMarket ?? model.marketFilter
+        router.openSiteMarket = nil
+        let isShownMarket = market.caseInsensitiveCompare(model.marketFilter) == .orderedSame
+        if isShownMarket,
+           let site = model.antennas.first(where: { $0.id == siteId || $0.siteId == siteId }) {
             selectedAntenna = site
             return
         }
         Task {
-            let results = (try? await services.antennas.quickSearch(
-                query: siteId,
-                market: model.marketFilter,
-                department: model.currentDromRegion?.department
-            )) ?? []
+            let results: [AntennaSite]
+            do {
+                results = try await services.antennas.quickSearch(
+                    query: siteId,
+                    market: market,
+                    department: isShownMarket ? model.currentDromRegion?.department : nil
+                )
+            } catch {
+                // Hors ligne, « Site introuvable » accusait le lien : on dit la vraie cause.
+                if !error.isCancellation { model.showMarketNotice(error.userFacingMessage) }
+                return
+            }
             // Correspondance exacte seulement : `results.first` ouvrait un site au
             // texte voisin, c'est-à-dire la fiche d'une autre antenne (AF-CARTE-07).
             guard let site = results.first(where: { $0.id == siteId || $0.siteId == siteId }) else {
@@ -3676,6 +3689,30 @@ struct MapExplorerView: View {
         case .declared: return Color(hex: 0x2563EB)       // bleu — déclaré, pas en service
         case .planned: return Color(hex: 0x64748B)        // ardoise — prévu, pas construit
         }
+    }
+
+    /// Le statut en version ENCRE : les hex ci-dessus sont calibrés pour une pastille portant un
+    /// glyphe blanc, pas pour écrire. Posé en texte, l'ambre tombe à ~2:1 et aucun de ces hex ne
+    /// s'adapte au mode sombre. Le hex reste pour les pastilles et les fonds teintés.
+    static func plannedStatusInk(_ status: PlannedActivationStatus) -> Color {
+        switch status {
+        case .active: return OutageTint.resolvedInk
+        case .upgradePending: return OutageTint.degradedInk
+        case .declared: return dynamicInk(light: 0x1D4ED8, dark: 0x93B4FF)
+        case .planned: return SQColor.labelSecondary
+        }
+    }
+
+    private static func dynamicInk(light: UInt32, dark: UInt32) -> Color {
+        Color(UIColor { traits in
+            let hex = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(
+                red: CGFloat((hex >> 16) & 0xFF) / 255,
+                green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255,
+                alpha: 1
+            )
+        })
     }
 
     static func plannedStatusGlyph(_ status: PlannedActivationStatus) -> String {
@@ -4420,7 +4457,9 @@ struct MapExplorerView: View {
             service: services.antennas,
             sightOrigin: sightOrigin,
             onIsolateCoverage: { focus in isolateCoverage(focus) },
-            onClose: onClose
+            onClose: onClose,
+            // Signaler, confirmer ou clore une panne change son marqueur : on recharge la région.
+            onOutageChanged: { Task { await reloadCurrentRegion() } }
         )
         // Tous les chemins mènent ici : recherche, carte, lien, historique.
         .onAppear { RecentlyViewedStore.record(.site(site, market: model.marketFilter)) }
@@ -4571,7 +4610,8 @@ struct MapExplorerView: View {
             service: services.antennas,
             customSite: site,
             sightOrigin: sightOrigin,
-            onIsolateCoverage: { focus in isolateCoverage(focus) }
+            onIsolateCoverage: { focus in isolateCoverage(focus) },
+            onOutageChanged: { Task { await reloadCurrentRegion() } }
         )
     }
 

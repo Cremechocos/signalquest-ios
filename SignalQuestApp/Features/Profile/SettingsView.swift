@@ -864,7 +864,7 @@ struct E2EEV2TrustedDevicesView: View {
             if let errorMessage = model.errorMessage {
                 Section {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                     Button("Réessayer") { Task { await model.load() } }
                         .frame(minHeight: 48)
                 }
@@ -985,7 +985,7 @@ struct E2EEV2TrustedDevicesView: View {
         if let message = model.approvalErrorMessage {
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .font(SQType.body)
-                .foregroundStyle(SQColor.danger)
+                .foregroundStyle(SQColor.dangerInk)
                 .accessibilityLabel("Erreur d’approbation. \(message)")
         }
     }
@@ -1008,7 +1008,7 @@ struct E2EEV2TrustedDevicesView: View {
                         .accessibilityLabel("Code de proximité \(code.map(String.init).joined(separator: " "))")
                 } else {
                     Label("Code indisponible. Crée une nouvelle demande.", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                 }
             case .qr:
                 if let device = model.localDescriptor,
@@ -1027,7 +1027,7 @@ struct E2EEV2TrustedDevicesView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                 } else {
                     Label("QR indisponible. Crée une nouvelle demande.", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                 }
             }
 
@@ -1123,7 +1123,7 @@ struct E2EEV2TrustedDevicesView: View {
         switch status {
         case .pending: return SQColor.warning
         case .approved: return SQColor.success
-        case .revoked: return SQColor.danger
+        case .revoked: return SQColor.dangerInk
         }
     }
 
@@ -1398,7 +1398,7 @@ private final class E2EEV2RecoveryResetViewModel: ObservableObject {
         case .failed(let failure):
             errorMessage = Self.message(
                 for: failure,
-                fallback: "La réinitialisation a échoué ; l’identité actuelle reste inchangée."
+                fallback: String(localized: "La réinitialisation a échoué ; l’identité actuelle reste inchangée.")
             )
         }
     }
@@ -1660,7 +1660,7 @@ struct E2EEV2RecoveryResetView: View {
             if let error = model.errorMessage {
                 Section {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                         .accessibilityLabel("Erreur. \(error)")
                 }
                 .listRowBackground(SQColor.surface)
@@ -1841,9 +1841,9 @@ struct E2EEV2RecoveryResetView: View {
         Section {
             Label("Action irréversible", systemImage: "exclamationmark.octagon.fill")
                 .font(SQType.heading)
-                .foregroundStyle(SQColor.danger)
+                .foregroundStyle(SQColor.dangerInk)
             Text("Tous les appareils actuels seront révoqués. L’historique non récupéré sera définitivement perdu.")
-                .foregroundStyle(SQColor.danger)
+                .foregroundStyle(SQColor.dangerInk)
 
             if let pending = model.pendingReset {
                 Label("Réinitialisation en attente", systemImage: "hourglass")
@@ -1900,7 +1900,7 @@ struct E2EEV2RecoveryResetView: View {
             if model.resetNeedsRecovery && model.recoveryKey == nil {
                 Label("L’identité est réinitialisée, mais aucune nouvelle clé n’a encore été créée.",
                       systemImage: "key.slash.fill")
-                    .foregroundStyle(SQColor.danger)
+                    .foregroundStyle(SQColor.dangerInk)
                 Button {
                     Task { await model.retryRecoveryAfterReset() }
                 } label: {
@@ -2093,6 +2093,11 @@ final class SettingsViewModel: ObservableObject {
     }
 }
 
+/// Écrans ouverts depuis les Réglages, poussés par valeur.
+private enum SettingsDestination: Hashable {
+    case password, devices, privacy, notifications, glossary, bugs
+}
+
 struct SettingsView: View {
     @StateObject private var model: SettingsViewModel
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -2142,6 +2147,18 @@ struct SettingsView: View {
         _model = StateObject(wrappedValue: SettingsViewModel(userService: userService, authService: authService))
     }
 
+    @ViewBuilder
+    private func destination(for destination: SettingsDestination) -> some View {
+        switch destination {
+        case .password: ChangePasswordView(appleLinked: appleLinked)
+        case .devices: E2EEV2TrustedDevicesView(api: services.api)
+        case .privacy: PrivacySettingsView(service: services.privacy)
+        case .notifications: NotificationSettingsView(userService: services.users)
+        case .glossary: SQGlossaryView()
+        case .bugs: BugReportsListView()
+        }
+    }
+
     var body: some View {
         Form {
             Section {
@@ -2153,9 +2170,9 @@ struct SettingsView: View {
             .listRowBackground(Color.clear)
 
             Section {
-                NavigationLink {
-                    ChangePasswordView(appleLinked: appleLinked)
-                } label: { SQSettingsRowLabel("Mot de passe", systemImage: "key") }
+                NavigationLink(value: SettingsDestination.password) {
+                    SQSettingsRowLabel("Mot de passe", systemImage: "key")
+                }
                 .accessibilityIdentifier("settings.password")
                 twoFactorRow
                 Button {
@@ -2171,9 +2188,9 @@ struct SettingsView: View {
                 // Masqué tant que la v2 dort : l'écran créait une identité locale
                 // pour un chiffrement qui ne peut encore ni envoyer ni lire (E2E-03).
                 if E2EEV2RuntimeWriteGate.enabled {
-                    NavigationLink {
-                        E2EEV2TrustedDevicesView(api: services.api)
-                    } label: { SQSettingsRowLabel("Appareils", systemImage: "lock.shield") }
+                    NavigationLink(value: SettingsDestination.devices) {
+                        SQSettingsRowLabel("Appareils", systemImage: "lock.shield")
+                    }
                 }
             } header: {
                 Text("Compte").sqKicker()
@@ -2246,18 +2263,14 @@ struct SettingsView: View {
             // `Section` fait résoudre vers TableRowContent ; le modificateur qui
             // le suit ancre la résolution côté vues.
             Section {
-                NavigationLink {
-                    PrivacySettingsView(service: services.privacy)
-                } label: {
+                NavigationLink(value: SettingsDestination.privacy) {
                     SQSettingsRowLabel("Confidentialité", systemImage: "hand.raised")
                 }
                 .accessibilityIdentifier("settings.privacy")
                 // Notifications, appels et antennes suivies : un écran à part,
                 // qui enregistre chaque réglage au geste (TRX-03) et que le lien
                 // « Réglages de notifications » d'iOS ouvre directement (TRX-21).
-                NavigationLink {
-                    NotificationSettingsView(userService: services.users)
-                } label: {
+                NavigationLink(value: SettingsDestination.notifications) {
                     SQSettingsRowLabel("Notifications", systemImage: "bell")
                 }
                 .accessibilityIdentifier("settings.notifications")
@@ -2315,15 +2328,11 @@ struct SettingsView: View {
             .listRowBackground(SQColor.surface)
 
             Section {
-                NavigationLink {
-                    SQGlossaryView()
-                } label: {
+                NavigationLink(value: SettingsDestination.glossary) {
                     SQSettingsRowLabel("Aide et glossaire", systemImage: "questionmark.circle")
                 }
                 .accessibilityIdentifier("settings.glossary")
-                NavigationLink {
-                    BugReportsListView()
-                } label: {
+                NavigationLink(value: SettingsDestination.bugs) {
                     SQSettingsRowLabel("Bugs et idées", systemImage: "ladybug",
                                        subtitle: String(localized: "Signaler un problème, proposer une amélioration"))
                 }
@@ -2384,6 +2393,8 @@ struct SettingsView: View {
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Réglages")
+        // Par valeur, comme le Profil : la destination n'est plus recréée à chaque rendu (iOS 16).
+        .navigationDestination(for: SettingsDestination.self) { destination(for: $0) }
         .toolbar(.hidden, for: .navigationBar)
         // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
         .sqKeepsSwipeBack()
@@ -3166,7 +3177,7 @@ private struct DeleteAccountSheet: View {
         } else {
             Label("Aucune méthode de réauthentification disponible.", systemImage: "lock.trianglebadge.exclamationmark")
                 .font(SQType.body)
-                .foregroundStyle(SQColor.danger)
+                .foregroundStyle(SQColor.dangerInk)
         }
     }
 

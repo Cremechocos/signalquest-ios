@@ -48,6 +48,10 @@ struct OutageThreadSection: View {
     @State private var repliesByComment: [String: [SocialComment]] = [:]
     @State private var expandedReplies: Set<String> = []
     @State private var loadingReplies: Set<String> = []
+    /// Échec de lecture des réponses, par commentaire parent : le fil reste replié et le dit.
+    @State private var repliesErrors: [String: String] = [:]
+    /// Réaction refusée ou perdue : sans mot, le cœur revenait à son état sans explication.
+    @State private var likeError: String?
     /// `nil` quand on écrit au fil, sinon le commentaire auquel on répond.
     @State private var replyTarget: SocialComment?
 
@@ -61,6 +65,10 @@ struct OutageThreadSection: View {
             }
 
             composer
+
+            if let likeError {
+                SQInlineError(message: likeError)
+            }
 
             if loading {
                 SQSpinner()
@@ -120,7 +128,7 @@ struct OutageThreadSection: View {
                 // RÉPONSE depuis un autre appareil ne bougeait pas ici, alors même que le fil
                 // parent venait d'être relu.
                 for parentId in expandedReplies {
-                    await loadReplies(parentId)
+                    await loadReplies(parentId, reportsFailure: false)
                 }
             }
         }
@@ -254,6 +262,20 @@ struct OutageThreadSection: View {
                                 .foregroundStyle(SQColor.brandRed)
                         }
                         .frame(minHeight: 44)
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                }
+
+                if let repliesError = repliesErrors[comment.id] {
+                    SQInlineError(message: repliesError)
+                    Button {
+                        Task { await toggleReplies(comment) }
+                    } label: {
+                        Text("Réessayer")
+                            .font(SQFont.body(13, .semibold, relativeTo: .caption))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(SQPressButtonStyle())
                 }
@@ -437,8 +459,7 @@ struct OutageThreadSection: View {
             // Une réponse envoyée déplie le fil où elle atterrit : sans cela, elle disparaissait
             // derrière un « Voir 1 réponse » qu'il fallait deviner.
             if let parent {
-                expandedReplies.insert(parent)
-                await loadReplies(parent)
+                if await loadReplies(parent) { expandedReplies.insert(parent) }
             }
         }
         posting = false
@@ -457,18 +478,30 @@ struct OutageThreadSection: View {
             return
         }
         loadingReplies.insert(id)
-        await loadReplies(id)
-        expandedReplies.insert(id)
+        // On ne déplie que si la lecture a réussi : sinon « Masquer les réponses » s'affichait
+        // au-dessus d'un fil vide, comme si personne n'avait répondu.
+        if await loadReplies(id) { expandedReplies.insert(id) }
         loadingReplies.remove(id)
     }
 
-    private func loadReplies(_ commentId: String) async {
-        if let page = try? await services.comments.replies(
-            postId: postId,
-            commentId: commentId,
-            cursor: nil
-        ) {
+    /// `true` si les réponses sont à jour. `reportsFailure: false` pour les relectures du
+    /// direct, qui gardent silencieusement ce qui est déjà affiché.
+    @discardableResult
+    private func loadReplies(_ commentId: String, reportsFailure: Bool = true) async -> Bool {
+        do {
+            let page = try await services.comments.replies(
+                postId: postId,
+                commentId: commentId,
+                cursor: nil
+            )
             repliesByComment[commentId] = page.comments
+            repliesErrors[commentId] = nil
+            return true
+        } catch {
+            if reportsFailure, !error.isCancellation {
+                repliesErrors[commentId] = error.userFacingMessage
+            }
+            return false
         }
     }
 
@@ -476,10 +509,18 @@ struct OutageThreadSection: View {
     /// dans le fil de son parent, et sans cette distinction le compteur restait figé.
     private func toggleLike(_ comment: SocialComment, parentId: String? = nil) async {
         let liked = comment.likedByMe == true
-        let response = liked
-            ? try? await services.comments.unlike(postId: postId, commentId: comment.id)
-            : try? await services.comments.like(postId: postId, commentId: comment.id)
-        guard let response else { return }
+        likeError = nil
+        let response: CommentReactionResponse
+        do {
+            if liked {
+                response = try await services.comments.unlike(postId: postId, commentId: comment.id)
+            } else {
+                response = try await services.comments.like(postId: postId, commentId: comment.id)
+            }
+        } catch {
+            if !error.isCancellation { likeError = error.userFacingMessage }
+            return
+        }
         // Mise à jour EN PLACE et non rechargement : un like ne réordonne rien, et recharger
         // ferait sauter la liste sous le doigt.
         if let parentId {

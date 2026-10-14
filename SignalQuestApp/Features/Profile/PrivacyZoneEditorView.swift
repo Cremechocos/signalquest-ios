@@ -18,6 +18,9 @@ struct PrivacyZoneEditorView: View {
     @State private var showDeleteConfirmation = false
     @State private var locationRequest = PrivacyZoneEditorRequest()
     @State private var mutationRequest = PrivacyZoneEditorRequest()
+    /// Un champ n'est jugé qu'une fois touché : un formulaire vierge ne s'ouvre pas sur des erreurs.
+    @State private var nameTouched = false
+    @State private var coordinateTouched = false
 
     init(model: PrivacySettingsViewModel, zone: PrivacyZone?, location: LocationService) {
         self.model = model
@@ -39,6 +42,10 @@ struct PrivacyZoneEditorView: View {
                     TextField("Nom de la zone", text: draftBinding(for: \.name))
                         .textInputAutocapitalization(.words)
                         .accessibilityIdentifier("privacy-zone.name")
+                        .onChangeCompat(of: draft.name) { _, _ in nameTouched = true }
+                    if nameTouched, draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        validationMessage(.name)
+                    }
                     Picker("Type de lieu", selection: draftBinding(for: \.type)) {
                         ForEach(PrivacyZoneType.allCases) { type in Text(type.label).tag(type) }
                     }
@@ -59,6 +66,7 @@ struct PrivacyZoneEditorView: View {
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         SQFormFieldLabel("Latitude")
                         TextField("Latitude", text: draftBinding(for: \.latitudeText))
+                            .onChangeCompat(of: draft.latitudeText) { _, _ in coordinateTouched = true }
                             .keyboardType(.numbersAndPunctuation)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -67,10 +75,14 @@ struct PrivacyZoneEditorView: View {
                     VStack(alignment: .leading, spacing: SQSpace.xs) {
                         SQFormFieldLabel("Longitude")
                         TextField("Longitude", text: draftBinding(for: \.longitudeText))
+                            .onChangeCompat(of: draft.longitudeText) { _, _ in coordinateTouched = true }
                             .keyboardType(.numbersAndPunctuation)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .accessibilityIdentifier("privacy-zone.longitude")
+                    }
+                    if coordinateTouched, !draft.hasValidCoordinate {
+                        validationMessage(.coordinate)
                     }
                     HStack {
                         Text("Rayon")
@@ -176,6 +188,13 @@ struct PrivacyZoneEditorView: View {
         .onChangeCompat(of: model.isSessionCurrent) { _, current in
             if !current { closeRequests() }
         }
+    }
+
+    private func validationMessage(_ error: PrivacyZoneDraft.ValidationError) -> some View {
+        Text(error.localizedDescription)
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.dangerInk)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func draftBinding<Value>(for keyPath: WritableKeyPath<PrivacyZoneDraft, Value>) -> Binding<Value> {

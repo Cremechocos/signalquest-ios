@@ -53,14 +53,12 @@ struct StoriesBar: View {
         } label: {
             VStack(spacing: SQSpace.xs2) {
                 ZStack {
-                    SQAvatarShape().fill(SQColor.chip)
-                    if let initial = currentUser?.displayName.first {
-                        Text(String(initial).uppercased())
-                            .font(SQFont.display(20, .bold, relativeTo: .title2))
-                            .foregroundStyle(SQColor.chipInk)
-                            .accessibilityHidden(true)
-                            .accessibilityIdentifier("feed.avatar.initial")
+                    // Ton avatar (photo ou initiale) : la bulle te représente, comme
+                    // les autres bulles représentent leur auteur.
+                    if let currentUser, !currentUser.displayName.isEmpty {
+                        SQAvatar(url: currentUser.avatarUrl, name: currentUser.displayName, size: StoryBubble.avatarSize)
                     } else {
+                        SQAvatarShape().fill(SQColor.chip)
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(SQColor.chipInk)

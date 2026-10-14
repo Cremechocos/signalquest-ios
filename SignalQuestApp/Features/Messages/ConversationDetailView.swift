@@ -24,6 +24,9 @@ struct ConversationDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var messages: [MessageItem] = []
+    /// Vrai dès que le premier chargement a répondu (succès ou échec) : tant qu'il
+    /// ne l'est pas, une liste vide veut dire « pas encore là », pas « vide ».
+    @State private var hasLoadedOnce = false
     @State private var olderCursor: String?
     @State private var isLoadingOlder = false
     @State private var readReceipts: [ReadReceipt] = []
@@ -55,6 +58,8 @@ struct ConversationDetailView: View {
     @State private var conversationIsV2 = false
     /// Nom donné au groupe depuis ses réglages pendant cette ouverture.
     @State private var renamedTitle: String?
+    /// Nombre de membres après un ajout ou un retrait depuis les réglages.
+    @State private var updatedMemberCount: Int?
     @State private var confirmsLocationShare = false
     /// Vrai une fois la nature v1/v2 de la conversation établie : le bandeau
     /// du mot de passe v1 ne doit jamais apparaître, même un instant, en v2.
@@ -291,6 +296,23 @@ struct ConversationDetailView: View {
                             } else {
                                 v2NoticeLabel(notice, detail: nil)
                                     .accessibilityIdentifier("conversation.v2Notice")
+                            }
+                        }
+                        if messages.isEmpty, !v2Unavailable {
+                            if !hasLoadedOnce {
+                                if errorMessage == nil {
+                                    SQSpinner()
+                                        .tint(SQColor.brandRed)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, SQSpace.xl)
+                                }
+                            } else if errorMessage == nil, v2Notices.isEmpty {
+                                EmptyStateView(
+                                    title: "Aucun message pour l’instant",
+                                    message: "Les messages de cette conversation apparaîtront ici.",
+                                    systemImage: "bubble.left.and.bubble.right"
+                                )
+                                .accessibilityIdentifier("conversation.empty")
                             }
                         }
                         // PERF-MSG-04 — Itère directement sur `messages` (identité
@@ -599,13 +621,14 @@ struct ConversationDetailView: View {
         }
         .sheet(isPresented: $showGroupSettings, onDismiss: { if leftGroup { dismiss() } }) {
             GroupSettingsView(conversation: conversation, service: service, e2ee: e2ee,
-                              onRenamed: { renamedTitle = $0 }) {
+                              onRenamed: { renamedTitle = $0 },
+                              onMembersChanged: { updatedMemberCount = $0 }) {
                 // Groupe quitté : rester sur la conversation n'aurait plus de sens.
                 leftGroup = true
             }
         }
         .sheet(isPresented: $showSaved) {
-            SavedMessagesView(service: service, currentUserId: currentUserId, e2ee: e2ee)
+            SavedMessagesView(service: service, currentUserId: currentUserId, e2ee: e2ee, currentConversationId: conversation.id)
         }
         // Photo de la conversation en plein écran (zoom + glisser pour fermer).
         .fullScreenCover(item: $imageViewerTarget) { target in
@@ -785,7 +808,7 @@ struct ConversationDetailView: View {
                                     .minimumScaleFactor(0.6)
                                     .accessibilityIdentifier("conversation.status")
                             } else if conversation.isGroup && !isE2EE {
-                                Text("\(conversation.participants.count) membres")
+                                Text("\(updatedMemberCount ?? conversation.participants.count) membres")
                                     .font(SQType.micro(.regular))
                                     .foregroundStyle(SQColor.labelSecondary)
                                     .lineLimit(1)
@@ -945,10 +968,14 @@ struct ConversationDetailView: View {
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.accentInk)
                     Spacer(minLength: SQSpace.sm)
-                    Button("Désactiver") { ephemeralEnabled = false }
-                        .font(SQType.micro.weight(.semibold))
-                        .foregroundStyle(SQColor.accentInk)
-                        .buttonStyle(.plain)
+                    Button { ephemeralEnabled = false } label: {
+                        Text("Désactiver")
+                            .font(SQType.micro.weight(.semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
                 .foregroundStyle(SQColor.brandRed)
                 .padding(.horizontal)
@@ -961,6 +988,7 @@ struct ConversationDetailView: View {
                 isSharingLocation: isSharingLocation,
                 isE2EE: isE2EE,
                 canSchedule: EncryptedConversationSurfaces.allowsScheduling(isV2: conversationIsV2),
+                isEditing: editTarget != nil,
                 seedText: composerSeed,
                 seedToken: composerSeedToken,
                 ephemeralEnabled: $ephemeralEnabled,
@@ -1676,7 +1704,9 @@ struct ConversationDetailView: View {
                         url: attachment.url,
                         maxDimension: 240,
                         contentMode: .fill,
-                        cacheScope: privateImageCacheScope
+                        cacheScope: privateImageCacheScope,
+                        // Sans état d'échec, le reflet tournait indéfiniment.
+                        showsFailureUI: true
                     ) {
                         Rectangle().fill(SQColor.surfaceMuted).sqShimmer()
                     }
@@ -2068,6 +2098,7 @@ struct ConversationDetailView: View {
     }
 
     private func loadV2Once() async {
+        defer { hasLoadedOnce = true }
         switch await services.e2eeV2Messaging.thread(
             conversationId: conversation.id, isGroup: conversation.isGroup, participants: conversation.participants
         ) {
@@ -2111,6 +2142,7 @@ struct ConversationDetailView: View {
     }
 
     private func load() async {
+        defer { hasLoadedOnce = true }
         if AppEnvironment.usesDemoData {
             messages = conversation.lastMessage.map { [$0] } ?? MessageItem.demo
             errorMessage = nil

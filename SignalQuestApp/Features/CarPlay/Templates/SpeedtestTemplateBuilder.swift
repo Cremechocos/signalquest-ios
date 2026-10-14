@@ -42,6 +42,9 @@ enum SpeedtestTemplateBuilder {
         case idle(last: SpeedtestRunResult?)
         case running(SpeedtestLiveProgress)
         case finished(SpeedtestRunResult)
+        /// Mesure terminée mais non sauvegardée : le résultat reste lisible, avec
+        /// la mention qu'il ne figurera pas dans l'historique.
+        case finishedUnsaved(SpeedtestRunResult)
         case failed(String)
     }
 
@@ -95,6 +98,12 @@ enum SpeedtestTemplateBuilder {
         case .finished(let result):
             return resultItems(result, titlePrefix: nil)
 
+        case .finishedUnsaved(let result):
+            return resultItems(result, titlePrefix: nil) + [CPInformationItem(
+                title: String(localized: "Non enregistré"),
+                detail: String(localized: "Ce résultat n’a pas pu être sauvegardé.")
+            )]
+
         case .failed(let message):
             return [CPInformationItem(title: String(localized: "Échec"), detail: message)]
         }
@@ -131,7 +140,7 @@ enum SpeedtestTemplateBuilder {
         case .idle(let last): title = last == nil
             ? String(localized: "Lancer le test")
             : String(localized: "Relancer")
-        case .finished, .failed: title = String(localized: "Relancer")
+        case .finished, .finishedUnsaved, .failed: title = String(localized: "Relancer")
         case .running: title = ""
         }
         return [CPTextButton(title: title, textStyle: .confirm) { _ in start() }]

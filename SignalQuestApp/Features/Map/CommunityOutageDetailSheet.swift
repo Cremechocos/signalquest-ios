@@ -77,7 +77,8 @@ struct CommunityOutageDetailSheet: View {
                     // et la carte de la fiche antenne les aurait réécrits juste en dessous.
                     OutageArbitrationBlock(
                         outage: outage,
-                        onVote: { _, kind in Task { await vote(kind) } }
+                        onVote: { _, kind in Task { await vote(kind) } },
+                        isVoting: voting
                     )
                     .disabled(voting)
                 } else {

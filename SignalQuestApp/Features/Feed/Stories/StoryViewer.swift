@@ -210,19 +210,46 @@ struct StoryViewer: View {
     @ViewBuilder
     private func content(for story: SocialStory) -> some View {
         if let url = story.mediaUrl {
-            RemoteImage(url: url, maxDimension: 1400, contentMode: .fill) {
-                Color.black
+            if story.mediaKind?.lowercased().contains("video") == true {
+                // Pas de lecteur vidéo ici : la vignette, avec une pastille qui
+                // dit qu'il s'agit d'une vidéo, plutôt qu'un chargeur d'image
+                // qui échouerait sur le fichier vidéo.
+                ZStack {
+                    Color.black
+                    if let thumbnail = story.thumbnailUrl {
+                        RemoteImage(url: thumbnail, maxDimension: 1400, contentMode: .fill, showsFailureUI: true) {
+                            Color.black
+                        }
+                    }
+                    Label("Vidéo", systemImage: "play.fill")
+                        .font(SQType.subhead(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, SQSpace.lg)
+                        .frame(minHeight: 44)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .accessibilityHidden(true)
+                }
+                .ignoresSafeArea()
+                .accessibilityElement()
+                .accessibilityLabel(mediaLabel(for: story))
+                .accessibilityValue(Text("Vidéo"))
+            } else {
+                RemoteImage(url: url, maxDimension: 1400, contentMode: .fill, showsFailureUI: true) {
+                    Color.black
+                }
+                .ignoresSafeArea()
+                // A11Y-04 : le média n'avait aucun label VoiceOver.
+                .accessibilityElement()
+                .accessibilityLabel(mediaLabel(for: story))
             }
-            .ignoresSafeArea()
-            // A11Y-04 : le média n'avait aucun label VoiceOver.
-            .accessibilityElement()
-            .accessibilityLabel(mediaLabel(for: story))
         } else {
             // Story texte : canevas « nuit » de la charte, typo display crème.
             // Le crème du mode clair rendait illisibles le nom, l'heure et les
-            // boutons du lecteur, écrits en blanc pour les photos.
+            // boutons du lecteur, écrits en blanc pour les photos. Une couleur
+            // de fond choisie par l'auteur (hex) prend la place du canevas.
+            let custom = Self.backgroundColor(story.background)
             ZStack {
-                SQColor.bg.ignoresSafeArea()
+                (custom?.color ?? SQColor.bg).ignoresSafeArea()
                 VStack(spacing: SQSpace.lg) {
                     SQAvatar(url: story.author.avatarUrl, name: story.author.displayName, size: 88)
                     Text(story.text ?? String(localized: "Story"))
@@ -232,8 +259,22 @@ struct StoryViewer: View {
                         .padding(.horizontal, SQSpace.xxl + 4)
                 }
             }
-            .environment(\.colorScheme, .dark)
+            .environment(\.colorScheme, custom?.isLight == true ? .light : .dark)
         }
+    }
+
+    /// Couleur de fond d'une story texte, quand le serveur en porte une au
+    /// format `#RRGGBB`. Tout autre format est ignoré : le canevas de la charte reste.
+    /// `isLight` choisit l'encre du texte (sombre sur fond clair).
+    static func backgroundColor(_ raw: String?) -> (color: Color, isLight: Bool)? {
+        guard var hex = raw?.trimmingCharacters(in: .whitespacesAndNewlines), hex.hasPrefix("#") else { return nil }
+        hex.removeFirst()
+        guard hex.count == 6, let value = UInt32(hex, radix: 16) else { return nil }
+        let red = Double((value >> 16) & 0xFF) / 255
+        let green = Double((value >> 8) & 0xFF) / 255
+        let blue = Double(value & 0xFF) / 255
+        let luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        return (Color(hex: value), luminance > 0.6)
     }
 
     private func progressBars(now: Date) -> some View {
@@ -705,7 +746,9 @@ private struct StoryViewersSheet: View {
                 }
             }
             .signalQuestBackground()
-            .navigationTitle("Vu par \(viewers.count)")
+            // « Vu par 0 » serait faux pendant le chargement ou après un échec.
+            .navigationTitle(isLoading || (errorMessage != nil && viewers.isEmpty)
+                ? Text("Vu par…") : Text("Vu par \(viewers.count)"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

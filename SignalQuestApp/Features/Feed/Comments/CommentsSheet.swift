@@ -9,6 +9,10 @@ final class CommentsViewModel: ObservableObject {
     @Published var nextCursor: String?
     @Published var paginationErrorMessage: String?
     @Published var errorMessage: String?
+    /// Échec d'une action (envoi, suppression, j'aime), distinct de
+    /// `errorMessage` qui ne concerne que le chargement : un envoi raté ne doit
+    /// ni effacer ni remplacer l'erreur de chargement.
+    @Published var actionErrorMessage: String?
     @Published var draft: String = ""
     @Published var isSending = false
     @Published var replyTo: SocialComment?
@@ -16,6 +20,8 @@ final class CommentsViewModel: ObservableObject {
     @Published var repliesByParent: [String: ReplyPage] = [:]
     /// Commentaires publiés depuis l'ouverture : le titre de la feuille les compte.
     @Published var postedCount = 0
+    /// Commentaires supprimés depuis l'ouverture : le titre les retire.
+    @Published var deletedCount = 0
     /// Commentaire publié : nourrit le classement « Pour toi » après réussite,
     /// plus à la simple ouverture de la feuille (SOC-19).
     var onCommentPosted: (() -> Void)?
@@ -144,7 +150,7 @@ final class CommentsViewModel: ObservableObject {
         guard !text.isEmpty, !isSending else { return }
         let parentID = replyTo?.id
         isSending = true
-        errorMessage = nil
+        actionErrorMessage = nil
         defer { isSending = false }
         do {
             let comment = try await service.add(postId: postId, text: text, parentId: parentID)
@@ -175,7 +181,7 @@ final class CommentsViewModel: ObservableObject {
         } catch {
             guard !error.isCancellation else { return }
             if draft == submittedDraft && replyTo?.id == parentID {
-                errorMessage = String(localized: "Échec de l'envoi. Réessaie.")
+                actionErrorMessage = String(localized: "Échec de l'envoi. Réessaie.")
                 Haptics.error()
             }
         }
@@ -202,6 +208,8 @@ final class CommentsViewModel: ObservableObject {
             } catch {
                 guard !error.isCancellation else { return }
                 _ = updateComment(comment.id, liked: wasLiked, count: previousCount)
+                actionErrorMessage = String(localized: "Impossible d’enregistrer ton j’aime. Réessaie.")
+                Haptics.error()
             }
         }
     }
@@ -212,6 +220,8 @@ final class CommentsViewModel: ObservableObject {
     func delete(_ comment: SocialComment) async {
         do {
             try await service.delete(postId: postId, commentId: comment.id)
+            actionErrorMessage = nil
+            deletedCount += 1
             withAnimation(SQMotion.resolve(SQMotion.standard, UIAccessibility.isReduceMotionEnabled)) {
                 comments.removeAll { $0.id == comment.id }
                 for parentID in Array(repliesByParent.keys) {
@@ -222,7 +232,7 @@ final class CommentsViewModel: ObservableObject {
             Haptics.success()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = error.userFacingMessage
+            actionErrorMessage = error.userFacingMessage
             Haptics.error()
         }
     }
@@ -306,9 +316,21 @@ struct CommentsSheet: View {
                 if let error = model.errorMessage, model.hasLoaded || !model.comments.isEmpty {
                     errorBanner(error)
                 }
+                if let error = model.actionErrorMessage {
+                    errorBanner(error)
+                        .accessibilityIdentifier("comments.actionError")
+                }
                 composer
             }
             .sqAnimation(SQMotion.snappy, value: model.errorMessage)
+            .sqAnimation(SQMotion.snappy, value: model.actionErrorMessage)
+            // Le bandeau d'action s'efface seul : rien à fermer à la main.
+            .task(id: model.actionErrorMessage) {
+                guard model.actionErrorMessage != nil else { return }
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                guard !Task.isCancelled else { return }
+                model.actionErrorMessage = nil
+            }
             .background(SQColor.surface.ignoresSafeArea())
             .navigationTitle("Commentaires")
             .toolbar(.hidden, for: .navigationBar)
@@ -347,7 +369,7 @@ struct CommentsSheet: View {
 
     /// Titre avec le nombre, fermeture ronde : pas de barre de navigation.
     private var header: some View {
-        let total = (commentsCount ?? 0) + model.postedCount
+        let total = max(0, (commentsCount ?? 0) + model.postedCount - model.deletedCount)
         return HStack(spacing: SQSpace.sm) {
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs2) {
                 Text("Commentaires")

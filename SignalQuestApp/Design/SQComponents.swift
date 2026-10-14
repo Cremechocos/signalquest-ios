@@ -177,6 +177,17 @@ struct SQInlineError: View {
     }
 }
 
+extension View {
+    /// Annonce `message` à VoiceOver quand il apparaît ou change (même mécanisme que
+    /// `SQInlineError`). `message` est cherché dans les catalogues : les textes
+    /// d'erreur affichés via `LocalizedStringKey` seraient sinon lus en français.
+    func sqAnnounce(_ message: String) -> some View {
+        task(id: message) {
+            UIAccessibility.post(notification: .announcement, argument: NSLocalizedString(message, comment: ""))
+        }
+    }
+}
+
 /// Une ligne en taille normale ; en très grand texte (tailles d'accessibilité),
 /// jusqu'à trois lignes plutôt qu'un texte coupé en « … » (TRX-12).
 private struct SQSingleLine: ViewModifier {
@@ -295,6 +306,8 @@ struct LoadingSkeleton: View {
                 card
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Chargement…"))
     }
 
     private var card: some View {
@@ -365,6 +378,8 @@ struct ConversationListSkeleton: View {
                 }
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Chargement…"))
     }
 }
 
@@ -807,6 +822,12 @@ struct SQNotice: View {
                 .strokeBorder(tone == .neutral ? SQOledPalette.fieldStroke : SQOledPalette.cardStroke, lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
+        // Seule une erreur est annoncée : les autres tons sont des notes statiques,
+        // que VoiceOver lirait à chaque apparition de l'écran.
+        .task(id: tone == .danger ? message : "") {
+            guard tone == .danger else { return }
+            UIAccessibility.post(notification: .announcement, argument: NSLocalizedString(message, comment: ""))
+        }
     }
 
     private var defaultIcon: String {

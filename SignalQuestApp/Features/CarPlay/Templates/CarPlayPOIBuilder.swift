@@ -105,6 +105,30 @@ enum CarPlayPOIBuilder {
         }
     }
 
+    /// Requête échouée : un template de points d'intérêt n'a ni vue vide ni message,
+    /// donc on pose un point explicite sur la position, avec de quoi réessayer.
+    /// Une liste vide laisserait croire qu'aucune antenne n'est à proximité.
+    static func failurePoint(at coordinate: CLLocationCoordinate2D,
+                             onRetry: @escaping () -> Void) -> CPPointOfInterest {
+        let item = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        let message = String(localized: "Impossible de charger pour le moment.")
+        item.name = message
+        let color = UIColor(SQColor.danger)
+        let poi = CPPointOfInterest(
+            location: item,
+            title: message,
+            subtitle: nil,
+            summary: nil,
+            detailTitle: message,
+            detailSubtitle: nil,
+            detailSummary: nil,
+            pinImage: CarPlayImageFactory.antennaPin(color: color),
+            selectedPinImage: CarPlayImageFactory.antennaPin(color: color, selected: true)
+        )
+        poi.primaryButton = CPTextButton(title: String(localized: "Réessayer"), textStyle: .confirm) { _ in onRetry() }
+        return poi
+    }
+
     // MARK: - Textes
 
     /// Ce qu'on lit en premier doit être ce qui distingue les points entre eux.

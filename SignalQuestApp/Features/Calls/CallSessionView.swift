@@ -577,8 +577,11 @@ struct ActiveCallBanner: View {
                     if let joinedAt = liveKit.remoteJoinedAt {
                         Text(joinedAt, style: .timer)
                             .monospacedDigit()
-                    } else {
+                    } else if call.isOutgoing {
                         Text("Sonnerie…")
+                    } else {
+                        // Appel entrant déjà décroché : ça ne sonne plus, ça se connecte.
+                        Text("Connexion…")
                     }
                 }
                 .font(SQType.subhead.weight(.semibold))

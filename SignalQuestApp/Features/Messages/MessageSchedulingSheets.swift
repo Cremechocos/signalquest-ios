@@ -78,7 +78,6 @@ struct ScheduleMessageSheet: View {
                     Task { await schedule() }
                 }
                 .disabled(!canSchedule || isBusy)
-                .opacity(canSchedule ? 1 : 0.5)
             }
             .padding(SQSpace.lg)
         }
@@ -166,7 +165,6 @@ struct AddReminderSheet: View {
                     Task { await add() }
                 }
                 .disabled(!canAdd || isBusy)
-                .opacity(canAdd ? 1 : 0.5)
             }
             .padding(SQSpace.lg)
         }

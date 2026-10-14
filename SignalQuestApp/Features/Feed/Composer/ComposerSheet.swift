@@ -243,11 +243,13 @@ final class ComposerViewModel: ObservableObject {
         do {
             // Aperçu décodé réduit : une photo de 48 Mpx pleine taille pour une
             // vignette coûtait des centaines de Mo et figeait l'écran (SOC-36).
-            if let data = try await item.loadTransferable(type: Data.self),
-               let image = ImagePipeline.downsample(data: data, maxPixel: 1600) {
-                previewImage = image
-                pickedImageData = data
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = ImagePipeline.downsample(data: data, maxPixel: 1600) else {
+                errorMessage = String(localized: "Photo illisible")
+                return
             }
+            previewImage = image
+            pickedImageData = data
         } catch {
             errorMessage = error.userFacingMessage
         }
@@ -463,6 +465,8 @@ struct ComposerSheet: View {
                         } label: {
                             Image(systemName: "minus.circle.fill")
                                 .foregroundStyle(SQColor.labelTertiary)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
                         .accessibilityLabel(Text("Supprimer l'option \(position)"))
                     }
@@ -477,6 +481,8 @@ struct ComposerSheet: View {
                     Label("Ajouter une option", systemImage: "plus.circle")
                         .font(SQType.subhead(.semibold))
                         .foregroundStyle(SQColor.accentInk)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
             }
 
@@ -583,7 +589,8 @@ struct ComposerSheet: View {
                         text: model.text,
                         image: model.previewImage,
                         speedtest: model.attachedSpeedtest,
-                        visibility: model.visibility
+                        visibility: model.visibility,
+                        poll: model.preparedPoll
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 }
@@ -870,6 +877,8 @@ struct PostPreviewCard: View {
     let image: UIImage?
     let speedtest: SocialShareableSpeedtest?
     let visibility: SocialVisibility
+    /// Sondage prêt à l'envoi : l'aperçu le montre, il part avec la publication.
+    var poll: CreatePostPoll? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md2) {
@@ -896,16 +905,21 @@ struct PostPreviewCard: View {
 
             // Body text
             let bodyTrimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let fallbackText = speedtest != nil
-                ? String(localized: "Mon dernier speedtest SignalQuest")
-                : String(localized: "Photo SignalQuest")
+            // Même repli que `ComposerViewModel.fallbackBody` : question du sondage, sinon légende.
+            let fallbackText: String = {
+                if let question = poll?.question, !question.isEmpty { return question }
+                if poll != nil { return String(localized: "Sondage") }
+                if speedtest != nil { return String(localized: "Mon dernier speedtest SignalQuest") }
+                return String(localized: "Photo SignalQuest")
+            }()
+            let hasAttachment = image != nil || speedtest != nil || poll != nil
             let displayText = bodyTrimmed.isEmpty
-                ? ((image != nil || speedtest != nil) ? fallbackText : String(localized: "Quoi de neuf sur le réseau ?"))
+                ? (hasAttachment ? fallbackText : String(localized: "Quoi de neuf sur le réseau ?"))
                 : bodyTrimmed
 
             Text(displayText)
                 .font(SQType.body)
-                .foregroundStyle(bodyTrimmed.isEmpty && image == nil && speedtest == nil ? SQColor.labelSecondary : SQColor.label)
+                .foregroundStyle(bodyTrimmed.isEmpty && !hasAttachment ? SQColor.labelSecondary : SQColor.label)
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.leading)
 
@@ -922,6 +936,31 @@ struct PostPreviewCard: View {
             // Même bloc de mesure que dans le fil.
             if let speedtest {
                 FeedMeasureBlock(speedtest: speedtest)
+            }
+
+            // Sondage : question et choix, sans vote possible dans l'aperçu.
+            if let poll {
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    if let question = poll.question, !question.isEmpty {
+                        Text(verbatim: question)
+                            .font(SQType.body(.semibold))
+                            .foregroundStyle(SQColor.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(Array(poll.options.enumerated()), id: \.offset) { _, option in
+                        Text(verbatim: option)
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.label)
+                            .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                            .padding(.horizontal, SQSpace.md)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+                                    .stroke(SQColor.separator, lineWidth: 1)
+                            )
+                    }
+                }
+                .padding(SQSpace.md)
+                .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
 
             // Actions Bar

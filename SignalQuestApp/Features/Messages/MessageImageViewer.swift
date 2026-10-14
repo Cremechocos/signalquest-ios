@@ -14,7 +14,8 @@ struct MessageImageTarget: Identifiable, Equatable {
     let url: URL
     /// Session exacte ayant ouvert la pièce jointe. Le pipeline refusera sa
     /// réponse si l'utilisateur se déconnecte ou change de compte entre-temps.
-    let accountSession: LocalAccountSession
+    /// Absente pour une image publique (photo d'une publication du fil).
+    let accountSession: LocalAccountSession?
 }
 
 struct MessageImageViewer: View {
@@ -47,7 +48,7 @@ struct MessageImageViewer: View {
                     url: target.url,
                     maxDimension: 1600,
                     contentMode: .fit,
-                    cacheScope: .privateAccount(target.accountSession),
+                    cacheScope: target.accountSession.map(ImageCacheScope.privateAccount) ?? .publicContent,
                     showsFailureUI: true
                 ) {
                     SQSpinner()

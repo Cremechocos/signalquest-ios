@@ -17,7 +17,10 @@ struct ThreadView: View {
     @State private var draft = ""
     @State private var isLoading = true
     @State private var isSending = false
+    /// Échec du chargement du fil (remplace le fil, avec « Réessayer »).
     @State private var errorMessage: String?
+    /// Échec d'envoi d'une réponse : dit près du champ, le brouillon reste.
+    @State private var sendError: String?
     @State private var decrypted: [String: String] = [:]
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
@@ -63,7 +66,9 @@ struct ThreadView: View {
                     }
                     .padding(.leading, SQSpace.sm)
                     if let errorMessage {
-                        ErrorStateView(title: "Fil de discussion indisponible", message: errorMessage)
+                        ErrorStateView(title: "Fil de discussion indisponible", message: errorMessage) {
+                            Task { await load() }
+                        }
                     }
                 }
                 .padding(.horizontal, SQSpace.lg)
@@ -153,29 +158,35 @@ struct ThreadView: View {
     /// Même compositeur que la conversation : champ blanc, envoi rond encre.
     private var composer: some View {
         let sendable = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
-        return HStack(alignment: .bottom, spacing: SQSpace.sm) {
-            TextField("Répondre dans le fil", text: $draft, axis: .vertical)
-                .lineLimit(1...4)
-                .font(SQType.body)
-                .foregroundStyle(SQColor.label)
-                .padding(.horizontal, SQSpace.md)
-                .padding(.vertical, SQSpace.sm)
-                .frame(minHeight: 44)
-                .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(SQColor.separator))
-            Button {
-                Task { await sendReply() }
-            } label: {
-                Image(systemName: isSending ? "hourglass" : "paperplane.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(sendable ? SQColor.onInk : SQColor.labelTertiary)
-                    .frame(width: 44, height: 44)
-                    .background(sendable ? SQColor.label : SQColor.chip, in: Circle())
-                    .contentShape(Circle())
+        return VStack(alignment: .leading, spacing: SQSpace.xs) {
+            if let sendError {
+                SQInlineError(message: sendError)
+                    .padding(.horizontal, SQSpace.xs)
             }
-            .disabled(!sendable)
-            .keyboardShortcut(.return, modifiers: .command)
-            .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer la réponse")
+            HStack(alignment: .bottom, spacing: SQSpace.sm) {
+                TextField("Répondre dans le fil", text: $draft, axis: .vertical)
+                    .lineLimit(1...4)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.sm)
+                    .frame(minHeight: 44)
+                    .background(SQColor.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(SQColor.separator))
+                Button {
+                    Task { await sendReply() }
+                } label: {
+                    Image(systemName: isSending ? "hourglass" : "paperplane.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(sendable ? SQColor.onInk : SQColor.labelTertiary)
+                        .frame(width: 44, height: 44)
+                        .background(sendable ? SQColor.label : SQColor.chip, in: Circle())
+                        .contentShape(Circle())
+                }
+                .disabled(!sendable)
+                .keyboardShortcut(.return, modifiers: .command)
+                .accessibilityLabel(isSending ? "Envoi en cours" : "Envoyer la réponse")
+            }
         }
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
@@ -206,6 +217,7 @@ struct ThreadView: View {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         isSending = true
+        sendError = nil
         defer { isSending = false }
         do {
             let sent = try await service.sendThreadReply(parentMessageId: parentMessage.id, text: text, in: conversation, e2ee: e2ee)
@@ -214,7 +226,7 @@ struct ThreadView: View {
             draft = ""
             Haptics.success()
         } catch {
-            errorMessage = error.userFacingMessage
+            sendError = error.userFacingMessage
             Haptics.error()
         }
     }

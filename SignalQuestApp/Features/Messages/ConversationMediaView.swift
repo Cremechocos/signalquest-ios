@@ -127,7 +127,7 @@ struct ConversationMediaView: View {
                 .aspectRatio(1, contentMode: .fill)
                 .overlay {
                     if let privateImageCacheScope {
-                        RemoteImage(url: entry.url, maxDimension: 240, contentMode: .fill, cacheScope: privateImageCacheScope) {
+                        RemoteImage(url: entry.url, maxDimension: 240, contentMode: .fill, cacheScope: privateImageCacheScope, showsFailureUI: true) {
                             Rectangle().fill(SQColor.chip).sqShimmer()
                         }
                     } else {

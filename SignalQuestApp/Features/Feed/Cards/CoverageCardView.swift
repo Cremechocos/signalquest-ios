@@ -46,7 +46,8 @@ struct CoverageCardView: View {
                     createdAt: item.createdAt,
                     kindBadge: nil,
                     kindColor: SQColor.brandRed,
-                    onAuthorTap: onAuthorTap
+                    onAuthorTap: onAuthorTap,
+                    isPinned: item.isPinned
                 )
 
                 Group {

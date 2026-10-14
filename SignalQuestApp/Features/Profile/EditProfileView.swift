@@ -136,6 +136,11 @@ struct EditProfileView: View {
                 if let data = try? await newValue.loadTransferable(type: Data.self),
                    let img = ImagePipeline.downsample(data: data, maxPixel: 600) {
                     avatarPreview = img
+                    error = nil
+                } else {
+                    // Sans message, le choix semblait pris en compte alors que rien n'avait changé.
+                    avatarItem = nil
+                    error = String(localized: "Image illisible.")
                 }
             }
         }
@@ -228,7 +233,16 @@ struct EditProfileView: View {
                let data = await Task.detached(priority: .userInitiated, operation: {
                    PhotoUploadPreparation.downscaledJPEG(from: original, maxSide: 512, quality: 0.85)
                }).value {
-                _ = try await services.users.uploadAvatar(data: data, filename: "avatar.jpg", mimeType: "image/jpeg")
+                do {
+                    _ = try await services.users.uploadAvatar(data: data, filename: "avatar.jpg", mimeType: "image/jpeg")
+                } catch {
+                    // Le nom et la bio sont déjà enregistrés : la session doit les relire
+                    // avant qu'on remonte l'échec de la photo.
+                    await session.refreshUser()
+                    Haptics.error()
+                    self.error = String(localized: "Profil enregistré, mais la photo n’a pas pu être envoyée. Réessaie.")
+                    return
+                }
             }
             // Rafraîchir la session : sans ça, l'en-tête du profil gardait l'ancien nom/
             // avatar jusqu'au relancement de l'app (EDITPROFILE-STALE-03).

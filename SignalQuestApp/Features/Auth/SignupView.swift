@@ -89,6 +89,7 @@ struct SignupView: View {
                                 .padding(.horizontal, SQSpace.md2)
                                 .padding(.bottom, SQSpace.sm2)
                                 .accessibilityIdentifier("auth.signup.error")
+                                .sqAnnounce(error)
                         }
                         AuthFieldDivider()
                         AuthFieldRow("Mot de passe", isFocused: focus == .password) {
@@ -138,7 +139,12 @@ struct SignupView: View {
         .scrollDismissesKeyboard(.interactively)
         .signalQuestHeroBackground()
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { appeared = true }
+        .onAppear {
+            appeared = true
+            // L'erreur est globale à la session : sans cela, celle d'une connexion
+            // ratée s'afficherait déjà sous le champ Email à l'ouverture.
+            session.errorMessage = nil
+        }
         .mobileChallenge(using: challenge)
         .onDisappear { cancelSubmission() }
         .onChangeCompat(of: session.state) { _, state in

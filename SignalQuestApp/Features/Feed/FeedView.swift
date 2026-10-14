@@ -464,6 +464,11 @@ final class FeedViewModel: ObservableObject {
         )
     }
 
+    /// Un commentaire publié depuis la feuille compte aussitôt sur la carte.
+    func commentPosted(on item: UnifiedSocialFeedItem) {
+        Task { await applyLocalToggle(itemId: item.id) { var copy = $0; copy.commentsCount += 1; return copy } }
+    }
+
     private func applyLocalToggle(itemId: String, _ transform: (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem) async {
         guard var current = page else { return }
         let updated = current.items.map { $0.id == itemId ? transform($0) : $0 }
@@ -839,7 +844,14 @@ struct FeedView: View {
         } message: {
             Text("Cette action est irréversible.")
         }
-        .sheet(item: $presentedSheet, onDismiss: { model.actionError = nil }) { sheet in
+        .sheet(item: $presentedSheet, onDismiss: {
+            // Une erreur survenue pendant que la feuille était ouverte n'a pas pu
+            // s'afficher en bandeau : on la montre à la fermeture plutôt que de l'effacer.
+            if let message = model.actionError {
+                inAppNotifications.showError(message)
+                model.actionError = nil
+            }
+        }) { sheet in
             switch sheet {
             case .detail(let opened):
                 // L'élément courant du fil, pas la copie prise à l'ouverture : sans
@@ -863,6 +875,7 @@ struct FeedView: View {
                     onShare: { presentedSheet = .share(item) },
                     onMute: { model.muteNotifications(item) },
                     onReport: { presentedSheet = .report(item) },
+                    onPollVote: { option in model.votePoll(item, option: option) },
                     onAuthorTap: {
                         presentedSheet = nil
                         pushProfileAfterDismiss(item.author)
@@ -876,7 +889,10 @@ struct FeedView: View {
                     profileService: services.feed,
                     reports: services.reports,
                     commentsCount: item.commentsCount,
-                    onCommentPosted: { recordSignal("comment", for: item) }
+                    onCommentPosted: {
+                        recordSignal("comment", for: item)
+                        model.commentPosted(on: item)
+                    }
                 )
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
@@ -1322,7 +1338,8 @@ struct FeedView: View {
     @ViewBuilder
     private func photoGallery(_ items: [UnifiedSocialFeedItem]) -> some View {
         let tiles: [GalleryTile] = items.compactMap { item in
-            guard let url = item.attachments.lazy
+            // Images seulement : une vidéo n'a pas de vignette décodable ici.
+            guard let url = item.imageAttachments.lazy
                 .compactMap({ $0.thumbnailUrl ?? $0.url })
                 .first
             else { return nil }
@@ -1350,7 +1367,7 @@ struct FeedView: View {
                     // 320 pt de côté max : une vignette de grille ne dépasse
                     // jamais le tiers de la largeur, décoder du 1500 px pour
                     // l'afficher à 120 remplirait le cache pour rien.
-                    RemoteImage(url: tile.url, maxDimension: 320, contentMode: .fill) {
+                    RemoteImage(url: tile.url, maxDimension: 320, contentMode: .fill, showsFailureUI: true) {
                         RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
                             .fill(SQColor.surfaceMuted)
                     }
@@ -1453,7 +1470,11 @@ struct FeedView: View {
         // Même menu derrière le ⋯ de la carte.
         .environment(\.feedCardMenu, AnyView(postMenu(for: item)))
         .environment(\.feedHashtagAction, { filter(byHashtag: $0) })
-        .accessibilityAction(named: Text("Signaler")) { presentedSheet = .report(item) }
+        .accessibilityActions {
+            if !item.canManage {
+                Button("Signaler") { presentedSheet = .report(item) }
+            }
+        }
         .sqFadeUp()
         .accessibilityIdentifier("feed.item.\(item.id)")
         .onAppear {
@@ -1497,8 +1518,11 @@ struct FeedView: View {
             let icon = muted ? "bell" : "bell.slash"
             Label(title, systemImage: icon)
         }
-        Button(role: .destructive) { presentedSheet = .report(item) } label: {
-            Label("Signaler", systemImage: "flag")
+        // On ne signale pas sa propre publication.
+        if !item.canManage {
+            Button(role: .destructive) { presentedSheet = .report(item) } label: {
+                Label("Signaler", systemImage: "flag")
+            }
         }
     }
 

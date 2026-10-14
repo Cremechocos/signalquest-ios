@@ -940,6 +940,8 @@ final class AuthSessionViewModel: ObservableObject {
     }
 
     func cancelTwoFactor() {
+        // L'erreur du code refusé ne doit pas rester affichée sur la connexion.
+        errorMessage = nil
         state = .loggedOut
     }
 

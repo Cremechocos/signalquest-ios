@@ -14,6 +14,9 @@ struct MessageComposerBar: View {
     let isE2EE: Bool
     /// Faux dans une conversation v2 (§13) : « Programmer l'envoi » disparaît.
     var canSchedule = true
+    /// Vrai pendant la modification d'un message : une photo jointe partirait
+    /// comme un message à part, sans rapport avec l'édition.
+    var isEditing = false
     let seedText: String
     let seedToken: Int
     @Binding var ephemeralEnabled: Bool
@@ -177,7 +180,7 @@ struct MessageComposerBar: View {
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
-                    .disabled(!canSend || isSending)
+                    .disabled(!canSend || isSending || isEditing)
                     .accessibilityLabel("Joindre une photo")
                 }
             }

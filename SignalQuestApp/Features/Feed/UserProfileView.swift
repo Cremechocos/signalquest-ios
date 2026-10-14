@@ -66,7 +66,7 @@ final class UserProfileViewModel: ObservableObject {
             items.append(contentsOf: page.items.filter { !known.contains($0.id) })
             nextCursor = page.nextCursor
         } catch {
-            actionError = error.userFacingMessage
+            if !error.isCancellation { actionError = error.userFacingMessage }
         }
     }
 
@@ -210,6 +210,11 @@ final class UserProfileViewModel: ObservableObject {
         }
     }
 
+    /// Un commentaire publié depuis la feuille compte aussitôt sur la carte.
+    func commentPosted(on item: UnifiedSocialFeedItem) {
+        updateItem(id: item.id) { var copy = $0; copy.commentsCount += 1; return copy }
+    }
+
     private func updateItem(id: String, _ transform: (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem) {
         items = items.map { $0.id == id ? transform($0) : $0 }
     }
@@ -348,8 +353,13 @@ struct UserProfileView: View {
                 if model.isLoading && model.profile == nil {
                     profileSkeleton
                 } else {
+                    // Échec de chargement sans profil : ni « — » dans les stats ni
+                    // « Aucune publication » sous le message d'erreur.
+                    let loadFailed = model.profile == nil && model.errorMessage != nil && !model.isPrivate
                     header
-                    statsCard
+                    if !loadFailed {
+                        statsCard
+                    }
                     if let networks = model.profile?.networks, !networks.operators.isEmpty {
                         measuredNetworks(networks)
                     }
@@ -366,11 +376,13 @@ struct UserProfileView: View {
                                 Task { await model.load() }
                             }
                         }
-                        Text("Publications")
-                            .sqKicker()
-                            .accessibilityAddTraits(.isHeader)
-                            .padding(.leading, SQSpace.xs)
-                        postsSection
+                        if !loadFailed {
+                            Text("Publications")
+                                .sqKicker()
+                                .accessibilityAddTraits(.isHeader)
+                                .padding(.leading, SQSpace.xs)
+                            postsSection
+                        }
                     }
                 }
             }
@@ -428,12 +440,14 @@ struct UserProfileView: View {
                     // Partage et sourdine étaient des actions vides (AF-FIL-01).
                     onShare: { presentedSheet = .share(item) },
                     onMute: { model.muteNotifications(item) },
-                    onReport: { presentedSheet = .report(item) }
+                    onReport: { presentedSheet = .report(item) },
+                    onPollVote: { option in model.votePoll(item, option: option) }
                 )
             case .comments(let item):
                 CommentsSheet(service: services.comments, postId: item.backendPostId,
                               profileService: services.feed, reports: services.reports,
-                              commentsCount: item.commentsCount)
+                              commentsCount: item.commentsCount,
+                              onCommentPosted: { model.commentPosted(on: item) })
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
             case .share(let item):
@@ -577,7 +591,7 @@ struct UserProfileView: View {
                 avatar
                 VStack(alignment: .leading, spacing: SQSpace.xxs) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(profile?.displayName ?? model.prefill?.displayName ?? "Utilisateur")
+                        Text(profile?.displayName ?? model.prefill?.displayName ?? String(localized: "Utilisateur"))
                             .font(SQFont.display(22, .bold, relativeTo: .title2))
                             .foregroundStyle(SQColor.label)
                             .lineLimit(2)
@@ -786,9 +800,9 @@ struct UserProfileView: View {
         let name = operatorLabel(for: entry)
         guard let hostKey = entry.hostKey,
               let host = SQBrand.operatorName(hostKey) else {
-            return "\(name) : \(entry.percentLabel) des mesures"
+            return String(localized: "\(name) : \(entry.percentLabel) des mesures")
         }
-        return "\(name), sur le réseau \(host) : \(entry.percentLabel) des mesures"
+        return String(localized: "\(name), sur le réseau \(host) : \(entry.percentLabel) des mesures")
     }
 
     /// Teinte d'une part de réseau. Une clé non résolue reçoit un gris neutre,

@@ -94,8 +94,12 @@ struct SentinelleFollowersCard: View {
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                         Spacer()
-                        Button(busy == follower.userId ? String(localized: "Retrait…") : String(localized: "Retirer")) {
+                        Button {
                             followerToRevoke = follower
+                        } label: {
+                            Text(busy == follower.userId ? String(localized: "Retrait…") : String(localized: "Retirer"))
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .font(SQFont.body(13, .medium))
                         .tint(SQColor.brandRed)

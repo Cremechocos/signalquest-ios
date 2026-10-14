@@ -64,6 +64,11 @@ final class ExploreViewModel: ObservableObject {
         searchPosts.first { $0.id == item.id } ?? hashtagItems.first { $0.id == item.id } ?? item
     }
 
+    /// Un commentaire publié depuis la feuille compte aussitôt sur la carte.
+    func commentPosted(on item: UnifiedSocialFeedItem) {
+        update(item.id) { var copy = $0; copy.commentsCount += 1; return copy }
+    }
+
     private func update(_ id: String, _ transform: (UnifiedSocialFeedItem) -> UnifiedSocialFeedItem) {
         searchPosts = searchPosts.map { $0.id == id ? transform($0) : $0 }
         hashtagItems = hashtagItems.map { $0.id == id ? transform($0) : $0 }
@@ -138,6 +143,8 @@ final class ExploreViewModel: ObservableObject {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
             searchResults = []
+            searchPosts = []
+            searchError = nil
             searchPlaces = []
             searchSites = []
             isSearching = false
@@ -179,6 +186,9 @@ final class ExploreViewModel: ObservableObject {
             // `CancellationError`. Elle s'affichait « Requête annulée » (SOC-15).
             if !error.isCancellation {
                 searchError = error.userFacingMessage
+                // Les résultats de la requête précédente ne répondent pas à celle-ci.
+                searchResults = []
+                searchPosts = []
             }
         }
         let found = await map
@@ -407,7 +417,11 @@ struct ExploreView: View {
                             recentProfilesSection
                         }
                         trendingSection
-                        suggestionsSection
+                        // Pendant une erreur de chargement, « Aucune suggestion »
+                        // contredirait le message d'erreur affiché au-dessus.
+                        if model.errorMessage == nil || !model.suggestions.isEmpty {
+                            suggestionsSection
+                        }
                     }
                 }
             }
@@ -447,12 +461,14 @@ struct ExploreView: View {
                     onComment: { presentedSheet = .comments(item) },
                     onShare: { presentedSheet = .share(item) },
                     onMute: { model.muteNotifications(item) },
-                    onReport: { presentedSheet = .report(item) }
+                    onReport: { presentedSheet = .report(item) },
+                    onPollVote: { option in model.votePoll(item, option: option) }
                 )
             case .comments(let item):
                 CommentsSheet(service: services.comments, postId: item.backendPostId,
                               profileService: services.feed, reports: services.reports,
-                              commentsCount: item.commentsCount)
+                              commentsCount: item.commentsCount,
+                              onCommentPosted: { model.commentPosted(on: item) })
             case .report(let item):
                 ReportSheet(target: .post(item.backendPostId), service: services.reports)
             case .share(let item):
@@ -621,6 +637,7 @@ struct ExploreView: View {
                         .foregroundStyle(SQColor.labelSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, SQSpace.md)
+                        .accessibilityAddTraits(.isHeader)
                     ForEach(model.searchPosts) { item in
                         exploreCard(item)
                     }
@@ -823,8 +840,12 @@ struct ExploreView: View {
                             let following = model.isFollowing(hashtag: tag)
                             // `String(localized:)` : un ternaire de littéraux devient un
                             // `String` que SwiftUI ne traduit pas.
-                            Button(following ? String(localized: "Suivi") : String(localized: "Suivre")) {
+                            Button {
                                 Task { await model.toggleHashtagFollow(tag) }
+                            } label: {
+                                Text(verbatim: following ? String(localized: "Suivi") : String(localized: "Suivre"))
+                                    .frame(minHeight: 44)
+                                    .contentShape(Rectangle())
                             }
                             .font(SQType.caption.weight(.semibold))
                             .tint(following ? SQColor.labelSecondary : SQColor.brandRed)
@@ -834,9 +855,13 @@ struct ExploreView: View {
                                 : String(localized: "Suivre #\(tag)"))
                             .accessibilityIdentifier("explore.hashtag.follow")
                         }
-                        Button("Effacer") {
+                        Button {
                             Haptics.selection()
                             model.selectHashtag(nil)
+                        } label: {
+                            Text("Effacer")
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .font(SQType.caption)
                         .tint(SQColor.brandRed)
@@ -847,7 +872,7 @@ struct ExploreView: View {
                 LoadingSkeleton().sqShimmer()
             } else if model.hashtagItems.isEmpty {
                 EmptyStateView(
-                    title: "Aucun post",
+                    title: "Aucune publication",
                     message: "Pas encore de publication sur ce hashtag.",
                     systemImage: "number"
                 )

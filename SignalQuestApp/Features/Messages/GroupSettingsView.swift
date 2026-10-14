@@ -12,6 +12,9 @@ struct GroupSettingsView: View {
     /// Appelé après un départ réussi : la conversation quittée se ferme aussi.
     var onLeft: () -> Void = {}
     var onRenamed: (String) -> Void = { _ in }
+    /// Appelé quand le nombre de membres change (ajout, retrait) : l'en-tête de
+    /// la conversation garde sinon l'ancien compte.
+    var onMembersChanged: (Int) -> Void = { _ in }
     /// Dernier nom enregistré pendant cette ouverture.
     @State private var renamedTo: String?
 
@@ -56,11 +59,13 @@ struct GroupSettingsView: View {
 
     init(conversation: MessageConversation, service: MessagesServicing, e2ee: E2EEServicing?,
          onRenamed: @escaping (String) -> Void = { _ in },
+         onMembersChanged: @escaping (Int) -> Void = { _ in },
          onLeft: @escaping () -> Void = {}) {
         self.conversation = conversation
         self.service = service
         self.e2ee = e2ee
         self.onRenamed = onRenamed
+        self.onMembersChanged = onMembersChanged
         self.onLeft = onLeft
         _title = State(initialValue: conversation.title ?? "")
         _participants = State(initialValue: conversation.participants)
@@ -108,7 +113,13 @@ struct GroupSettingsView: View {
                         Task {
                             if hasPendingRename {
                                 await rename()
-                                guard errorMessage == nil else { return }
+                                // Renommage refusé : on rétablit l'ancien nom (l'erreur
+                                // reste affichée) pour que « Fermer » ne soit pas bloqué
+                                // au prochain appui.
+                                if errorMessage != nil {
+                                    title = renamedTo ?? conversation.title ?? ""
+                                    return
+                                }
                             }
                             dismiss()
                         }
@@ -193,6 +204,7 @@ struct GroupSettingsView: View {
                 await search()
             }
         }
+        .onChangeCompat(of: participants.count) { _, count in onMembersChanged(count) }
         .onDisappear { searchTask?.cancel() }
         .onChangeCompat(of: photoItem) { _, newValue in
             guard let newValue else { return }
@@ -217,16 +229,27 @@ struct GroupSettingsView: View {
                     .padding(.trailing, 2)
                     .hidden()
                     .overlay {
-                        TextField("Nom du groupe", text: $title)
-                            .font(SQFont.display(24, .bold, relativeTo: .title))
-                            .foregroundStyle(SQColor.label)
-                            .multilineTextAlignment(.center)
-                            .onSubmit { Task { await rename() } }
+                        // Le serveur réserve le renommage aux admins : les autres
+                        // lisent le nom, sans champ grisé.
+                        if isAdmin {
+                            TextField("Nom du groupe", text: $title)
+                                .font(SQFont.display(24, .bold, relativeTo: .title))
+                                .foregroundStyle(SQColor.label)
+                                .multilineTextAlignment(.center)
+                                .onSubmit { Task { await rename() } }
+                        } else {
+                            Text(verbatim: title.isEmpty ? String(localized: "Nom du groupe") : title)
+                                .font(SQFont.display(24, .bold, relativeTo: .title))
+                                .foregroundStyle(SQColor.label)
+                                .lineLimit(1)
+                        }
                     }
-                Image(systemName: "pencil")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .accessibilityHidden(true)
+                if isAdmin {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityHidden(true)
+                }
             }
             Text("Groupe · \(participants.count) membres")
                 .font(SQType.callout)
@@ -538,13 +561,21 @@ struct GroupSettingsView: View {
 
     private func uploadPhoto(item: PhotosPickerItem) async {
         defer { photoItem = nil }
-        guard let raw = try? await item.loadTransferable(type: Data.self) else { return }
+        guard let raw = try? await item.loadTransferable(type: Data.self) else {
+            errorMessage = String(localized: "La photo n’a pas pu être lue. Choisis-en une autre.")
+            Haptics.error()
+            return
+        }
         // La photo d'un groupe s'affiche en petit : on la décode réduite, hors du
         // fil principal, au lieu de l'image pleine taille (SOC-33).
         let prepared = await Task.detached(priority: .userInitiated) {
             ImagePipeline.downsample(data: raw, maxPixel: 1024)?.jpegData(compressionQuality: 0.85)
         }.value
-        guard let jpeg = prepared, let image = UIImage(data: jpeg) else { return }
+        guard let jpeg = prepared, let image = UIImage(data: jpeg) else {
+            errorMessage = String(localized: "La photo n’a pas pu être lue. Choisis-en une autre.")
+            Haptics.error()
+            return
+        }
         // Aperçu optimiste immédiat, puis upload ; on confirme avec l'URL renvoyée.
         // On conserve l'aperçu local en cas de succès (il EST la photo uploadée)
         // pour éviter un flash le temps que l'image distante se charge.

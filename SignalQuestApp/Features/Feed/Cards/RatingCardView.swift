@@ -29,7 +29,8 @@ struct RatingCardView: View {
                     createdAt: item.createdAt,
                     kindBadge: nil,
                     kindColor: SQColor.warning,
-                    onAuthorTap: onAuthorTap
+                    onAuthorTap: onAuthorTap,
+                    isPinned: item.isPinned
                 )
 
                 // Héro : étoiles + tendance.

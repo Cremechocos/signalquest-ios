@@ -148,7 +148,6 @@ struct NearbyNetworkQualityDetailSheet: View {
     }
 
     private var radiusText: String {
-        let m = quality.radiusMeters
-        return m >= 1000 ? "\(m / 1000) km" : "\(m) m"
+        SQUnits.distanceCompact(meters: Double(quality.radiusMeters))
     }
 }

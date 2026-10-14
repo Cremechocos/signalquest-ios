@@ -283,7 +283,7 @@ struct SharedPostCardBubble: View {
     @ViewBuilder
     private var media: some View {
         if let image = card.imageUrl {
-            RemoteImage(url: image, maxDimension: 600, contentMode: .fill) {
+            RemoteImage(url: image, maxDimension: 600, contentMode: .fill, showsFailureUI: true) {
                 Rectangle()
                     .fill(mine ? SQColor.onInk.opacity(0.12) : SQColor.surfaceMuted)
                     .sqShimmer()

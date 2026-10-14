@@ -108,7 +108,7 @@ struct DriveSpeedtestDetailSheet: View {
                 triCell("Envoi", value: result.uploadAverageMbps.map { SQUnits.throughputValue(mbps: $0) } ?? "—",
                         unit: SQUnits.throughputUnit(mbps: result.uploadAverageMbps ?? 0))
                 triCell("Latence", value: Self.wholeMs(result.primaryPingMs), unit: "ms", term: .latency)
-                triCell("Gigue", value: Self.wholeMs(result.jitterMs), unit: "ms", term: .jitter)
+                triCell("Gigue", value: result.jitterMs.map { SQUnits.jitterValue($0) } ?? "—", unit: "ms", term: .jitter)
             }
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: SQSpace.sm) { metrics }

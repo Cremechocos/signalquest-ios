@@ -74,7 +74,9 @@ struct SentinelleAddressView: View {
                     existing: address.address,
                     currentIp: { await model.currentIp() }
                 ) { value in
-                    await model.setAddress(targetId: targetId, family: family, address: value)
+                    let failure = await model.setAddress(targetId: targetId, family: family, address: value)
+                    if failure == nil { resetSections() }
+                    return failure
                 }
             }
         }
@@ -666,6 +668,19 @@ struct SentinelleAddressView: View {
             guard !Task.isCancelled, requestKey == seriesKey else { return }
             _ = seriesLoad.fail(key: requestKey, generation: generation)
         }
+    }
+
+    /// Diagnostic, tendances et preuve décrivaient l'ancienne adresse : on les efface
+    /// et on relit l'onglet ouvert, sans attendre qu'on en change.
+    private func resetSections() {
+        diagnostic = nil
+        trends = nil
+        proof = nil
+        diagnosticFailed = false
+        trendsFailed = false
+        proofFailed = false
+        sectionFailure = nil
+        Task { await loadSection() }
     }
 
     /// Les lectures longues ne sont chargées qu'à l'ouverture de leur onglet :

@@ -17,10 +17,11 @@ struct SentinelleFollowedCard: View {
     let onUnfollow: () -> Void
     /// Chargée à l'OUVERTURE seulement : la précharger ferait une requête par
     /// connexion suivie à chaque affichage de la page.
-    var loadSeries: ((SentinelleWindow) async -> [SentinelleSeriesPoint])? = nil
+    var loadSeries: ((SentinelleWindow) async throws -> [SentinelleSeriesPoint])? = nil
 
     @State private var points: [SentinelleSeriesPoint] = []
     @State private var window: SentinelleWindow = .h24
+    @State private var seriesFailed = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var confirming = false
@@ -74,7 +75,17 @@ struct SentinelleFollowedCard: View {
                     }
                     .pickerStyle(.segmented)
 
-                    if !points.isEmpty {
+                    if seriesFailed {
+                        SQInlineError(message: String(localized: "Mesures indisponibles"))
+                        Button { reloadSeries() } label: {
+                            Text("Réessayer")
+                                .frame(minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .font(SQFont.body(14, .semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                    } else if !points.isEmpty {
                         Text("Latence · IPv4 et IPv6")
                             .font(SQFont.body(12))
                             .foregroundStyle(SQColor.labelSecondary)
@@ -132,7 +143,7 @@ struct SentinelleFollowedCard: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .foregroundStyle(SQColor.danger)
+                        .foregroundStyle(SQColor.dangerInk)
                     }
                     .font(SQFont.body(14))
                 } else {
@@ -148,12 +159,31 @@ struct SentinelleFollowedCard: View {
             }
         }
         .onChangeCompat(of: open) { _, isOpen in
-            guard isOpen, points.isEmpty, let loadSeries else { return }
-            Task { points = await loadSeries(window) }
+            guard isOpen, points.isEmpty else { return }
+            reloadSeries()
         }
-        .onChangeCompat(of: window) { _, newWindow in
-            guard open, let loadSeries else { return }
-            Task { points = await loadSeries(newWindow) }
+        .onChangeCompat(of: window) { _, _ in
+            guard open else { return }
+            reloadSeries()
+        }
+    }
+
+    /// Une réponse qui arrive après un changement de période est ignorée : sans cela,
+    /// la plus lente écraserait le graphe de la période choisie ensuite.
+    private func reloadSeries() {
+        guard let loadSeries else { return }
+        let requested = window
+        seriesFailed = false
+        Task {
+            do {
+                let loaded = try await loadSeries(requested)
+                guard requested == window else { return }
+                points = loaded
+            } catch {
+                guard requested == window, !error.isCancellation else { return }
+                points = []
+                seriesFailed = true
+            }
         }
     }
 
@@ -258,6 +288,8 @@ struct SentinelleFollowInvite: View {
                 Button(action: onTap) {
                     Label("Coller un lien", systemImage: "link")
                         .font(SQFont.body(14))
+                        .frame(minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(SQColor.accentInk)

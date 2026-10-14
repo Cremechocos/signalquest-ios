@@ -170,7 +170,7 @@ extension SpeedtestV6ContractTests {
             downloadMaxMbps: 1000, downloadP90Mbps: 1000, pingMs: 20, pingMinMs: 12, durationSeconds: 4,
             connectionType: .wifi, uploadMeasurementSource: "client-written", measurementTrace: trace, methodologyVersion: 6)
         let card = SQShareCardBuilder.model(for: result, theme: .light, locale: Locale(identifier: "fr_FR"))
-        XCTAssertEqual(card.download.unit, "Gbps")
+        XCTAssertEqual(card.download.unit, SQUnits.throughputUnit(mbps: 1000))
         XCTAssertEqual(card.download.value, "1,00")
         XCTAssertEqual(card.download.graph.normalizedTimes, [0.65, 1.0])
         XCTAssertEqual(card.latencyValueText, "12")

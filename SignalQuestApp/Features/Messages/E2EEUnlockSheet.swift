@@ -181,7 +181,6 @@ struct E2EEUnlockSheet: View {
                     }
                 }
                 .disabled(!canSubmit)
-                .opacity(canSubmit ? 1 : 0.5)
 
                 // Déverrouillage biométrique direct (déjà mémorisé).
                 if !choosesNewPassword, E2EEBiometric.isEnabled, E2EEBiometric.hasStored {

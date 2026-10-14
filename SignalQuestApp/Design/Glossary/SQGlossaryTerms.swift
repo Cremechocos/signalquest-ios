@@ -122,7 +122,9 @@ enum SQTerm: String, CaseIterable, Identifiable {
                 example: String(localized: "À −95 dBm, la navigation reste fluide ; sous −110 dBm, les pages peinent à charger."),
                 scale: [
                     (String(localized: "−80 dBm et plus"), String(localized: "excellent, même à l’intérieur")),
+                    (String(localized: "−80 à −90 dBm"), String(localized: "bon, fluide dans la plupart des lieux")),
                     (String(localized: "−90 à −100 dBm"), String(localized: "correct, parfois fragile à l’intérieur")),
+                    (String(localized: "−100 à −110 dBm"), String(localized: "faible, le débit baisse")),
                     (String(localized: "sous −110 dBm"), String(localized: "très faible, coupures probables")),
                 ],
                 related: related
@@ -145,6 +147,7 @@ enum SQTerm: String, CaseIterable, Identifiable {
                 definition: String(localized: "L’écart entre le signal utile et le bruit ambiant, en dB. Plus il est élevé, plus le téléphone peut monter en débit."),
                 scale: [
                     (String(localized: "20 dB et plus"), String(localized: "excellent")),
+                    (String(localized: "13 à 20 dB"), String(localized: "bon")),
                     (String(localized: "0 à 13 dB"), String(localized: "moyen")),
                     (String(localized: "sous 0 dB"), String(localized: "le bruit domine")),
                 ],

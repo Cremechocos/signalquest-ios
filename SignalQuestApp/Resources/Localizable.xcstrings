@@ -17,6 +17,22 @@
         }
       }
     },
+    "%@ : %@ des mesures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: %@ of measurements"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ : %@ des mesures"
+          }
+        }
+      }
+    },
     "%@ au total" : {
       "localizations" : {
         "en" : {
@@ -62,6 +78,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ en download%@, ping %@, %@ — mesuré avec SignalQuest."
+          }
+        }
+      }
+    },
+    "%@ en envoi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ upload"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en envoi"
           }
         }
       }
@@ -232,6 +264,38 @@
         }
       }
     },
+    "%@ · %@ en réception" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · %@ download"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · %@ en réception"
+          }
+        }
+      }
+    },
+    "%@ · %@ en réception · %@ en envoi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · %@ download · %@ upload"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · %@ en réception · %@ en envoi"
+          }
+        }
+      }
+    },
     "%@ · %lld PCI" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -328,6 +392,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ → %2$@ pendant la mesure. Relance le test pour mesurer une connexion stable."
+          }
+        }
+      }
+    },
+    "%@, sur le réseau %@ : %@ des mesures" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, on the %@ network: %@ of measurements"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, sur le réseau %@ : %@ des mesures"
           }
         }
       }
@@ -1124,17 +1204,42 @@
       }
     },
     "%lld photos · les plus récentes d’abord" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld photos · most recent first"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photo · most recent first"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photos · most recent first"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld photos · les plus récentes d’abord"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photo · les plus récentes d’abord"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld photos · les plus récentes d’abord"
+                }
+              }
+            }
           }
         }
       }
@@ -2124,6 +2229,22 @@
         }
       }
     },
+    "13 à 20 dB" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "13 to 20 dB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "13 à 20 dB"
+          }
+        }
+      }
+    },
     "3 ans" : {
       "localizations" : {
         "en" : {
@@ -2350,6 +2471,22 @@
         }
       }
     },
+    "Ami en direct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live friend"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ami en direct"
+          }
+        }
+      }
+    },
     "Amis (%lld)" : {
       "localizations" : {
         "en" : {
@@ -2394,6 +2531,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Anciennes notes"
+          }
+        }
+      }
+    },
+    "Annuler cet envoi programmé ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel this scheduled message?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler cet envoi programmé ?"
           }
         }
       }
@@ -2718,6 +2871,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun itinéraire trouvé vers cette destination."
+          }
+        }
+      }
+    },
+    "Aucun message pour l’instant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No messages yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun message pour l’instant"
           }
         }
       }
@@ -3300,6 +3469,22 @@
         }
       }
     },
+    "Ce résultat n’a pas pu être sauvegardé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This result could not be saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce résultat n’a pas pu être sauvegardé."
+          }
+        }
+      }
+    },
     "Ce signalement est clos, les réponses sont fermées. Tu peux en ouvrir un nouveau." : {
       "localizations" : {
         "en" : {
@@ -3610,6 +3795,38 @@
         }
       }
     },
+    "Clôturer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clôturer"
+          }
+        }
+      }
+    },
+    "Clôturer ce sondage ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close this poll?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clôturer ce sondage ?"
+          }
+        }
+      }
+    },
     "Code e-mail" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3737,6 +3954,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Confiance"
+          }
+        }
+      }
+    },
+    "Confirmations" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmations"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmations"
           }
         }
       }
@@ -4173,6 +4406,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Depuis toujours"
+          }
+        }
+      }
+    },
+    "Dernier Speedtest — %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest speedtest — %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier Speedtest — %@"
           }
         }
       }
@@ -4868,6 +5117,38 @@
         }
       }
     },
+    "Garder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garder"
+          }
+        }
+      }
+    },
+    "Garder ouvert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep open"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garder ouvert"
+          }
+        }
+      }
+    },
     "Gardé sur l'iPhone" : {
       "localizations" : {
         "en" : {
@@ -4960,6 +5241,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Glisse sur la courbe pour lire une mesure."
+          }
+        }
+      }
+    },
+    "Gravité" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Severity"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravité"
           }
         }
       }
@@ -5179,6 +5476,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identifie une antenne depuis une session ou la carte. Tes identifications, y compris depuis Android, apparaîtront ici."
+          }
+        }
+      }
+    },
+    "Identifier %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identify %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifier %@"
           }
         }
       }
@@ -5427,6 +5740,22 @@
         }
       }
     },
+    "Impossible d'actualiser ce signalement. Vérifie ta connexion." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't refresh this report. Check your connection."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d'actualiser ce signalement. Vérifie ta connexion."
+          }
+        }
+      }
+    },
     "Impossible de charger ce signalement." : {
       "localizations" : {
         "en" : {
@@ -5576,6 +5905,22 @@
         }
       }
     },
+    "Impossible de préparer l’image du bilan. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t prepare the recap image. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de préparer l’image du bilan. Réessaie."
+          }
+        }
+      }
+    },
     "Impossible de révoquer cet appareil." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5622,6 +5967,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible d’approuver cet appareil. Actualise puis réessaie."
+          }
+        }
+      }
+    },
+    "Impossible d’enregistrer ton j’aime. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t save your like. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’enregistrer ton j’aime. Réessaie."
           }
         }
       }
@@ -5689,6 +6050,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Indisponibilité"
+          }
+        }
+      }
+    },
+    "Indisponible pour l’instant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable for now"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponible pour l’instant"
           }
         }
       }
@@ -5956,6 +6333,22 @@
         }
       }
     },
+    "La photo n’a pas pu être lue. Choisis-en une autre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The photo couldn’t be read. Pick another one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La photo n’a pas pu être lue. Choisis-en une autre."
+          }
+        }
+      }
+    },
     "La restauration de l’historique a échoué." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5969,6 +6362,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La restauration de l’historique a échoué."
+          }
+        }
+      }
+    },
+    "La réinitialisation a échoué ; l’identité actuelle reste inchangée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The reset failed; your current identity is unchanged."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La réinitialisation a échoué ; l’identité actuelle reste inchangée."
           }
         }
       }
@@ -6232,6 +6641,22 @@
         }
       }
     },
+    "Le message ne sera pas envoyé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The message won’t be sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le message ne sera pas envoyé."
+          }
+        }
+      }
+    },
     "Le numéro de sécurité n’est pas disponible pour le moment." : {
       "localizations" : {
         "en" : {
@@ -6469,6 +6894,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les longs trajets sont allégés à l’affichage : la carte montre un échantillon de %lld points sur %lld. Tes mesures restent toutes enregistrées."
+          }
+        }
+      }
+    },
+    "Les messages de cette conversation apparaîtront ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This conversation’s messages will appear here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les messages de cette conversation apparaîtront ici."
           }
         }
       }
@@ -7266,6 +7707,22 @@
         }
       }
     },
+    "Non enregistré" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not saved"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non enregistré"
+          }
+        }
+      }
+    },
     "Non envoyé" : {
       "localizations" : {
         "en" : {
@@ -7294,6 +7751,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Non retenu"
+          }
+        }
+      }
+    },
+    "Note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rating"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note"
           }
         }
       }
@@ -7829,6 +8302,38 @@
         }
       }
     },
+    "Photo illisible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unreadable photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo illisible"
+          }
+        }
+      }
+    },
+    "Photo. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo. %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo. %@"
+          }
+        }
+      }
+    },
     "Photos de mes amis seulement" : {
       "localizations" : {
         "en" : {
@@ -7921,6 +8426,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plus anciens"
+          }
+        }
+      }
+    },
+    "Plus aucun vote ne sera possible. Cette action est définitive." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No more votes will be possible. This can’t be undone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus aucun vote ne sera possible. Cette action est définitive."
           }
         }
       }
@@ -8098,6 +8619,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Problème"
+          }
+        }
+      }
+    },
+    "Prochain test dans %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next test in %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prochain test dans %@"
+          }
+        }
+      }
+    },
+    "Profil enregistré, mais la photo n’a pas pu être envoyée. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profile saved, but the photo couldn’t be uploaded. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil enregistré, mais la photo n’a pas pu être envoyée. Réessaie."
           }
         }
       }
@@ -9445,6 +9998,22 @@
         }
       }
     },
+    "Speedtest SignalQuest — %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest speedtest — %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtest SignalQuest — %@"
+          }
+        }
+      }
+    },
     "Speedtests · %lld" : {
       "localizations" : {
         "en" : {
@@ -9538,6 +10107,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suppression impossible. Réessaie."
+          }
+        }
+      }
+    },
+    "Supprimer ce rappel ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this reminder?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ce rappel ?"
           }
         }
       }
@@ -9702,6 +10287,22 @@
         }
       }
     },
+    "Tendance" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trend"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tendance"
+          }
+        }
+      }
+    },
     "Terminée" : {
       "localizations" : {
         "en" : {
@@ -9714,6 +10315,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminée"
+          }
+        }
+      }
+    },
+    "Terminés · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminés · %lld"
           }
         }
       }
@@ -10443,6 +11060,22 @@
         }
       }
     },
+    "Tu ne seras plus rappelé de ce message." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You won’t be reminded about this message anymore."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ne seras plus rappelé de ce message."
+          }
+        }
+      }
+    },
     "Tu peux confirmer avec la 168 ?" : {
       "localizations" : {
         "en" : {
@@ -10792,6 +11425,38 @@
         }
       }
     },
+    "Vidéo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo"
+          }
+        }
+      }
+    },
+    "Voir %@ sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show %@ on the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir %@ sur la carte"
+          }
+        }
+      }
+    },
     "Voir mon signalement" : {
       "localizations" : {
         "en" : {
@@ -10885,6 +11550,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vus en dernier"
+          }
+        }
+      }
+    },
+    "Vérification en pause" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check paused"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vérification en pause"
           }
         }
       }
@@ -10998,6 +11679,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réduire"
+          }
+        }
+      }
+    },
+    "bon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "good"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bon"
+          }
+        }
+      }
+    },
+    "bon, fluide dans la plupart des lieux" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "good, smooth in most places"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bon, fluide dans la plupart des lieux"
           }
         }
       }
@@ -11315,6 +12028,22 @@
         }
       }
     },
+    "faible, le débit baisse" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "weak, speeds drop"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "faible, le débit baisse"
+          }
+        }
+      }
+    },
     "gNB (5G)" : {
       "localizations" : {
         "en" : {
@@ -11444,6 +12173,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "meilleure famille"
+          }
+        }
+      }
+    },
+    "mi %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mi %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mi %@"
           }
         }
       }
@@ -12052,6 +12797,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écrire une réponse…"
+          }
+        }
+      }
+    },
+    "Épinglé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pinned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Épinglé"
           }
         }
       }
@@ -71058,6 +71819,22 @@
         }
       }
     },
+    "−100 à −110 dBm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−100 to −110 dBm"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−100 à −110 dBm"
+          }
+        }
+      }
+    },
     "−80 dBm et plus" : {
       "localizations" : {
         "en" : {
@@ -71070,6 +71847,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "−80 dBm et plus"
+          }
+        }
+      }
+    },
+    "−80 à −90 dBm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−80 to −90 dBm"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "−80 à −90 dBm"
           }
         }
       }

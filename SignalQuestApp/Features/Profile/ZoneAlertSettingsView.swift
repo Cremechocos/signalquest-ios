@@ -97,13 +97,7 @@ struct ZoneAlertSettingsView: View {
 
     var body: some View {
         List {
-            if let settings = model.settings {
-                content(settings)
-            } else if model.isLoading {
-                SQSpinner()
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
-            }
+            // En tête : en bas de liste, l'erreur d'un réglage restait hors écran.
             if let error = model.errorMessage {
                 Section {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -116,6 +110,13 @@ struct ZoneAlertSettingsView: View {
                     }
                 }
                 .listRowBackground(SQColor.dangerSoft)
+            }
+            if let settings = model.settings {
+                content(settings)
+            } else if model.isLoading {
+                SQSpinner()
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
             }
         }
         .scrollContentBackground(.hidden)
