@@ -683,7 +683,7 @@ final class SignalQuestUITests: XCTestCase {
         app.staticTexts["Photos"].tap()
         XCTAssertTrue(app.staticTexts["Photos"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Paris centre"].waitForExistence(timeout: 5))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["photos.back"].tap()
 
         app.staticTexts["Classements"].tap()
         // La carte « Mon rang » et les colonnes du podium regroupent leurs

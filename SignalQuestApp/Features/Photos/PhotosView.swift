@@ -328,6 +328,7 @@ struct PhotosView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
     @StateObject private var model: PhotosViewModel
     @State private var showingUpload = false
+    @Environment(\.dismiss) private var dismiss
 
     init(service: PhotoServicing, initialFilter: PhotosViewModel.GalleryFilter = .approved) {
         let model = PhotosViewModel(service: service)
@@ -342,7 +343,7 @@ struct PhotosView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SQSpace.xl) {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
                 galleryHeader
                 if model.isLoading && model.photos.isEmpty {
                     gallerySkeleton
@@ -365,22 +366,14 @@ struct PhotosView: View {
                 }
             }
             .padding(.horizontal, SQSpace.lg)
-            .padding(.top, SQSpace.md)
+            .padding(.top, SQSpace.sm)
             .padding(.bottom, 96)
             .sqReadableWidth()
         }
         .navigationTitle("Photos")
-        .toolbarTitleInlineCompat()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showingUpload = true } label: {
-                    Image(systemName: "plus")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(SQColor.brandRed)
-                }
-                .accessibilityLabel("Ajouter une photo")
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
         .refreshable { await model.load() }
         .task { if model.photos.isEmpty { await model.load() } }
@@ -432,39 +425,56 @@ struct PhotosView: View {
 
     // MARK: Header
 
-    // Pas de gros titre interne : la barre de navigation affiche déjà
-    // « Photos » — on ne garde que le compteur en ligne discrète.
-    @ViewBuilder
     private var galleryHeader: some View {
-        // « Mes photos » et « En vérification » n'ont de sens qu'avec un compte.
-        if case .authenticated = session.state {
-            Picker("Galerie", selection: $model.filter) {
-                ForEach(PhotosViewModel.GalleryFilter.allCases) { Text($0.label).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("photos.filter")
-            .onChangeCompat(of: model.filter) { _, _ in
-                Task { await model.load() }
-            }
-        }
-        if !model.photos.isEmpty {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "photos.back") { dismiss() }
+                Spacer()
+                MapChipIconButton(systemImage: "plus", label: "Ajouter une photo", identifier: "photos.add") { showingUpload = true }
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Photos")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("photos.title")
+                Text("Les photos d’antennes partagées par la communauté, et les tiennes.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // « Mes photos » et « En vérification » n'ont de sens qu'avec un compte.
+            if case .authenticated = session.state {
+                SQSegmentedFilter(
+                    selection: $model.filter,
+                    options: PhotosViewModel.GalleryFilter.allCases.map { (value: $0, label: $0.label, icon: String?.none) }
+                )
+                // Le segment ajoute sa propre marge latérale : on la compense.
+                .padding(.horizontal, -SQSpace.lg)
+                .accessibilityIdentifier("photos.filter")
+                .onChangeCompat(of: model.filter) { _, _ in
+                    Task { await model.load() }
+                }
+            }
+            if !model.photos.isEmpty {
                 // Le total serveur quand il existe ; sinon, tant que d'autres pages restent,
                 // le nombre de photos chargées plutôt qu'un total qu'on ne connaît pas.
                 Group {
                     if let total = model.totalCount, total >= model.photos.count {
-                        Text("\(total) photos")
+                        Text("\(total) photos · les plus récentes d’abord")
                     } else if model.hasMore {
                         Text("\(model.photos.count) photos chargées")
                     } else {
-                        Text("\(model.photos.count) photos")
+                        Text("\(model.photos.count) photos · les plus récentes d’abord")
                     }
                 }
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
-                Spacer()
+                .padding(.horizontal, SQSpace.xs)
+                .accessibilityIdentifier("photos.summary")
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: Content
@@ -508,7 +518,6 @@ struct PhotosView: View {
     // MARK: Featured tile — pleine largeur, 16:9
 
     private func featuredTile(_ photo: Photo) -> some View {
-        let opColor = SQBrand.operatorColor(photo.operator)
         let isLiked = photo.isLikedByMe == true || photo.likedByCurrentUser == true
         return ZStack(alignment: .bottom) {
             Color.clear
@@ -551,19 +560,18 @@ struct PhotosView: View {
             // elles la recouvraient entière. Le détail de la photo les reprend en grand.
             .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
-        .overlay(alignment: .topTrailing) {
-            if let op = photo.operator, !op.isEmpty {
-                Text(op)
-                    .font(SQType.micro)
-                    .foregroundStyle(SQBrand.operatorBadgeForeground(op))
-                    .padding(.horizontal, SQSpace.sm2)
-                    .padding(.vertical, SQSpace.xs)
-                    .background(opColor, in: Capsule(style: .continuous))
-                    .padding(SQSpace.sm)
-                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .overlay(alignment: .topLeading) {
+            HStack(spacing: SQSpace.xs) {
+                if photo.approved == false { Self.pendingTag }
+                Spacer(minLength: 0)
+                if let op = photo.operator, !op.isEmpty { Self.operatorChip(op) }
             }
+            .padding(SQSpace.sm)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
         .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+        // L'image remplie déborde de son cadre : le toucher s'arrête à la tuile.
+        .contentShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
         .sqShadowCard()
     }
 
@@ -591,7 +599,7 @@ struct PhotosView: View {
                         .fill(opColor)
                         .frame(width: 6, height: 6)
                     if let op = photo.operator, !op.isEmpty {
-                        Text(op)
+                        Text(verbatim: Self.operatorLabel(op))
                             .font(SQFont.body(12, .medium))
                             .foregroundStyle(.white.opacity(0.82))
                             .sqSingleLine()
@@ -614,8 +622,47 @@ struct PhotosView: View {
             // Même plafond que la grande tuile : la vignette garde son format 3:4.
             .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
+        .overlay(alignment: .topLeading) {
+            if photo.approved == false {
+                Self.pendingTag
+                    .padding(SQSpace.sm)
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        // L'image remplie déborde de son cadre : le toucher s'arrête à la tuile.
+        .contentShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .sqShadowSoft()
+    }
+
+    /// « Orange » plutôt que la clé brute « ORANGE » ; une clé inconnue reste telle quelle.
+    static func operatorLabel(_ raw: String) -> String {
+        SQBrand.operatorName(raw) ?? raw
+    }
+
+    /// Puce claire posée sur l'image : la pastille de l'opérateur et son nom.
+    static func operatorChip(_ raw: String) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(SQBrand.operatorColor(raw)).frame(width: 8, height: 8)
+            Text(verbatim: operatorLabel(raw))
+                .font(SQFont.body(12, .bold, relativeTo: .caption2))
+                .foregroundStyle(SQColor.label)
+                .sqSingleLine()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(SQColor.surface.opacity(0.94), in: Capsule(style: .continuous))
+    }
+
+    /// Une photo pas encore validée par la modération.
+    static var pendingTag: some View {
+        Label("En vérification", systemImage: "hourglass")
+            .font(SQFont.body(12, .bold, relativeTo: .caption2))
+            .foregroundStyle(OutageTint.degradedInk)
+            .labelStyle(.titleAndIcon)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(SQColor.surface.opacity(0.94), in: Capsule(style: .continuous))
     }
 
     // MARK: Skeleton
@@ -700,7 +747,6 @@ struct PhotoDetailView: View {
     private var isLiked: Bool { photo.isLikedByMe == true || photo.likedByCurrentUser == true }
     private var likeCount: Int { photo.likeCount ?? photo.likes ?? 0 }
     private var commentCount: Int { photo.commentCount ?? comments.count }
-    private var opColor: Color { SQBrand.operatorColor(photo.operator) }
     private var photoMarketCode: String? {
         let normalized = photo.marketCode?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -729,34 +775,8 @@ struct PhotoDetailView: View {
                 composerBar
             }
             .signalQuestBackground()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Fermer") { dismiss() }
-                        .tint(SQColor.brandRed)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button { showShareSheet = true } label: {
-                            Label("Partager sur SignalQuest", systemImage: "bubble.left.and.bubble.right")
-                        }
-                        Button { showNativeShare = true } label: {
-                            Label("Partager ailleurs…", systemImage: "square.and.arrow.up")
-                        }
-                        Divider()
-                        if ownsPhoto, operatorChoices.count > 1 {
-                            Button { showOperatorPicker = true } label: {
-                                Label("Modifier le réseau", systemImage: "antenna.radiowaves.left.and.right")
-                            }
-                        }
-                        Button(role: .destructive) { showReport = true } label: {
-                            Label("Signaler la photo", systemImage: "flag")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .accessibilityLabel("Plus d'options")
-                }
-            }
+            .overlay(alignment: .top) { floatingBar }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showReport) {
                 ReportSheet(target: .photo(photo.id), service: services.reports)
             }
@@ -801,7 +821,7 @@ struct PhotoDetailView: View {
                 titleVisibility: .visible
             ) {
                 ForEach(operatorChoices, id: \.self) { networkOperator in
-                    Button(networkOperator) {
+                    Button(PhotosView.operatorLabel(networkOperator)) {
                         Task { _ = await onChangeOperator(photo, networkOperator) }
                     }
                 }
@@ -810,6 +830,42 @@ struct PhotoDetailView: View {
                 Text("Cette photo est rattachée à un support mutualisé. Choisis le réseau réellement concerné.")
             }
         }
+    }
+
+    /// Fermer et options, en boutons ronds posés sur la photo.
+    private var floatingBar: some View {
+        HStack {
+            MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "photo.close") { dismiss() }
+            Spacer()
+            Menu {
+                Button { showShareSheet = true } label: {
+                    Label("Partager sur SignalQuest", systemImage: "bubble.left.and.bubble.right")
+                }
+                Button { showNativeShare = true } label: {
+                    Label("Partager ailleurs…", systemImage: "square.and.arrow.up")
+                }
+                Divider()
+                if ownsPhoto, operatorChoices.count > 1 {
+                    Button { showOperatorPicker = true } label: {
+                        Label("Modifier le réseau", systemImage: "antenna.radiowaves.left.and.right")
+                    }
+                }
+                Button(role: .destructive) { showReport = true } label: {
+                    Label("Signaler la photo", systemImage: "flag")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 44, height: 44)
+                    .sqSurface(SQColor.chip, in: Circle())
+                    .contentShape(Circle())
+            }
+            .accessibilityLabel("Plus d'options")
+            .accessibilityIdentifier("photo.more")
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.top, SQSpace.md)
     }
 
     private var operatorChoices: [String] {
@@ -836,16 +892,11 @@ struct PhotoDetailView: View {
                     }
                 }
                 .clipped()
-            // Badge opérateur
-            if let op = photo.operator, !op.isEmpty {
-                Text(op)
-                    .font(SQType.micro)
-                    .foregroundStyle(SQBrand.operatorBadgeForeground(op))
-                    .padding(.horizontal, SQSpace.sm2)
-                    .padding(.vertical, SQSpace.xs)
-                    .background(opColor, in: Capsule(style: .continuous))
-                    .padding(SQSpace.md)
+            HStack(spacing: SQSpace.sm) {
+                if let op = photo.operator, !op.isEmpty { PhotosView.operatorChip(op) }
+                if photo.approved == false { PhotosView.pendingTag }
             }
+            .padding(SQSpace.md)
         }
     }
 
@@ -875,8 +926,9 @@ struct PhotoDetailView: View {
     private var photoMeta: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
             Text(photo.displayCaption)
-                .font(SQType.title)
+                .font(SQFont.display(24, .bold, relativeTo: .title2))
                 .foregroundStyle(SQColor.label)
+                .sqHeader()
 
             // Site + adresse
             let metaParts = [photo.siteAddress, photo.siteId].compactMap { $0 }.filter { !$0.isEmpty }
@@ -1144,6 +1196,7 @@ struct PhotoUploadView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    uploadHeader
                     // Aperçu image
                     ZStack {
                         if let image {
@@ -1260,7 +1313,7 @@ struct PhotoUploadView: View {
                             Picker("Réseau concerné", selection: $selectedOperator) {
                                 Text("Choisir un réseau").tag(String?.none)
                                 ForEach(availableOperators, id: \.self) { networkOperator in
-                                    Text(networkOperator).tag(Optional(networkOperator))
+                                    Text(verbatim: PhotosView.operatorLabel(networkOperator)).tag(Optional(networkOperator))
                                 }
                             }
                             .pickerStyle(.menu)
@@ -1271,19 +1324,19 @@ struct PhotoUploadView: View {
                             .accessibilityHint("Choisis l'opérateur réellement concerné par la photo")
                         }
                     } else if let networkOperator = availableOperators.first {
-                        Label("Réseau concerné : \(networkOperator)", systemImage: "antenna.radiowaves.left.and.right")
+                        Label("Réseau concerné : \(PhotosView.operatorLabel(networkOperator))", systemImage: "antenna.radiowaves.left.and.right")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                     }
 
-                    TextField("Légende", text: $description, axis: .vertical)
+                    TextField("Légende (facultatif)", text: $description, axis: .vertical)
                         .font(SQType.body)
                         .foregroundStyle(SQColor.label)
                         .lineLimit(2...5)
                         .padding(SQSpace.md2)
                         .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
 
-                    GradientButton("Uploader", systemImage: "arrow.up.circle", isBusy: isUploading) {
+                    GradientButton("Envoyer la photo", systemImage: "arrow.up.circle", isBusy: isUploading) {
                         guard let original = imageData, let site = selectedSite else { return }
                         let regions = blurRegions
                         Task {
@@ -1319,12 +1372,7 @@ struct PhotoUploadView: View {
                 .padding(SQSpace.lg)
             }
             .navigationTitle("Nouvelle photo")
-            .toolbarTitleInlineCompat()
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Annuler") { dismiss() }.tint(SQColor.brandRed)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .signalQuestBackground()
             .sheet(isPresented: $showSitePicker) {
                 AntennaSitePickerSheet(antennas: antennas, markets: markets) { site in
@@ -1334,6 +1382,24 @@ struct PhotoUploadView: View {
                 }
             }
         }
+    }
+
+    private var uploadHeader: some View {
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Nouvelle photo")
+                    .font(SQFont.display(24, .bold, relativeTo: .title2))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                Text("Elle rejoint la galerie une fois vérifiée par la modération.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            MapChipIconButton(systemImage: "xmark", label: "Annuler", identifier: "photoUpload.close") { dismiss() }
+        }
+        .padding(.top, SQSpace.sm)
     }
 
     private var availableOperators: [String] {

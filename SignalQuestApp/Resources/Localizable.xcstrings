@@ -1027,6 +1027,22 @@
         }
       }
     },
+    "%lld photos · les plus récentes d’abord" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld photos · most recent first"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld photos · les plus récentes d’abord"
+          }
+        }
+      }
+    },
     "%lld points" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3954,6 +3970,22 @@
         }
       }
     },
+    "Elle rejoint la galerie une fois vérifiée par la modération." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It joins the gallery once moderation has checked it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle rejoint la galerie une fois vérifiée par la modération."
+          }
+        }
+      }
+    },
     "En %@, sur %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4175,6 +4207,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Envoyer l'idée"
+          }
+        }
+      }
+    },
+    "Envoyer la photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send the photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer la photo"
           }
         }
       }
@@ -5945,6 +5993,22 @@
         }
       }
     },
+    "Les photos d’antennes partagées par la communauté, et les tiennes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna photos shared by the community, and yours."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les photos d’antennes partagées par la communauté, et les tiennes."
+          }
+        }
+      }
+    },
     "Les plus rapides et les plus actifs de la communauté." : {
       "localizations" : {
         "en" : {
@@ -6086,6 +6150,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Légendaire"
+          }
+        }
+      }
+    },
+    "Légende (facultatif)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caption (optional)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Légende (facultatif)"
           }
         }
       }
@@ -63739,23 +63819,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Upload"
-          }
-        }
-      }
-    },
-    "Uploader" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Upload"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uploader"
           }
         }
       }
