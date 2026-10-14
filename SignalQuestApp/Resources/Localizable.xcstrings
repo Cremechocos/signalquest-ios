@@ -300,6 +300,22 @@
         }
       }
     },
+    "%@ → %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ → %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ → %2$@"
+          }
+        }
+      }
+    },
     "%@ → %@ pendant la mesure. Relance le test pour mesurer une connexion stable." : {
       "localizations" : {
         "en" : {
@@ -2087,6 +2103,38 @@
         }
       }
     },
+    "Affichés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shown"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affichés"
+          }
+        }
+      }
+    },
+    "Agrandir la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expand the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agrandir la carte"
+          }
+        }
+      }
+    },
     "Ajouter des captures" : {
       "localizations" : {
         "en" : {
@@ -3495,6 +3543,38 @@
         }
       }
     },
+    "Couleur des points : génération" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point colour: generation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur des points : génération"
+          }
+        }
+      }
+    },
+    "Couleur des points : signal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point colour: signal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur des points : signal"
+          }
+        }
+      }
+    },
     "Coupures" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4136,6 +4216,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Famille"
+          }
+        }
+      }
+    },
+    "Fermer la mesure" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close the reading"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la mesure"
           }
         }
       }
@@ -6021,6 +6117,22 @@
         }
       }
     },
+    "Masqués" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hidden"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masqués"
+          }
+        }
+      }
+    },
     "Mauvais" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6034,6 +6146,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mauvais"
+          }
+        }
+      }
+    },
+    "Meilleur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Best"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meilleur"
           }
         }
       }
@@ -6954,6 +7082,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photos en vérification"
+          }
+        }
+      }
+    },
+    "Pire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Worst"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pire"
           }
         }
       }
@@ -8303,6 +8447,22 @@
         }
       }
     },
+    "Speedtests · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtests · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speedtests · %lld"
+          }
+        }
+      }
+    },
     "Spécial" : {
       "localizations" : {
         "en" : {
@@ -8942,6 +9102,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Touche un opérateur pour l’afficher ou le masquer"
+          }
+        }
+      }
+    },
+    "Touche un point pour lire sa mesure." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap a point to read its measurement."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touche un point pour lire sa mesure."
           }
         }
       }
@@ -9934,6 +10110,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "jamais"
+          }
+        }
+      }
+    },
+    "km %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "km %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "km %@"
           }
         }
       }
@@ -54444,22 +54636,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réinitialiser l’identité"
-          }
-        }
-      }
-    },
-    "Répartition par génération" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Breakdown by generation"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Répartition par génération"
           }
         }
       }

@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 @MainActor
 final class SessionDetailViewModel: ObservableObject {
@@ -83,6 +84,47 @@ final class SessionDetailViewModel: ObservableObject {
     var pointsProgress: Double? {
         guard isLoadingMorePoints, let detail, let expected = detail.expectedPointRows, expected > 0 else { return nil }
         return min(Double(detail.points.count) / Double(expected), 1)
+    }
+
+    /// Kilomètre parcouru à chaque point, recalculé à chaque lot de points.
+    private var kilometerCache: (version: UUID, ids: [String: Int], points: [CoverageSessionPoint], km: [Double])?
+
+    private func kilometers() -> (ids: [String: Int], points: [CoverageSessionPoint], km: [Double]) {
+        if let cache = kilometerCache, cache.version == renderVersion { return (cache.ids, cache.points, cache.km) }
+        let points = (detail?.points ?? []).filter(\.hasValidCoordinate)
+        var km: [Double] = []
+        km.reserveCapacity(points.count)
+        var total = 0.0
+        var previous: CLLocation?
+        var ids: [String: Int] = [:]
+        for (index, point) in points.enumerated() {
+            let location = CLLocation(latitude: point.lat, longitude: point.lng)
+            if let previous { total += location.distance(from: previous) / 1000 }
+            previous = location
+            km.append(total)
+            ids[point.id] = index
+        }
+        kilometerCache = (renderVersion, ids, points, km)
+        return (ids, points, km)
+    }
+
+    /// Kilomètre d'un point du tracé.
+    func kilometer(at point: CoverageSessionPoint) -> Double? {
+        let k = kilometers()
+        return k.ids[point.id].map { k.km[$0] }
+    }
+
+    /// Kilomètre du point du tracé le plus proche (un speedtest, par exemple).
+    func kilometer(near coordinate: CLLocationCoordinate2D) -> Double? {
+        let k = kilometers()
+        var best: (index: Int, distance: Double)?
+        for (index, point) in k.points.enumerated() {
+            let dLat = point.lat - coordinate.latitude
+            let dLng = (point.lng - coordinate.longitude) * cos(coordinate.latitude * .pi / 180)
+            let d = dLat * dLat + dLng * dLng
+            if best == nil || d < best!.distance { best = (index, d) }
+        }
+        return best.map { k.km[$0.index] }
     }
 
     func load(service: SessionsServicing) async {
@@ -258,7 +300,11 @@ struct SessionDetailView: View {
     @State private var validationTarget: ValidationTarget?
     @State private var pendingIdentify: ServingAntenna?
     @State private var marketRegistry: MarketRegistryPayload?
+    /// Couleur des points choisie ; `nil` = signal, sauf couverture iOS (génération seule).
+    @State private var chosenColoring: SessionPointColoring?
+    @State private var showsFullMap = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.dismiss) private var dismiss
 
     struct ValidationTarget: Identifiable {
         let id = UUID()
@@ -270,14 +316,24 @@ struct SessionDetailView: View {
         _model = StateObject(wrappedValue: SessionDetailViewModel(session: session))
     }
 
+    private var title: String {
+        model.session.name ?? (model.session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture"))
+    }
+
+    /// Couverture iOS : la génération seule, iOS ne lisant pas le signal.
+    private var coloring: Binding<SessionPointColoring> {
+        Binding(
+            get: { model.session.isIosCoverage ? .generation : (chosenColoring ?? .rsrp) },
+            set: { chosenColoring = $0 }
+        )
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
-                statsCard
-                if !model.session.operators.isEmpty || !model.session.technologies.isEmpty {
-                    chipsRow
-                }
+                header
                 traceSection
+                summaryCard
                 generationSection
                 speedtestsSection
                 if let antennas = model.detail?.servingAntennas, !antennas.isEmpty {
@@ -297,12 +353,16 @@ struct SessionDetailView: View {
                     }
                 }
             }
-            .padding()
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.xxl)
             .sqReadableWidth()
         }
         .background(SQColor.bg.ignoresSafeArea())
-        .navigationTitle(model.session.name ?? (model.session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")))
-        .toolbarTitleInlineCompat()
+        .navigationTitle(title)
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .overlay {
             if model.isLoading && model.detail == nil { SQSpinner().tint(SQColor.brandRed) }
         }
@@ -310,6 +370,15 @@ struct SessionDetailView: View {
         .task { marketRegistry = await services.markets.registry() }
         .sheet(item: $validationTarget) { target in
             ValidationsSheet(siteId: target.siteId, operatorName: target.operatorName, service: services.validations)
+        }
+        .fullScreenCover(isPresented: $showsFullMap) {
+            SessionTraceFullScreen(
+                model: model,
+                title: title,
+                coloring: coloring,
+                operatorLabels: speedtestOperatorLabels,
+                onClose: { showsFullMap = false }
+            )
         }
         .confirmationDialog(
             "Confirmer cette antenne ?",
@@ -330,62 +399,135 @@ struct SessionDetailView: View {
         }
     }
 
-    // MARK: Stats
+    // MARK: En-tête
 
-    private var statsCard: some View {
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "sessionDetail.back") { dismiss() }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text(verbatim: title)
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .sqHeader()
+                    .accessibilityIdentifier("sessionDetail.title")
+                Text(subtitle)
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// « Drive Test · samedi 10 octobre 2026 · 10:00 → 10:40 ».
+    private var subtitle: String {
+        let s = model.detail?.session ?? model.session
+        // Le type vient de la liste, comme le tracé et la couleur des points.
+        var parts = [model.session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")]
+        if let start = s.startTime {
+            parts.append(start.formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
+            let from = start.formatted(.dateTime.hour().minute())
+            if let end = s.endTime, end > start {
+                parts.append(String(localized: "\(from) → \(end.formatted(.dateTime.hour().minute()))"))
+            } else {
+                parts.append(from)
+            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: Synthèse
+
+    private var summaryCard: some View {
         // Stats du DÉTAIL (recalculées par le backend sur les points VISIBLES filtrés
         // qualité) plutôt que celles de la LISTE (comptage brut non filtré + valeurs
         // stockées parfois périmées) → cohérence avec la carte et le breakdown de
         // génération. Repli sur la liste tant que le détail n'est pas chargé.
         let s = model.detail?.session ?? model.session
-        return GlassCard {
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: SQSpace.sm), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
-                spacing: SQSpace.sm
-            ) {
-                statTile("Points", s.totalPoints.map { "\($0)" } ?? "—", "mappin.and.ellipse")
-                statTile("Distance", s.distanceKm.map(Self.formatKm) ?? "—", "ruler")
-                // iOS ne lit pas le RSRP : la tuile n'apparaît que si la session en porte un.
-                if let rsrp = s.avgRsrpLabel {
-                    statTile("RSRP moyen", rsrp, "antenna.radiowaves.left.and.right")
+        let operators = s.operators.isEmpty ? model.session.operators : s.operators
+        let technologies = s.technologies.isEmpty ? model.session.technologies : s.technologies
+        return VStack(alignment: .leading, spacing: SQSpace.md) {
+            kpiRow([
+                (s.totalPoints.map { $0.formatted() } ?? "—", "Points"),
+                (s.distanceKm.map(Self.formatKm) ?? "—", "Distance"),
+                (s.durationLabel ?? "—", "Durée")
+            ])
+            // iOS ne lit pas le RSRP : la ligne n'apparaît que si la session en porte un.
+            if let average = s.avgRsrpLabel {
+                Divider()
+                kpiRow([
+                    (average, "RSRP moyen"),
+                    (Self.rsrpLabel(s.maxSignalStrength) ?? "—", "Meilleur"),
+                    (Self.rsrpLabel(s.minSignalStrength) ?? "—", "Pire")
+                ])
+            }
+            if !operators.isEmpty || !technologies.isEmpty {
+                Divider()
+                chipsRow(operators: operators, technologies: technologies)
+            }
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground()
+        .accessibilityIdentifier("sessionDetail.summary")
+    }
+
+    /// Trois valeurs côte à côte, empilées quand le texte est très agrandi.
+    private func kpiRow(_ items: [(value: String, label: LocalizedStringKey)]) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: SQSpace.sm))
+        return layout {
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: item.value)
+                        .font(SQFont.display(18, .bold, relativeTo: .headline))
+                        .foregroundStyle(SQColor.label)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text(item.label)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
                 }
-                statTile(s.isDriveTest ? "Durée" : "Date",
-                         s.isDriveTest ? (s.durationLabel ?? "—")
-                                       : (s.startTime.map { $0.formatted(.dateTime.day().month().year()) } ?? "—"),
-                         s.isDriveTest ? "clock" : "calendar")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
             }
         }
     }
 
-    private func statTile(_ label: String, _ value: String, _ icon: String) -> some View {
-        SQMetricTile(label: label, value: value, icon: icon, iconTint: SQColor.brandRed)
+    /// RSRP lisible, avec le même garde-fou que la moyenne.
+    static func rsrpLabel(_ value: Double?) -> String? {
+        guard let value, value <= -44 else { return nil }
+        return "\(Int(value)) dBm"
     }
 
     // MARK: Operators + technologies chips
 
-    private var chipsRow: some View {
+    private func chipsRow(operators: [SessionOperator], technologies: [String]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                ForEach(model.session.operators) { op in
+                ForEach(operators) { op in
                     HStack(spacing: 5) {
                         Circle().fill(Self.operatorColor(op.colorHex)).frame(width: 8, height: 8)
+                            .accessibilityHidden(true)
                         Text(op.label).font(SQFont.body(13, .semibold, relativeTo: .caption))
                         if let count = op.count {
-                            Text("\(count)")
+                            Text("\(count) points")
                                 .font(SQFont.body(12, relativeTo: .caption2))
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
                     .foregroundStyle(SQColor.label)
-                    .padding(.horizontal, SQSpace.md).padding(.vertical, 7)
-                    .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
-                    .sqShadowSoft()
+                    .padding(.horizontal, SQSpace.sm2).padding(.vertical, 5)
+                    .background(Self.operatorColor(op.colorHex).opacity(0.14), in: Capsule(style: .continuous))
+                    .accessibilityElement(children: .combine)
                 }
-                ForEach(model.session.technologies, id: \.self) { tech in
+                ForEach(technologies, id: \.self) { tech in
                     TechBadge(text: tech, color: SQBrand.techColor(tech))
                 }
             }
-            .padding(.vertical, SQSpace.xs)
         }
     }
 
@@ -402,24 +544,33 @@ struct SessionDetailView: View {
     @ViewBuilder
     private var traceSection: some View {
         if let detail = model.detail, !(detail.points.isEmpty && detail.servingAntennas.isEmpty) {
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
                 SessionTraceMapView(points: detail.points,
                                     antennas: detail.servingAntennas,
                                     speedtests: detail.speedtests,
                                     drawPath: model.session.isDriveTest,
-                                    coloring: model.session.isIosCoverage ? .generation : .rsrp,
+                                    coloring: coloring.wrappedValue,
                                     renderID: model.renderVersion,
                                     keepsUserViewport: true,
                                     operatorLabels: speedtestOperatorLabels)
-                    .frame(height: 300)
+                    .frame(height: 240)
                     .clipShape(RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                    .overlay(alignment: .bottomTrailing) {
+                        MapFloatingIconButton(systemImage: "arrow.up.left.and.arrow.down.right",
+                                              label: "Agrandir la carte",
+                                              identifier: "sessionDetail.map.expand") { showsFullMap = true }
+                            .padding(SQSpace.sm)
+                    }
                     .sqShadowCard()
+                    .accessibilityIdentifier("sessionDetail.map")
                 if model.isLoadingMorePoints {
                     pointsProgressRow
                 }
                 if !detail.points.isEmpty {
-                    // Couverture iOS = génération seule (pas de RSRP) → légende génération.
-                    if model.session.isIosCoverage {
+                    if !model.session.isIosCoverage {
+                        coloringMenu
+                    }
+                    if coloring.wrappedValue == .generation {
                         generationLegend
                     } else {
                         rsrpLegend
@@ -433,6 +584,30 @@ struct SessionDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, SQSpace.lg)
         }
+    }
+
+    /// « Couleur des points : signal ▾ » : signal ou génération.
+    private var coloringMenu: some View {
+        Menu {
+            Picker(selection: coloring) {
+                Text("Signal").tag(SessionPointColoring.rsrp)
+                Text("Génération").tag(SessionPointColoring.generation)
+            } label: {
+                Text("Couleur des points")
+            }
+        } label: {
+            HStack(spacing: SQSpace.xs) {
+                Text(coloring.wrappedValue == .rsrp ? "Couleur des points : signal" : "Couleur des points : génération")
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .accessibilityHidden(true)
+            }
+            .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+            .foregroundStyle(SQColor.labelSecondary)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier("sessionDetail.coloring")
     }
 
     private var pointsProgressRow: some View {
@@ -460,13 +635,13 @@ struct SessionDetailView: View {
 
     /// Légende RSRP — couleurs dérivées de `SessionRSRPColor` (celles des points
     /// de la carte) pour garantir la correspondance légende ↔ tracé.
-    private var rsrpLegend: some View {
+    static var rsrpLegend: some View {
         HStack(spacing: SQSpace.sm) {
             legendDot(SessionRSRPColor.ui(-70), "Excellent")
             legendDot(SessionRSRPColor.ui(-85), "Bon")
             legendDot(SessionRSRPColor.ui(-95), "Moyen")
             legendDot(SessionRSRPColor.ui(-105), "Faible")
-            legendDot(SessionRSRPColor.ui(-115), "Mauvais")
+            legendDot(SessionRSRPColor.ui(-115), "Critique")
         }
         .font(SQFont.body(12, .medium, relativeTo: .caption2))
         .foregroundStyle(SQColor.labelSecondary)
@@ -475,7 +650,7 @@ struct SessionDetailView: View {
 
     /// Légende GÉNÉRATION (couverture iOS) — couleurs de `SessionGenerationColor`,
     /// identiques aux points de la carte (correspondance légende ↔ tracé).
-    private var generationLegend: some View {
+    static var generationLegend: some View {
         HStack(spacing: SQSpace.sm) {
             legendDot(SessionGenerationColor.ui("5G"), "5G")
             legendDot(SessionGenerationColor.ui("4G"), "4G")
@@ -489,11 +664,24 @@ struct SessionDetailView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func legendDot(_ color: UIColor, _ label: String) -> some View {
+    private var rsrpLegend: some View { Self.rsrpLegend }
+    private var generationLegend: some View { Self.generationLegend }
+
+    private static func legendDot(_ color: UIColor, _ label: String) -> some View {
         HStack(spacing: 3) {
             Circle().fill(Color(uiColor: color)).frame(width: 7, height: 7)
             Text(LocalizedStringKey(label))
         }
+    }
+
+    /// Titre de section, posé au-dessus de sa carte.
+    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(SQType.heading)
+            .foregroundStyle(SQColor.label)
+            .sqHeader()
+            .padding(.horizontal, SQSpace.xs)
+            .padding(.bottom, -SQSpace.xs)
     }
 
     // MARK: Génération (répartition %)
@@ -502,10 +690,8 @@ struct SessionDetailView: View {
     private var generationSection: some View {
         let shares = model.generationBreakdown
         if !shares.isEmpty {
+            sectionHeader("Générations")
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                Text("Répartition par génération")
-                    .font(SQType.heading)
-                    .foregroundStyle(SQColor.label)
                 // Barre empilée : part de chaque génération sur l'ensemble des points.
                 GeometryReader { geo in
                     HStack(spacing: 0) {
@@ -519,23 +705,28 @@ struct SessionDetailView: View {
                 .frame(height: 12)
                 .clipShape(Capsule())
                 .padding(.top, 2)
+                .accessibilityHidden(true)
                 ForEach(shares) { s in
                     HStack(spacing: SQSpace.sm) {
                         Circle()
                             .fill(Color(uiColor: SessionGenerationColor.ui(genColorKey(s.generation))))
                             .frame(width: 9, height: 9)
+                            .accessibilityHidden(true)
                         Text(LocalizedStringKey(s.generation))
                             .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
                             .foregroundStyle(SQColor.label)
                         Spacer()
-                        Text("\(s.count) pts")
+                        Text("\(s.count) points")
                             .font(SQFont.body(12, relativeTo: .caption2))
                             .foregroundStyle(SQColor.labelSecondary)
-                        Text("\(Int(s.pct.rounded()))%")
+                            .monospacedDigit()
+                        Text((s.pct / 100).formatted(.percent.precision(.fractionLength(0))))
                             .font(SQFont.display(15, .bold, relativeTo: .subheadline))
                             .foregroundStyle(SQColor.label)
-                            .frame(width: 46, alignment: .trailing)
+                            .monospacedDigit()
+                            .frame(minWidth: 46, alignment: .trailing)
                     }
+                    .accessibilityElement(children: .combine)
                 }
             }
             .padding(SQSpace.lg)
@@ -553,16 +744,8 @@ struct SessionDetailView: View {
     private var speedtestsSection: some View {
         let sts = model.speedtests
         if !sts.isEmpty {
+            sectionHeader("Speedtests · \(sts.count)")
             VStack(alignment: .leading, spacing: SQSpace.sm) {
-                HStack {
-                    Text("Speedtests")
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                    Spacer()
-                    Text("\(sts.count)")
-                        .font(SQFont.body(13, .semibold, relativeTo: .footnote))
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
                 if let sum = model.speedtestSummary {
                     // Lexique : Réception / Envoi / Latence, unité selon la langue (valeurs en Mbit/s).
                     // Couleurs de la fiche d'une mesure (TRX-11), portées par l'icône.
@@ -591,7 +774,7 @@ struct SessionDetailView: View {
                         Rectangle()
                             .fill(SQColor.separator)
                             .frame(height: 1)
-                            .padding(.leading, SQSpace.lg)
+                            .padding(.leading, 34 + SQSpace.sm2)
                     }
                 }
             }
@@ -609,9 +792,19 @@ struct SessionDetailView: View {
         )
     }
 
+    /// « 10:05 · km 2,1 » : l'heure, et la position sur le trajet d'un Drive Test.
+    private func speedtestWhen(_ st: SessionSpeedtest) -> String? {
+        var parts: [String] = []
+        if let t = st.timestamp { parts.append(t.formatted(.dateTime.hour().minute())) }
+        if model.session.isDriveTest, let coordinate = st.coordinate, let km = model.kilometer(near: coordinate) {
+            parts.append(String(localized: "km \(km.formatted(.number.precision(.fractionLength(1))))"))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private func speedtestRow(_ st: SessionSpeedtest) -> some View {
-        HStack(spacing: SQSpace.sm) {
-            Circle().fill(Color(uiColor: SessionSpeedColor.ui(st.downloadMbps))).frame(width: 10, height: 10)
+        HStack(spacing: SQSpace.sm2) {
+            SQIconPastille(systemImage: "speedometer", size: 34, font: .system(size: 14, weight: .medium))
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     // Le RÉSEAU d'abord : c'est lui qui décrit la mesure. La SIM ne
@@ -642,27 +835,40 @@ struct SessionDetailView: View {
                         .background(Color(uiColor: SessionGenerationColor.ui(net)).opacity(0.16), in: Capsule(style: .continuous))
                     }
                 }
-                if let t = st.timestamp {
-                    Text(t.formatted(.dateTime.hour().minute()))
+                if let when = speedtestWhen(st) {
+                    Text(when)
                         .font(SQFont.body(12, relativeTo: .caption2))
                         .foregroundStyle(SQColor.labelSecondary)
+                        .monospacedDigit()
                 }
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(verbatim: "↓ \(st.downloadMbps.map { "\(Int($0.rounded()))" } ?? "—") \(String(localized: "Mbit/s"))")
-                    .font(SQFont.body(14, .bold, relativeTo: .subheadline))
-                    .foregroundStyle(SQColor.info)
-                HStack(spacing: 8) {
-                    Text("↑ \(st.uploadMbps.map { "\(Int($0.rounded()))" } ?? "—")")
-                        .foregroundStyle(SQColor.success)
-                    Text("\(st.pingMs.map { "\(Int($0.rounded()))" } ?? "—") ms")
+            Spacer(minLength: SQSpace.xs)
+            VStack(alignment: .trailing, spacing: 2) {
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .accessibilityHidden(true)
+                    Text(st.downloadMbps.map { "\(Int($0.rounded()))" } ?? "—")
+                        .font(SQFont.body(15, .bold, relativeTo: .subheadline))
+                        .foregroundStyle(SQColor.label)
+                    Text("Mbit/s")
+                        .font(SQFont.body(11, .semibold, relativeTo: .caption2))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 10, weight: .bold))
+                        .accessibilityHidden(true)
+                    Text(verbatim: "\(st.uploadMbps.map { "\(Int($0.rounded()))" } ?? "—") \(String(localized: "Mbit/s")) · \(st.pingMs.map { "\(Int($0.rounded()))" } ?? "—") ms")
+                }
                 .font(SQFont.body(12, relativeTo: .caption2))
+                .foregroundStyle(SQColor.labelSecondary)
             }
+            .monospacedDigit()
         }
         .padding(.vertical, SQSpace.xs)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Serving antennas
@@ -794,5 +1000,168 @@ struct SessionDetailView: View {
         let cleaned = hex.replacingOccurrences(of: "#", with: "")
         guard let value = UInt32(cleaned, radix: 16) else { return SQColor.labelSecondary }
         return Color(hex: value)
+    }
+}
+
+/// Carte d'un trajet en plein écran : couleur des points, antennes et speedtests
+/// à la demande, et lecture d'un point touché.
+private struct SessionTraceFullScreen: View {
+    @ObservedObject var model: SessionDetailViewModel
+    let title: String
+    @Binding var coloring: SessionPointColoring
+    let operatorLabels: [String: String]
+    let onClose: () -> Void
+    @State private var showsAntennas = true
+    @State private var showsSpeedtests = true
+    @State private var selected: CoverageSessionPoint?
+    /// Renouvelé à chaque réglage : la carte ne se redessine que là.
+    @State private var renderID = UUID()
+
+    var body: some View {
+        let detail = model.detail
+        SessionTraceMapView(points: detail?.points ?? [],
+                            antennas: showsAntennas ? (detail?.servingAntennas ?? []) : [],
+                            speedtests: showsSpeedtests ? (detail?.speedtests ?? []) : [],
+                            drawPath: model.session.isDriveTest,
+                            coloring: coloring,
+                            renderID: renderID,
+                            keepsUserViewport: true,
+                            operatorLabels: operatorLabels,
+                            onPointTap: { selected = $0 },
+                            selectedPoint: selected)
+            .ignoresSafeArea()
+            .accessibilityIdentifier("sessionDetail.fullMap")
+            .safeAreaInset(edge: .top, spacing: 0) { topBar }
+            .safeAreaInset(edge: .bottom, spacing: 0) { bottomCard }
+            .onChange(of: model.renderVersion) { _ in renderID = UUID() }
+            .onChange(of: coloring) { _ in renderID = UUID() }
+            .onChange(of: showsAntennas) { _ in renderID = UUID() }
+            .onChange(of: showsSpeedtests) { _ in renderID = UUID() }
+    }
+
+    private var topBar: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.sm) {
+                MapFloatingIconButton(systemImage: "xmark", label: "Fermer",
+                                      identifier: "sessionDetail.fullMap.close", action: onClose)
+                MapFloatingTitle(title: "\(title)", identifier: "sessionDetail.fullMap.title")
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: SQSpace.sm) {
+                if !model.session.isIosCoverage {
+                    MapSegmented(selection: $coloring,
+                                 options: [(SessionPointColoring.rsrp, "Signal"), (.generation, "Génération")],
+                                 identifier: "sessionDetail.fullMap.coloring")
+                        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .sqShadowCard()
+                        .frame(maxWidth: 240)
+                }
+                Spacer(minLength: 0)
+                layerToggle(isOn: $showsAntennas, systemImage: "antenna.radiowaves.left.and.right",
+                            label: "Antennes", identifier: "sessionDetail.fullMap.antennas")
+                layerToggle(isOn: $showsSpeedtests, systemImage: "speedometer",
+                            label: "Speedtests", identifier: "sessionDetail.fullMap.speedtests")
+            }
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.top, SQSpace.sm)
+    }
+
+    /// Bouton rond qui affiche ou masque une couche ; son état est lu à voix haute.
+    private func layerToggle(isOn: Binding<Bool>, systemImage: String, label: LocalizedStringKey, identifier: String) -> some View {
+        MapFloatingIconButton(systemImage: systemImage, label: label, identifier: identifier,
+                              tint: isOn.wrappedValue ? SQColor.accentInk : SQColor.labelTertiary) {
+            isOn.wrappedValue.toggle()
+        }
+        .accessibilityValue(Text(isOn.wrappedValue ? "Affichés" : "Masqués"))
+        .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
+    }
+
+    private var bottomCard: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            if let point = selected {
+                pointReading(point)
+                Divider()
+            }
+            if coloring == .generation {
+                SessionDetailView.generationLegend
+            } else {
+                SessionDetailView.rsrpLegend
+            }
+            if selected == nil {
+                Text("Touche un point pour lire sa mesure.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground()
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.bottom, SQSpace.sm)
+        .sqReadableWidth()
+    }
+
+    /// « −104 dBm · Faible », la génération, l'heure, le kilomètre et la cellule.
+    private func pointReading(_ point: CoverageSessionPoint) -> some View {
+        let quality = SQQualityScale.Signal(rsrp: point.signalStrength)
+        let dbm = SessionDetailView.rsrpLabel(point.signalStrength)
+        var facts: [String] = []
+        if let t = point.timestamp { facts.append(t.formatted(.dateTime.hour().minute())) }
+        if model.session.isDriveTest, let km = model.kilometer(at: point) {
+            facts.append(String(localized: "km \(km.formatted(.number.precision(.fractionLength(1))))"))
+        }
+        var cell: [String] = []
+        if let pci = point.pci, !pci.isEmpty { cell.append("PCI \(pci)") }
+        if let gnb = point.gnb, !gnb.isEmpty {
+            cell.append("gNB \(gnb)")
+        } else if let enb = point.enb, !enb.isEmpty {
+            cell.append("eNB \(enb)")
+        }
+        return VStack(alignment: .leading, spacing: SQSpace.xs) {
+            HStack(spacing: SQSpace.sm) {
+                Circle().fill(quality.color).frame(width: 12, height: 12)
+                    .accessibilityHidden(true)
+                Text(verbatim: dbm ?? String(localized: "Pas de mesure"))
+                    .font(SQFont.display(17, .bold, relativeTo: .headline))
+                    .foregroundStyle(SQColor.label)
+                    .monospacedDigit()
+                if dbm != nil {
+                    Text(quality.label)
+                        .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                Spacer(minLength: 0)
+                if let tech = point.tech, !tech.isEmpty {
+                    TechBadge(text: tech, color: SQBrand.techColor(tech))
+                }
+                Button { selected = nil } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, -SQSpace.sm)
+                .accessibilityLabel(Text("Fermer la mesure"))
+                .accessibilityIdentifier("sessionDetail.fullMap.point.close")
+            }
+            if !(facts.isEmpty && cell.isEmpty) {
+                HStack(spacing: SQSpace.md) {
+                    if !facts.isEmpty { Text(verbatim: facts.joined(separator: " · ")) }
+                    if !cell.isEmpty {
+                        Text(verbatim: cell.joined(separator: " · "))
+                            .font(.system(size: 12, design: .monospaced))
+                    }
+                }
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .monospacedDigit()
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("sessionDetail.fullMap.point")
     }
 }
