@@ -555,7 +555,12 @@ final class AccessibilityAuditTests: XCTestCase {
         }
         XCTAssertTrue(sentinelle.waitForExistence(timeout: 10), "Entrée Sentinelle introuvable après défilement")
         sentinelle.tap()
-        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 10))
+        // En-tête Halo : la barre de navigation est masquée, on attend le titre
+        // de la liste ou, avec une seule box, celui de sa page.
+        let title = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier IN %@", ["sentinelle.title", "sentinelle.box.title", "sentinelle.back"])
+        ).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
         audit(app, screen: "Sentinelle — texte accessibilité", blocking: true)
     }
 }

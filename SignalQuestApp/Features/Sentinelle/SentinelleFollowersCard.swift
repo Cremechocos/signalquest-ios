@@ -275,7 +275,7 @@ struct SentinelleFollowersCard: View {
     }
 
     private func shortDate(_ iso: String) -> String {
-        guard let date = ISO8601DateFormatter().date(from: iso) else { return iso }
-        return date.formatted(date: .abbreviated, time: .omitted)
+        // Le lecteur commun accepte aussi les fractions de seconde (« .000Z »).
+        SignalFormatters.date(iso) ?? iso
     }
 }

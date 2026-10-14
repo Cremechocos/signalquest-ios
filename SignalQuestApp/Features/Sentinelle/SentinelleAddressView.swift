@@ -33,6 +33,7 @@ struct SentinelleAddressView: View {
     @State private var sectionFailure: String?
 
     @State private var editing = false
+    @Environment(\.dismiss) private var dismiss
 
     private var target: SentinelleTarget? { model.target(targetId) }
     private var address: SentinelleAddress? {
@@ -43,6 +44,7 @@ struct SentinelleAddressView: View {
         ScrollView {
             if let target, let address {
                 VStack(spacing: SQSpace.md2) {
+                    header(target, address)
                     verdictCard(target, address)
                     seriesStatus
                     latencyCard(address)
@@ -60,21 +62,10 @@ struct SentinelleAddressView: View {
             }
         }
         .navigationTitle(family.label)
-        .toolbarTitleInlineCompat()
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
-        .toolbar {
-            // L'action de modification vit dans la barre du haut : c'est une
-            // action sur l'objet de la page entière, pas sur l'une de ses cartes.
-            if let address, !address.fromHostname {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Modifier") {
-                        Haptics.light()
-                        editing = true
-                    }
-                    .tint(SQColor.brandRed)
-                }
-            }
-        }
         .sheet(isPresented: $editing) {
             if let target, let address {
                 SentinelleAddressSheet(
@@ -100,6 +91,35 @@ struct SentinelleAddressView: View {
 
     private var seriesContext: String {
         "\(targetId)-\(family.rawValue)-\(address?.address ?? "none")-\(window.rawValue)"
+    }
+
+    // MARK: En-tête
+
+    private func header(_ target: SentinelleTarget, _ address: SentinelleAddress) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack(spacing: SQSpace.sm) {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "sentinelle.address.back") { dismiss() }
+                Spacer(minLength: 0)
+                // La modification vit en tête de page : c'est une action sur
+                // l'objet de la page entière, pas sur l'une de ses cartes.
+                if !address.fromHostname {
+                    MapChipIconButton(systemImage: "pencil", label: "Modifier l’adresse", identifier: "sentinelle.address.edit") {
+                        editing = true
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text(verbatim: family.label)
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("sentinelle.address.title")
+                Text(verbatim: target.label)
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder private var seriesStatus: some View {
@@ -184,7 +204,23 @@ struct SentinelleAddressView: View {
     private func latencyCard(_ address: SentinelleAddress) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.md) {
-                SentinelleSectionTitle(title: "Latence", systemImage: "waveform.path.ecg")
+                HStack(spacing: SQSpace.sm) {
+                    SentinelleSectionTitle(title: "Latence", systemImage: "waveform.path.ecg")
+                    if let points, SentinelleLatencySeries(points: points).samples.count >= 3 {
+                        SentinelleFullScreenButton(identifier: "sentinelle.latency.expand") {
+                            ANFRLandscapeHost.present(SentinelleChartFullScreen(
+                                kind: .latency(SentinelleLatencySeries(points: points)),
+                                title: String(localized: "Latence \(family.label)"),
+                                subtitle: [target?.label, address.address, window.periodLabel]
+                                    .compactMap { $0 }.joined(separator: " · "),
+                                window: window,
+                                onClose: ANFRLandscapeHost.dismissCurrent
+                            ))
+                        }
+                    }
+                }
+                // Le bouton fait 44 pt : le titre garde sa place dans la carte.
+                .padding(.vertical, -SQSpace.sm)
                 SentinelleWindowPicker(selection: $window) { selected = nil }
 
                 if let points {
@@ -307,31 +343,13 @@ struct SentinelleAddressView: View {
     // MARK: Onglets
 
     private var tabPicker: some View {
-        HStack(spacing: 0) {
-            ForEach(SentinelleDetailTab.allCases) { value in
-                let isSelected = value == tab
-                Button {
-                    Haptics.selection()
-                    tab = value
-                } label: {
-                    Text(LocalizedStringKey(value.label))
-                        .font(SQFont.body(13, .semibold))
-                        .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, SQSpace.sm2)
-                        .frame(minHeight: 44)
-                        .background(
-                            isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(Color.clear),
-                            in: Capsule(style: .continuous)
-                        )
-                }
-                .buttonStyle(SQPressButtonStyle())
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-                .sqAnimation(SQMotion.fast, value: isSelected)
-            }
-        }
-        .padding(3)
-        .sqSurface(SQColor.surfaceMuted, in: Capsule(style: .continuous))
+        SQSegmentedFilter(
+            selection: $tab,
+            options: SentinelleDetailTab.allCases.map { (value: $0, label: $0.label, icon: String?.none) }
+        )
+        // Le segment ajoute sa propre marge latérale : on la compense.
+        .padding(.horizontal, -SQSpace.lg)
+        .accessibilityIdentifier("sentinelle.address.tabs")
     }
 
     @ViewBuilder

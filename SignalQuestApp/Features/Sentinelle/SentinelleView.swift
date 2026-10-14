@@ -285,6 +285,7 @@ struct SentinelleView: View {
     @StateObject private var model: SentinelleViewModel
     @EnvironmentObject private var services: AppServices
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismiss) private var dismiss
     @State private var showCreate = false
     @State private var showSettings = false
     @State private var showFollow = false
@@ -315,25 +316,30 @@ struct SentinelleView: View {
     var body: some View {
         Group {
             if model.isLoading && model.targets.isEmpty {
-                loadingState
+                withActionBar { loadingState }
             } else if model.sharedInvite != nil {
                 // L'invitation venue d'un lien passe avant l'offre Premium, l'état
                 // vide et la box unique : suivre ne demande ni abonnement ni box.
                 boxList
             } else if model.accessDenied && model.following.isEmpty {
-                if services.entitlements.confirmedServerTier == .premium {
-                    premiumActivationPending
-                } else {
-                    premiumUpsell
+                withActionBar {
+                    if services.entitlements.confirmedServerTier == .premium {
+                        premiumActivationPending
+                    } else {
+                        premiumUpsell
+                    }
                 }
             } else if let errorMessage = model.errorMessage, model.targets.isEmpty {
-                ErrorStateView(title: "Chargement impossible", message: errorMessage) {
-                    Task { await model.load() }
+                withActionBar {
+                    ErrorStateView(title: "Chargement impossible", message: errorMessage) {
+                        Task { await model.load() }
+                    }
+                    .padding(SQSpace.lg)
                 }
-                .padding(SQSpace.lg)
             } else if model.targets.isEmpty && model.following.isEmpty {
                 ScrollView {
-                    VStack(spacing: SQSpace.lg) {
+                    VStack(alignment: .leading, spacing: SQSpace.lg) {
+                        listHeader
                         EmptyStateView(
                             title: "Aucune connexion surveillée",
                             message: "Ajoute l’adresse publique de ta box : Sentinelle l’interrogera chaque minute depuis nos serveurs, téléphone éteint compris.",
@@ -341,57 +347,26 @@ struct SentinelleView: View {
                         )
                         SentinelleFollowInvite { showFollow = true }
                     }
-                    .padding(SQSpace.lg)
+                    .padding(.horizontal, SQSpace.lg)
+                    .padding(.top, SQSpace.sm)
+                    .padding(.bottom, SQSpace.huge)
                     .sqReadableWidth()
                 }
             } else if let root = rootTarget {
                 // Une liste à un seul élément n'apporte rien : la box unique EST
                 // l'accueil. Une box désignée par une notification l'est aussi —
                 // on réutilise le même chemin, déjà éprouvé.
-                SentinelleBoxView(model: model, targetId: root.id, isRoot: true)
+                SentinelleBoxView(model: model, targetId: root.id, isRoot: true,
+                                  rootActions: AnyView(rootActionButtons))
             } else {
                 boxList
             }
         }
         .navigationTitle(title)
-        .toolbarTitleInlineCompat()
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
-        .toolbar {
-            // L'ajout n'existe qu'au niveau ACCUEIL, y compris quand celui-ci
-            // prend la forme de la box unique : le masquer dans ce cas rendrait
-            // la deuxième connexion impossible à créer. Il crée toujours une
-            // NOUVELLE box — compléter une box existante se fait sur sa page.
-            // Les réglages d'alerte vivaient uniquement sur le web. Or c'est en
-            // mobilité qu'on découvre n'avoir pas été prévenu, donc là qu'on veut
-            // corriger.
-            if !model.accessDenied {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        Haptics.light()
-                        showSettings = true
-                    } label: {
-                        Label("Réglages des alertes", systemImage: "bell.badge")
-                    }
-                    .tint(SQColor.labelSecondary)
-                }
-            }
-            if canAttemptCreate {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        Haptics.light()
-                        if model.quota?.isFull == true {
-                            // Le « + » ne disparaît pas sans rien dire : on explique pourquoi.
-                            model.actionError = String(localized: "Tu as atteint le nombre maximal de connexions surveillées. Retire-en une pour en ajouter une autre.")
-                        } else {
-                            showCreate = true
-                        }
-                    } label: {
-                        Label("Ajouter une connexion", systemImage: "plus")
-                    }
-                    .tint(SQColor.brandRed)
-                }
-            }
-        }
         .refreshable { await model.load(silently: true) }
         // La boucle est attachée à la PHASE, pas au simple cycle de vie de la vue.
         //
@@ -460,6 +435,147 @@ struct SentinelleView: View {
         }
     }
 
+    // MARK: En-tête
+
+    /// Retour, puis les actions de l'accueil.
+    private var actionBar: some View {
+        HStack(spacing: SQSpace.sm) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "sentinelle.back") { dismiss() }
+            Spacer(minLength: 0)
+            rootActionButtons
+        }
+    }
+
+    /// L'ajout n'existe qu'au niveau ACCUEIL, y compris quand celui-ci prend la
+    /// forme de la box unique : le masquer dans ce cas rendrait la deuxième
+    /// connexion impossible à créer. Il crée toujours une NOUVELLE box —
+    /// compléter une box existante se fait sur sa page. Les réglages d'alerte
+    /// vivaient uniquement sur le web. Or c'est en mobilité qu'on découvre
+    /// n'avoir pas été prévenu, donc là qu'on veut corriger.
+    @ViewBuilder
+    private var rootActionButtons: some View {
+        if !model.accessDenied {
+            MapChipIconButton(systemImage: "bell.badge", label: "Réglages des alertes", identifier: "sentinelle.settings") {
+                showSettings = true
+            }
+        }
+        // Dès DEUX box : au-dessous il n'y a rien à ordonner, mais à deux la
+        // fonction doit être VISIBLE — la cacher donnerait l'impression
+        // qu'elle n'existe pas.
+        if rootTarget == nil, model.targets.count + model.following.count >= 2 {
+            orderMenu
+        }
+        if canAttemptCreate {
+            MapChipIconButton(systemImage: "plus", label: "Ajouter une connexion", identifier: "sentinelle.add") {
+                if model.quota?.isFull == true {
+                    // Le « + » ne disparaît pas sans rien dire : on explique pourquoi.
+                    model.actionError = String(localized: "Tu as atteint le nombre maximal de connexions surveillées. Retire-en une pour en ajouter une autre.")
+                } else {
+                    showCreate = true
+                }
+            }
+        }
+    }
+
+    /// Regrouper et trier : des réglages de lecture, rangés dans un menu plutôt
+    /// qu'en deux rangées de segments au-dessus de la liste.
+    private var orderMenu: some View {
+        Menu {
+            Section("Regrouper") {
+                Picker("Regrouper", selection: $group) {
+                    ForEach(SentinelleListOrder.Group.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.inline)
+            }
+            Section("Trier") {
+                Picker("Trier", selection: $sort) {
+                    // La disponibilité n'est connue que des connexions suivies :
+                    // sans elles, l'option ne trierait rien.
+                    ForEach(SentinelleListOrder.Sort.allCases.filter { $0 != .uptime || !model.following.isEmpty }) {
+                        Text($0.label).tag($0)
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 44, height: 44)
+                .sqSurface(SQColor.chip, in: Circle())
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("Regrouper et trier")
+        .accessibilityValue(Text("\(group.label), \(sort.label)"))
+        .accessibilityIdentifier("sentinelle.order")
+    }
+
+    /// Barre fixe des états sans liste (chargement, offre, erreur) : le retour
+    /// doit rester à portée, la barre de navigation étant masquée.
+    private func withActionBar<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            actionBar
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.top, SQSpace.sm)
+            content()
+                .frame(maxHeight: .infinity)
+        }
+    }
+
+    private var listHeader: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            actionBar
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Sentinelle")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("sentinelle.title")
+                Text("Ta connexion surveillée depuis nos serveurs, téléphone éteint compris.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let summary = listSummary {
+                Text(verbatim: summary)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .padding(.horizontal, SQSpace.xs)
+                    .accessibilityIdentifier("sentinelle.summary")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// « 3 connexions sur 5 · 1 ne répond plus » : le quota, puis ce qui presse.
+    private var listSummary: String? {
+        guard !model.targets.isEmpty else { return nil }
+        var parts: [String] = []
+        if let quota = model.quota {
+            parts.append(String(localized: "\(quota.used) connexions sur \(quota.max)"))
+        }
+        let down = model.targets.filter { $0.status == "down" }.count
+        if down > 0 { parts.append(String(localized: "\(down) ne répond plus")) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func groupTitle(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(SQType.heading)
+            .foregroundStyle(SQColor.label)
+            .sqHeader()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, SQSpace.xs)
+            .padding(.top, SQSpace.sm)
+    }
+
+    private func operatorTitle(_ key: String) -> some View {
+        Text(verbatim: SentinelleListOrder.displayOperator(key))
+            .sqKicker()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, SQSpace.xs)
+    }
+
     private var singleTarget: SentinelleTarget? {
         model.targets.count == 1 ? model.targets.first : nil
     }
@@ -489,6 +605,7 @@ struct SentinelleView: View {
     private var boxList: some View {
         ScrollView {
             VStack(spacing: SQSpace.md2) {
+                listHeader
                 // L'invitation venue d'un lien passe AVANT tout : c'est ce qu'on
                 // vient de faire, et elle disparaît dès qu'on a suivi.
                 if let invite = model.sharedInvite {
@@ -497,44 +614,14 @@ struct SentinelleView: View {
                     }
                 }
 
-                // Dès DEUX box : au-dessous il n'y a rien à ordonner, mais à
-                // deux la fonction doit être VISIBLE — la cacher donnerait
-                // l'impression qu'elle n'existe pas.
-                if model.targets.count + model.following.count >= 2 {
-                    VStack(spacing: SQSpace.xs) {
-                        Picker("Regrouper", selection: $group) {
-                            ForEach(SentinelleListOrder.Group.allCases) { Text($0.label).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        Picker("Trier", selection: $sort) {
-                            // La disponibilité n'est connue que des connexions suivies :
-                            // sans elles, l'option ne trierait rien.
-                            ForEach(SentinelleListOrder.Sort.allCases.filter { $0 != .uptime || !model.following.isEmpty }) {
-                                Text($0.label).tag($0)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                }
-
                 // Les deux groupes ne se distinguent que s'il y a les deux : un
                 // seul en-tête au-dessus d'une liste homogène serait du bruit.
                 if !model.targets.isEmpty && !model.following.isEmpty {
-                    HStack {
-                        Text("Mes connexions")
-                            .font(SQFont.body(13))
-                            .foregroundStyle(SQColor.labelSecondary)
-                        Spacer()
-                    }
+                    groupTitle("Mes connexions")
                 }
 
                 ForEach(SentinelleListOrder.grouped(model.targets, by: group, sort: sort)) { bucket in
-                if let key = bucket.key {
-                    HStack {
-                        Text(SentinelleListOrder.displayOperator(key)).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
-                        Spacer()
-                    }
-                }
+                if let key = bucket.key { operatorTitle(key) }
                 ForEach(bucket.boxes) { target in
                     NavigationLink {
                         SentinelleBoxView(model: model, targetId: target.id)
@@ -552,21 +639,10 @@ struct SentinelleView: View {
                 // Les connexions suivies viennent APRÈS les siennes : on regarde
                 // d'abord ce dont on est responsable.
                 if !model.following.isEmpty {
-                    HStack {
-                        Text("Connexions partagées")
-                            .font(SQFont.body(13))
-                            .foregroundStyle(SQColor.labelSecondary)
-                        Spacer()
-                    }
-                    .padding(.top, SQSpace.xs)
+                    groupTitle("Connexions partagées")
 
                     ForEach(SentinelleListOrder.grouped(model.following, by: group, sort: sort)) { bucket in
-                        if let key = bucket.key {
-                            HStack {
-                                Text(SentinelleListOrder.displayOperator(key)).font(SQFont.body(12)).foregroundStyle(SQColor.labelSecondary)
-                                Spacer()
-                            }
-                        }
+                        if let key = bucket.key { operatorTitle(key) }
                         ForEach(bucket.boxes) { followed in
                             SentinelleFollowedCard(
                                 box: followed,

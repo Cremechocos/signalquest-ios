@@ -87,32 +87,16 @@ struct SentinelleWindowPicker: View {
     var onSelect: () -> Void = {}
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SQSpace.sm) {
-                ForEach(SentinelleWindow.allCases) { value in
-                    let isSelected = value == selection
-                    Button {
-                        Haptics.selection()
-                        onSelect()
-                        selection = value
-                    } label: {
-                        Text(LocalizedStringKey(value.label))
-                            .font(SQFont.body(13, .semibold))
-                            .padding(.horizontal, SQSpace.md)
-                            .frame(minHeight: 44)
-                            .background(
-                                isSelected ? AnyShapeStyle(SQColor.brandRed) : AnyShapeStyle(SQColor.surfaceMuted),
-                                in: Capsule(style: .continuous)
-                            )
-                            .foregroundStyle(isSelected ? SQColor.onAccent : SQColor.label)
-                    }
-                    .buttonStyle(SQPressButtonStyle())
-                    .accessibilityAddTraits(isSelected ? .isSelected : [])
-                    .sqAnimation(SQMotion.fast, value: isSelected)
-                }
-            }
-            .padding(.horizontal, 2)
-        }
+        SQSegmentedFilter(
+            selection: Binding(get: { selection }, set: { value in
+                onSelect()
+                selection = value
+            }),
+            options: SentinelleWindow.allCases.map { (value: $0, label: $0.label, icon: String?.none) }
+        )
+        // Le segment ajoute sa propre marge latérale : posé dans une carte, on
+        // la compense pour l'aligner sur le texte.
+        .padding(.horizontal, -SQSpace.lg)
     }
 }
 

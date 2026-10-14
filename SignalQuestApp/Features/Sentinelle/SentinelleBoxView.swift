@@ -12,6 +12,8 @@ struct SentinelleBoxView: View {
     /// il n'y a alors nulle part où revenir, et le retrait de la connexion doit
     /// rester possible depuis ici.
     var isRoot = false
+    /// Actions de l'accueil (alertes, ajout) quand cette page en tient lieu.
+    var rootActions: AnyView? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var openedFamily: SentinelleFamily?
@@ -45,6 +47,7 @@ struct SentinelleBoxView: View {
         ScrollView {
             if let target {
                 VStack(spacing: SQSpace.md2) {
+                    header(target)
                     verdictCard(target)
                     if hasBothFamilies { comparisonCard }
                     metricsCard
@@ -66,7 +69,9 @@ struct SentinelleBoxView: View {
             }
         }
         .navigationTitle(target?.label ?? String(localized: "Ma connexion"))
-        .toolbarTitleInlineCompat()
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .signalQuestBackground()
         .navigationDestinationItemCompat($openedFamily) { family in
             SentinelleAddressView(model: model, targetId: targetId, family: family)
@@ -103,6 +108,32 @@ struct SentinelleBoxView: View {
         } message: {
             Text("Les mesures, les coupures et les relevés de chemin partent avec elle. C’est sans retour.")
         }
+    }
+
+    // MARK: En-tête
+
+    private func header(_ target: SentinelleTarget) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack(spacing: SQSpace.sm) {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "sentinelle.box.back") { dismiss() }
+                Spacer(minLength: 0)
+                if let rootActions { rootActions }
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text(verbatim: target.label)
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("sentinelle.box.title")
+                Text(isRoot
+                    ? String(localized: "Sentinelle · surveillée depuis nos serveurs, téléphone éteint compris.")
+                    : String(localized: "Surveillée depuis nos serveurs, téléphone éteint compris."))
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: Verdict
@@ -150,7 +181,22 @@ struct SentinelleBoxView: View {
     private var comparisonCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: SQSpace.md) {
-                SentinelleSectionTitle(title: "IPv4 et IPv6, côte à côte", systemImage: "arrow.left.arrow.right")
+                HStack(spacing: SQSpace.sm) {
+                    SentinelleSectionTitle(title: "IPv4 et IPv6, côte à côte", systemImage: "arrow.left.arrow.right")
+                    if let comparisonPoints, !comparisonPoints.isEmpty {
+                        SentinelleFullScreenButton(identifier: "sentinelle.comparison.expand") {
+                            ANFRLandscapeHost.present(SentinelleChartFullScreen(
+                                kind: .families(comparisonPoints),
+                                title: String(localized: "IPv4 et IPv6, côte à côte"),
+                                subtitle: [target?.label, window.periodLabel].compactMap { $0 }.joined(separator: " · "),
+                                window: window,
+                                onClose: ANFRLandscapeHost.dismissCurrent
+                            ))
+                        }
+                    }
+                }
+                // Le bouton fait 44 pt : le titre garde sa place dans la carte.
+                .padding(.vertical, -SQSpace.sm)
                 Text("Les deux versions d’Internet, mesurées séparément : les superposer montre laquelle décroche.")
                     .font(.footnote)
                     .foregroundStyle(SQColor.label)

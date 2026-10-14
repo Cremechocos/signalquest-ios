@@ -642,6 +642,22 @@
         }
       }
     },
+    "%lld connexions sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld of %2$lld connections"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld connexions sur %2$lld"
+          }
+        }
+      }
+    },
     "%lld contestations" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -900,6 +916,22 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "%lld ne répond plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld not responding"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ne répond plus"
           }
         }
       }
@@ -5605,6 +5637,22 @@
         }
       }
     },
+    "Latence %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ latency"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latence %@"
+          }
+        }
+      }
+    },
     "Latence minimale" : {
       "localizations" : {
         "en" : {
@@ -6623,6 +6671,22 @@
         }
       }
     },
+    "Modifier l’adresse" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit the address"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier l’adresse"
+          }
+        }
+      }
+    },
     "Modération et données personnelles, par e-mail" : {
       "localizations" : {
         "en" : {
@@ -7253,6 +7317,22 @@
         }
       }
     },
+    "Perte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loss"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perte"
+          }
+        }
+      }
+    },
     "Photos de mes amis seulement" : {
       "localizations" : {
         "en" : {
@@ -7831,6 +7911,22 @@
         }
       }
     },
+    "Regrouper et trier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Group and sort"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regrouper et trier"
+          }
+        }
+      }
+    },
     "Relais hertzien" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8247,6 +8343,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Semaine du %@"
+          }
+        }
+      }
+    },
+    "Sentinelle · surveillée depuis nos serveurs, téléphone éteint compris." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinel · watched from our servers, even with your phone off."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinelle · surveillée depuis nos serveurs, téléphone éteint compris."
           }
         }
       }
@@ -8838,6 +8950,22 @@
         }
       }
     },
+    "Surveillée depuis nos serveurs, téléphone éteint compris." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watched from our servers, even with your phone off."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Surveillée depuis nos serveurs, téléphone éteint compris."
+          }
+        }
+      }
+    },
     "Système" : {
       "localizations" : {
         "en" : {
@@ -8850,6 +8978,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Système"
+          }
+        }
+      }
+    },
+    "Ta connexion surveillée depuis nos serveurs, téléphone éteint compris." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your connection, watched from our servers, even with your phone off."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta connexion surveillée depuis nos serveurs, téléphone éteint compris."
           }
         }
       }

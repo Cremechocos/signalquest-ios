@@ -127,6 +127,10 @@ struct SentinelleLatencyChart: View {
     let window: SentinelleWindow
     @Binding var selected: SentinelleLatencySample?
     var color: Color = SQColor.brandRed
+    /// Plage de temps affichée, quand le plein écran zoome ; sinon toute la fenêtre.
+    var xDomain: ClosedRange<Date>? = nil
+    /// En plein écran, la lecture reste affichée une fois le doigt levé.
+    var keepsReading = false
 
     var body: some View {
         Chart {
@@ -172,7 +176,7 @@ struct SentinelleLatencyChart: View {
         .chartYScale(domain: 0...SentinelleChartScale.upperBound(series.values))
         .chartYAxis { SentinelleChartAxes.latency }
         .chartXAxis { SentinelleChartAxes.time(window) }
-        .chartPlotStyle { plot in plot.background(Color.clear) }
+        .modifier(SentinelleXDomain(domain: xDomain))
         .chartOverlay { proxy in
             GeometryReader { geometry in
                 Rectangle()
@@ -181,7 +185,7 @@ struct SentinelleLatencyChart: View {
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in scrub(to: value.location.x, proxy, geometry) }
-                            .onEnded { _ in selected = nil }
+                            .onEnded { _ in if !keepsReading { selected = nil } }
                     )
             }
         }
@@ -260,6 +264,10 @@ struct SentinelleFamilyChart: View {
     /// Hauteur du graphe seul : la ligne de lecture (déjà espacée par son propre
     /// padding) s'ajoute en dessous, sans écraser le tracé.
     let height: CGFloat
+    /// Plage de temps affichée, quand le plein écran zoome ; sinon toute la fenêtre.
+    var xDomain: ClosedRange<Date>? = nil
+    /// En plein écran, la lecture reste affichée une fois le doigt levé.
+    var keepsReading = false
 
     /// Instant lu sous le doigt. Il vaut pour les DEUX familles à la fois :
     /// l'intérêt de ce graphe est justement de les comparer au même moment,
@@ -303,7 +311,7 @@ struct SentinelleFamilyChart: View {
             .chartYScale(domain: 0...SentinelleChartScale.upperBound(values))
             .chartYAxis { SentinelleChartAxes.latency }
             .chartXAxis { SentinelleChartAxes.time(window) }
-            .chartPlotStyle { plot in plot.background(Color.clear) }
+            .modifier(SentinelleXDomain(domain: xDomain))
             .chartOverlay { proxy in
                 GeometryReader { geometry in
                     Rectangle()
@@ -312,7 +320,7 @@ struct SentinelleFamilyChart: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in scrub(to: value.location.x, proxy, geometry, series) }
-                                .onEnded { _ in readAt = nil }
+                                .onEnded { _ in if !keepsReading { readAt = nil } }
                         )
                 }
             }
@@ -477,5 +485,167 @@ enum SentinelleChartAxes {
                 }
             }
         }
+    }
+}
+
+// MARK: - Plein écran
+
+/// Fond de tracé transparent ; resserré sur une plage, il coupe ce qui en déborde.
+struct SentinelleXDomain: ViewModifier {
+    let domain: ClosedRange<Date>?
+
+    func body(content: Content) -> some View {
+        if let domain {
+            content
+                .chartXScale(domain: domain)
+                .chartPlotStyle { plot in plot.background(Color.clear).clipped() }
+        } else {
+            content
+                .chartPlotStyle { plot in plot.background(Color.clear) }
+        }
+    }
+}
+
+/// Un graphe de latence en grand, en paysage : le doigt lit chaque mesure,
+/// le pincement resserre la période.
+struct SentinelleChartFullScreen: View {
+    enum Kind {
+        /// Une famille : sa courbe et ses coupures.
+        case latency(SentinelleLatencySeries)
+        /// IPv4 et IPv6 superposées.
+        case families([SentinelleSeriesPoint])
+    }
+
+    let kind: Kind
+    let title: String
+    let subtitle: String
+    let window: SentinelleWindow
+    let onClose: () -> Void
+
+    @State private var selected: SentinelleLatencySample?
+    @State private var zoomDomain: ClosedRange<Date>?
+    @State private var pinchBase: ClosedRange<Date>?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.sm2) {
+                MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "sentinelle.chart.fullscreen.close") { onClose() }
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(verbatim: title)
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                        .sqHeader()
+                    Text(verbatim: subtitle)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: SQSpace.sm)
+                if case .families = kind {
+                    HStack(spacing: SQSpace.md) {
+                        ForEach(SentinelleFamily.allCases) { SentinelleFamilyChart.legend(for: $0) }
+                    }
+                }
+            }
+            chart
+                .frame(maxHeight: .infinity)
+                .modifier(ANFRPinchZoom(onChange: zoom(scale:anchor:), onEnd: { pinchBase = nil }))
+                .accessibilityIdentifier("sentinelle.chart.fullscreen.chart")
+            Text("Glisse le doigt pour lire chaque mesure · pince pour zoomer")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.sm)
+        .background(SQColor.bg.ignoresSafeArea())
+        .accessibilityAction(.escape) { onClose() }
+    }
+
+    @ViewBuilder
+    private var chart: some View {
+        switch kind {
+        case .latency(let series):
+            ZStack(alignment: .topTrailing) {
+                SentinelleLatencyChart(series: series, window: window, selected: $selected,
+                                       xDomain: zoomDomain, keepsReading: true)
+                if let selected {
+                    reading(selected)
+                        .padding(SQSpace.sm)
+                        .allowsHitTesting(false)
+                }
+            }
+        case .families(let points):
+            GeometryReader { proxy in
+                // La ligne de lecture des deux familles s'ajoute sous le tracé.
+                SentinelleFamilyChart(points: points, window: window,
+                                      height: max(proxy.size.height - 32, 120), xDomain: zoomDomain,
+                                      keepsReading: true)
+            }
+        }
+    }
+
+    /// « 12:05 · 29 ms », posé au-dessus de la courbe.
+    private func reading(_ sample: SentinelleLatencySample) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            Text(sample.at.formatted(date: .omitted, time: .shortened))
+                .foregroundStyle(SQColor.labelSecondary)
+            Text(verbatim: SentinelleWording.ms(sample.rttMs))
+                .font(SQFont.body(15, .bold, relativeTo: .subheadline))
+                .foregroundStyle(SQColor.label)
+        }
+        .font(SQType.caption)
+        .monospacedDigit()
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
+        .sqCardBackground(cornerRadius: SQRadius.md)
+    }
+
+    private var fullDomain: ClosedRange<Date>? {
+        let dates: [Date]
+        switch kind {
+        case .latency(let series): dates = series.samples.map(\.at) + series.outages.flatMap { [$0.start, $0.end] }
+        case .families(let points): dates = points.map(\.at)
+        }
+        guard let first = dates.min(), let last = dates.max(), first < last else { return nil }
+        return first...last
+    }
+
+    /// Pincement : resserre ou élargit la période autour des doigts, sans
+    /// descendre sous le vingtième de la fenêtre.
+    private func zoom(scale: Double, anchor: Double) {
+        guard let full = fullDomain else { return }
+        let base = pinchBase ?? (zoomDomain ?? full)
+        if pinchBase == nil { pinchBase = base }
+        let fullSpan = full.upperBound.timeIntervalSince(full.lowerBound)
+        let baseSpan = base.upperBound.timeIntervalSince(base.lowerBound)
+        let span = min(max(baseSpan / max(scale, 0.05), fullSpan / 20), fullSpan)
+        let a = min(max(anchor, 0), 1)
+        let anchorDate = base.lowerBound.addingTimeInterval(baseSpan * a)
+        var lower = max(anchorDate.addingTimeInterval(-span * a), full.lowerBound)
+        var upper = lower.addingTimeInterval(span)
+        if upper > full.upperBound {
+            upper = full.upperBound
+            lower = upper.addingTimeInterval(-span)
+        }
+        zoomDomain = span >= fullSpan ? nil : lower...upper
+    }
+}
+
+/// « Plein écran », posé à côté du titre de la carte du graphe.
+struct SentinelleFullScreenButton: View {
+    let identifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Plein écran", systemImage: "arrow.up.left.and.arrow.down.right")
+                .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                .foregroundStyle(SQColor.accentInk)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityIdentifier(identifier)
     }
 }
