@@ -11,12 +11,15 @@ private typealias P = RadioLogsPalette
 /// L'app ne décide de rien : elle affiche la piste du serveur (quand il en a
 /// une) et les antennes voisines, et c'est l'utilisateur qui tranche. Le mot
 /// « automatique » n'a rien à faire ici — cette page VÉRIFIE, elle n'attribue pas.
+/// Comme depuis la carte et la file, l'envoi passe par une confirmation qui dit
+/// sur quel site, et que c'est public et retirable.
 struct RadioLogIdentifySheet: View {
     let site: RadioLogSite
     @StateObject private var picker: RadioLogIdentifyPicker
     @Environment(\.dismiss) private var dismiss
     @State private var region: MKCoordinateRegion
     @State private var showsMapPicker = false
+    @State private var showsConfirmation = false
     /// Renseigné dès que le serveur a accepté l'identification : l'écran bascule
     /// alors sur son résultat au lieu de se refermer sèchement. On vient de
     /// contribuer à une base publique, l'écran doit dire QUOI.
@@ -55,7 +58,7 @@ struct RadioLogIdentifySheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: SQSpace.md) {
                     header
                     if let identifiedSiteId {
                         resultCard(siteId: identifiedSiteId)
@@ -64,7 +67,6 @@ struct RadioLogIdentifySheet: View {
                     } else {
                         map
                         candidateList
-                        mapPickerButton
                     }
                     if identifiedSiteId == nil, let errorMessage = picker.errorMessage {
                         noticeBanner(errorMessage, systemImage: "exclamationmark.circle.fill", tint: SQColor.dangerInk, soft: SQColor.dangerSoft)
@@ -75,14 +77,22 @@ struct RadioLogIdentifySheet: View {
                                 .frame(minHeight: 44)
                         }
                     }
+                    if identifiedSiteId == nil, RadioLogIdentifyPicker.blockingReason(for: site) == nil {
+                        submitBlock
+                    }
                 }
                 .padding(.horizontal, M.sheetPaddingH)
+                .padding(.top, SQSpace.sm)
                 .padding(.bottom, M.sheetPaddingBottom)
             }
             .background(SQColor.bg.ignoresSafeArea())
             .navigationTitle(identifiedSiteId == nil ? String(localized: "Identifier ce site") : String(localized: "Site identifié"))
             .toolbarTitleInlineCompat()
-            .toolbar { toolbarContent }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(identifiedSiteId == nil ? String(localized: "Fermer") : String(localized: "Terminé")) { dismiss() }
+                }
+            }
             .task { await picker.load(for: site) }
             .onChangeCompat(of: identifiedSiteId) { _, siteId in
                 guard siteId != nil else { return }
@@ -90,6 +100,19 @@ struct RadioLogIdentifySheet: View {
                     resultFocused = true
                     UIAccessibility.post(notification: .announcement, argument: String(localized: "Site identifié"))
                 }
+            }
+            .alert("Identifier ce site ?", isPresented: $showsConfirmation, presenting: picker.selectedCandidate) { _ in
+                Button("Annuler", role: .cancel) {}
+                Button("Identifier") {
+                    Task {
+                        if let siteId = await picker.submit(site: site) {
+                            identifiedSiteId = siteId
+                            onIdentified(siteId)
+                        }
+                    }
+                }
+            } message: { candidate in
+                Text(RadioLogIdentifyPicker.confirmationMessage(nodeLabel: site.nodeLabel, siteId: candidate.siteId, address: candidate.address))
             }
             .sheet(isPresented: $showsMapPicker) {
                 RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas, customSites: customSites) { siteId in
@@ -103,30 +126,26 @@ struct RadioLogIdentifySheet: View {
         }
     }
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .cancellationAction) {
-            Button(identifiedSiteId == nil ? String(localized: "Fermer") : String(localized: "Terminé")) { dismiss() }
-        }
-        if identifiedSiteId == nil {
-            ToolbarItem(placement: .confirmationAction) {
-                Button {
-                    Task {
-                        if let siteId = await picker.submit(site: site) {
-                            identifiedSiteId = siteId
-                            onIdentified(siteId)
-                        }
-                    }
-                } label: {
-                    if picker.isSubmitting {
-                        SQSpinner()
-                    } else {
-                        Text("Identifier")
-                    }
-                }
-                .disabled(picker.selectedId == nil || picker.isSubmitting)
+    /// Le bouton d'envoi, en bas comme sur les autres formulaires, avec ce qu'il
+    /// engage écrit dessous.
+    private var submitBlock: some View {
+        VStack(spacing: SQSpace.sm) {
+            GradientButton(
+                picker.selectedCandidate.map { String(localized: "Identifier sur le site \($0.siteId)") } ?? String(localized: "Identifier"),
+                isBusy: picker.isSubmitting
+            ) {
+                showsConfirmation = true
             }
+            .disabled(picker.selectedCandidate == nil || picker.isSubmitting)
+            .accessibilityIdentifier("radioLogs.identify.submit")
+            Text("Publique et attribuée à ton compte. Tu pourras la retirer dans « Mes identifications ».")
+                .font(SQType.caption)
+                .foregroundStyle(P.muted)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(.top, SQSpace.xs)
     }
 
     /// Le résultat, une fois le serveur d'accord : quel nœud, sur quel site.
@@ -144,45 +163,18 @@ struct RadioLogIdentifySheet: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, M.siteMetaTop)
         }
-        .padding(M.cardPaddingH)
+        .padding(SQSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(P.card, in: RoundedRectangle(cornerRadius: M.cardRadius, style: .continuous))
-        .sqShadowCard()
-        .padding(.top, SQSpace.sm)
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
         .accessibilityElement(children: .combine)
         .accessibilityFocused($resultFocused)
-    }
-
-    /// L'échappatoire : les propositions du serveur ne couvrent pas tout, et
-    /// forcer un choix dans une liste fausse serait pire que de ne rien proposer.
-    private var mapPickerButton: some View {
-        Button {
-            showsMapPicker = true
-            Haptics.selection()
-        } label: {
-            HStack(spacing: SQSpace.sm) {
-                Image(systemName: "map")
-                    .font(.system(size: 14, weight: .semibold))
-                Text("Choisir une autre antenne sur la carte")
-                    .font(SQFont.body(M.buttonSize, .bold))
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-            }
-            .foregroundStyle(P.accentInk)
-            .padding(.horizontal, M.buttonPaddingH)
-            .padding(.vertical, M.buttonPaddingV + 3)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(P.accentSoft, in: RoundedRectangle(cornerRadius: M.buttonRadius, style: .continuous))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.top, M.ctaTop)
+        .accessibilityIdentifier("radioLogs.identify.result")
     }
 
     // MARK: Sous-vues
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
                 Text(site.nodeLabel)
                     .font(.sqTechnical(M.siteIdSize, .semibold))
@@ -195,7 +187,6 @@ struct RadioLogIdentifySheet: View {
                 .font(SQFont.body(M.siteMetaSize))
                 .monospacedDigit()
                 .foregroundStyle(P.muted)
-                .padding(.top, M.siteMetaTop)
 
             let pciLabels = site.distinctPciLabels
             if !pciLabels.isEmpty {
@@ -204,10 +195,8 @@ struct RadioLogIdentifySheet: View {
                         RadioLogPill(label: label)
                     }
                 }
-                .padding(.top, M.pillsTop)
             }
         }
-        .padding(.bottom, SQSpace.lg)
     }
 
     private var metaLine: String {
@@ -234,9 +223,8 @@ struct RadioLogIdentifySheet: View {
                 }
             }
             .frame(height: M.chainMapHeight)
-            .clipShape(RoundedRectangle(cornerRadius: M.chainMapRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
             .accessibilityHidden(true)
-            .padding(.bottom, SQSpace.md)
         }
     }
 
@@ -283,26 +271,19 @@ struct RadioLogIdentifySheet: View {
                     .foregroundStyle(P.muted)
             }
             .padding(.vertical, SQSpace.lg)
-        } else if !picker.candidates.isEmpty {
-            Text("Quelle antenne as-tu relevée ?")
-                .font(SQFont.body(M.groupHeaderSize, .bold))
-                .foregroundStyle(P.muted)
-                .padding(.bottom, M.groupHeaderBottom)
-
-            VStack(spacing: M.cardSpacing) {
-                ForEach(picker.candidates) { candidate in
-                    RadioLogCandidateRow(
-                        candidate: candidate,
-                        isSelected: picker.selectedId == candidate.id
-                    ) {
-                        picker.selectedId = candidate.id
-                        if let latitude = candidate.latitude, let longitude = candidate.longitude {
-                            region.center = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-                        }
-                        Haptics.selection()
+        } else {
+            RadioLogCandidateCard(
+                candidates: picker.candidates,
+                selectedId: picker.selectedId,
+                mapLabel: "Choisir une autre antenne sur la carte",
+                onSelect: { candidate in
+                    picker.selectedId = candidate.id
+                    if let latitude = candidate.latitude, let longitude = candidate.longitude {
+                        region.center = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
                     }
-                }
-            }
+                },
+                onOpenMap: { showsMapPicker = true }
+            )
         }
     }
 
@@ -313,11 +294,66 @@ struct RadioLogIdentifySheet: View {
             .padding(SQSpace.md)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(soft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-            .padding(.top, SQSpace.md)
     }
 }
 
-/// Une antenne candidate. La piste du serveur porte un liseré d'accent et dit sa
+/// « Quelle antenne as-tu captée ? » — les candidats dans une seule carte, puis
+/// l'échappatoire vers la carte : les propositions du serveur ne couvrent pas
+/// tout, et forcer un choix dans une liste fausse serait pire que de ne rien
+/// proposer.
+struct RadioLogCandidateCard: View {
+    let candidates: [RadioLogCandidate]
+    let selectedId: String?
+    let mapLabel: LocalizedStringKey
+    let onSelect: (RadioLogCandidate) -> Void
+    let onOpenMap: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Quelle antenne as-tu captée ?")
+                .font(SQFont.display(17, .bold, relativeTo: .headline))
+                .foregroundStyle(P.ink)
+                .sqHeader()
+            VStack(spacing: 0) {
+                ForEach(candidates) { candidate in
+                    RadioLogCandidateRow(candidate: candidate, isSelected: selectedId == candidate.id) {
+                        onSelect(candidate)
+                        Haptics.selection()
+                    }
+                    Rectangle().fill(SQColor.separator).frame(height: 1)
+                        .padding(.leading, candidates.last?.id == candidate.id ? SQSpace.md : 48)
+                }
+                Button {
+                    onOpenMap()
+                    Haptics.selection()
+                } label: {
+                    HStack(spacing: SQSpace.md) {
+                        SQIconPastille(systemImage: "map", size: 30, tint: SQColor.accentInk, fill: SQColor.accentSoft)
+                            .accessibilityHidden(true)
+                        Text(mapLabel)
+                            .font(SQFont.body(15, .semibold))
+                            .foregroundStyle(P.ink)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(P.muted)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, SQSpace.md)
+                    .padding(.vertical, SQSpace.sm)
+                    .frame(minHeight: 50)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("radioLogs.identify.mapChoice")
+            }
+            .clipShape(RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
+        }
+    }
+}
+
+/// Une antenne candidate. La piste du serveur porte « Proposé » et dit sa
 /// confiance ; les autres sont de simples voisines classées par distance.
 struct RadioLogCandidateRow: View {
     let candidate: RadioLogCandidate
@@ -326,61 +362,58 @@ struct RadioLogCandidateRow: View {
 
     var body: some View {
         Button(action: onSelect) {
-            HStack(alignment: .top, spacing: M.cardInnerGap) {
-                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                    .font(.system(size: 18, weight: .regular))
-                    .foregroundStyle(isSelected ? P.accent : P.muted)
+            HStack(alignment: .top, spacing: SQSpace.md) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(isSelected ? P.accent : P.hairStrong, lineWidth: 2)
+                    if isSelected {
+                        Circle().fill(P.accent).frame(width: 10, height: 10)
+                    }
+                }
+                .frame(width: 22, height: 22)
+                .padding(.top, 1)
+                .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: SQSpace.sm) {
                         Text("Site \(candidate.siteId)")
-                            .font(.sqTechnical(13, .semibold))
+                            .font(.sqTechnical(14, .semibold))
                             .foregroundStyle(P.ink)
                             .sqSingleLine()
                         if candidate.isServerHypothesis {
                             Text("Proposé")
-                                .font(SQFont.body(M.techSize, .heavy))
-                                .tracking(M.techTracking)
+                                .font(SQFont.body(11, .bold))
                                 .foregroundStyle(P.accentInk)
                                 .padding(.horizontal, M.techPaddingH)
                                 .padding(.vertical, M.techPaddingV)
-                                .background(P.accentSoft, in: RoundedRectangle(cornerRadius: M.techRadius, style: .continuous))
+                                .background(P.accentSoft, in: Capsule(style: .continuous))
                         }
                         Spacer(minLength: 0)
                     }
                     if let address = candidate.address, !address.isEmpty {
                         Text(address)
-                            .font(SQFont.body(M.siteNameSize))
-                            .foregroundStyle(P.ink)
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                     }
                     if let meta = metaLine {
                         Text(meta)
-                            .font(SQFont.body(M.siteMetaSize))
+                            .font(SQType.caption)
                             .monospacedDigit()
                             .foregroundStyle(P.muted)
                             .sqSingleLine()
                     }
                 }
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, M.cardPaddingH)
-            .padding(.vertical, M.cardPaddingV)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: M.cardRadius, style: .continuous)
-                    .fill(P.card)
-                    .overlay {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: M.cardRadius, style: .continuous)
-                                .strokeBorder(P.accent.opacity(0.45), lineWidth: 1.5)
-                        }
-                    }
-            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .background(isSelected ? P.accentSoft : Color.clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityIdentifier("radioLogs.identify.candidate.\(candidate.siteId)")
     }
 
     private var metaLine: String? {

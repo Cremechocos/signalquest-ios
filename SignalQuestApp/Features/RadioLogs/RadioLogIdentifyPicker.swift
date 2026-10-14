@@ -249,6 +249,22 @@ final class RadioLogIdentifyPicker: ObservableObject {
         errorMessage = nil
     }
 
+    /// Le candidat choisi, s'il y en a un.
+    var selectedCandidate: RadioLogCandidate? {
+        guard let selectedId else { return nil }
+        return candidates.first { $0.id == selectedId }
+    }
+
+    /// Le texte de la confirmation, le même depuis la feuille, la file et la carte :
+    /// on publie dans une base commune, l'utilisateur doit lire sur quel site et
+    /// savoir qu'il pourra revenir dessus.
+    nonisolated static func confirmationMessage(nodeLabel: String, siteId: String, address: String?) -> String {
+        let base = String(localized: "\(nodeLabel) sera identifié sur le site \(siteId)")
+        let place = address.flatMap { $0.isEmpty ? nil : $0 }
+        let located = place.map { String(localized: "\(base) — \($0)") } ?? base
+        return located + ".\n\n" + String(localized: "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications ».")
+    }
+
     /// Écrit l'identification. Retourne le `siteId` retenu, ou nil en cas d'échec
     /// (le message d'erreur est alors posé sur `errorMessage`).
     func submit(site: RadioLogSite) async -> String? {

@@ -364,57 +364,6 @@
         }
       }
     },
-    "%lld anneaux TA — ils ne se croisent pas : relevés à vérifier" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld TA rings — they do not intersect: check the logs"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld anneaux TA — ils ne se croisent pas : relevés à vérifier"
-          }
-        }
-      }
-    },
-    "%lld anneaux TA — leur intersection désigne le site" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld TA rings — their intersection points to the site"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld anneaux TA — leur intersection désigne le site"
-          }
-        }
-      }
-    },
-    "%lld anneaux TA — trop rapprochés pour désigner un point" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld TA rings — too close together to pinpoint a location"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld anneaux TA — trop rapprochés pour désigner un point"
-          }
-        }
-      }
-    },
     "%lld antennes" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1128,19 +1077,18 @@
         }
       }
     },
-    "%lld relevés écartés" : {
-      "extractionState" : "manual",
+    "%lld relevés incohérents écartés." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld logs discarded"
+            "value" : "%lld inconsistent logs set aside."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld relevés écartés"
+            "value" : "%lld relevés incohérents écartés."
           }
         }
       }
@@ -1806,36 +1754,18 @@
         }
       }
     },
-    "1 anneau TA — il faut au moins deux passages écartés pour croiser" : {
-      "extractionState" : "manual",
+    "1 relevé incohérent écarté." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1 TA ring — at least two widely spaced passes are needed to cross"
+            "value" : "1 inconsistent log set aside."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1 anneau TA — il faut au moins deux passages écartés pour croiser"
-          }
-        }
-      }
-    },
-    "1 relevé écarté" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 log discarded"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 relevé écarté"
+            "value" : "1 relevé incohérent écarté."
           }
         }
       }
@@ -2918,6 +2848,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Charger plus de publications"
+          }
+        }
+      }
+    },
+    "Choisir sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose on the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir sur la carte"
           }
         }
       }
@@ -4409,6 +4355,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identifier ici"
+          }
+        }
+      }
+    },
+    "Identifier sur le site %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identify on site %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifier sur le site %@"
           }
         }
       }
@@ -7050,6 +7012,22 @@
         }
       }
     },
+    "Publique et attribuée à ton compte. Tu pourras la retirer dans « Mes identifications »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public and attributed to your account. You can withdraw it in “My identifications”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publique et attribuée à ton compte. Tu pourras la retirer dans « Mes identifications »."
+          }
+        }
+      }
+    },
     "Pylône rue des Lilas" : {
       "localizations" : {
         "en" : {
@@ -7094,6 +7072,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Que s'est-il passé ?"
+          }
+        }
+      }
+    },
+    "Quelle antenne as-tu captée ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Which antenna did you pick up?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelle antenne as-tu captée ?"
           }
         }
       }
@@ -8235,6 +8229,54 @@
         }
       }
     },
+    "Tes %lld passages ne se croisent pas : des relevés sont peut-être à vérifier." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your %lld passes don’t cross: some logs may need checking."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes %lld passages ne se croisent pas : des relevés sont peut-être à vérifier."
+          }
+        }
+      }
+    },
+    "Tes %lld passages se croisent ici : l’antenne se trouve probablement dans la zone commune des cercles." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your %lld passes cross here: the antenna is probably in the area all the circles share."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes %lld passages se croisent ici : l’antenne se trouve probablement dans la zone commune des cercles."
+          }
+        }
+      }
+    },
+    "Tes %lld passages sont trop rapprochés pour situer l’antenne." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your %lld passes are too close together to locate the antenna."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes %lld passages sont trop rapprochés pour situer l’antenne."
+          }
+        }
+      }
+    },
     "Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web." : {
       "localizations" : {
         "en" : {
@@ -8846,6 +8888,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un pylône partagé compte une fois par opérateur."
+          }
+        }
+      }
+    },
+    "Un seul passage : il en faut au moins deux, écartés, pour situer l’antenne." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only one pass: it takes at least two, far apart, to locate the antenna."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un seul passage : il en faut au moins deux, écartés, pour situer l’antenne."
           }
         }
       }
@@ -51021,22 +51079,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Que constates-tu ?"
-          }
-        }
-      }
-    },
-    "Quelle antenne as-tu relevée ?" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Which antenna did you record?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quelle antenne as-tu relevée ?"
           }
         }
       }

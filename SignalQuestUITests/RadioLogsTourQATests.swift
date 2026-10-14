@@ -112,16 +112,19 @@ final class RadioLogsTourQATests: XCTestCase {
             Thread.sleep(forTimeInterval: 10)
             snap(app, "logs-04-file-identification")
 
-            let mapChoice = app.buttons["Choisir une autre antenne sur la carte"].firstMatch
+            let mapChoice = app.buttons["radioLogs.identify.mapChoice"].firstMatch
             if SignalQuestUITestSupport.scrollToHittable(mapChoice, in: app) {
                 mapChoice.tap()
+                // La carte n'a plus de barre de navigation : son « Annuler » flottant
+                // dit qu'elle est ouverte.
+                let cancel = app.buttons["radioLogs.mapPicker.cancel"].firstMatch
                 XCTAssertTrue(
-                    app.navigationBars["Choisir l'antenne"].waitForExistence(timeout: 20),
+                    cancel.waitForExistence(timeout: 20),
                     "Le choix d'antenne sur carte ne s'est pas ouvert"
                 )
                 Thread.sleep(forTimeInterval: 8)
                 snap(app, "logs-05-choix-carte")
-                app.buttons["Annuler"].firstMatch.tap()
+                cancel.tap()
                 Thread.sleep(forTimeInterval: 1.5)
             } else if !token.isEmpty {
                 XCTFail("Le bouton de choix sur carte est absent de la file")

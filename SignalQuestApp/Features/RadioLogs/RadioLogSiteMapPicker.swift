@@ -121,26 +121,20 @@ struct RadioLogSiteMapPicker: View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 map
-                plausibleToggle
+                VStack(spacing: SQSpace.sm) {
+                    topBar
+                    HStack {
+                        Spacer()
+                        plausibleToggle
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, SQSpace.md)
+                .padding(.top, SQSpace.md)
                 overlayCard
             }
             .background(SQColor.bg.ignoresSafeArea())
-            .navigationTitle("Choisir l'antenne")
-            .toolbarTitleInlineCompat()
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuler") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Text(operatorLabel)
-                        .font(SQFont.body(12.5, .semibold))
-                        .foregroundStyle(P.accentInk)
-                        .padding(.horizontal, SQSpace.md)
-                        .padding(.vertical, SQSpace.xs + 1)
-                        .background(P.accentSoft, in: Capsule(style: .continuous))
-                        .accessibilityLabel("Antennes affichées : \(operatorLabel)")
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             // Recadrage sur les anneaux, UNE FOIS. La fenêtre de départ tient 3 km autour du
             // RELEVÉ ; quand le TA annonce 5 km, le site est hors champ et l'écran cherche des
             // antennes là où il ne peut y en avoir. Les anneaux, eux, savent où regarder.
@@ -321,10 +315,7 @@ struct RadioLogSiteMapPicker: View {
     private var plausibleToggle: some View {
         if let plausible, !plausible.isEmpty {
             let shown = showOnlyPlausible ? plausible.count : visible.count
-            VStack {
-                HStack {
-                    Spacer()
-                    Button {
+            Button {
                         withAnimation(SQMotion.resolve(.easeInOut(duration: 0.2), reduceMotion)) { showOnlyPlausible.toggle() }
                     } label: {
                         HStack(spacing: SQSpace.xs) {
@@ -353,11 +344,33 @@ struct RadioLogSiteMapPicker: View {
                         ? String(localized: "\(plausible.count) antennes compatibles avec tes anneaux TA. Touche pour afficher les \(visible.count).")
                         : String(localized: "\(visible.count) antennes affichées. Touche pour ne garder que les \(plausible.count) compatibles avec tes anneaux TA."))
                     .accessibilityAddTraits(showOnlyPlausible ? [.isSelected] : [])
-                    .padding(.trailing, SQSpace.md)
-                    .padding(.top, SQSpace.md)
-                }
-                Spacer()
+        }
+    }
+
+    /// L'en-tête flotte sur la carte : la carte est l'écran, une barre de navigation lui
+    /// prendrait une bande entière pour deux boutons.
+    private var topBar: some View {
+        HStack(spacing: SQSpace.sm) {
+            Button { dismiss() } label: {
+                Text("Annuler")
+                    .font(SQFont.body(15, .semibold))
+                    .foregroundStyle(P.ink)
+                    .padding(.horizontal, SQSpace.lg)
+                    .frame(minHeight: 44)
+                    .sqSurface(P.card, in: Capsule(style: .continuous))
+                    .sqShadowSoft()
             }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityIdentifier("radioLogs.mapPicker.cancel")
+            Spacer(minLength: 0)
+            Text(operatorLabel)
+                .font(SQFont.body(12.5, .semibold))
+                .foregroundStyle(P.accentInk)
+                .padding(.horizontal, SQSpace.md)
+                .frame(minHeight: 32)
+                .sqSurface(P.card, in: Capsule(style: .continuous))
+                .sqShadowSoft()
+                .accessibilityLabel("Antennes affichées : \(operatorLabel)")
         }
     }
 
@@ -449,6 +462,10 @@ struct RadioLogSiteMapPicker: View {
 
     private var overlayCard: some View {
         VStack(alignment: .leading, spacing: 0) {
+            Text("Choisir l'antenne")
+                .sqKicker()
+                .accessibilityAddTraits(.isHeader)
+                .padding(.bottom, SQSpace.xs)
             HStack(spacing: SQSpace.sm) {
                 Text(site.nodeLabel)
                     .font(.sqTechnical(M.siteIdSize, .semibold))
@@ -517,15 +534,12 @@ struct RadioLogSiteMapPicker: View {
                 .accessibilityElement(children: .combine)
             }
 
-            HStack(spacing: M.ctaGap) {
-                RadioLogActionButton(label: picker.isSubmitting ? "…" : "Identifier ici") {
-                    showsConfirmation = true
-                }
-                .disabled(selected == nil || picker.isSubmitting)
-                .opacity(selected == nil ? 0.5 : 1)
-                RadioLogActionButton(label: "Annuler", ghost: true) { dismiss() }
+            GradientButton(String(localized: "Identifier ici"), isBusy: picker.isSubmitting) {
+                showsConfirmation = true
             }
+            .disabled(selected == nil || picker.isSubmitting)
             .padding(.top, M.ctaTop)
+            .accessibilityIdentifier("radioLogs.mapPicker.identify")
 
             // Créer le site : la seule issue quand le référentiel ne connaît RIEN ici. Sans ce
             // geste, l'écran n'avait ni antenne à désigner, ni moyen d'en ajouter une — et les
@@ -558,19 +572,19 @@ struct RadioLogSiteMapPicker: View {
         var text: String
         switch picker.taAssessment {
         case .convergent:
-            text = String(localized: "\(count) anneaux TA — leur intersection désigne le site")
+            text = String(localized: "Tes \(count) passages se croisent ici : l’antenne se trouve probablement dans la zone commune des cercles.")
         case .divergent:
-            text = String(localized: "\(count) anneaux TA — ils ne se croisent pas : relevés à vérifier")
+            text = String(localized: "Tes \(count) passages ne se croisent pas : des relevés sont peut-être à vérifier.")
         case .unusable:
             text = count > 1
-                ? String(localized: "\(count) anneaux TA — trop rapprochés pour désigner un point")
-                : String(localized: "1 anneau TA — il faut au moins deux passages écartés pour croiser")
+                ? String(localized: "Tes \(count) passages sont trop rapprochés pour situer l’antenne.")
+                : String(localized: "Un seul passage : il en faut au moins deux, écartés, pour situer l’antenne.")
         }
         if picker.taDiscardedCount > 0 {
-            text += " · "
+            text += " "
             text += picker.taDiscardedCount > 1
-                ? String(localized: "\(picker.taDiscardedCount) relevés écartés")
-                : String(localized: "1 relevé écarté")
+                ? String(localized: "\(picker.taDiscardedCount) relevés incohérents écartés.")
+                : String(localized: "1 relevé incohérent écarté.")
         }
         return text
     }
@@ -590,11 +604,11 @@ struct RadioLogSiteMapPicker: View {
     }
 
     private var confirmationMessage: String {
-        let siteId = selected.map { $0.siteId ?? $0.id } ?? "?"
-        let place = selected?.address.flatMap { $0.isEmpty ? nil : $0 }
-        let base = String(localized: "\(site.nodeLabel) sera identifié sur le site \(siteId)")
-        let located = place.map { String(localized: "\(base) — \($0)") } ?? base
-        return located + ".\n\n" + String(localized: "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications ».")
+        RadioLogIdentifyPicker.confirmationMessage(
+            nodeLabel: site.nodeLabel,
+            siteId: selected.map { $0.siteId ?? $0.id } ?? "?",
+            address: selected?.address
+        )
     }
 
     // MARK: Chargement
@@ -715,7 +729,8 @@ struct RadioLogSiteMapPicker: View {
         let keys = queriedOperatorKeys
         if keys == ["ALL"] { return String(localized: "Toutes") }
         if keys.first == "ZB" { return String(localized: "Zone blanche") }
-        return (site.operatorName ?? keys.first ?? "").capitalized
+        // Le nom porte déjà sa casse (« SFR », « Orange ») : seule la clé brute en a besoin.
+        return site.operatorName ?? (keys.first ?? "").capitalized
     }
 
     private func confirm() async {
