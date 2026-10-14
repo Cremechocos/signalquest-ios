@@ -90,4 +90,88 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertEqual(router.selectedTab, .profile)
         XCTAssertNil(router.openBugId, "Sans identifiant, la liste reste à portée dans le Profil")
     }
+
+    /// Un nouveau bug, adressé aux administrateurs, ouvre lui aussi le signalement.
+    func testNewBugOpensTheReport() {
+        let router = AppRouter()
+        router.handle(type: "new_bug", conversationId: nil, postId: nil, bugId: "bug-2")
+        XCTAssertEqual(router.selectedTab, .profile)
+        XCTAssertEqual(router.openBugId, "bug-2")
+    }
+
+    func testAntennaAlertsOpenTheSite() {
+        for type in ["favorite_antenna_issue", "zone_antenna_issue"] {
+            let router = AppRouter()
+            router.handle(type: type, conversationId: nil, postId: nil, siteId: "0382203")
+            XCTAssertEqual(router.selectedTab, .map, type)
+            XCTAssertEqual(router.openSiteId, "0382203", type)
+        }
+    }
+
+    func testANFRUpdateOpensTheANFRScreen() {
+        let router = AppRouter()
+        router.handle(type: "anfr_update", conversationId: nil, postId: nil)
+        XCTAssertEqual(router.selectedTab, .map)
+        XCTAssertTrue(router.openANFRMap)
+        XCTAssertTrue(router.hasPendingContentRoute)
+    }
+
+    func testSentinelleNotificationsOpenTheBox() {
+        for type in ["sentinelle", "sentinelle_incident"] {
+            let router = AppRouter()
+            router.handle(type: type, conversationId: nil, postId: nil, targetId: "box-1")
+            XCTAssertTrue(router.openSentinelle, type)
+            XCTAssertEqual(router.openSentinelleTargetId, "box-1", type)
+        }
+        let router = AppRouter()
+        router.handle(type: "sentinelle_follower", conversationId: nil, postId: nil)
+        XCTAssertTrue(router.openSentinelle)
+        XCTAssertNil(router.openSentinelleTargetId)
+    }
+
+    func testProfileScreensFromNotifications() {
+        let cases: [(String, AppRouter.ProfileScreen)] = [
+            ("improvement", .photos), ("status_change", .photos), ("photo_comment", .photos),
+            ("badge", .progression), ("badge_unlocked", .progression), ("level_up", .progression),
+            ("streak_milestone", .progression), ("coverage_session_auto_closed", .sessions),
+            ("supporter_granted", .subscription),
+        ]
+        for (type, screen) in cases {
+            let router = AppRouter()
+            router.handle(type: type, conversationId: nil, postId: nil)
+            XCTAssertEqual(router.selectedTab, .profile, type)
+            XCTAssertEqual(router.openProfileScreen, screen, type)
+        }
+    }
+
+    /// Retiré d'un groupe : la boîte de réception, pas la conversation quittée.
+    func testGroupRemovalOpensTheInbox() {
+        let router = AppRouter()
+        router.handle(type: "GROUP_MEMBER_REMOVED", conversationId: "conv-3", postId: nil)
+        XCTAssertTrue(router.openMessagesInbox)
+        XCTAssertNil(router.openConversationId)
+    }
+
+    /// Un message signalé ne doit jamais ouvrir la conversation d'un autre membre.
+    func testModerationReportsDoNotOpenTheConversation() {
+        let router = AppRouter()
+        router.handle(type: "message_report", conversationId: "conv-4", postId: nil)
+        XCTAssertNil(router.openConversationId)
+        XCTAssertFalse(router.hasPendingContentRoute)
+    }
+
+    func testModerationNotificationsOpenTheAdminWebPage() {
+        let base = URL(string: "https://signalquest.fr")!
+        XCTAssertEqual(
+            NotificationsCenterView.adminWebURL(type: "photo_reported", link: "/admin/moderation", base: base)?.absoluteString,
+            "https://signalquest.fr/admin/moderation"
+        )
+        XCTAssertEqual(
+            NotificationsCenterView.adminWebURL(type: "message_report", link: "/admin?tab=reports&sub=messages", base: base)?.absoluteString,
+            "https://signalquest.fr/admin?tab=reports&sub=messages"
+        )
+        XCTAssertNil(NotificationsCenterView.adminWebURL(type: "photo_reported", link: "//example.com/admin", base: base))
+        XCTAssertNil(NotificationsCenterView.adminWebURL(type: "message_new", link: "/admin/moderation", base: base))
+        XCTAssertNil(NotificationsCenterView.adminWebURL(type: "photo_appeal", link: nil, base: base))
+    }
 }

@@ -97,6 +97,15 @@ final class AppRouter: ObservableObject {
     @Published var openNotificationSettings = false
     /// Jeton d'un lien de partage ouvert depuis l'extérieur (lien universel).
     @Published var openSentinelleShareSlug: String?
+    /// Écran du Profil ouvert par une notification qui ne vise pas une fiche précise :
+    /// photos modérées, badge ou niveau, trajet clos par le serveur, statut de soutien.
+    enum ProfileScreen: String, Identifiable {
+        case photos, progression, sessions, subscription
+        var id: String { rawValue }
+    }
+    @Published var openProfileScreen: ProfileScreen?
+    /// Mise à jour ANFR : l'écran ANFR de l'onglet Carte, consommé par la carte.
+    @Published var openANFRMap = false
     /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
     /// consommée par MapExplorerView une fois l'onglet carte actif).
     @Published var pendingMapFocus: Coordinates?
@@ -148,6 +157,7 @@ final class AppRouter: ObservableObject {
             || openE2EEDeviceApprovalId != nil || openE2EEApprovalQR != nil || openE2EEIdentityReset
             || openSentinelleTargetId != nil
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
+            || openProfileScreen != nil || openANFRMap
             || pendingMapFocus != nil || pendingDriveTest || pendingSpeedtestStart
     }
 
@@ -251,10 +261,33 @@ final class AppRouter: ObservableObject {
             route(toAntennaReport: reportId)
         // Bugs et idées : statut, réponse, commentaire de l'équipe ou récompense,
         // tous avec `bugId`. Avant ce cas, le repli ne savait rien en faire.
-        case "bug_status_change", "bug_response", "bug_comment", "bug_resolved_reward":
+        // `new_bug` va aux administrateurs : ProfileView leur ouvre la fiche Admin.
+        case "bug_status_change", "bug_response", "bug_comment", "bug_resolved_reward", "new_bug":
             route(toBug: bugId)
-        case "site", "antenna", "validation":
+        // Antenne suivie ou proche d'un lieu : le site porte son code sous `siteId`
+        // ou `antennaId` (push) et `codeSiteOp` (centre de notifications).
+        case "site", "antenna", "validation", "favorite_antenna_issue", "zone_antenna_issue":
             route(toSite: siteId)
+        case "anfr_update":
+            selectedTab = .map
+            openANFRMap = true
+        // Retiré d'un groupe : la boîte de réception, pas une conversation devenue illisible.
+        case "group_member_removed":
+            route(toConversation: nil)
+        // Modération sans écran iOS : le centre de notifications ouvre la page
+        // d'administration du site ; jamais la conversation d'un autre membre.
+        case "message_report", "photo_reported", "photo_appeal":
+            break
+        // Photo approuvée, masquée ou retirée, avertissement : la page Photos.
+        case "improvement", "status_change", "photo_comment", "photo_like", "photo_mention", "photo_reply":
+            route(toProfileScreen: .photos)
+        case "badge", "badge_unlocked", "badge_earned", "level_up", "streak_milestone":
+            route(toProfileScreen: .progression)
+        // Trajet clos par le serveur : les enregistrements, le plus récent en tête.
+        case "coverage_session_auto_closed":
+            route(toProfileScreen: .sessions)
+        case "supporter_granted":
+            route(toProfileScreen: .subscription)
         // Panne communautaire : le fan-out serveur (`lib/outages/fanout.ts`) envoie
         // `type: "community_outage"`, `outageId` et `siteId: outage.targetId`.
         // Le cas était déjà servi par le repli plus bas, mais par accident : ce
@@ -262,7 +295,7 @@ final class AppRouter: ObservableObject {
         // ajoutée au payload le détournerait sans qu'on s'en aperçoive.
         case "community_outage":
             route(toCommunityOutageId: outageId, fallbackSiteId: siteId)
-        case "sentinelle":
+        case "sentinelle", "sentinelle_incident", "sentinelle_follower":
             route(toSentinelle: targetId)
         case "e2ee_v2_device_approval":
             route(toE2EEDeviceApproval: e2eeDeviceApprovalId)
@@ -379,6 +412,11 @@ final class AppRouter: ObservableObject {
     func route(toAntennaReport id: String?) {
         selectedTab = .profile
         if let id { openAntennaReportId = id }
+    }
+
+    func route(toProfileScreen screen: ProfileScreen) {
+        selectedTab = .profile
+        openProfileScreen = screen
     }
 
     func route(toBug id: String?) {

@@ -731,6 +731,275 @@ enum BugReportsSeenStore {
     }
 }
 
+// MARK: Admin (`/api/admin/bugs`)
+
+/// Les segments de la liste d'admin, dans l'ordre du site : le tri d'abord.
+enum AdminBugSegment: String, CaseIterable, Identifiable, Sendable {
+    case triage
+    case inProgress = "in_progress"
+    case resolved, ideas, all
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .triage: return String(localized: "À trier")
+        case .inProgress: return String(localized: "En cours")
+        case .resolved: return String(localized: "Résolus")
+        case .ideas: return String(localized: "Idées")
+        case .all: return String(localized: "Tous")
+        }
+    }
+}
+
+/// D'où vient le signalement (`source`).
+enum AdminBugSource: String, CaseIterable, Identifiable, Sendable {
+    case all, ios, android, web, assistant
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .all: return String(localized: "Toutes les sources")
+        case .ios: return "iOS"
+        case .android: return "Android"
+        case .web: return String(localized: "admin.source.web", defaultValue: "Site")
+        case .assistant: return String(localized: "Assistant")
+        }
+    }
+}
+
+struct AdminBugFilters: Equatable, Sendable {
+    var segment: AdminBugSegment = .triage
+    var source: AdminBugSource = .all
+    var onlyMine = false
+    var onlyCritical = false
+    var query = ""
+
+    /// Les filtres hors segment : ce que le bouton de filtres signale comme actif.
+    var activeCount: Int { (source == .all ? 0 : 1) + (onlyMine ? 1 : 0) + (onlyCritical ? 1 : 0) }
+
+    /// `segment` est toujours envoyé : sans aucun des paramètres récents, le serveur
+    /// garderait l'ancienne réponse, avec chaque conversation entière.
+    func queryItems(page: Int) -> [URLQueryItem] {
+        var items = [URLQueryItem(name: "segment", value: segment.rawValue),
+                     URLQueryItem(name: "page", value: String(page)),
+                     URLQueryItem(name: "limit", value: "30")]
+        if source != .all { items.append(URLQueryItem(name: "source", value: source.rawValue)) }
+        if onlyMine { items.append(URLQueryItem(name: "assignee", value: "me")) }
+        if onlyCritical { items.append(URLQueryItem(name: "critical", value: "1")) }
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !q.isEmpty { items.append(URLQueryItem(name: "q", value: q)) }
+        return items
+    }
+}
+
+/// Signaleur, assigné ou candidat à l'assignation.
+struct AdminBugPerson: Decodable, Equatable, Identifiable, Sendable {
+    let id: String
+    let name: String?
+    let email: String?
+    let handle: String?
+    let isMe: Bool
+
+    enum CodingKeys: String, CodingKey { case id, name, email, handle, isMe }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+        name = try? c.decodeIfPresent(String.self, forKey: .name)
+        email = try? c.decodeIfPresent(String.self, forKey: .email)
+        handle = try? c.decodeIfPresent(String.self, forKey: .handle)
+        isMe = (try? c.decodeIfPresent(Bool.self, forKey: .isMe)) ?? false
+    }
+
+    init(id: String, name: String?, email: String? = nil, handle: String? = nil, isMe: Bool = false) {
+        self.id = id
+        self.name = name
+        self.email = email
+        self.handle = handle
+        self.isMe = isMe
+    }
+
+    var displayName: String {
+        if let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty { return name }
+        if let handle, !handle.isEmpty { return "@\(handle)" }
+        return email ?? String(localized: "Compte sans nom")
+    }
+}
+
+/// Un signalement vu par l'équipe : celui de l'auteur, plus le tri.
+struct AdminBug: Decodable, Identifiable, Equatable, Sendable {
+    let report: BugReport
+    let source: String?
+    let reporter: AdminBugPerson?
+    let assignee: AdminBugPerson?
+    let commentCount: Int
+    let similarCount: Int
+    let fixReleaseVersion: String?
+    let stackTrace: String?
+    let build: String?
+    let legacyAdminNotes: String?
+
+    var id: String { report.id }
+
+    private enum CodingKeys: String, CodingKey {
+        case source, user, assignee, commentCount, similarCount, fixRelease, stackTrace, build, legacyAdminNotes
+    }
+    private struct FixRelease: Decodable { let version: String? }
+
+    init(from decoder: Decoder) throws {
+        report = try BugReport(from: decoder)
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        source = try? c.decodeIfPresent(String.self, forKey: .source)
+        reporter = try? c.decodeIfPresent(AdminBugPerson.self, forKey: .user)
+        assignee = try? c.decodeIfPresent(AdminBugPerson.self, forKey: .assignee)
+        commentCount = (try? c.decodeIfPresent(Int.self, forKey: .commentCount)) ?? 0
+        similarCount = (try? c.decodeIfPresent(Int.self, forKey: .similarCount)) ?? 0
+        fixReleaseVersion = (try? c.decodeIfPresent(FixRelease.self, forKey: .fixRelease))?.version
+        stackTrace = try? c.decodeIfPresent(String.self, forKey: .stackTrace)
+        build = try? c.decodeIfPresent(String.self, forKey: .build)
+        legacyAdminNotes = try? c.decodeIfPresent(String.self, forKey: .legacyAdminNotes)
+    }
+
+    var sourceLabel: String? { source.flatMap(AdminBugSource.init(rawValue:))?.label ?? source }
+}
+
+/// Un message de la discussion vu par l'équipe : la réponse publique au signaleur,
+/// ou la note interne, que le signaleur ne voit jamais.
+struct AdminBugComment: Decodable, Identifiable, Equatable, Sendable {
+    let comment: BugComment
+    let isInternal: Bool
+    let authorName: String?
+
+    var id: String { comment.id }
+
+    private enum CodingKeys: String, CodingKey { case `internal`, author, authorName }
+    private struct Author: Decodable { let name: String? }
+
+    init(from decoder: Decoder) throws {
+        comment = try BugComment(from: decoder)
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        isInternal = (try? c.decodeIfPresent(Bool.self, forKey: .internal)) ?? false
+        authorName = (try? c.decodeIfPresent(Author.self, forKey: .author))?.name
+            ?? (try? c.decodeIfPresent(String.self, forKey: .authorName))
+    }
+}
+
+struct AdminBugDetail: Decodable, Equatable, Sendable {
+    let bug: AdminBug
+    let comments: [AdminBugComment]
+    let assignees: [AdminBugPerson]
+
+    private enum CodingKeys: String, CodingKey { case bug, assignees }
+    private enum BugKeys: String, CodingKey { case comments }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        bug = try c.decode(AdminBug.self, forKey: .bug)
+        let bugContainer = try c.nestedContainer(keyedBy: BugKeys.self, forKey: .bug)
+        comments = ((try? bugContainer.decodeIfPresent([BugFailable<AdminBugComment>].self, forKey: .comments)) ?? [])
+            .compactMap(\.value)
+            .sorted { ($0.comment.createdAt ?? .distantPast) < ($1.comment.createdAt ?? .distantPast) }
+        assignees = ((try? c.decodeIfPresent([BugFailable<AdminBugPerson>].self, forKey: .assignees)) ?? [])
+            .compactMap(\.value)
+            .filter { !$0.id.isEmpty }
+    }
+}
+
+struct AdminBugsPage: Decodable, Equatable, Sendable {
+    let bugs: [AdminBug]
+    let totalCount: Int
+    let currentPage: Int
+    let totalPages: Int
+    /// Par segment, avec la source et « à moi » appliqués, comme sur le site.
+    let counts: [String: Int]
+
+    private enum CodingKeys: String, CodingKey { case bugs, pagination, counts }
+    private struct Pagination: Decodable {
+        let totalCount: Int?
+        let totalPages: Int?
+        let currentPage: Int?
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        bugs = ((try? c.decodeIfPresent([BugFailable<AdminBug>].self, forKey: .bugs)) ?? []).compactMap(\.value)
+        let pagination = try? c.decodeIfPresent(Pagination.self, forKey: .pagination)
+        totalCount = pagination?.totalCount ?? bugs.count
+        currentPage = pagination?.currentPage ?? 1
+        totalPages = pagination?.totalPages ?? 1
+        counts = (try? c.decodeIfPresent([String: Int].self, forKey: .counts)) ?? [:]
+    }
+
+    func count(_ segment: AdminBugSegment) -> Int? { counts[segment.rawValue] }
+    var hasMore: Bool { currentPage < totalPages }
+}
+
+/// Corps de `PATCH /api/admin/bugs/{id}` : seuls les champs posés partent.
+struct AdminBugPatch: Encodable, Equatable, Sendable {
+    enum Assignment: Equatable, Sendable { case me, nobody }
+
+    var status: BugStatus?
+    var severity: BugSeverity?
+    var fixVersion: String?
+    var adminResponse: String?
+    var assignment: Assignment?
+
+    private enum CodingKeys: String, CodingKey { case status, severity, fixVersion, adminResponse, assigneeId }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(status?.rawValue, forKey: .status)
+        try c.encodeIfPresent(severity?.rawValue, forKey: .severity)
+        try c.encodeIfPresent(fixVersion, forKey: .fixVersion)
+        try c.encodeIfPresent(adminResponse, forKey: .adminResponse)
+        switch assignment {
+        case .me: try c.encode("me", forKey: .assigneeId)
+        case .nobody: try c.encodeNil(forKey: .assigneeId)
+        case nil: break
+        }
+    }
+}
+
+protocol AdminBugsServicing: Sendable {
+    func list(_ filters: AdminBugFilters, page: Int) async throws -> AdminBugsPage
+    func detail(id: String) async throws -> AdminBugDetail
+    func update(id: String, _ patch: AdminBugPatch) async throws
+    /// `isInternal` : note de l'équipe, jamais montrée ni notifiée au signaleur.
+    func comment(id: String, content: String, isInternal: Bool) async throws
+}
+
+/// Réservé aux administrateurs : le serveur répond 403 à tout autre compte.
+final class AdminBugsService: AdminBugsServicing {
+    private let api: APIClient
+
+    init(api: APIClient) { self.api = api }
+
+    private struct DataEnvelope<T: Decodable>: Decodable { let data: T }
+
+    private static func path(_ id: String) -> String { "/api/admin/bugs/\(id)" }
+
+    func list(_ filters: AdminBugFilters, page: Int) async throws -> AdminBugsPage {
+        try await api.request(APIEndpoint(path: "/api/admin/bugs", query: filters.queryItems(page: page)),
+                              as: DataEnvelope<AdminBugsPage>.self).data
+    }
+
+    func detail(id: String) async throws -> AdminBugDetail {
+        try await api.request(APIEndpoint(path: Self.path(id)), as: DataEnvelope<AdminBugDetail>.self).data
+    }
+
+    func update(id: String, _ patch: AdminBugPatch) async throws {
+        try await api.requestJSON(Self.path(id), method: .patch, body: patch)
+    }
+
+    func comment(id: String, content: String, isInternal: Bool) async throws {
+        struct Body: Encodable {
+            let content: String
+            let `internal`: Bool
+        }
+        try await api.requestJSON(Self.path(id), body: Body(content: content, internal: isInternal))
+    }
+}
+
 // MARK: Enveloppes tolérantes
 
 /// `GET /api/bugs?myBugs=true` renvoie un tableau nu ; `{ bugs: [...] }` est

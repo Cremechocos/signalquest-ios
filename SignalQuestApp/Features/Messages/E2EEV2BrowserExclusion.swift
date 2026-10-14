@@ -106,12 +106,11 @@ struct E2EEV2BrowserExclusionQAScreen: View {
     }
 
     @StateObject private var model: E2EEV2BrowserExclusionModel = {
-        let arguments = ProcessInfo.processInfo.arguments
-        return E2EEV2BrowserExclusionModel(
+        E2EEV2BrowserExclusionModel(
             excludesBrowsers: false,
             isGroup: true,
-            isAdmin: !arguments.contains("--qa-e2ee-browsers-member"),
-            changer: Changer(result: arguments.contains("--qa-e2ee-browsers-refused") ? .notAllowed : .applied(changeNumber: 7))
+            isAdmin: !AppEnvironment.hasQAFlag("e2ee-browsers-member"),
+            changer: Changer(result: AppEnvironment.hasQAFlag("e2ee-browsers-refused") ? .notAllowed : .applied(changeNumber: 7))
         )
     }()
     #endif

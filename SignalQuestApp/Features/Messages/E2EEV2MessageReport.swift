@@ -115,8 +115,8 @@ struct E2EEV2MessageReportQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
     @State private var showsSheet = true
     @State private var received: String?
-    private let available = !ProcessInfo.processInfo.arguments.contains("--qa-e2ee-report-unavailable")
-    private let allowsComment = ProcessInfo.processInfo.arguments.contains("--qa-e2ee-report-comment")
+    private let available = !AppEnvironment.hasQAFlag("e2ee-report-unavailable")
+    private let allowsComment = AppEnvironment.hasQAFlag("e2ee-report-comment")
     #endif
 
     var body: some View {

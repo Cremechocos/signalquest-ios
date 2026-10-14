@@ -1453,3 +1453,920 @@ private struct UnevenRoundedRectangleCompat: InsettableShape {
         return copy
     }
 }
+
+// MARK: - Espace Admin
+
+/// Admin · « Bugs et retours » : tous les signalements, pour l'équipe, comme la page
+/// d'admin du site. L'entrée n'apparaît qu'aux comptes administrateurs ; le serveur
+/// garde la porte (403 pour tout autre compte).
+struct AdminBugsView: View {
+    let service: AdminBugsServicing
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var filters = AdminBugFilters()
+    @State private var loadedFilters: AdminBugFilters?
+    @State private var page: AdminBugsPage?
+    @State private var bugs: [AdminBug] = []
+    @State private var isLoading = false
+    @State private var isLoadingMore = false
+    @State private var loadError: String?
+    @State private var search = ""
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                header
+                searchField
+                SQSegmentedFilter(
+                    selection: $filters.segment,
+                    options: AdminBugSegment.allCases.map { (value: $0, label: segmentLabel($0), icon: String?.none) }
+                )
+                // Le segment ajoute sa propre marge latérale : on la compense.
+                .padding(.horizontal, -SQSpace.lg)
+                .accessibilityIdentifier("admin.bugs.segments")
+                content
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.vertical, SQSpace.sm)
+        }
+        .sqReadableWidth()
+        .signalQuestBackground()
+        .navigationTitle("Bugs et retours")
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
+        .task(id: filters) { await load() }
+        .task(id: search) {
+            // La recherche part une fois la frappe posée, pas à chaque lettre.
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            filters.query = search
+        }
+        .refreshable { await load() }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "admin.back") { dismiss() }
+                Spacer()
+                filterMenu
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Admin").sqKicker()
+                Text("Bugs et retours")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .sqHeader()
+                Text("Tous les signalements de l'app iPhone, d'Android et du site. Seule l'équipe voit cet espace.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let summary {
+                    Text(verbatim: summary)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.ink2)
+                        .accessibilityIdentifier("admin.bugs.summary")
+                }
+            }
+        }
+    }
+
+    /// « 4 à trier · 1 bloquant », avec la source et « à moi » appliqués.
+    private var summary: String? {
+        guard let page else { return nil }
+        var parts: [String] = []
+        if let triage = page.count(.triage) { parts.append(String(localized: "\(triage) à trier")) }
+        if let critical = page.counts["critical"], critical > 0 {
+            parts.append(critical == 1 ? String(localized: "1 bloquant") : String(localized: "\(critical) bloquants"))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func segmentLabel(_ segment: AdminBugSegment) -> String {
+        guard let count = page?.count(segment) else { return segment.label }
+        return "\(segment.label) \(count.formatted())"
+    }
+
+    private var searchField: some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: "magnifyingglass")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityHidden(true)
+            TextField("Titre, appareil, version, signaleur…", text: $search)
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .onSubmit { filters.query = search }
+                .accessibilityIdentifier("admin.bugs.search")
+            if !search.isEmpty {
+                Button { search = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(SQColor.labelTertiary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Effacer la recherche")
+            }
+        }
+        .padding(.leading, SQSpace.lg)
+        .frame(minHeight: 48)
+        .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
+    }
+
+    /// Source, « à moi » et « bloquants » : dans un menu, pour garder la page aux seuls segments.
+    private var filterMenu: some View {
+        Menu {
+            Picker("Source", selection: $filters.source) {
+                ForEach(AdminBugSource.allCases) { source in
+                    Text(verbatim: source.label).tag(source)
+                }
+            }
+            Toggle("Assignés à moi", isOn: $filters.onlyMine)
+            Toggle("Bloquants seulement", isOn: $filters.onlyCritical)
+            if filters.activeCount > 0 {
+                Button("Effacer les filtres", role: .destructive) {
+                    filters.source = .all
+                    filters.onlyMine = false
+                    filters.onlyCritical = false
+                }
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(filters.activeCount > 0 ? SQColor.onInk : SQColor.label)
+                .frame(width: 44, height: 44)
+                .sqSurface(filters.activeCount > 0 ? SQColor.label : SQColor.chip, in: Circle())
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("Filtres")
+        .accessibilityValue(filters.activeCount > 0 ? String(localized: "\(filters.activeCount) actifs") : "")
+        .accessibilityIdentifier("admin.filters")
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if isLoading && bugs.isEmpty {
+            SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity).padding(.top, SQSpace.xl)
+        } else if let loadError, bugs.isEmpty {
+            ErrorStateView(title: "Signalements indisponibles", message: loadError) { Task { await load() } }
+        } else if bugs.isEmpty {
+            EmptyStateView(title: "Rien dans ce segment",
+                           message: "Change de segment ou de filtres pour voir les autres signalements.",
+                           systemImage: "tray")
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("admin.bugs.empty")
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(bugs.enumerated()), id: \.element.id) { index, bug in
+                    if index > 0 { Divider() }
+                    NavigationLink {
+                        AdminBugDetailView(service: service, bug: bug, onChange: { updated in
+                            if let position = bugs.firstIndex(where: { $0.id == updated.id }) { bugs[position] = updated }
+                        })
+                    } label: {
+                        row(bug)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("admin.bugs.row.\(bug.id)")
+                }
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .sqCardBackground()
+            if page?.hasMore == true {
+                Button { Task { await loadMore() } } label: {
+                    HStack(spacing: SQSpace.sm) {
+                        if isLoadingMore { SQSpinner() }
+                        Text("Voir plus")
+                    }
+                    .font(SQFont.body(15, .semibold, relativeTo: .body))
+                    .foregroundStyle(SQColor.label)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .sqSurface(SQColor.chip, in: Capsule(style: .continuous))
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .disabled(isLoadingMore)
+                .accessibilityIdentifier("admin.bugs.more")
+            }
+        }
+    }
+
+    private func row(_ bug: AdminBug) -> some View {
+        let report = bug.report
+        return HStack(alignment: .top, spacing: SQSpace.md) {
+            BugReportPastille(report: report)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(verbatim: report.title.isEmpty ? String(localized: "Sans titre") : report.title)
+                    .font(SQFont.body(15, .semibold, relativeTo: .body))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                Text(verbatim: Self.subtitle(bug))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.ink2)
+                FlowLayout(spacing: SQSpace.sm2) {
+                    if report.severity == .critical {
+                        fact(String(localized: "Bloquant"), "exclamationmark.octagon.fill", tint: SQColor.dangerInk)
+                    }
+                    if bug.commentCount > 0 { fact(bug.commentCount.formatted(), "bubble.left") }
+                    if let assignee = bug.assignee {
+                        fact(assignee.isMe ? String(localized: "À moi") : assignee.displayName,
+                             assignee.isMe ? "person.fill" : "person")
+                    }
+                    if bug.similarCount > 0 {
+                        fact(String(localized: "+\(bug.similarCount) similaires"), "square.on.square")
+                    }
+                }
+                if dynamicTypeSize.isAccessibilitySize {
+                    BugStatusPill(status: report.status)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if !dynamicTypeSize.isAccessibilitySize {
+                BugStatusPill(status: report.status)
+            }
+        }
+        .padding(.vertical, SQSpace.md)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private func fact(_ text: String, _ icon: String, tint: Color = SQColor.ink2) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon).accessibilityHidden(true)
+            Text(verbatim: text)
+        }
+        .font(SQFont.body(12, .semibold, relativeTo: .caption))
+        .foregroundStyle(tint)
+    }
+
+    /// « iOS · Plantage · Alex · il y a 2 h ».
+    static func subtitle(_ bug: AdminBug) -> String {
+        let when = bug.report.createdAt?.formatted(.relative(presentation: .named))
+        return [bug.sourceLabel, bug.report.category.label, bug.reporter?.displayName, when]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+    }
+
+    private func load() async {
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false }
+        // Un autre segment ou d'autres filtres : la liste d'avant ne doit pas rester à l'écran.
+        if loadedFilters != filters { bugs = [] }
+        do {
+            let result = try await service.list(filters, page: 1)
+            guard !Task.isCancelled else { return }
+            page = result
+            bugs = result.bugs
+            loadedFilters = filters
+        } catch {
+            guard !error.isCancellation else { return }
+            loadError = error.userFacingMessage
+        }
+    }
+
+    private func loadMore() async {
+        guard let page, page.hasMore, !isLoadingMore else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        do {
+            let next = try await service.list(filters, page: page.currentPage + 1)
+            let known = Set(bugs.map(\.id))
+            bugs.append(contentsOf: next.bugs.filter { !known.contains($0.id) })
+            self.page = next
+        } catch {
+            guard !error.isCancellation else { return }
+            loadError = error.userFacingMessage
+        }
+    }
+}
+
+@MainActor
+final class AdminBugDetailModel: ObservableObject {
+    @Published private(set) var detail: AdminBugDetail?
+    @Published private(set) var isLoading = false
+    @Published private(set) var loadError: String?
+    @Published var actionError: String?
+    @Published var draft = ""
+    /// Une note interne par défaut : une réponse publique prévient le signaleur.
+    @Published var draftIsInternal = true
+    @Published var fixVersionDraft = ""
+    @Published private(set) var isSending = false
+    @Published private(set) var isSaving = false
+
+    let bugId: String
+    private let initial: AdminBug?
+    private let service: AdminBugsServicing
+    static let fixVersionLimit = 50
+
+    /// `bug` absent : ouvert depuis une notification, qui ne porte que l'identifiant.
+    init(service: AdminBugsServicing, bug: AdminBug?, bugId: String) {
+        self.service = service
+        self.initial = bug
+        self.bugId = bug?.id ?? bugId
+        self.fixVersionDraft = bug?.report.fixVersion ?? ""
+    }
+
+    var bug: AdminBug? { detail?.bug ?? initial }
+    var comments: [AdminBugComment] { detail?.comments ?? [] }
+    var canSend: Bool { !isSending && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    var fixVersionChanged: Bool {
+        let value = fixVersionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value != (bug?.report.fixVersion ?? "") && value.count <= Self.fixVersionLimit
+    }
+
+    func load() async {
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false }
+        do {
+            let value = try await service.detail(id: bugId)
+            guard !Task.isCancelled else { return }
+            detail = value
+            fixVersionDraft = value.bug.report.fixVersion ?? ""
+        } catch {
+            guard !error.isCancellation else { return }
+            loadError = error.userFacingMessage
+        }
+    }
+
+    /// Écrit, puis relit : c'est le serveur qui décide (assignation refusée, statut voisin…).
+    @discardableResult
+    func apply(_ patch: AdminBugPatch) async -> Bool {
+        guard !isSaving else { return false }
+        isSaving = true
+        actionError = nil
+        defer { isSaving = false }
+        do {
+            try await service.update(id: bugId, patch)
+            await load()
+            Haptics.success()
+            return true
+        } catch {
+            actionError = error.userFacingMessage
+            Haptics.error()
+            return false
+        }
+    }
+
+    func saveFixVersion() async {
+        let value = fixVersionDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard fixVersionChanged else { return }
+        await apply(AdminBugPatch(fixVersion: value))
+    }
+
+    func send() async {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !isSending, !text.isEmpty else { return }
+        isSending = true
+        actionError = nil
+        defer { isSending = false }
+        do {
+            try await service.comment(id: bugId, content: text, isInternal: draftIsInternal)
+            draft = ""
+            await load()
+            Haptics.success()
+        } catch {
+            actionError = String(localized: "Échec de l'envoi. Réessaie.")
+            Haptics.error()
+        }
+    }
+}
+
+/// Un signalement vu par l'équipe : tri (statut, gêne, assignation, version corrigée,
+/// réponse affichée), contexte et trace, puis la discussion, publique ou interne.
+struct AdminBugDetailView: View {
+    @StateObject private var model: AdminBugDetailModel
+    var onChange: ((AdminBug) -> Void)?
+    /// Présenté en feuille depuis une notification : une croix plutôt qu'un retour.
+    var onClose: (() -> Void)?
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var viewerImage: AntennaReportImage?
+    @State private var editingResponse = false
+    @State private var showsFullTrace = false
+    /// Défile jusqu'au dernier message après un envoi, pas à l'ouverture : on lit d'abord le tri.
+    @State private var scrollsToLatest = false
+
+    private static let statuses: [BugStatus] = [.open, .inProgress, .resolved, .closed, .wontFix]
+
+    init(service: AdminBugsServicing, bug: AdminBug? = nil, bugId: String? = nil,
+         onClose: (() -> Void)? = nil, onChange: ((AdminBug) -> Void)? = nil) {
+        _model = StateObject(wrappedValue: AdminBugDetailModel(service: service, bug: bug,
+                                                               bugId: bug?.id ?? bugId ?? ""))
+        self.onClose = onClose
+        self.onChange = onChange
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: SQSpace.lg) {
+                        MapChipIconButton(systemImage: onClose == nil ? "chevron.left" : "xmark",
+                                          label: onClose == nil ? "Retour" : "Fermer",
+                                          identifier: "admin.detail.back") {
+                            if let onClose { onClose() } else { dismiss() }
+                        }
+                        if let bug = model.bug {
+                            header(bug)
+                            triage(bug)
+                            descriptionCard(bug.report)
+                            context(bug)
+                            if let trace = bug.stackTrace?.trimmingCharacters(in: .whitespacesAndNewlines), !trace.isEmpty {
+                                traceCard(trace)
+                            }
+                            if let notes = bug.legacyAdminNotes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
+                                section("Anciennes notes") {
+                                    Text(verbatim: notes)
+                                        .font(SQType.callout)
+                                        .foregroundStyle(SQColor.label)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(SQSpace.lg)
+                                        .sqCardBackground()
+                                }
+                            }
+                            discussion
+                        }
+                        if model.bug == nil, model.loadError == nil {
+                            SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity).padding(.top, SQSpace.xl)
+                        }
+                        if model.detail == nil, let error = model.loadError {
+                            ErrorStateView(title: "Signalement indisponible", message: error) { Task { await model.load() } }
+                        }
+                    }
+                    .padding(.horizontal, SQSpace.lg)
+                    .padding(.vertical, SQSpace.sm)
+                }
+                .onChangeCompat(of: model.comments.count) { _, _ in
+                    guard scrollsToLatest, let last = model.comments.last else { return }
+                    scrollsToLatest = false
+                    withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
+            }
+            if let error = model.actionError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.dangerInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, SQSpace.lg)
+                    .padding(.vertical, SQSpace.sm)
+                    .background(SQColor.dangerSoft)
+                    .accessibilityIdentifier("admin.detail.error")
+            }
+            if model.bug != nil { composer }
+        }
+        .sqReadableWidth()
+        .signalQuestBackground()
+        .navigationTitle(model.bug?.report.title ?? "")
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
+        .task { await model.load() }
+        .onChangeCompat(of: model.detail) { _, detail in
+            if let bug = detail?.bug { onChange?(bug) }
+        }
+        .fullScreenCover(item: $viewerImage) { image in
+            AntennaReportImageViewer(image: image)
+        }
+        .sheet(isPresented: $editingResponse) {
+            AdminBugResponseSheet(initial: model.bug?.report.adminResponse ?? "") { text in
+                await model.apply(AdminBugPatch(adminResponse: text))
+            }
+        }
+    }
+
+    private func header(_ bug: AdminBug) -> some View {
+        let report = bug.report
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(verbatim: [report.isIdea ? String(localized: "Idée") : String(localized: "Bug · \(report.category.label)"),
+                            bug.sourceLabel].compactMap { $0 }.joined(separator: " · "))
+                .sqKicker()
+            Text(verbatim: report.title.isEmpty ? String(localized: "Sans titre") : report.title)
+                .font(SQFont.display(26, .bold, relativeTo: .title))
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+                .sqHeader()
+            FlowLayout(spacing: SQSpace.sm) {
+                BugStatusPill(status: report.status)
+                if !report.isIdea { BugStatusPill(text: report.severity.pillLabel) }
+            }
+            let meta = [bug.reporter?.displayName,
+                        report.createdAt?.formatted(.dateTime.day().month(.abbreviated).year().hour().minute())]
+                .compactMap { $0 }.filter { !$0.isEmpty }
+            if !meta.isEmpty {
+                Text(verbatim: meta.joined(separator: " · "))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.ink2)
+            }
+        }
+        .accessibilityIdentifier("admin.detail.header")
+    }
+
+    // MARK: Tri
+
+    private func triage(_ bug: AdminBug) -> some View {
+        let report = bug.report
+        return section("Tri") {
+            VStack(spacing: 0) {
+                Menu {
+                    Picker("Statut", selection: Binding(
+                        get: { report.status },
+                        set: { value in Task { await model.apply(AdminBugPatch(status: value)) } }
+                    )) {
+                        ForEach(Self.statuses, id: \.self) { Text(verbatim: $0.label).tag($0) }
+                    }
+                } label: {
+                    triageRow("Statut", value: report.status.label, icon: "flag")
+                }
+                .accessibilityIdentifier("admin.detail.status")
+                Divider()
+                Menu {
+                    Picker("Gêne", selection: Binding(
+                        get: { report.severity },
+                        set: { value in Task { await model.apply(AdminBugPatch(severity: value)) } }
+                    )) {
+                        ForEach(BugSeverity.allCases) { Text(verbatim: $0.label).tag($0) }
+                    }
+                } label: {
+                    triageRow("Gêne", value: report.severity.label, icon: "gauge.with.dots.needle.33percent")
+                }
+                .accessibilityIdentifier("admin.detail.severity")
+                Divider()
+                Button {
+                    Task { await model.apply(AdminBugPatch(assignment: bug.assignee?.isMe == true ? .nobody : .me)) }
+                } label: {
+                    triageRow("Assigné à",
+                              value: bug.assignee.map { $0.isMe ? String(localized: "Moi") : $0.displayName }
+                                ?? String(localized: "Personne"),
+                              icon: "person",
+                              action: bug.assignee?.isMe == true ? String(localized: "Retirer") : String(localized: "M'assigner"))
+                }
+                .accessibilityIdentifier("admin.detail.assign")
+                Divider()
+                fixVersionRow
+                Divider()
+                Button { editingResponse = true } label: {
+                    triageRow("Réponse affichée",
+                              value: report.adminResponse.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Aucune"),
+                              icon: "checkmark.seal",
+                              action: String(localized: "Modifier"))
+                }
+                .accessibilityIdentifier("admin.detail.response")
+            }
+            .buttonStyle(.plain)
+            .disabled(model.isSaving)
+            .padding(.horizontal, SQSpace.lg)
+            .sqCardBackground()
+            Text("Le signaleur est prévenu quand le statut change.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.ink2)
+        }
+    }
+
+    private func triageRow(_ title: LocalizedStringKey, value: String, icon: String, action: String? = nil) -> some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: icon)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(width: 24)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(SQFont.body(13, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.ink2)
+                Text(verbatim: value)
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let action {
+                Text(verbatim: action)
+                    .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.accentInk)
+            } else {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.vertical, SQSpace.sm2)
+        .frame(minHeight: 52)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private var fixVersionRow: some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: "shippingbox")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+                .frame(width: 24)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Corrigé dans")
+                    .font(SQFont.body(13, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.ink2)
+                TextField("1.0 (171)", text: $model.fixVersionDraft)
+                    .font(SQType.callout)
+                    .keyboardType(.numbersAndPunctuation)
+                    .foregroundStyle(SQColor.label)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .onSubmit { Task { await model.saveFixVersion() } }
+                    .accessibilityLabel("Corrigé dans")
+                    .accessibilityIdentifier("admin.detail.fixVersion")
+            }
+            if model.fixVersionChanged {
+                Button("Enregistrer") { Task { await model.saveFixVersion() } }
+                    .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("admin.detail.fixVersion.save")
+            }
+        }
+        .padding(.vertical, SQSpace.sm2)
+        .frame(minHeight: 52)
+    }
+
+    // MARK: Contenu
+
+    private func descriptionCard(_ report: BugReport) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            if !report.description.isEmpty {
+                Text(verbatim: report.description)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            if let steps = report.steps, !steps.isEmpty { labelled("Étapes pour reproduire", steps) }
+            if let expected = report.expectedResult, !expected.isEmpty { labelled("Résultat attendu", expected) }
+            let images = report.images.compactMap(AntennaReportImage.parse)
+            if !images.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: SQSpace.sm) {
+                        ForEach(images) { image in
+                            Button { viewerImage = image } label: {
+                                Group {
+                                    switch image {
+                                    case .remote(let url):
+                                        RemoteImage(url: url, maxDimension: 148, contentMode: .fill) { SQColor.surfaceMuted }
+                                    case .inline(let uiImage):
+                                        Image(uiImage: uiImage).resizable().scaledToFill()
+                                    }
+                                }
+                                .frame(width: 74, height: 74)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Capture jointe, toucher pour agrandir")
+                        }
+                    }
+                }
+            }
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground()
+    }
+
+    private func labelled(_ title: LocalizedStringKey, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(SQFont.body(13, .semibold, relativeTo: .subheadline))
+                .foregroundStyle(SQColor.ink2)
+            Text(verbatim: value)
+                .font(SQType.callout)
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func context(_ bug: AdminBug) -> some View {
+        let report = bug.report
+        let rows: [(String, String?)] = [
+            (String(localized: "Appareil"), report.deviceModel),
+            (String(localized: "Système"), report.osVersion),
+            (String(localized: "Version"), report.appVersion),
+            (String(localized: "Build"), bug.build),
+            (String(localized: "Corrigé dans"), bug.fixReleaseVersion),
+            (String(localized: "Signalements similaires"), bug.similarCount > 0 ? bug.similarCount.formatted() : nil),
+            (String(localized: "Identifiant"), report.id)
+        ]
+        let visible = rows.compactMap { label, value in value.flatMap { $0.isEmpty ? nil : (label, $0) } }
+        return section("Contexte") {
+            VStack(spacing: SQSpace.sm2) {
+                ForEach(visible, id: \.0) { label, value in SQFactRow(label: label, value: value) }
+            }
+            .padding(SQSpace.lg)
+            .sqCardBackground()
+        }
+    }
+
+    private func traceCard(_ trace: String) -> some View {
+        section("Trace de plantage") {
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                Text(verbatim: trace)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(showsFullTrace ? nil : 12)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("admin.detail.trace")
+                if trace.split(separator: "\n").count > 12 {
+                    Button(showsFullTrace ? String(localized: "admin.trace.collapse", defaultValue: "Réduire")
+                           : String(localized: "Tout afficher")) { showsFullTrace.toggle() }
+                        .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(minHeight: 44)
+                }
+            }
+            .padding(SQSpace.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .sqCardBackground()
+        }
+    }
+
+    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(title).sqKicker().accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    // MARK: Discussion
+
+    private var discussion: some View {
+        section("admin.discussion") {
+            if model.comments.isEmpty {
+                Text(model.detail == nil
+                     ? String(localized: "Chargement de la discussion…")
+                     : String(localized: "Pas encore de message. Une note interne reste entre membres de l'équipe."))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach(model.comments) { entry($0).id($0.id) }
+            }
+        }
+    }
+
+    /// Note interne sur fond ambre avec un cadenas, réponse publique sur fond carmin
+    /// doux, message du signaleur sur la carte.
+    private func entry(_ item: AdminBugComment) -> some View {
+        let comment = item.comment
+        let kind: (label: String, icon: String, ink: Color, fill: Color?) =
+            item.isInternal ? (String(localized: "Note interne"), "lock.fill", SQColor.ink2, SQColor.warningSoft)
+            : comment.isAdmin ? (String(localized: "Réponse publique"), "checkmark.seal.fill", SQColor.accentInk, SQColor.accentSoft)
+            : (String(localized: "Signaleur"), "person.fill", SQColor.ink2, nil)
+        let name = item.authorName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return VStack(alignment: .leading, spacing: SQSpace.xs) {
+            HStack(spacing: SQSpace.xs) {
+                Image(systemName: kind.icon).accessibilityHidden(true)
+                Text(verbatim: [name.flatMap { $0.isEmpty ? nil : $0 }, kind.label].compactMap { $0 }.joined(separator: " · "))
+                Spacer(minLength: SQSpace.sm)
+                if let date = comment.createdAt {
+                    Text(date, format: .dateTime.day().month(.abbreviated).hour().minute())
+                }
+            }
+            .font(SQFont.body(12, .semibold, relativeTo: .caption))
+            .foregroundStyle(kind.ink)
+            if !comment.content.isEmpty {
+                Text(verbatim: comment.content)
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            if let fill = kind.fill {
+                RoundedRectangle(cornerRadius: 16, style: .continuous).fill(fill)
+            } else {
+                RoundedRectangle(cornerRadius: 16, style: .continuous).fill(SQColor.surface)
+                    .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(SQOledPalette.cardStroke, lineWidth: 1) }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(item.isInternal ? "admin.comment.internal" : "admin.comment.public")
+    }
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            SQSegmentedFilter(
+                selection: $model.draftIsInternal,
+                options: [(value: true, label: "Note interne", icon: "lock"),
+                          (value: false, label: "Réponse au signaleur", icon: "bubble.left")]
+            )
+            .padding(.horizontal, -SQSpace.lg)
+            .accessibilityIdentifier("admin.composer.kind")
+            if !model.draftIsInternal {
+                Text("Le signaleur la voit dans l'app et sur le site, et en est prévenu.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: SQSpace.sm2) {
+                TextField(model.draftIsInternal ? "Note pour l'équipe…" : "Réponse au signaleur…",
+                          text: $model.draft, axis: .vertical)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1...5)
+                    .padding(.horizontal, SQSpace.lg)
+                    .padding(.vertical, SQSpace.sm2)
+                    .frame(minHeight: 44)
+                    .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
+                    .accessibilityIdentifier("admin.composer.field")
+                Button {
+                    scrollsToLatest = true
+                    Task { await model.send() }
+                } label: {
+                    Image(systemName: model.isSending ? "ellipsis" : "paperplane.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(SQColor.onInk)
+                        .frame(width: 44, height: 44)
+                        .background(SQColor.label, in: Circle())
+                        .opacity(model.canSend ? 1 : 0.45)
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .disabled(!model.canSend)
+                .accessibilityLabel(model.draftIsInternal ? "Publier la note interne" : "Envoyer la réponse")
+                .accessibilityIdentifier("admin.composer.send")
+            }
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.sm2)
+        .background(SQColor.bg)
+        .overlay(alignment: .top) { Divider() }
+    }
+}
+
+/// La réponse affichée en tête du signalement, sur l'app et sur le site.
+private struct AdminBugResponseSheet: View {
+    let initial: String
+    let save: (String) async -> Bool
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var isSaving = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.lg) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text("Admin").sqKicker()
+                    Text("Réponse affichée")
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                        .sqHeader()
+                    Text("Elle apparaît en tête du signalement, dans l'app et sur le site.")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "admin.response.close") { dismiss() }
+            }
+            TextEditor(text: $text)
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
+                .scrollContentBackground(.hidden)
+                .padding(SQSpace.sm)
+                .frame(minHeight: 160)
+                .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                .accessibilityLabel("Réponse affichée")
+                .accessibilityIdentifier("admin.response.field")
+            GradientButton(String(localized: "Enregistrer"), systemImage: "checkmark") {
+                Task {
+                    isSaving = true
+                    defer { isSaving = false }
+                    if await save(text.trimmingCharacters(in: .whitespacesAndNewlines)) { dismiss() }
+                }
+            }
+            .disabled(isSaving || text == initial)
+            .accessibilityIdentifier("admin.response.save")
+            Spacer(minLength: 0)
+        }
+        .padding(SQSpace.lg)
+        .padding(.top, SQSpace.sm)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackgroundCompat(SQColor.bg)
+        .onAppear { text = initial }
+    }
+}

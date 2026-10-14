@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         #if DEBUG
         // Preuve de bout en bout de la remontée : un non-fatal reconnaissable,
         // envoyé au prochain lancement par le SDK.
-        if ProcessInfo.processInfo.arguments.contains("--qa-crashlytics-proof") {
+        if AppEnvironment.hasQAFlag("crashlytics-proof") {
             SQDiagnostics.recordReport("chain_proof", area: .qa, info: [
                 "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
             ])

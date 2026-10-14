@@ -750,7 +750,7 @@ struct CommentsQAScreen: View {
     @State private var showsComments = true
 
     init() {
-        let repliesOnly = ProcessInfo.processInfo.arguments.contains("--qa-comments-replies")
+        let repliesOnly = AppEnvironment.hasQAFlag("comments-replies")
         _fixture = State(initialValue: CommentsQAFixture(singleParent: repliesOnly))
     }
     #endif

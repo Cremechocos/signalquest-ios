@@ -73,7 +73,7 @@ enum SQDiagnostics {
         // En Debug (poste de développement, tests automatiques qui provoquent des
         // échecs exprès), rien ne part vers le tableau de bord de production, sauf
         // la preuve de chaîne demandée explicitement.
-        guard ProcessInfo.processInfo.arguments.contains("--qa-crashlytics-proof") else { return }
+        guard AppEnvironment.hasQAFlag("crashlytics-proof") else { return }
         #endif
         Crashlytics.crashlytics().record(error: report)
     }

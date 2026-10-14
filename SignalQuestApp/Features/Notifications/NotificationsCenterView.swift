@@ -197,6 +197,7 @@ private extension AppNotification {
 struct NotificationsCenterView: View {
     @StateObject private var model: NotificationsCenterViewModel
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.openURL) private var openURL
     /// « Tout supprimer » est définitif : il se confirme (SOC-22).
     @State private var confirmDeleteAll = false
     init(service: NotificationsServicing, badge: AppServices? = nil) {
@@ -400,14 +401,19 @@ struct NotificationsCenterView: View {
 
     /// Route vers le contenu lié (NOTIF-UX-01) via l'AppRouter partagé.
     private func route(_ item: AppNotification) {
+        if let url = Self.adminWebURL(type: item.type, link: item.link, base: AppConfig.current.appBaseURL) {
+            openURL(url)
+            return
+        }
         let meta = item.metadata
         router.handle(
             type: item.type,
             conversationId: metaString(meta, "conversationId", "conversation_id"),
             postId: metaString(meta, "postId", "post_id"),
             userId: metaString(meta, "userId", "user_id", "actorId", "actor_id"),
-            siteId: metaString(meta, "siteId", "site_id"),
+            siteId: metaString(meta, "siteId", "site_id", "codeSiteOp"),
             reportId: metaString(meta, "reportId", "report_id"),
+            targetId: metaString(meta, "targetId", "target_id"),
             // Panne communautaire : la metadata en base porte `outageId` (cf. le fan-out
             // serveur). C'est ce qui envoie sur la FEUILLE de panne plutôt que sur la fiche du
             // site — et le seul chemin qui atteigne une panne déjà rétablie, qu'aucune liste ne
@@ -415,6 +421,16 @@ struct NotificationsCenterView: View {
             outageId: metaString(meta, "outageId", "outage_id"),
             bugId: metaString(meta, "bugId", "bug_id")
         )
+    }
+
+    /// Modération sans écran iOS (message ou photo signalés, contestation, nom d'antenne
+    /// proposé) : la page d'administration du site. Seul un chemin `/admin` est suivi.
+    static func adminWebURL(type: String?, link: String?, base: URL) -> URL? {
+        let adminTypes: Set<String> = ["message_report", "photo_reported", "photo_appeal", "antenna_name_proposal_admin"]
+        guard adminTypes.contains(type?.lowercased() ?? ""), let link, link.hasPrefix("/admin"),
+              let url = URL(string: link, relativeTo: base)?.absoluteURL,
+              url.host == base.host else { return nil }
+        return url
     }
 
     private func metaString(_ metadata: [String: JSONValue]?, _ keys: String...) -> String? {

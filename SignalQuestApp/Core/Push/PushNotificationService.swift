@@ -882,7 +882,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         let conversationId = Self.string(info, "conversationId", "conversation_id")
         let postId = Self.string(info, "postId", "post_id")
         let userId = Self.string(info, "userId", "user_id", "actorId", "actor_id")
-        let siteId = Self.string(info, "siteId", "site_id")
+        // Une alerte d'antenne près d'un lieu porte le code du site sous `antennaId`.
+        let siteId = Self.string(info, "siteId", "site_id", "antennaId")
         let reportId = Self.string(info, "reportId", "report_id")
         let targetId = Self.string(info, "targetId", "target_id")
         // Panne communautaire : le fan-out serveur envoie `outageId` à côté de `siteId`. Sans

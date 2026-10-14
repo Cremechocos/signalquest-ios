@@ -444,11 +444,11 @@ actor E2EEV2SafetyNumberQATrust: E2EEV2SafetyNumberTrusting {
     private var verified: Bool
     private let served: String
 
-    init(arguments: [String]) {
-        let changed = arguments.contains("--qa-safety-number-changed")
-            || arguments.contains("--qa-safety-number-changed-verified")
+    init(hasFlag: (String) -> Bool) {
+        let changed = hasFlag("safety-number-changed")
+            || hasFlag("safety-number-changed-verified")
         pinned = Self.pinnedKey
-        verified = arguments.contains("--qa-safety-number-changed-verified")
+        verified = hasFlag("safety-number-changed-verified")
         served = changed ? Self.servedKey : Self.pinnedKey
     }
 
@@ -481,7 +481,7 @@ actor E2EEV2SafetyNumberQATrust: E2EEV2SafetyNumberTrusting {
 
 struct E2EEV2SafetyNumberQAScreen: View {
     #if DEBUG && targetEnvironment(simulator)
-    private let trust = E2EEV2SafetyNumberQATrust(arguments: ProcessInfo.processInfo.arguments)
+    private let trust = E2EEV2SafetyNumberQATrust(hasFlag: AppEnvironment.hasQAFlag)
     #endif
 
     var body: some View {

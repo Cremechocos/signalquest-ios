@@ -368,6 +368,154 @@ final class BugReportsServiceTests: XCTestCase {
     }
 }
 
+/// Espace Admin : `/api/admin/bugs`, aux formes servies par le site (lot 9a).
+final class AdminBugsServiceTests: XCTestCase {
+
+    private var service: AdminBugsService!
+
+    override func setUp() {
+        super.setUp()
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        service = AdminBugsService(
+            api: APIClient(
+                config: .test,
+                credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                session: URLSession(configuration: config)
+            )
+        )
+    }
+
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        service = nil
+        super.tearDown()
+    }
+
+    private func respond(status: Int = 200, _ json: String, into box: BugCaptureBox) {
+        MockURLProtocol.requestHandler = { request in
+            box.request = request
+            box.body = request.httpBodyData
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: status,
+                httpVersion: nil, headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(json.utf8))
+        }
+    }
+
+    func testListSendsTheSegmentAndReadsCountsAndTriageFields() async throws {
+        let box = BugCaptureBox()
+        respond(#"""
+        {"success":true,"data":{"bugs":[
+          {"id":"b-1","title":"Plante","description":"d","category":"crash","severity":"critical","status":"open","source":"ios",
+           "user":{"id":"u-1","name":"Camille","email":"c@example.invalid","avatarUrl":null},
+           "assignee":{"id":"a-1","name":"Alex","isMe":true},"commentCount":3,"similarCount":2,
+           "fixRelease":{"id":"r-1","version":"1.0 (171)","platform":"ios","status":"planned"}},
+          {"title":"sans identifiant"}
+        ],"pagination":{"totalCount":31,"totalPages":2,"currentPage":1,"limit":30},
+        "counts":{"triage":4,"in_progress":1,"resolved":9,"ideas":2,"all":16,"critical":1,"mine":1}}}
+        """#, into: box)
+        var filters = AdminBugFilters()
+        filters.source = .android
+        filters.onlyMine = true
+        filters.onlyCritical = true
+        filters.query = "  carte  "
+        let page = try await service.list(filters, page: 1)
+
+        let items = URLComponents(url: box.request!.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let query = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
+        XCTAssertEqual(box.request?.url?.path, "/api/admin/bugs")
+        XCTAssertEqual(query["segment"], "triage", "Sans segment, le serveur renverrait chaque conversation entière")
+        XCTAssertEqual(query["source"], "android")
+        XCTAssertEqual(query["assignee"], "me")
+        XCTAssertEqual(query["critical"], "1")
+        XCTAssertEqual(query["q"], "carte")
+        XCTAssertEqual(query["page"], "1")
+
+        XCTAssertEqual(page.bugs.map(\.id), ["b-1"])
+        XCTAssertTrue(page.hasMore)
+        XCTAssertEqual(page.count(.triage), 4)
+        XCTAssertEqual(page.count(.inProgress), 1)
+        let bug = try XCTUnwrap(page.bugs.first)
+        XCTAssertEqual(bug.report.severity, .critical)
+        XCTAssertEqual(bug.sourceLabel, "iOS")
+        XCTAssertEqual(bug.reporter?.displayName, "Camille")
+        XCTAssertEqual(bug.assignee?.isMe, true)
+        XCTAssertEqual(bug.commentCount, 3)
+        XCTAssertEqual(bug.similarCount, 2)
+        XCTAssertEqual(bug.fixReleaseVersion, "1.0 (171)")
+    }
+
+    func testDetailTellsInternalNotesFromPublicReplies() async throws {
+        let box = BugCaptureBox()
+        respond(#"""
+        {"success":true,"data":{"bug":{"id":"b 1","title":"Plante","description":"d","category":"crash","status":"in_progress",
+          "stackTrace":"0 SignalQuest main","build":"171","legacyAdminNotes":null,
+          "comments":[
+            {"id":"c-2","content":"Merci","internal":false,"isAdmin":true,"createdAt":"2026-10-14T08:30:00.000Z","author":{"id":"a-1","name":"Alex","handle":"alex"}},
+            {"id":"c-1","content":"Reproduit","internal":true,"isAdmin":true,"createdAt":"2026-10-14T08:10:00.000Z","author":{"id":"a-1","name":"Alex","handle":"alex"}},
+            {"id":"c-3","content":"Toujours là","internal":false,"isAdmin":false,"createdAt":"2026-10-14T09:00:00.000Z","author":null,"authorName":"Camille"}
+          ]},
+          "assignees":[{"id":"a-1","name":"Alex","isMe":true},{"id":"a-2","name":null,"isMe":false}]}}
+        """#, into: box)
+        let detail = try await service.detail(id: "b 1")
+
+        XCTAssertEqual(box.request?.url?.absoluteString.hasSuffix("/api/admin/bugs/b%201"), true,
+                       "L'identifiant est encodé une seule fois : \(box.request?.url?.absoluteString ?? "-")")
+        XCTAssertEqual(detail.comments.map(\.id), ["c-1", "c-2", "c-3"], "Discussion dans l'ordre du temps")
+        XCTAssertEqual(detail.comments.map(\.isInternal), [true, false, false])
+        XCTAssertEqual(detail.comments.map(\.comment.isAdmin), [true, true, false])
+        XCTAssertEqual(detail.comments.last?.authorName, "Camille")
+        XCTAssertEqual(detail.bug.stackTrace, "0 SignalQuest main")
+        XCTAssertEqual(detail.bug.build, "171")
+        XCTAssertEqual(detail.assignees.map(\.isMe), [true, false])
+        XCTAssertEqual(detail.assignees.last?.displayName, String(localized: "Compte sans nom"))
+    }
+
+    func testPatchSendsOnlyWhatChangedAndCanUnassign() async throws {
+        let box = BugCaptureBox()
+        respond(#"{"success":true,"data":{"id":"b-1"}}"#, into: box)
+        try await service.update(id: "b-1", AdminBugPatch(status: .inProgress, assignment: .me))
+        XCTAssertEqual(box.request?.httpMethod, "PATCH")
+        XCTAssertEqual(box.request?.url?.path, "/api/admin/bugs/b-1")
+        XCTAssertEqual(box.json?["status"] as? String, "in_progress")
+        XCTAssertEqual(box.json?["assigneeId"] as? String, "me")
+        XCTAssertEqual(box.json?.count, 2)
+
+        try await service.update(id: "b-1", AdminBugPatch(assignment: .nobody))
+        XCTAssertEqual(box.json?.count, 1)
+        XCTAssertTrue(box.json?["assigneeId"] is NSNull, "Désassigner envoie null, pas l'absence du champ")
+
+        try await service.update(id: "b-1", AdminBugPatch(severity: .low, fixVersion: "1.0 (171)", adminResponse: "Corrigé"))
+        XCTAssertEqual(box.json?["severity"] as? String, "low")
+        XCTAssertEqual(box.json?["fixVersion"] as? String, "1.0 (171)")
+        XCTAssertEqual(box.json?["adminResponse"] as? String, "Corrigé")
+    }
+
+    func testCommentSaysWhetherItIsInternal() async throws {
+        let box = BugCaptureBox()
+        respond(status: 201, #"{"success":true,"data":{"id":"c-9"}}"#, into: box)
+        try await service.comment(id: "b-1", content: "Note", isInternal: true)
+        XCTAssertEqual(box.request?.httpMethod, "POST")
+        XCTAssertEqual(box.request?.url?.path, "/api/admin/bugs/b-1")
+        XCTAssertEqual(box.json?["internal"] as? Bool, true, "Sans ce champ, le serveur publie la note au signaleur")
+        XCTAssertEqual(box.json?["content"] as? String, "Note")
+
+        try await service.comment(id: "b-1", content: "Réponse", isInternal: false)
+        XCTAssertEqual(box.json?["internal"] as? Bool, false)
+    }
+
+    func testForbiddenAccountGetsAnError() async {
+        let box = BugCaptureBox()
+        respond(status: 403, #"{"error":"Accès administrateur requis"}"#, into: box)
+        do {
+            _ = try await service.list(AdminBugFilters(), page: 1)
+            XCTFail("Un compte qui n'est pas administrateur ne doit rien lire")
+        } catch {}
+    }
+}
+
 private final class BugCaptureBox: @unchecked Sendable {
     var request: URLRequest?
     var body: Data?

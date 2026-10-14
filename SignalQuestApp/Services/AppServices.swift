@@ -76,6 +76,8 @@ final class AppServices: ObservableObject {
     let antennaReports: AntennaReportsServicing
     /// Bugs et idées (`/api/bugs`), suivis aussi sur le web et Android.
     let bugReports: BugReportsServicing
+    /// Espace Admin : tous les signalements, réservé aux administrateurs.
+    let adminBugs: AdminBugsServicing
     /// Signalement communautaire de pannes — cf. `CommunityOutageService`.
     let communityOutages: CommunityOutageServicing
     /// Antennes suivies. Observable et UNIQUE : le contrat serveur remplace la liste entière,
@@ -196,6 +198,7 @@ final class AppServices: ObservableObject {
         terrain = TerrainService(api: api)
         antennaReports = AntennaReportsService(api: api)
         bugReports = BugReportsService(api: api)
+        adminBugs = AdminBugsService(api: api)
         communityOutages = CommunityOutageService(api: api)
         favoriteAntennas = FavoriteAntennasService(api: api)
         customSites = CustomSitesService(

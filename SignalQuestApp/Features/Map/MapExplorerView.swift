@@ -1899,6 +1899,7 @@ struct MapExplorerView: View {
             }
             // Notification/deep link antenne reçu avant l'apparition de la carte.
             openSiteFromRouterIfNeeded()
+            openANFRFromRouterIfNeeded()
         }
         // Le calque pilote uniquement la CONSOMMATION des amis. La diffusion de
         // ma propre position « carte ouverte » est liée à l'écran via onAppear.
@@ -2023,6 +2024,8 @@ struct MapExplorerView: View {
         }
         // Notification/deep link antenne : ouvre la fiche du site demandé.
         .onChangeCompat(of: router.openSiteId) { _, _ in openSiteFromRouterIfNeeded() }
+        // Notification de mise à jour ANFR : l'écran ANFR, comme depuis la feuille Carte.
+        .onChangeCompat(of: router.openANFRMap) { _, _ in openANFRFromRouterIfNeeded() }
         .onChangeCompat(of: searchFieldFocused) { _, focused in
             if focused { recentItems = RecentlyViewedStore.items() }
         }
@@ -2814,6 +2817,12 @@ struct MapExplorerView: View {
         case .map: showsANFRMap = true
         case .stats: showsANFRStats = true
         }
+    }
+
+    private func openANFRFromRouterIfNeeded() {
+        guard router.openANFRMap else { return }
+        router.openANFRMap = false
+        showsANFRMap = true
     }
 
     private func centerOnCurrentLocation() {

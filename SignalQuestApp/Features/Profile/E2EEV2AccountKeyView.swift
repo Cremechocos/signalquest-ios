@@ -252,12 +252,11 @@ struct E2EEV2AccountKeyQAScreen: View {
     private static let namespace = "qa-account-key"
 
     private let store: E2EEV2AccountIdentityStore = {
-        let arguments = ProcessInfo.processInfo.arguments
         let store = E2EEV2AccountIdentityStore(tokenStore: InMemoryTokenStore()) { _ in true }
-        if !arguments.contains("--qa-account-key-missing"),
+        if !AppEnvironment.hasQAFlag("account-key-missing"),
            let key = try? P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 0x11, count: 32)) {
             try? store.install(key, ownerNamespace: E2EEV2AccountKeyQAScreen.namespace)
-            if arguments.contains("--qa-account-key-verified") { try? store.markVerified(ownerNamespace: E2EEV2AccountKeyQAScreen.namespace) }
+            if AppEnvironment.hasQAFlag("account-key-verified") { try? store.markVerified(ownerNamespace: E2EEV2AccountKeyQAScreen.namespace) }
         }
         return store
     }()

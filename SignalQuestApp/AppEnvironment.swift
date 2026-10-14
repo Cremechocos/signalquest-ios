@@ -120,6 +120,12 @@ enum AppEnvironment {
     #endif
 
     #if DEBUG
+    /// Drapeau `--qa-<name>` des écrans de QA : la lecture des arguments de lancement
+    /// reste ici, derrière #if DEBUG, comme les autres drapeaux.
+    static func hasQAFlag(_ name: String) -> Bool {
+        ProcessInfo.processInfo.arguments.contains("--qa-" + name)
+    }
+
     static var injectedAuthToken: String? {
         let value = ProcessInfo.processInfo.environment["SQ_AUTH_TOKEN"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)

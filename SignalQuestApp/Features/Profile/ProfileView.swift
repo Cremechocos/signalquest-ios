@@ -56,6 +56,7 @@ struct ProfileView: View {
     @State private var deepLinkReport: AntennaReportDeepLink?
     /// Signalement « Bugs et idées » à ouvrir en sheet (notification `bug_*`).
     @State private var deepLinkBug: AntennaReportDeepLink?
+    @State private var deepLinkScreen: AppRouter.ProfileScreen?
     /// Écran Sentinelle à ouvrir en sheet (tap sur une notification de coupure).
     @State private var deepLinkSentinelle: SentinelleDeepLink?
     /// Box partagée ouverte depuis un lien universel.
@@ -140,8 +141,26 @@ struct ProfileView: View {
         }
         .sheet(item: $deepLinkBug) { link in
             NavigationStack {
-                BugReportDetailView(service: services.bugReports, reportId: link.id,
-                                    onClose: { deepLinkBug = nil })
+                // Un administrateur suit tous les bugs depuis l'espace Admin : la vue de
+                // l'auteur ne distingue pas les notes internes, que le serveur lui sert aussi.
+                if case .authenticated(let user) = session.state, user.role == "admin" {
+                    AdminBugDetailView(service: services.adminBugs, bugId: link.id,
+                                       onClose: { deepLinkBug = nil })
+                } else {
+                    BugReportDetailView(service: services.bugReports, reportId: link.id,
+                                        onClose: { deepLinkBug = nil })
+                }
+            }
+        }
+        // Notification sans fiche précise : l'écran du Profil qui en parle.
+        .sheet(item: $deepLinkScreen) { screen in
+            NavigationStack {
+                switch screen {
+                case .photos: PhotosView(service: services.photos)
+                case .progression: GamificationView(service: services.gamification)
+                case .sessions: SessionsListView(service: services.sessions)
+                case .subscription: PaywallView(store: services.entitlements, entryPoint: .profile)
+                }
             }
         }
         // Sentinelle vit dans les réglages, eux-mêmes sous l'onglet Profil : une
@@ -216,6 +235,7 @@ struct ProfileView: View {
         .onAppear {
             consumeAntennaReportDeepLink()
             consumeBugDeepLink()
+            consumeScreenDeepLink()
             consumeSentinelleDeepLink()
             consumeShareDeepLink()
             consumeE2EEApprovalDeepLink()
@@ -228,6 +248,7 @@ struct ProfileView: View {
         .onChangeCompat(of: router.openSentinelleShareSlug) { _, _ in consumeShareDeepLink() }
         .onChangeCompat(of: router.openAntennaReportId) { _, _ in consumeAntennaReportDeepLink() }
         .onChangeCompat(of: router.openBugId) { _, _ in consumeBugDeepLink() }
+        .onChangeCompat(of: router.openProfileScreen) { _, _ in consumeScreenDeepLink() }
         .onChangeCompat(of: router.openSentinelle) { _, _ in consumeSentinelleDeepLink() }
         .onChangeCompat(of: router.openE2EEDeviceApprovalId) { _, _ in consumeE2EEApprovalDeepLink() }
         .onChangeCompat(of: router.openE2EEApprovalQR) { _, _ in consumeE2EEApprovalQRDeepLink() }
@@ -271,6 +292,12 @@ struct ProfileView: View {
         guard let id = router.openBugId else { return }
         router.openBugId = nil
         deepLinkBug = AntennaReportDeepLink(id: id)
+    }
+
+    private func consumeScreenDeepLink() {
+        guard let screen = router.openProfileScreen else { return }
+        router.openProfileScreen = nil
+        deepLinkScreen = screen
     }
 
     private func consumeNotificationSettingsDeepLink() {
@@ -626,6 +653,17 @@ struct ProfileView: View {
                             badge: unseenBugReplies > 0 ? unseenBugReplies.formatted() : nil)
                 }
                 .accessibilityIdentifier("profile.bugs")
+                // Réservé aux administrateurs ; le serveur refuse de toute façon les autres comptes.
+                if case .authenticated(let user) = session.state, user.role == "admin" {
+                    menuSeparator
+                    NavigationLink {
+                        AdminBugsView(service: services.adminBugs)
+                    } label: {
+                        menuRow(title: "Admin · bugs et retours", icon: "wrench.and.screwdriver",
+                                subtitle: String(localized: "Trier et répondre à tous les signalements"))
+                    }
+                    .accessibilityIdentifier("profile.admin")
+                }
             }
         }
     }
