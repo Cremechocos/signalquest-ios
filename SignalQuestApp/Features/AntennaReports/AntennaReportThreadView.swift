@@ -50,6 +50,15 @@ struct PendingReportImage: Identifiable {
     let dataURL: String
 }
 
+/// Réponse partie du composeur : affichée tout de suite, elle reste dans le fil
+/// avec « Réessayer » si l'envoi échoue, au lieu de revenir dans le champ.
+struct OutgoingReportReply: Identifiable {
+    let id = UUID()
+    let text: String
+    let images: [PendingReportImage]
+    var failed = false
+}
+
 // MARK: - ViewModel
 
 @MainActor
@@ -65,6 +74,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
     @Published var pickerItems: [PhotosPickerItem] = []
     @Published var isSending = false
     @Published var attachmentError: String?
+    @Published private(set) var outgoing: [OutgoingReportReply] = []
 
     let reportId: String
     private let service: AntennaReportsServicing
@@ -127,15 +137,35 @@ final class AntennaReportThreadViewModel: ObservableObject {
     func send() async {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !isSending, !text.isEmpty || !pendingImages.isEmpty else { return }
+        let reply = OutgoingReportReply(text: text, images: pendingImages)
+        outgoing.append(reply)
+        draft = ""
+        pendingImages = []
+        await deliver(reply.id)
+    }
+
+    /// Renvoie une réponse restée « Non envoyé ».
+    func retry(_ id: UUID) async {
+        guard !isSending, let index = outgoing.firstIndex(where: { $0.id == id }) else { return }
+        outgoing[index].failed = false
+        await deliver(id)
+    }
+
+    /// Abandonne une réponse non envoyée.
+    func discard(_ id: UUID) {
+        outgoing.removeAll { $0.id == id }
+    }
+
+    private func deliver(_ id: UUID) async {
+        guard let reply = outgoing.first(where: { $0.id == id }) else { return }
         isSending = true
-        errorMessage = nil
         defer { isSending = false }
-        let images = pendingImages.map(\.dataURL)
         do {
-            let comment = try await service.addComment(reportId: reportId, content: text, images: images)
-            withAnimation(SQMotion.resolve(SQMotion.bouncy, UIAccessibility.isReduceMotionEnabled)) { comments.append(comment) }
-            draft = ""
-            pendingImages = []
+            let comment = try await service.addComment(reportId: reportId, content: reply.text, images: reply.images.map(\.dataURL))
+            withAnimation(SQMotion.resolve(SQMotion.bouncy, UIAccessibility.isReduceMotionEnabled)) {
+                outgoing.removeAll { $0.id == id }
+                comments.append(comment)
+            }
             Haptics.success()
             // La réponse d'un signaleur rouvre un ticket clos côté serveur : on
             // rafraîchit le statut affiché pour rester cohérent.
@@ -143,7 +173,7 @@ final class AntennaReportThreadViewModel: ObservableObject {
                 report = try? await service.myReports().first { $0.id == reportId }
             }
         } catch {
-            errorMessage = String(localized: "Échec de l'envoi. Réessaie.")
+            if let index = outgoing.firstIndex(where: { $0.id == id }) { outgoing[index].failed = true }
             Haptics.error()
         }
     }
@@ -185,8 +215,8 @@ struct AntennaReportThreadView: View {
     var body: some View {
         VStack(spacing: 0) {
             content
-            // Un échec d'envoi se dit même dans un fil encore vide (AF-RAD-18) ;
-            // l'échec de chargement, lui, prend la place du fil.
+            // L'échec de chargement prend la place d'un fil vide ; un fil déjà
+            // affiché le signale ici. Un envoi raté, lui, reste sur son message.
             if let error = model.errorMessage, !(model.loadFailed && model.comments.isEmpty) {
                 errorBanner(error)
             }
@@ -194,15 +224,10 @@ struct AntennaReportThreadView: View {
         }
         .sqAnimation(SQMotion.snappy, value: model.errorMessage)
         .signalQuestBackground()
-        .navigationTitle("Discussion")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if let onClose {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Fermer") { onClose() }.tint(SQColor.brandRed)
-                }
-            }
-        }
+        .navigationTitle(model.report?.reportType.label ?? String(localized: "Discussion"))
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .task { await model.load() }
         .onChangeCompat(of: model.pickerItems) { _, _ in
             Task { await model.processPickedItems() }
@@ -214,38 +239,82 @@ struct AntennaReportThreadView: View {
 
     @ViewBuilder
     private var content: some View {
-        if model.isLoading && model.comments.isEmpty {
-            SQSpinner().tint(SQColor.brandRed).frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: SQSpace.md) {
-                        if let report = model.report {
-                            AntennaReportHeaderCard(report: report)
-                                .padding(.bottom, SQSpace.xs)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: SQSpace.md) {
+                    header
+                    if model.isLoading && model.comments.isEmpty {
+                        SQSpinner().tint(SQColor.brandRed)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, SQSpace.xl)
+                    } else if model.comments.isEmpty, model.loadFailed, let error = model.errorMessage {
+                        ErrorStateView(title: "Discussion indisponible", message: error) {
+                            Task { await model.load() }
                         }
-                        if model.comments.isEmpty, model.loadFailed, let error = model.errorMessage {
-                            ErrorStateView(title: "Discussion indisponible", message: error) {
-                                Task { await model.load() }
-                            }
-                        } else if model.comments.isEmpty {
+                    } else {
+                        if model.comments.isEmpty, model.outgoing.isEmpty {
                             emptyThread
-                        } else {
-                            ForEach(model.comments) { comment in
-                                bubble(comment)
-                                    .id(comment.id)
-                                    .sqFadeUp()
-                            }
+                        }
+                        ForEach(model.comments) { comment in
+                            bubble(comment)
+                                .id(comment.id)
+                                .sqFadeUp()
+                        }
+                        ForEach(model.outgoing) { reply in
+                            outgoingBubble(reply)
+                                .id(reply.id)
                         }
                     }
-                    .padding(SQSpace.lg)
                 }
-                .onChangeCompat(of: model.comments.count) { _, _ in
-                    guard let last = model.comments.last else { return }
-                    withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
-                }
+                .padding(.horizontal, SQSpace.lg)
+                .padding(.vertical, SQSpace.sm)
+                .sqReadableWidth()
+            }
+            .onChangeCompat(of: model.comments.count + model.outgoing.count) { _, _ in
+                let last = model.outgoing.last.map { AnyHashable($0.id) } ?? model.comments.last.map { AnyHashable($0.id) }
+                guard let last else { return }
+                withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { proxy.scrollTo(last, anchor: .bottom) }
             }
         }
+    }
+
+    // MARK: En-tête
+
+    @Environment(\.dismiss) private var dismiss
+
+    /// Retour (ou fermeture en feuille), puis le type et le site en titre.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            if let onClose {
+                MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "antennaReport.thread.close") { onClose() }
+            } else {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "antennaReport.thread.back") { dismiss() }
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(model.report?.reportType.label ?? String(localized: "Discussion"))
+                    .font(SQFont.display(24, .bold, relativeTo: .title))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("antennaReport.thread.title")
+                if let report = model.report {
+                    subtitle(report)
+                        .font(SQType.subhead(.regular))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            if let report = model.report {
+                AntennaReportHeaderCard(report: report)
+            }
+        }
+        .padding(.bottom, SQSpace.xs)
+    }
+
+    /// « Site 0381234 · signalé il y a 2 jours ».
+    private func subtitle(_ report: AntennaReport) -> Text {
+        let site = Text("Site \(report.siteId)").monospacedDigit()
+        guard let date = report.createdAt else { return site }
+        let when = date.formatted(.relative(presentation: .named))
+        return site + Text(verbatim: " · ") + Text("signalé \(when)")
     }
 
     private var emptyThread: some View {
@@ -266,42 +335,123 @@ struct AntennaReportThreadView: View {
 
     /// Bulle : équipe (`isAdmin`) à gauche sur surface douce avec le nom réel,
     /// moi (le signaleur) à droite en brique (bulle sortante de la DA Crème).
-    @ViewBuilder
     private func bubble(_ comment: AntennaReportComment) -> some View {
         let isTeam = comment.isAdmin
-        HStack {
+        return HStack {
             if !isTeam { Spacer(minLength: SQSpace.xxl) }
             VStack(alignment: isTeam ? .leading : .trailing, spacing: SQSpace.xs) {
-                if isTeam {
-                    Label(comment.author?.name?.nonEmpty ?? String(localized: "Équipe SignalQuest"), systemImage: "shield.lefthalf.filled")
-                        .font(SQFont.body(12, .semibold))
-                        .foregroundStyle(SQColor.accentInk)
-                }
-                VStack(alignment: isTeam ? .leading : .trailing, spacing: SQSpace.sm) {
-                    if !comment.content.isEmpty {
-                        Text(comment.content)
-                            .font(SQType.body)
-                            .foregroundStyle(isTeam ? SQColor.label : SQColor.onAccent)
-                            .multilineTextAlignment(isTeam ? .leading : .trailing)
-                    }
-                    let images = comment.images.compactMap(AntennaReportImage.parse)
-                    if !images.isEmpty {
-                        AntennaReportBubbleImages(images: images) { viewerImage = $0 }
-                    }
-                }
-                .padding(SQSpace.md)
-                .background(
-                    isTeam ? AnyShapeStyle(SQColor.surfaceMuted) : AnyShapeStyle(SQColor.brandRed),
-                    in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
-                )
+                if isTeam { teamAuthor(comment.author?.name?.nonEmpty) }
+                bubbleBody(text: comment.content, images: comment.images.compactMap(AntennaReportImage.parse), isTeam: isTeam)
                 if let date = comment.createdAt {
                     Text(date, format: .relative(presentation: .named, unitsStyle: .abbreviated))
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
+                        .padding(.horizontal, SQSpace.xs)
                 }
             }
             if isTeam { Spacer(minLength: SQSpace.xxl) }
         }
+    }
+
+    /// Nom de l'auteur et pastille « Équipe », comme dans les bugs et idées.
+    @ViewBuilder
+    private func teamAuthor(_ name: String?) -> some View {
+        HStack(spacing: 6) {
+            if let name {
+                Text(verbatim: name)
+                Label("Équipe", systemImage: "checkmark.seal.fill")
+                    .labelStyle(.titleAndIcon)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(SQColor.accentSoft, in: Capsule())
+            } else {
+                Text("Équipe SignalQuest")
+            }
+        }
+        .font(SQFont.body(11, .bold, relativeTo: .caption2))
+        .foregroundStyle(SQColor.accentInk)
+        .padding(.horizontal, SQSpace.xs)
+    }
+
+    private func bubbleBody(text: String, images: [AntennaReportImage], isTeam: Bool) -> some View {
+        VStack(alignment: isTeam ? .leading : .trailing, spacing: SQSpace.sm) {
+            if !text.isEmpty {
+                Text(text)
+                    .font(SQType.body)
+                    .foregroundStyle(isTeam ? SQColor.label : SQColor.onAccent)
+                    .multilineTextAlignment(.leading)
+            }
+            if !images.isEmpty {
+                AntennaReportBubbleImages(images: images) { viewerImage = $0 }
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm2)
+        .background(
+            isTeam ? AnyShapeStyle(SQColor.chip) : AnyShapeStyle(SQColor.brandRed),
+            // Coin bas côté émetteur plus petit, comme les bulles de la messagerie.
+            in: UnevenRoundedRectangle(
+                topLeadingRadius: 18,
+                bottomLeadingRadius: isTeam ? 6 : 18,
+                bottomTrailingRadius: isTeam ? 18 : 6,
+                topTrailingRadius: 18,
+                style: .continuous
+            )
+        )
+    }
+
+    /// Ma réponse en cours d'envoi, ou restée « Non envoyé » avec de quoi la
+    /// renvoyer ou l'abandonner.
+    private func outgoingBubble(_ reply: OutgoingReportReply) -> some View {
+        HStack {
+            Spacer(minLength: SQSpace.xxl)
+            VStack(alignment: .trailing, spacing: SQSpace.xs) {
+                bubbleBody(text: reply.text, images: reply.images.map { .inline($0.image) }, isTeam: false)
+                    .opacity(reply.failed ? 0.75 : 0.6)
+                if reply.failed {
+                    HStack(spacing: SQSpace.sm) {
+                        Text("Non envoyé")
+                            .font(SQFont.body(12, .bold, relativeTo: .caption))
+                            .foregroundStyle(SQColor.dangerInk)
+                        Button {
+                            Haptics.light()
+                            model.discard(reply.id)
+                        } label: {
+                            Text("Supprimer")
+                                .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                        .accessibilityIdentifier("antennaReport.thread.discard")
+                        Button {
+                            Haptics.light()
+                            Task { await model.retry(reply.id) }
+                        } label: {
+                            Label("Réessayer", systemImage: "arrow.clockwise")
+                                .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                                .foregroundStyle(SQColor.dangerInk)
+                                .padding(.horizontal, SQSpace.sm2)
+                                .frame(minHeight: 32)
+                                .sqSurface(SQColor.chip, in: Capsule())
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                        .disabled(model.isSending)
+                        .accessibilityIdentifier("antennaReport.thread.retry")
+                    }
+                } else {
+                    Text("Envoi…")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .padding(.horizontal, SQSpace.xs)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("antennaReport.thread.outgoing")
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -348,6 +498,7 @@ struct AntennaReportThreadView: View {
                 }
                 .disabled(model.pendingImages.count >= AntennaReportThreadViewModel.maxImages)
                 .accessibilityLabel("Ajouter des photos")
+                .accessibilityIdentifier("antennaReport.thread.photos")
 
                 TextField("Écris une réponse", text: $model.draft, axis: .vertical)
                     .font(SQType.body)
@@ -357,6 +508,7 @@ struct AntennaReportThreadView: View {
                     .padding(.vertical, SQSpace.sm2)
                     .frame(minHeight: 44)
                     .sqFieldSurface(in: RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous))
+                    .accessibilityIdentifier("antennaReport.thread.field")
 
                 Button {
                     Task { await model.send() }
@@ -371,6 +523,7 @@ struct AntennaReportThreadView: View {
                 }
                 .buttonStyle(SQPressButtonStyle())
                 .accessibilityLabel("Envoyer")
+                .accessibilityIdentifier("antennaReport.thread.send")
                 .disabled(!model.canSend)
             }
         }
@@ -578,46 +731,38 @@ struct AntennaReportImageViewer: View {
 
 // MARK: - En-tête du signalement
 
-/// Carte d'en-tête d'un fil : type de problème, statut, site, précisions et note
-/// de modération éventuelle.
+/// Carte d'en-tête d'un fil : statut, secteur, correction proposée, précisions
+/// et note de modération éventuelle (le type et le site sont dans le titre).
 struct AntennaReportHeaderCard: View {
     let report: AntennaReport
 
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm2) {
-            HStack(spacing: SQSpace.sm2) {
-                Image(systemName: report.reportType.systemImage)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(SQColor.brandRed)
-                    .frame(width: 40, height: 40)
-                    .background(SQColor.accentSoft, in: Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(report.reportType.label)
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                    Text("Site \(report.siteId)")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                }
-                Spacer()
+            HStack(spacing: SQSpace.sm) {
                 AntennaReportStatusChip(status: report.status)
-            }
-            if let reason = report.reason?.nonEmpty {
-                Text(reason)
-                    .font(SQType.body)
-                    .foregroundStyle(SQColor.label)
+                Spacer(minLength: SQSpace.sm)
+                if let sector = report.sector {
+                    Label("Secteur \(sector)°", systemImage: "safari")
+                        .font(SQFont.body(12, .bold, relativeTo: .caption))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .padding(.horizontal, SQSpace.sm)
+                        .padding(.vertical, 4)
+                        .background(SQColor.chip, in: Capsule())
+                }
             }
             if let current = report.currentValue?.nonEmpty, let suggested = report.suggestedValue?.nonEmpty {
                 HStack(spacing: SQSpace.xs2) {
                     Text(current).strikethrough().foregroundStyle(SQColor.labelSecondary)
                     Image(systemName: "arrow.right").font(.caption).foregroundStyle(SQColor.labelTertiary)
-                    Text(suggested).foregroundStyle(SQColor.success)
+                        .accessibilityLabel(Text("remplacé par"))
+                    Text(suggested).foregroundStyle(OutageTint.resolvedInk)
                 }
-                .font(SQFont.body(13, .semibold))
+                .font(SQFont.body(15, .bold, relativeTo: .body))
+                .accessibilityElement(children: .combine)
             }
-            if let sector = report.sector {
-                Text("Secteur \(sector)°")
-                    .font(SQType.caption)
+            if let reason = report.reason?.nonEmpty {
+                Text(reason)
+                    .font(SQType.subhead(.regular))
                     .foregroundStyle(SQColor.labelSecondary)
             }
             if let note = report.reviewComment?.nonEmpty {
@@ -629,29 +774,44 @@ struct AntennaReportHeaderCard: View {
                     .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
             }
         }
-        .padding(SQSpace.lg)
+        .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground()
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
+        .accessibilityIdentifier("antennaReport.thread.header")
     }
 }
 
-/// Capsule de statut (en attente / résolu / rejeté).
+/// Pastille d'état (en attente / résolu / rejeté) : un point de couleur et le
+/// mot, écrit à l'encre lisible de la teinte.
 struct AntennaReportStatusChip: View {
     let status: AntennaReportStatus
 
     var body: some View {
-        Label(status.label, systemImage: status.systemImage)
-            .font(SQFont.body(12, .semibold))
-            .foregroundStyle(color)
-            .padding(.horizontal, SQSpace.sm2)
-            .padding(.vertical, SQSpace.xs + 1)
-            .background(color.opacity(0.14), in: Capsule(style: .continuous))
+        HStack(spacing: 5) {
+            Circle().fill(tint).frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text(status.label)
+        }
+        .font(SQFont.body(12, .bold, relativeTo: .caption))
+        .foregroundStyle(ink)
+        .padding(.horizontal, SQSpace.sm)
+        .padding(.vertical, 4)
+        .background(tint.opacity(0.14), in: Capsule(style: .continuous))
+        .fixedSize()
     }
 
-    private var color: Color {
+    private var tint: Color {
         switch status {
         case .pending: return SQColor.warning
         case .resolved: return SQColor.success
+        case .dismissed: return SQColor.labelSecondary
+        }
+    }
+
+    private var ink: Color {
+        switch status {
+        case .pending: return OutageTint.degradedInk
+        case .resolved: return OutageTint.resolvedInk
         case .dismissed: return SQColor.labelSecondary
         }
     }

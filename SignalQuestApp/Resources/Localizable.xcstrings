@@ -645,6 +645,47 @@
         }
       }
     },
+    "%lld contestations" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld dispute"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld disputes"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld contestation"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld contestations"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld conversation non lue" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3015,6 +3056,22 @@
         }
       }
     },
+    "Correction proposée · facultatif" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggested correction · optional"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correction proposée · facultatif"
+          }
+        }
+      }
+    },
     "Corrigé : la session reprend toute seule après le changement de cellule. Merci pour les étapes, elles ont tout débloqué." : {
       "localizations" : {
         "en" : {
@@ -5027,6 +5084,22 @@
         }
       }
     },
+    "Les erreurs que tu as signalées sur une fiche d’antenne, et les réponses de l’équipe." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The errors you reported on an antenna page, and the team's replies."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les erreurs que tu as signalées sur une fiche d’antenne, et les réponses de l’équipe."
+          }
+        }
+      }
+    },
     "Les idées sont lues par l'équipe ; tu es prévenu si elle est retenue." : {
       "localizations" : {
         "en" : {
@@ -5087,6 +5160,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les plus rapides et les plus actifs de la communauté."
+          }
+        }
+      }
+    },
+    "Les plus récents d’abord. Pour signaler, ouvre la fiche d’une antenne sur la carte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most recent first. To report one, open an antenna page on the map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les plus récents d’abord. Pour signaler, ouvre la fiche d’une antenne sur la carte."
           }
         }
       }
@@ -5689,6 +5778,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "N'afficher que"
+          }
+        }
+      }
+    },
+    "Non envoyé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not sent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non envoyé"
           }
         }
       }
@@ -6369,6 +6474,22 @@
         }
       }
     },
+    "Problème" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problem"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problème"
+          }
+        }
+      }
+    },
     "Protocole de latence" : {
       "localizations" : {
         "en" : {
@@ -6401,18 +6522,34 @@
         }
       }
     },
-    "Précisions (obligatoire)" : {
+    "Précisions · facultatif" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Details (required)"
+            "value" : "Details · optional"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Précisions (obligatoire)"
+            "value" : "Précisions · facultatif"
+          }
+        }
+      }
+    },
+    "Précisions · obligatoire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details · required"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Précisions · obligatoire"
           }
         }
       }
@@ -6964,6 +7101,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sa mesure et sa position enregistrée sont visibles sur la carte publique. Tes zones privées restent appliquées."
+          }
+        }
+      }
+    },
+    "Secteur concerné · facultatif" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sector concerned · optional"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secteur concerné · facultatif"
           }
         }
       }
@@ -7761,6 +7914,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ton opérateur ne peut pas être détecté : ce test ne sera pas publié sur la carte."
+          }
+        }
+      }
+    },
+    "Ton signalement part à l’équipe de modération, qui pourra te répondre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your report goes to the moderation team, who can reply to you."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton signalement part à l’équipe de modération, qui pourra te répondre."
           }
         }
       }
@@ -8793,6 +8962,22 @@
         }
       }
     },
+    "remplacé par" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "replaced by"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "remplacé par"
+          }
+        }
+      }
+    },
     "résolu le %@" : {
       "localizations" : {
         "en" : {
@@ -8822,6 +9007,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "sans limite"
+          }
+        }
+      }
+    },
+    "signalé %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "reported %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "signalé %@"
           }
         }
       }
@@ -28310,22 +28511,6 @@
         }
       }
     },
-    "Correction proposée (optionnel)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suggested correction (optional)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Correction proposée (optionnel)"
-          }
-        }
-      }
-    },
     "Corrige le point bloquant ci-dessous." : {
       "localizations" : {
         "en" : {
@@ -41921,22 +42106,6 @@
         }
       }
     },
-    "Mes signalements" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "My reports"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mes signalements"
-          }
-        }
-      }
-    },
     "Mes signalements d'antenne" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -50227,22 +50396,6 @@
         }
       }
     },
-    "Que veux-tu signaler ?" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "What do you want to report?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Que veux-tu signaler ?"
-          }
-        }
-      }
-    },
     "Quelle antenne as-tu relevée ?" : {
       "localizations" : {
         "en" : {
@@ -55053,22 +55206,6 @@
         }
       }
     },
-    "Secteur concerné (optionnel)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sector concerned (optional)"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Secteur concerné (optionnel)"
-          }
-        }
-      }
-    },
     "Secteur incorrect" : {
       "localizations" : {
         "en" : {
@@ -56417,22 +56554,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Site %@"
-          }
-        }
-      }
-    },
-    "Site %@. Ton signalement est envoyé à l'équipe de modération, qui pourra te répondre." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Site %@. Your report is sent to the moderation team, who can reply to you."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Site %@. Ton signalement est envoyé à l'équipe de modération, qui pourra te répondre."
           }
         }
       }

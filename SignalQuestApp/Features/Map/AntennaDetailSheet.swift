@@ -307,6 +307,7 @@ struct AntennaDetailSheet: View {
                 availableSectors: reportSectors,
                 service: services.antennaReports,
                 leaderReport: leaderReport,
+                operatorName: selectedOperator,
                 initialType: reportInitialType
             )
         }

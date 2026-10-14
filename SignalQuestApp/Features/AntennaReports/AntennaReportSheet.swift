@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Formulaire d'émission d'un signalement sur une antenne, présenté depuis la
-/// fiche antenne (`AntennaDetailSheet`). Calqué sur `ReportSheet` (Form natif,
-/// fond crème) pour rester cohérent avec le reste de l'app.
+/// fiche antenne (`AntennaDetailSheet`) : sections Halo, envoi en bouton
+/// principal en bas.
 struct AntennaReportSheet: View {
     let siteId: String
     let siteLabel: String
@@ -12,6 +12,8 @@ struct AntennaReportSheet: View {
     /// Site partagé (Crozon, zone blanche) : seul cas où « opérateur porteur
     /// incorrect » a un sens, avec la liste des opérateurs possibles.
     let leaderReport: AntennaLeaderReport?
+    /// Réseau affiché sur la fiche : donne la numérotation des secteurs (« Secteur 2 · 120° »).
+    let operatorName: String?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -33,6 +35,7 @@ struct AntennaReportSheet: View {
         availableSectors: [Int],
         service: AntennaReportsServicing,
         leaderReport: AntennaLeaderReport? = nil,
+        operatorName: String? = nil,
         initialType: AntennaReportType = .other
     ) {
         self.siteId = siteId
@@ -40,6 +43,7 @@ struct AntennaReportSheet: View {
         self.availableSectors = availableSectors
         self.service = service
         self.leaderReport = leaderReport
+        self.operatorName = operatorName
         _reportType = State(initialValue: leaderReport == nil && initialType == .incorrectLeader ? .other : initialType)
     }
 
@@ -54,140 +58,204 @@ struct AntennaReportSheet: View {
         reportType == .other && reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Picker(selection: $reportType) {
-                        ForEach(availableTypes) { type in
-                            Label(type.label, systemImage: type.systemImage).tag(type)
-                        }
-                    } label: {
-                        Label("Type de problème", systemImage: "exclamationmark.triangle")
-                    }
-                    .pickerStyle(.menu)
-                } header: {
-                    Text("Que veux-tu signaler ?")
-                } footer: {
-                    Text("Site \(siteLabel). Ton signalement est envoyé à l'équipe de modération, qui pourra te répondre.")
-                        .font(SQType.caption)
-                }
-                .listRowBackground(SQColor.surface)
+    private var canSend: Bool {
+        !isBusy && !needsReason && !(isLeaderReport && suggestedLeader == nil)
+    }
 
-                if isLeaderReport, let leaderReport {
-                    Section {
-                        if let current = leaderReport.currentLeader {
-                            LabeledContent("Opérateur affiché") {
-                                Text(verbatim: AntennaLeaderReport.displayName(current))
-                            }
-                        }
-                        Picker(selection: $suggestedLeader) {
-                            Text("À choisir").tag(String?.none)
-                            ForEach(leaderReport.choices, id: \.self) { key in
-                                Text(verbatim: AntennaLeaderReport.displayName(key)).tag(String?.some(key))
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MapSheetHeader(
+                    title: String(localized: "Signaler un problème"),
+                    subtitle: String(localized: "Site \(siteLabel)"),
+                    closeIdentifier: "antennaReport.form.close"
+                ) { dismiss() }
+
+                formSection("Problème", footer: "Ton signalement part à l’équipe de modération, qui pourra te répondre.") {
+                    pickerRow("Type", value: reportType.label, identifier: "antennaReport.form.type") {
+                        Picker(selection: $reportType) {
+                            ForEach(availableTypes) { type in
+                                Label(type.label, systemImage: type.systemImage).tag(type)
                             }
                         } label: {
-                            Label("Opérateur qui porte le site", systemImage: "building.2")
+                            Text("Type de problème")
                         }
-                        .pickerStyle(.menu)
-                    } header: {
-                        Text("Opérateur porteur")
-                    } footer: {
-                        Text(leaderReport.sharingKind == "crozon"
-                             ? String(localized: "Site partagé entre SFR et Bouygues Telecom : l’un des deux le porte pour l’autre.")
-                             : String(localized: "Site en zone blanche : un seul opérateur le porte pour tous les autres."))
-                            .font(SQType.caption)
                     }
-                    .foregroundStyle(SQColor.label)
-                    .listRowBackground(SQColor.surface)
+                }
+
+                if isLeaderReport, let leaderReport {
+                    formSection(
+                        "Opérateur porteur",
+                        footer: leaderReport.sharingKind == "crozon"
+                            ? "Site partagé entre SFR et Bouygues Telecom : l’un des deux le porte pour l’autre."
+                            : "Site en zone blanche : un seul opérateur le porte pour tous les autres."
+                    ) {
+                        if let current = leaderReport.currentLeader {
+                            HStack {
+                                Text("Opérateur affiché").foregroundStyle(SQColor.label)
+                                Spacer(minLength: SQSpace.sm)
+                                Text(verbatim: AntennaLeaderReport.displayName(current))
+                                    .foregroundStyle(SQColor.labelSecondary)
+                            }
+                            .font(SQType.body)
+                            .padding(.horizontal, SQSpace.md)
+                            .frame(minHeight: 48)
+                            Divider().overlay(SQColor.separator).padding(.leading, SQSpace.md)
+                        }
+                        pickerRow("Opérateur qui porte le site",
+                                  value: suggestedLeader.map(AntennaLeaderReport.displayName) ?? String(localized: "À choisir"),
+                                  identifier: "antennaReport.form.leader") {
+                            Picker(selection: $suggestedLeader) {
+                                Text("À choisir").tag(String?.none)
+                                ForEach(leaderReport.choices, id: \.self) { key in
+                                    Text(verbatim: AntennaLeaderReport.displayName(key)).tag(String?.some(key))
+                                }
+                            } label: {
+                                Text("Opérateur qui porte le site")
+                            }
+                        }
+                    }
                 }
 
                 if reportType.suggestsValues {
-                    Section("Correction proposée (optionnel)") {
-                        TextField("Valeur actuelle affichée", text: $currentValue, axis: .vertical)
-                            .lineLimit(1...3)
-                        TextField("Valeur correcte selon toi", text: $suggestedValue, axis: .vertical)
-                            .lineLimit(1...3)
+                    formSection("Correction proposée · facultatif") {
+                        fieldRow("Valeur actuelle affichée", text: $currentValue, identifier: "antennaReport.form.current")
+                        Divider().overlay(SQColor.separator).padding(.leading, SQSpace.md)
+                        fieldRow("Valeur correcte selon toi", text: $suggestedValue, identifier: "antennaReport.form.suggested")
                     }
-                    .foregroundStyle(SQColor.label)
-                    .listRowBackground(SQColor.surface)
                 }
 
                 if !availableSectors.isEmpty {
-                    Section("Secteur concerné (optionnel)") {
-                        Picker(selection: $sector) {
-                            Text("Non précisé").tag(Int?.none)
-                            ForEach(availableSectors, id: \.self) { deg in
-                                Text("Secteur \(deg)°").tag(Int?.some(deg))
+                    formSection("Secteur concerné · facultatif") {
+                        pickerRow("Secteur", value: selectedSectorLabel, identifier: "antennaReport.form.sector") {
+                            Picker(selection: $sector) {
+                                Text("Non précisé").tag(Int?.none)
+                                ForEach(Array(availableSectors.enumerated()), id: \.element) { index, deg in
+                                    Text(sectorLabel(index: index, azimuth: deg)).tag(Int?.some(deg))
+                                }
+                            } label: {
+                                Text("Secteur")
                             }
-                        } label: {
-                            Label("Secteur", systemImage: "safari")
                         }
-                        .pickerStyle(.menu)
                     }
-                    .foregroundStyle(SQColor.label)
-                    .listRowBackground(SQColor.surface)
                 }
 
-                Section {
+                formSection(reportType == .other ? "Précisions · obligatoire" : "Précisions · facultatif") {
                     TextField("Décris ce qui ne va pas", text: $reason, axis: .vertical)
                         .lineLimit(3...6)
-                } header: {
-                    if reportType == .other {
-                        Text("Précisions (obligatoire)")
-                    } else {
-                        Text("Précisions (optionnel)")
-                    }
+                        .font(SQType.body)
+                        .foregroundStyle(SQColor.label)
+                        .padding(SQSpace.md)
+                        .frame(minHeight: 84, alignment: .topLeading)
+                        .accessibilityIdentifier("antennaReport.form.reason")
                 }
-                .foregroundStyle(SQColor.label)
-                .listRowBackground(SQColor.surface)
 
                 if let duplicateMessage {
-                    Section {
-                        Label(duplicateMessage, systemImage: "checkmark.circle")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.success)
-                    }
-                    .listRowBackground(SQColor.successSoft)
+                    Label(duplicateMessage, systemImage: "checkmark.circle")
+                        .font(SQType.caption)
+                        .foregroundStyle(OutageTint.resolvedInk)
+                        .padding(SQSpace.md)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .sqSurface(SQColor.successSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .accessibilityIdentifier("antennaReport.form.duplicate")
                 }
 
                 if let error {
-                    Section { Text(error).foregroundStyle(SQColor.dangerInk) }
-                        .listRowBackground(SQColor.dangerSoft)
-                }
-
-                Section {
-                    Button {
-                        Task { await send() }
-                    } label: {
-                        HStack {
-                            if isBusy {
-                                SQSpinner().tint(SQColor.brandRed)
-                            } else {
-                                Text("Envoyer le signalement")
-                                    .font(SQType.button)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .foregroundStyle(SQColor.accentInk)
-                    }
-                    .disabled(isBusy || needsReason || (isLeaderReport && suggestedLeader == nil))
-                    .listRowBackground(SQColor.accentSoft)
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .padding(SQSpace.md)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .sqSurface(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                        .accessibilityIdentifier("antennaReport.form.error")
                 }
             }
-            .scrollContentBackground(.hidden)
-            .signalQuestBackground()
-            .navigationTitle("Signaler un problème")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(duplicateMessage == nil ? String(localized: "Annuler") : String(localized: "Fermer")) { dismiss() }
-                        .tint(SQColor.brandRed)
-                }
-            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.lg)
+            .padding(.bottom, SQSpace.xl)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) {
+            GradientButton(String(localized: "Envoyer le signalement"), systemImage: "paperplane.fill", isBusy: isBusy) {
+                Task { await send() }
+            }
+            .disabled(!canSend)
+            .accessibilityIdentifier("antennaReport.form.send")
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.sm)
+            .background(SQColor.surface.ignoresSafeArea(edges: .bottom))
+        }
+        .background(SQColor.surface.ignoresSafeArea())
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    /// « Secteur 2 · 120° » : le numéro suit la convention du réseau affiché ;
+    /// sans réseau connu, seul l'azimut est sûr.
+    private func sectorLabel(index: Int, azimuth: Int) -> String {
+        guard let operatorName else { return String(localized: "Secteur \(azimuth)°") }
+        let number = SectorNumbering.displayValue(index: index, operatorName: operatorName)
+        return String(localized: "Secteur \(number) · \(azimuth)°")
+    }
+
+    private var selectedSectorLabel: String {
+        guard let sector, let index = availableSectors.firstIndex(of: sector) else { return String(localized: "Non précisé") }
+        return sectorLabel(index: index, azimuth: sector)
+    }
+
+    private func formSection<Content: View>(_ title: LocalizedStringKey, footer: LocalizedStringKey? = nil,
+                                            @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(title).sqKicker().accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 0) { content() }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .sqCardBackground(SQColor.bg, cornerRadius: SQRadius.lg, elevation: .rest)
+            if let footer {
+                Text(footer)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Ligne « libellé … valeur ⌃⌄ » : toute la ligne ouvre le menu, qui garde
+    /// les icônes et la coche ; la ligne ne montre que la valeur, sur une ligne.
+    private func pickerRow<P: View>(_ title: LocalizedStringKey, value: String, identifier: String,
+                                    @ViewBuilder picker: () -> P) -> some View {
+        Menu {
+            picker().pickerStyle(.inline)
+        } label: {
+            HStack(spacing: SQSpace.sm) {
+                Text(title)
+                    .foregroundStyle(SQColor.label)
+                Spacer(minLength: SQSpace.sm)
+                Text(value)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+            }
+            .font(SQType.body)
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier(identifier)
+    }
+
+    private func fieldRow(_ placeholder: LocalizedStringKey, text: Binding<String>, identifier: String) -> some View {
+        TextField(placeholder, text: text, axis: .vertical)
+            .lineLimit(1...3)
+            .font(SQType.body)
+            .foregroundStyle(SQColor.label)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm2)
+            .frame(minHeight: 48)
+            .accessibilityIdentifier(identifier)
     }
 
     private func send() async {

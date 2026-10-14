@@ -32,6 +32,7 @@ final class AntennaReportsListViewModel: ObservableObject {
 /// ligne ouvre le fil de discussion avec la modération.
 struct AntennaReportsListView: View {
     @StateObject private var model: AntennaReportsListViewModel
+    @Environment(\.dismiss) private var dismiss
     private let service: AntennaReportsServicing
 
     init(service: AntennaReportsServicing) {
@@ -41,14 +42,20 @@ struct AntennaReportsListView: View {
 
     var body: some View {
         List {
+            Section {
+                header
+                    .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                    .listRowBackground(Color.clear)
+            }
+            .listRowSeparator(.hidden)
+
             if let error = model.errorMessage, model.reports.isEmpty {
                 Section {
                     ErrorStateView(title: "Signalements indisponibles", message: error) {
                         Task { await model.load() }
                     }
                     .listRowBackground(Color.clear)
-                    // Marges de page : sans elles la carte touchait les deux bords.
-                    .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.lg, bottom: SQSpace.sm, trailing: SQSpace.lg))
+                    .listRowInsets(EdgeInsets())
                 }
             } else if !model.hasLoaded, model.reports.isEmpty {
                 Section {
@@ -77,76 +84,118 @@ struct AntennaReportsListView: View {
                         } label: {
                             reportRow(report)
                         }
-                        .buttonStyle(SQPressButtonStyle())
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
+                        .listRowBackground(SQColor.surface)
+                        .listRowSeparatorTint(SQColor.separator)
+                        .accessibilityIdentifier("antennaReports.row.\(report.id)")
                     }
                 } header: {
-                    Text("Mes signalements")
-                        .font(SQType.subhead)
+                    Text("Les plus récents d’abord. Pour signaler, ouvre la fiche d’une antenne sur la carte.")
+                        .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .textCase(nil)
                 }
             }
         }
-        .listStyle(.plain)
+        .listStyle(.insetGrouped)
+        .modifier(CompactListMargins())
         .scrollContentBackground(.hidden)
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Signalements d'antenne")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .task { await model.load() }
         .refreshable { await model.load() }
     }
 
-    private func reportRow(_ report: AntennaReport) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            HStack(alignment: .top, spacing: SQSpace.md) {
-                SQIconPastille(systemImage: report.reportType.systemImage, size: 38, font: .system(size: 15, weight: .medium))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(report.reportType.label)
-                        .font(SQType.heading)
-                        .foregroundStyle(SQColor.label)
-                    Text("Site \(report.siteId)")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
-                    if let date = report.createdAt {
-                        Text(date, format: .relative(presentation: .named))
-                            .font(SQFont.body(12, relativeTo: .caption2))
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                }
-                Spacer(minLength: 0)
-                AntennaReportStatusChip(status: report.status)
-            }
-            if let reason = report.reason?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty {
-                Text(reason)
-                    .font(SQType.body)
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "antennaReports.back") { dismiss() }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Signalements d'antenne")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("antennaReports.title")
+                Text("Les erreurs que tu as signalées sur une fiche d’antenne, et les réponses de l’équipe.")
+                    .font(SQType.callout)
                     .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(2)
-            }
-            if (report.confirmCount ?? 0) > 0 || (report.disputeCount ?? 0) > 0 || report.communityConfirmed == true {
-                HStack(spacing: SQSpace.md) {
-                    if report.communityConfirmed == true {
-                        Label("Confirmé par la communauté", systemImage: "checkmark.seal.fill")
-                            .foregroundStyle(SQColor.success)
-                    }
-                    if let confirm = report.confirmCount, confirm > 0 {
-                        Label("\(confirm)", systemImage: "hand.thumbsup")
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    if let dispute = report.disputeCount, dispute > 0 {
-                        Label("\(dispute)", systemImage: "hand.thumbsdown")
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                }
-                .font(SQType.caption)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(SQSpace.md2)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
+    }
+
+    private func reportRow(_ report: AntennaReport) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            HStack(alignment: .top, spacing: SQSpace.sm2) {
+                SQIconPastille(systemImage: report.reportType.systemImage, size: 38, font: .system(size: 15, weight: .medium))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(report.reportType.label)
+                        .font(SQFont.body(15, .semibold, relativeTo: .headline))
+                        .foregroundStyle(SQColor.label)
+                    siteLine(report)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                AntennaReportStatusChip(status: report.status)
+            }
+            Group {
+                if let reason = report.reason?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty {
+                    Text(reason)
+                        .font(SQType.subhead(.regular))
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(2)
+                }
+                if (report.confirmCount ?? 0) > 0 || (report.disputeCount ?? 0) > 0 || report.communityConfirmed == true {
+                    // Icône et texte côte à côte : un `Label` prendrait ici le style
+                    // des listes, avec une colonne d'icône très large.
+                    HStack(spacing: SQSpace.md) {
+                        if report.communityConfirmed == true {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.seal.fill")
+                                Text("Confirmé par la communauté")
+                            }
+                            .foregroundStyle(OutageTint.resolvedInk)
+                            .accessibilityElement(children: .combine)
+                        }
+                        if let confirm = report.confirmCount, confirm > 0 {
+                            HStack(spacing: 3) {
+                                Image(systemName: "hand.thumbsup")
+                                Text("\(confirm)").monospacedDigit()
+                            }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text("\(confirm) confirmations"))
+                        }
+                        if let dispute = report.disputeCount, dispute > 0 {
+                            HStack(spacing: 3) {
+                                Image(systemName: "hand.thumbsdown")
+                                Text("\(dispute)").monospacedDigit()
+                            }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text("\(dispute) contestations"))
+                        }
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            // Aligné sous le titre, après la tuile d'icône.
+            .padding(.leading, 38 + SQSpace.sm2)
+        }
+        .padding(.vertical, SQSpace.xs)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    /// « Site 0381234 · il y a 2 jours » : l'identifiant en chiffres tabulaires.
+    private func siteLine(_ report: AntennaReport) -> Text {
+        let site = Text("Site \(report.siteId)").monospacedDigit()
+        guard let date = report.createdAt else { return site }
+        return site + Text(verbatim: " · ") + Text(date, format: .relative(presentation: .named))
     }
 }
