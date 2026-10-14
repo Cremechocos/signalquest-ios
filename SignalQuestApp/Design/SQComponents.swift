@@ -699,6 +699,9 @@ struct SQFactRow: View {
         Text(value)
             .font(SQType.subhead(.semibold))
             .foregroundStyle(SQColor.label)
+            // Chiffres tabulaires : sans eux, la police ne dessine pas l'espace
+            // fine des milliers (« 1180 » au lieu de « 1 180 »).
+            .monospacedDigit()
             .multilineTextAlignment(.trailing)
     }
 }

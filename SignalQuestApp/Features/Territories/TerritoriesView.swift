@@ -16,6 +16,8 @@ struct TerritoriesView: View {
     /// Cellule touchée : retrouvée par sa clé dans la grille courante, elle
     /// disparaît d'elle-même quand la zone rechargée ne la contient plus.
     @State private var selectedCellKey: String?
+    /// Suivi de position de la carte, piloté par le bouton de l'en-tête.
+    @State private var trackingMode: MKUserTrackingMode = .none
 
     private var selectedCell: TerritoryCell? {
         guard let selectedCellKey else { return nil }
@@ -32,94 +34,213 @@ struct TerritoriesView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            TerritoryMapView(
-                cells: model.grid?.cells ?? [],
-                onRegionChange: { region, span in model.regionChanged(region, span: span) },
-                onSelectCell: { key in selectedCellKey = key }
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: SQSpace.sm) {
-                if model.isZoomedOut {
-                    // Message HONNÊTE : on ne prétend pas afficher une grille
-                    // complète, on explique pourquoi elle ne l'est pas.
-                    notice("Zoome pour voir les territoires", icon: "plus.magnifyingglass")
-                } else if model.grid?.truncated == true {
-                    notice("Zone trop large : certains territoires ne sont pas affichés", icon: "exclamationmark.triangle")
-                }
-                if let errorMessage = model.errorMessage {
-                    VStack(alignment: .leading, spacing: SQSpace.sm) {
-                        Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
-                        if model.grid != nil {
-                            Text("Dernier état connu conservé.")
-                                .font(SQType.caption)
-                                .foregroundStyle(SQColor.labelSecondary)
-                        }
-                        GradientButton("Réessayer", isBusy: model.isLoading, style: .secondary) {
-                            Task { await model.retry() }
-                        }
-                    }
-                    .padding(SQSpace.md)
-                    .background(SQColor.surfaceGlass, in: RoundedRectangle(cornerRadius: SQRadius.md))
-                    .accessibilityIdentifier("territories.loadError")
-                } else if !model.isZoomedOut, model.grid?.cells.isEmpty == true, !model.isLoading {
-                    notice("Aucun territoire dans cette zone", icon: "square.grid.3x3")
-                }
-                if let selectedCell, !model.isZoomedOut {
-                    cellCard(selectedCell)
-                }
-                legend
-            }
-            .padding(SQSpace.lg)
-            // La carte ignore la safe area et le dock flotte par-dessus : sans ce
-            // dégagement, notice et légende passent DESSOUS et deviennent
-            // illisibles (retour testeur TestFlight, 4 août 2026).
-            .padding(.bottom, SQDock.floatingContentInset(subtracting: SQSpace.lg))
-        }
+        TerritoryMapView(
+            cells: model.grid?.cells ?? [],
+            selectedCellKey: model.isZoomedOut ? nil : selectedCellKey,
+            trackingMode: $trackingMode,
+            onRegionChange: { region, span in model.regionChanged(region, span: span) },
+            onSelectCell: { key in selectedCellKey = key }
+        )
+        .ignoresSafeArea()
         .overlay(alignment: .top) {
-            if model.isLoading {
-                SQSpinner()
-                    .tint(SQColor.brandRed)
-                    .padding(SQSpace.md)
-                    .background(SQColor.surfaceGlass, in: Capsule())
-                    .padding(.top, SQSpace.lg)
+            VStack(spacing: SQSpace.sm) {
+                mapHeader
+                notices
             }
         }
+        .overlay(alignment: .bottom) {
+            VStack(spacing: SQSpace.sm) {
+                if model.errorMessage != nil { errorCard }
+                bottomCard
+            }
+            .padding(.horizontal, SQSpace.lg)
+            // La carte ignore la safe area et le dock flotte par-dessus : sans ce
+            // dégagement, la carte du bas passerait DESSOUS et deviendrait
+            // illisible (retour testeur TestFlight, 4 août 2026).
+            .padding(.bottom, SQDock.floatingContentInset(subtracting: SQSpace.md) + SQSpace.xl)
+            .sqReadableWidth()
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : UIKit coupe le balayage retour, rétabli ici.
+        .sqKeepsSwipeBack()
         .navigationTitle("Territoires")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func notice(_ text: String, icon: String) -> some View {
+    // MARK: En-tête et avis sur la carte
+
+    private var mapHeader: some View {
+        HStack(spacing: SQSpace.sm) {
+            MapFloatingIconButton(systemImage: "chevron.left", label: "Retour", identifier: "territories.back") { dismiss() }
+            MapFloatingTitle(title: "Territoires", identifier: "territories.title")
+            Spacer(minLength: 0)
+            MapFloatingIconButton(systemImage: trackingSymbol, label: "Recentrer sur ma position",
+                                  identifier: "territories.userTracking",
+                                  tint: trackingMode == .none ? SQColor.label : SQColor.accentInk) {
+                // Même cycle que le bouton de suivi de Plans : position, puis cap, puis libre.
+                switch trackingMode {
+                case .none: trackingMode = .follow
+                case .follow: trackingMode = .followWithHeading
+                default: trackingMode = .none
+                }
+            }
+            .accessibilityValue(trackingValue)
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.top, SQSpace.sm)
+    }
+
+    private var trackingSymbol: String {
+        switch trackingMode {
+        case .follow: return "location.fill"
+        case .followWithHeading: return "location.north.line.fill"
+        default: return "location"
+        }
+    }
+
+    private var trackingValue: Text {
+        switch trackingMode {
+        case .follow: return Text("Suit ma position")
+        case .followWithHeading: return Text("Suit ma position et mon cap")
+        default: return Text(verbatim: "")
+        }
+    }
+
+    @ViewBuilder
+    private var notices: some View {
+        if model.isZoomedOut {
+            // Message HONNÊTE : on ne prétend pas afficher une grille
+            // complète, on explique pourquoi elle ne l'est pas.
+            notice("Zoome pour voir les territoires", icon: "plus.magnifyingglass", tint: SQColor.label)
+        } else if model.grid?.truncated == true {
+            notice("Zone trop large : certains territoires ne sont pas affichés",
+                   icon: "exclamationmark.triangle", tint: OutageTint.degradedInk)
+        } else if model.errorMessage == nil, model.grid?.cells.isEmpty == true, !model.isLoading {
+            notice("Aucun territoire dans cette zone", icon: "square.grid.3x3", tint: SQColor.label)
+        } else if model.isLoading {
+            SQSpinner()
+                .tint(SQColor.brandRed)
+                .padding(SQSpace.sm2)
+                .sqSurface(SQColor.surface, in: Capsule())
+                .sqShadowCard()
+        } else if selectedCell == nil, model.grid?.cells.isEmpty == false {
+            notice("Touche un carré pour voir son détail", icon: "info.circle", tint: SQColor.label)
+        }
+    }
+
+    private func notice(_ text: LocalizedStringKey, icon: String, tint: Color) -> some View {
         HStack(spacing: SQSpace.xs + 1) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold))
                 .accessibilityHidden(true)
-            Text(LocalizedStringKey(text))
+            Text(text)
                 .font(SQFont.body(13, .medium))
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
         }
-        .foregroundStyle(SQColor.label)
+        .foregroundStyle(tint)
         .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.sm)
-        .background(SQColor.surfaceGlass, in: Capsule(style: .continuous))
-        .sqShadowSoft()
+        .frame(minHeight: 36)
+        .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
+        .sqShadowCard()
+        .padding(.horizontal, SQSpace.lg)
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Carte du bas : la zone ou le carré touché
+
+    private var errorCard: some View {
+        HStack(alignment: .top, spacing: SQSpace.sm2) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(SQColor.dangerInk)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Territoires non chargés")
+                    .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+                Group {
+                    if model.grid != nil {
+                        Text("Le dernier état connu reste affiché.")
+                    } else if let errorMessage = model.errorMessage {
+                        Text(errorMessage)
+                    }
+                }
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            GradientButton("Réessayer", isBusy: model.isLoading, style: .secondary) {
+                Task { await model.retry() }
+            }
+            .fixedSize()
+        }
+        .padding(SQSpace.md)
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("territories.loadError")
+    }
+
+    @ViewBuilder
+    private var bottomCard: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            if let selectedCell, !model.isZoomedOut {
+                cellDetail(selectedCell)
+            } else {
+                zoneSummary
+            }
+            if showsLegend { legend }
+        }
+        .padding(SQSpace.md)
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
+    }
+
+    /// Côté d'un carré, arrondi au kilomètre : la grille est en degrés.
+    private var cellSideKm: Int {
+        max(1, Int(((model.grid?.cellSize ?? 0.02) * 111).rounded()))
+    }
+
+    private var zoneSummary: some View {
+        HStack(alignment: .center, spacing: SQSpace.sm) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Dans cette zone")
+                    .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+                Group {
+                    if model.isZoomedOut {
+                        Text("Zoome pour compter les carrés")
+                    } else if let cells = model.grid?.cells {
+                        Text("\(cells.count) carrés") + Text(verbatim: " · ")
+                            + Text("\(cellSideKm) km de côté") + Text(verbatim: " · ")
+                            + Text("\(cells.filter(\.mine).count) à toi")
+                    }
+                }
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .monospacedDigit()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            legendToggle
+        }
+        .accessibilityIdentifier("territories.summary")
     }
 
     /// Fiche d'une cellule touchée : ce que la grille charge déjà, enfin lisible.
-    private func cellCard(_ cell: TerritoryCell) -> some View {
+    private func cellDetail(_ cell: TerritoryCell) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.xs) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(spacing: SQSpace.sm) {
+                swatch(for: cell.status)
                 Text(cell.statusLabel)
-                    .font(SQFont.body(15, .semibold, relativeTo: .headline))
+                    .font(SQFont.body(17, .semibold, relativeTo: .headline))
                     .foregroundStyle(SQColor.label)
                 if cell.mine {
                     Text("Ma zone")
-                        .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                        .font(SQFont.body(11, .bold, relativeTo: .caption2))
                         .foregroundStyle(SQColor.accentInk)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(SQColor.accentSoft, in: Capsule())
                 }
                 Spacer(minLength: SQSpace.sm)
                 Button {
@@ -128,6 +249,8 @@ struct TerritoriesView: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SQColor.labelSecondary)
+                        .frame(width: 32, height: 32)
+                        .background(SQColor.chip, in: Circle())
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -135,94 +258,133 @@ struct TerritoriesView: View {
                 .accessibilityLabel(Text("Fermer"))
                 .accessibilityIdentifier("territories.cell.close")
             }
-            cellRow("Mesures", value: cell.pointsCount.formatted())
-            cellRow("Contributeurs", value: cell.userCount.formatted())
-            cellRow(
-                "Dernière observation",
+            SQFactRow(label: "Mesures", value: cell.pointsCount.formatted())
+            SQFactRow(label: "Contributeurs", value: cell.userCount.formatted())
+            SQFactRow(
+                label: "Dernière mesure",
                 value: cell.lastObservedAt.map { $0.formatted(.relative(presentation: .named)) }
                     ?? String(localized: "Jamais observée")
             )
+            HStack {
+                Spacer(minLength: 0)
+                legendToggle
+            }
+            // La cible reste de 44 pt ; seul l'espace visible se resserre.
+            .padding(.vertical, -SQSpace.sm)
         }
-        .padding(.leading, SQSpace.md)
-        .padding(.vertical, SQSpace.xs)
-        .background(SQColor.surfaceGlass, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .sqShadowSoft()
+        .monospacedDigit()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("territories.cell")
     }
 
-    private func cellRow(_ title: LocalizedStringKey, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .foregroundStyle(SQColor.labelSecondary)
-            Spacer(minLength: SQSpace.sm)
-            Text(value)
-                .foregroundStyle(SQColor.label)
-                .monospacedDigit()
-        }
-        .font(SQFont.body(13, relativeTo: .subheadline))
-        .padding(.trailing, SQSpace.md)
-        .accessibilityElement(children: .combine)
-    }
+    // MARK: Légende
 
-    /// Largeur d'une entrée de légende, qui suit la taille du texte : à 104 pt
-    /// fixes, « Zone inexplorée » se coupait en très grand texte.
-    @ScaledMetric(relativeTo: .caption) private var legendColumnWidth: CGFloat = 104
+    /// Légende repliable : ouverte par défaut, elle se range pour libérer la carte.
+    @State private var showsLegend = true
+
+    private var legendToggle: some View {
+        Button {
+            Haptics.light()
+            withAnimation(.snappy(duration: 0.2)) { showsLegend.toggle() }
+        } label: {
+            HStack(spacing: 3) {
+                Text("Légende")
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+                    .rotationEffect(.degrees(showsLegend ? 180 : 0))
+                    .accessibilityHidden(true)
+            }
+            .font(SQFont.body(12, .semibold, relativeTo: .caption))
+            .foregroundStyle(SQColor.labelSecondary)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(showsLegend ? Text("Masquer la légende") : Text("Afficher la légende"))
+        .accessibilityIdentifier("territories.legendToggle")
+    }
 
     /// Légende complète (SOC-39) : les cinq états dessinés sur la carte, dont
     /// « À rafraîchir », et le contour brique des zones où tu as contribué.
     private var legend: some View {
         let statuses: [TerritoryCell.Status] = [.virgin, .observed, .reliable, .complete, .stale]
+        let counts = !model.isZoomedOut
         return LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: legendColumnWidth), spacing: SQSpace.sm, alignment: .leading)],
+            columns: [GridItem(.adaptive(minimum: legendColumnWidth), spacing: SQSpace.md, alignment: .leading)],
             alignment: .leading,
-            spacing: SQSpace.xs
+            spacing: SQSpace.sm
         ) {
             ForEach(statuses, id: \.self) { status in
-                let sample = TerritoryCell(
-                    cellKey: "", status: status,
-                    bounds: .init(north: 0, south: 0, east: 0, west: 0),
-                    pointsCount: 0, userCount: 0, trustScore: 0,
-                    lastObservedAt: nil, mine: false
-                )
-                legendItem(sample.statusLabel, fill: Color(sample.fillColor),
-                           stroke: SQColor.label.opacity(0.15), lineWidth: 0.5,
-                           count: model.isZoomedOut ? nil : model.grid?.count(of: status))
+                legendItem(Self.sample(status).statusLabel, count: counts ? model.grid?.count(of: status) : nil) {
+                    swatch(for: status)
+                }
             }
-            legendItem(String(localized: "Mes zones"), fill: .clear,
-                       stroke: SQColor.brandRed, lineWidth: 1.5,
-                       count: model.isZoomedOut ? nil : model.grid?.cells.filter(\.mine).count)
+            legendItem(String(localized: "Mes zones"), count: counts ? model.grid?.cells.filter(\.mine).count : nil) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .strokeBorder(SQColor.brandRed, lineWidth: 2.5)
+                    .frame(width: 18, height: 18)
+            }
         }
-        .padding(.horizontal, SQSpace.md)
-        .padding(.vertical, SQSpace.sm)
-        .background(SQColor.surfaceGlass, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-        .sqShadowSoft()
+        .accessibilityIdentifier("territories.legend")
     }
 
-    private func legendItem(_ label: String, fill: Color, stroke: Color, lineWidth: CGFloat, count: Int?) -> some View {
-        HStack(spacing: SQSpace.xs) {
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(fill)
-                .frame(width: 14, height: 14)
+    /// Largeur d'une entrée de légende, qui suit la taille du texte : à 104 pt
+    /// fixes, « Zone inexplorée » se coupait en très grand texte.
+    @ScaledMetric(relativeTo: .caption) private var legendColumnWidth: CGFloat = 132
+
+    private static func sample(_ status: TerritoryCell.Status) -> TerritoryCell {
+        TerritoryCell(
+            cellKey: "", status: status,
+            bounds: .init(north: 0, south: 0, east: 0, west: 0),
+            pointsCount: 0, userCount: 0, trustScore: 0,
+            lastObservedAt: nil, mine: false
+        )
+    }
+
+    /// Pastille d'un statut, comme sur la carte : « Inexplorée » hachurée, les
+    /// autres teintées de leur couleur.
+    @ViewBuilder
+    private func swatch(for status: TerritoryCell.Status) -> some View {
+        if status == .virgin {
+            SQHatchedSwatch(color: SQColor.labelTertiary)
+                .frame(width: 18, height: 18)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        } else {
+            let tint = Color(Self.sample(status).strokeTint)
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(Color(Self.sample(status).fillColor))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .strokeBorder(stroke, lineWidth: lineWidth)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .strokeBorder(tint, lineWidth: 1)
                 )
+                .frame(width: 18, height: 18)
+        }
+    }
+
+    private func legendItem<Swatch: View>(_ label: String, count: Int?, @ViewBuilder swatch: () -> Swatch) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            swatch()
             // 12 pt à l'encre pleine : le gris secondaire à 11 pt passait sous
             // le contraste rendu (TRX-12).
             Text(label)
-                .font(SQFont.body(12, relativeTo: .caption))
+                .font(SQFont.body(12, .medium, relativeTo: .caption))
                 .foregroundStyle(SQColor.label)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let count {
+                Text(count.formatted())
+                    .font(SQFont.body(12, .bold, relativeTo: .caption))
+                    .foregroundStyle(SQColor.label)
+                    .monospacedDigit()
+            }
         }
         // Chaque entrée annoncée d'un bloc : la pastille seule ne dit rien à
-        // VoiceOver.
-        .accessibilityElement(children: .combine)
+        // VoiceOver. La grille dessinée est muette : la légende en donne le
+        // décompte pour la zone affichée (« Fiable, 9 carrés »).
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
-        // La grille dessinée est muette pour VoiceOver : la légende en donne
-        // le décompte pour la zone affichée.
-        .accessibilityValue(count.map { $0.formatted() } ?? "")
+        .accessibilityValue(count.map { Text("\($0) carrés") } ?? Text(verbatim: ""))
     }
 }
 
@@ -313,6 +475,9 @@ final class TerritoriesViewModel: ObservableObject {
 /// `Coordinator`, un seul overlay remplacé à chaque grille.
 struct TerritoryMapView: UIViewRepresentable {
     let cells: [TerritoryCell]
+    /// Carré touché : entouré à l'encre sur la carte.
+    var selectedCellKey: String?
+    @Binding var trackingMode: MKUserTrackingMode
     let onRegionChange: (MKCoordinateRegion, MKCoordinateSpan) -> Void
     var onSelectCell: (String?) -> Void = { _ in }
 
@@ -337,20 +502,6 @@ struct TerritoryMapView: UIViewRepresentable {
             context.coordinator.centerOnce(on: location.coordinate, in: map)
         }
 
-        let tracking = MKUserTrackingButton(mapView: map)
-        tracking.backgroundColor = UIColor(SQColor.surfaceGlass)
-        tracking.layer.cornerRadius = 12
-        tracking.layer.cornerCurve = .continuous
-        tracking.accessibilityIdentifier = "territories.userTracking"
-        tracking.translatesAutoresizingMaskIntoConstraints = false
-        map.addSubview(tracking)
-        NSLayoutConstraint.activate([
-            tracking.widthAnchor.constraint(equalToConstant: 44),
-            tracking.heightAnchor.constraint(equalToConstant: 44),
-            tracking.topAnchor.constraint(equalTo: map.safeAreaLayoutGuide.topAnchor, constant: SQSpace.md),
-            tracking.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -SQSpace.md),
-        ])
-
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
         tap.delegate = context.coordinator
         map.addGestureRecognizer(tap)
@@ -358,11 +509,17 @@ struct TerritoryMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.trackingMode = $trackingMode
+        // Le bouton de suivi est dans l'en-tête SwiftUI : la carte suit son mode.
+        if map.userTrackingMode != trackingMode {
+            map.setUserTrackingMode(trackingMode, animated: true)
+        }
         // Un overlay UNIQUE : on le remplace en bloc plutôt que d'ajouter des
         // milliers de polygones. La clé seule ne suffit pas : une même cellule
         // peut changer de statut, de propriétaire ou de couleur avec le thème.
         let identity = TerritoryRenderIdentity(
             cells: cells,
+            selectedKey: selectedCellKey,
             colorScheme: context.environment.colorScheme,
             contrast: context.environment.colorSchemeContrast
         )
@@ -374,6 +531,7 @@ struct TerritoryMapView: UIViewRepresentable {
     final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
         let onRegionChange: (MKCoordinateRegion, MKCoordinateSpan) -> Void
         let onSelectCell: (String?) -> Void
+        var trackingMode: Binding<MKUserTrackingMode>?
         var lastIdentity: TerritoryRenderIdentity?
         private var cells: [TerritoryCell] = []
         private var hasCentered = false
@@ -401,6 +559,12 @@ struct TerritoryMapView: UIViewRepresentable {
             centerOnce(on: location.coordinate, in: mapView)
         }
 
+        /// Un geste sur la carte coupe le suivi : l'en-tête doit le refléter.
+        func mapView(_ mapView: MKMapView, didChange mode: MKUserTrackingMode, animated: Bool) {
+            guard let trackingMode, trackingMode.wrappedValue != mode else { return }
+            DispatchQueue.main.async { trackingMode.wrappedValue = mode }
+        }
+
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let map = gesture.view as? MKMapView else { return }
             let point = MKMapPoint(map.convert(gesture.location(in: map), toCoordinateFrom: map))
@@ -425,7 +589,9 @@ struct TerritoryMapView: UIViewRepresentable {
                     rect: $0.mapRect,
                     fill: $0.fillColor.cgColor,
                     stroke: $0.strokeColor.cgColor,
-                    mine: $0.mine
+                    mine: $0.mine,
+                    hatch: $0.status == .virgin ? TerritoryCell.hatchColor.cgColor : nil,
+                    selection: $0.cellKey == identity.selectedKey ? UIColor(SQColor.label).cgColor : nil
                 )
             })
             map.addOverlay(overlay, level: .aboveRoads)
@@ -453,11 +619,13 @@ struct TerritoryRenderIdentity: Equatable {
     }
 
     let cells: [Cell]
+    var selectedKey: String?
     let colorScheme: ColorScheme
     let contrast: ColorSchemeContrast
 
-    init(cells: [TerritoryCell], colorScheme: ColorScheme, contrast: ColorSchemeContrast) {
+    init(cells: [TerritoryCell], selectedKey: String? = nil, colorScheme: ColorScheme, contrast: ColorSchemeContrast) {
         self.cells = cells.map { Cell(key: $0.cellKey, status: $0.status, bounds: $0.bounds, mine: $0.mine) }
+        self.selectedKey = selectedKey
         self.colorScheme = colorScheme
         self.contrast = contrast
     }

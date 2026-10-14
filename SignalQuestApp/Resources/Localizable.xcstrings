@@ -481,6 +481,47 @@
         }
       }
     },
+    "%lld carrés" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld square"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld squares"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld carré"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld carrés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld cellule" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -723,6 +764,22 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "%lld km de côté" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld km per side"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld km de côté"
           }
         }
       }
@@ -1468,6 +1525,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld à réclamer"
+          }
+        }
+      }
+    },
+    "%lld à toi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld yours"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld à toi"
           }
         }
       }
@@ -3040,6 +3113,22 @@
         }
       }
     },
+    "Dans cette zone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In this area"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans cette zone"
+          }
+        }
+      }
+    },
     "Dans une conversation chiffrée, la recherche se fait sur ton appareil." : {
       "localizations" : {
         "en" : {
@@ -3117,22 +3206,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dernière mesure : %@. Ouvre le Speedtest."
-          }
-        }
-      }
-    },
-    "Dernière observation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last observed"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dernière observation"
           }
         }
       }
@@ -4788,6 +4861,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le code est invalide, expiré ou ne correspond plus à cet appareil."
+          }
+        }
+      }
+    },
+    "Le dernier état connu reste affiché." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The last known state stays on screen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dernier état connu reste affiché."
           }
         }
       }
@@ -7273,6 +7362,38 @@
         }
       }
     },
+    "Suit ma position" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Following my location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suit ma position"
+          }
+        }
+      }
+    },
+    "Suit ma position et mon cap" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Following my location and heading"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suit ma position et mon cap"
+          }
+        }
+      }
+    },
     "Suivre cette connexion" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7382,6 +7503,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ta position et ton réseau, en continu, dans %@."
+          }
+        }
+      }
+    },
+    "Territoires non chargés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Territories not loaded"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Territoires non chargés"
           }
         }
       }
@@ -7640,6 +7777,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Top régions · %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Touche un carré pour voir son détail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap a square to see its details"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Touche un carré pour voir son détail"
           }
         }
       }
@@ -8082,6 +8235,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wi-Fi"
+          }
+        }
+      }
+    },
+    "Zoome pour compter les carrés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom in to count the squares"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoome pour compter les carrés"
           }
         }
       }

@@ -14,6 +14,10 @@ final class TerritoryOverlay: NSObject, MKOverlay {
         let stroke: CGColor
         /// Cellule conquise par l'utilisateur : soulignée d'un liseré plus net.
         let mine: Bool
+        /// Hachures d'une zone inexplorée : un aplat à 6 % ne se voyait pas.
+        var hatch: CGColor?
+        /// Carré touché : entouré de cette encre.
+        var selection: CGColor?
     }
 
     let cells: [Cell]
@@ -48,10 +52,38 @@ final class TerritoryOverlayRenderer: MKOverlayRenderer {
             let rect = self.rect(for: cell.rect)
             context.setFillColor(cell.fill)
             context.fill(rect)
+            if let hatch = cell.hatch {
+                drawHatch(in: rect, color: hatch, zoomScale: zoomScale, context: context)
+            }
             context.setStrokeColor(cell.stroke)
             context.setLineWidth(cell.mine ? lineWidth * 2.5 : lineWidth)
             context.stroke(rect)
         }
+        // Le carré touché en dernier, pour que ses voisins ne recouvrent pas son contour.
+        if let selected = overlay.cells.first(where: { $0.selection != nil }), let ink = selected.selection,
+           visible.intersects(selected.rect) {
+            context.setShouldAntialias(true)
+            context.setStrokeColor(ink)
+            context.setLineWidth(lineWidth * 3)
+            context.stroke(self.rect(for: selected.rect).insetBy(dx: lineWidth * 1.5, dy: lineWidth * 1.5))
+        }
+    }
+
+    /// Diagonales espacées de 7 pt à l'écran, quelle que soit l'échelle.
+    private func drawHatch(in rect: CGRect, color: CGColor, zoomScale: MKZoomScale, context: CGContext) {
+        let step = 7.0 / zoomScale
+        context.saveGState()
+        context.clip(to: rect)
+        context.setStrokeColor(color)
+        context.setLineWidth(1.0 / zoomScale)
+        var x = rect.minX - rect.height
+        while x < rect.maxX {
+            context.move(to: CGPoint(x: x, y: rect.maxY))
+            context.addLine(to: CGPoint(x: x + rect.height, y: rect.minY))
+            x += step
+        }
+        context.strokePath()
+        context.restoreGState()
     }
 }
 
@@ -81,6 +113,20 @@ extension TerritoryCell {
         case .stale: return UIColor(SQColor.labelSecondary).withAlphaComponent(0.14)
         }
     }
+
+    /// Teinte pleine du statut, pour le liseré des pastilles de légende.
+    var strokeTint: UIColor {
+        switch status {
+        case .virgin: return UIColor(SQColor.labelTertiary)
+        case .observed: return UIColor(SQColor.warning)
+        case .reliable: return UIColor(SQColor.brandRed)
+        case .complete: return UIColor(SQColor.success)
+        case .stale: return UIColor(SQColor.labelSecondary)
+        }
+    }
+
+    /// Hachures des zones inexplorées.
+    static var hatchColor: UIColor { UIColor(SQColor.labelTertiary).withAlphaComponent(0.35) }
 
     var strokeColor: UIColor {
         mine

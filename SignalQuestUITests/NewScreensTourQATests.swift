@@ -102,7 +102,8 @@ final class NewScreensTourQATests: XCTestCase {
             territories.tap()
             _ = app.staticTexts.firstMatch.waitForExistence(timeout: 8)
             capture(app, named: "\(prefix)-territoires")
-            app.navigationBars.buttons.element(boundBy: 0).tap()
+            // En-tête Halo flottant : plus de barre de navigation.
+            app.buttons["territories.back"].firstMatch.tap()
             _ = app.staticTexts[labels.territories].waitForExistence(timeout: 4)
         } else {
             // Signalé, jamais silencieux : un `guard … else { return }` muet
