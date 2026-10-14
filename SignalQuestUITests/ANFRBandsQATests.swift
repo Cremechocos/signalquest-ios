@@ -13,6 +13,35 @@ final class ANFRBandsQATests: XCTestCase {
 
     func testGenerationsAndBandsInEnglish() { run(locale: "en") }
 
+    /// Évolution en plein écran (refonte Halo) : le graphique s'ouvre tourné en
+    /// paysage, la période se choisit, et l'écran revient en portrait à la fermeture.
+    func testTrendFullScreenTurnsToLandscapeAndBack() {
+        let app = XCUIApplication()
+        SignalQuestUITestSupport.launch(app, arguments: ["--mock-auth", "--reset-map", "--qa-anfr-stats"], locale: "fr")
+        defer { app.terminate() }
+
+        let expand = app.buttons["anfr.stats.fullscreen"].firstMatch
+        XCTAssertTrue(expand.waitForExistence(timeout: 45), "Bouton « Agrandir » absent")
+        XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(expand, in: app))
+        let window = app.windows.firstMatch
+        XCTAssertGreaterThan(window.frame.height, window.frame.width, "L'écran des statistiques reste en portrait")
+        expand.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["anfr.stats.fullscreen.chart"].waitForExistence(timeout: 10))
+        let landscape = NSPredicate { _, _ in window.frame.width > window.frame.height }
+        wait(for: [XCTNSPredicateExpectation(predicate: landscape, object: nil)], timeout: 10)
+        let oneYear = app.buttons["anfr.stats.fullscreen.range.oneYear"]
+        XCTAssertTrue(oneYear.waitForExistence(timeout: 5))
+        oneYear.tap()
+        XCTAssertTrue(oneYear.isSelected, "La période choisie est annoncée")
+        capture(app, "fr-anfr-evolution-plein-ecran")
+
+        app.buttons["anfr.stats.fullscreen.close"].tap()
+        XCTAssertTrue(expand.waitForExistence(timeout: 10))
+        let portrait = NSPredicate { _, _ in window.frame.height > window.frame.width }
+        wait(for: [XCTNSPredicateExpectation(predicate: portrait, object: nil)], timeout: 10)
+    }
+
     private func run(locale: String) {
         let fr = locale == "fr"
         let app = XCUIApplication()

@@ -107,6 +107,27 @@ final class ANFRBandsViewModelTests: XCTestCase {
         XCTAssertEqual(model.bandRows.map(\.band.key), ["n28", "n78"])
     }
 
+    /// Évolution (refonte Halo) : une série triée par opérateur sur la bande
+    /// filtrée, à l'identité stable, et la hausse lue du premier au dernier relevé.
+    func testTrendSeriesPerOperatorAndChangeOverThePeriod() {
+        let model = ANFRStatsViewModel(service: BandsOnlyService())
+        model.stats = ANFRDemoData.stats
+        let orange = model.trendSeries(for: .orange)
+        XCTAssertGreaterThan(orange.count, 1)
+        XCTAssertEqual(orange.map(\.date), orange.map(\.date).sorted())
+        XCTAssertNotEqual(orange.map(\.value), model.trendSeries(for: .free).map(\.value))
+        XCTAssertEqual(model.trendSeries.map(\.id), orange.map(\.id), "La carte suit l'opérateur choisi")
+        XCTAssertEqual(model.trendSeries(for: .orange).map(\.id), orange.map(\.id), "Le geste ne retrace pas la courbe")
+
+        func points(_ values: Int...) -> [ANFRTrendPoint] {
+            values.enumerated().map { ANFRTrendPoint(date: Date(timeIntervalSince1970: Double($0.offset) * 604_800), value: $0.element, generation: .g4) }
+        }
+        XCTAssertEqual(ANFRStatsViewModel.change(of: points(100, 110, 128)) ?? 0, 0.28, accuracy: 0.0001)
+        XCTAssertEqual(ANFRStatsViewModel.change(of: points(100, 90)) ?? 0, -0.1, accuracy: 0.0001)
+        XCTAssertNil(ANFRStatsViewModel.change(of: points(100)), "Un seul relevé : pas de hausse")
+        XCTAssertNil(ANFRStatsViewModel.change(of: points(0, 5)), "Départ à zéro : pas de pourcentage")
+    }
+
     func testPeakAndChangeTexts() throws {
         let stats = ANFRDemoData.bandStats(generation: "3g", operatorKey: "all", weeks: 1)
         let threeG = try XCTUnwrap(stats.summary(operatorKey: "all", band: "3g"))

@@ -26,6 +26,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     private static let logger = Logger(subsystem: "fr.signalquest.ios", category: "firebase")
 
+    /// iPhone en portrait (Info.plist), sauf pendant un graphique plein écran ;
+    /// l'iPad garde toutes ses orientations.
+    func application(_ application: UIApplication,
+                     supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        if UIDevice.current.userInterfaceIdiom == .pad { return .all }
+        return SQOrientation.allowsLandscape ? .allButUpsideDown : .portrait
+    }
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         // Le délégué des notifications doit être posé AVANT la fin du lancement :
@@ -194,5 +202,24 @@ extension AppDelegate: MessagingDelegate {
         Task { @MainActor in
             AppDelegate.sharedPush?.didRegister(fcmToken: fcmToken)
         }
+    }
+}
+
+/// Paysage sur iPhone, le temps d'un graphique plein écran : son contrôleur
+/// le demande à l'ouverture, l'app revient en portrait à la fermeture.
+@MainActor
+enum SQOrientation {
+    private(set) static var allowsLandscape = false
+
+    static func allowLandscape(_ allowed: Bool) {
+        guard UIDevice.current.userInterfaceIdiom == .phone, allowsLandscape != allowed else { return }
+        allowsLandscape = allowed
+        guard !allowed else { return }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
+        for window in scene.windows {
+            window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
     }
 }
