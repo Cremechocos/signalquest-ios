@@ -995,6 +995,88 @@
         }
       }
     },
+    "%lld points" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld points"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld point"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld points"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld points · %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld point · %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld points · %@"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld point · %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld points · %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld prévisionnels" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1518,6 +1600,47 @@
         }
       }
     },
+    "%lld trajets · les plus récents d’abord" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld trip · most recent first"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld trips · most recent first"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld trajet · les plus récents d’abord"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld trajets · les plus récents d’abord"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld validations" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1932,6 +2055,22 @@
         }
       }
     },
+    "Afficher les trajets suivants" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show more trips"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher les trajets suivants"
+          }
+        }
+      }
+    },
     "Affiché" : {
       "localizations" : {
         "en" : {
@@ -1976,6 +2115,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Amis (%lld)"
+          }
+        }
+      }
+    },
+    "Anciennes captures gardées ici, qui ne sont plus envoyées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Older captures kept here, no longer uploaded."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anciennes captures gardées ici, qui ne sont plus envoyées."
           }
         }
       }
@@ -2144,6 +2299,22 @@
         }
       }
     },
+    "Archives locales · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local archives · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archives locales · %lld"
+          }
+        }
+      }
+    },
     "Arrêter la rafale" : {
       "localizations" : {
         "en" : {
@@ -2268,6 +2439,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun test sur cet iPhone pour l'instant"
+          }
+        }
+      }
+    },
+    "Aucun trajet de ce type" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No trips of this type"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun trajet de ce type"
+          }
+        }
+      }
+    },
+    "Aucun trajet ne correspond à ce filtre dans l’historique complet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No trip matches this filter in your full history."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun trajet ne correspond à ce filtre dans l’historique complet."
+          }
+        }
+      }
+    },
+    "Aucun trajet pour l’instant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No trips yet"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun trajet pour l’instant"
           }
         }
       }
@@ -4779,6 +4998,22 @@
         }
       }
     },
+    "Interrompu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrupted"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompu"
+          }
+        }
+      }
+    },
     "Irréversible. Les cellules confirmées par d’autres sont seulement retirées." : {
       "localizations" : {
         "en" : {
@@ -5071,6 +5306,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La session s'arrête dès que l'iPhone change de cellule."
+          }
+        }
+      }
+    },
+    "Lance un Drive Test ou une session de couverture dans l’app Android : tes trajets apparaîtront ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a Drive Test or a coverage session in the Android app: your trips will appear here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lance un Drive Test ou une session de couverture dans l’app Android : tes trajets apparaîtront ici."
           }
         }
       }
@@ -7610,6 +7861,22 @@
         }
       }
     },
+    "Sans date" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undated"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans date"
+          }
+        }
+      }
+    },
     "Secteur concerné · facultatif" : {
       "localizations" : {
         "en" : {
@@ -8181,6 +8448,22 @@
         }
       }
     },
+    "Sur cet iPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this iPhone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur cet iPhone"
+          }
+        }
+      }
+    },
     "Système" : {
       "localizations" : {
         "en" : {
@@ -8209,6 +8492,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ta position et ton réseau, en continu, dans %@."
+          }
+        }
+      }
+    },
+    "Terminée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finished"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminée"
           }
         }
       }
@@ -8337,6 +8636,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tes tests"
+          }
+        }
+      }
+    },
+    "Tes trajets enregistrés avec l’app Android : Drive Test et couverture." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your trips recorded with the Android app: Drive Test and coverage."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes trajets enregistrés avec l’app Android : Drive Test et couverture."
           }
         }
       }
@@ -8725,6 +9040,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trajet terminé"
+          }
+        }
+      }
+    },
+    "Trajets indisponibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trips unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trajets indisponibles"
           }
         }
       }
@@ -10669,23 +11000,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Récompenses indisponibles"
-          }
-        }
-      }
-    },
-    "Sessions indisponibles" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessions unavailable"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessions indisponibles"
           }
         }
       }
@@ -22607,40 +22921,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune réponse sur %@, dans aucune des deux familles : il n’y a pas de latence à comparer."
-          }
-        }
-      }
-    },
-    "Aucune session" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No sessions"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune session"
-          }
-        }
-      }
-    },
-    "Aucune session ne correspond à ce filtre dans l’historique complet." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No sessions match this filter in your complete history."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucune session ne correspond à ce filtre dans l’historique complet."
           }
         }
       }
@@ -42761,22 +43041,6 @@
         }
       }
     },
-    "Mes enregistrements de trajet" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "My trip recordings"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mes enregistrements de trajet"
-          }
-        }
-      }
-    },
     "Mes identifications" : {
       "localizations" : {
         "en" : {
@@ -60117,23 +60381,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tes notifications d'activité apparaîtront ici."
-          }
-        }
-      }
-    },
-    "Tes sessions enregistrées (drive-test, couverture) — y compris depuis Android — apparaîtront ici." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your recorded sessions (drive test, coverage) — including from Android — will appear here."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tes sessions enregistrées (drive-test, couverture) — y compris depuis Android — apparaîtront ici."
           }
         }
       }

@@ -22,6 +22,8 @@ final class SessionsListViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var hasMore = false
     @Published var filter: Filter = .all
+    /// Total côté serveur (`pagination.total`), quand il est connu.
+    @Published private(set) var total: Int?
 
     enum Filter: String, CaseIterable, Identifiable {
         case all, driveTest, coverage
@@ -66,6 +68,36 @@ final class SessionsListViewModel: ObservableObject {
         }
     }
 
+    /// Un groupe par mois, dans l'ordre du serveur (les plus récents d'abord).
+    struct MonthGroup: Identifiable {
+        let id: String
+        let title: String
+        var sessions: [CoverageSession]
+    }
+
+    var monthGroups: [MonthGroup] {
+        var groups: [MonthGroup] = []
+        let calendar = Calendar.current
+        for session in filtered {
+            let id: String
+            let title: String
+            if let date = session.startTime {
+                let parts = calendar.dateComponents([.year, .month], from: date)
+                id = "\(parts.year ?? 0)-\(parts.month ?? 0)"
+                title = date.formatted(.dateTime.month(.wide).year())
+            } else {
+                id = "undated"
+                title = String(localized: "Sans date")
+            }
+            if let index = groups.firstIndex(where: { $0.id == id }) {
+                groups[index].sessions.append(session)
+            } else {
+                groups.append(MonthGroup(id: id, title: title, sessions: [session]))
+            }
+        }
+        return groups
+    }
+
     var isExhaustedEmpty: Bool {
         filtered.isEmpty && !isLoading && !hasMore && errorMessage == nil
     }
@@ -90,6 +122,7 @@ final class SessionsListViewModel: ObservableObject {
             let page = try await loadPage(0, pageSize)
             guard requestGeneration == generation else { return }
             sessions = page.sessions
+            total = page.pagination?.total
             hasMore = !page.sessions.isEmpty && (page.pagination?.hasMore ?? (page.sessions.count >= pageSize))
             offset = page.sessions.count
         } catch {
@@ -124,111 +157,129 @@ final class SessionsListViewModel: ObservableObject {
 struct SessionsListView: View {
     @StateObject private var model: SessionsListViewModel
     @StateObject private var archiveModel = LocalCoverageArchiveViewModel()
+    @Environment(\.dismiss) private var dismiss
 
     init(service: SessionsServicing) {
         _model = StateObject(wrappedValue: SessionsListViewModel(service: service))
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: SQSpace.sm2) {
+        List {
+            Section {
+                header
+                    .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                    .listRowBackground(Color.clear)
                 SQSegmentedFilter(
                     selection: $model.filter,
                     options: SessionsListViewModel.Filter.allCases.map { (value: $0, label: $0.label, icon: String?.none) }
                 )
-                .padding(.horizontal, -SQSpace.lg)
-                .padding(.bottom, SQSpace.xs)
+                .accessibilityIdentifier("sessions.filter")
+                // Le segment ajoute sa propre marge latérale de 16 pt : on la compense.
+                .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: -SQSpace.lg, bottom: SQSpace.xs, trailing: -SQSpace.lg))
+                .listRowBackground(Color.clear)
+                if let total = model.total, total > 0 {
+                    Text("\(total) trajets · les plus récents d’abord")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .listRowInsets(EdgeInsets(top: 0, leading: SQSpace.xs, bottom: 0, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .accessibilityIdentifier("sessions.summary")
+                }
+            }
+            .listRowSeparator(.hidden)
 
-                if model.showsEmptyState(archive: archiveModel.snapshot, archiveIsLoading: archiveModel.isLoading) {
-                    EmptyStateView(
-                        title: "Aucune session",
-                        message: model.sessions.isEmpty
-                            ? "Tes sessions enregistrées (drive-test, couverture) — y compris depuis Android — apparaîtront ici."
-                            : "Aucune session ne correspond à ce filtre dans l’historique complet.",
-                        systemImage: "point.topleft.down.curvedto.point.bottomright.up"
-                    )
-                } else {
-                    ForEach(model.filtered) { session in
-                        NavigationLink {
-                            SessionDetailView(session: session)
-                        } label: {
-                            SessionRow(session: session)
+            if model.showsEmptyState(archive: archiveModel.snapshot, archiveIsLoading: archiveModel.isLoading) {
+                EmptyStateView(
+                    title: model.sessions.isEmpty ? "Aucun trajet pour l’instant" : "Aucun trajet de ce type",
+                    message: model.sessions.isEmpty
+                        ? "Lance un Drive Test ou une session de couverture dans l’app Android : tes trajets apparaîtront ici."
+                        : "Aucun trajet ne correspond à ce filtre dans l’historique complet.",
+                    systemImage: "point.topleft.down.curvedto.point.bottomright.up"
+                )
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+            } else if model.sessions.isEmpty, !model.isLoading, let errorMessage = model.errorMessage {
+                // Rien de chargé : même carte d'erreur que les autres listes.
+                ErrorStateView(title: "Trajets indisponibles", message: errorMessage) {
+                    Task { await model.reload() }
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+            } else {
+                ForEach(model.monthGroups) { group in
+                    Section {
+                        ForEach(group.sessions) { session in
+                            NavigationLink {
+                                SessionDetailView(session: session)
+                            } label: {
+                                SessionRow(session: session)
+                            }
+                            .listRowBackground(SQColor.surface)
+                            .listRowSeparatorTint(SQColor.separator)
+                            .accessibilityIdentifier("sessions.row.\(session.id)")
                         }
-                        .buttonStyle(SQPressButtonStyle())
+                    } header: {
+                        Text(group.title).sqKicker()
                     }
-                    if model.hasMore {
+                }
+                if model.hasMore {
+                    Section {
                         if model.isLoading {
-                            HStack { Spacer(); SQSpinner().tint(SQColor.brandRed); Spacer() }
-                                .padding(.vertical, SQSpace.md)
+                            loadingRow
                         } else if model.filtered.isEmpty || model.errorMessage != nil {
-                            GradientButton("Charger la suite", style: .secondary) {
+                            GradientButton("Afficher les trajets suivants", style: .secondary) {
                                 Task { await model.loadMore() }
                             }
-                                .accessibilityIdentifier("sessions.loadMore")
+                            .accessibilityIdentifier("sessions.loadMore")
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets())
                         } else {
-                            HStack { Spacer(); SQSpinner().tint(SQColor.brandRed); Spacer() }
-                                .padding(.vertical, SQSpace.md)
+                            loadingRow
                                 .task { await model.loadMore() }
                         }
                     }
                 }
+            }
 
-                if let errorMessage = model.errorMessage {
-                    if model.sessions.isEmpty {
-                        // Rien de chargé : même carte d'erreur que les autres listes.
-                        ErrorStateView(title: "Sessions indisponibles", message: errorMessage) {
+            if let errorMessage = model.errorMessage, !model.sessions.isEmpty {
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .listRowBackground(Color.clear)
+                    if !model.hasMore {
+                        GradientButton("Réessayer", style: .secondary) {
                             Task { await model.reload() }
                         }
-                    } else {
-                        Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.dangerInk)
-                            .padding(.horizontal, SQSpace.xs)
-                        if !model.hasMore {
-                            GradientButton("Réessayer", style: .secondary) {
-                                Task { await model.reload() }
-                            }
-                        }
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
                     }
-                }
-
-                if model.showsLocalCoverageArchive && !archiveModel.snapshot.entries.isEmpty {
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        Text("Archives locales")
-                            .font(SQType.heading)
-                            .foregroundStyle(SQColor.label)
-                        Text("Anciennes captures de couverture conservées sur cet appareil. Elles ne sont plus envoyées.")
-                            .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
-                    }
-                    .padding(.top, SQSpace.lg)
-                    .accessibilityIdentifier("sessions.localArchives")
-
-                    ForEach(archiveModel.snapshot.entries) { archive in
-                        NavigationLink {
-                            LocalCoverageArchiveDetailView(archive: archive)
-                        } label: {
-                            LocalCoverageArchiveRow(archive: archive)
-                        }
-                        .buttonStyle(SQPressButtonStyle())
-                    }
-                }
-
-                if model.showsLocalCoverageArchive && archiveModel.snapshot.unreadableSources > 0 {
-                    Label("Certaines archives locales sont illisibles. Les fichiers ont été conservés.", systemImage: "exclamationmark.triangle")
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.warning)
-                        .accessibilityIdentifier("sessions.localArchives.error")
                 }
             }
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.top, SQSpace.md)
-            .padding(.bottom, SQSpace.xxl)
-            .sqReadableWidth()
+
+            if model.showsLocalCoverageArchive && archiveModel.hasContent {
+                Section {
+                    NavigationLink {
+                        LocalCoverageArchivesView(model: archiveModel)
+                    } label: {
+                        archivesRow
+                    }
+                    .listRowBackground(SQColor.surface)
+                    .accessibilityIdentifier("sessions.localArchives")
+                } header: {
+                    Text("Sur cet iPhone").sqKicker()
+                }
+            }
         }
+        .listStyle(.insetGrouped)
+        .modifier(CompactListMargins())
+        .scrollContentBackground(.hidden)
+        .sqReadableWidth()
         .signalQuestBackground()
-        .navigationTitle("Mes enregistrements de trajet")
-        .toolbarTitleInlineCompat()
+        .navigationTitle("Enregistrements de trajet")
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .refreshable {
             await archiveModel.reload()
             await model.reload()
@@ -242,53 +293,188 @@ struct SessionsListView: View {
         .task { if model.sessions.isEmpty { await model.reload() } }
         .task { await archiveModel.reload() }
     }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "sessions.back") { dismiss() }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Enregistrements de trajet")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("sessions.title")
+                Text("Tes trajets enregistrés avec l’app Android : Drive Test et couverture.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var loadingRow: some View {
+        HStack { Spacer(); SQSpinner().tint(SQColor.brandRed); Spacer() }
+            .padding(.vertical, SQSpace.sm)
+            .listRowBackground(Color.clear)
+    }
+
+    private var archivesRow: some View {
+        HStack(spacing: SQSpace.sm2) {
+            SQIconPastille(systemImage: "archivebox", size: 38, tint: SQColor.accentInk, font: .system(size: 15, weight: .medium))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(archiveModel.snapshot.entries.isEmpty
+                     ? String(localized: "Archives locales")
+                     : String(localized: "Archives locales · \(archiveModel.snapshot.entries.count)"))
+                    .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+                Text("Anciennes captures gardées ici, qui ne sont plus envoyées.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, SQSpace.xs)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private extension LocalCoverageArchiveViewModel {
+    var hasContent: Bool { !snapshot.entries.isEmpty || snapshot.unreadableSources > 0 }
+}
+
+/// Archives locales : anciennes captures de couverture restées sur l'appareil.
+private struct LocalCoverageArchivesView: View {
+    @ObservedObject var model: LocalCoverageArchiveViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: SQSpace.md) {
+                    MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "sessions.localArchives.back") { dismiss() }
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        Text("Archives locales")
+                            .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                            .foregroundStyle(SQColor.label)
+                            .sqHeader()
+                        Text("Anciennes captures de couverture conservées sur cet appareil. Elles ne sont plus envoyées.")
+                            .font(SQType.callout)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                .listRowBackground(Color.clear)
+            }
+            .listRowSeparator(.hidden)
+
+            if !model.snapshot.entries.isEmpty {
+                Section {
+                    ForEach(model.snapshot.entries) { archive in
+                        NavigationLink {
+                            LocalCoverageArchiveDetailView(archive: archive)
+                        } label: {
+                            LocalCoverageArchiveRow(archive: archive)
+                        }
+                        .listRowBackground(SQColor.surface)
+                        .listRowSeparatorTint(SQColor.separator)
+                    }
+                }
+            }
+
+            if model.snapshot.unreadableSources > 0 {
+                Label("Certaines archives locales sont illisibles. Les fichiers ont été conservés.", systemImage: "exclamationmark.triangle")
+                    .font(SQType.caption)
+                    .foregroundStyle(OutageTint.degradedInk)
+                    .listRowBackground(Color.clear)
+                    .accessibilityIdentifier("sessions.localArchives.error")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .modifier(CompactListMargins())
+        .scrollContentBackground(.hidden)
+        .sqReadableWidth()
+        .signalQuestBackground()
+        .navigationTitle("Archives locales")
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
+        .refreshable { await model.reload() }
+    }
+}
+
+/// Étiquette d'état d'une archive : interrompue (brouillon) ou terminée.
+private struct LocalCoverageArchiveStateTag: View {
+    let state: CoverageSessionQueueState
+
+    var body: some View {
+        let interrupted = state == .recording
+        let tint = interrupted ? OutageTint.degradedInk : OutageTint.resolvedInk
+        Text(interrupted ? "Interrompu" : "Terminée")
+            .font(SQFont.body(11, .bold, relativeTo: .caption2))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(tint.opacity(0.14), in: Capsule(style: .continuous))
+            .fixedSize()
+    }
 }
 
 private struct LocalCoverageArchiveRow: View {
     let archive: LocalCoverageArchive
 
     var body: some View {
-        HStack(spacing: SQSpace.md) {
-            SQIconPastille(systemImage: "archivebox", size: 42, tint: SQColor.accentInk, font: .system(size: 17, weight: .semibold))
-            VStack(alignment: .leading, spacing: SQSpace.xs) {
+        HStack(spacing: SQSpace.sm2) {
+            SQIconPastille(systemImage: "archivebox", size: 38, tint: SQColor.accentInk, font: .system(size: 15, weight: .medium))
+            VStack(alignment: .leading, spacing: 2) {
                 Text(archive.state == .recording ? LocalizedStringKey("Brouillon de couverture") : LocalizedStringKey("Ancienne capture de couverture"))
                     .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
-                Text(Date(timeIntervalSince1970: Double(archive.startTime) / 1_000), format: .dateTime.day().month().year().hour().minute())
+                Text("\(archive.pointCount) points · \(Date(timeIntervalSince1970: Double(archive.startTime) / 1_000).formatted(.dateTime.day().month().year().hour().minute()))")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
+                    .monospacedDigit()
             }
             Spacer(minLength: SQSpace.sm)
-            Image(systemName: "chevron.right")
-                .foregroundStyle(SQColor.labelTertiary)
-                .accessibilityHidden(true)
+            LocalCoverageArchiveStateTag(state: archive.state)
         }
-        .padding(SQSpace.md2)
-        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
-        .contentShape(Rectangle())
+        .padding(.vertical, SQSpace.xs)
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("sessions.localArchive.row")
     }
 }
 
 private struct LocalCoverageArchiveDetailView: View {
     let archive: LocalCoverageArchive
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
-                Text("Archive conservée sur cet appareil")
-                    .font(SQType.heading)
-                    .foregroundStyle(SQColor.label)
-                Text("Cette consultation reste sur cet appareil et n’envoie aucune coordonnée.")
-                    .font(SQType.body)
-                    .foregroundStyle(SQColor.labelSecondary)
+                VStack(alignment: .leading, spacing: SQSpace.md) {
+                    MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "sessions.localArchive.back") { dismiss() }
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        Text(archive.state == .recording ? LocalizedStringKey("Brouillon de couverture") : LocalizedStringKey("Ancienne capture de couverture"))
+                            .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                            .foregroundStyle(SQColor.label)
+                            .sqHeader()
+                        Text("Archive conservée sur cet appareil")
+                            .font(SQType.callout)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: SQSpace.md) {
-                    Label(archive.state == .recording ? LocalizedStringKey("Brouillon interrompu") : LocalizedStringKey("Capture terminée"), systemImage: "archivebox")
+                    HStack {
+                        Label(archive.state == .recording ? LocalizedStringKey("Brouillon interrompu") : LocalizedStringKey("Capture terminée"), systemImage: "archivebox")
+                        Spacer()
+                        LocalCoverageArchiveStateTag(state: archive.state)
+                    }
+                    Divider()
                     HStack {
                         Text("Points enregistrés")
                         Spacer()
-                        Text(archive.pointCount, format: .number)
+                        Text(archive.pointCount, format: .number).monospacedDigit()
                     }
                     HStack {
                         Text("Début")
@@ -307,13 +493,19 @@ private struct LocalCoverageArchiveDetailView: View {
                 .foregroundStyle(SQColor.label)
                 .padding(SQSpace.lg)
                 .sqCardBackground(cornerRadius: SQRadius.lg, elevation: .rest)
+
+                Text("Cette consultation reste sur cet appareil et n’envoie aucune coordonnée.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(SQSpace.lg)
             .sqReadableWidth()
         }
         .signalQuestBackground()
         .navigationTitle("Archive locale")
-        .toolbarTitleInlineCompat()
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
         .accessibilityIdentifier("sessions.localArchive.detail")
     }
 }
@@ -321,57 +513,58 @@ private struct LocalCoverageArchiveDetailView: View {
 private struct SessionRow: View {
     let session: CoverageSession
 
+    /// « 240 points · 18,4 km · 40 min · −91 dBm », ce qui est connu seulement.
+    private var metrics: String {
+        var parts: [String] = []
+        if let points = session.totalPoints { parts.append(String(localized: "\(points) points")) }
+        if let km = session.distanceKm, km > 0 { parts.append(SQUnits.distance(kilometers: km)) }
+        if let duration = session.durationLabel { parts.append(duration) }
+        if let rsrp = session.avgRsrpLabel { parts.append(rsrp) }
+        return parts.joined(separator: " · ")
+    }
+
     var body: some View {
-        HStack(spacing: SQSpace.md) {
-            SQIconPastille(systemImage: session.isDriveTest ? "car.fill" : "dot.radiowaves.left.and.right", size: 42, font: .system(size: 17, weight: .semibold))
+        HStack(spacing: SQSpace.sm2) {
+            SQIconPastille(systemImage: session.isDriveTest ? "car.fill" : "dot.radiowaves.left.and.right", size: 38, font: .system(size: 15, weight: .medium))
             VStack(alignment: .leading, spacing: 3) {
                 Text(session.name ?? (session.isDriveTest ? String(localized: "Drive Test") : String(localized: "Couverture")))
                     .font(SQFont.body(15.5, .semibold, relativeTo: .subheadline))
                     .foregroundStyle(SQColor.label)
                     .sqSingleLine()
-                HStack(spacing: SQSpace.sm) {
-                    if let points = session.totalPoints {
-                        Label("\(points)", systemImage: "mappin.and.ellipse")
-                    }
-                    if let km = session.distanceKm, km > 0 {
-                        Label(SQUnits.distance(kilometers: km), systemImage: "ruler")
-                    }
-                    if let rsrp = session.avgSignalStrength {
-                        Label("\(Int(rsrp)) dBm", systemImage: "antenna.radiowaves.left.and.right")
+                if !metrics.isEmpty {
+                    Text(metrics)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .monospacedDigit()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 5) {
+                    ForEach(session.operators.prefix(4)) { op in
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(SessionDetailView.operatorColor(op.colorHex))
+                                .frame(width: 7, height: 7)
+                                .accessibilityHidden(true)
+                            Text(op.label)
+                                .font(SQFont.body(12, .semibold, relativeTo: .caption2))
+                                .foregroundStyle(SQColor.label)
+                        }
+                        .padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(SessionDetailView.operatorColor(op.colorHex).opacity(0.14), in: Capsule(style: .continuous))
                     }
                     if let date = session.startTime {
-                        Text(date, format: .dateTime.day().month().year())
-                    }
-                }
-                .font(SQFont.body(12, .medium, relativeTo: .caption2))
-                .foregroundStyle(SQColor.labelSecondary)
-                .sqSingleLine()
-                if !session.operators.isEmpty {
-                    HStack(spacing: 5) {
-                        ForEach(session.operators.prefix(4)) { op in
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(SessionDetailView.operatorColor(op.colorHex))
-                                    .frame(width: 7, height: 7)
-                                    .accessibilityHidden(true)
-                                Text(op.label)
-                                    .font(SQFont.body(12, .semibold, relativeTo: .caption2))
-                                    .foregroundStyle(SQColor.label)
-                            }
-                            .padding(.horizontal, 7).padding(.vertical, 2)
-                            .background(SessionDetailView.operatorColor(op.colorHex).opacity(0.14), in: Capsule(style: .continuous))
-                        }
+                        Text(date, format: .dateTime.day().month().hour().minute())
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelTertiary)
+                            .sqSingleLine()
                     }
                 }
             }
-            Spacer(minLength: SQSpace.sm)
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(SQColor.labelTertiary)
-                .accessibilityHidden(true)
+            Spacer(minLength: 0)
         }
-        .padding(SQSpace.md2)
-        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
+        .padding(.vertical, SQSpace.xs)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(session.isDriveTest ? Text("Drive Test") : Text("Couverture"))
     }
 }
