@@ -441,7 +441,7 @@ enum RadioLogSiteState: Codable, Sendable, Equatable {
         switch self {
         case .unchecked: return String(localized: "Vérification…")
         case .identified: return String(localized: "Identifié")
-        case .unidentified: return String(localized: "Non identifié")
+        case .unidentified: return String(localized: "À identifier")
         }
     }
 

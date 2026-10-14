@@ -54,14 +54,16 @@ struct RadioLogStatePill: View {
         switch state {
         case .identified: return P.okSoft
         case .unidentified: return P.chip
-        case .unchecked: return P.chip
+        case .unchecked: return checkable ? SQColor.warningSoft : P.chip
         }
     }
 
     private var ink: Color {
         switch state {
         case .identified: return P.okInk
-        case .unidentified, .unchecked: return P.muted
+        case .unidentified: return P.muted
+        // Vérification en cours : ambre, comme le bandeau de vérification.
+        case .unchecked: return checkable ? OutageTint.degradedInk : P.muted
         }
     }
 
@@ -93,11 +95,19 @@ struct RadioLogStatePill: View {
 struct RadioLogActionButton: View {
     let label: LocalizedStringKey
     var ghost = false
+    var systemImage: String? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(label)
+            HStack(spacing: SQSpace.xs) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 12, weight: .semibold))
+                        .accessibilityHidden(true)
+                }
+                Text(label)
+            }
                 .font(SQFont.body(M.buttonSize, .bold))
                 .sqSingleLine()
                 .foregroundStyle(ghost ? P.ink : P.onAccent)
@@ -164,122 +174,125 @@ struct RadioLogDashedSeparator: View {
     }
 }
 
-/// `.oph` — l'intertitre d'opérateur.
-///
-/// La maquette y inverse la hiérarchie attendue : le nom de l'opérateur est
-/// DISCRET, le décompte est en encre pleine. C'est juste — on sait déjà chez quel
-/// opérateur on est, ce qu'on cherche c'est combien de sites tient cette section.
-///
-/// ÉCART ASSUMÉ avec la maquette : elle met ces libellés en capitales tracées.
-/// La DA « Crème & Terre cuite » les proscrit explicitement (`sqKicker` a été
-/// réécrit pour les supprimer partout). On garde la hiérarchie et les mesures,
-/// pas la casse — sinon cette page détonnerait dans l'app.
+/// L'intertitre d'opérateur : un repère à sa couleur, son nom, puis combien de
+/// sites et de relevés tient la section.
 struct RadioLogOperatorHeader: View {
     let operatorName: String
     let siteCount: Int
     let logCount: Int
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: M.operatorHeaderGap) {
+        HStack(alignment: .center, spacing: SQSpace.sm) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(SQBrand.operatorColor(operatorName))
+                .frame(width: 4, height: 16)
+                .accessibilityHidden(true)
             Text(operatorName)
-                .font(SQFont.body(M.operatorHeaderSize, .bold))
-                .foregroundStyle(P.muted)
-                .sqSingleLine()
-            Text(String(localized: "\(siteCount) site"))
-                .font(SQFont.body(M.operatorHeaderStrongSize, .bold))
+                .font(SQFont.body(14, .bold))
                 .foregroundStyle(P.ink)
                 .sqSingleLine()
-            Text(String(localized: "\(logCount) relevé"))
-                .font(SQFont.body(M.operatorHeaderSize, .bold))
+            Text(verbatim: [String(localized: "\(siteCount) site"), String(localized: "\(logCount) relevé")].joined(separator: " · "))
+                .font(SQType.caption)
                 .foregroundStyle(P.muted)
                 .sqSingleLine()
             Spacer(minLength: 0)
         }
         .monospacedDigit()
-        .padding(.top, M.operatorHeaderTop)
-        .padding(.bottom, M.operatorHeaderBottom)
+        .textCase(nil)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
-// MARK: - La carte site
+// MARK: - La ligne site
 
-/// Une carte par eNB/gNB — l'unité de la page.
+/// Une ligne par eNB/gNB — l'unité de la page, posée dans la carte de son opérateur.
 ///
-/// Un seul niveau : les groupes PCI et les rangées cellule imbriquées de
-/// l'ancienne version ont disparu, et avec eux les chevrons de repli emboîtés.
 /// Le dépliement montre la COMPOSITION du site, en lecture seule : aucune
 /// pastille d'état ni bouton n'y figure, parce qu'aucune identification n'est
-/// calculée par cellule.
+/// calculée par cellule. Il s'ouvre par le bouton « 3 cellules », et non plus
+/// par toute la carte : un appui sur la ligne ne déclenche plus rien d'imprévu.
 struct RadioLogSiteCard: View {
     let site: RadioLogSite
     let state: RadioLogSiteState
     /// Commune et adresse, quand le site est identifié ET que la fiche a été
-    /// chargée. Absente, la carte ne prétend rien savoir.
+    /// chargée. Absente, la ligne ne prétend rien savoir.
     let siteName: String?
     let isExpanded: Bool
     let onIdentify: () -> Void
     let onOpenMap: () -> Void
+    var onToggleCells: () -> Void = {}
+
+    /// Les actions s'alignent sous le texte, pas sous la pastille.
+    private var actionInset: CGFloat { M.leadPill + M.cardInnerGap }
 
     var body: some View {
-        HStack(alignment: .top, spacing: M.cardInnerGap) {
-            leadPill
-            VStack(alignment: .leading, spacing: 0) {
-                identifierLine
-                if let siteName {
-                    Text(siteName)
-                        .font(SQFont.body(M.siteNameSize, .semibold))
-                        .foregroundStyle(P.ink)
-                        .lineLimit(2)
-                        .padding(.top, M.siteNameTop)
-                }
-                // À QUEL site ce nœud est rattaché. La commune ne suffit pas :
-                // deux antennes d'une même commune se ressemblent, et c'est
-                // l'identifiant qu'on retrouve dans « Mes identifications » ou
-                // qu'on compare avec le terrain.
-                if let identifiedSiteId = state.siteId, !identifiedSiteId.isEmpty {
-                    Text("Site \(identifiedSiteId)")
-                        .font(.sqTechnical(M.siteMetaSize, .semibold))
-                        .foregroundStyle(P.muted)
-                        .sqSingleLine()
-                        .padding(.top, siteName == nil ? M.siteNameTop : 1)
-                }
-                Text(metaLine)
-                    .font(SQFont.body(M.siteMetaSize))
-                    .monospacedDigit()
-                    .foregroundStyle(P.muted)
-                    .padding(.top, M.siteMetaTop)
-
-                RadioLogStatePill(state: state, checkable: site.isCheckable)
-                    .padding(.top, M.stateTop)
-
-                if state.isUnidentified {
-                    HStack(spacing: M.ctaGap) {
-                        RadioLogActionButton(label: "Identifier", action: onIdentify)
-                        if site.hasCoordinate {
-                            RadioLogActionButton(label: "Carte", ghost: true, action: onOpenMap)
-                        }
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .top, spacing: M.cardInnerGap) {
+                leadPill
+                VStack(alignment: .leading, spacing: 3) {
+                    identifierLine
+                    if let siteName {
+                        Text(siteName)
+                            .font(SQFont.body(M.siteNameSize, .semibold))
+                            .foregroundStyle(P.ink)
+                            .lineLimit(2)
                     }
-                    .padding(.top, M.ctaTop)
+                    // À QUEL site ce nœud est rattaché. La commune ne suffit pas :
+                    // deux antennes d'une même commune se ressemblent, et c'est
+                    // l'identifiant qu'on retrouve dans « Mes identifications » ou
+                    // qu'on compare avec le terrain.
+                    if let identifiedSiteId = state.siteId, !identifiedSiteId.isEmpty {
+                        Text("Site \(identifiedSiteId)")
+                            .font(.sqTechnical(M.siteMetaSize, .semibold))
+                            .foregroundStyle(P.muted)
+                            .sqSingleLine()
+                    }
+                    Text(metaLine)
+                        .font(SQFont.body(M.siteMetaSize))
+                        .monospacedDigit()
+                        .foregroundStyle(P.muted)
                 }
-
-                if isExpanded {
-                    cellsPanel
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            chevron
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("radioLogs.site.\(site.node)")
+
+            if state.isUnidentified {
+                RadioLogStatePill(state: state, checkable: site.isCheckable)
+                    .padding(.leading, actionInset)
+                HStack(spacing: M.ctaGap) {
+                    RadioLogActionButton(label: "Identifier", action: onIdentify)
+                        .accessibilityIdentifier("radioLogs.site.identify")
+                    if site.hasCoordinate {
+                        RadioLogActionButton(label: "Carte", ghost: true, systemImage: "map", action: onOpenMap)
+                            .accessibilityIdentifier("radioLogs.site.map")
+                    }
+                    Spacer(minLength: 0)
+                    cellsToggle(short: true)
+                }
+                .padding(.leading, actionInset)
+            } else {
+                HStack(spacing: M.ctaGap) {
+                    RadioLogStatePill(state: state, checkable: site.isCheckable)
+                    Spacer(minLength: 0)
+                    cellsToggle(short: false)
+                }
+                .padding(.leading, actionInset)
+            }
+
+            if isExpanded {
+                cellsPanel
+            }
         }
-        .padding(.horizontal, M.cardPaddingH)
-        .padding(.vertical, M.cardPaddingV)
+        .padding(.vertical, SQSpace.xs)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(P.card, in: RoundedRectangle(cornerRadius: M.cardRadius, style: .continuous))
-        .sqShadowCard()
     }
 
     // MARK: Sous-vues
 
-    /// `.lead-pill` — pastille d'accent quand le site est identifié, neutre sinon.
-    /// C'est le seul repère qui se lit au balayage vertical, avant même de lire.
+    /// Pastille d'accent quand le site est identifié, neutre sinon. C'est le seul
+    /// repère qui se lit au balayage vertical, avant même de lire.
     private var leadPill: some View {
         Image(systemName: site.kind == .gnb ? "antenna.radiowaves.left.and.right" : "cellularbars")
             .font(.system(size: 16, weight: .semibold))
@@ -311,16 +324,37 @@ struct RadioLogSiteCard: View {
         return parts.joined(separator: " · ")
     }
 
-    private var chevron: some View {
-        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(P.muted)
-            .accessibilityHidden(true)
+    /// « 3 cellules ⌄ » : annonce ce que le dépliage montre. À côté des actions
+    /// d'un site à identifier, la place manque : « Cellules ⌄ » suffit, le compte
+    /// figure déjà dans la ligne du dessus.
+    private func cellsToggle(short: Bool) -> some View {
+        let count = String(localized: "\(site.cells.count) cellule")
+        return Button {
+            onToggleCells()
+            Haptics.selection()
+        } label: {
+            HStack(spacing: 3) {
+                Text(short ? String(localized: "Cellules") : count)
+                    .font(SQFont.body(12, .semibold))
+                    .monospacedDigit()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    .accessibilityHidden(true)
+            }
+            .foregroundStyle(P.chipInk)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(count)
+        .accessibilityValue(isExpanded ? String(localized: "Développé") : String(localized: "Réduit"))
+        .accessibilityIdentifier("radioLogs.site.cells")
     }
 
-    /// `.cells` — la composition du site. DESCRIPTIVE : aucune pastille de statut,
-    /// aucun bouton. On ne calcule plus d'identification par cellule, donc il n'y
-    /// a plus rien à y valider.
+    /// La composition du site. DESCRIPTIVE : aucune pastille de statut, aucun
+    /// bouton. On ne calcule plus d'identification par cellule, donc il n'y a
+    /// plus rien à y valider.
     private func cellIdentity(_ cell: RadioLogCell) -> some View {
         Text(cell.identityLabel ?? "—")
             .font(.sqTechnical(M.cellIdSize))
@@ -339,10 +373,8 @@ struct RadioLogSiteCard: View {
     private var cellsPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             RadioLogDashedSeparator()
-                .padding(.top, M.cellsTop)
-            Text("Cellules relevées")
-                .font(SQFont.body(M.cellsHeaderSize, .bold))
-                .foregroundStyle(P.muted)
+            Text("Cellules captées")
+                .sqKicker()
                 .padding(.top, M.cellsTop)
                 .padding(.bottom, M.cellsHeaderBottom)
 
@@ -375,5 +407,6 @@ struct RadioLogSiteCard: View {
                 }
             }
         }
+        .accessibilityIdentifier("radioLogs.site.cellsPanel")
     }
 }

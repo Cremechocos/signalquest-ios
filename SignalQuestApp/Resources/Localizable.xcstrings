@@ -348,6 +348,22 @@
         }
       }
     },
+    "%lld %% vérifiés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld %% verified"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld %% vérifiés"
+          }
+        }
+      }
+    },
     "%lld anneaux TA — ils ne se croisent pas : relevés à vérifier" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2776,6 +2792,22 @@
         }
       }
     },
+    "Cellules captées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cells picked up"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cellules captées"
+          }
+        }
+      }
+    },
     "Cellules sans nœud" : {
       "localizations" : {
         "en" : {
@@ -3586,6 +3618,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Désélectionner"
+          }
+        }
+      }
+    },
+    "D’abord ceux que tu captes le plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The ones you pick up most come first"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D’abord ceux que tu captes le plus"
           }
         }
       }
@@ -5244,6 +5292,22 @@
         }
       }
     },
+    "Le journal se remplit avec l’app Android, qui capte les antennes pendant tes trajets." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The log fills up with the Android app, which picks up antennas on your trips."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le journal se remplit avec l’app Android, qui capte les antennes pendant tes trajets."
+          }
+        }
+      }
+    },
     "Le numéro de sécurité n’est pas disponible pour le moment." : {
       "localizations" : {
         "en" : {
@@ -5357,6 +5421,22 @@
         }
       }
     },
+    "Les antennes captées par l’app Android pendant tes trajets." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennas the Android app picked up on your trips."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les antennes captées par l’app Android pendant tes trajets."
+          }
+        }
+      }
+    },
     "Les antennes que tu as reliées à un site, ici et sur Android." : {
       "localizations" : {
         "en" : {
@@ -5449,6 +5529,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les plus rapides et les plus actifs de la communauté."
+          }
+        }
+      }
+    },
+    "Les plus relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most recorded"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les plus relevés"
+          }
+        }
+      }
+    },
+    "Les plus relevés d’abord" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most recorded first"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les plus relevés d’abord"
+          }
+        }
+      }
+    },
+    "Les plus récents" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most recent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les plus récents"
+          }
+        }
+      }
+    },
+    "Les plus récents d’abord" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most recent first"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les plus récents d’abord"
           }
         }
       }
@@ -6070,23 +6214,6 @@
         }
       }
     },
-    "N'afficher que" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show only"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "N'afficher que"
-          }
-        }
-      }
-    },
     "Non envoyé" : {
       "localizations" : {
         "en" : {
@@ -6243,6 +6370,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouverts · %lld"
+          }
+        }
+      }
+    },
+    "Ouvre Trier et afficher" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens Sort and display"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre Trier et afficher"
           }
         }
       }
@@ -6404,6 +6547,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Page suivante"
+          }
+        }
+      }
+    },
+    "Par identifiant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By identifier"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par identifiant"
           }
         }
       }
@@ -6855,6 +7014,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Précisions · obligatoire"
+          }
+        }
+      }
+    },
+    "Présentation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Présentation"
           }
         }
       }
@@ -7392,19 +7567,18 @@
         }
       }
     },
-    "SFR, Orange, Free, Bouygues" : {
-      "extractionState" : "manual",
+    "SFR, Orange, Free, Bouygues Telecom" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SFR, Orange, Free, Bouygues"
+            "value" : "SFR, Orange, Free, Bouygues Telecom"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SFR, Orange, Free, Bouygues"
+            "value" : "SFR, Orange, Free, Bouygues Telecom"
           }
         }
       }
@@ -7965,6 +8139,22 @@
         }
       }
     },
+    "Supprimer le journal…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete log…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le journal…"
+          }
+        }
+      }
+    },
     "Supprimer le rappel" : {
       "localizations" : {
         "en" : {
@@ -8497,6 +8687,22 @@
         }
       }
     },
+    "Trier et afficher" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sort and display"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trier et afficher"
+          }
+        }
+      }
+    },
     "Trier par" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8644,6 +8850,22 @@
         }
       }
     },
+    "Un site après l’autre, tu t’arrêtes quand tu veux." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One site after another; stop whenever you like."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un site après l’autre, tu t’arrêtes quand tu veux."
+          }
+        }
+      }
+    },
     "Une idée" : {
       "localizations" : {
         "en" : {
@@ -8656,6 +8878,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Une idée"
+          }
+        }
+      }
+    },
+    "Une vérification complète fait quelques dizaines de requêtes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A full check makes a few dozen requests."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une vérification complète fait quelques dizaines de requêtes."
           }
         }
       }
@@ -8845,6 +9083,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Voir tout le monde"
+          }
+        }
+      }
+    },
+    "Vus en dernier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seen last"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vus en dernier"
           }
         }
       }
@@ -9131,6 +9385,22 @@
         }
       }
     },
+    "eNB et gNB croissants" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eNB and gNB, ascending"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eNB et gNB croissants"
+          }
+        }
+      }
+    },
     "envoyé le %@" : {
       "localizations" : {
         "en" : {
@@ -9394,6 +9664,22 @@
         }
       }
     },
+    "par opérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "by carrier"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "par opérateur"
+          }
+        }
+      }
+    },
     "plus %lld points" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9647,23 +9933,6 @@
         }
       }
     },
-    "une passe complète représente quelques dizaines de requêtes" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "a full pass takes a few dozen requests"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "une passe complète représente quelques dizaines de requêtes"
-          }
-        }
-      }
-    },
     "« %@ » ne te sera plus attribuée. Tu pourras la ré-identifier." : {
       "localizations" : {
         "en" : {
@@ -9772,6 +10041,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À envoyer"
+          }
+        }
+      }
+    },
+    "À identifier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To identify"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À identifier"
           }
         }
       }
@@ -14591,22 +14876,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld %% vs 30 jours précédents"
-          }
-        }
-      }
-    },
-    "%lld %% vérifié" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld %% verified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld %% vérifié"
           }
         }
       }
@@ -24786,22 +25055,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cellules observées"
-          }
-        }
-      }
-    },
-    "Cellules relevées" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recorded cells"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cellules relevées"
           }
         }
       }
@@ -44659,38 +44912,6 @@
         }
       }
     },
-    "Non identifié" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unidentified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Non identifié"
-          }
-        }
-      }
-    },
-    "Non identifiés" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not identified"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Non identifiés"
-          }
-        }
-      }
-    },
     "Non lu" : {
       "localizations" : {
         "en" : {
@@ -48121,22 +48342,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Perte totale d’accès"
-          }
-        }
-      }
-    },
-    "Pertinence" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Relevance"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pertinence"
           }
         }
       }
@@ -53281,22 +53486,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réauthentification Apple impossible. Réessaie."
-          }
-        }
-      }
-    },
-    "Récence" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recency"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Récence"
           }
         }
       }
@@ -58720,22 +58909,6 @@
         }
       }
     },
-    "Supprimer le journal" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete log"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Supprimer le journal"
-          }
-        }
-      }
-    },
     "Supprimer le journal radio ?" : {
       "localizations" : {
         "en" : {
@@ -60443,23 +60616,6 @@
         }
       }
     },
-    "Ton journal radio est vide. Il se remplit depuis l'application Android, qui capte les cellules pendant tes trajets." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your radio log is empty. It fills up from the Android app, which captures cells during your trips."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ton journal radio est vide. Il se remplit depuis l'application Android, qui capte les cellules pendant tes trajets."
-          }
-        }
-      }
-    },
     "Ton mot de passe de chiffrement, choisi à la création de ta clé et différent de celui de ton compte, ouvre tes conversations chiffrées le temps de la session." : {
       "localizations" : {
         "en" : {
@@ -61255,22 +61411,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trier"
-          }
-        }
-      }
-    },
-    "Trier et filtrer" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sort and filter"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trier et filtrer"
           }
         }
       }
@@ -65644,22 +65784,6 @@
         }
       }
     },
-    "eNB croissant" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ascending eNB"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "eNB croissant"
-          }
-        }
-      }
-    },
     "eNB incorrect" : {
       "localizations" : {
         "en" : {
@@ -66482,22 +66606,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "le signal médian"
-          }
-        }
-      }
-    },
-    "les plus relevés d'abord" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "most recorded first"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "les plus relevés d'abord"
           }
         }
       }
@@ -67988,22 +68096,6 @@
         }
       }
     },
-    "un site après l'autre, sortie à tout moment" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "one site at a time; leave whenever you want"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "un site après l'autre, sortie à tout moment"
-          }
-        }
-      }
-    },
     "une autre plateforme" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -68097,22 +68189,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "votre connexion"
-          }
-        }
-      }
-    },
-    "vus en dernier" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "seen last"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "vus en dernier"
           }
         }
       }

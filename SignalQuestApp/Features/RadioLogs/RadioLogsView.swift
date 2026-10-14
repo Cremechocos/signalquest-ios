@@ -7,15 +7,19 @@ private typealias P = RadioLogsPalette
 ///
 /// L'unité n'est plus la cellule mais le site (eNB/gNB) : `identify/quick` rend
 /// le même `siteId` avec ou sans PCI, donc l'identification porte sur le nœud.
-/// Les PCI et les ECI restent visibles, en pastilles, mais comme
+/// Les PCI et les ECI restent visibles, dans le dépliage, mais comme
 /// CARACTÉRISTIQUES du site — plus aucun bouton pour les valider. Ils décrivent,
 /// ils ne demandent rien.
 ///
 /// Le journal est alimenté par la capture Android et lu ici : iOS n'écrit jamais
 /// dans le journal, il ne fait qu'en tirer les sites et demander au serveur
 /// lesquels sont déjà identifiés.
+///
+/// Une `List` plutôt qu'une pile : le journal compte des milliers de sites, et
+/// une carte par opérateur doit rester paresseuse ligne à ligne.
 struct RadioLogsView: View {
     @EnvironmentObject private var services: AppServices
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var model: RadioLogsViewModel
     @State private var showsFilterSheet = false
     @State private var showsSearch = false
@@ -33,48 +37,103 @@ struct RadioLogsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
+        List {
+            Section {
+                header
+                    .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                    .listRowBackground(Color.clear)
                 if showsSearch {
                     SQSearchField(text: $model.searchText, placeholder: "eNB, gNB, opérateur…")
-                        .padding(.bottom, SQSpace.md)
+                        .accessibilityIdentifier("radioLogs.searchField")
+                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                        .listRowBackground(Color.clear)
                 }
                 if let premiumMessage = model.premiumMessage {
                     premiumBanner(premiumMessage)
-                }
-                if model.isScanning || model.isSyncing {
-                    scanBanner
+                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                        .listRowBackground(Color.clear)
                 }
                 // Avec un journal en cache, l'échec de synchronisation ou de
                 // purge ne se voyait nulle part (AF-RAD-08) : le cache reste,
                 // l'échec se dit au-dessus.
                 if let errorMessage = model.errorMessage, !model.sites.isEmpty, !model.isSyncing {
-                    VStack(alignment: .leading, spacing: SQSpace.xs) {
-                        SQInlineError(message: errorMessage)
-                        Button("Réessayer") { Task { await model.refresh() } }
-                            .font(SQFont.body(14, .semibold))
-                            .foregroundStyle(SQColor.accentInk)
-                            .frame(minHeight: 44)
-                    }
-                    .padding(SQSpace.md)
-                    .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-                    .padding(.bottom, SQSpace.md)
+                    inlineError(errorMessage)
+                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                        .listRowBackground(Color.clear)
                 }
-                tally
-                filterRail
-                completionLine
+                if !model.sites.isEmpty || model.isSyncing {
+                    summaryCard
+                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                        .listRowBackground(Color.clear)
+                }
+                if !model.sites.isEmpty {
+                    SQSegmentedFilter(
+                        selection: $model.filter,
+                        options: RadioLogsViewModel.Filter.allCases.map { option in
+                            (value: option, label: "\(option.label) · \(model.count(for: option).formatted())", icon: String?.none)
+                        }
+                    )
+                    .accessibilityIdentifier("radioLogs.filter")
+                    // Le segment ajoute sa propre marge latérale de 16 pt : on la compense.
+                    .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: -SQSpace.lg, bottom: 0, trailing: -SQSpace.lg))
+                    .listRowBackground(Color.clear)
+                    sortSummary
+                        .listRowInsets(EdgeInsets(top: 0, leading: SQSpace.xs, bottom: 0, trailing: 0))
+                        .listRowBackground(Color.clear)
+                }
                 if !model.chainCandidates.isEmpty {
                     chainCallToAction
+                        .listRowInsets(EdgeInsets(top: SQSpace.xs, leading: 0, bottom: SQSpace.xs, trailing: 0))
+                        .listRowBackground(Color.clear)
                 }
-                content
+                if model.sites.isEmpty || model.filteredCount == 0 {
+                    emptyContent
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                }
             }
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.bottom, SQSpace.huge)
+            .listRowSeparator(.hidden)
+
+            ForEach(model.sections) { section in
+                Section {
+                    ForEach(section.sites) { site in
+                        RadioLogSiteCard(
+                            site: site,
+                            state: model.state(of: site),
+                            siteName: model.siteNames[site.id],
+                            isExpanded: model.expandedSiteId == site.id,
+                            onIdentify: { identifyTarget = site },
+                            onOpenMap: { mapTarget = site },
+                            onToggleCells: { model.toggleExpansion(site) }
+                        )
+                        .listRowBackground(SQColor.surface)
+                        .listRowSeparatorTint(SQColor.separator)
+                        .onAppear {
+                            // La commune n'est chargée que pour ce qui s'affiche —
+                            // c'est un GET par site, et la liste en compte des milliers.
+                            if model.state(of: site).isIdentified { model.loadSiteName(for: site) }
+                        }
+                    }
+                } header: {
+                    if let operatorName = section.operatorName {
+                        RadioLogOperatorHeader(
+                            operatorName: operatorName,
+                            siteCount: section.sites.count,
+                            logCount: section.logCount
+                        )
+                    }
+                }
+            }
         }
-        .background(SQColor.bg.ignoresSafeArea())
+        .listStyle(.insetGrouped)
+        .modifier(CompactListMargins())
+        .scrollContentBackground(.hidden)
+        .sqReadableWidth()
+        .signalQuestBackground()
         .navigationTitle("Logs antennes")
-        .toolbarTitleInlineCompat()
-        .toolbar { toolbarContent }
+        .toolbar(.hidden, for: .navigationBar)
+        // Barre masquée : le balayage retour est rétabli, comme sur les autres écrans Halo.
+        .sqKeepsSwipeBack()
         .refreshable { await model.refresh() }
         .task { await model.onAppear() }
         .onDisappear { model.stopScan() }
@@ -126,99 +185,193 @@ struct RadioLogsView: View {
         .sqAnimation(SQMotion.standard, value: model.expandedSiteId)
     }
 
-    // MARK: - Barre supérieure
+    // MARK: - En-tête
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
-            HStack(spacing: SQSpace.md) {
-                Button {
+    private var header: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack(spacing: SQSpace.sm) {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "radioLogs.back") { dismiss() }
+                Spacer(minLength: 0)
+                MapChipIconButton(
+                    systemImage: showsSearch ? "xmark" : "magnifyingglass",
+                    label: showsSearch ? "Fermer la recherche" : "Rechercher un site",
+                    identifier: "radioLogs.search"
+                ) {
                     showsSearch.toggle()
                     if !showsSearch { model.searchText = "" }
-                    Haptics.selection()
-                } label: {
-                    Image(systemName: showsSearch ? "magnifyingglass.circle.fill" : "magnifyingglass")
                 }
-                .accessibilityLabel("Rechercher un site")
-
-                Menu {
-                    Button {
-                        showsFilterSheet = true
-                    } label: {
-                        Label("Trier et filtrer", systemImage: "line.3.horizontal.decrease")
-                    }
-                    Button {
-                        model.rescanAll()
-                    } label: {
-                        Label("Tout revérifier", systemImage: "arrow.clockwise")
-                    }
-                    Divider()
-                    Button(role: .destructive) {
-                        showsPurgeConfirmation = true
-                    } label: {
-                        Label("Supprimer le journal", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .accessibilityLabel("Plus d'options")
+                optionsMenu
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Logs antennes")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("radioLogs.title")
+                Text("Les antennes captées par l’app Android pendant tes trajets.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Bandeau de balayage
+    /// Le menu garde ses trois actions ; la suppression, irréversible, est
+    /// rangée à part et annonce par ses points de suspension qu'elle demande
+    /// confirmation.
+    private var optionsMenu: some View {
+        Menu {
+            Button {
+                showsFilterSheet = true
+            } label: {
+                Label("Trier et afficher", systemImage: "slider.horizontal.3")
+            }
+            Button {
+                model.rescanAll()
+            } label: {
+                Label("Tout revérifier", systemImage: "arrow.clockwise")
+            }
+            Divider()
+            Button(role: .destructive) {
+                showsPurgeConfirmation = true
+            } label: {
+                Label("Supprimer le journal…", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 44, height: 44)
+                .sqSurface(SQColor.chip, in: Circle())
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("Plus d'options")
+        .accessibilityIdentifier("radioLogs.more")
+    }
 
-    /// `.scan` — le bandeau de vérification du catalogue.
-    ///
-    /// C'est un élément de CONTENU, pas une barre système : il partage le
-    /// vocabulaire des cartes, se suspend d'un geste, et disparaît une fois le
-    /// catalogue résolu.
-    private var scanBanner: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: M.scanHeadGap) {
-                Circle()
-                    .fill(P.accent)
-                    .frame(width: M.scanDot, height: M.scanDot)
-                    .overlay(Circle().stroke(P.accentSoft, lineWidth: 4))
-                    .accessibilityHidden(true)
-                Text(model.isSyncing ? String(localized: "Récupération du journal") : String(localized: "Vérification du catalogue"))
-                    .font(SQFont.body(M.scanTitleSize, .bold))
-                    .foregroundStyle(P.ink)
+    // MARK: - Synthèse
+
+    /// Sites, relevés, synchronisation et part vérifiée, en une carte. Pendant la
+    /// récupération ou la vérification, la carte porte aussi la tâche en cours et
+    /// de quoi la suspendre.
+    private var summaryCard: some View {
+        let isWorking = model.isScanning || model.isSyncing
+        return VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack(alignment: .top, spacing: SQSpace.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(siteTally)
+                        .foregroundStyle(SQColor.label)
+                        .monospacedDigit()
+                    Text(tallySubtitle)
+                        .font(SQType.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                Spacer(minLength: 0)
+                if !isWorking && model.totalCount > 0 {
+                    verifiedPill
+                }
+            }
+            if isWorking {
+                scanBlock
+            } else if model.totalCount > 0 {
+                progressBar(value: model.completion, height: M.barHeight, tint: P.okInk)
+            }
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("radioLogs.summary")
+    }
+
+    /// « 214 sites », le nombre en grand : la clé plurielle reste celle du reste
+    /// de l'app, seule la part chiffrée change de corps.
+    private var siteTally: AttributedString {
+        var tally = AttributedString(localized: "\(model.totalCount) site")
+        tally.font = SQFont.body(14, .bold)
+        tally.foregroundColor = SQColor.labelSecondary
+        if let range = tally.characters.firstIndex(where: { !$0.isNumber && !$0.isWhitespace && $0 != "\u{202F}" && $0 != "\u{00A0}" && $0 != "," && $0 != "." }) {
+            tally[tally.startIndex..<range].font = SQFont.display(26, .heavy, relativeTo: .title)
+            tally[tally.startIndex..<range].foregroundColor = SQColor.label
+        }
+        return tally
+    }
+
+    private var tallySubtitle: String {
+        // Traduit, avec les variantes de pluriel du catalogue (« 0 relevé » en
+        // français, « 0 measurements » en anglais).
+        var parts = [String(localized: "\(model.logCount) relevé")]
+        if let lastSyncedAt = model.lastSyncedAt {
+            parts.append(String(localized: "synchronisé \(lastSyncedAt.formatted(.relative(presentation: .named)))"))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// La complétude PERMANENTE. Elle reste après le balayage : elle dit l'état de
+    /// CONNAISSANCE du catalogue, pas une tâche en cours.
+    private var verifiedPill: some View {
+        let percent = Int((model.completion * 100).rounded())
+        return HStack(spacing: SQSpace.xs) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 11, weight: .bold))
+                .accessibilityHidden(true)
+            Text("\(percent) % vérifiés")
+                .font(SQFont.body(12, .bold))
+                .monospacedDigit()
+        }
+        .foregroundStyle(P.okInk)
+        .padding(.horizontal, SQSpace.sm)
+        .frame(minHeight: 26)
+        .background(P.okSoft, in: Capsule(style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Catalogue vérifié à \(percent) pour cent")
+        .accessibilityIdentifier("radioLogs.verified")
+    }
+
+    /// La vérification du catalogue, dans la carte de synthèse : elle se suspend
+    /// d'un geste et disparaît une fois le catalogue résolu.
+    private var scanBlock: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.md) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(model.isSyncing ? String(localized: "Récupération du journal") : String(localized: "Vérification du catalogue"))
+                        .font(SQFont.body(12, .bold))
+                        .foregroundStyle(OutageTint.degradedInk)
+                    Text(scanSubtitle)
+                        .font(SQType.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
                 Spacer(minLength: 0)
                 if !model.isSyncing {
                     Button {
                         model.toggleScan()
                         Haptics.selection()
                     } label: {
-                        Text(model.isScanning ? String(localized: "Suspendre") : String(localized: "Reprendre"))
-                            .font(SQFont.body(M.scanActionSize, .bold))
-                            .foregroundStyle(P.accentInk)
-                            .padding(.horizontal, M.scanActionPaddingH)
-                            .padding(.vertical, M.scanActionPaddingV)
-                            .background(P.accentSoft, in: RoundedRectangle(cornerRadius: M.scanActionRadius, style: .continuous))
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
+                        HStack(spacing: SQSpace.xs) {
+                            Image(systemName: model.isScanning ? "pause.fill" : "play.fill")
+                                .font(.system(size: 11, weight: .bold))
+                                .accessibilityHidden(true)
+                            Text(model.isScanning ? String(localized: "Suspendre") : String(localized: "Reprendre"))
+                                .font(SQFont.body(12, .bold))
+                        }
+                        .foregroundStyle(SQColor.label)
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minHeight: 32)
+                        .sqSurface(SQColor.chip, in: Capsule(style: .continuous))
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("radioLogs.scan.toggle")
                 }
             }
-            .padding(.bottom, M.scanHeadBottom)
-
-            progressBar(value: model.isSyncing ? nil : model.completion, height: M.barHeight, tint: P.accent)
-
-            Text(scanSubtitle)
-                .font(SQFont.body(M.scanSubSize))
-                .monospacedDigit()
-                .foregroundStyle(P.muted)
-                .padding(.top, M.scanSubTop)
+            progressBar(value: model.isSyncing ? nil : model.completion, height: M.barHeight, tint: OutageTint.degradedInk)
         }
-        .padding(.horizontal, M.scanPaddingH)
-        .padding(.vertical, M.scanPaddingV)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(P.card, in: RoundedRectangle(cornerRadius: M.scanRadius, style: .continuous))
-        .sqShadowCard()
-        .padding(.bottom, M.scanBottom)
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("radioLogs.scan")
     }
 
     private var scanSubtitle: String {
@@ -252,98 +405,29 @@ struct RadioLogsView: View {
         .accessibilityHidden(true)
     }
 
-    // MARK: - Dénombrement et filtres
+    // MARK: - Tri et file
 
-    /// `.tally` — combien de sites, combien de relevés.
-    private var tally: some View {
-        HStack(spacing: M.tallyGap) {
-            Image(systemName: "square.grid.2x2.fill")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(P.accentInk)
-                .frame(width: M.tallyBadge, height: M.tallyBadge)
-                .background(P.accentSoft, in: RoundedRectangle(cornerRadius: M.tallyBadgeRadius, style: .continuous))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(String(localized: "\(model.totalCount) site"))
-                    .font(SQFont.display(M.tallyNumberSize, .bold))
-                    .foregroundStyle(P.ink)
-                Text(tallySubtitle)
-                    .font(SQFont.body(M.tallySubSize))
-                    .foregroundStyle(P.muted)
+    /// « Les plus relevés d'abord · par opérateur » : dit le tri en cours et ouvre
+    /// « Trier et afficher ».
+    private var sortSummary: some View {
+        let parts = [model.sortOrder.summary] + (model.groupByOperator ? [String(localized: "par opérateur")] : [])
+        return Button {
+            showsFilterSheet = true
+        } label: {
+            HStack(spacing: SQSpace.xs2) {
+                Text(verbatim: parts.joined(separator: " · "))
+                    .font(SQFont.body(12, .semibold))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+                    .accessibilityHidden(true)
             }
-            .monospacedDigit()
-            Spacer(minLength: 0)
+            .foregroundStyle(SQColor.labelSecondary)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
-        .padding(.bottom, M.tallyBottom)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var tallySubtitle: String {
-        // Traduit, avec les variantes de pluriel du catalogue (« 0 relevé » en
-        // français, « 0 measurements » en anglais).
-        var parts = [String(localized: "\(model.logCount) relevé")]
-        if let lastSyncedAt = model.lastSyncedAt {
-            parts.append(String(localized: "synchronisé \(lastSyncedAt.formatted(.relative(presentation: .named)))"))
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    /// `.rail` — les compteurs portent sur le CATALOGUE ENTIER, pas sur une
-    /// fenêtre chargée.
-    private var filterRail: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: M.railGap) {
-                ForEach(RadioLogsViewModel.Filter.allCases) { option in
-                    let isSelected = model.filter == option
-                    Button {
-                        model.filter = option
-                        Haptics.selection()
-                    } label: {
-                        Text("\(option.label) · \(model.count(for: option).formatted())")
-                            .font(SQFont.body(M.chipSize, .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(isSelected ? P.accentInk : P.chipInk)
-                            .padding(.horizontal, M.chipPaddingH)
-                            .padding(.vertical, M.chipPaddingV)
-                            .background {
-                                Capsule(style: .continuous)
-                                    .fill(isSelected ? P.accentSoft : P.chip)
-                                    .overlay {
-                                        if isSelected {
-                                            Capsule(style: .continuous)
-                                                .strokeBorder(P.accent.opacity(0.32), lineWidth: 1)
-                                        }
-                                    }
-                            }
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(isSelected ? .isSelected : [])
-                }
-            }
-            .padding(.horizontal, 2)
-        }
-        .padding(.bottom, M.railBottom)
-    }
-
-    /// `.done-line` — la complétude PERMANENTE. Elle reste après le balayage :
-    /// elle dit l'état de CONNAISSANCE du catalogue, pas une tâche en cours.
-    @ViewBuilder
-    private var completionLine: some View {
-        if model.totalCount > 0 {
-            HStack(spacing: M.doneGap) {
-                progressBar(value: model.completion, height: M.doneBarHeight, tint: P.okInk)
-                Text("\(Int((model.completion * 100).rounded())) % vérifié")
-                    .font(SQFont.body(M.doneTextSize))
-                    .monospacedDigit()
-                    .foregroundStyle(P.muted)
-                    .fixedSize()
-            }
-            .padding(.bottom, M.doneBottom)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Catalogue vérifié à \(Int((model.completion * 100).rounded())) pour cent")
-        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Ouvre Trier et afficher")
+        .accessibilityIdentifier("radioLogs.sortSummary")
     }
 
     /// L'entrée de la file en chaîne. Elle n'ouvre pas douze fois le même écran :
@@ -355,74 +439,58 @@ struct RadioLogsView: View {
             Haptics.selection()
         } label: {
             HStack(spacing: SQSpace.md) {
-                Image(systemName: "list.bullet.rectangle.portrait")
-                    .font(.system(size: 15, weight: .semibold))
-                VStack(alignment: .leading, spacing: 1) {
+                SQIconPastille(systemImage: "list.bullet.rectangle.portrait", size: 38, tint: SQColor.accentInk, fill: SQColor.surface)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Identifier \(min(candidates.count, 50)) site à la suite")
-                        .font(SQFont.body(13, .bold))
-                    Text("un site après l'autre, sortie à tout moment")
-                        .font(SQFont.body(12))
-                        // Pas d'opacité sous 13 pt sur aplat brique : l'anti-crénelage
-                        // mange déjà ~23 % du contraste (DesignTokenContrastTests).
-                        .foregroundStyle(P.onAccent)
+                        .font(SQFont.body(14, .bold))
+                        .foregroundStyle(SQColor.label)
+                    Text("Un site après l’autre, tu t’arrêtes quand tu veux.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .accessibilityHidden(true)
             }
-            .foregroundStyle(P.onAccent)
-            .padding(.horizontal, SQSpace.lg)
-            .padding(.vertical, SQSpace.md)
+            .padding(SQSpace.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(P.accent, in: RoundedRectangle(cornerRadius: M.cardRadius, style: .continuous))
+            .background(P.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.bottom, M.cardSpacing)
+        .accessibilityIdentifier("radioLogs.chain")
     }
 
-    // MARK: - Liste
+    // MARK: - États
+
+    private func inlineError(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs) {
+            SQInlineError(message: message)
+            Button("Réessayer") { Task { await model.refresh() } }
+                .font(SQFont.body(14, .semibold))
+                .foregroundStyle(SQColor.accentInk)
+                .frame(minHeight: 44)
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SQColor.dangerSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+    }
 
     @ViewBuilder
-    private var content: some View {
+    private var emptyContent: some View {
         if model.sites.isEmpty {
             emptyState
-        } else if model.filteredCount == 0 {
+        } else {
             EmptyStateView(
                 title: "Aucun site",
                 message: "Aucun site ne correspond à ce filtre.",
                 systemImage: "line.3.horizontal.decrease.circle"
             )
             .padding(.top, SQSpace.xl)
-        } else {
-            ForEach(model.sections) { section in
-                if let operatorName = section.operatorName {
-                    RadioLogOperatorHeader(
-                        operatorName: operatorName,
-                        siteCount: section.sites.count,
-                        logCount: section.logCount
-                    )
-                }
-                ForEach(section.sites) { site in
-                    RadioLogSiteCard(
-                        site: site,
-                        state: model.state(of: site),
-                        siteName: model.siteNames[site.id],
-                        isExpanded: model.expandedSiteId == site.id,
-                        onIdentify: { identifyTarget = site },
-                        onOpenMap: { mapTarget = site }
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture { model.toggleExpansion(site) }
-                    .accessibilityAction(named: Text(model.expandedSiteId == site.id ? String(localized: "Réduire les cellules") : String(localized: "Afficher les cellules"))) {
-                        model.toggleExpansion(site)
-                    }
-                    .padding(.bottom, M.cardSpacing)
-                    .onAppear {
-                        // La commune n'est chargée que pour ce qui s'affiche —
-                        // c'est un GET par site, et la liste en compte des milliers.
-                        if model.state(of: site).isIdentified { model.loadSiteName(for: site) }
-                    }
-                }
-            }
         }
     }
 
@@ -438,10 +506,10 @@ struct RadioLogsView: View {
                 retry: { Task { await model.refresh() } }
             )
             .padding(.top, SQSpace.xl)
-        } else {
+        } else if model.premiumMessage == nil {
             EmptyStateView(
                 title: "Aucun relevé",
-                message: "Ton journal radio est vide. Il se remplit depuis l'application Android, qui capte les cellules pendant tes trajets.",
+                message: "Le journal se remplit avec l’app Android, qui capte les antennes pendant tes trajets.",
                 systemImage: "antenna.radiowaves.left.and.right"
             )
             .padding(.top, SQSpace.xl)
@@ -451,15 +519,23 @@ struct RadioLogsView: View {
     /// Refus Premium : dire pourquoi et proposer d'agir (TRX-34). Un abonnement
     /// pris sur Android ou sur le web vaut ici aussi ; l'app le relit à la demande.
     private func premiumBanner(_ message: String) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Label(message, systemImage: "lock.fill")
-                .font(SQType.caption.weight(.semibold))
-                .foregroundStyle(SQColor.warning)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Abonné sur Android ou sur le web ? Ton abonnement vaut aussi ici : actualise-le.")
-                .font(SQType.caption)
-                .foregroundStyle(SQColor.label)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(OutageTint.degradedInk)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(message)
+                        .font(SQFont.body(14, .bold))
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Abonné sur Android ou sur le web ? Ton abonnement vaut aussi ici : actualise-le.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: SQSpace.sm) { premiumActions }
                 VStack(alignment: .leading, spacing: SQSpace.sm) { premiumActions }
@@ -467,31 +543,38 @@ struct RadioLogsView: View {
         }
         .padding(SQSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
-        .padding(.bottom, SQSpace.md)
+        .background(SQColor.warningSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("radioLogs.premium")
     }
 
     @ViewBuilder
     private var premiumActions: some View {
-        premiumAction("Voir l’abonnement", identifier: "radioLogs.premium.paywall") {
+        premiumAction("Voir l’abonnement", prominent: true, identifier: "radioLogs.premium.paywall") {
             showsPremiumPaywall = true
         }
         premiumAction(isRefreshingEntitlement ? "Vérification…" : "Actualiser mon abonnement",
-                      identifier: "radioLogs.premium.refresh") {
+                      prominent: false, identifier: "radioLogs.premium.refresh") {
             Task { await refreshEntitlement() }
         }
         .disabled(isRefreshingEntitlement)
     }
 
-    private func premiumAction(_ title: LocalizedStringKey, identifier: String,
+    private func premiumAction(_ title: LocalizedStringKey, prominent: Bool, identifier: String,
                                action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(SQType.caption.weight(.semibold))
-                .foregroundStyle(SQColor.label)
+                .font(SQFont.body(13, .semibold))
+                .foregroundStyle(prominent ? SQColor.onAccent : SQColor.label)
                 .padding(.horizontal, SQSpace.md)
                 .frame(minHeight: 44)
-                .sqSurface(SQColor.surface, in: Capsule())
+                .background {
+                    if prominent {
+                        Capsule().fill(SQColor.brandRed)
+                    } else {
+                        Capsule().fill(SQColor.surface)
+                    }
+                }
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
@@ -516,6 +599,7 @@ struct RadioLogsView: View {
                 .background(SQColor.label, in: Capsule(style: .continuous))
                 .padding(.bottom, SQSpace.xxl)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .accessibilityIdentifier("radioLogs.toast")
                 .task {
                     try? await Task.sleep(nanoseconds: 2_400_000_000)
                     model.toast = nil

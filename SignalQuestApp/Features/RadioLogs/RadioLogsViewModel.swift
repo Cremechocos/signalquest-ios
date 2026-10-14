@@ -16,7 +16,7 @@ final class RadioLogsViewModel: ObservableObject {
             switch self {
             case .all: return String(localized: "Tous")
             case .identified: return String(localized: "Identifiés")
-            case .unidentified: return String(localized: "Non identifiés")
+            case .unidentified: return String(localized: "À identifier")
             }
         }
     }
@@ -28,16 +28,24 @@ final class RadioLogsViewModel: ObservableObject {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .relevance: return String(localized: "Pertinence")
-            case .recency: return String(localized: "Récence")
+            case .relevance: return String(localized: "Les plus relevés")
+            case .recency: return String(localized: "Les plus récents")
             case .identifier: return String(localized: "Identifiant")
             }
         }
         var hint: String {
             switch self {
-            case .relevance: return String(localized: "les plus relevés d'abord")
-            case .recency: return String(localized: "vus en dernier")
-            case .identifier: return String(localized: "eNB croissant")
+            case .relevance: return String(localized: "D’abord ceux que tu captes le plus")
+            case .recency: return String(localized: "Vus en dernier")
+            case .identifier: return String(localized: "eNB et gNB croissants")
+            }
+        }
+        /// Résumé du tri, sur la ligne qui ouvre « Trier et afficher ».
+        var summary: String {
+            switch self {
+            case .relevance: return String(localized: "Les plus relevés d’abord")
+            case .recency: return String(localized: "Les plus récents d’abord")
+            case .identifier: return String(localized: "Par identifiant")
             }
         }
     }
@@ -196,6 +204,18 @@ final class RadioLogsViewModel: ObservableObject {
         let verifiable = totalCount - uncheckableCount
         guard verifiable > 0 else { return 0 }
         return Double(checkedCount) / Double(verifiable)
+    }
+
+    /// Vrai quand tri et réglages sont ceux d'origine : la feuille masque alors
+    /// « Revenir aux réglages par défaut », qui n'aurait rien à faire.
+    var hasDefaultDisplaySettings: Bool {
+        sortOrder == .relevance && groupByOperator && scanOnCellular
+    }
+
+    func resetDisplaySettings() {
+        sortOrder = .relevance
+        groupByOperator = true
+        scanOnCellular = true
     }
 
     func count(for filter: Filter) -> Int {

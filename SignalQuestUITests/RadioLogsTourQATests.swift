@@ -41,7 +41,7 @@ final class RadioLogsTourQATests: XCTestCase {
 
         // La page doit s'être ouverte, pas seulement le bouton avoir répondu.
         XCTAssertTrue(
-            app.navigationBars["Logs antennes"].waitForExistence(timeout: 15),
+            app.staticTexts["radioLogs.title"].waitForExistence(timeout: 15),
             "La page Logs antennes ne s'est pas ouverte"
         )
 
@@ -62,12 +62,12 @@ final class RadioLogsTourQATests: XCTestCase {
             XCTAssertTrue(loaded, "Aucun site n'est apparu après 120 s de rattrapage")
         }
 
-        // Feuille « Trier et filtrer », via le menu de la barre.
+        // Feuille « Trier et afficher », via le menu de l'en-tête.
         let more = app.buttons["Plus d'options"].firstMatch
         if more.waitForExistence(timeout: 5) {
             more.tap()
             Thread.sleep(forTimeInterval: 1)
-            let sort = app.buttons["Trier et filtrer"].firstMatch
+            let sort = app.buttons["Trier et afficher"].firstMatch
             if sort.waitForExistence(timeout: 4) {
                 sort.tap()
                 Thread.sleep(forTimeInterval: 2)
@@ -90,9 +90,9 @@ final class RadioLogsTourQATests: XCTestCase {
         }
         snap(app, "logs-02b-balayage")
 
-        // Filtre « Non identifiés » : c'est la vue qui porte les actions.
+        // Filtre « À identifier » : c'est la vue qui porte les actions.
         let unidentified = app.buttons
-            .matching(NSPredicate(format: "label BEGINSWITH 'Non identifiés'"))
+            .matching(NSPredicate(format: "label BEGINSWITH 'À identifier'"))
             .firstMatch
         if unidentified.waitForExistence(timeout: 5) {
             unidentified.tap()
@@ -138,7 +138,7 @@ final class RadioLogsTourQATests: XCTestCase {
 
     /// Attend que le catalogue cesse d'être vide.
     ///
-    /// On observe la puce « Tous · N » du rail plutôt qu'un compteur de la page :
+    /// On observe le segment « Tous · N » plutôt qu'un compteur de la page :
     /// c'est un bouton, donc un élément d'accessibilité stable, et son libellé
     /// porte le décompte du catalogue ENTIER.
     private func waitForSites(_ app: XCUIApplication, timeout: TimeInterval) -> Bool {
@@ -153,14 +153,14 @@ final class RadioLogsTourQATests: XCTestCase {
 
     /// Attend que le balayage ait classé au moins un site.
     ///
-    /// On observe « Identifiés · N » ET « Non identifiés · N » : le balayage a
+    /// On observe « Identifiés · N » ET « À identifier · N » : le balayage a
     /// commencé dès que l'un des deux quitte zéro. Attendre le seul « Identifiés »
     /// bloquerait sur un catalogue dont aucun site n'est encore rattaché — un
     /// résultat parfaitement légitime.
     private func waitForScan(_ app: XCUIApplication, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         let classified = NSPredicate(
-            format: "(label BEGINSWITH 'Identifiés · ' AND NOT (label ==[c] 'Identifiés · 0')) OR (label BEGINSWITH 'Non identifiés · ' AND NOT (label ==[c] 'Non identifiés · 0'))"
+            format: "(label BEGINSWITH 'Identifiés · ' AND NOT (label ==[c] 'Identifiés · 0')) OR (label BEGINSWITH 'À identifier · ' AND NOT (label ==[c] 'À identifier · 0'))"
         )
         while Date() < deadline {
             if app.buttons.matching(classified).firstMatch.exists { return true }

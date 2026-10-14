@@ -3,64 +3,62 @@ import SwiftUI
 private typealias M = RadioLogsMetrics
 private typealias P = RadioLogsPalette
 
-/// « Trier et filtrer » — le tri devient un réglage de premier plan, plus un
-/// comportement figé. Chaque option dit ce qu'elle FAIT : « Pertinence » sans
-/// explication ne veut rien dire pour qui ouvre la feuille la première fois.
+/// « Trier et afficher » — le tri et les deux réglages de la page. Le filtre
+/// Tous / Identifiés / À identifier n'y figure plus : il reste sur la page, en
+/// segment, et l'avoir aux deux endroits ne disait pas lequel faisait foi.
+/// Chaque option dit ce qu'elle FAIT, pas seulement son nom.
 struct RadioLogsFilterSheet: View {
     @ObservedObject var model: RadioLogsViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Trier et filtrer")
-                    .font(SQFont.display(M.sheetTitleSize, .bold))
-                    .foregroundStyle(P.ink)
-                Text(verbatim: [String(localized: "\(model.totalCount) site"), String(localized: "\(model.logCount) relevé")].joined(separator: " · "))
-                    .font(SQFont.body(M.sheetSubtitleSize))
-                    .monospacedDigit()
-                    .foregroundStyle(P.muted)
-                    .padding(.bottom, M.sheetSubtitleBottom)
+            VStack(alignment: .leading, spacing: SQSpace.xl) {
+                header
 
-                group("Trier par") {
-                    FlowOptions(
-                        options: RadioLogsViewModel.SortOrder.allCases.map {
-                            Option(id: $0.id, label: $0.label, hint: $0.hint, isOn: model.sortOrder == $0)
+                section("Trier par") {
+                    VStack(spacing: 0) {
+                        ForEach(Array(RadioLogsViewModel.SortOrder.allCases.enumerated()), id: \.element.id) { index, order in
+                            if index > 0 { divider }
+                            sortRow(order)
                         }
-                    ) { id in
-                        guard let value = RadioLogsViewModel.SortOrder(rawValue: id) else { return }
-                        model.sortOrder = value
-                        Haptics.selection()
                     }
+                    .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
                 }
 
-                group("N'afficher que") {
-                    FlowOptions(
-                        options: RadioLogsViewModel.Filter.allCases.map {
-                            Option(
-                                id: $0.id,
-                                label: "\($0.label) · \(model.count(for: $0).formatted())",
-                                hint: nil,
-                                isOn: model.filter == $0
-                            )
-                        }
-                    ) { id in
-                        guard let value = RadioLogsViewModel.Filter(rawValue: id) else { return }
-                        model.filter = value
-                        Haptics.selection()
+                section("Présentation") {
+                    VStack(spacing: 0) {
+                        toggleRow(
+                            title: "Grouper par opérateur",
+                            hint: "SFR, Orange, Free, Bouygues Telecom",
+                            isOn: $model.groupByOperator,
+                            identifier: "radioLogs.sort.group"
+                        )
+                        divider
+                        toggleRow(
+                            title: "Vérifier en données mobiles",
+                            hint: "Une vérification complète fait quelques dizaines de requêtes.",
+                            isOn: $model.scanOnCellular,
+                            identifier: "radioLogs.sort.cellular"
+                        )
                     }
+                    .sqCardBackground(SQColor.surface, cornerRadius: SQRadius.lg, elevation: .rest)
                 }
 
-                toggleRow(
-                    title: "Grouper par opérateur",
-                    hint: "SFR, Orange, Free, Bouygues",
-                    isOn: $model.groupByOperator
-                )
-                toggleRow(
-                    title: "Vérifier en données mobiles",
-                    hint: "une passe complète représente quelques dizaines de requêtes",
-                    isOn: $model.scanOnCellular
-                )
+                if !model.hasDefaultDisplaySettings {
+                    Button {
+                        model.resetDisplaySettings()
+                        Haptics.selection()
+                    } label: {
+                        Text("Revenir aux réglages par défaut")
+                            .font(SQFont.body(15, .semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("radioLogs.sort.reset")
+                }
             }
             .padding(.horizontal, M.sheetPaddingH)
             .padding(.top, SQSpace.xl)
@@ -69,97 +67,103 @@ struct RadioLogsFilterSheet: View {
         .background(SQColor.bg.ignoresSafeArea())
         .presentationDetentsCompat()
         .presentationDragIndicator(.visible)
+        .accessibilityIdentifier("radioLogs.sortSheet")
     }
 
     // MARK: Briques
 
-    @ViewBuilder
-    private func group<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(SQFont.body(M.groupHeaderSize, .bold))
-                .foregroundStyle(P.muted)
-                .padding(.bottom, M.groupHeaderBottom)
-            content()
+    private var header: some View {
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Trier et afficher")
+                    .font(SQFont.display(22, .bold, relativeTo: .title2))
+                    .foregroundStyle(P.ink)
+                    .sqHeader()
+                Text(verbatim: [String(localized: "\(model.totalCount) site"), String(localized: "\(model.logCount) relevé")].joined(separator: " · "))
+                    .font(SQType.callout)
+                    .monospacedDigit()
+                    .foregroundStyle(P.muted)
+            }
+            Spacer(minLength: 0)
+            Button {
+                dismiss()
+            } label: {
+                Text("OK")
+                    .font(SQFont.body(15, .bold))
+                    .foregroundStyle(SQColor.onAccent)
+                    .padding(.horizontal, SQSpace.lg)
+                    .frame(minHeight: 44)
+                    .background(SQColor.brandRed, in: Capsule(style: .continuous))
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityIdentifier("radioLogs.sort.done")
         }
-        .padding(.bottom, M.groupBottom)
     }
 
-    private func toggleRow(title: LocalizedStringKey, hint: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
-        HStack(spacing: M.toggleRowGap) {
-            VStack(alignment: .leading, spacing: 2) {
+    private func section<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text(title).sqKicker()
+            content()
+        }
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(SQColor.separator)
+            .frame(height: 1)
+            .padding(.leading, SQSpace.md)
+    }
+
+    private func sortRow(_ order: RadioLogsViewModel.SortOrder) -> some View {
+        let isOn = model.sortOrder == order
+        return Button {
+            model.sortOrder = order
+            Haptics.selection()
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(order.label)
+                        .font(SQFont.body(15, .semibold))
+                        .foregroundStyle(P.ink)
+                    Text(order.hint)
+                        .font(SQType.caption)
+                        .foregroundStyle(P.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if isOn {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+        .accessibilityIdentifier("radioLogs.sort.\(order.rawValue)")
+    }
+
+    private func toggleRow(title: LocalizedStringKey, hint: LocalizedStringKey, isOn: Binding<Bool>, identifier: String) -> some View {
+        Toggle(isOn: isOn) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(SQFont.body(M.toggleLabelSize, .semibold))
+                    .font(SQFont.body(15, .semibold))
                     .foregroundStyle(P.ink)
                 Text(hint)
-                    .font(SQFont.body(M.toggleHintSize))
+                    .font(SQType.caption)
                     .foregroundStyle(P.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 0)
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .tint(P.accent)
         }
-        .padding(.vertical, M.toggleRowPaddingV)
-        .overlay(alignment: .top) {
-            Rectangle().fill(P.hair).frame(height: 1)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    struct Option: Identifiable {
-        let id: String
-        let label: String
-        let hint: String?
-        let isOn: Bool
-    }
-
-    /// `.opts` — options qui reviennent à la ligne quand elles ne tiennent pas.
-    /// Écrit à la main plutôt qu'avec un `Grid` : le nombre d'options par ligne
-    /// dépend de la longueur des libellés, qui change avec la langue et la taille
-    /// de police choisie par l'utilisateur.
-    struct FlowOptions: View {
-        let options: [Option]
-        let onSelect: (String) -> Void
-
-        var body: some View {
-            FlowLayoutCompat(spacing: M.optionGap) {
-                ForEach(options) { option in
-                    Button {
-                        onSelect(option.id)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(option.label)
-                                .font(SQFont.body(M.optionSize, .semibold))
-                            if let hint = option.hint {
-                                Text(hint)
-                                    .font(SQFont.body(M.optionHintSize))
-                                    .opacity(0.75)
-                            }
-                        }
-                        .multilineTextAlignment(.leading)
-                        .foregroundStyle(option.isOn ? P.accentInk : P.chipInk)
-                        .padding(.horizontal, M.optionPaddingH)
-                        .padding(.vertical, M.optionPaddingV)
-                        .background {
-                            RoundedRectangle(cornerRadius: M.optionRadius, style: .continuous)
-                                .fill(option.isOn ? P.accentSoft : P.chip)
-                                .overlay {
-                                    if option.isOn {
-                                        RoundedRectangle(cornerRadius: M.optionRadius, style: .continuous)
-                                            .strokeBorder(P.accent.opacity(0.34), lineWidth: 1)
-                                    }
-                                }
-                        }
-                        .frame(minHeight: 44)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(option.isOn ? .isSelected : [])
-                }
-            }
-        }
+        .tint(P.accent)
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
+        .frame(minHeight: 56)
+        .accessibilityIdentifier(identifier)
     }
 }
 
