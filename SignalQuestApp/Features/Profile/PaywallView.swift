@@ -81,6 +81,7 @@ struct PaywallView: View {
     @ObservedObject private var store: EntitlementsStore
     private let entryPoint: PaywallEntryPoint
     @State private var selectedPeriod = SubscriptionBillingPeriod.monthly
+    @Environment(\.dismiss) private var dismiss
 
     init(store: EntitlementsStore, entryPoint: PaywallEntryPoint = .profile) {
         _store = ObservedObject(wrappedValue: store)
@@ -98,13 +99,15 @@ struct PaywallView: View {
                 restorationSection
                 legalFooter
             }
-            .padding(SQSpace.lg)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.huge)
             .sqReadableWidth()
         }
         .signalQuestBackground()
         .navigationTitle("Abonnements")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
         .task { await store.prepare() }
         .refreshable { await store.prepare() }
         .alert("Abonnement", isPresented: operationAlertBinding) {
@@ -115,15 +118,26 @@ struct PaywallView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Choisis ton niveau d’exploration")
-                .font(SQType.display)
-                .foregroundStyle(SQColor.label)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(entryPoint.introduction)
-                .font(SQType.body)
-                .foregroundStyle(SQColor.labelSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            // Poussée depuis le Profil, la page se quitte par un retour ; ouverte
+            // en feuille depuis une fonction Premium, elle se ferme.
+            if entryPoint == .profile {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "paywall.back") { dismiss() }
+            } else {
+                MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "paywall.close") { dismiss() }
+            }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Choisis ton niveau d’exploration")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("paywall.title")
+                Text(entryPoint.introduction)
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
