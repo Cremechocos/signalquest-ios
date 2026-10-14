@@ -532,6 +532,63 @@ struct MapSheetPageHeader: View {
     }
 }
 
+/// Bouton rond de 44 pt posé sur une carte : fond de surface et ombre, comme
+/// les boutons de l'onglet Carte. Le point signale un réglage modifié.
+struct MapFloatingIconButton: View {
+    let systemImage: String
+    let label: LocalizedStringKey
+    let identifier: String
+    var tint: Color = SQColor.label
+    var showsDot = false
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 44, height: 44)
+                .sqSurface(SQColor.surface, in: Circle())
+                .sqShadowCard()
+                .overlay(alignment: .topTrailing) {
+                    if showsDot {
+                        Circle().fill(SQColor.brandRed)
+                            .frame(width: 10, height: 10)
+                            .overlay { Circle().strokeBorder(SQColor.surface, lineWidth: 2) }
+                            .offset(x: -1, y: 1)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// Titre d'une page carte, en capsule à côté du bouton retour.
+struct MapFloatingTitle: View {
+    let title: LocalizedStringKey
+    let identifier: String
+
+    var body: some View {
+        Text(title)
+            .font(SQType.heading)
+            .foregroundStyle(SQColor.label)
+            .lineLimit(1)
+            .padding(.horizontal, SQSpace.lg)
+            .frame(minHeight: 44)
+            .sqSurface(SQColor.surface, in: Capsule())
+            .sqShadowCard()
+            .sqHeader()
+            .accessibilityIdentifier(identifier)
+    }
+}
+
 /// Bouton rond de 44 pt sur le fond des puces.
 struct MapChipIconButton: View {
     let systemImage: String

@@ -92,11 +92,20 @@ final class MyMeasurementsHTTPQATests: XCTestCase {
         let entry = app.staticTexts[locale == "fr" ? "Mes mesures" : "My measurements"].firstMatch
         XCTAssertTrue(SignalQuestUITestSupport.scrollToHittable(entry, in: app))
         entry.tap()
-        XCTAssertTrue(app.navigationBars[locale == "fr" ? "Mes mesures" : "My measurements"]
-            .waitForExistence(timeout: 10), "Le titre doit suivre la langue de l’app")
+        XCTAssertTrue(app.staticTexts["measurements.title"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["measurements.title"].label, locale == "fr" ? "Mes mesures" : "My measurements",
+                       "Le titre doit suivre la langue de l’app")
 
-        let firstRange = "1–40 / \(total)"
-        XCTAssertTrue(app.staticTexts[firstRange].waitForExistence(timeout: 30),
+        func range(_ start: Int, _ end: Int) -> String {
+            let format = NumberFormatter.localizedString(from: NSNumber(value: total), number: .decimal)
+            return locale == "fr" ? "Sessions \(start) à \(end) sur \(format)" : "Sessions \(start) to \(end) of \(format)"
+        }
+        // La carte du bas se lit d'un bloc : on cherche la portée dans son libellé.
+        func text(_ value: String) -> XCUIElement {
+            app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
+        }
+        let firstRange = range(1, 40)
+        XCTAssertTrue(text(firstRange).waitForExistence(timeout: 30),
                       "La première page doit annoncer sa portée réelle")
         let sample = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS[c] %@", locale == "fr" ? "Échantillon" : "Sample"))
@@ -109,13 +118,13 @@ final class MyMeasurementsHTTPQATests: XCTestCase {
         let next = app.buttons["measurements.nextPage"]
         XCTAssertTrue(next.isEnabled)
         next.tap()
-        let secondRange = "41–\(40 + secondCount) / \(total)"
-        XCTAssertTrue(app.staticTexts[secondRange].waitForExistence(timeout: 30))
+        let secondRange = range(41, 40 + secondCount)
+        XCTAssertTrue(text(secondRange).waitForExistence(timeout: 30))
         XCTAssertFalse(next.isEnabled)
         capture(app, "personal-map-second-\(locale)")
         XCTAssertTrue(back.isEnabled)
         back.tap()
-        XCTAssertTrue(app.staticTexts[firstRange].waitForExistence(timeout: 30),
+        XCTAssertTrue(text(firstRange).waitForExistence(timeout: 30),
                       "Le retour doit restaurer la page initiale")
     }
 

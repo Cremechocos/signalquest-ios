@@ -2098,6 +2098,22 @@
         }
       }
     },
+    "Aucune des sessions de cette page n’a de position. Passe à la page suivante." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None of the sessions on this page has a location. Go to the next page."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune des sessions de cette page n’a de position. Passe à la page suivante."
+          }
+        }
+      }
+    },
     "Aucune photo dans cette conversation." : {
       "localizations" : {
         "en" : {
@@ -2582,6 +2598,22 @@
         }
       }
     },
+    "Chaque point de couverture que tu as relevé, sur la carte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every coverage point you recorded, on the map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque point de couverture que tu as relevé, sur la carte."
+          }
+        }
+      }
+    },
     "Charger plus de publications" : {
       "localizations" : {
         "en" : {
@@ -2938,6 +2970,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Corrigé dans"
+          }
+        }
+      }
+    },
+    "Couleur des points" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point colour"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couleur des points"
           }
         }
       }
@@ -4301,6 +4349,22 @@
         }
       }
     },
+    "Inconnue" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inconnue"
+          }
+        }
+      }
+    },
     "Indisponibilité" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4598,6 +4662,22 @@
         }
       }
     },
+    "Lance une session de couverture : chaque point relevé apparaîtra ici, y compris ceux faits avec l’app Android." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a coverage session: every point you record will show up here, including those from the Android app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lance une session de couverture : chaque point relevé apparaîtra ici, y compris ceux faits avec l’app Android."
+          }
+        }
+      }
+    },
     "Latence minimale" : {
       "localizations" : {
         "en" : {
@@ -4826,6 +4906,22 @@
         }
       }
     },
+    "Le signal vient des mesures faites avec l’app Android : l’iPhone ne le mesure pas. Les points sans signal restent en gris." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal comes from measurements made with the Android app: the iPhone doesn’t measure it. Points without signal stay grey."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le signal vient des mesures faites avec l’app Android : l’iPhone ne le mesure pas. Les points sans signal restent en gris."
+          }
+        }
+      }
+    },
     "Lenteur" : {
       "localizations" : {
         "en" : {
@@ -4854,6 +4950,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les idées sont lues par l'équipe ; tu es prévenu si elle est retenue."
+          }
+        }
+      }
+    },
+    "Les longs trajets peuvent être allégés à l’affichage. Tes mesures restent toutes enregistrées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long trips may be thinned out on the map. All your measurements stay saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les longs trajets peuvent être allégés à l’affichage. Tes mesures restent toutes enregistrées."
+          }
+        }
+      }
+    },
+    "Les longs trajets sont allégés à l’affichage : la carte montre un échantillon de %lld points sur %lld. Tes mesures restent toutes enregistrées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long trips are thinned out on the map: it shows a sample of %1$lld points out of %2$lld. All your measurements stay saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les longs trajets sont allégés à l’affichage : la carte montre un échantillon de %lld points sur %lld. Tes mesures restent toutes enregistrées."
           }
         }
       }
@@ -4919,6 +5047,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Légendaire"
+          }
+        }
+      }
+    },
+    "Légende par génération" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legend by generation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Légende par génération"
+          }
+        }
+      }
+    },
+    "Légende par signal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legend by signal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Légende par signal"
           }
         }
       }
@@ -5713,6 +5873,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PLMN servant absent dans cette session : identifie ce nœud depuis les logs radio ou choisis explicitement son réseau."
+          }
+        }
+      }
+    },
+    "Page précédente" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous page"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page précédente"
+          }
+        }
+      }
+    },
+    "Page suivante" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next page"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page suivante"
           }
         }
       }
@@ -6800,6 +6992,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Serveurs iPerf3 injoignables — test via Cloudflare"
+          }
+        }
+      }
+    },
+    "Sessions %lld à %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessions %1$lld to %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessions %lld à %lld"
+          }
+        }
+      }
+    },
+    "Sessions %lld à %lld sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessions %1$lld to %2$lld of %3$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessions %lld à %lld sur %lld"
           }
         }
       }
@@ -8689,6 +8913,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ça arrive aussi en données mobiles ?"
+          }
+        }
+      }
+    },
+    "Échantillon : %lld affichées sur %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sample: %1$lld shown out of %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échantillon : %lld affichées sur %lld"
           }
         }
       }

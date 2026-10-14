@@ -65,12 +65,17 @@ final class FilterChipsQATests: XCTestCase {
         let row = app.staticTexts[fr ? "Mes mesures" : "My measurements"].firstMatch
         if row.waitForExistence(timeout: 10), SignalQuestUITestSupport.scrollToHittable(row, in: app) {
             row.tap()
-            let signal = app.buttons["Signal"]
-            if signal.waitForExistence(timeout: 12) {
+            // Refonte Halo : la coloration se règle dans la feuille « Afficher ».
+            let display = app.buttons["measurements.display"]
+            if display.waitForExistence(timeout: 12) {
+                display.tap()
+                let signal = app.buttons["Signal"]
+                XCTAssertTrue(signal.waitForExistence(timeout: 5))
                 assertChip(signal)
                 assertChip(app.buttons[fr ? "Génération" : "Generation"])
+                app.buttons["measurements.display.close"].tap()
             } else {
-                print("SQ_CHIPS Mes mesures : pas de points en démo, sélecteur non affiché")
+                print("SQ_CHIPS Mes mesures : pas de points en démo, réglage non affiché")
             }
             capture(app, "\(locale)-mes-mesures")
         }
