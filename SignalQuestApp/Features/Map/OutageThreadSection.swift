@@ -54,9 +54,7 @@ struct OutageThreadSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("La conversation")
-                    .font(SQFont.display(22, .bold, relativeTo: .title2))
-                    .accessibilityAddTraits(.isHeader)
+                Text("La conversation").sqKicker().accessibilityAddTraits(.isHeader)
                 Text("Ouverte à tous. Les commentaires et les réactions ne modifient pas l'état de la panne.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)

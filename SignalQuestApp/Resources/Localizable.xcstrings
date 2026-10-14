@@ -740,6 +740,22 @@
         }
       }
     },
+    "%lld en cours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ongoing"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld en cours"
+          }
+        }
+      }
+    },
     "%lld jours" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -932,6 +948,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld ne répond plus"
+          }
+        }
+      }
+    },
+    "%lld pannes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld outages"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld pannes"
           }
         }
       }
@@ -1769,6 +1801,22 @@
         }
       }
     },
+    "%lld+ pannes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld+ outages"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld+ pannes"
+          }
+        }
+      }
+    },
     "%lld. %@, %lld %@, %@." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1928,6 +1976,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1 an"
+          }
+        }
+      }
+    },
+    "1 panne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 outage"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 panne"
           }
         }
       }
@@ -3433,6 +3497,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Confirme les identifiants que tu as relevés, conteste ceux qui te semblent faux."
+          }
+        }
+      }
+    },
+    "Confirme ou dément les pannes sans chercher chaque antenne sur la carte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm or dispute outages without hunting for each antenna on the map."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirme ou dément les pannes sans chercher chaque antenne sur la carte."
           }
         }
       }

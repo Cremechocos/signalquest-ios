@@ -199,6 +199,7 @@ struct CommunityOutagesListView: View {
     @StateObject private var model: CommunityOutagesListViewModel
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var services: AppServices
+    @Environment(\.dismiss) private var dismiss
     /// Panne dont la fermeture attend confirmation. Le geste est irréversible et collectif : il
     /// ne part jamais du premier appui.
     @State private var pendingClose: CommunityOutage?
@@ -210,6 +211,10 @@ struct CommunityOutagesListView: View {
     var body: some View {
         List {
             Section {
+                listHeader
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.lg, bottom: 0, trailing: SQSpace.lg))
                 SQSegmentedFilter(
                     selection: $model.scope,
                     options: OutageFeedScope.allCases.map { (value: $0, label: $0.label, icon: String?.none) }
@@ -282,7 +287,8 @@ struct CommunityOutagesListView: View {
         .sqReadableWidth()
         .signalQuestBackground()
         .navigationTitle("Pannes signalées")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
         .task { await model.reload() }
         .onDisappear { model.stop() }
         .refreshable { await model.reload() }
@@ -308,6 +314,45 @@ struct CommunityOutagesListView: View {
         } message: { _ in
             Text("Elle disparaîtra de la carte pour tout le monde, tout de suite. On ne peut pas revenir en arrière.")
         }
+    }
+
+    // MARK: - En-tête
+
+    private var listHeader: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "outages.back") { dismiss() }
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Pannes signalées")
+                    .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
+                    .foregroundStyle(SQColor.label)
+                    .sqHeader()
+                    .accessibilityIdentifier("outages.title")
+                Text("Confirme ou dément les pannes sans chercher chaque antenne sur la carte.")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let summary = listSummary {
+                Text(verbatim: summary)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityIdentifier("outages.summary")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// « 4 pannes · 2 en cours » — sur ce qui est chargé, sans prétendre au total quand il en
+    /// reste d'autres à faire défiler.
+    private var listSummary: String? {
+        guard !model.outages.isEmpty else { return nil }
+        let count = model.outages.count
+        var parts = [model.hasMore
+            ? String(localized: "\(count)+ pannes")
+            : (count == 1 ? String(localized: "1 panne") : String(localized: "\(count) pannes"))]
+        let open = model.outages.filter { $0.state.isVisible }.count
+        if open > 0, open < count { parts.append(String(localized: "\(open) en cours")) }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: - Ligne
@@ -417,7 +462,7 @@ struct CommunityOutagesListView: View {
     /// Le nom du lieu, ou à défaut l'identifiant de cible — jamais une ligne vide.
     private func siteLabel(_ outage: CommunityOutage) -> String {
         if let name = outage.siteName, !name.isEmpty { return name }
-        return outage.targetId.isEmpty ? String(localized: "Panne signalée") : outage.targetId
+        return outage.targetId.isEmpty ? String(localized: "Panne signalée") : String(localized: "Site \(outage.targetId)")
     }
 
     /// L'adresse, sauf quand elle RÉPÈTE mot pour mot le titre.

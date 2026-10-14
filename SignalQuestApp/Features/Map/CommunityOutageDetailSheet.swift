@@ -139,36 +139,46 @@ struct CommunityOutageDetailSheet: View {
     // MARK: - Sections
 
     /// Le site EN TÊTE, avant la gravité : on arrive ici en se demandant « quel endroit ? », la
-    /// couleur ayant déjà répondu à « à quel point ? » sur la carte.
+    /// couleur ayant déjà répondu à « à quel point ? » sur la carte. En-tête Halo : l'opérateur en
+    /// petites capitales, le lieu, son adresse, puis l'état et la gravité en étiquette.
     private var header: some View {
-        HStack(alignment: .top, spacing: SQSpace.md) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(ink)
-                .frame(width: 46, height: 46)
-                .background(tint.opacity(0.13), in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(siteLabel)
-                    .font(SQFont.display(20, .bold, relativeTo: .title3))
-                    .foregroundStyle(SQColor.label)
-                Text(headline)
-                    .font(SQFont.body(14.5, .semibold, relativeTo: .callout))
-                    .foregroundStyle(ink)
-                // L'adresse juste sous l'état, avant l'opérateur : « quel endroit ? » est la
-                // question de l'en-tête, et un nom de site (« Site 3079254 ») n'y répond pas.
-                if let address = secondaryAddress {
-                    Text(address)
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text(verbatim: operatorLabel).sqKicker()
+                    Text(siteLabel)
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    // L'adresse juste sous le lieu : « quel endroit ? » est la question de
+                    // l'en-tête, et un nom de site (« Site 3079254 ») n'y répond pas.
+                    if let address = secondaryAddress {
+                        Text(address)
+                            .font(SQType.subhead)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                Text(operatorLabel)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+                MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "outage.detail.close") {
+                    dismiss()
+                }
             }
-            Spacer(minLength: 0)
+            HStack(spacing: SQSpace.xs) {
+                Image(systemName: outage.state.isVisible ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                    .font(.footnote.weight(.semibold))
+                    .accessibilityHidden(true)
+                Text(headline)
+                    .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+            }
+            .foregroundStyle(ink)
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, SQSpace.xs + 1)
+            .background(tint.opacity(0.13), in: Capsule(style: .continuous))
+            .accessibilityElement(children: .combine)
         }
-        .accessibilityElement(children: .combine)
     }
 
     /// Une panne close ouverte depuis une carte pas encore rechargée. Le bloc d'arbitrage ne
@@ -196,11 +206,9 @@ struct CommunityOutageDetailSheet: View {
         if let timeline = outage.timeline, !timeline.isEmpty {
             let events = Array(timeline.reversed())
             let shown = timelineExpanded ? events : Array(events.prefix(Self.collapsedTimelineCount))
-            VStack(alignment: .leading, spacing: SQSpace.md) {
-                Text("Chronologie")
-                    .font(SQFont.body(12.5, .semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: SQSpace.xs2) {
+                Text("Chronologie").sqKicker().accessibilityAddTraits(.isHeader)
+                VStack(alignment: .leading, spacing: SQSpace.md) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(shown.enumerated()), id: \.offset) { index, entry in
                         timelineRow(entry, isFirst: index == 0, isLast: index == shown.count - 1)
@@ -212,10 +220,11 @@ struct CommunityOutageDetailSheet: View {
                         .foregroundStyle(SQColor.accentInk)
                         .frame(minHeight: 44, alignment: .leading)
                 }
+                }
+                .padding(SQSpace.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .sqCardBackground()
             }
-            .padding(SQSpace.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .sqCardBackground()
         }
     }
 
@@ -259,6 +268,8 @@ struct CommunityOutageDetailSheet: View {
     }
 
     private var infoSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+        Text("Détails").sqKicker().accessibilityAddTraits(.isHeader)
         VStack(alignment: .leading, spacing: 0) {
             infoRow("Depuis", SignalFormatters.date(outage.startedAt, includingTime: true, relative: true))
             infoRow("Adresse", outage.address)
@@ -295,6 +306,7 @@ struct CommunityOutageDetailSheet: View {
         }
         .padding(.vertical, SQSpace.xs)
         .sqCardBackground()
+        }
     }
 
 
@@ -355,7 +367,7 @@ struct CommunityOutageDetailSheet: View {
 
     private var siteLabel: String {
         if let name = outage.siteName, !name.isEmpty { return name }
-        return outage.targetId.isEmpty ? String(localized: "Panne signalée") : outage.targetId
+        return outage.targetId.isEmpty ? String(localized: "Panne signalée") : String(localized: "Site \(outage.targetId)")
     }
 
     /// L'adresse, sauf quand elle RÉPÈTE mot pour mot le titre.

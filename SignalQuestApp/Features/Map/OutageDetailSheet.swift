@@ -9,6 +9,8 @@ struct OutageDetailSheet: View {
     /// Code opérateur → nom affiché, résolu par la carte selon le marché courant.
     var operatorLabel: (String) -> String = { $0 }
 
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
@@ -24,35 +26,45 @@ struct OutageDetailSheet: View {
         .presentationBackgroundCompat(SQColor.bg)
     }
 
+    /// En-tête Halo : l'opérateur en petites capitales, la commune, puis le type d'incident en
+    /// étiquette à sa teinte, avec le triangle de son marqueur de carte.
     var header: some View {
-        HStack(alignment: .top, spacing: SQSpace.md) {
-            Image(systemName: issueGlyph)
-                .font(.title2.weight(.bold))
-                .foregroundStyle(SQColor.onAccent)
-                .frame(width: 46, height: 46)
-                .background(issueColor, in: Circle())
-            VStack(alignment: .leading, spacing: 3) {
-                Text(site.commune?.capitalized ?? site.siteId ?? String(localized: "Site en panne"))
-                    .font(SQFont.display(20, .bold, relativeTo: .title3))
-                    .foregroundStyle(SQColor.label)
-                Text(issueLabel)
-                    .font(SQFont.body(14.5, .semibold, relativeTo: .callout))
-                    .foregroundStyle(OperatorIncidentCard.ink(for: issueKey))
-                if let op = site.operator {
-                    Text(operatorLabel(op))
-                        .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+        VStack(alignment: .leading, spacing: SQSpace.sm2) {
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    if let op = site.operator {
+                        Text(verbatim: operatorLabel(op)).sqKicker()
+                    }
+                    Text(site.commune?.capitalized ?? site.siteId ?? String(localized: "Site en panne"))
+                        .font(SQType.title)
+                        .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+                MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "operatorOutage.close") {
+                    dismiss()
                 }
             }
-            Spacer()
+            HStack(spacing: SQSpace.xs) {
+                Image(systemName: issueGlyph)
+                    .font(.footnote.weight(.semibold))
+                    .accessibilityHidden(true)
+                Text(issueLabel)
+                    .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+            }
+            .foregroundStyle(OperatorIncidentCard.ink(for: issueKey))
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, SQSpace.xs + 1)
+            .background(issueColor.opacity(0.13), in: Capsule(style: .continuous))
+            .accessibilityElement(children: .combine)
         }
     }
 
     var servicesSection: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Services impactés")
-                .font(SQFont.body(12.5, .semibold))
-                .foregroundStyle(SQColor.labelSecondary)
+            Text("Services impactés").sqKicker().accessibilityAddTraits(.isHeader)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
                 ForEach(site.services, id: \.label) { service in
                     HStack(spacing: 6) {
@@ -74,6 +86,8 @@ struct OutageDetailSheet: View {
     }
 
     var infoSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+        Text("Détails").sqKicker().accessibilityAddTraits(.isHeader)
         VStack(alignment: .leading, spacing: 0) {
             infoRow("Raison", reasonText)
             infoRow("Début", formattedDate(site.startedAt))
@@ -84,6 +98,7 @@ struct OutageDetailSheet: View {
         }
         .padding(.vertical, SQSpace.xs)
         .sqCardBackground()
+        }
     }
 
     @ViewBuilder

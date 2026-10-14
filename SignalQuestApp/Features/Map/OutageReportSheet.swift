@@ -99,13 +99,7 @@ struct OutageReportSheet: View {
             }
             .background(SQColor.bg)
             .navigationTitle("Signaler un problème")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuler") { dismiss() }
-                        .disabled(submitting)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .task {
             restoreDraft()
@@ -123,24 +117,33 @@ struct OutageReportSheet: View {
 
     // MARK: - Sections
 
+    /// En-tête Halo : le titre, le lieu et l'opérateur en dessous, et la fermeture en bouton rond.
+    /// La pastille de gravité reste à côté du lieu : elle prend la teinte choisie plus bas.
     private var header: some View {
-        HStack(spacing: SQSpace.sm) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(tint)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(siteLabel)
-                    .font(SQFont.body(14, .semibold))
+        HStack(alignment: .top, spacing: SQSpace.sm) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                Text("Signaler un problème")
+                    .font(SQFont.display(24, .bold, relativeTo: .title2))
                     .foregroundStyle(SQColor.label)
-                Text(operatorLabel)
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .sqHeader()
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(tint)
+                        .accessibilityHidden(true)
+                    Text(verbatim: "\(siteLabel) · \(operatorLabel)")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            MapChipIconButton(systemImage: "xmark", label: "Annuler", identifier: "outageReport.close") {
+                dismiss()
+            }
+            .disabled(submitting)
         }
-        .padding(SQSpace.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .padding(.bottom, SQSpace.xs)
     }
 
     private var whatSection: some View {
@@ -376,16 +379,13 @@ struct OutageReportSheet: View {
     /// catalogue, si bien que les titres de section restaient français en anglais. Les appels
     /// passent des littéraux, donc le compilateur les verse au catalogue sans autre changement.
     private func module<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(title)
-                .font(SQFont.body(12.5, .semibold))
-                .foregroundStyle(SQColor.labelSecondary)
-                .accessibilityAddTraits(.isHeader)
+        VStack(alignment: .leading, spacing: SQSpace.xs2) {
+            Text(title).sqKicker().accessibilityAddTraits(.isHeader)
             content()
+                .padding(SQSpace.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .sqCardBackground()
         }
-        .padding(SQSpace.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
     }
 
     private func severityOption(
