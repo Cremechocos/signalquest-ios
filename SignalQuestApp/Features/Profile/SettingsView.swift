@@ -2802,7 +2802,7 @@ struct SQSettingsMenuRow<Value: Hashable, Options: View>: View {
             HStack(spacing: SQSpace.xs) {
                 SQSettingsRowLabel(title, systemImage: systemImage, subtitle: subtitle, value: valueLabel)
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(SQColor.labelSecondary)
                     .accessibilityHidden(true)
             }

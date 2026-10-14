@@ -737,7 +737,7 @@ struct SentinelleBoxCard: View {
                     // phrase.
                     if let emoji = target.ownerEmoji, !emoji.isEmpty {
                         Text(emoji)
-                            .font(.system(size: 19))
+                            .font(.title3)
                             .padding(.top, 1)
                             .sqDecorative()
                     }

@@ -108,7 +108,7 @@ struct ProfileView: View {
 
                 Text(verbatim: Self.versionLine)
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
                     .frame(maxWidth: .infinity)
                     .accessibilityIdentifier("profile.version")
             }
@@ -783,7 +783,7 @@ struct ProfileView: View {
                 if let subtitle {
                     Text(verbatim: subtitle)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -934,7 +934,7 @@ struct ProfileMenuRow: View {
                 if let subtitle {
                     Text(verbatim: subtitle)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("profile.menu.subtitle")
                 }

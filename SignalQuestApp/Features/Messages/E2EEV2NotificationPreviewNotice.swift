@@ -18,8 +18,9 @@ struct E2EEV2NotificationPreviewNotice: View {
             } else if showReminder && selected == .full {
                 Text("Le contenu complet est affiché par défaut. Il peut être visible par toute personne ayant accès à ton écran verrouillé.")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("notifications.footer.preview")
             }
         }
         .task(id: PushOwnerScope.current) { reload() }

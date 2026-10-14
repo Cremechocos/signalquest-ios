@@ -198,13 +198,17 @@ struct SignalQuestHomeView: View {
                     Text("Bonjour, \(firstName)")
                         .font(SQFont.display(28, .bold, relativeTo: .largeTitle))
                         .foregroundStyle(SQColor.label)
-                        // Aux plus grandes tailles, le prénom rétrécit plutôt que de se couper (UI-16).
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.6)
+                        // Aux grandes tailles, le prénom rétrécit plutôt que de se couper (UI-16) ;
+                        // aux tailles d'accessibilité, il passe à la ligne à pleine taille : le
+                        // réduire annulerait le réglage qu'on vient de choisir.
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.6)
+                        .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
                 }
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("home.greeting")
             Spacer(minLength: 0)
             if user != nil { notificationsButton }
         }
@@ -469,8 +473,9 @@ struct SignalQuestHomeView: View {
                     }
                     Text(verbatim: networkSubtitle)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("home.network.subtitle")
                 }
                 .accessibilityElement(children: .combine)
                 Spacer(minLength: 0)
@@ -480,12 +485,12 @@ struct SignalQuestHomeView: View {
             if !isOnline {
                 Text("Disponible au retour du réseau. Le verdict et les mesures autour de toi reviendront d’eux-mêmes.")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             } else if user == nil {
                 Text("Le test fonctionne sans compte.")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
             } else if needsLocation {
                 locationTile
             } else if let quality = networkQuality, quality.level != .unknown, !networkStatus.isConstrained {
@@ -581,8 +586,9 @@ struct SignalQuestHomeView: View {
                     .frame(width: 9, height: 9)
                     .accessibilityHidden(true)
                 (Text(verbatim: verdictTitle(quality.level)).font(SQType.callout(.bold)).foregroundColor(SQColor.label)
-                 + Text(verbatim: " " + source).font(SQType.callout).foregroundColor(SQColor.labelSecondary))
+                 + Text(verbatim: " " + source).font(SQType.callout).foregroundColor(SQColor.ink2))
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("home.network.verdict.text")
                 Spacer(minLength: 0)
                 chevron()
             }
@@ -639,7 +645,7 @@ struct SignalQuestHomeView: View {
             moduleHeader("Pannes près de toi", systemImage: "exclamationmark.triangle") {
                 Text(verbatim: "5 km")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
             }
             if let outages = nearbyOutages {
                 if outages.isEmpty {
@@ -716,7 +722,7 @@ struct SignalQuestHomeView: View {
                         .foregroundStyle(SQColor.label)
                     Text(verbatim: subtitle)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -788,7 +794,7 @@ struct SignalQuestHomeView: View {
             if let unit {
                 Text(verbatim: unit)
                     .font(SQType.caption(.semibold))
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
             }
         }
     }
@@ -820,13 +826,13 @@ struct SignalQuestHomeView: View {
                     }
                     Text(verbatim: line)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     bigValue("—", unit: nil)
                     Text("Lance un premier test pour créer ton repère.")
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -849,7 +855,7 @@ struct SignalQuestHomeView: View {
                 bigValue(week?.points.map { $0.formatted(.number) } ?? "—", unit: String(localized: "pts"))
                 Text(verbatim: weekLine)
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -934,8 +940,9 @@ struct SignalQuestHomeView: View {
                         .foregroundStyle(SQColor.label)
                     Text(verbatim: subtitle)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("home.evolution.subtitle")
                 }
                 Spacer(minLength: 0)
                 chevron()
@@ -1045,7 +1052,7 @@ struct SignalQuestHomeView: View {
         HStack(spacing: SQSpace.xs2) {
             Text("Tendances")
                 .font(SQType.caption(.semibold))
-                .foregroundStyle(SQColor.labelSecondary)
+                .foregroundStyle(SQColor.ink2)
                 .fixedSize()
             ForEach(trending.prefix(count)) { tag in
                 Text(verbatim: tag.tag.hasPrefix("#") ? tag.tag : "#\(tag.tag)")
@@ -1066,7 +1073,7 @@ struct SignalQuestHomeView: View {
             moduleHeader("Opérateurs ici", systemImage: "chart.bar") {
                 Text(verbatim: "1 km")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
             }
             if let stats = operatorStats {
                 if stats.isEmpty {
@@ -1106,7 +1113,7 @@ struct SignalQuestHomeView: View {
                             HStack {
                                 Text("Débit médian · comparer en détail")
                                     .font(SQType.caption)
-                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .foregroundStyle(SQColor.ink2)
                                 Spacer(minLength: 0)
                                 chevron()
                             }
@@ -1178,7 +1185,7 @@ struct SignalQuestHomeView: View {
                         .foregroundStyle(SQColor.label)
                     Text(verbatim: nearbyContext(for: measure))
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("home.nearby.context")
                 }
@@ -1236,7 +1243,7 @@ struct SignalQuestHomeView: View {
                                         friend.location?.updatedAt.map { $0.formatted(.relative(presentation: .named)) },
                                     ].compactMap { $0 }.joined(separator: " · "))
                                         .font(SQType.caption)
-                                        .foregroundStyle(SQColor.labelSecondary)
+                                        .foregroundStyle(SQColor.ink2)
                                 }
                                 Spacer(minLength: 0)
                                 chevron()
@@ -1592,7 +1599,7 @@ private struct HomeFollowedSitesModule: View {
                 if !favorites.favorites.isEmpty {
                     Text(favorites.favorites.count, format: .number)
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                 }
             }
             if favorites.favorites.isEmpty {
@@ -1659,7 +1666,7 @@ private struct HomeFollowedSitesModule: View {
                         .lineLimit(1)
                     Text(verbatim: [operatorName, distance].compactMap { $0 }.joined(separator: " · "))
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.labelSecondary)
+                        .foregroundStyle(SQColor.ink2)
                 }
                 Spacer(minLength: 0)
                 if let outage = hasOutage[favorite.id] {
@@ -1756,14 +1763,14 @@ struct HomeLayoutEditor: View {
                         Spacer(minLength: SQSpace.sm)
                         Text("Glisse ≡ pour déplacer")
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .foregroundStyle(SQColor.ink2)
                     }
                     .textCase(nil)
                 } footer: {
                     if draft.entries.isEmpty {
                         Text("Aucun module : ajoute-en un ci-dessous.")
                             .font(SQType.caption)
-                            .foregroundStyle(SQColor.labelSecondary)
+                            .foregroundStyle(SQColor.ink2)
                     }
                 }
 
@@ -2002,7 +2009,7 @@ private struct HomeLayoutPresetsSheet: View {
                 }
                 Text("Un préréglage remplace l’ordre et les tailles ; tu peux ensuite tout ajuster.")
                     .font(SQType.caption)
-                    .foregroundStyle(SQColor.labelSecondary)
+                    .foregroundStyle(SQColor.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(SQSpace.lg)

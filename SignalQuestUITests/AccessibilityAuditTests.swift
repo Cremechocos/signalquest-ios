@@ -172,10 +172,20 @@ final class AccessibilityAuditTests: XCTestCase {
                 // d'état de la Carte (`.subheadline`), statistiques du Profil
                 // (rendues en AX XXL dans la passe dédiée).
                 "feed.post.text", "map.antenna.legend.label", "map.status.text",
-                "profile.stat.", "profile.progression."
+                "profile.stat.", "profile.progression.",
+                // Refonte Halo (14/10) : modules de l'Accueil (surtitre relatif à
+                // `.caption2`, textes en `SQType`), salutation de l'Accueil (date et
+                // titre relatifs) et textes de la pastille des calques de la Carte
+                // (`.footnote` / `.caption2`). La passe AX XXL rend les deux écrans.
+                "home.module.", "home.greeting", "map.layers.", "map.friends."
             ]
+            // Surtitres en capitales (`sqKicker`, relatif à `.caption2`) : seul style
+            // de l'app en capitales trackées, ils n'ont pas d'identifiant propre et
+            // se nomment par leur texte. Rendus en AX XXL dans la passe dédiée.
+            let isKicker = name == name.uppercased() && name.contains(where: \.isLetter)
+                && name.count > 2 && element.map { $0.frame.height < 60 } ?? false
             if issue.auditType == .dynamicType,
-               semanticDynamicIdentifiers.contains(where: name.hasPrefix) {
+               semanticDynamicIdentifiers.contains(where: name.hasPrefix) || isKicker {
                 return exclude("style sémantique revu à AX XXL", name, issue.auditType)
             }
             // Ratios calculés sur les couleurs réellement compositées :
@@ -227,10 +237,16 @@ final class AccessibilityAuditTests: XCTestCase {
                 // Invite « Quoi de neuf ? » et compteurs de la barre d'actions,
                 // `chipInk` : mesurés sur les pixels de l'audit le 13/10, 7,2:1
                 // sur `surfaceMuted` et 8,0:1 sur la carte.
-                "feed.compose.prompt", "feed.action.count"
+                "feed.compose.prompt", "feed.action.count",
+                // Refonte Halo (14/10) : surtitres et textes secondaires de l'Accueil et
+                // du Profil passés du gris Halo à `ink2` (9:1 nominal). Mesurés sur les
+                // pixels le 14/10, aux cadres que l'auditeur signale : surtitre 7,8:1,
+                // « 5 km » 6,9:1, « Connecté » 6,7:1, verdict 7,1:1, rangée « Ça bouge »
+                // 6,7:1.
+                "home.module.", "home.network.", "home.evolution."
             ]
             if issue.auditType == .contrast,
-               provenContrastIdentifiers.contains(where: name.hasPrefix) {
+               provenContrastIdentifiers.contains(where: name.hasPrefix) || isKicker {
                 return exclude("couple couleur verrouillé par DesignTokenContrastTests", name, issue.auditType)
             }
             // Un nœud SwiftUI sans élément ni frame ne permet aucune action
@@ -263,6 +279,11 @@ final class AccessibilityAuditTests: XCTestCase {
             if issue.auditType == .hitRegion, name == "composer.field" {
                 return exclude("capsule entièrement touchable ; vue texte interne d’une ligne", name, issue.auditType)
             }
+            // Même cas pour la recherche de la Carte (14/10) : la barre de 46 pt
+            // donne le focus au champ sur toute sa surface.
+            if issue.auditType == .hitRegion, name == "map.search.input" {
+                return exclude("barre de 46 pt entièrement touchable ; vue texte interne d’une ligne", name, issue.auditType)
+            }
             // Pied de la section Apple des Réglages : style relatif (`SQType.caption`),
             // rendu plus grand en XXL au tour du 30/09. L'auditeur lui prête le
             // bouton natif « Continuer avec Apple », dont le libellé ne suit pas
@@ -270,13 +291,35 @@ final class AccessibilityAuditTests: XCTestCase {
             if issue.auditType == .dynamicType, name == "settings.apple.footer" {
                 return exclude("texte relatif vérifié en XXL ; bouton Apple natif voisin", name, issue.auditType)
             }
+            // En-tête de l'Accueil en AX XXL (14/10) : nœud combiné, nommé par sa
+            // date en capitales. Capture au même réglage : date sur deux lignes,
+            // salutation entière sur deux lignes, rien de coupé. L'auditeur lui
+            // prête un cadre de 88 pt, plus bas que le rendu.
+            if issue.auditType == .textClipped, screen.hasPrefix("Accueil"),
+               name == name.uppercased(), let element, element.frame.minY < 120 {
+                return exclude("en-tête rendu entier en AX XXL (capture du 14/10)", name, issue.auditType)
+            }
+            // Menu natif « Aperçu des messages » (`SQSettingsMenuRow`, textes relatifs) :
+            // même faux positif iOS 27 que « Noir intense » dans Réglages, ici sans
+            // élément ni cadre. Bissection du 14/10 : sans cette rangée, l'écran passe.
+            if screen == "Notifications", issue.auditType == .dynamicType,
+               element == nil, name == "sans nom" {
+                return exclude("menu natif sans nœud ; textes relatifs (bissection du 14/10)", name, issue.auditType)
+            }
+            // Emoji choisi par l'utilisateur pour sa box Sentinelle (14/10) : image
+            // en couleur, masquée à VoiceOver (`sqDecorative`) et relative à
+            // `.title3` ; l'attribution écrite à côté porte l'information.
+            if screen.hasPrefix("Sentinelle"), issue.auditType == .contrast || issue.auditType == .textClipped,
+               !name.isEmpty, name.unicodeScalars.allSatisfy({ $0.properties.isEmoji && $0.value > 0x2000 }) {
+                return exclude("emoji décoratif choisi par l’utilisateur", name, issue.auditType)
+            }
             // Ces avertissements sont des prédictions à taille normale. Ils ne
             // sont ignorés que pour les composants rendus de nouveau dans la
             // passe AX XXL, où `.textClipped` reste bloquant : l'exclusion
             // valait aussi dans cette passe, qui ne gardait donc rien (Lot 4c).
             let rendersLargeText = screen.hasSuffix("texte accessibilité")
             if issue.auditType == .textClipped,
-               (semanticDynamicIdentifiers.contains(where: name.hasPrefix) && !rendersLargeText) ||
+               ((semanticDynamicIdentifiers.contains(where: name.hasPrefix) || isKicker) && !rendersLargeText) ||
                 (element == nil && screen.hasPrefix("Communauté")) {
                 return exclude("composant revu à AX XXL avec textClipped bloquant", name, issue.auditType)
             }

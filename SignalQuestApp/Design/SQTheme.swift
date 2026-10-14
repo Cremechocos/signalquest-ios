@@ -93,6 +93,8 @@ extension Text {
         self.font(SQFont.body(11, .bold, relativeTo: .caption2))
             .tracking(11 * 0.18)
             .textCase(.uppercase)
-            .foregroundStyle(SQColor.labelSecondary)
+            // Encre secondaire et non gris Halo : à 11 pt, le lissage des glyphes fait
+            // tomber les 4,9:1 nominaux du gris sous le seuil une fois rendus.
+            .foregroundStyle(SQColor.ink2)
     }
 }
