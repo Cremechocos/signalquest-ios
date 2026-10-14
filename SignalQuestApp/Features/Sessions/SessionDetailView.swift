@@ -311,7 +311,7 @@ final class SessionDetailViewModel: ObservableObject {
             )
             // Un refus du serveur n'est pas un succès : icône, couleur et
             // retour haptique suivent le verdict (AF-MES-03).
-            identifyResult = result.success ? String(localized: "Site identifié ✓") : (result.message ?? String(localized: "Identification non confirmée"))
+            identifyResult = result.success ? String(localized: "Site identifié") : (result.message ?? String(localized: "Identification non confirmée"))
             identifySucceeded = result.success
             if result.success { Haptics.success() } else { Haptics.warning() }
         } catch {
@@ -413,9 +413,10 @@ struct SessionDetailView: View {
         .confirmationDialog(
             "Confirmer cette antenne ?",
             isPresented: Binding(get: { pendingIdentify != nil }, set: { if !$0 { pendingIdentify = nil } }),
+            titleVisibility: .visible,
             presenting: pendingIdentify
         ) { antenna in
-            Button("Valider cette antenne", role: .none) {
+            Button("Valider l’antenne", role: .none) {
                 Task {
                     await model.identify(antenna, service: services.identify, location: services.location)
                     pendingIdentify = nil
@@ -425,7 +426,8 @@ struct SessionDetailView: View {
             }
             Button("Annuler", role: .cancel) { pendingIdentify = nil }
         } message: { antenna in
-            Text("Cette antenne est indiquée comme \(Self.statusLabel(antenna)). Confirme uniquement si tu l'as sélectionnée comme antenne réelle.")
+            let place = [Self.antennaTitle(antenna), Self.antennaSubtitle(antenna)].filter { !$0.isEmpty }.joined(separator: " · ")
+            Text("\(place). Confirme uniquement si tu l’as captée sur ce trajet : ton identification est publique et tu peux la retirer dans « Mes identifications ».")
         }
     }
 
@@ -951,87 +953,136 @@ struct SessionDetailView: View {
 
     private func servingAntennasSection(_ antennas: [ServingAntenna]) -> some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Antennes desservantes")
-                .font(SQType.heading)
-                .foregroundStyle(SQColor.label)
-                .padding(.bottom, SQSpace.xs)
-            ForEach(antennas) { antenna in
-                antennaRow(antenna)
-                if antenna.id != antennas.last?.id {
-                    Rectangle()
-                        .fill(SQColor.separator)
-                        .frame(height: 1)
-                        .padding(.leading, SQSpace.cardPadding)
+            sectionHeader("Antennes desservantes · \(antennas.count)")
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(antennas) { antenna in
+                    antennaRow(antenna)
+                    if antenna.id != antennas.last?.id {
+                        Rectangle()
+                            .fill(SQColor.separator)
+                            .frame(height: 1)
+                            .padding(.leading, 34 + SQSpace.sm2)
+                    }
                 }
             }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.vertical, SQSpace.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .sqCardBackground()
+            Text("Identifiée : confirmée par la communauté. Hypothèse : l’antenne la plus probable d’après tes mesures. Proximité : le site ANFR le plus proche du trajet.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, SQSpace.xs)
         }
-        .padding(SQSpace.lg)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .sqCardBackground()
+    }
+
+    /// « Site 0381234 » quand le numéro est lisible ; sinon le nom du site ou l'opérateur.
+    static func antennaTitle(_ antenna: ServingAntenna) -> String {
+        if let siteId = antenna.siteId, !siteId.isEmpty, siteId.count <= 12 {
+            return String(localized: "Site \(siteId)")
+        }
+        return antenna.displayName ?? antenna.operatorDisplayName ?? String(localized: "Antenne")
+    }
+
+    /// « Orange · Gières », puis le nom du site s'il n'est pas déjà le titre.
+    static func antennaSubtitle(_ antenna: ServingAntenna) -> String {
+        let title = antennaTitle(antenna)
+        var parts: [String] = []
+        if let op = antenna.operatorDisplayName, !op.isEmpty, op != title { parts.append(op) }
+        if let commune = antenna.commune, !commune.isEmpty { parts.append(commune) }
+        if let name = antenna.displayName, !name.isEmpty, name != title, name != antenna.commune { parts.append(name) }
+        return parts.joined(separator: " · ")
     }
 
     private func antennaRow(_ antenna: ServingAntenna) -> some View {
-        HStack(spacing: SQSpace.sm) {
-            Circle().fill(Self.statusColor(antenna.status)).frame(width: 10, height: 10)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(antenna.operatorDisplayName ?? antenna.displayName ?? String(localized: "Antenne"))
-                    .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
-                    .foregroundStyle(SQColor.label)
-                    .sqSingleLine()
-                Text(Self.statusLabel(antenna))
-                    .font(SQFont.body(12, relativeTo: .caption2))
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .lineLimit(2)
-                if let commune = antenna.commune, !commune.isEmpty {
-                    Text(commune)
-                        .font(SQFont.body(12, relativeTo: .caption2))
-                        .foregroundStyle(SQColor.labelSecondary)
-                        .lineLimit(2)
-                }
-            }
-            Spacer()
-            if antenna.isUnconfirmed && (antenna.siteId != nil || antenna.enb != nil || antenna.gnb != nil) {
-                Button {
-                    pendingIdentify = antenna
-                } label: {
-                    Group {
-                        if model.identifyingId == antenna.id {
-                            SQSpinner().tint(SQColor.onAccent)
-                        } else {
-                            Text("Valider").font(SQFont.body(13, .semibold, relativeTo: .caption))
+        let canValidate = antenna.isUnconfirmed && (antenna.siteId != nil || antenna.enb != nil || antenna.gnb != nil)
+        let subtitle = Self.antennaSubtitle(antenna)
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(alignment: .top, spacing: SQSpace.sm2) {
+                SQIconPastille(systemImage: "antenna.radiowaves.left.and.right", size: 34,
+                               tint: SQBrand.operatorColor(antenna.operatorName ?? ""))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(verbatim: Self.antennaTitle(antenna))
+                        .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(SQColor.label)
+                        .monospacedDigit()
+                        .sqSingleLine()
+                    if !subtitle.isEmpty {
+                        Text(verbatim: subtitle)
+                            .font(SQFont.body(13, relativeTo: .footnote))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
+                    HStack(spacing: SQSpace.sm) {
+                        statusPill(antenna.status)
+                        if let detail = Self.statusDetail(antenna) {
+                            Text(verbatim: detail)
+                                .font(SQFont.body(12, relativeTo: .caption2))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .monospacedDigit()
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    .foregroundStyle(SQColor.onAccent)
-                    .padding(.horizontal, SQSpace.md2)
-                    .frame(minHeight: 34)
-                    .background(SQColor.brandRed, in: Capsule(style: .continuous))
-                    // Capsule visuelle 34 pt, zone tactile étendue à ≥ 44 pt.
-                    .padding(.vertical, 5)
-                    .contentShape(Rectangle())
+                    .padding(.top, 2)
+                    if antenna.status == .hypothesis, !antenna.evidence.isEmpty {
+                        Text(verbatim: antenna.evidence.joined(separator: " · "))
+                            .font(SQFont.body(12, relativeTo: .caption2))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(2)
+                    }
                 }
-                .buttonStyle(SQPressButtonStyle())
-                .disabled(model.identifyingId != nil)
-                .accessibilityLabel("Valider l'antenne \(antenna.operatorDisplayName ?? antenna.displayName ?? "")")
+                Spacer(minLength: 0)
             }
-            if antenna.siteId != nil {
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(SQColor.labelTertiary)
-                    .accessibilityHidden(true)
+            .accessibilityElement(children: .combine)
+            if canValidate || antenna.siteId != nil {
+                HStack(spacing: SQSpace.sm) {
+                    if canValidate {
+                        if model.identifyingId == antenna.id {
+                            SQSpinner().tint(SQColor.brandRed).frame(minWidth: 44, minHeight: 44)
+                        } else {
+                            RadioLogActionButton(label: "Valider l’antenne", systemImage: "checkmark") {
+                                pendingIdentify = antenna
+                            }
+                            .disabled(model.identifyingId != nil)
+                            .accessibilityLabel(Text("Valider l’antenne \(Self.antennaTitle(antenna))"))
+                            .accessibilityIdentifier("sessionDetail.antenna.validate")
+                        }
+                    }
+                    if let siteId = antenna.siteId {
+                        RadioLogActionButton(label: "Détails", ghost: true) {
+                            validationTarget = ValidationTarget(siteId: siteId, operatorName: antenna.operatorName)
+                        }
+                        .accessibilityLabel(Text("Validations de \(Self.antennaTitle(antenna))"))
+                        .accessibilityIdentifier("sessionDetail.antenna.details")
+                    }
+                }
+                .padding(.leading, 34 + SQSpace.sm2)
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if let siteId = antenna.siteId {
-                validationTarget = ValidationTarget(siteId: siteId, operatorName: antenna.operatorName)
-            }
+        .padding(.vertical, SQSpace.md)
+    }
+
+    /// Étiquette d'état : verte une fois identifiée, ambre pour une hypothèse, neutre sinon.
+    private func statusPill(_ status: ServingStatus) -> some View {
+        let ink: Color
+        let container: Color
+        switch status {
+        case .identified: ink = SQColor.success; container = SQColor.successSoft
+        case .hypothesis: ink = OutageTint.degradedInk; container = SQColor.warningSoft
+        case .proximity, .unknown: ink = SQColor.labelSecondary; container = SQColor.chip
         }
-        .accessibilityAction(named: Text("Afficher les validations")) {
-            if let siteId = antenna.siteId {
-                validationTarget = ValidationTarget(siteId: siteId, operatorName: antenna.operatorName)
-            }
+        return HStack(spacing: 5) {
+            Circle().fill(ink).frame(width: 6, height: 6)
+            Text(status.label)
+                .font(SQFont.body(12, .bold, relativeTo: .caption2))
+                .foregroundStyle(ink)
+                .sqSingleLine()
         }
-        .padding(.vertical, SQSpace.sm)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 3)
+        .background(container, in: Capsule(style: .continuous))
     }
 
     private var emptyAntennasHint: some View {
@@ -1058,15 +1109,14 @@ struct SessionDetailView: View {
         }
     }
 
-    static func statusLabel(_ a: ServingAntenna) -> String {
-        var parts: [String] = [a.status.label]
-        // SESS-DETAIL-TELECOM-01 : la confiance n'a de sens que pour une hypothèse scorée ;
-        // pour une antenne de proximité, la distance suffit à exprimer l'incertitude.
-        if a.status == .hypothesis, let conf = a.confidenceFR {
-            parts.append(conf)
-        }
+    /// Ce qui suit l'étiquette d'état : la confiance d'une hypothèse et la distance au trajet.
+    /// SESS-DETAIL-TELECOM-01 : la confiance n'a de sens que pour une hypothèse scorée ;
+    /// pour une antenne de proximité, la distance suffit à exprimer l'incertitude.
+    static func statusDetail(_ a: ServingAntenna) -> String? {
+        var parts: [String] = []
+        if a.status == .hypothesis, let conf = a.confidenceFR { parts.append(conf) }
         if let d = a.distanceKm, d > 0 { parts.append(String(localized: "à \(formatKm(d))")) }
-        return parts.joined(separator: " · ")
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     /// Couleur d'opérateur fournie par le backend (donnée, pas décor) ;

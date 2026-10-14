@@ -332,6 +332,22 @@
         }
       }
     },
+    "%@. Confirme uniquement si tu l’as captée sur ce trajet : ton identification est publique et tu peux la retirer dans « Mes identifications »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@. Confirm only if you picked it up on this trip: your identification is public and you can withdraw it in “My identifications”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@. Confirme uniquement si tu l’as captée sur ce trajet : ton identification est publique et tu peux la retirer dans « Mes identifications »."
+          }
+        }
+      }
+    },
     "%@° bas" : {
       "localizations" : {
         "en" : {
@@ -1093,6 +1109,22 @@
         }
       }
     },
+    "%lld pour · %lld contre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld for · %2$lld against"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld pour · %2$lld contre"
+          }
+        }
+      }
+    },
     "%lld prévisionnels" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1127,47 +1159,6 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld prévisionnels"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld rejet" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld rejection"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld rejections"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld rejet"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld rejets"
                 }
               }
             }
@@ -2227,6 +2218,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Antennes (estim.)"
+          }
+        }
+      }
+    },
+    "Antennes desservantes · %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serving antennas · %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antennes desservantes · %lld"
           }
         }
       }
@@ -3366,6 +3373,22 @@
         }
       }
     },
+    "Confirme les identifiants que tu as relevés, conteste ceux qui te semblent faux." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm the identifiers you picked up, dispute the ones that look wrong."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirme les identifiants que tu as relevés, conteste ceux qui te semblent faux."
+          }
+        }
+      }
+    },
     "Confirme ton compte" : {
       "localizations" : {
         "en" : {
@@ -3378,6 +3401,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Confirme ton compte"
+          }
+        }
+      }
+    },
+    "Confirmer l’identifiant %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm identifier %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirmer l’identifiant %1$@ %2$@"
           }
         }
       }
@@ -3410,6 +3449,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connecte-toi pour envoyer un signalement"
+          }
+        }
+      }
+    },
+    "Contester l’identifiant %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispute identifier %1$@ %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contester l’identifiant %1$@ %2$@"
           }
         }
       }
@@ -4734,6 +4789,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Identifier sur le site %@"
+          }
+        }
+      }
+    },
+    "Identifiée : confirmée par la communauté. Hypothèse : l’antenne la plus probable d’après tes mesures. Proximité : le site ANFR le plus proche du trajet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identified: confirmed by the community. Hypothesis: the most likely antenna from your measurements. Proximity: the ANFR site closest to the trip."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifiée : confirmée par la communauté. Hypothèse : l’antenne la plus probable d’après tes mesures. Proximité : le site ANFR le plus proche du trajet."
           }
         }
       }
@@ -7680,23 +7751,6 @@
         }
       }
     },
-    "Rejeter %@ %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reject %@ %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rejeter %@ %@"
-          }
-        }
-      }
-    },
     "Relais hertzien" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9625,19 +9679,50 @@
         }
       }
     },
-    "Valider %@ %@" : {
-      "extractionState" : "manual",
+    "Validations de %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Confirm %@ %@"
+            "value" : "Validations for %@"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Valider %@ %@"
+            "value" : "Validations de %@"
+          }
+        }
+      }
+    },
+    "Valider l’antenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm the antenna"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider l’antenne"
+          }
+        }
+      }
+    },
+    "Valider l’antenne %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm antenna %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valider l’antenne %@"
           }
         }
       }
@@ -10046,6 +10131,22 @@
         }
       }
     },
+    "eNB (4G)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eNB (4G)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "eNB (4G)"
+          }
+        }
+      }
+    },
     "eNB et gNB croissants" : {
       "localizations" : {
         "en" : {
@@ -10122,6 +10223,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "facultatif, 5 au plus"
+          }
+        }
+      }
+    },
+    "gNB (5G)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gNB (5G)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gNB (5G)"
           }
         }
       }
@@ -10574,6 +10691,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "sur 7 jours"
+          }
+        }
+      }
+    },
+    "ta proposition" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "your proposal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ta proposition"
           }
         }
       }
@@ -19393,22 +19526,6 @@
         }
       }
     },
-    "Afficher les validations" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show validations"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher les validations"
-          }
-        }
-      }
-    },
     "Afficher ma dernière activité" : {
       "localizations" : {
         "en" : {
@@ -20622,22 +20739,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Antennes autour"
-          }
-        }
-      }
-    },
-    "Antennes desservantes" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Serving antennas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Antennes desservantes"
           }
         }
       }
@@ -26368,22 +26469,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette ancienne photo ne contient pas de marché vérifiable. SignalQuest ne l’attribue pas automatiquement à la France."
-          }
-        }
-      }
-    },
-    "Cette antenne est indiquée comme %@. Confirme uniquement si tu l'as sélectionnée comme antenne réelle." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This antenna is marked as %@. Confirm only if you selected it as the actual antenna."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette antenne est indiquée comme %@. Confirme uniquement si tu l'as sélectionnée comme antenne réelle."
           }
         }
       }
@@ -57946,23 +58031,6 @@
         }
       }
     },
-    "Site identifié ✓" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Site identified ✓"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Site identifié ✓"
-          }
-        }
-      }
-    },
     "Site identifié." : {
       "localizations" : {
         "en" : {
@@ -64113,38 +64181,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Valider ce premier appareil"
-          }
-        }
-      }
-    },
-    "Valider cette antenne" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirm this antenna"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valider cette antenne"
-          }
-        }
-      }
-    },
-    "Valider l'antenne %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Confirm antenna %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valider l'antenne %@"
           }
         }
       }
