@@ -3657,6 +3657,22 @@
         }
       }
     },
+    "De %lld à %lld dBm, %lld dBm en moyenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From %1$lld to %2$lld dBm, %3$lld dBm on average"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De %1$lld à %2$lld dBm, %3$lld dBm en moyenne"
+          }
+        }
+      }
+    },
     "Demain %@" : {
       "localizations" : {
         "en" : {
@@ -4365,6 +4381,22 @@
         }
       }
     },
+    "Glisse le doigt pour lire chaque mesure · pince pour zoomer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slide your finger to read each measurement · pinch to zoom"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glisse le doigt pour lire chaque mesure · pince pour zoomer"
+          }
+        }
+      }
+    },
     "Glisse le doigt pour lire chaque relevé · pince pour zoomer sur une période" : {
       "localizations" : {
         "en" : {
@@ -4393,6 +4425,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Glisse le doigt sur la courbe, touche-la pour l’agrandir."
+          }
+        }
+      }
+    },
+    "Glisse sur la courbe pour lire une mesure." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slide along the curve to read a measurement."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glisse sur la courbe pour lire une mesure."
           }
         }
       }
@@ -7118,6 +7166,22 @@
         }
       }
     },
+    "Plein écran" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full screen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plein écran"
+          }
+        }
+      }
+    },
     "Plus anciens" : {
       "localizations" : {
         "en" : {
@@ -8236,6 +8300,22 @@
         }
       }
     },
+    "Signal le long du trajet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal along the trip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signal le long du trajet"
+          }
+        }
+      }
+    },
     "Signalement envoyé. Merci, nous allons l'examiner." : {
       "localizations" : {
         "en" : {
@@ -8652,6 +8732,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ta position et ton réseau, en continu, dans %@."
+          }
+        }
+      }
+    },
+    "Temps" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps"
           }
         }
       }

@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import Charts
 
 @MainActor
 final class SessionDetailViewModel: ObservableObject {
@@ -106,6 +107,33 @@ final class SessionDetailViewModel: ObservableObject {
         }
         kilometerCache = (renderVersion, ids, points, km)
         return (ids, points, km)
+    }
+
+    /// Mesure de signal placée le long du trajet (temps écoulé et kilomètre).
+    struct SignalSample: Identifiable {
+        let id: Int
+        let seconds: Double
+        let km: Double
+        let rsrp: Double
+        let point: CoverageSessionPoint
+    }
+
+    private var signalCache: (version: UUID, start: Date?, samples: [SignalSample])?
+
+    /// Points porteurs d'un RSRP, dans l'ordre du trajet ; réduits à ~800 pour le graphique.
+    var signalSamples: (start: Date?, samples: [SignalSample]) {
+        if let cache = signalCache, cache.version == renderVersion { return (cache.start, cache.samples) }
+        let k = kilometers()
+        let start = k.points.compactMap(\.timestamp).min()
+        var all: [SignalSample] = []
+        for (index, point) in k.points.enumerated() {
+            guard let rsrp = point.signalStrength, rsrp <= -44, rsrp > -140, let time = point.timestamp, let start else { continue }
+            all.append(SignalSample(id: index, seconds: time.timeIntervalSince(start), km: k.km[index], rsrp: rsrp, point: point))
+        }
+        let step = max(1, Int((Double(all.count) / 800).rounded(.up)))
+        let samples = step == 1 ? all : stride(from: 0, to: all.count, by: step).map { all[$0] }
+        signalCache = (renderVersion, start, samples)
+        return (start, samples)
     }
 
     /// Kilomètre d'un point du tracé.
@@ -303,6 +331,7 @@ struct SessionDetailView: View {
     /// Couleur des points choisie ; `nil` = signal, sauf couverture iOS (génération seule).
     @State private var chosenColoring: SessionPointColoring?
     @State private var showsFullMap = false
+    @State private var signalSelection: SessionDetailViewModel.SignalSample?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
 
@@ -335,6 +364,7 @@ struct SessionDetailView: View {
                 traceSection
                 summaryCard
                 generationSection
+                signalSection
                 speedtestsSection
                 if let antennas = model.detail?.servingAntennas, !antennas.isEmpty {
                     servingAntennasSection(antennas)
@@ -738,6 +768,52 @@ struct SessionDetailView: View {
     /// "Aucun" → nil (gris) ; sinon la génération telle quelle pour SessionGenerationColor.
     private func genColorKey(_ gen: String) -> String? { gen == "Aucun" ? nil : gen }
 
+    // MARK: Signal le long du trajet
+
+    @ViewBuilder
+    private var signalSection: some View {
+        let data = model.signalSamples
+        if data.samples.count >= 2 {
+            HStack(alignment: .firstTextBaseline) {
+                sectionHeader("Signal le long du trajet")
+                Spacer(minLength: SQSpace.sm)
+                Button(action: openSignalFullScreen) {
+                    Label("Plein écran", systemImage: "arrow.up.left.and.arrow.down.right")
+                        .font(SQFont.body(13, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("sessionDetail.signal.expand")
+            }
+            // Le bouton fait 44 pt : le titre reste aussi près de sa carte que les autres.
+            .padding(.vertical, -SQSpace.sm)
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                SessionSignalChart(samples: data.samples, start: data.start, axis: .time,
+                                   selection: $signalSelection, onTap: openSignalFullScreen)
+                    .frame(height: 130)
+                    .accessibilityIdentifier("sessionDetail.signal.chart")
+                if let sample = signalSelection {
+                    SessionSignalReading(sample: sample, start: data.start, showsKilometer: model.session.isDriveTest)
+                } else {
+                    Text("Glisse sur la courbe pour lire une mesure.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .padding(SQSpace.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .sqCardBackground()
+        }
+    }
+
+    private func openSignalFullScreen() {
+        ANFRLandscapeHost.present(
+            SessionSignalFullScreen(model: model, title: title, axis: .time, onClose: ANFRLandscapeHost.dismissCurrent)
+        )
+    }
+
     // MARK: Speedtests
 
     @ViewBuilder
@@ -1000,6 +1076,357 @@ struct SessionDetailView: View {
         let cleaned = hex.replacingOccurrences(of: "#", with: "")
         guard let value = UInt32(cleaned, radix: 16) else { return SQColor.labelSecondary }
         return Color(hex: value)
+    }
+}
+
+/// Axe horizontal du graphique de signal : le temps, ou la distance parcourue.
+enum SessionSignalAxis: Hashable { case time, distance }
+
+/// Signal le long du trajet : la courbe du RSRP, ses seuils, et un curseur
+/// qui lit une mesure. Compact dans le détail, plein écran en paysage.
+private struct SessionSignalChart: View {
+    let samples: [SessionDetailViewModel.SignalSample]
+    let start: Date?
+    let axis: SessionSignalAxis
+    var domain: ClosedRange<Double>? = nil
+    @Binding var selection: SessionDetailViewModel.SignalSample?
+    var isExpanded = false
+    var onTap: (() -> Void)? = nil
+    @State private var lastHapticId: Int?
+
+    /// Tranche du trajet : moyenne et écart du signal, pour la courbe lissée du détail.
+    struct Bucket: Identifiable {
+        let id: Int
+        let x: Double
+        let mean: Double
+        let low: Double
+        let high: Double
+    }
+
+    func x(_ sample: SessionDetailViewModel.SignalSample) -> Double {
+        axis == .time ? sample.seconds : sample.km
+    }
+
+    var fullDomain: ClosedRange<Double> {
+        let xs = samples.map(x)
+        guard let low = xs.min(), let high = xs.max(), low < high else { return 0...1 }
+        return low...high
+    }
+
+    private var xDomain: ClosedRange<Double> { domain ?? fullDomain }
+
+    private var visible: [SessionDetailViewModel.SignalSample] {
+        samples.filter { xDomain.contains(x($0)) }
+    }
+
+    /// Bornes à 5 dB près, avec une marge, sans dépasser la plage RSRP.
+    private var yDomain: ClosedRange<Double> {
+        let values = visible.map(\.rsrp)
+        let low = max(-140, (((values.min() ?? -120) - 5) / 5).rounded(.down) * 5)
+        let high = min(-44, (((values.max() ?? -70) + 5) / 5).rounded(.up) * 5)
+        return low < high ? low...high : -120...(-70)
+    }
+
+    /// Tableaux de 0 ou 1 élément plutôt que des `if` dans `Chart {}` (plantage
+    /// connu de Swift Charts avec `symbolSize`).
+    private var selected: [SessionDetailViewModel.SignalSample] { selection.map { [$0] } ?? [] }
+
+    /// Moyenne et bande min–max par tranche (48 dans le détail ; en plein écran
+    /// environ quatre mesures par tranche, 160 au plus) ; chaque mesure telle
+    /// quelle une fois assez zoomé.
+    private var buckets: [Bucket] {
+        let domain = xDomain
+        let samples = visible
+        let count = isExpanded ? min(160, samples.count / 4) : 48
+        let width = (domain.upperBound - domain.lowerBound) / Double(max(count, 1))
+        guard count >= 12, samples.count > count, width > 0 else {
+            return samples.map { Bucket(id: $0.id, x: x($0), mean: $0.rsrp, low: $0.rsrp, high: $0.rsrp) }
+        }
+        var groups: [Int: [SessionDetailViewModel.SignalSample]] = [:]
+        for sample in samples {
+            groups[min(count - 1, Int((x(sample) - domain.lowerBound) / width)), default: []].append(sample)
+        }
+        return groups.keys.sorted().compactMap { key in
+            guard let group = groups[key], !group.isEmpty else { return nil }
+            let values = group.map(\.rsrp)
+            let xs = group.map(x)
+            return Bucket(id: key, x: xs.reduce(0, +) / Double(xs.count), mean: values.reduce(0, +) / Double(values.count),
+                          low: values.min() ?? 0, high: values.max() ?? 0)
+        }
+    }
+
+    func label(_ value: Double) -> String {
+        switch axis {
+        case .time:
+            return (start ?? Date()).addingTimeInterval(value).formatted(.dateTime.hour().minute())
+        case .distance:
+            return String(localized: "km \(value.formatted(.number.precision(.fractionLength(0...1))))")
+        }
+    }
+
+    var body: some View {
+        Chart {
+            ForEach(buckets) { bucket in
+                AreaMark(x: .value("Position", bucket.x),
+                         yStart: .value("Minimum", bucket.low),
+                         yEnd: .value("Maximum", bucket.high))
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(SQColor.brandRed.opacity(0.16))
+                LineMark(x: .value("Position", bucket.x), y: .value("RSRP", bucket.mean))
+                    .interpolationMethod(.monotone)
+                    .lineStyle(StrokeStyle(lineWidth: isExpanded ? 2.2 : 2.4, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(SQColor.brandRed)
+            }
+            ForEach(selected) { sample in
+                RuleMark(x: .value("Position", x(sample)))
+                    .foregroundStyle(SQColor.labelSecondary.opacity(0.6))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                PointMark(x: .value("Position", x(sample)), y: .value("RSRP", sample.rsrp))
+                    .symbolSize(90)
+                    .foregroundStyle(SQQualityScale.Signal(rsrp: sample.rsrp).color)
+            }
+        }
+        .chartXScale(domain: xDomain)
+        .chartYScale(domain: yDomain)
+        .chartLegend(.hidden)
+        .chartYAxis {
+            AxisMarks(position: .leading, values: [-80, -95, -110].filter { yDomain.contains($0) }) { value in
+                AxisGridLine().foregroundStyle(SQColor.separator.opacity(0.6))
+                AxisValueLabel {
+                    if let dbm = value.as(Double.self) {
+                        Text(verbatim: "\(Int(dbm))")
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: isExpanded ? 6 : 3)) { value in
+                AxisValueLabel {
+                    if let v = value.as(Double.self) {
+                        Text(verbatim: label(v))
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+            }
+        }
+        .chartPlotStyle { $0.clipped() }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                let plot = geo[proxy.plotAreaFrame]
+                // Un toucher ouvre le plein écran depuis la page, et lit la mesure une fois agrandi.
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .gesture(SpatialTapGesture().onEnded { value in
+                        if isExpanded {
+                            select(at: value.location.x - plot.origin.x, proxy: proxy)
+                        } else {
+                            onTap?()
+                        }
+                    })
+                    .gesture(
+                        DragGesture(minimumDistance: isExpanded ? 0 : 8)
+                            .onChanged { value in
+                                select(at: value.location.x - plot.origin.x, proxy: proxy)
+                            }
+                            .onEnded { _ in
+                                if !isExpanded { selection = nil }
+                            }
+                    )
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Signal le long du trajet"))
+        .accessibilityValue(Text(accessibilitySummary))
+    }
+
+    /// Retient la mesure la plus proche du doigt, avec un retour haptique à chaque nouvelle mesure.
+    private func select(at plotX: CGFloat, proxy: ChartProxy) {
+        guard let position: Double = proxy.value(atX: plotX),
+              let nearest = visible.min(by: { abs(x($0) - position) < abs(x($1) - position) })
+        else { return }
+        if lastHapticId != nearest.id {
+            lastHapticId = nearest.id
+            Haptics.selection()
+        }
+        selection = nearest
+    }
+
+    /// « De −112 à −78 dBm, −91 dBm en moyenne ».
+    private var accessibilitySummary: String {
+        let values = visible.map(\.rsrp)
+        guard let low = values.min(), let high = values.max() else { return "" }
+        let mean = values.reduce(0, +) / Double(values.count)
+        return String(localized: "De \(Int(low)) à \(Int(high)) dBm, \(Int(mean)) dBm en moyenne")
+    }
+}
+
+/// Lecture d'une mesure sous le curseur : « 10:18 · km 8,4 », « −104 dBm · Faible »,
+/// puis la génération et la cellule.
+private struct SessionSignalReading: View {
+    let sample: SessionDetailViewModel.SignalSample
+    let start: Date?
+    let showsKilometer: Bool
+
+    var body: some View {
+        let quality = SQQualityScale.Signal(rsrp: sample.rsrp)
+        var when: [String] = []
+        if let t = sample.point.timestamp { when.append(t.formatted(.dateTime.hour().minute())) }
+        if showsKilometer {
+            when.append(String(localized: "km \(sample.km.formatted(.number.precision(.fractionLength(1))))"))
+        }
+        var cell: [String] = []
+        if let tech = sample.point.tech, !tech.isEmpty { cell.append(tech) }
+        if let pci = sample.point.pci, !pci.isEmpty { cell.append("PCI \(pci)") }
+        if let gnb = sample.point.gnb, !gnb.isEmpty {
+            cell.append("gNB \(gnb)")
+        } else if let enb = sample.point.enb, !enb.isEmpty {
+            cell.append("eNB \(enb)")
+        }
+        return VStack(alignment: .leading, spacing: 2) {
+            if !when.isEmpty {
+                Text(verbatim: when.joined(separator: " · "))
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            HStack(spacing: SQSpace.xs) {
+                Circle().fill(quality.color).frame(width: 9, height: 9)
+                    .accessibilityHidden(true)
+                Text(verbatim: "\(Int(sample.rsrp)) dBm · \(quality.label)")
+                    .font(SQFont.display(15, .bold, relativeTo: .subheadline))
+                    .foregroundStyle(SQColor.label)
+            }
+            if !cell.isEmpty {
+                Text(verbatim: cell.joined(separator: " · "))
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .monospacedDigit()
+        .padding(.horizontal, SQSpace.md)
+        .padding(.vertical, SQSpace.sm)
+        .sqCardBackground(cornerRadius: SQRadius.md, elevation: .rest)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("sessionDetail.signal.reading")
+    }
+}
+
+/// Signal le long du trajet en paysage : axe Temps ou Distance, curseur, pincement.
+private struct SessionSignalFullScreen: View {
+    @ObservedObject var model: SessionDetailViewModel
+    let title: String
+    let onClose: () -> Void
+    @State private var axis: SessionSignalAxis
+    @State private var zoomDomain: ClosedRange<Double>?
+    @State private var pinchBase: ClosedRange<Double>?
+    @State private var selection: SessionDetailViewModel.SignalSample?
+
+    init(model: SessionDetailViewModel, title: String, axis: SessionSignalAxis, onClose: @escaping () -> Void) {
+        self.model = model
+        self.title = title
+        self.onClose = onClose
+        _axis = State(initialValue: axis)
+    }
+
+    private var data: (start: Date?, samples: [SessionDetailViewModel.SignalSample]) { model.signalSamples }
+
+    private var fullDomain: ClosedRange<Double> {
+        SessionSignalChart(samples: data.samples, start: data.start, axis: axis, selection: .constant(nil)).fullDomain
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            header
+            ZStack(alignment: .topTrailing) {
+                SessionSignalChart(samples: data.samples, start: data.start, axis: axis, domain: zoomDomain,
+                                   selection: $selection, isExpanded: true)
+                    .modifier(ANFRPinchZoom(onChange: zoom(scale:anchor:), onEnd: { pinchBase = nil }))
+                    .accessibilityIdentifier("sessionDetail.signal.fullscreen.chart")
+                if let selection {
+                    SessionSignalReading(sample: selection, start: data.start, showsKilometer: model.session.isDriveTest)
+                        .padding(SQSpace.sm)
+                        .allowsHitTesting(false)
+                }
+            }
+            .frame(maxHeight: .infinity)
+            Text("Glisse le doigt pour lire chaque mesure · pince pour zoomer")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.sm)
+        .background(SQColor.bg.ignoresSafeArea())
+        .accessibilityAction(.escape) { onClose() }
+    }
+
+    private var header: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: SQSpace.sm2) {
+                closeButton
+                titleStack
+                Spacer(minLength: SQSpace.sm)
+                if model.session.isDriveTest { axisPicker.frame(width: 240) }
+            }
+            VStack(alignment: .leading, spacing: SQSpace.sm) {
+                HStack(spacing: SQSpace.sm2) {
+                    closeButton
+                    titleStack
+                }
+                if model.session.isDriveTest { axisPicker }
+            }
+        }
+    }
+
+    private var closeButton: some View {
+        MapChipIconButton(systemImage: "xmark", label: "Fermer", identifier: "sessionDetail.signal.fullscreen.close") { onClose() }
+    }
+
+    private var titleStack: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Signal le long du trajet")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+                .sqHeader()
+            Text(verbatim: title)
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .lineLimit(1)
+        }
+    }
+
+    private var axisPicker: some View {
+        MapSegmented(
+            selection: Binding(get: { axis }, set: { value in
+                axis = value
+                zoomDomain = nil
+                selection = nil
+            }),
+            options: [(.time, String(localized: "Temps")), (.distance, String(localized: "Distance"))],
+            identifier: "sessionDetail.signal.fullscreen.axis"
+        )
+    }
+
+    /// Pincement : resserre ou élargit la plage autour des doigts, sans
+    /// descendre sous le vingtième du trajet.
+    private func zoom(scale: Double, anchor: Double) {
+        let full = fullDomain
+        let base = pinchBase ?? (zoomDomain ?? full)
+        if pinchBase == nil { pinchBase = base }
+        let fullSpan = full.upperBound - full.lowerBound
+        let baseSpan = base.upperBound - base.lowerBound
+        let span = min(max(baseSpan / max(scale, 0.05), fullSpan / 20), fullSpan)
+        let a = min(max(anchor, 0), 1)
+        let anchorValue = base.lowerBound + baseSpan * a
+        var lower = max(anchorValue - span * a, full.lowerBound)
+        var upper = lower + span
+        if upper > full.upperBound {
+            upper = full.upperBound
+            lower = upper - span
+        }
+        zoomDomain = lower...upper
     }
 }
 

@@ -1279,7 +1279,7 @@ private struct ANFRTrendFullScreen: View {
 /// Hôte UIKit du plein écran. L'Info.plist garde l'iPhone en portrait et un
 /// `fullScreenCover` SwiftUI s'y tient : seul un contrôleur présenté par UIKit
 /// peut déclarer le paysage, le temps de sa présentation.
-private final class ANFRLandscapeHost: UIHostingController<AnyView> {
+final class ANFRLandscapeHost: UIHostingController<AnyView> {
     private static weak var current: ANFRLandscapeHost?
     private static var isPhone: Bool { UIDevice.current.userInterfaceIdiom == .phone }
 
@@ -1324,7 +1324,7 @@ private final class ANFRLandscapeHost: UIHostingController<AnyView> {
 }
 
 /// Geste de pincement : la position des doigts n'est connue qu'à partir d'iOS 17.
-private struct ANFRPinchZoom: ViewModifier {
+struct ANFRPinchZoom: ViewModifier {
     let onChange: (Double, Double) -> Void
     let onEnd: () -> Void
 
