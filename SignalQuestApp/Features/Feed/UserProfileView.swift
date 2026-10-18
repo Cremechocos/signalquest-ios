@@ -360,7 +360,7 @@ struct UserProfileView: View {
                     // « Aucune publication » sous le message d'erreur.
                     let loadFailed = model.profile == nil && model.errorMessage != nil && !model.isPrivate
                     header
-                    if !loadFailed {
+                    if !loadFailed, model.profile?.showsStats != false {
                         statsCard
                     }
                     if let networks = model.profile?.networks, !networks.operators.isEmpty {
@@ -645,7 +645,7 @@ struct UserProfileView: View {
                 .foregroundStyle(SQColor.labelSecondary)
                 .lineLimit(1)
             }
-            let level = profile?.stats?.level.map { String(localized: "Niveau \($0)") }
+            let level = profile?.showsStats == false ? nil : profile?.stats?.level.map { String(localized: "Niveau \($0)") }
             let since = profile?.createdAt.map {
                 String(localized: "membre depuis \($0.formatted(.dateTime.month(.wide).year()))")
             }
@@ -667,10 +667,15 @@ struct UserProfileView: View {
     /// Libellés traduits, singulier compris (SOC-28).
     private func followCounters(_ profile: SocialUserProfile) -> some View {
         let locked = profile.followListsHidden && !profile.isSelf
+        // Chiffres masqués par le membre : les lignes restent, sans nombre.
+        let followers = profile.showsStats ? followersLabel(profile.followersCount) : String(localized: "Abonnés")
+        let following = profile.showsStats
+            ? followingLabel(profile.followingCount)
+            : String(localized: "followlist.segment.following")
         return HStack(spacing: SQSpace.xs) {
-            followCounter(followersLabel(profile.followersCount), kind: .followers, profile: profile, locked: locked)
+            followCounter(followers, kind: .followers, profile: profile, locked: locked)
             Text(verbatim: "·").accessibilityHidden(true)
-            followCounter(followingLabel(profile.followingCount), kind: .following, profile: profile, locked: locked)
+            followCounter(following, kind: .following, profile: profile, locked: locked)
         }
         .font(SQType.caption(.semibold))
         .foregroundStyle(locked ? SQColor.labelSecondary : SQColor.label)

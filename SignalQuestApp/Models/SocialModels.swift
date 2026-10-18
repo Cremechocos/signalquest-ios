@@ -629,6 +629,10 @@ struct SocialUserProfile: Codable, Equatable {
     let stats: SocialUserProfileStats?
     /// Réglages de visibilité exposés par le serveur ; absents d'un serveur plus ancien.
     let privacy: SocialUserProfilePrivacy?
+    /// Vrai quand le membre masque ses chiffres : les compteurs et `stats`
+    /// restent servis pour les versions installées, l'app ne les montre pas.
+    /// Toujours faux sur son propre profil.
+    let statsHidden: Bool
 
     var displayName: String {
         name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur")
@@ -638,10 +642,13 @@ struct SocialUserProfile: Codable, Equatable {
     /// compteurs restent affichés mais ne mènent plus à la liste.
     var followListsHidden: Bool { privacy?.hideFollowLists == true }
 
+    /// Chiffres affichables : toujours sur son propre profil.
+    var showsStats: Bool { isSelf || !statsHidden }
+
     enum CodingKeys: String, CodingKey {
         case id, name, handle, bio, avatarUrl, createdAt, isSelf, isFriend
         case isFollowing, followersCount, followingCount, canMessage, stats
-        case accountBadges, networks, privacy
+        case accountBadges, networks, privacy, statsHidden
     }
 
     init(
@@ -660,7 +667,8 @@ struct SocialUserProfile: Codable, Equatable {
         stats: SocialUserProfileStats?,
         accountBadges: [SocialUserBadge] = [],
         networks: SocialProfileNetworks? = nil,
-        privacy: SocialUserProfilePrivacy? = nil
+        privacy: SocialUserProfilePrivacy? = nil,
+        statsHidden: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -678,6 +686,7 @@ struct SocialUserProfile: Codable, Equatable {
         self.accountBadges = accountBadges
         self.networks = networks
         self.privacy = privacy
+        self.statsHidden = statsHidden
     }
 
     init(from decoder: Decoder) throws {
@@ -698,6 +707,7 @@ struct SocialUserProfile: Codable, Equatable {
         accountBadges = c.decodeLossyArray([SocialUserBadge].self, forKey: .accountBadges)
         networks = try? c.decodeIfPresent(SocialProfileNetworks.self, forKey: .networks)
         privacy = try? c.decodeIfPresent(SocialUserProfilePrivacy.self, forKey: .privacy)
+        statsHidden = (try? c.decodeIfPresent(Bool.self, forKey: .statsHidden)) ?? false
     }
 }
 

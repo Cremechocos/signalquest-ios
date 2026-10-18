@@ -189,6 +189,24 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertFalse(visible.followListsHidden)
     }
 
+    /// `profile.statsHidden` : les nombres restent servis, l'app ne les montre
+    /// pas ; absent = visibles ; son propre profil les montre toujours.
+    func testProfileStatsHiddenKeepsNumbersButHidesThem() throws {
+        func profile(_ extra: String) throws -> SocialUserProfile {
+            let json = #"{"id":"u1","name":"Léa","followersCount":12,"followingCount":3\#(extra)}"#
+            return try JSONDecoder.signalQuest.decode(SocialUserProfile.self, from: Data(json.utf8))
+        }
+        XCTAssertTrue(try profile(#","isSelf":false"#).showsStats)
+
+        let hidden = try profile(#","isSelf":false,"statsHidden":true"#)
+        XCTAssertTrue(hidden.statsHidden)
+        XCTAssertFalse(hidden.showsStats)
+        XCTAssertEqual(hidden.followersCount, 12)
+
+        XCTAssertTrue(try profile(#","isSelf":true,"statsHidden":true"#).showsStats)
+        XCTAssertTrue(try profile(#","isSelf":false,"statsHidden":"oui""#).showsStats)
+    }
+
     func testFollowListShowsHiddenAndPrivateStatesInsteadOfAnError() async {
         let fixture = ComposerFeedFixture()
         let model = FollowListViewModel(
