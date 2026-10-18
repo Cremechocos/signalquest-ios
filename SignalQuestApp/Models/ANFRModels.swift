@@ -359,11 +359,15 @@ struct ANFRMapSnapshot: Decodable, Sendable {
     let lastUpdate: String?
     let siteCount: Int
     let sites: [ANFRMapSite]
+    /// Antennes du relevé ; seul le relevé léger le donne, le complet les porte.
+    let antennaCount: Int
+    /// Relevé léger (`fields=lite`) : des compteurs par support, sans les antennes.
+    let isLite: Bool
     /// Vrai quand la copie vient du disque faute de réseau (relevé courant).
     var servedFromCache = false
 
     enum CodingKeys: String, CodingKey {
-        case source, snapshotDate, lastUpdate, siteCount, sites
+        case source, snapshotDate, lastUpdate, siteCount, sites, antennaCount, fields
     }
 
     init(from decoder: Decoder) throws {
@@ -375,15 +379,79 @@ struct ANFRMapSnapshot: Decodable, Sendable {
         let valid = rawSites.filter { $0.hasValidCoordinate }
         sites = valid
         siteCount = c.value(Int.self, .siteCount, valid.count)
+        isLite = c.optional(String.self, .fields) == "lite"
+        antennaCount = c.optional(Int.self, .antennaCount) ?? valid.reduce(0) { $0 + $1.changeCount }
     }
 
-    init(source: String?, snapshotDate: String?, lastUpdate: String?, sites: [ANFRMapSite]) {
+    init(source: String?, snapshotDate: String?, lastUpdate: String?, sites: [ANFRMapSite], isLite: Bool = false) {
         self.source = source
         self.snapshotDate = snapshotDate
         self.lastUpdate = lastUpdate
         self.sites = sites
         self.siteCount = sites.count
+        self.antennaCount = sites.reduce(0) { $0 + $1.changeCount }
+        self.isLite = isLite
     }
+}
+
+// MARK: - Comparaison de deux relevés (GET /api/anfr/map-diff)
+
+/// Ce qui a changé entre deux relevés, en net par antenne : seul compte son dernier
+/// état sur la période. Les supports sont au format léger.
+struct ANFRMapDiff: Decodable, Sendable {
+    let from: String
+    let to: String
+    /// Relevés cumulés, du plus ancien au plus récent (`from` exclu).
+    let weeks: [String]
+    let siteCount: Int
+    let antennaCount: Int
+    let sites: [ANFRMapSite]
+
+    enum CodingKeys: String, CodingKey { case from, to, weeks, siteCount, antennaCount, sites }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        from = c.value(String.self, .from, "")
+        to = c.value(String.self, .to, "")
+        weeks = c.value([String].self, .weeks, [])
+        sites = c.value([ANFRMapSite].self, .sites, []).filter { $0.hasValidCoordinate }
+        siteCount = c.value(Int.self, .siteCount, sites.count)
+        antennaCount = c.optional(Int.self, .antennaCount) ?? sites.reduce(0) { $0 + $1.changeCount }
+    }
+
+    init(from: String, to: String, weeks: [String], sites: [ANFRMapSite]) {
+        self.from = from
+        self.to = to
+        self.weeks = weeks
+        self.sites = sites
+        self.siteCount = sites.count
+        self.antennaCount = sites.reduce(0) { $0 + $1.changeCount }
+    }
+
+    /// La comparaison vue comme un relevé léger, pour la carte.
+    var snapshot: ANFRMapSnapshot {
+        ANFRMapSnapshot(source: "diff", snapshotDate: to, lastUpdate: nil, sites: sites, isLite: true)
+    }
+}
+
+/// Ce que le relevé léger dit d'un support : ses opérateurs et ses changements par type.
+struct ANFRSiteChangeSummary: Equatable, Sendable {
+    /// Opérateurs suivis présents, dans l'ordre de l'enum.
+    let operators: [ANFROperator]
+    /// Un opérateur hors des quatre suivis figure aussi sur le support.
+    let hasOtherOperator: Bool
+    let counts: [ANFRModType: Int]
+    /// Antennes en rattrapage, tous types confondus : elles recoupent `counts`.
+    let catchUp: Int
+    /// Dans une comparaison, le relevé de son dernier changement.
+    let lastChangeDate: String?
+
+    var total: Int { counts.values.reduce(0, +) }
+
+    /// Types présents, dans l'ordre de l'enum.
+    var presentTypes: [ANFRModType] { ANFRModType.allCases.filter { (counts[$0] ?? 0) > 0 } }
+
+    func count(for type: ANFRModType) -> Int { counts[type] ?? 0 }
 }
 
 /// Un site ANFR (un support) et ses antennes modifiées au relevé.
@@ -393,18 +461,51 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
     let longitude: Double
     let city: String
     let antennas: [ANFRMapAntenna]
+    /// Relevé léger ou comparaison : le support sans ses antennes, avec ses compteurs.
+    /// `nil` dans un relevé complet.
+    let summary: ANFRSiteChangeSummary?
 
     var id: String { supId }
 
     enum CodingKeys: String, CodingKey {
         case info, antennas
+        case supId, lat, lon, city, operators, changes, catchUp, lastChangeDate
     }
     private enum InfoKeys: String, CodingKey {
         case sup_id, lat, lon, city
     }
+    private enum ChangeKeys: String, CodingKey {
+        case new, added, activated, deleted, modified
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let changes = try? c.nestedContainer(keyedBy: ChangeKeys.self, forKey: .changes) {
+            // Format léger : position en nombres, opérateurs en libellés ANFR bruts.
+            supId = c.optional(String.self, .supId) ?? ""
+            latitude = c.optional(ANFRLooseNumber.self, .lat)?.value ?? .nan
+            longitude = c.optional(ANFRLooseNumber.self, .lon)?.value ?? .nan
+            city = c.optional(String.self, .city) ?? ""
+            antennas = []
+            let rawOperators = c.value([String].self, .operators, [])
+            let tracked = Set(rawOperators.compactMap(ANFROperator.from(raw:)))
+            var counts: [ANFRModType: Int] = [:]
+            let keys: [(ANFRModType, ChangeKeys)] = [(.new, .new), (.added, .added), (.activated, .activated),
+                                                     (.deleted, .deleted), (.modified, .modified)]
+            for (type, key) in keys {
+                let count = changes.value(Int.self, key, 0)
+                if count > 0 { counts[type] = count }
+            }
+            summary = ANFRSiteChangeSummary(
+                operators: ANFROperator.allCases.filter(tracked.contains),
+                hasOtherOperator: rawOperators.contains { ANFROperator.from(raw: $0) == nil },
+                counts: counts,
+                catchUp: max(c.value(Int.self, .catchUp, 0), 0),
+                lastChangeDate: c.optional(String.self, .lastChangeDate)
+            )
+            return
+        }
+        summary = nil
         let info = try? c.nestedContainer(keyedBy: InfoKeys.self, forKey: .info)
         let rawAntennas = c.value([ANFRMapAntenna].self, .antennas, [])
         antennas = rawAntennas
@@ -421,13 +522,18 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
         city = (infoCity?.isEmpty == false ? infoCity : nil) ?? rawAntennas.first?.city ?? ""
     }
 
-    init(supId: String, latitude: Double, longitude: Double, city: String, antennas: [ANFRMapAntenna]) {
+    init(supId: String, latitude: Double, longitude: Double, city: String, antennas: [ANFRMapAntenna],
+         summary: ANFRSiteChangeSummary? = nil) {
         self.supId = supId
         self.latitude = latitude
         self.longitude = longitude
         self.city = city
         self.antennas = antennas
+        self.summary = summary
     }
+
+    /// Changements du support : ses antennes, ou ses compteurs en relevé léger.
+    var changeCount: Int { summary?.total ?? antennas.count }
 
     var hasValidCoordinate: Bool {
         guard latitude.isFinite, longitude.isFinite else { return false }
@@ -443,6 +549,7 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
 
     /// Opérateurs présents, dédupliqués, ordonnés selon l'enum (cache-stable).
     var operators: [ANFROperator] {
+        if let summary { return summary.operators }
         var seen = Set<ANFROperator>()
         var ordered: [ANFROperator] = []
         for op in ANFROperator.allCases where antennas.contains(where: { $0.operator == op }) {
@@ -455,6 +562,8 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
     /// d'enum (le plus petit ordinal gagne, comme Android). `nil` quand aucune
     /// antenne n'est d'un des quatre opérateurs suivis.
     var dominantOperator: ANFROperator? {
+        // Le relevé léger ne compte pas les antennes par opérateur : ordre de l'enum.
+        if let summary { return summary.operators.first }
         let counts = Dictionary(grouping: antennas.compactMap(\.operator), by: { $0 })
             .mapValues(\.count)
         // `allCases` est déjà en ordre d'enum : `max(by:)` renvoie le dernier
@@ -468,7 +577,8 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
 
     /// Type de modification dominant (priorité : voir `ANFRModType.priority`).
     var dominantModType: ANFRModType {
-        antennas.map(\.modType).max { $0.priority < $1.priority } ?? .activated
+        let types = summary?.presentTypes ?? antennas.map(\.modType)
+        return types.max { $0.priority < $1.priority } ?? .activated
     }
 
     /// Génération la plus élevée présente sur le site.
@@ -669,10 +779,13 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
     /// Supports réorientés cette semaine, hors `total`. Absent tant que la semaine
     /// n'est pas archivée ou que le calcul n'existe pas.
     let reoriented: Int?
+    /// Poids de l'archive : supports et antennes. Absent avant le mode léger.
+    let siteCount: Int?
+    let antennaCount: Int?
 
     var id: String { date }
 
-    private enum CodingKeys: String, CodingKey { case date, counts, total, reoriented }
+    private enum CodingKeys: String, CodingKey { case date, counts, total, reoriented, siteCount, antennaCount }
     private enum CountKeys: String, CodingKey { case new, added, activated, deleted, modified, catchUp }
 
     init(from decoder: Decoder) throws {
@@ -688,10 +801,12 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
         // Le `total` du serveur somme les quatre types historiques : `modified` s'y ajoute.
         total = (c.optional(Int.self, .total) ?? new + added + activated + deleted) + modified
         reoriented = c.optional(Int.self, .reoriented)
+        siteCount = c.optional(Int.self, .siteCount)
+        antennaCount = c.optional(Int.self, .antennaCount)
     }
 
     init(date: String, new: Int, added: Int, activated: Int, deleted: Int, modified: Int = 0, catchUp: Int = 0, total: Int? = nil,
-         reoriented: Int? = nil) {
+         reoriented: Int? = nil, siteCount: Int? = nil, antennaCount: Int? = nil) {
         self.date = date
         self.new = new
         self.added = added
@@ -701,6 +816,8 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
         self.catchUp = catchUp
         self.total = total ?? new + added + activated + deleted + modified
         self.reoriented = reoriented
+        self.siteCount = siteCount
+        self.antennaCount = antennaCount
     }
 
     func count(for type: ANFRModType) -> Int {
@@ -861,9 +978,13 @@ struct ANFRFocus: Equatable, Sendable {
 
 enum ANFRMapPolicy {
     /// Première date d'une série hebdomadaire régulière. Les relevés antérieurs
-    /// (mai 2022) sont l'état complet du parc, des dizaines de milliers de supports,
-    /// et non un différentiel : la carte ne les ouvre pas.
+    /// (mai 2022) sont des différentiels énormes, des dizaines de milliers de
+    /// supports : la carte ne les ouvre qu'en relevé léger.
     static let firstWeeklyDate = "2025-10-01"
+    /// Au-delà de ces antennes, une semaine se charge en relevé léger.
+    static let liteAntennaThreshold = 20_000
+    /// Relevés cumulés au plus par une comparaison (plafond du serveur).
+    static let maxComparedWeeks = 26
 
     static func isISODate(_ raw: String) -> Bool {
         let chars = Array(raw.utf8)
@@ -878,7 +999,7 @@ enum ANFRMapPolicy {
         return ANFRDateParser.date(from: raw) != nil
     }
 
-    /// Relevé d'état complet (et non d'un différentiel hebdomadaire) à ne pas charger.
+    /// Relevé antérieur à la série hebdomadaire : trop lourd pour le format complet.
     static func isFullStateDate(_ raw: String) -> Bool {
         isISODate(raw) && raw < firstWeeklyDate
     }

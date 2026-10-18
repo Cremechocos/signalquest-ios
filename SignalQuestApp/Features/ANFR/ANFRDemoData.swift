@@ -144,6 +144,25 @@ enum ANFRDemoData {
         ]
     )
 
+    /// Comparaison du 21 mai au dernier relevé : supports au format léger.
+    static let mapDiff: ANFRMapDiff = {
+        func site(_ supId: String, _ lat: Double, _ lon: Double, _ city: String, _ operators: [ANFROperator],
+                  _ counts: [ANFRModType: Int], catchUp: Int = 0, last: String) -> ANFRMapSite {
+            ANFRMapSite(supId: supId, latitude: lat, longitude: lon, city: city, antennas: [], summary: ANFRSiteChangeSummary(
+                operators: operators, hasOtherOperator: false, counts: counts, catchUp: catchUp, lastChangeDate: last
+            ))
+        }
+        return ANFRMapDiff(from: "2026-05-21", to: "current", weeks: ["2026-05-28", "2026-06-04", "2026-06-11"], sites: [
+            site("29847", 44.5297, -0.1806, "BRANNENS", [.bouygues], [.new: 1], last: "2026-06-11"),
+            site("120044", 48.8566, 2.3522, "PARIS", [.sfr, .free], [.activated: 3, .added: 2], last: "2026-06-11"),
+            site("130088", 45.7640, 4.8357, "LYON", [.bouygues], [.new: 1], last: "2026-06-04"),
+            site("140122", 43.2965, 5.3698, "MARSEILLE", [.orange, .free], [.activated: 4, .deleted: 1], catchUp: 1, last: "2026-06-04"),
+            site("150301", 47.2184, -1.5536, "NANTES", [.sfr], [.modified: 2], last: "2026-05-28"),
+            site("160455", 43.6047, 1.4442, "TOULOUSE", [.orange], [.deleted: 3], last: "2026-05-28"),
+            site("170612", 50.6292, 3.0573, "LILLE", [.free], [.activated: 2], catchUp: 2, last: "2026-05-28")
+        ])
+    }()
+
     static let archiveDates = ANFRArchiveDates(
         dates: ["2026-06-04", "2026-05-28", "2026-05-21", "2026-05-14", "2026-05-07"],
         current: "2026-06-11"

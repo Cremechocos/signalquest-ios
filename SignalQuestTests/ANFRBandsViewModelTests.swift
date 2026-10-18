@@ -197,8 +197,25 @@ final class ANFRMapViewModelTests: XCTestCase {
         var dates = ANFRArchiveDates(dates: [], current: nil)
         var weeks: [ANFRWeekSummary] = []
         var reorientationWeeks: [String: ANFRReorientationsWeek] = [:]
+        var liteSnapshots: [String: ANFRMapSnapshot] = [:]
+        var diffs: [String: ANFRMapDiff] = [:]
+        var diffError: Error?
+        private var liteRequested: [String] = []
 
         var requests: [String?] { lock.withLock { requested } }
+        var liteRequests: [String] { lock.withLock { liteRequested } }
+
+        func mapSnapshotLite(date: String) async throws -> ANFRMapSnapshot {
+            lock.withLock { liteRequested.append(date) }
+            guard let snapshot = liteSnapshots[date] else { throw URLError(.fileDoesNotExist) }
+            return snapshot
+        }
+
+        func mapDiff(from: String, to: String?) async throws -> ANFRMapDiff {
+            if let diffError { throw diffError }
+            guard let diff = diffs["\(from)|\(to ?? "current")"] else { throw URLError(.fileDoesNotExist) }
+            return diff
+        }
 
         func reorientations(date: String?) async throws -> ANFRReorientationsWeek? {
             reorientationWeeks[date ?? "current"]
@@ -784,6 +801,224 @@ extension ANFRMapViewModelTests {
         missing.value = true
         let none = try await service.reorientations(date: "2026-09-01")
         XCTAssertNil(none)
+    }
+
+    // MARK: Relevé léger et comparaison (ANFR-MAP v1.1)
+
+    private func liteSite(_ supId: String, _ operators: [ANFROperator], _ counts: [ANFRModType: Int],
+                          other: Bool = false, catchUp: Int = 0) -> ANFRMapSite {
+        ANFRMapSite(supId: supId, latitude: 45, longitude: 5, city: "LYON", antennas: [], summary: ANFRSiteChangeSummary(
+            operators: operators, hasOtherOperator: other, counts: counts, catchUp: catchUp, lastChangeDate: "2026-10-08"
+        ))
+    }
+
+    func testDecodesALiteSnapshotWithoutAntennas() throws {
+        let json = """
+        {"source":"archive","snapshotDate":"2022-05-20","lastUpdate":"x","fields":"lite","siteCount":3,"antennaCount":169742,"sites":[
+          {"supId":"29847","lat":44.5297,"lon":-0.1806,"city":"BRANNENS","operators":["FREE MOBILE","ORANGE","TDF"],
+           "changes":{"new":0,"added":2,"activated":5,"deleted":0,"modified":1},"catchUp":3},
+          {"supId":"7","lat":"45.1","lon":"5.1","city":null,"operators":[],"changes":{"new":1},"catchUp":0},
+          {"supId":"8","lat":null,"lon":5,"operators":["SFR"],"changes":{"new":1},"catchUp":0}]}
+        """
+        let snapshot = try JSONDecoder.signalQuest.decode(ANFRMapSnapshot.self, from: Data(json.utf8))
+        XCTAssertTrue(snapshot.isLite)
+        XCTAssertEqual(snapshot.antennaCount, 169_742, "le poids annoncé par le serveur, pas un recomptage")
+        XCTAssertEqual(snapshot.sites.map(\.supId), ["29847", "7"], "un support sans position n'a pas de repère")
+        let site = snapshot.sites[0]
+        XCTAssertTrue(site.antennas.isEmpty)
+        XCTAssertEqual(site.operators, [.orange, .free])
+        XCTAssertEqual(site.summary?.hasOtherOperator, true)
+        XCTAssertEqual(site.summary?.count(for: .activated), 5)
+        XCTAssertEqual(site.summary?.catchUp, 3)
+        XCTAssertEqual(site.changeCount, 8)
+        XCTAssertEqual(site.dominantModType, .added, "même priorité que le relevé complet")
+        XCTAssertEqual(site.dominantOperator, .orange)
+        XCTAssertNil(site.highestGeneration)
+        XCTAssertEqual(snapshot.sites[1].city, "")
+
+        let full = try JSONDecoder.signalQuest.decode(ANFRMapSnapshot.self, from: Data(#"{"sites":[]}"#.utf8))
+        XCTAssertFalse(full.isLite)
+    }
+
+    func testDecodesAComparisonAndTheWeightOfAWeek() throws {
+        let json = """
+        {"from":"2026-09-17","to":"current","weeks":["2026-09-24","2026-10-01"],"siteCount":1,"antennaCount":4,"sites":[
+          {"supId":"5","lat":45,"lon":5,"city":"LYON","operators":["SFR"],"changes":{"new":0,"added":0,"activated":3,"deleted":1,"modified":0},
+           "catchUp":0,"lastChangeDate":"2026-10-01"}]}
+        """
+        let diff = try JSONDecoder.signalQuest.decode(ANFRMapDiff.self, from: Data(json.utf8))
+        XCTAssertEqual(diff.weeks, ["2026-09-24", "2026-10-01"])
+        XCTAssertEqual(diff.sites.first?.summary?.lastChangeDate, "2026-10-01")
+        XCTAssertTrue(diff.snapshot.isLite)
+        XCTAssertEqual(diff.snapshot.antennaCount, 4)
+
+        let week = try JSONDecoder.signalQuest.decode(ANFRWeekSummary.self, from: Data(
+            #"{"date":"2022-05-20","counts":{"new":10,"added":0,"activated":0,"deleted":0,"catchUp":0},"total":10,"siteCount":25860,"antennaCount":169742}"#.utf8
+        ))
+        XCTAssertEqual(week.siteCount, 25_860)
+        XCTAssertEqual(week.antennaCount, 169_742)
+    }
+
+    func testTheOld2022RelevésOpenInLiteOnlyWhenTheServerOffersIt() async {
+        let service = FakeService()
+        service.snapshots["current"] = snapshot(mixedSites)
+        service.dates = ANFRArchiveDates(dates: ["2026-10-08", "2022-05-31", "2022-05-20"], current: "2026-10-15")
+        service.weeks = [ANFRWeekSummary(date: "2026-10-08", new: 1, added: 0, activated: 0, deleted: 0)]
+        var model = await loadedModel(service)
+        XCTAssertFalse(model.supportsLite)
+        XCTAssertEqual(model.selectableDates, ["2026-10-08"])
+        XCTAssertTrue(model.hidesFullStateDates)
+
+        service.weeks = [ANFRWeekSummary(date: "2026-10-08", new: 1, added: 0, activated: 0, deleted: 0, siteCount: 1, antennaCount: 1)]
+        service.liteSnapshots["2022-05-20"] = ANFRMapSnapshot(source: "archive", snapshotDate: "2022-05-20", lastUpdate: nil,
+                                                              sites: [liteSite("9", [.sfr], [.new: 4])], isLite: true)
+        model = await loadedModel(service)
+        XCTAssertTrue(model.supportsLite)
+        XCTAssertEqual(model.selectableDates, ["2026-10-08", "2022-05-31", "2022-05-20"])
+        XCTAssertFalse(model.hidesFullStateDates)
+        await model.selectDate("2022-05-20")
+        XCTAssertEqual(service.liteRequests, ["2022-05-20"])
+        XCTAssertFalse(service.requests.contains("2022-05-20"), "jamais le relevé complet de 2022")
+        XCTAssertTrue(model.displaysLite)
+        XCTAssertEqual(model.filteredSites.map(\.supId), ["9"])
+    }
+
+    func testLiteSitesFilterAsAWholeAndIgnoreTheGenerationFilter() async {
+        let service = FakeService()
+        service.snapshots["current"] = snapshot(mixedSites)
+        service.dates = ANFRArchiveDates(dates: ["2026-10-08", "2026-10-01"], current: "2026-10-15")
+        service.weeks = [ANFRWeekSummary(date: "2026-10-08", new: 1, added: 0, activated: 0, deleted: 0, siteCount: 1)]
+        service.diffs["2026-10-01|current"] = ANFRMapDiff(from: "2026-10-01", to: "current", weeks: ["2026-10-08", "2026-10-15"], sites: [
+            liteSite("A", [.orange, .free], [.activated: 2, .new: 1]),
+            liteSite("B", [.sfr], [.deleted: 1]),
+            liteSite("C", [], [.added: 1], other: true),
+            liteSite("D", [.bouygues], [.activated: 2], catchUp: 2),
+            liteSite("E", [.bouygues], [.activated: 2], catchUp: 1)
+        ])
+        let model = await loadedModel(service)
+        model.selectedGenerations = [.g5]
+        await settle()
+        let fullCount = model.filteredSites.count
+        await model.compare(from: "2026-10-01", to: nil)
+        XCTAssertEqual(model.displayedComparison, ANFRComparison(from: "2026-10-01", to: nil))
+        XCTAssertEqual(model.filteredSites.count, 5, "la génération ne filtre pas un relevé léger")
+        XCTAssertEqual(model.activeFilterCount, 0)
+        XCTAssertEqual(model.comparisonWeeks, ["2026-10-08", "2026-10-15"])
+        XCTAssertEqual(model.weekBars.filter(\.inComparison).map(\.date), ["2026-10-08", nil])
+        XCTAssertNotEqual(fullCount, 0)
+
+        model.toggleOperator(.sfr)
+        model.toggleOperator(.bouygues)
+        await settle()
+        XCTAssertEqual(model.filteredSites.map(\.supId), ["A"], "un opérateur non suivi disparaît dès qu'un opérateur est écarté")
+        XCTAssertEqual(model.modTypeCounts[.new], 1)
+
+        model.resetFilters()
+        model.selectedModTypes = [.deleted]
+        await settle()
+        XCTAssertEqual(model.filteredSites.map(\.supId), ["B"])
+
+        model.resetFilters()
+        model.hidesCatchUp = true
+        await settle()
+        XCTAssertEqual(Set(model.filteredSites.map(\.supId)), ["A", "B", "C", "E"], "seul un support tout en rattrapage disparaît")
+    }
+
+    func testAComparisonForcesTheChangesLayerAndEndsOnADateChoice() async {
+        let service = FakeService()
+        service.snapshots["current"] = snapshot(mixedSites)
+        service.snapshots["2026-10-08"] = snapshot([site("8", "BRON", [antenna("x", "SFR", "new")])])
+        service.dates = ANFRArchiveDates(dates: ["2026-10-08", "2026-10-01"], current: "2026-10-15")
+        service.weeks = [ANFRWeekSummary(date: "2026-10-08", new: 1, added: 0, activated: 0, deleted: 0, siteCount: 1)]
+        service.diffs["2026-10-01|2026-10-08"] = ANFRMapDiff(from: "2026-10-01", to: "2026-10-08", weeks: ["2026-10-08"],
+                                                             sites: [liteSite("A", [.orange], [.new: 1])])
+        let model = await loadedModel(service)
+        model.layer = .reorientations
+        await model.compare(from: "2026-10-01", to: "2026-10-08")
+        XCTAssertEqual(model.layer, .changes)
+        model.layer = .reorientations
+        XCTAssertEqual(model.layer, .changes, "les réorientations sont celles d'une semaine")
+        XCTAssertEqual(model.filteredSites.map(\.supId), ["A"])
+        XCTAssertNotNil(model.comparisonLabel)
+
+        await model.endComparison()
+        XCTAssertNil(model.comparison)
+        XCTAssertFalse(model.displaysLite)
+        XCTAssertEqual(model.filteredSites.count, mixedSites.count)
+
+        await model.compare(from: "2026-10-01", to: "2026-10-08")
+        await model.selectDate("2026-10-08")
+        XCTAssertNil(model.comparison)
+        XCTAssertEqual(model.filteredSites.map(\.supId), ["8"])
+    }
+
+    func testComparisonBoundsFollowTheServerCeiling() async {
+        let service = FakeService()
+        service.snapshots["current"] = snapshot([])
+        var ascending: [String] = []
+        for index in 0..<30 {
+            ascending.append(String(format: "2026-%02d-%02d", 1 + index / 28, 1 + index % 28))
+        }
+        let dates: [String] = ascending.reversed()
+        service.dates = ANFRArchiveDates(dates: dates, current: "2026-10-15")
+        service.weeks = [ANFRWeekSummary(date: "2026-10-08", new: 1, added: 0, activated: 0, deleted: 0, siteCount: 1)]
+        let model = await loadedModel(service)
+        let starts = model.comparisonStarts(to: nil)
+        XCTAssertEqual(starts.count, ANFRMapPolicy.maxComparedWeeks)
+        XCTAssertEqual(starts.first, dates.first)
+        XCTAssertEqual(model.comparisonEnds.first, .some(nil), "le dernier relevé d'abord")
+        XCTAssertFalse(model.comparisonEnds.contains(.some(dates.last!)), "le plus ancien n'a rien avant lui")
+        let older = model.comparisonStarts(to: dates.first)
+        XCTAssertFalse(older.contains(dates.first!))
+        XCTAssertTrue(older.allSatisfy { $0 < dates.first! })
+    }
+
+    func testATooLongComparisonSaysTheCeiling() async {
+        let service = FakeService()
+        service.snapshots["current"] = snapshot(mixedSites)
+        service.dates = ANFRArchiveDates(dates: ["2026-10-08", "2026-10-01"], current: "2026-10-15")
+        service.weeks = [ANFRWeekSummary(date: "2026-10-08", new: 1, added: 0, activated: 0, deleted: 0, siteCount: 1)]
+        service.diffError = APIError.http(status: 422, code: "RANGE_TOO_LONG", message: "x", requestId: nil, retryAfter: nil)
+        let model = await loadedModel(service)
+        await model.compare(from: "2026-10-01", to: nil)
+        XCTAssertEqual(model.errorMessage, String(localized: "Compare au plus \(ANFRMapPolicy.maxComparedWeeks) relevés d’écart."))
+        XCTAssertEqual(model.filteredSites.count, mixedSites.count, "le relevé affiché reste à l'écran")
+    }
+
+    func testTheServiceAsksForTheLiteFormatAndTheComparison() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-anfr-map-reader")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let seen = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            seen.append(request, body: [:])
+            let body = request.url?.path == "/api/anfr/map-diff"
+                ? #"{"from":"2026-10-01","to":"2026-10-08","weeks":["2026-10-08"],"siteCount":0,"antennaCount":0,"sites":[]}"#
+                : #"{"fields":"lite","snapshotDate":"2022-05-20","siteCount":0,"antennaCount":0,"sites":[]}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                    headerFields: ["Content-Type": "application/json"])!, Data(body.utf8))
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let service = ANFRService(api: api, diskCache: ANFRSnapshotDiskCache(directory: directory))
+
+        let lite = try await service.mapSnapshotLite(date: "2022-05-20")
+        XCTAssertTrue(lite.isLite)
+        _ = try await service.mapSnapshotLite(date: "2022-05-20")
+        let diff = try await service.mapDiff(from: "2026-10-01", to: "2026-10-08")
+        XCTAssertEqual(diff.weeks, ["2026-10-08"])
+        _ = try await service.mapDiff(from: "2026-10-01", to: "2026-10-08")
+        _ = try await service.mapDiff(from: "2026-10-01", to: nil)
+
+        let urls = seen.all.compactMap(\.0.url)
+        XCTAssertEqual(urls.count, 3, "un relevé léger daté et une comparaison figée se relisent du disque")
+        func query(_ url: URL) -> [URLQueryItem] { URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [] }
+        XCTAssertEqual(urls[0].path, "/api/anfr/map-snapshot")
+        XCTAssertEqual(query(urls[0]), [URLQueryItem(name: "date", value: "2022-05-20"), URLQueryItem(name: "fields", value: "lite")])
+        XCTAssertEqual(query(urls[1]), [URLQueryItem(name: "from", value: "2026-10-01"), URLQueryItem(name: "to", value: "2026-10-08")])
+        XCTAssertEqual(query(urls[2]), [URLQueryItem(name: "from", value: "2026-10-01"), URLQueryItem(name: "to", value: "current")])
     }
 }
 

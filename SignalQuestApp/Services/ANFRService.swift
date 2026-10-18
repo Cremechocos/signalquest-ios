@@ -150,6 +150,10 @@ protocol ANFRServicing: Sendable {
     func bandStats(weeks: Int?, generation: String?, operatorKey: String?) async throws -> ANFRBandStats
     /// Snapshot carte : tous les sites du relevé `date` (ou le dernier si `nil`).
     func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot
+    /// Relevé léger d'une date : supports et compteurs par type, sans les antennes.
+    func mapSnapshotLite(date: String) async throws -> ANFRMapSnapshot
+    /// Changements nets entre le relevé `from` et le relevé `to` (le dernier si `nil`).
+    func mapDiff(from: String, to: String?) async throws -> ANFRMapDiff
     /// Dates d'archives disponibles + relevé courant (sélecteur de date carte).
     func archiveDates() async throws -> ANFRArchiveDates
     /// Les `count` dernières semaines avec leurs compteurs par type (barres de la carte).
@@ -169,6 +173,10 @@ extension ANFRServicing {
 
     /// Les services sans couche des réorientations n'en connaissent aucune.
     func reorientations(date: String?) async throws -> ANFRReorientationsWeek? { nil }
+
+    /// Les services sans mode léger ne savent ni l'un ni l'autre.
+    func mapSnapshotLite(date: String) async throws -> ANFRMapSnapshot { throw URLError(.unsupportedURL) }
+    func mapDiff(from: String, to: String?) async throws -> ANFRMapDiff { throw URLError(.unsupportedURL) }
 
     /// Les services qui ne comparent pas les opérateurs d'une zone n'ont rien à fournir.
     func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
@@ -247,6 +255,41 @@ final class ANFRService: ANFRServicing {
         guard let snapshot = Self.decode(data) else { throw APIError.decoding("map-snapshot") }
         diskCache.write(data, key: date ?? Self.currentKey)
         return snapshot
+    }
+
+    /// Relevé léger : demandé seulement quand le serveur l'annonce (`siteCount` des
+    /// semaines), un relevé figé, gardé sur le disque comme le complet.
+    func mapSnapshotLite(date: String) async throws -> ANFRMapSnapshot {
+        let key = "lite-\(date)"
+        if let cached = diskCache.read(key: key), let snapshot = Self.decode(cached), snapshot.isLite {
+            return snapshot
+        }
+        let data = try await api.requestData(APIEndpoint(path: "/api/anfr/map-snapshot", query: [
+            URLQueryItem(name: "date", value: date),
+            URLQueryItem(name: "fields", value: "lite")
+        ]))
+        guard let snapshot = Self.decode(data), snapshot.isLite else { throw APIError.decoding("map-snapshot") }
+        diskCache.write(data, key: key)
+        return snapshot
+    }
+
+    /// Une comparaison entre deux relevés figés ne change plus : gardée sur le disque.
+    /// Celle qui va jusqu'au dernier relevé se redemande.
+    func mapDiff(from: String, to: String?) async throws -> ANFRMapDiff {
+        let key = to.map { "diff-\(from)-\($0)" }
+        if let key, let cached = diskCache.read(key: key),
+           let diff = try? JSONDecoder.signalQuest.decode(ANFRMapDiff.self, from: cached) {
+            return diff
+        }
+        let data = try await api.requestData(APIEndpoint(path: "/api/anfr/map-diff", query: [
+            URLQueryItem(name: "from", value: from),
+            URLQueryItem(name: "to", value: to ?? "current")
+        ]))
+        guard let diff = try? JSONDecoder.signalQuest.decode(ANFRMapDiff.self, from: data) else {
+            throw APIError.decoding("map-diff")
+        }
+        if let key { diskCache.write(data, key: key) }
+        return diff
     }
 
     private static let currentKey = "current"

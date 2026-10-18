@@ -11,10 +11,29 @@ import CoreLocation
 /// tableau est construit une fois par relevé (hors fil principal) puis seulement lu.
 private struct ANFRIndexedSite: Sendable {
     let site: ANFRMapSite
-    /// Parallèles à `site.antennas`.
+    /// Parallèles à `site.antennas`. Un support léger n'a pas d'antennes : une ligne
+    /// par couple opérateur × type présent, ce qui filtre le support entier.
     let operators: [ANFROperator?]
     let modTypes: [ANFRModType]
     let generations: [ANFRGeneration?]
+    let catchUps: [Bool]
+
+    init(site: ANFRMapSite) {
+        self.site = site
+        if let summary = site.summary {
+            let operators: [ANFROperator?] = summary.operators.map { Optional($0) } + (summary.hasOtherOperator || summary.operators.isEmpty ? [nil] : [])
+            let types = summary.presentTypes
+            self.operators = operators.flatMap { op in types.map { _ in op } }
+            self.modTypes = operators.flatMap { _ in types }
+            self.generations = self.modTypes.map { _ in nil }
+            self.catchUps = self.modTypes.map { _ in summary.catchUp > 0 && summary.catchUp >= summary.total }
+        } else {
+            operators = site.antennas.map(\.operator)
+            modTypes = site.antennas.map(\.modType)
+            generations = site.antennas.map(\.generationEnum)
+            catchUps = site.antennas.map(\.catchUp)
+        }
+    }
 }
 
 /// Un relevé analysé, prêt à être dessiné.
@@ -27,28 +46,24 @@ private struct ANFRLoadedSnapshot: Sendable {
     let snapshotDate: String?
     let servedFromCache: Bool
     let loadedAt: Date
+    /// Supports sans antennes (relevé léger ou comparaison).
+    let isLite: Bool
+    /// Comparaison : les relevés cumulés, du plus ancien au plus récent.
+    let weeks: [String]
 
     /// Construit l'index d'un relevé : à appeler hors du fil principal.
-    static func build(_ snapshot: ANFRMapSnapshot) -> ANFRLoadedSnapshot {
+    static func build(_ snapshot: ANFRMapSnapshot, weeks: [String] = []) -> ANFRLoadedSnapshot {
         let sites = snapshot.sites
-        let index = sites.map { site in
-            ANFRIndexedSite(
-                site: site,
-                operators: site.antennas.map(\.operator),
-                modTypes: site.antennas.map(\.modType),
-                generations: site.antennas.map(\.generationEnum)
-            )
-        }
+        let index = sites.map(ANFRIndexedSite.init(site:))
         var lookup: [String: ANFRMapSite] = [:]
         lookup.reserveCapacity(sites.count)
-        var antennaCount = 0
-        for site in sites {
-            if lookup[site.supId] == nil { lookup[site.supId] = site }
-            antennaCount += site.antennas.count
+        for site in sites where lookup[site.supId] == nil {
+            lookup[site.supId] = site
         }
         return ANFRLoadedSnapshot(
-            sites: sites, index: index, lookup: lookup, antennaCount: antennaCount,
-            snapshotDate: snapshot.snapshotDate, servedFromCache: snapshot.servedFromCache, loadedAt: Date()
+            sites: sites, index: index, lookup: lookup, antennaCount: snapshot.antennaCount,
+            snapshotDate: snapshot.snapshotDate, servedFromCache: snapshot.servedFromCache, loadedAt: Date(),
+            isLite: snapshot.isLite, weeks: weeks
         )
     }
 }
@@ -114,8 +129,20 @@ struct ANFRWeekBar: Identifiable, Equatable {
     /// La date à écrire (celle du dernier relevé quand `date` est `nil`).
     let displayDate: String?
     let total: Int?
+    /// Relevé cumulé par la comparaison affichée.
+    var inComparison = false
 
     var id: String { date ?? "current" }
+}
+
+/// Deux relevés comparés ; `to` à `nil` : jusqu'au dernier relevé.
+struct ANFRComparison: Equatable, Sendable {
+    let from: String
+    let to: String?
+
+    var key: String { "diff|\(from)|\(to ?? "current")" }
+    /// Deux relevés figés : la réponse ne changera plus.
+    var isFrozen: Bool { to != nil }
 }
 
 /// Ce que la carte des évolutions dessine : les changements du relevé, ou les
@@ -165,11 +192,25 @@ final class ANFRMapViewModel: ObservableObject {
     @Published var layer: ANFRMapLayer = .changes {
         didSet {
             guard layer != oldValue else { return }
+            // Les réorientations sont celles d'une semaine, pas d'une période.
+            if comparison != nil, layer == .reorientations {
+                layer = .changes
+                return
+            }
             recomputeNow()
             if layer == .reorientations { Task { await loadReorientations() } }
         }
     }
     @Published private(set) var reorientationState: ANFRReorientationState = .idle
+    /// Le serveur sait le relevé léger et la comparaison : il annonce le poids des semaines.
+    @Published private(set) var supportsLite = false { didSet { refreshSelectableDates() } }
+    /// La comparaison demandée ; `nil` : un seul relevé.
+    @Published private(set) var comparison: ANFRComparison?
+    /// La comparaison réellement dessinée, et les relevés qu'elle cumule.
+    @Published private(set) var displayedComparison: ANFRComparison?
+    @Published private(set) var comparisonWeeks: [String] = []
+    /// Le relevé dessiné est léger : pas d'antennes, donc pas de génération à filtrer.
+    @Published private(set) var displaysLite = false
     /// Supports réorientés du dernier relevé, une fois chargés (absent de `weeks`).
     @Published private(set) var currentWeekReoriented: Int?
 
@@ -239,14 +280,17 @@ final class ANFRMapViewModel: ObservableObject {
     /// rattrapages retenus (indépendant du filtre d'opérateur).
     @Published private(set) var operatorCounts: [ANFROperator: Int] = [:]
 
-    private func apply(_ loaded: ANFRLoadedSnapshot, date: String?) {
+    private func apply(_ loaded: ANFRLoadedSnapshot, date: String?, comparison: ANFRComparison? = nil) {
         sites = loaded.sites
         index = loaded.index
         lookup = loaded.lookup
         displayedDate = date
+        displayedComparison = comparison
+        comparisonWeeks = comparison == nil ? [] : loaded.weeks
+        displaysLite = loaded.isLite
         displayedSnapshotISO = loaded.snapshotDate
         isShowingCachedCopy = loaded.servedFromCache
-        if date == nil { currentWeekTotal = loaded.antennaCount }
+        if date == nil, comparison == nil { currentWeekTotal = loaded.antennaCount }
         hasLoadedSnapshot = true
         errorMessage = nil
         recomputeNow()
@@ -280,7 +324,8 @@ final class ANFRMapViewModel: ObservableObject {
         let generations = selectedGenerations
         let hideCatchUp = hidesCatchUp
         let everyOperator = operators.count == ANFROperator.allCases.count
-        let everyGeneration = generations.count == ANFRGeneration.allCases.count
+        // Un relevé léger ne dit pas les générations : le filtre ne s'y applique pas.
+        let everyGeneration = displaysLite || generations.count == ANFRGeneration.allCases.count
         var result: [ANFRMapSite] = []
         result.reserveCapacity(index.count)
         var typeCounts: [ANFRModType: Int] = [:]
@@ -290,7 +335,7 @@ final class ANFRMapViewModel: ObservableObject {
             // Génération et rattrapage ne dépendent ni de l'opérateur ni du type : ils
             // s'appliquent aux compteurs comme au dessin.
             func passesShared(_ i: Int) -> Bool {
-                if hideCatchUp, antennas[i].catchUp { return false }
+                if hideCatchUp, entry.catchUps[i] { return false }
                 if !everyGeneration {
                     guard let generation = entry.generations[i], generations.contains(generation) else { return false }
                 }
@@ -305,7 +350,7 @@ final class ANFRMapViewModel: ObservableObject {
             var keptCount = 0
             var typesPresent = 0
             var operatorsPresent = 0
-            for i in antennas.indices where passesShared(i) {
+            for i in entry.modTypes.indices where passesShared(i) {
                 let typeAllowed = modTypes.contains(entry.modTypes[i])
                 if typeAllowed, let op = entry.operators[i] { operatorsPresent |= op.presenceBit }
                 guard passesOperator(i) else { continue }
@@ -321,7 +366,7 @@ final class ANFRMapViewModel: ObservableObject {
             // Le repère ne garde que les antennes retenues : un site Orange + Free
             // filtré sur Free s'affichait en Orange. La fiche relit le site entier.
             guard keptCount > 0 else { continue }
-            if keptCount == antennas.count {
+            if entry.site.summary != nil || keptCount == antennas.count {
                 result.append(entry.site)
                 continue
             }
@@ -420,8 +465,10 @@ final class ANFRMapViewModel: ObservableObject {
     private func refreshSelectableDates() {
         let current = currentSnapshotDate
         let sorted = availableDates.sorted(by: >)
-        hidesFullStateDates = sorted.contains(where: ANFRMapPolicy.isFullStateDate)
-        let selectable = sorted.filter { !ANFRMapPolicy.isFullStateDate($0) && $0 != current }
+        // Sans relevé léger, les relevés de 2022 pèsent des dizaines de Mo : écartés.
+        let hidesHeavy = !supportsLite
+        hidesFullStateDates = hidesHeavy && sorted.contains(where: ANFRMapPolicy.isFullStateDate)
+        let selectable = sorted.filter { !(hidesHeavy && ANFRMapPolicy.isFullStateDate($0)) && $0 != current }
         selectableDates = selectable
         dateSections = Self.sections(from: selectable)
     }
@@ -462,11 +509,14 @@ final class ANFRMapViewModel: ObservableObject {
     var weekBars: [ANFRWeekBar] {
         guard !selectableDates.isEmpty || currentSnapshotDate != nil else { return [] }
         let reoriented = layer == .reorientations
+        let cumulated = Set(comparisonWeeks)
         var bars: [ANFRWeekBar] = selectableDates.prefix(12).reversed().map { date in
             let week = weeks.first(where: { $0.date == date })
-            return ANFRWeekBar(date: date, displayDate: date, total: reoriented ? week?.reoriented : week?.total)
+            return ANFRWeekBar(date: date, displayDate: date, total: reoriented ? week?.reoriented : week?.total,
+                               inComparison: cumulated.contains(date))
         }
-        bars.append(ANFRWeekBar(date: nil, displayDate: currentSnapshotDate, total: reoriented ? currentWeekReoriented : currentWeekTotal))
+        bars.append(ANFRWeekBar(date: nil, displayDate: currentSnapshotDate, total: reoriented ? currentWeekReoriented : currentWeekTotal,
+                                inComparison: displayedComparison != nil && displayedComparison?.to == nil))
         return bars
     }
 
@@ -476,6 +526,19 @@ final class ANFRMapViewModel: ObservableObject {
             ? (displayedDate ?? currentSnapshotDate ?? displayedSnapshotISO)
             : (selectedDate ?? currentSnapshotDate)
         return ANFRText.date(raw, month: .abbreviated) ?? String(localized: "Dernier relevé")
+    }
+
+    /// « 14 mai → 11 juin 2026 » : la comparaison demandée, `nil` hors comparaison.
+    /// L'année du début n'est écrite que si elle diffère de celle de la fin.
+    var comparisonLabel: String? {
+        guard let comparison else { return nil }
+        guard let end = comparison.to ?? currentSnapshotDate else {
+            return (ANFRText.date(comparison.from, month: .abbreviated) ?? comparison.from) + " → " + String(localized: "Dernier relevé")
+        }
+        let sameYear = comparison.from.prefix(4) == end.prefix(4)
+        let from = ANFRText.date(comparison.from, month: .abbreviated, year: !sameYear) ?? comparison.from
+        let to = ANFRText.date(end, month: .abbreviated) ?? end
+        return "\(from) → \(to)"
     }
 
     /// Le relevé demandé, pour dire ce qu'on charge.
@@ -492,6 +555,7 @@ final class ANFRMapViewModel: ObservableObject {
             apply(demo, date: nil)
             availableDates = ANFRDemoData.archiveDates.dates
             currentSnapshotDate = ANFRDemoData.archiveDates.current
+            supportsLite = true
             return
         }
         #endif
@@ -531,7 +595,7 @@ final class ANFRMapViewModel: ObservableObject {
             zone = ANFRZone(center: center, radiusMeters: radius)
             requestCamera(.region(center: center, radiusMeters: radius))
         }
-        guard let date = focus.date, !ANFRMapPolicy.isFullStateDate(date), selectableDates.contains(date) else { return nil }
+        guard let date = focus.date, selectableDates.contains(date) else { return nil }
         return date
     }
 
@@ -551,54 +615,87 @@ final class ANFRMapViewModel: ObservableObject {
 
     func loadSnapshot() async {
         guard !Task.isCancelled else { return }
+        // Une réponse arrivée après un autre choix est ignorée : elle aurait affiché
+        // les sites de la date A sous le libellé de la date B.
+        let date = selectedDate
+        let comparison = comparison
+        let key = requestKey
         #if DEBUG
         if AppEnvironment.usesDemoData {
-            apply(ANFRLoadedSnapshot.build(ANFRDemoData.mapSnapshot), date: nil)
+            if let comparison {
+                apply(ANFRLoadedSnapshot.build(ANFRDemoData.mapDiff.snapshot, weeks: ANFRDemoData.mapDiff.weeks),
+                      date: nil, comparison: comparison)
+            } else {
+                apply(ANFRLoadedSnapshot.build(ANFRDemoData.mapSnapshot), date: nil)
+            }
             return
         }
         #endif
-        // Une réponse arrivée après le choix d'une autre date est ignorée : elle
-        // aurait affiché les sites de la date A sous le libellé de la date B.
-        let date = selectedDate
+        let frozen = comparison?.isFrozen ?? (date != nil)
         var shownFromMemory = false
-        if let hit = recall(date) {
-            apply(hit, date: date)
+        if let hit = recall(key) {
+            apply(hit, date: date, comparison: comparison)
             isLoading = false
             // Un relevé daté ne change plus ; le dernier est redemandé s'il est ancien.
-            if date != nil || Date().timeIntervalSince(hit.loadedAt) < currentFreshness { return }
+            if frozen || Date().timeIntervalSince(hit.loadedAt) < currentFreshness { return }
             shownFromMemory = true
         } else {
             isLoading = true
         }
         errorMessage = nil
-        defer { if date == selectedDate { isLoading = false } }
+        defer { if key == requestKey { isLoading = false } }
         do {
-            let snapshot = try await service.mapSnapshot(date: date)
-            guard date == selectedDate else { return }
+            let snapshot: ANFRMapSnapshot
+            var cumulated: [String] = []
+            if let comparison {
+                let diff = try await service.mapDiff(from: comparison.from, to: comparison.to)
+                snapshot = diff.snapshot
+                cumulated = diff.weeks
+            } else if let date, loadsLite(date) {
+                snapshot = try await service.mapSnapshotLite(date: date)
+            } else {
+                snapshot = try await service.mapSnapshot(date: date)
+            }
+            guard key == requestKey else { return }
             // L'index se construit hors du fil principal : la pastille de chargement
             // reste animée pendant l'analyse des antennes.
-            let built = await Task.detached(priority: .userInitiated) { ANFRLoadedSnapshot.build(snapshot) }.value
-            guard date == selectedDate else { return }
-            remember(built, for: date)
-            apply(built, date: date)
+            let built = await Task.detached(priority: .userInitiated) { ANFRLoadedSnapshot.build(snapshot, weeks: cumulated) }.value
+            guard key == requestKey else { return }
+            remember(built, for: key)
+            apply(built, date: date, comparison: comparison)
         } catch {
             // Le relevé affiché reste à l'écran ; une revalidation manquée ne dit rien.
-            if !error.isCancellation, date == selectedDate, !shownFromMemory { errorMessage = error.userFacingMessage }
+            if !error.isCancellation, key == requestKey, !shownFromMemory { errorMessage = Self.message(for: error, comparison: comparison) }
         }
     }
 
-    private func recall(_ date: String?) -> ANFRLoadedSnapshot? {
-        let key = date ?? "current"
+    /// Ce que l'écran demande : un relevé ou une comparaison.
+    private var requestKey: String { comparison?.key ?? selectedDate ?? "current" }
+
+    /// Relevé chargé en léger : les relevés de 2022 et les semaines très lourdes.
+    private func loadsLite(_ date: String) -> Bool {
+        guard supportsLite else { return false }
+        if ANFRMapPolicy.isFullStateDate(date) { return true }
+        return (weeks.first { $0.date == date }?.antennaCount ?? 0) > ANFRMapPolicy.liteAntennaThreshold
+    }
+
+    private static func message(for error: Error, comparison: ANFRComparison?) -> String {
+        if comparison != nil, case APIError.http(let status, _, _, _, _) = error, status == 422 {
+            return String(localized: "Compare au plus \(ANFRMapPolicy.maxComparedWeeks) relevés d’écart.")
+        }
+        return error.userFacingMessage
+    }
+
+    private func recall(_ key: String) -> ANFRLoadedSnapshot? {
         guard let hit = memory[key] else { return nil }
         memoryOrder.removeAll { $0 == key }
         memoryOrder.append(key)
         return hit
     }
 
-    private func remember(_ snapshot: ANFRLoadedSnapshot, for date: String?) {
+    private func remember(_ snapshot: ANFRLoadedSnapshot, for key: String) {
         // Une copie du disque servie faute de réseau ne doit pas passer pour fraîche.
         guard !snapshot.servedFromCache else { return }
-        let key = date ?? "current"
         memory[key] = snapshot
         memoryOrder.removeAll { $0 == key }
         memoryOrder.append(key)
@@ -622,7 +719,8 @@ final class ANFRMapViewModel: ObservableObject {
     /// Les barres du bandeau ; sans elles le bandeau n'affiche que les dates.
     func loadWeeks() async {
         guard let loaded = try? await service.archiveWeeks(count: 12) else { return }
-        weeks = loaded.filter { !ANFRMapPolicy.isFullStateDate($0.date) }
+        supportsLite = loaded.contains { $0.siteCount != nil }
+        weeks = supportsLite ? loaded : loaded.filter { !ANFRMapPolicy.isFullStateDate($0.date) }
     }
 
     /// « Réessayer » : relit le relevé ET les dates d'archive, que le premier
@@ -636,10 +734,13 @@ final class ANFRMapViewModel: ObservableObject {
 
     func selectDate(_ requested: String?) async {
         var date = requested
-        // Un relevé d'état complet pèse des dizaines de Mo : on ouvre le dernier à la place.
-        if let candidate = date, ANFRMapPolicy.isFullStateDate(candidate) { date = nil }
+        // Sans relevé léger, un relevé de 2022 pèse des dizaines de Mo : on ouvre le dernier.
+        if let candidate = date, !supportsLite, ANFRMapPolicy.isFullStateDate(candidate) { date = nil }
         if date != nil, date == currentSnapshotDate { date = nil }
-        if date == selectedDate {
+        // Choisir un relevé quitte la comparaison.
+        let leavesComparison = comparison != nil
+        comparison = nil
+        if date == selectedDate, !leavesComparison {
             // Premier chargement en échec : « Dernier relevé » doit réessayer.
             if !isLoading, !hasLoadedSnapshot || errorMessage != nil { await reload() }
             return
@@ -650,6 +751,48 @@ final class ANFRMapViewModel: ObservableObject {
         async let reorientationsLoad: Void = loadReorientations()
         await startSnapshotLoad()
         await reorientationsLoad
+    }
+
+    // MARK: Comparaison
+
+    /// Relevés du plus récent au plus ancien, le dernier compris.
+    private var orderedDates: [String] {
+        var dates = availableDates
+        if let current = currentSnapshotDate, !dates.contains(current) { dates.append(current) }
+        return dates.sorted(by: >)
+    }
+
+    /// Fins possibles d'une comparaison : le dernier relevé (`nil`), puis chaque relevé
+    /// qui en a un plus ancien.
+    var comparisonEnds: [String?] {
+        let dates = orderedDates.filter { $0 != currentSnapshotDate }
+        return [nil] + dates.dropLast().map { Optional($0) }
+    }
+
+    /// Débuts possibles pour la fin `to` : les relevés plus anciens, au plus
+    /// `maxComparedWeeks` relevés d'écart (le plafond du serveur).
+    func comparisonStarts(to: String?) -> [String] {
+        let dates = orderedDates
+        let end = to ?? currentSnapshotDate
+        guard let end, let index = dates.firstIndex(of: end) else { return [] }
+        return Array(dates.dropFirst(index + 1).prefix(ANFRMapPolicy.maxComparedWeeks))
+    }
+
+    /// Montre ce qui a changé entre deux relevés, en net sur la période.
+    func compare(from: String, to: String?) async {
+        let request = ANFRComparison(from: from, to: to == currentSnapshotDate ? nil : to)
+        guard supportsLite, request != comparison else { return }
+        layer = .changes
+        reorientationTask?.cancel()
+        comparison = request
+        await startSnapshotLoad()
+    }
+
+    /// Revient au relevé choisi avant la comparaison.
+    func endComparison() async {
+        guard comparison != nil else { return }
+        comparison = nil
+        await startSnapshotLoad()
     }
 
     // MARK: Filtres
@@ -694,7 +837,7 @@ final class ANFRMapViewModel: ObservableObject {
         // Types, générations et rattrapages ne s'appliquent pas aux réorientations.
         if layer == .reorientations { return count }
         if selectedModTypes.count != ANFRModType.allCases.count { count += 1 }
-        if selectedGenerations.count != ANFRGeneration.allCases.count { count += 1 }
+        if !displaysLite, selectedGenerations.count != ANFRGeneration.allCases.count { count += 1 }
         if hidesCatchUp { count += 1 }
         return count
     }
@@ -709,7 +852,9 @@ final class ANFRMapViewModel: ObservableObject {
         let counts = ANFRModType.allCases
             .compactMap { type in modTypeCounts[type].map { "\(type.label) : \($0.formatted())" } }
             .joined(separator: ", ")
-        let head = String(localized: "Relevé du \(dateLabel) : \(filteredSites.count.formatted()) supports modifiés")
+        let head = displayedComparison != nil
+            ? String(localized: "Comparaison \(comparisonLabel ?? dateLabel) : \(filteredSites.count.formatted()) supports modifiés")
+            : String(localized: "Relevé du \(dateLabel) : \(filteredSites.count.formatted()) supports modifiés")
         return counts.isEmpty ? head : "\(head). \(counts)"
     }
 }
@@ -748,7 +893,7 @@ enum ANFRSiteList {
                 detail = "\(operatorText) · " + String(localized: "Réorienté")
             } else {
                 detail = "\(operatorText) · \(site.dominantModType.label)"
-                if site.antennas.count > 1 { detail += " · " + String(localized: "\(site.antennas.count) antennes") }
+                if site.changeCount > 1 { detail += " · " + String(localized: "\(site.changeCount) antennes") }
             }
             rows.append(ANFRSiteRow(
                 site: site,
@@ -869,7 +1014,8 @@ struct ANFRMapView: View {
         }
         .sheet(item: $selectedSite) { site in
             ANFRSiteDetailSheet(
-                site: site, service: services.anfr, snapshotDate: model.displayedDate ?? model.currentSnapshotDate,
+                site: site, service: services.anfr,
+                snapshotDate: site.summary?.lastChangeDate ?? model.displayedDate ?? model.currentSnapshotDate,
                 reorientations: model.reorientations(supId: site.supId),
                 showsChanges: model.site(supId: site.supId) != nil
             )
@@ -1061,10 +1207,50 @@ struct ANFRMapView: View {
                     filterButton
                 }
             }
-            layerPicker
+            if model.comparison != nil {
+                comparisonBar
+            } else {
+                layerPicker
+            }
         }
         .padding(SQSpace.xs + 1)
         .sqCardBackground()
+    }
+
+    /// En comparaison : ce que la carte montre, et la sortie vers le relevé choisi.
+    private var comparisonBar: some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(SQColor.accentInk)
+                .accessibilityHidden(true)
+            Group {
+                if model.displayedComparison != nil, !model.comparisonWeeks.isEmpty {
+                    Text("Changements nets, \(model.comparisonWeeks.count) relevés cumulés")
+                } else {
+                    Text("Changements nets entre deux relevés")
+                }
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button {
+                Haptics.light()
+                Task { await model.endComparison() }
+            } label: {
+                Label("Quitter", systemImage: "xmark")
+                    .font(SQType.caption(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .padding(.horizontal, SQSpace.sm2)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(SQPressButtonStyle())
+            .accessibilityLabel("Quitter la comparaison")
+            .accessibilityIdentifier("anfr.map.compare.exit")
+        }
+        .padding(.leading, SQSpace.sm)
     }
 
     /// Changements du relevé, ou supports dont les azimuts ont changé.
@@ -1088,10 +1274,10 @@ struct ANFRMapView: View {
                     .frame(width: 28, height: 28)
                     .background(SQColor.accentSoft, in: Circle())
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Relevé")
+                    Text(model.comparison != nil ? "Comparaison" : "Relevé")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
-                    Text(model.dateLabel)
+                    Text(model.comparisonLabel ?? model.dateLabel)
                         .font(SQType.callout(.semibold))
                         .foregroundStyle(SQColor.label)
                         .lineLimit(1)
@@ -1102,7 +1288,7 @@ struct ANFRMapView: View {
             .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         }
         .buttonStyle(SQPressButtonStyle())
-        .accessibilityHint("Choisir une date")
+        .accessibilityHint(model.supportsLite ? "Choisir une date ou comparer deux relevés" : "Choisir une date")
         .accessibilityIdentifier("anfr.map.date")
     }
 
@@ -1249,7 +1435,7 @@ struct ANFRMapView: View {
     }
 
     private func weekBarButton(_ bar: ANFRWeekBar, maxTotal: Int) -> some View {
-        let isSelected = bar.date == model.selectedDate
+        let isSelected = model.comparison == nil ? bar.date == model.selectedDate : bar.inComparison
         let barHeight: CGFloat = bar.total.map { max(4, 30 * CGFloat($0) / CGFloat(maxTotal)) } ?? 10
         let dayText = ANFRText.date(bar.displayDate, month: .abbreviated, year: false) ?? String(localized: "Dernier")
         let spoken = ANFRText.date(bar.displayDate) ?? String(localized: "Dernier relevé")
@@ -1330,6 +1516,8 @@ struct ANFRMapView: View {
             Group {
                 if model.layer == .reorientations {
                     Text("Chargement des réorientations du \(model.pendingDateLabel)…")
+                } else if let comparison = model.comparisonLabel {
+                    Text("Comparaison \(comparison)…")
                 } else if model.hasLoadedSnapshot {
                     Text("Chargement du relevé du \(model.pendingDateLabel)…")
                 } else {
@@ -1708,6 +1896,14 @@ struct ANFRMapFilterSheet: View {
                     }
                 }
 
+                if model.displaysLite {
+                    section(title: "Génération") {
+                        Text("Ce relevé ne détaille pas les antennes : il ne se filtre pas par génération. La fiche d’un support donne ses antennes.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
                 section(title: "Génération") {
                     FlexibleChips(ANFRGeneration.allCases) { generation in
                         SQChip(
@@ -1718,6 +1914,7 @@ struct ANFRMapFilterSheet: View {
                             model.toggleGeneration(generation)
                         }
                     }
+                }
                 }
 
                 section(title: "Rattrapages") {
@@ -1732,6 +1929,12 @@ struct ANFRMapFilterSheet: View {
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if model.displaysLite {
+                        Text("Ici, un support n’est masqué que si tous ses changements sont des rattrapages.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 }
 
@@ -1790,6 +1993,11 @@ struct ANFRMapFilterSheet: View {
 struct ANFRDatePickerSheet: View {
     @ObservedObject var model: ANFRMapViewModel
     @Environment(\.dismiss) private var dismiss
+    /// Bornes de la comparaison ; `latestTag` désigne le dernier relevé.
+    @State private var compareFrom = ""
+    @State private var compareTo = Self.latestTag
+
+    private static let latestTag = "current"
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -1807,7 +2015,13 @@ struct ANFRDatePickerSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, SQSpace.sm)
 
-                    dateRow(label: "Dernier relevé", value: model.currentSnapshotDate, detail: nil, isSelected: model.selectedDate == nil) {
+                    if model.supportsLite, !model.comparisonStarts(to: nil).isEmpty {
+                        compareCard
+                            .padding(.bottom, SQSpace.sm)
+                    }
+
+                    dateRow(label: "Dernier relevé", value: model.currentSnapshotDate, detail: nil,
+                            isSelected: model.comparison == nil && model.selectedDate == nil) {
                         Task { await model.selectDate(nil) }
                         dismiss()
                     }
@@ -1825,7 +2039,8 @@ struct ANFRDatePickerSheet: View {
                             .sqHeader()
                             .padding(.top, SQSpace.sm)
                         ForEach(section.dates, id: \.self) { date in
-                            dateRow(label: prettyDate(date), value: nil, detail: changesText(date), isSelected: model.selectedDate == date) {
+                            dateRow(label: prettyDate(date), value: nil, detail: changesText(date),
+                                    isSelected: model.comparison == nil && model.selectedDate == date) {
                                 Task { await model.selectDate(date) }
                                 dismiss()
                             }
@@ -1852,6 +2067,76 @@ struct ANFRDatePickerSheet: View {
         }
         // Liste vide à l'ouverture : la réponse des dates a pu être manquée.
         .task { if model.availableDates.isEmpty { await model.loadArchiveDates() } }
+        .onAppear(perform: prepareComparison)
+    }
+
+    // MARK: Comparaison
+
+    private var compareEnd: String? { compareTo == Self.latestTag ? nil : compareTo }
+
+    /// Reprend la comparaison affichée, sinon propose les quatre derniers relevés.
+    private func prepareComparison() {
+        if let comparison = model.comparison {
+            compareTo = comparison.to ?? Self.latestTag
+            compareFrom = comparison.from
+        } else {
+            compareTo = Self.latestTag
+            let starts = model.comparisonStarts(to: nil)
+            compareFrom = starts.dropFirst(3).first ?? starts.last ?? ""
+        }
+    }
+
+    private var compareCard: some View {
+        let starts = model.comparisonStarts(to: compareEnd)
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Comparer deux relevés")
+                .font(SQType.heading)
+                .foregroundStyle(SQColor.label)
+                .sqHeader()
+            Text("Ce qui a changé entre deux dates, en net : une antenne mise en service puis retirée compte une fois, comme retirée.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            comparePicker(title: "Du relevé", selection: $compareFrom, options: starts.map { ($0, prettyDate($0)) })
+                .accessibilityIdentifier("anfr.map.compare.from")
+            comparePicker(title: "Au relevé", selection: $compareTo, options: model.comparisonEnds.map { end in
+                (end ?? Self.latestTag, end.map(prettyDate) ?? String(localized: "Dernier relevé"))
+            })
+            .accessibilityIdentifier("anfr.map.compare.to")
+            GradientButton(String(localized: "Comparer"), systemImage: "arrow.left.arrow.right") {
+                let from = compareFrom
+                let to = compareEnd
+                Task { await model.compare(from: from, to: to) }
+                dismiss()
+            }
+            .disabled(!starts.contains(compareFrom))
+            .accessibilityIdentifier("anfr.map.compare.go")
+        }
+        .padding(SQSpace.md)
+        .background(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .sqShadowSoft()
+        // Une fin plus ancienne que le début : le début se recale sur le relevé précédent.
+        .onChangeCompat(of: compareTo) { _, _ in
+            let valid = model.comparisonStarts(to: compareEnd)
+            if !valid.contains(compareFrom) { compareFrom = valid.first ?? "" }
+        }
+    }
+
+    private func comparePicker(title: LocalizedStringKey, selection: Binding<String>, options: [(String, String)]) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            Text(title)
+                .font(SQType.body)
+                .foregroundStyle(SQColor.label)
+            Spacer(minLength: SQSpace.sm)
+            Picker(title, selection: selection) {
+                ForEach(options, id: \.0) { option in
+                    Text(verbatim: option.1).tag(option.0)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(SQColor.accentInk)
+        }
+        .frame(minHeight: 44)
     }
 
     private func dateRow(label: String, value: String?, detail: String?, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -1894,7 +2179,10 @@ struct ANFRDatePickerSheet: View {
 
     /// Les changements de la semaine, quand le bandeau les a chargés.
     private func changesText(_ date: String) -> String? {
-        model.weeks.first(where: { $0.date == date }).map { week in
+        if ANFRMapPolicy.isFullStateDate(date) {
+            return String(localized: "Relevé très lourd : supports et compteurs, sans le détail des antennes")
+        }
+        return model.weeks.first(where: { $0.date == date }).map { week in
             let changes = String(localized: "Changements : \(week.total.formatted())")
             guard let reoriented = week.reoriented else { return changes }
             return changes + " · " + String(localized: "Réorientés : \(reoriented.formatted())")
@@ -2290,7 +2578,7 @@ struct ANFRMapKitView: UIViewRepresentable {
         /// Ce qui détermine l'aspect d'un repère : position, commune et, par antenne,
         /// son identité et son type de modif.
         private static func sameContent(_ a: ANFRMapSite, _ b: ANFRMapSite) -> Bool {
-            a.antennas.count == b.antennas.count
+            a.antennas.count == b.antennas.count && a.summary == b.summary
                 && a.latitude == b.latitude && a.longitude == b.longitude && a.city == b.city
                 && zip(a.antennas, b.antennas).allSatisfy { $0.id == $1.id && $0.modTypeRaw == $1.modTypeRaw }
         }

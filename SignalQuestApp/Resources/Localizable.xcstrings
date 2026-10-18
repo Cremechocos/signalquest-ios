@@ -3539,6 +3539,22 @@
         }
       }
     },
+    "Au relevé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To survey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au relevé"
+          }
+        }
+      }
+    },
     "Au repos" : {
       "localizations" : {
         "en" : {
@@ -4661,6 +4677,22 @@
         }
       }
     },
+    "Ce qui a changé entre deux dates, en net : une antenne mise en service puis retirée compte une fois, comme retirée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What changed between two dates, net: an antenna put into service and then removed counts once, as removed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui a changé entre deux dates, en net : une antenne mise en service puis retirée compte une fois, comme retirée."
+          }
+        }
+      }
+    },
     "Ce qui aide à le reconnaître" : {
       "localizations" : {
         "en" : {
@@ -4689,6 +4721,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qui ne va pas"
+          }
+        }
+      }
+    },
+    "Ce relevé ne détaille pas les antennes : il ne se filtre pas par génération. La fiche d’un support donne ses antennes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This survey does not list the antennas, so it cannot be filtered by generation. A site’s sheet shows its antennas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce relevé ne détaille pas les antennes : il ne se filtre pas par génération. La fiche d’un support donne ses antennes."
           }
         }
       }
@@ -5015,6 +5063,38 @@
         }
       }
     },
+    "Changements nets entre deux relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Net changes between two surveys"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changements nets entre deux relevés"
+          }
+        }
+      }
+    },
+    "Changements nets, %lld relevés cumulés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Net changes across %lld surveys"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changements nets, %lld relevés cumulés"
+          }
+        }
+      }
+    },
     "Changer la vitesse de lecture" : {
       "localizations" : {
         "en" : {
@@ -5267,6 +5347,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisir sur la carte"
+          }
+        }
+      }
+    },
+    "Choisir une date ou comparer deux relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a date or compare two surveys"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir une date ou comparer deux relevés"
           }
         }
       }
@@ -5549,6 +5645,70 @@
         }
       }
     },
+    "Comparaison" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparison"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparaison"
+          }
+        }
+      }
+    },
+    "Comparaison %@ : %@ supports modifiés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparison %1$@: %2$@ changed sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparaison %@ : %@ supports modifiés"
+          }
+        }
+      }
+    },
+    "Comparaison %@…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparing %@…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparaison %@…"
+          }
+        }
+      }
+    },
+    "Compare au plus %lld relevés d’écart." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare surveys at most %lld weeks apart."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare au plus %lld relevés d’écart."
+          }
+        }
+      }
+    },
     "Compare cette empreinte sur le nouvel appareil avant d’approuver." : {
       "localizations" : {
         "en" : {
@@ -5561,6 +5721,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Compare cette empreinte sur le nouvel appareil avant d’approuver."
+          }
+        }
+      }
+    },
+    "Comparer deux relevés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare two surveys"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparer deux relevés"
           }
         }
       }
@@ -6415,6 +6591,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dossiers"
+          }
+        }
+      }
+    },
+    "Du relevé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From survey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du relevé"
           }
         }
       }
@@ -7660,6 +7852,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "IPv4 et IPv6, côte à côte"
+          }
+        }
+      }
+    },
+    "Ici, un support n’est masqué que si tous ses changements sont des rattrapages." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Here, a site is hidden only when all its changes are catch-ups."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ici, un support n’est masqué que si tous ses changements sont des rattrapages."
           }
         }
       }
@@ -12599,6 +12807,22 @@
         }
       }
     },
+    "Quitter la comparaison" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave the comparison"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitter la comparaison"
+          }
+        }
+      }
+    },
     "RSRP moyen" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12997,6 +13221,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relevé suivant"
+          }
+        }
+      }
+    },
+    "Relevé très lourd : supports et compteurs, sans le détail des antennes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Very large survey: sites and counts, without antenna details"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relevé très lourd : supports et compteurs, sans le détail des antennes"
           }
         }
       }
