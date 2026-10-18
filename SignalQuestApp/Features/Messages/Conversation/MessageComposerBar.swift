@@ -17,6 +17,9 @@ struct MessageComposerBar: View {
     /// Vrai pendant la modification d'un message : une photo jointe partirait
     /// comme un message à part, sans rapport avec l'édition.
     var isEditing = false
+    /// Des pièces jointes attendent dans le plateau au-dessus : envoyer reste
+    /// possible sans texte, et le micro cède la place au bouton d'envoi.
+    var hasStagedAttachments = false
     let seedText: String
     let seedToken: Int
     @Binding var ephemeralEnabled: Bool
@@ -32,6 +35,8 @@ struct MessageComposerBar: View {
     var onPickFile: (URL, String) -> Void = { _, _ in }
     /// Fichier demandé dans une conversation chiffrée : le parent explique pourquoi c'est impossible.
     var onFilesUnavailable: () -> Void = {}
+    /// « Coller » du menu « + » : le parent lit alors le presse-papiers, sur ce geste seulement.
+    var onPaste: () -> Void = {}
     /// ↑ dans un champ vide (clavier de l'iPad) : modifier le dernier message envoyé.
     var onEditLast: () -> Void = {}
     /// Photo prise avec l'appareil (JPEG), avec le texte déjà tapé en légende.
@@ -161,6 +166,11 @@ struct MessageComposerBar: View {
                     Label("Joindre un fichier", systemImage: "doc")
                 }
                 .disabled(isEditing)
+                // Photo ou texte du presse-papiers : lu seulement à cet appui.
+                Button { onPaste() } label: {
+                    Label("Coller", systemImage: "doc.on.clipboard")
+                }
+                .disabled(isEditing)
                 Divider()
                 Toggle(isOn: $ephemeralEnabled) {
                     Label("Messages éphémères (24 h)", systemImage: "timer")
@@ -234,7 +244,7 @@ struct MessageComposerBar: View {
             // Micro OU envoi, selon qu'il y a du texte : c'est la convention de
             // toutes les messageries, et ça évite un bouton de plus dans une
             // barre déjà dense.
-            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending && !isE2EE {
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasStagedAttachments && !isSending && !isE2EE {
                 Button {
                     Haptics.selection()
                     Task { await recorder.start() }
@@ -249,7 +259,8 @@ struct MessageComposerBar: View {
                 .disabled(!canSend)
                 .accessibilityLabel("Enregistrer une note vocale")
             } else {
-            let sendable = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending && canSend
+            let sendable = (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasStagedAttachments)
+                && !isSending && canSend
             Button {
                 onSend(text)
             } label: {

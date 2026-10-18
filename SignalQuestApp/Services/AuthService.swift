@@ -373,6 +373,8 @@ final class AuthService: AuthServicing {
             CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
             ConversationSecretPolicyCache.purge(ownerScopeId: ownerScopeId)
         }
+        // Un partage reçu attend sans compte : il part avec la session qui s'en va.
+        ShareInbox.appGroup()?.purgeAll()
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         Self.clearDeviceSurfaces()
@@ -411,6 +413,8 @@ final class AuthService: AuthServicing {
             CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
             ConversationSecretPolicyCache.purge(ownerScopeId: ownerScopeId)
         }
+        // Un partage reçu attend sans compte : il part avec la session qui s'en va.
+        ShareInbox.appGroup()?.purgeAll()
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         Self.clearDeviceSurfaces()
@@ -442,6 +446,8 @@ final class AuthService: AuthServicing {
             RecentlyViewedStore.purge(ownerScopeId: previousScope)
             PrivateImageDiskCache.purge(ownerScopeId: previousScope)
             CarPlayDestinationStore.reset()
+            // Le partage en attente a été fait pour l'ancien compte, pas pour celui-ci.
+            ShareInbox.appGroup()?.purgeAll()
             Task { await MessageDraftStore.shared.purge(ownerScopeId: previousScope) }
         }
         LocalAccountScope.activate(userId: user.id)

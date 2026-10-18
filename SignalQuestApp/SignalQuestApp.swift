@@ -766,11 +766,17 @@ struct MainTabView: View {
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var appLock: AppLockController
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let user: AuthUser?
     @State private var showHandleGate = false
     @State private var showGuestReceipts = false
+    /// Partage déposé par l'extension « Partager vers SignalQuest », proposé à
+    /// l'utilisateur. Chaque dépôt n'est présenté qu'une fois par session : fermer
+    /// la feuille sans choisir ne la fait pas revenir à chaque retour dans l'app.
+    @State private var receivedShare: ShareInbox.Entry?
+    @State private var presentedShareIds = Set<String>()
     /// Dernier onglet de cette fenêtre. @SceneStorage le rend quand iOS a fermé
     /// l'app en arrière-plan, pas après un arrêt forcé par l'utilisateur.
     @SceneStorage("sq.lastTab") private var lastTab = ""
@@ -793,6 +799,7 @@ struct MainTabView: View {
             SQQuickActions.install(signedIn: user != nil)
             consumeIntentRoutes()
             restoreLastTabIfNeeded()
+            checkShareInbox()
             #if DEBUG
             if AppEnvironment.showsCallEndQA { services.callManager.presentQAEndNotice() }
             if AppEnvironment.showsBlurEditorQA { showsBlurEditorQA = true }
@@ -806,6 +813,16 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $showGuestReceipts) {
             NavigationStack { GuestSpeedtestReceiptsView() }
+        }
+        .sheet(item: $receivedShare) { entry in
+            ReceivedShareSheet(
+                entry: entry,
+                onDelivered: { conversation, attachments in
+                    deliverShare(entry, to: conversation, attachments: attachments)
+                },
+                onFeed: { content in shareToFeed(entry, content: content) },
+                onIgnore: { finishShare(entry) }
+            )
         }
         #if DEBUG
         .sheet(isPresented: $showsBlurEditorQA) {
@@ -831,7 +848,12 @@ struct MainTabView: View {
                     }
                 }
                 consumeIntentRoutes()
+                checkShareInbox()
             }
+        }
+        // Déverrouillage : un partage arrivé pendant le verrouillage est proposé.
+        .onChangeCompat(of: appLock.isLocked) { _, locked in
+            if !locked { checkShareInbox() }
         }
         .onChangeCompat(of: router.selectedTab) { _, tab in
             lastTab = tab.rawValue
@@ -1036,6 +1058,41 @@ struct MainTabView: View {
               router.selectedTab == .home, !router.hasPendingContentRoute,
               let tab = AppRouter.AppTab(rawValue: lastTab), tab != .home else { return }
         router.selectedTab = tab
+    }
+
+    /// Au lancement et au retour au premier plan : les dépôts de plus de 24 h
+    /// partent, et le plus récent est proposé à un compte connecté. Un invité ne
+    /// voit rien : le partage l'attend, dans la limite des 24 h.
+    private func checkShareInbox() {
+        guard let inbox = ShareInbox.appGroup() else { return }
+        inbox.purgeExpired()
+        guard user != nil, !appLock.isLocked, receivedShare == nil,
+              !showHandleGate, !showGuestReceipts, !router.showsCommandPalette,
+              let entry = inbox.pending(), !presentedShareIds.contains(entry.id) else { return }
+        presentedShareIds.insert(entry.id)
+        receivedShare = entry
+    }
+
+    /// Le partage est remis à la conversation (brouillon et pièces jointes) : il
+    /// quitte la boîte, et la conversation s'ouvre.
+    private func deliverShare(_ entry: ShareInbox.Entry, to conversation: MessageConversation, attachments: [ShareHandoffAttachment]) {
+        finishShare(entry)
+        // Toujours posé, même sans pièce jointe : la conversation déjà ouverte y lit
+        // qu'un texte l'attend dans son brouillon.
+        router.pendingShare = ShareHandoff(conversationId: conversation.id, attachments: attachments)
+        router.route(toConversation: conversation.id)
+    }
+
+    private func shareToFeed(_ entry: ShareInbox.Entry, content: ComposerSharedContent) {
+        finishShare(entry)
+        router.selectedTab = .community
+        router.pendingSharedPost = content
+    }
+
+    /// Remis ou ignoré : le dépôt est supprimé et la feuille se ferme.
+    private func finishShare(_ entry: ShareInbox.Entry) {
+        ShareInbox.appGroup()?.remove(id: entry.id)
+        receivedShare = nil
     }
 
     private func consumeIntentRoutes() {

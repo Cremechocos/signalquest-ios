@@ -113,7 +113,7 @@ targets:
         # Info.plist référence $(MARKETING_VERSION) / $(CURRENT_PROJECT_VERSION) :
         # sans ces réglages, toute archive porterait 1.0 (1) en dur et App Store
         # Connect refuserait le 2e upload. DOIVENT rester alignés sur ceux de
-        # SignalQuestWidget — Apple rejette une extension dont la version diffère
+        # SignalQuestWidget et SignalQuestShare — Apple rejette une extension dont la version diffère
         # de l'app hôte.
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "173"
@@ -164,6 +164,10 @@ targets:
         embed: true
       # Transforme les pushes de panne en reçus observables même si l'app est tuée.
       - target: SignalQuestNotificationService
+        embed: true
+      # Feuille de partage « Partager vers SignalQuest » : dépose le contenu dans
+      # l'App Group, l'app le propose à l'ouverture suivante.
+      - target: SignalQuestShare
         embed: true
   SignalQuestNotificationService:
     type: app-extension
@@ -261,6 +265,66 @@ targets:
           PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.widget
         Staging:
           PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.widget
+  SignalQuestShare:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: SignalQuestShare
+        excludes:
+          - PrivacyInfo.xcprivacy
+          - Localizable.xcstrings
+      # Une extension a son propre bundle : catalogue séparé.
+      - path: SignalQuestShare/Localizable.xcstrings
+        buildPhase: resources
+      # Manifeste de confidentialité PROPRE à l'extension (un par bundle).
+      - path: SignalQuestShare/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      # Boîte de dépôt partagée app ↔ extension (App Group).
+      - path: SignalQuestApp/Core/Shared/ShareInbox.swift
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      DebugBeta: Config/DebugBeta.xcconfig
+      Staging: Config/Staging.xcconfig
+      Release: Config/Release.xcconfig
+    info:
+      path: SignalQuestShare/Info.plist
+      properties:
+        # Nom montré dans la feuille de partage : celui de l'app (Beta comprise).
+        CFBundleDisplayName: $(SQ_DISPLAY_NAME)
+        CFBundleDevelopmentRegion: en
+        # Sans ces deux lignes XcodeGen écrit "1.0"/"1" en dur (cf. le widget).
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Même clé que l'app : l'extension lit son App Group ici (ShareInbox),
+        # alimenté par le xcconfig, jamais figé dans le code.
+        SQ_APP_GROUP: $(SQ_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            # Dictionnaire, pas TRUEPREDICATE : l'extension n'apparaît que pour du
+            # texte, un lien web, 10 images au plus, une vidéo ou un fichier.
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsMovieWithMaxCount: 1
+              NSExtensionActivationSupportsFileWithMaxCount: 1
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.share
+        PRODUCT_NAME: SignalQuestShare
+        CODE_SIGN_ENTITLEMENTS: SignalQuestShare/SignalQuestShare.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "173"
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+      configs:
+        DebugBeta:
+          PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.share
+        Staging:
+          PRODUCT_BUNDLE_IDENTIFIER: fr.signalquest.ios.beta.share
   SignalQuestTests:
     type: bundle.unit-test
     platform: iOS

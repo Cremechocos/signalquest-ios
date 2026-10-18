@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 
 @MainActor
 final class MessagesViewModel: ObservableObject {
@@ -2701,5 +2702,383 @@ struct ConversationAvatar: View {
                 size: size
             )
         }
+    }
+}
+
+/// « Partage reçu » : ce que l'extension « Partager vers SignalQuest » a déposé.
+///
+/// Rien ne part d'ici. Choisir une conversation l'ouvre avec le compositeur
+/// prérempli (texte par le brouillon, pièces jointes mises en attente) ; choisir
+/// le fil ouvre le composer de publication. L'envoi reste celui de ces écrans,
+/// chiffrement compris.
+struct ReceivedShareSheet: View {
+    let entry: ShareInbox.Entry
+    /// Brouillon écrit, pièces jointes lues : la conversation peut s'ouvrir.
+    let onDelivered: (MessageConversation, [ShareHandoffAttachment]) -> Void
+    let onFeed: (ComposerSharedContent) -> Void
+    let onIgnore: () -> Void
+
+    @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var session: AuthSessionViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var conversations: [MessageConversation] = []
+    @State private var routes: [String: EncryptedConversationSurfaces.ForwardRoute] = [:]
+    @State private var hasLoaded = false
+    @State private var loadError: String?
+    @State private var busyId: String?
+    @State private var actionError: String?
+    @State private var thumbnails: [UIImage] = []
+    @State private var query = ""
+
+    private var manifest: ShareInbox.Manifest { entry.manifest }
+    private var currentUserId: String? {
+        if case .authenticated(let user) = session.state { return user.id }
+        return nil
+    }
+
+    /// Les conversations qui peuvent recevoir ce partage, et combien en sont écartées.
+    private var targets: [MessageConversation] {
+        conversations.filter { accepts($0) }
+    }
+
+    private var hiddenEncryptedCount: Int {
+        conversations.filter { $0.e2eeEnabled == true && !accepts($0) }.count
+    }
+
+    private func accepts(_ conversation: MessageConversation) -> Bool {
+        ShareDestinationPolicy.conversationAccepts(
+            manifest, toEncrypted: conversation.e2eeEnabled == true,
+            route: routes[conversation.id] ?? .plain
+        )
+    }
+
+    private var visibleTargets: [MessageConversation] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return targets }
+        return targets.filter {
+            $0.displayTitle(excluding: currentUserId).localizedCaseInsensitiveContains(needle)
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(
+                    title: "Partage reçu",
+                    subtitle: String(localized: "Choisis où le déposer. Rien ne part sans ton accord."),
+                    closeIdentifier: "share.close"
+                ) { dismiss() }
+                previewCard
+                conversationsSection
+                feedSection
+                Button(role: .destructive) { onIgnore() } label: {
+                    Text("Ignorer")
+                        .font(SQType.body.weight(.semibold))
+                        .foregroundStyle(SQColor.dangerInk)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(busyId != nil)
+                .accessibilityIdentifier("share.ignore")
+            }
+            .padding(SQSpace.lg)
+        }
+        .sqSheet(background: SQColor.bg)
+        .presentationDetents([.large])
+        .task { await load() }
+        .task { thumbnails = await Self.thumbnails(for: entry) }
+    }
+
+    // MARK: Aperçu
+
+    private var previewCard: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            if let text = manifest.text {
+                Text(verbatim: text)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(6)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let raw = manifest.url, let url = URL(string: raw) {
+                let host = Self.displayHost(of: url)
+                Label {
+                    Text(verbatim: host).font(SQType.body.weight(.medium)).foregroundStyle(SQColor.label)
+                } icon: {
+                    Image(systemName: "link").foregroundStyle(SQColor.accentInk)
+                }
+                .frame(minHeight: 44, alignment: .leading)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Lien web : \(host)"))
+            }
+            if manifest.imageCount > 0 {
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: SQSpace.sm) {
+                            ForEach(Array(thumbnails.enumerated()), id: \.offset) { _, image in
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 76, height: 76)
+                                    .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            }
+                        }
+                    }
+                    .accessibilityHidden(true)
+                    Text("\(manifest.imageCount) image")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+            if let file = manifest.attachment {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: file.fileName)
+                            .font(SQType.body.weight(.medium))
+                            .foregroundStyle(SQColor.label)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                        Text(verbatim: ByteCountFormatter.string(fromByteCount: Int64(file.byteCount), countStyle: .file))
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                } icon: {
+                    Image(systemName: file.kind == .video ? "film" : "doc").foregroundStyle(SQColor.accentInk)
+                }
+                .frame(minHeight: 44, alignment: .leading)
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding(SQSpace.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .accessibilityIdentifier("share.preview")
+    }
+
+    // MARK: Conversations
+
+    private var conversationsSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Dans une conversation")
+                .sqKicker()
+                .padding(.leading, SQSpace.xs)
+                .accessibilityAddTraits(.isHeader)
+            if let loadError {
+                ErrorStateView(title: "Conversations indisponibles", message: loadError) {
+                    Task { await load() }
+                }
+            } else if !hasLoaded {
+                SQSpinner()
+                    .tint(SQColor.brandRed)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SQSpace.xl)
+            } else if targets.isEmpty {
+                EmptyStateView(
+                    title: String(localized: "Aucune conversation"),
+                    message: String(localized: "Aucune conversation ne peut recevoir ce partage."),
+                    systemImage: "bubble.left.and.bubble.right"
+                )
+            } else {
+                if targets.count > 6 {
+                    TextField("Rechercher une conversation", text: $query)
+                        .submitLabel(.search)
+                        .sqHaloField()
+                        .accessibilityIdentifier("share.search")
+                }
+                VStack(spacing: 0) {
+                    ForEach(visibleTargets) { target in
+                        if target.id != visibleTargets.first?.id { Divider().padding(.leading, 64) }
+                        row(for: target)
+                    }
+                }
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                if hiddenEncryptedCount > 0 {
+                    Text("Les conversations chiffrées ne reçoivent que du texte.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .padding(.horizontal, SQSpace.xs)
+                        .accessibilityIdentifier("share.encryptedNote")
+                }
+            }
+            if let actionError {
+                Text(verbatim: actionError)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.dangerInk)
+                    .accessibilityIdentifier("share.error")
+            }
+        }
+    }
+
+    private func row(for target: MessageConversation) -> some View {
+        Button {
+            Task { await choose(target) }
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                ConversationAvatar(conversation: target, currentUserId: currentUserId, size: 40)
+                    .accessibilityHidden(true)
+                Text(verbatim: target.displayTitle(excluding: currentUserId))
+                    .font(SQType.rowTitle)
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if busyId == target.id { SQSpinner().tint(SQColor.brandRed) }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(busyId != nil)
+    }
+
+    // MARK: Fil
+
+    private var feedSection: some View {
+        let blocker = ShareDestinationPolicy.feedBlocker(for: manifest)
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Dans le fil")
+                .sqKicker()
+                .padding(.leading, SQSpace.xs)
+                .accessibilityAddTraits(.isHeader)
+            Button {
+                Task { await postToFeed() }
+            } label: {
+                HStack(spacing: SQSpace.md) {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(blocker == nil ? SQColor.accentInk : SQColor.labelSecondary)
+                        .frame(width: 40, height: 40)
+                        .background(SQColor.chip, in: Circle())
+                        .accessibilityHidden(true)
+                    Text("Publier dans le fil")
+                        .font(SQType.rowTitle)
+                        .foregroundStyle(blocker == nil ? SQColor.label : SQColor.labelSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, SQSpace.md)
+                .frame(minHeight: 56)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(blocker != nil || busyId != nil)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            .accessibilityIdentifier("share.feed")
+            if let blocker {
+                Text(verbatim: Self.explanation(for: blocker))
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .padding(.horizontal, SQSpace.xs)
+                    .accessibilityIdentifier("share.feedBlocker")
+            }
+        }
+    }
+
+    // MARK: Actions
+
+    private func load() async {
+        loadError = nil
+        do {
+            // Mode démo : les conversations de la liste, comme l'écran Messages.
+            let loaded = AppEnvironment.usesDemoData
+                ? [MessageConversation].demo.inDisplayOrder()
+                : try await services.messages.conversations()
+            let v2Enabled = services.e2eeV2Messaging.readsEnabled && services.e2eeV2Messaging.writesEnabled
+            conversations = loaded
+            routes = Dictionary(loaded.map { conversation -> (String, EncryptedConversationSurfaces.ForwardRoute) in
+                let encrypted = conversation.e2eeEnabled == true
+                return (conversation.id, EncryptedConversationSurfaces.forwardRoute(
+                    toEncrypted: encrypted,
+                    targetIsV2: encrypted && EncryptedConversationSurfaces.isV2(conversation),
+                    v2Enabled: v2Enabled
+                ))
+            }, uniquingKeysWith: { first, _ in first })
+            hasLoaded = true
+        } catch {
+            loadError = error.userFacingMessage
+        }
+    }
+
+    private func choose(_ target: MessageConversation) async {
+        guard busyId == nil else { return }
+        busyId = target.id
+        actionError = nil
+        do {
+            let attachments = try await Self.attachments(of: entry)
+            let composed = manifest.composedText
+            if !composed.isEmpty {
+                let scope = LocalAccountScope.currentOwnerScopeId
+                let existing = await MessageDraftStore.shared.text(conversationId: target.id, ownerScopeId: scope)
+                try await MessageDraftStore.shared.save(
+                    Self.mergedDraft(existing: existing, shared: composed),
+                    conversationId: target.id, ownerScopeId: scope
+                )
+            }
+            onDelivered(target, attachments)
+        } catch {
+            actionError = String(localized: "Impossible de lire ce partage. Réessaie.")
+            busyId = nil
+            Haptics.error()
+        }
+    }
+
+    private func postToFeed() async {
+        guard busyId == nil, ShareDestinationPolicy.feedBlocker(for: manifest) == nil else { return }
+        busyId = "feed"
+        actionError = nil
+        do {
+            let image = try await Self.attachments(of: entry).first { $0.kind == .image }
+            onFeed(ComposerSharedContent(text: manifest.composedText, imageData: image?.data))
+        } catch {
+            actionError = String(localized: "Impossible de lire ce partage. Réessaie.")
+            busyId = nil
+            Haptics.error()
+        }
+    }
+
+    // MARK: Logique pure et lectures
+
+    /// Le texte partagé après le brouillon déjà là, sans l'écraser.
+    nonisolated static func mergedDraft(existing: String?, shared: String) -> String {
+        guard let existing, !existing.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return shared }
+        if existing.contains(shared) { return existing }
+        return existing + "\n" + shared
+    }
+
+    static func explanation(for blocker: ShareDestinationPolicy.FeedBlocker) -> String {
+        switch blocker {
+        case .videoOrFile: return String(localized: "Une publication ne porte ni vidéo ni fichier.")
+        case .severalImages: return String(localized: "Une publication ne porte qu’une seule photo.")
+        }
+    }
+
+    static func displayHost(of url: URL) -> String {
+        let host = url.host ?? url.absoluteString
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
+    private static func attachments(of entry: ShareInbox.Entry) async throws -> [ShareHandoffAttachment] {
+        try await Task.detached(priority: .userInitiated) {
+            try entry.manifest.items.map {
+                ShareHandoffAttachment(data: try entry.data(for: $0), fileName: $0.fileName, uti: $0.uti, kind: $0.kind)
+            }
+        }.value
+    }
+
+    /// Vignettes décodées depuis les fichiers, à la taille voulue.
+    private static func thumbnails(for entry: ShareInbox.Entry) async -> [UIImage] {
+        await Task.detached(priority: .userInitiated) {
+            entry.manifest.items.filter { $0.kind == .image }.compactMap { item -> UIImage? in
+                guard let source = CGImageSourceCreateWithURL(entry.fileURL(for: item) as CFURL, nil) else { return nil }
+                let options: [CFString: Any] = [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 240,
+                ]
+                return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary).map { UIImage(cgImage: $0) }
+            }
+        }.value
     }
 }

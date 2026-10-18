@@ -1,0 +1,398 @@
+{
+  "sourceLanguage" : "fr",
+  "strings" : {
+    "%lld image" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld image"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld images"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld image"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld images"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Annuler" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler"
+          }
+        }
+      }
+    },
+    "Ce contenu est illisible. Réessaie depuis l’app d’origine." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This content can't be read. Try again from the original app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce contenu est illisible. Réessaie depuis l’app d’origine."
+          }
+        }
+      }
+    },
+    "Ce fichier dépasse 10 Mo. Choisis-en un plus léger." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file is over 10 MB. Pick a lighter one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier dépasse 10 Mo. Choisis-en un plus léger."
+          }
+        }
+      }
+    },
+    "Ce lien n’est pas un lien web." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This link isn't a web link."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce lien n’est pas un lien web."
+          }
+        }
+      }
+    },
+    "Ce texte est trop long : 4 000 caractères au plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This text is too long: 4,000 characters at most."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce texte est trop long : 4 000 caractères au plus."
+          }
+        }
+      }
+    },
+    "Cette vidéo dépasse 10 Mo. Choisis-en une plus courte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video is over 10 MB. Pick a shorter one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette vidéo dépasse 10 Mo. Choisis-en une plus courte."
+          }
+        }
+      }
+    },
+    "C’est prêt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All set"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est prêt"
+          }
+        }
+      }
+    },
+    "Il n’y a rien à partager ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's nothing to share here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il n’y a rien à partager ici."
+          }
+        }
+      }
+    },
+    "Impossible de partager" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't share"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de partager"
+          }
+        }
+      }
+    },
+    "Impossible de préparer ce partage. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't prepare this share. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de préparer ce partage. Réessaie."
+          }
+        }
+      }
+    },
+    "Lecture du contenu…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading the content…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture du contenu…"
+          }
+        }
+      }
+    },
+    "Lien web : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web link: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lien web : %@"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "Ouvre SignalQuest : ton partage t’attend pour choisir une conversation ou le fil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open SignalQuest: your share is waiting for you to choose a conversation or the feed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre SignalQuest : ton partage t’attend pour choisir une conversation ou le fil."
+          }
+        }
+      }
+    },
+    "Partage une vidéo ou un fichier seul, sans images." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share a video or a file on its own, without images."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partage une vidéo ou un fichier seul, sans images."
+          }
+        }
+      }
+    },
+    "Partager vers SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share to SignalQuest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager vers SignalQuest"
+          }
+        }
+      }
+    },
+    "Préparation…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préparation…"
+          }
+        }
+      }
+    },
+    "Préparer dans SignalQuest" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepare in SignalQuest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préparer dans SignalQuest"
+          }
+        }
+      }
+    },
+    "SignalQuest ne prend pas en charge ce type de contenu." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest doesn't support this type of content."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest ne prend pas en charge ce type de contenu."
+          }
+        }
+      }
+    },
+    "SignalQuest n’est pas prêt à recevoir ce partage. Ouvre l’app puis réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest isn't ready to receive this share. Open the app, then try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest n’est pas prêt à recevoir ce partage. Ouvre l’app puis réessaie."
+          }
+        }
+      }
+    },
+    "Tu peux partager 10 images au plus à la fois." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can share up to 10 images at a time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu peux partager 10 images au plus à la fois."
+          }
+        }
+      }
+    },
+    "Une image est trop lourde : 20 Mo au plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An image is too large: 20 MB at most."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une image est trop lourde : 20 Mo au plus."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

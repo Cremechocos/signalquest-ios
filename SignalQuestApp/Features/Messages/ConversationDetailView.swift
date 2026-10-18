@@ -191,6 +191,10 @@ struct ConversationDetailView: View {
     @State private var emojiPickerTarget: MessageItem?
     /// Texte à transférer vers une autre conversation.
     @State private var forwardTarget: ForwardPayload?
+    /// Photos, vidéos et fichiers en attente dans le compositeur (partage reçu,
+    /// glisser-déposer, coller) : ils partent par les envois habituels, le texte
+    /// tapé en légende de la première.
+    @State private var stagedAttachments: [StagedAttachment] = []
 
     // Photos en grand + publications partagées interactives (parité Android).
     /// Photo de la conversation ouverte en plein écran (tap sur l'image).
@@ -783,6 +787,12 @@ struct ConversationDetailView: View {
 
     var body: some View {
         conversationBase
+        .modifier(ConversationInputModifier(
+            acceptsDrops: canSend && editTarget == nil && !showsProtectionVeil,
+            pendingShareId: router.pendingShare?.id,
+            onProviders: { providers in Task { await importProviders(providers) } },
+            onPendingShare: { await consumePendingShare() }
+        ))
         .accessibilityHidden(showsProtectionVeil)
         .overlay {
             if showsProtectionVeil { protectionVeil }
@@ -1247,6 +1257,13 @@ struct ConversationDetailView: View {
                 .padding(.top, SQSpace.sm)
                 .transition(.opacity)
             }
+            if !stagedAttachments.isEmpty, editTarget == nil {
+                StagedAttachmentsTray(items: stagedAttachments) { id in
+                    withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) {
+                        stagedAttachments.removeAll { $0.id == id }
+                    }
+                }
+            }
             MessageComposerBar(
                 canSend: canSend,
                 isSending: isSending,
@@ -1254,6 +1271,7 @@ struct ConversationDetailView: View {
                 isE2EE: isE2EE,
                 canSchedule: EncryptedConversationSurfaces.allowsScheduling(isV2: conversationIsV2),
                 isEditing: editTarget != nil,
+                hasStagedAttachments: !stagedAttachments.isEmpty && editTarget == nil,
                 seedText: composerSeed,
                 seedToken: composerSeedToken,
                 ephemeralEnabled: $ephemeralEnabled,
@@ -1276,6 +1294,7 @@ struct ConversationDetailView: View {
                 onPickPhotos: { items, caption in Task { await sendPhotos(items, caption: caption) } },
                 onPickFile: { url, caption in Task { await sendFile(at: url, caption: caption) } },
                 onFilesUnavailable: { showFilesUnavailable() },
+                onPaste: { Task { await pasteFromClipboard() } },
                 onEditLast: { beginEditOfLastOwnMessage() },
                 onCapturePhoto: { data, caption in Task { await sendCapturedPhoto(data, caption: caption) } },
                 onVoiceNote: { url, duration in Task { await sendVoiceNote(url: url, duration: duration) } },
@@ -3563,6 +3582,11 @@ struct ConversationDetailView: View {
 
     private func send(_ rawText: String) async {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Des pièces jointes attendent : elles partent, le texte en légende.
+        if editTarget == nil, !stagedAttachments.isEmpty {
+            await sendStaged(caption: text)
+            return
+        }
         guard !text.isEmpty else { return }
 
         // L'édition n'est pas optimiste : on attend la confirmation serveur
@@ -3865,6 +3889,154 @@ struct ConversationDetailView: View {
         draftAutosaver?.discard()
         clearComposer()
         replyTarget = nil
+    }
+
+    // MARK: Pièces jointes en attente (partage reçu, glisser-déposer, coller)
+
+    private static let maxStagedAttachments = 10
+
+    /// Envoie les pièces en attente par le chemin habituel, l'une après l'autre ;
+    /// le texte tapé est la légende de la première (comme pour plusieurs photos).
+    private func sendStaged(caption: String) async {
+        let items = stagedAttachments
+        stagedAttachments = []
+        guard !isE2EE else {
+            showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
+            Haptics.error()
+            return
+        }
+        for (index, item) in items.enumerated() {
+            await queueAttachment(
+                PendingAttachmentSend(
+                    data: item.data, filename: item.filename, mimeType: item.mimeType, kind: item.kind,
+                    caption: index == 0 ? caption : "", width: item.width, height: item.height,
+                    replyToId: replyTarget?.id, ttlSeconds: ephemeralTTL
+                )
+            )
+            draftAutosaver?.discard()
+            clearComposer()
+            replyTarget = nil
+        }
+    }
+
+    /// Met une photo, une vidéo ou un fichier en attente dans le compositeur, avec
+    /// les mêmes règles et limites que les envois directs.
+    private func stage(data: Data, fileName: String, uti: String) async {
+        let type = UTType(uti) ?? UTType(filenameExtension: (fileName as NSString).pathExtension)
+        let isImage = type?.conforms(to: .image) == true
+        guard !isE2EE else {
+            if isImage {
+                showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
+            } else {
+                showFilesUnavailable()
+            }
+            Haptics.error()
+            return
+        }
+        guard stagedAttachments.count < Self.maxStagedAttachments else {
+            showActionError(String(localized: "Tu peux joindre 10 éléments au plus à la fois."))
+            Haptics.error()
+            return
+        }
+        if isImage {
+            guard let prepared = await Task.detached(priority: .userInitiated, operation: {
+                Self.preparedJPEG(from: data)
+            }).value, MessageAttachmentOutboxStore.fits(prepared.data.count) else {
+                showActionError(String(localized: "Image illisible."))
+                Haptics.error()
+                return
+            }
+            stagedAttachments.append(StagedAttachment(
+                data: prepared.data, filename: "photo.jpg", mimeType: "image/jpeg", kind: "IMAGE",
+                width: prepared.width, height: prepared.height
+            ))
+        } else {
+            let isVideo = type?.conforms(to: .movie) == true
+            guard MessageAttachmentOutboxStore.fits(data.count) else {
+                showActionError(data.count > MessageAttachmentOutboxStore.maximumSourceBytes
+                    ? (isVideo ? String(localized: "Cette vidéo dépasse 10 Mo. Choisis-en une plus courte.") : String(localized: "Ce fichier dépasse 10 Mo."))
+                    : String(localized: "Ce fichier est illisible."))
+                Haptics.error()
+                return
+            }
+            let ext = (fileName as NSString).pathExtension
+            stagedAttachments.append(StagedAttachment(
+                data: data,
+                filename: isVideo ? "video.\(ext.isEmpty ? "mov" : ext)" : fileName,
+                mimeType: type?.preferredMIMEType ?? "application/octet-stream", kind: "FILE",
+                width: nil, height: nil
+            ))
+        }
+        Haptics.light()
+    }
+
+    /// Texte glissé ou collé : ajouté à la suite de ce qui est tapé, sans écraser.
+    private func insertIntoComposer(_ text: String) {
+        guard editTarget == nil, !text.isEmpty else { return }
+        let current = draftAutosaver?.text ?? ""
+        let separator = current.isEmpty || current.last?.isWhitespace == true ? "" : "\n"
+        let merged = current + separator + text
+        seedComposer(merged)
+        draftAutosaver?.textChanged(merged)
+    }
+
+    /// Ce qui est glissé sur la conversation, ou collé depuis le menu « + ».
+    private func importProviders(_ providers: [NSItemProvider]) async {
+        guard canSend, editTarget == nil else { return }
+        var texts: [String] = []
+        for item in await ConversationInputImport.items(from: providers) {
+            switch item {
+            case .text(let value):
+                texts.append(value)
+            case .file(let file):
+                await stage(data: file.data, fileName: file.fileName, uti: file.uti)
+            case .failure(let failure):
+                showActionError(failure.message)
+                Haptics.error()
+            }
+        }
+        let text = texts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        guard text.count <= ShareInbox.maxTextCharacters else {
+            showActionError(String(localized: "Ce texte est trop long : 4 000 caractères au plus."))
+            Haptics.error()
+            return
+        }
+        insertIntoComposer(text)
+    }
+
+    /// « Coller » : le presse-papiers n'est lu qu'à cet appui. Les tests de contenu
+    /// (`hasStrings`…) ne le déclenchent pas.
+    private func pasteFromClipboard() async {
+        guard canSend, editTarget == nil else { return }
+        let pasteboard = UIPasteboard.general
+        guard pasteboard.hasStrings || pasteboard.hasImages || pasteboard.hasURLs else {
+            showActionError(String(localized: "Le presse-papiers ne contient rien à coller."))
+            Haptics.error()
+            return
+        }
+        await importProviders(pasteboard.itemProviders)
+    }
+
+    /// Partage reçu : le texte (déjà dans le brouillon de la conversation) revient
+    /// dans le champ, les pièces jointes passent en attente.
+    private func consumePendingShare() async {
+        guard let handoff = router.pendingShare, handoff.conversationId == conversation.id else { return }
+        router.pendingShare = nil
+        guard handoff.isFresh else { return }
+        await restoreDraftIfNeeded()
+        if editTarget == nil, let autosaver = draftAutosaver {
+            let stored = await MessageDraftStore.shared.text(
+                conversationId: conversation.id, ownerScopeId: LocalAccountScope.currentOwnerScopeId
+            ) ?? ""
+            if !stored.isEmpty, stored != autosaver.text {
+                seedComposer(stored)
+                autosaver.textChanged(stored)
+            }
+        }
+        for attachment in handoff.attachments {
+            await stage(data: attachment.data, fileName: attachment.fileName, uti: attachment.uti)
+        }
     }
 
     /// Photo prise avec l'appareil : même chemin que celles de la photothèque.
@@ -5083,6 +5255,230 @@ private struct PendingAttachmentSend {
     var clientRequestId: String?
     /// Cause du dernier refus, montrée sous la bulle « Non envoyé » (U06).
     var failureReason: String? = nil
+}
+
+/// Pièce jointe en attente dans le compositeur : prête à partir telle quelle
+/// (photo déjà ré-encodée, vidéo ou fichier dans la limite de 10 Mo).
+private struct StagedAttachment: Identifiable, Equatable {
+    let id = UUID()
+    let data: Data
+    let filename: String
+    let mimeType: String
+    /// « IMAGE » ou « FILE », comme `PendingAttachmentSend.kind`.
+    let kind: String
+    let width: Int?
+    let height: Int?
+
+    static func == (lhs: StagedAttachment, rhs: StagedAttachment) -> Bool { lhs.id == rhs.id }
+}
+
+/// Plateau des pièces en attente, au-dessus du champ : une tuile par pièce, avec
+/// de quoi la retirer avant l'envoi.
+private struct StagedAttachmentsTray: View {
+    let items: [StagedAttachment]
+    let onRemove: (UUID) -> Void
+
+    @ScaledMetric(relativeTo: .body) private var tile: CGFloat = 64
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SQSpace.sm) {
+                ForEach(items) { item in
+                    ZStack(alignment: .topTrailing) {
+                        content(of: item)
+                            .frame(width: tile, height: tile)
+                            .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                            .padding(.top, 8)
+                            .padding(.trailing, 8)
+                        Button { onRemove(item.id) } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(SQColor.onInk)
+                                .frame(width: 22, height: 22)
+                                .background(SQColor.label, in: Circle())
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .offset(x: 14, y: -14)
+                        .accessibilityLabel(Text("Retirer la pièce jointe"))
+                    }
+                    .accessibilityElement(children: .contain)
+                }
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+        }
+        .accessibilityIdentifier("composer.staged")
+    }
+
+    @ViewBuilder
+    private func content(of item: StagedAttachment) -> some View {
+        if item.kind == "IMAGE", let image = PendingThumbnailCache.image(for: item.id.uuidString, data: item.data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .accessibilityLabel(Text("Photo jointe"))
+        } else {
+            VStack(spacing: 2) {
+                Image(systemName: item.mimeType.hasPrefix("video/") ? "film" : "doc")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(SQColor.accentInk)
+                Text(verbatim: item.filename)
+                    .font(SQType.micro)
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(SQSpace.xs)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(SQColor.chip)
+            .accessibilityElement(children: .combine)
+        }
+    }
+}
+
+/// Glisser-déposer sur la conversation, et réception d'un partage : regroupés
+/// dans un modificateur pour ne pas allonger la chaîne du corps de la vue.
+private struct ConversationInputModifier: ViewModifier {
+    let acceptsDrops: Bool
+    let pendingShareId: UUID?
+    let onProviders: ([NSItemProvider]) -> Void
+    let onPendingShare: () async -> Void
+
+    @State private var isTargeted = false
+
+    func body(content: Content) -> some View {
+        content
+            .onDrop(of: ConversationInputImport.dropTypes, isTargeted: $isTargeted) { providers in
+                guard acceptsDrops else { return false }
+                onProviders(providers)
+                return true
+            }
+            .overlay {
+                if isTargeted && acceptsDrops {
+                    RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous)
+                        .strokeBorder(SQColor.brandRed, style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
+                        .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                        .overlay {
+                            Text("Dépose ici pour joindre à la conversation")
+                                .font(SQType.body.weight(.semibold))
+                                .foregroundStyle(SQColor.accentInk)
+                                .multilineTextAlignment(.center)
+                                .padding(SQSpace.lg)
+                        }
+                        .padding(SQSpace.sm)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+            .task(id: pendingShareId) { await onPendingShare() }
+    }
+}
+
+/// Lecture de ce qui est glissé ou collé : texte, lien, image, vidéo, fichier.
+/// Les fichiers sont lus en mémoire dans le rappel du système, qui seul les
+/// garde le temps de la lecture ; leur taille est vérifiée avant.
+enum ConversationInputImport {
+    static let dropTypes: [UTType] = [.image, .movie, .fileURL, .url, .text, .data]
+
+    struct File: Sendable {
+        let data: Data
+        let fileName: String
+        let uti: String
+    }
+
+    struct Failure: Sendable {
+        enum Reason: Sendable { case tooLarge, unreadable }
+        let kind: ShareInbox.Kind
+        let reason: Reason
+
+        var message: String {
+            switch (kind, reason) {
+            case (.image, .tooLarge): return String(localized: "Cette image dépasse 20 Mo.")
+            case (.image, .unreadable): return String(localized: "Image illisible.")
+            case (.video, .tooLarge): return String(localized: "Cette vidéo dépasse 10 Mo. Choisis-en une plus courte.")
+            case (.file, .tooLarge): return String(localized: "Ce fichier dépasse 10 Mo.")
+            default: return String(localized: "Ce fichier est illisible.")
+            }
+        }
+    }
+
+    enum Item: Sendable {
+        case text(String)
+        case file(File)
+        case failure(Failure)
+    }
+
+    @MainActor
+    static func items(from providers: [NSItemProvider]) async -> [Item] {
+        var result: [Item] = []
+        for provider in providers {
+            let identifiers = provider.registeredTypeIdentifiers
+            func first(conformingTo type: UTType) -> String? {
+                identifiers.first { UTType($0)?.conforms(to: type) == true }
+            }
+            if let id = first(conformingTo: .image) {
+                result.append(await loadFile(provider, identifier: id, kind: .image))
+            } else if let id = first(conformingTo: .movie) {
+                result.append(await loadFile(provider, identifier: id, kind: .video))
+            } else if let id = identifiers.first(where: { id in
+                guard let type = UTType(id) else { return false }
+                return type.conforms(to: .data) && !type.conforms(to: .url) && !type.conforms(to: .text)
+                    && !type.conforms(to: .propertyList)
+            }) {
+                result.append(await loadFile(provider, identifier: id, kind: .file))
+            } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+                if let value = await loadString(provider, identifier: UTType.url.identifier) { result.append(.text(value)) }
+            } else if provider.hasItemConformingToTypeIdentifier(UTType.text.identifier) {
+                if let value = await loadString(provider, identifier: UTType.text.identifier) { result.append(.text(value)) }
+            }
+        }
+        return result
+    }
+
+    private struct Loaded: @unchecked Sendable {
+        let value: NSSecureCoding?
+    }
+
+    @MainActor
+    private static func loadString(_ provider: NSItemProvider, identifier: String) async -> String? {
+        let loaded: Loaded = await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: identifier, options: nil) { item, _ in
+                continuation.resume(returning: Loaded(value: item))
+            }
+        }
+        switch loaded.value {
+        case let url as URL: return url.absoluteString
+        case let string as String: return string
+        case let attributed as NSAttributedString: return attributed.string
+        case let data as Data: return String(data: data, encoding: .utf8)
+        default: return nil
+        }
+    }
+
+    @MainActor
+    private static func loadFile(_ provider: NSItemProvider, identifier: String, kind: ShareInbox.Kind) async -> Item {
+        let limit = kind == .image ? ShareInbox.maxImageBytes : MessageAttachmentOutboxStore.maximumSourceBytes
+        return await withCheckedContinuation { continuation in
+            provider.loadFileRepresentation(forTypeIdentifier: identifier) { url, _ in
+                guard let url, let size = try? ShareInbox.byteCount(of: url), size > 0 else {
+                    continuation.resume(returning: .failure(Failure(kind: kind, reason: .unreadable)))
+                    return
+                }
+                guard size <= limit else {
+                    continuation.resume(returning: .failure(Failure(kind: kind, reason: .tooLarge)))
+                    return
+                }
+                guard let data = try? Data(contentsOf: url) else {
+                    continuation.resume(returning: .failure(Failure(kind: kind, reason: .unreadable)))
+                    return
+                }
+                continuation.resume(returning: .file(File(data: data, fileName: url.lastPathComponent, uti: identifier)))
+            }
+        }
+    }
 }
 
 /// Miniature d'une photo en attente d'envoi, calculée une fois par bulle.

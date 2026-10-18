@@ -29,6 +29,27 @@ enum PostDeepLink {
     }
 }
 
+/// Un fichier d'un partage reçu, lu depuis la boîte de dépôt de l'App Group.
+struct ShareHandoffAttachment: Equatable, Sendable {
+    let data: Data
+    let fileName: String
+    let uti: String
+    let kind: ShareInbox.Kind
+}
+
+/// Pièces jointes d'un partage remises à une conversation. Éphémère : à défaut
+/// d'une conversation qui la prenne dans la minute, elle ne vaut plus.
+struct ShareHandoff: Equatable, Identifiable {
+    let id = UUID()
+    let conversationId: String
+    let attachments: [ShareHandoffAttachment]
+    let createdAt = Date()
+
+    var isFresh: Bool { Date().timeIntervalSince(createdAt) < 60 }
+
+    static func == (lhs: ShareHandoff, rhs: ShareHandoff) -> Bool { lhs.id == rhs.id }
+}
+
 /// App-wide navigation coordinator. Push notifications (and, later, universal
 /// links) write an intent here; the SwiftUI tree observes it to switch tab and
 /// open the relevant content. Keeping routing in one observable object means a
@@ -86,6 +107,12 @@ final class AppRouter: ObservableObject {
         var isFresh: Bool { Date().timeIntervalSince(requestedAt) < 60 }
     }
     @Published var pendingCall: PendingCall?
+    /// Pièces jointes d'un partage reçu (« Partager vers SignalQuest »), remises à
+    /// la conversation choisie : elle les met en attente dans son compositeur.
+    /// Le texte, lui, passe par le brouillon de la conversation.
+    @Published var pendingShare: ShareHandoff?
+    /// Texte et photo d'un partage reçu, que le fil ouvre dans son composer.
+    @Published var pendingSharedPost: ComposerSharedContent?
     /// Chaîne v3 d'un QR d'approbation ouvert par son lien universel (v0.4.34).
     @Published var openE2EEApprovalQR: String?
     /// Lot A2 : une réinitialisation d'identité demandée sur le compte, à
@@ -165,6 +192,7 @@ final class AppRouter: ObservableObject {
             || openSentinelle || openSentinelleShareSlug != nil || openNotificationSettings
             || openProfileScreen != nil || openANFRMap
             || pendingMapFocus != nil || pendingDriveTest || pendingSpeedtestStart
+            || pendingShare != nil || pendingSharedPost != nil
     }
 
     @discardableResult

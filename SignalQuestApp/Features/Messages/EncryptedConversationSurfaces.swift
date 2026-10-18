@@ -125,6 +125,37 @@ enum EncryptedConversationSurfaces {
     }
 }
 
+/// Où un partage reçu (extension « Partager vers SignalQuest ») peut aller,
+/// décidé en un seul endroit et testé.
+enum ShareDestinationPolicy {
+    /// Pourquoi le fil ne prend pas ce partage.
+    enum FeedBlocker: Equatable {
+        /// Une publication ne porte ni vidéo ni fichier.
+        case videoOrFile
+        /// Une publication ne porte qu'une photo.
+        case severalImages
+    }
+
+    /// `nil` : le fil accepte. Le composer du fil publie du texte et UNE photo.
+    static func feedBlocker(for manifest: ShareInbox.Manifest) -> FeedBlocker? {
+        if manifest.attachment != nil { return .videoOrFile }
+        if manifest.imageCount > 1 { return .severalImages }
+        return nil
+    }
+
+    /// Une conversation reçoit le partage si l'envoi y est possible. Dans une
+    /// conversation chiffrée, seul le texte l'est : une photo ou un fichier
+    /// partirait par la route des pièces jointes, jamais chiffrée.
+    static func conversationAccepts(
+        _ manifest: ShareInbox.Manifest,
+        toEncrypted: Bool,
+        route: EncryptedConversationSurfaces.ForwardRoute
+    ) -> Bool {
+        guard route != .unavailable else { return false }
+        return !toEncrypted || manifest.items.isEmpty
+    }
+}
+
 /// Messages v2 supprimés « pour moi », sur cet appareil et par compte.
 ///
 /// En v2, « pour moi » ne passe pas par le serveur (§5) : sans mémoire locale,

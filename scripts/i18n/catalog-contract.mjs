@@ -3,11 +3,13 @@ export const CATALOG_PATHS = [
   'SignalQuestApp/Resources/InfoPlist.xcstrings',
   'SignalQuestWidget/Localizable.xcstrings',
   'SignalQuestNotificationService/Localizable.xcstrings',
+  'SignalQuestShare/Localizable.xcstrings',
 ];
 export const BUNDLE_PLISTS = [
   'SignalQuestApp/Info.plist',
   'SignalQuestWidget/Info.plist',
   'SignalQuestNotificationService/Info.plist',
+  'SignalQuestShare/Info.plist',
 ];
 
 export function stringUnits(localization, prefix = '') {

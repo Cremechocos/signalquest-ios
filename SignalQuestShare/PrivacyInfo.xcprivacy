@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Manifeste propre à l'extension de partage. Apple exige une déclaration par
+	  bundle : celui de l'app hôte ne couvre pas l'extension.
+
+	  L'extension ne collecte AUCUNE donnée et n'a ni réseau, ni localisation, ni
+	  dépendance SDK : elle copie ce que l'utilisateur partage dans le conteneur
+	  de l'App Group (ShareInbox), que l'app lit à son ouverture. Elle n'utilise
+	  aucune des API à raison requise (défauts utilisateur, horodatages de
+	  fichiers, espace disque, heure système) : la taille d'un fichier est lue en
+	  se plaçant à sa fin, et l'âge d'un dépôt vient de son manifeste.
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+</dict>
+</plist>

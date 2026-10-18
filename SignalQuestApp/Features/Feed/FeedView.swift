@@ -599,6 +599,7 @@ struct FeedView: View {
     private struct ComposerRequest: Identifiable {
         let id = UUID()
         let start: ComposerStartAttachment?
+        var shared: ComposerSharedContent? = nil
     }
 
     private struct RoutedPost: Identifiable, Hashable {
@@ -822,6 +823,10 @@ struct FeedView: View {
         .onChangeCompat(of: router.openPostComposer) { _, requested in
             if requested { openComposerIfRequested() }
         }
+        // Contenu reçu de « Partager vers SignalQuest » : le composer s'ouvre prérempli.
+        .onChangeCompat(of: router.pendingSharedPost?.id) { _, id in
+            if id != nil { openComposerIfRequested() }
+        }
         .sheet(item: $editingPost) { post in
             // Même composer qu'à la création : deux écrans divergeraient
             // dès la première évolution de la saisie.
@@ -954,7 +959,7 @@ struct FeedView: View {
             .presentationDragIndicator(.visible)
         }
         .sheet(item: $composerRequest) { request in
-            ComposerSheet(service: services.feed, userService: services.users, startingWith: request.start)
+            ComposerSheet(service: services.feed, userService: services.users, startingWith: request.start, sharing: request.shared)
                 .onDisappear { Task { await model.load() } }
         }
         .sheet(isPresented: $isPulseExpanded) { pulseSheet }
@@ -1070,6 +1075,11 @@ struct FeedView: View {
     }
 
     private func openComposerIfRequested() {
+        if let shared = router.pendingSharedPost {
+            router.pendingSharedPost = nil
+            composerRequest = ComposerRequest(start: nil, shared: shared)
+            return
+        }
         guard router.openPostComposer else { return }
         router.openPostComposer = false
         composerRequest = ComposerRequest(start: nil)

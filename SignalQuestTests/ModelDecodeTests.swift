@@ -430,6 +430,275 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(Set(Mirror(reflecting: ConversationEntity(items[0])).children.compactMap(\.label)), ["id", "name"])
     }
 
+    // MARK: Partager vers SignalQuest (boîte de dépôt, destinations)
+
+    private func makeInbox() throws -> ShareInbox {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ShareInboxTests-\(UUID().uuidString)", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        return ShareInbox(root: root)
+    }
+
+    /// Fichier source de `bytes` octets ; au-delà de 1 Mio il est creux (rapide à créer).
+    private func makeSource(_ kind: ShareInbox.Kind, name: String, bytes: Int = 16, uti: String? = nil) throws -> ShareInbox.Source {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ShareSources-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent(name)
+        if bytes > 1_048_576 {
+            XCTAssertTrue(FileManager.default.createFile(atPath: url.path, contents: nil))
+            let handle = try FileHandle(forWritingTo: url)
+            try handle.truncate(atOffset: UInt64(bytes))
+            try handle.close()
+        } else {
+            try Data(repeating: 0x41, count: bytes).write(to: url)
+        }
+        let defaultUTI: String
+        switch kind {
+        case .image: defaultUTI = "public.jpeg"
+        case .video: defaultUTI = "public.mpeg-4"
+        case .file: defaultUTI = "com.adobe.pdf"
+        }
+        return ShareInbox.Source(kind: kind, fileName: name, uti: uti ?? defaultUTI, fileURL: url)
+    }
+
+    func testShareInboxWritesThenReadsTextLinkAndFiles() throws {
+        let inbox = try makeInbox()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let manifest = try inbox.write(
+            text: "  Voilà la mesure  ",
+            url: URL(string: "https://example.com/page?x=1"),
+            sources: [try makeSource(.image, name: "a.jpg", bytes: 40), try makeSource(.image, name: "b.jpg", bytes: 50)],
+            now: now
+        )
+        XCTAssertEqual(manifest.text, "Voilà la mesure")
+        XCTAssertEqual(manifest.url, "https://example.com/page?x=1")
+        XCTAssertEqual(manifest.imageCount, 2)
+        XCTAssertEqual(manifest.composedText, "Voilà la mesure\nhttps://example.com/page?x=1")
+
+        let entry = try XCTUnwrap(inbox.pending(now: now.addingTimeInterval(60)))
+        XCTAssertEqual(entry.manifest, manifest)
+        XCTAssertEqual(entry.directory.lastPathComponent, manifest.id)
+        let first = try XCTUnwrap(entry.manifest.items.first)
+        XCTAssertEqual(try entry.data(for: first).count, 40)
+        XCTAssertEqual(entry.manifest.items.map(\.byteCount), [40, 50])
+        // Le dossier de travail a disparu : seul le dépôt complet reste.
+        let names = try FileManager.default.contentsOfDirectory(atPath: inbox.root.path)
+        XCTAssertEqual(names, [manifest.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: entry.directory.appendingPathComponent("manifest.json").path))
+    }
+
+    func testShareInboxKeepsTheMostRecentAndRemovesById() throws {
+        let inbox = try makeInbox()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let older = try inbox.write(text: "ancien", url: nil, sources: [], now: now)
+        let newer = try inbox.write(text: "récent", url: nil, sources: [], now: now.addingTimeInterval(120))
+        XCTAssertEqual(inbox.pending(now: now.addingTimeInterval(200))?.id, newer.id)
+        inbox.remove(id: newer.id)
+        XCTAssertEqual(inbox.pending(now: now.addingTimeInterval(200))?.id, older.id)
+        // Un identifiant qui n'en est pas un ne touche à rien.
+        inbox.remove(id: "../\(older.id)")
+        inbox.remove(id: "")
+        XCTAssertEqual(inbox.pending(now: now.addingTimeInterval(200))?.id, older.id)
+    }
+
+    func testShareInboxEnforcesItsLimits() throws {
+        let inbox = try makeInbox()
+        let tenMiB = ShareInbox.maxFileBytes
+        // Dix images passent, onze non.
+        let ten = try (0..<10).map { try makeSource(.image, name: "i\($0).jpg") }
+        XCTAssertNoThrow(try inbox.write(text: nil, url: nil, sources: ten))
+        let eleven = try (0..<11).map { try makeSource(.image, name: "i\($0).jpg") }
+        XCTAssertThrowsError(try inbox.write(text: nil, url: nil, sources: eleven)) {
+            XCTAssertEqual($0 as? ShareInbox.Failure, .tooManyImages)
+        }
+        // Vidéo ou fichier : 10 Mio exactement passe, un octet de plus non.
+        XCTAssertNoThrow(try inbox.write(text: nil, url: nil, sources: [try makeSource(.file, name: "ok.pdf", bytes: tenMiB)]))
+        XCTAssertThrowsError(try inbox.write(text: nil, url: nil, sources: [try makeSource(.video, name: "gros.mp4", bytes: tenMiB + 1)])) {
+            XCTAssertEqual($0 as? ShareInbox.Failure, .fileTooLarge("gros.mp4"))
+        }
+        // Une image a sa propre borne, plus large.
+        XCTAssertNoThrow(try inbox.write(text: nil, url: nil, sources: [try makeSource(.image, name: "photo.heic", bytes: tenMiB + 1)]))
+        XCTAssertThrowsError(try inbox.write(text: nil, url: nil, sources: [try makeSource(.image, name: "enorme.heic", bytes: ShareInbox.maxImageBytes + 1)])) {
+            XCTAssertEqual($0 as? ShareInbox.Failure, .fileTooLarge("enorme.heic"))
+        }
+        // Une seule vidéo ou un seul fichier, jamais mêlé à des images.
+        XCTAssertThrowsError(try inbox.write(text: nil, url: nil, sources: [
+            try makeSource(.file, name: "a.pdf"), try makeSource(.video, name: "b.mp4"),
+        ])) { XCTAssertEqual($0 as? ShareInbox.Failure, .unsupportedCombination) }
+        XCTAssertThrowsError(try inbox.write(text: nil, url: nil, sources: [
+            try makeSource(.image, name: "a.jpg"), try makeSource(.file, name: "b.pdf"),
+        ])) { XCTAssertEqual($0 as? ShareInbox.Failure, .unsupportedCombination) }
+        // Texte : 4 000 caractères au plus (des caractères, pas des octets).
+        XCTAssertNoThrow(try inbox.write(text: String(repeating: "é", count: 4_000), url: nil, sources: []))
+        XCTAssertThrowsError(try inbox.write(text: String(repeating: "é", count: 4_001), url: nil, sources: [])) {
+            XCTAssertEqual($0 as? ShareInbox.Failure, .textTooLong)
+        }
+        // Lien web seulement, et rien du tout ne se dépose pas.
+        XCTAssertThrowsError(try inbox.write(text: nil, url: URL(string: "tel:0102030405"), sources: [])) {
+            XCTAssertEqual($0 as? ShareInbox.Failure, .unsupportedURL)
+        }
+        XCTAssertThrowsError(try inbox.write(text: "   \n", url: nil, sources: [])) {
+            XCTAssertEqual($0 as? ShareInbox.Failure, .empty)
+        }
+        // Un refus ne laisse aucun dossier de travail derrière lui.
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: inbox.root.path).filter { $0.hasPrefix(".tmp-") }
+        XCTAssertTrue(leftovers.isEmpty)
+    }
+
+    func testShareInboxExpiresAfterTwentyFourHours() throws {
+        let inbox = try makeInbox()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let fresh = try inbox.write(text: "frais", url: nil, sources: [try makeSource(.file, name: "f.pdf")], now: now.addingTimeInterval(-23 * 3_600))
+        let stale = try inbox.write(text: "périmé", url: nil, sources: [], now: now.addingTimeInterval(-25 * 3_600))
+        // Un dépôt daté trop loin dans le futur (horloge) ne vaut pas non plus.
+        let future = try inbox.write(text: "futur", url: nil, sources: [], now: now.addingTimeInterval(3_600))
+        XCTAssertEqual(inbox.pending(now: now)?.id, fresh.id)
+        XCTAssertNil(try makeInbox().pending(now: now))
+
+        inbox.purgeExpired(now: now)
+        let remaining = Set(try FileManager.default.contentsOfDirectory(atPath: inbox.root.path))
+        XCTAssertEqual(remaining, [fresh.id])
+        XCTAssertFalse(remaining.contains(stale.id) || remaining.contains(future.id))
+        // Exactement 24 h : expiré.
+        XCTAssertNil(inbox.pending(now: now.addingTimeInterval(3_600)))
+    }
+
+    func testShareInboxPurgeAllEmptiesTheInbox() throws {
+        let inbox = try makeInbox()
+        _ = try inbox.write(text: "a", url: nil, sources: [try makeSource(.image, name: "a.jpg")])
+        _ = try inbox.write(text: "b", url: nil, sources: [])
+        XCTAssertNotNil(inbox.pending())
+        inbox.purgeAll()
+        XCTAssertNil(inbox.pending())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: inbox.root.path))
+        // Purger une boîte absente ne plante pas, et elle se recrée à l'écriture suivante.
+        inbox.purgeAll()
+        inbox.purgeExpired()
+        XCTAssertNoThrow(try inbox.write(text: "c", url: nil, sources: []))
+    }
+
+    func testShareInboxManifestIsTolerant() throws {
+        let inbox = try makeInbox()
+        let id = UUID().uuidString
+        let directory = inbox.root.appendingPathComponent(id, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data("0123456789".utf8).write(to: directory.appendingPathComponent("photo.jpg"))
+        // Version future : clé inconnue, texte et lien absents, un élément d'un
+        // genre inconnu, un élément dont le fichier a disparu, un nom piégé.
+        let json = """
+        {"id":"\(id)","createdAt":1800000000,"futureKey":{"a":1},
+         "items":[
+          {"kind":"image","fileName":"photo.jpg","uti":"public.jpeg","byteCount":10,"extra":true},
+          {"kind":"hologram","fileName":"x.bin","uti":"public.data","byteCount":3},
+          {"kind":"file","fileName":"disparu.pdf","uti":"com.adobe.pdf","byteCount":5},
+          {"kind":"file","fileName":"../manifest.json","uti":"public.data","byteCount":5}
+         ]}
+        """
+        try Data(json.utf8).write(to: directory.appendingPathComponent("manifest.json"))
+        let entry = try XCTUnwrap(inbox.pending(now: Date(timeIntervalSince1970: 1_800_000_100)))
+        XCTAssertNil(entry.manifest.text)
+        XCTAssertNil(entry.manifest.url)
+        XCTAssertEqual(entry.manifest.items.map(\.fileName), ["photo.jpg"])
+
+        // Un manifeste lisible mais incompréhensible est un débris : il part.
+        let broken = inbox.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: broken, withIntermediateDirectories: true)
+        try Data("pas du JSON".utf8).write(to: broken.appendingPathComponent("manifest.json"))
+        // Un dossier sans manifeste aussi, mais pas un nom étranger au dépôt.
+        let headless = inbox.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: headless, withIntermediateDirectories: true)
+        let stranger = inbox.root.appendingPathComponent("autre-chose", isDirectory: true)
+        try FileManager.default.createDirectory(at: stranger, withIntermediateDirectories: true)
+        inbox.purgeExpired(now: Date(timeIntervalSince1970: 1_800_000_100))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: broken.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: headless.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: stranger.path))
+        XCTAssertNotNil(inbox.pending(now: Date(timeIntervalSince1970: 1_800_000_100)))
+    }
+
+    func testShareInboxSanitizesAndDeduplicatesFileNames() throws {
+        let inbox = try makeInbox()
+        let manifest = try inbox.write(text: nil, url: nil, sources: [
+            try makeSource(.image, name: "a.jpg"),
+            try makeSource(.image, name: "a.jpg"),
+            try makeSource(.image, name: "A.JPG"),
+        ])
+        XCTAssertEqual(manifest.items.map(\.fileName), ["a.jpg", "a (2).jpg", "A (3).JPG"])
+        XCTAssertEqual(ShareInbox.sanitizedFileName("../../etc/passwd"), "passwd")
+        XCTAssertEqual(ShareInbox.sanitizedFileName("..caché.png"), "caché.png")
+        XCTAssertEqual(ShareInbox.sanitizedFileName("a:b\\c.txt"), "a_b_c.txt")
+        XCTAssertEqual(ShareInbox.sanitizedFileName(""), "file")
+        XCTAssertLessThanOrEqual(ShareInbox.sanitizedFileName(String(repeating: "x", count: 300) + ".pdf").count, 140)
+        // Le manifeste n'est jamais écrasé par un fichier du même nom.
+        let clash = try inbox.write(text: nil, url: nil, sources: [try makeSource(.file, name: "manifest.json")])
+        XCTAssertEqual(clash.items.first?.fileName, "manifest (2).json")
+        XCTAssertNotNil(inbox.pending())
+    }
+
+    func testShareInboxOnlySweepsStaleWorkFolders() throws {
+        let inbox = try makeInbox()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        try FileManager.default.createDirectory(at: inbox.root, withIntermediateDirectories: true)
+        let old = inbox.root.appendingPathComponent(".tmp-\(Int(now.timeIntervalSince1970) - 7_200)-\(UUID().uuidString)")
+        let current = inbox.root.appendingPathComponent(".tmp-\(Int(now.timeIntervalSince1970) - 60)-\(UUID().uuidString)")
+        for url in [old, current] { try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
+        inbox.purgeExpired(now: now)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: old.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: current.path))
+    }
+
+    func testShareKindsAreClassifiedFromTheirTypeIdentifier() {
+        XCTAssertEqual(ShareInbox.Kind.classify(typeIdentifier: "public.heic"), .image)
+        XCTAssertEqual(ShareInbox.Kind.classify(typeIdentifier: "public.png"), .image)
+        XCTAssertEqual(ShareInbox.Kind.classify(typeIdentifier: "com.apple.quicktime-movie"), .video)
+        XCTAssertEqual(ShareInbox.Kind.classify(typeIdentifier: "com.adobe.pdf"), .file)
+        XCTAssertEqual(ShareInbox.Kind.classify(typeIdentifier: "inconnu.type"), .file)
+    }
+
+    private func shareManifest(text: String? = nil, url: String? = nil, _ items: [ShareInbox.Kind] = []) -> ShareInbox.Manifest {
+        ShareInbox.Manifest(
+            id: UUID().uuidString, createdAt: Date(), text: text, url: url,
+            items: items.enumerated().map { ShareInbox.Item(kind: $1, fileName: "f\($0)", uti: "public.data", byteCount: 1) }
+        )
+    }
+
+    func testFeedIsGreyedOutForVideosFilesAndSeveralImages() {
+        XCTAssertNil(ShareDestinationPolicy.feedBlocker(for: shareManifest(text: "salut")))
+        XCTAssertNil(ShareDestinationPolicy.feedBlocker(for: shareManifest(url: "https://example.com")))
+        XCTAssertNil(ShareDestinationPolicy.feedBlocker(for: shareManifest(text: "légende", [.image])))
+        XCTAssertEqual(ShareDestinationPolicy.feedBlocker(for: shareManifest([.video])), .videoOrFile)
+        XCTAssertEqual(ShareDestinationPolicy.feedBlocker(for: shareManifest(text: "doc", [.file])), .videoOrFile)
+        XCTAssertEqual(ShareDestinationPolicy.feedBlocker(for: shareManifest([.image, .image])), .severalImages)
+    }
+
+    func testEncryptedConversationsOnlyAcceptText() {
+        let text = shareManifest(text: "salut", url: "https://example.com")
+        let photo = shareManifest(text: "légende", [.image])
+        let file = shareManifest([.file])
+        // Non chiffrée : tout passe.
+        for manifest in [text, photo, file] {
+            XCTAssertTrue(ShareDestinationPolicy.conversationAccepts(manifest, toEncrypted: false, route: .plain))
+        }
+        // Chiffrée (v1 ou v2) : le texte seulement.
+        for route in [EncryptedConversationSurfaces.ForwardRoute.legacyEncrypted, .v2] {
+            XCTAssertTrue(ShareDestinationPolicy.conversationAccepts(text, toEncrypted: true, route: route))
+            XCTAssertFalse(ShareDestinationPolicy.conversationAccepts(photo, toEncrypted: true, route: route))
+            XCTAssertFalse(ShareDestinationPolicy.conversationAccepts(file, toEncrypted: true, route: route))
+        }
+        // Chiffrée v2 fermée dans cette version : rien n'y part.
+        XCTAssertFalse(ShareDestinationPolicy.conversationAccepts(text, toEncrypted: true, route: .unavailable))
+    }
+
+    func testSharedTextIsAppendedToAnExistingDraft() {
+        XCTAssertEqual(ReceivedShareSheet.mergedDraft(existing: nil, shared: "https://a.fr"), "https://a.fr")
+        XCTAssertEqual(ReceivedShareSheet.mergedDraft(existing: "  \n", shared: "https://a.fr"), "https://a.fr")
+        XCTAssertEqual(ReceivedShareSheet.mergedDraft(existing: "Regarde", shared: "https://a.fr"), "Regarde\nhttps://a.fr")
+        // Le même partage reçu deux fois ne double pas le brouillon.
+        XCTAssertEqual(ReceivedShareSheet.mergedDraft(existing: "Regarde\nhttps://a.fr", shared: "https://a.fr"), "Regarde\nhttps://a.fr")
+    }
+
     private static let mapJSON = """
     {"timestamp":"2026-05-11T10:00:00.000Z","friends":[],"photos":[],"validations":[],"sessions":[],"coveragePoints":[],"speedtests":[{"id":"sp1","userId":"u1","latitude":48.85,"longitude":2.35,"averageSpeed":210,"uploadAvg":42,"pingAvg":18,"timestamp":"2026-05-11T10:00:00.000Z","networkType":"WIFI","mobileOperator":"SignalQuest"}],"photosCount":0,"validationsCount":0,"sessionsCount":0,"coveragePointsCount":0,"speedtestsCount":1,"rawCoveragePointsCount":0,"logicalCoveragePointsCount":0}
     """

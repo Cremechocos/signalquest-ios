@@ -980,6 +980,46 @@
         }
       }
     },
+    "%lld image" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld image"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld images"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld image"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld images"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld jours" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3835,6 +3875,22 @@
         }
       }
     },
+    "Aucune conversation ne peut recevoir ce partage." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No conversation can receive this share."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune conversation ne peut recevoir ce partage."
+          }
+        }
+      }
+    },
     "Aucune des sessions de cette page n’a de position. Passe à la page suivante." : {
       "localizations" : {
         "en" : {
@@ -4493,6 +4549,22 @@
         }
       }
     },
+    "Ce texte est trop long : 4 000 caractères au plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This text is too long: 4,000 characters at most."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce texte est trop long : 4 000 caractères au plus."
+          }
+        }
+      }
+    },
     "Cellules captées" : {
       "localizations" : {
         "en" : {
@@ -4603,6 +4675,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications »."
+          }
+        }
+      }
+    },
+    "Cette image dépasse 20 Mo." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This image is over 20 MB."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette image dépasse 20 Mo."
           }
         }
       }
@@ -4959,6 +5047,22 @@
         }
       }
     },
+    "Choisis où le déposer. Rien ne part sans ton accord." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose where to put it. Nothing is sent without your approval."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis où le déposer. Rien ne part sans ton accord."
+          }
+        }
+      }
+    },
     "Choisis une conversation" : {
       "localizations" : {
         "en" : {
@@ -5152,6 +5256,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code indisponible. Crée une nouvelle demande."
+          }
+        }
+      }
+    },
+    "Coller" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coller"
           }
         }
       }
@@ -5833,6 +5953,22 @@
         }
       }
     },
+    "Dans le fil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In the feed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans le fil"
+          }
+        }
+      }
+    },
     "Dans les messages" : {
       "localizations" : {
         "en" : {
@@ -5845,6 +5981,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dans les messages"
+          }
+        }
+      }
+    },
+    "Dans une conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In a conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans une conversation"
           }
         }
       }
@@ -6135,6 +6287,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déplacer ici"
+          }
+        }
+      }
+    },
+    "Dépose ici pour joindre à la conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop here to attach to the conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dépose ici pour joindre à la conversation"
           }
         }
       }
@@ -7442,6 +7610,22 @@
         }
       }
     },
+    "Ignorer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorer"
+          }
+        }
+      }
+    },
     "Il disparaît aussi du site, et l'équipe ne pourra plus te répondre." : {
       "localizations" : {
         "en" : {
@@ -7707,6 +7891,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de créer la clé de récupération."
+          }
+        }
+      }
+    },
+    "Impossible de lire ce partage. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t read this share. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de lire ce partage. Réessaie."
           }
         }
       }
@@ -8865,6 +9065,22 @@
         }
       }
     },
+    "Le presse-papiers ne contient rien à coller." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The clipboard has nothing to paste."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le presse-papiers ne contient rien à coller."
+          }
+        }
+      }
+    },
     "Le problème revient ? Réponds ici…" : {
       "localizations" : {
         "en" : {
@@ -9118,6 +9334,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les antennes que tu as reliées à un site, ici et sur Android."
+          }
+        }
+      }
+    },
+    "Les conversations chiffrées ne reçoivent que du texte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted conversations only receive text."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les conversations chiffrées ne reçoivent que du texte."
           }
         }
       }
@@ -9486,6 +9718,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les supports modifiés par l’ANFR, sur la carte"
+          }
+        }
+      }
+    },
+    "Lien web : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Web link: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lien web : %@"
           }
         }
       }
@@ -11134,6 +11382,22 @@
         }
       }
     },
+    "Partage reçu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared content received"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partage reçu"
+          }
+        }
+      }
+    },
     "Partager la photo" : {
       "localizations" : {
         "en" : {
@@ -11402,6 +11666,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photo indisponible. Réessaie avec du réseau."
+          }
+        }
+      }
+    },
+    "Photo jointe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attached photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo jointe"
           }
         }
       }
@@ -11899,6 +12179,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Publication introuvable ou supprimée."
+          }
+        }
+      }
+    },
+    "Publier dans le fil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Post to the feed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publier dans le fil"
           }
         }
       }
@@ -12526,6 +12822,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer la capture"
+          }
+        }
+      }
+    },
+    "Retirer la pièce jointe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove the attachment"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer la pièce jointe"
           }
         }
       }
@@ -14980,6 +15292,22 @@
         }
       }
     },
+    "Tu peux joindre 10 éléments au plus à la fois." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can attach up to 10 items at a time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu peux joindre 10 éléments au plus à la fois."
+          }
+        }
+      }
+    },
     "Type %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15250,6 +15578,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Une idée"
+          }
+        }
+      }
+    },
+    "Une publication ne porte ni vidéo ni fichier." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A post can’t carry a video or a file."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une publication ne porte ni vidéo ni fichier."
+          }
+        }
+      }
+    },
+    "Une publication ne porte qu’une seule photo." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A post carries only one photo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une publication ne porte qu’une seule photo."
           }
         }
       }

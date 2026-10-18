@@ -238,6 +238,21 @@ final class ComposerViewModel: ObservableObject {
         }
     }
 
+    /// Contenu partagé depuis une autre app. Le texte s'ajoute au brouillon déjà
+    /// là au lieu de l'écraser.
+    func prefill(with shared: ComposerSharedContent) {
+        guard !isEditing else { return }
+        if !shared.text.isEmpty {
+            text = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? shared.text : text + "\n\n" + shared.text
+        }
+        if let data = shared.imageData, let image = ImagePipeline.downsample(data: data, maxPixel: 1600) {
+            previewImage = image
+            pickedImageData = data
+        } else if shared.imageData != nil {
+            errorMessage = String(localized: "Photo illisible")
+        }
+    }
+
     func loadPickerImage() async {
         guard let item = selectedItem else { return }
         do {
@@ -407,6 +422,14 @@ final class ComposerViewModel: ObservableObject {
     }
 }
 
+/// Contenu reçu par « Partager vers SignalQuest » et déposé dans le composer :
+/// le texte (lien compris) et UNE photo, la seule qu'une publication porte.
+struct ComposerSharedContent: Identifiable {
+    let id = UUID()
+    let text: String
+    let imageData: Data?
+}
+
 /// Pièce jointe choisie avant d'ouvrir le composer (ligne « Quoi de neuf ? »
 /// du fil).
 enum ComposerStartAttachment: String {
@@ -431,7 +454,8 @@ struct ComposerSheet: View {
         service: SocialFeedServicing,
         userService: UserServicing? = nil,
         editing: UnifiedSocialFeedItem? = nil,
-        startingWith: ComposerStartAttachment? = nil
+        startingWith: ComposerStartAttachment? = nil,
+        sharing: ComposerSharedContent? = nil
     ) {
         self.startingWith = editing == nil ? startingWith : nil
         // Créé une seule fois, dans l'autoclosure : la vue parente réévalue
@@ -440,6 +464,7 @@ struct ComposerSheet: View {
         _model = StateObject(wrappedValue: {
             let model = ComposerViewModel(service: service, userService: userService)
             if let editing { model.beginEditing(editing) }
+            if let sharing { model.prefill(with: sharing) }
             return model
         }())
     }
