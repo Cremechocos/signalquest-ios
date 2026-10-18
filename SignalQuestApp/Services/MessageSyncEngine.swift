@@ -11,16 +11,19 @@ enum MessageSyncLog {
 enum SyncTrigger: Sendable, Equatable {
     case polling
     case serverEvent
-    /// Réaction, vote, accusé de lecture, édition ou suppression : le delta ne
-    /// porte pas ces changements, la conversation relit sa dernière page (SOC-05).
+    /// Réaction, vote, édition ou suppression : le delta ne porte pas ces
+    /// changements, la conversation relit sa dernière page (SOC-05).
     case stateEvent
+    /// Accusé « distribué » ou « lu » d'un participant : seuls les accusés sont
+    /// relus, jamais les messages. `userId` est l'auteur annoncé, s'il l'est.
+    case receiptsEvent(userId: String?)
     /// Auteurs annoncés par l'événement : le serveur le renvoie aussi à celui qui écrit.
     case typingEvent(userIds: [String])
     case viewingEvent
 
     /// Événements relayés par le flux de la conversation.
     static let relayedEvents: Set<String> = [
-        "update", "message", "read_state", "feature_sync", "thread_reply",
+        "update", "message", "read_state", "delivered_state", "feature_sync", "thread_reply",
         "poll_created", "poll_voted", "poll_closed",
         "task_created", "task_updated", "task_completed",
         "mention", "typing", "viewing", "reaction"
@@ -30,8 +33,11 @@ enum SyncTrigger: Sendable, Equatable {
     /// message déjà affiché plutôt que d'en ajouter un.
     private static let stateTypes: Set<String> = [
         "message_updated", "message_reaction", "reaction", "message_edited", "message_deleted",
-        "message_pinned", "message_unpinned", "poll_created", "poll_voted", "poll_closed", "read_state"
+        "message_pinned", "message_unpinned", "poll_created", "poll_voted", "poll_closed"
     ]
+
+    /// Types d'événement qui avancent l'accusé « distribué » ou « lu » d'un participant.
+    private static let receiptTypes: Set<String> = ["read_state", "delivered_state"]
 
     /// Le serveur envoie un événement nommé (ex. `poll_voted`) PUIS un `update`
     /// générique portant le même `type` : on lit le `type` du payload pour ne pas
@@ -46,15 +52,21 @@ enum SyncTrigger: Sendable, Equatable {
         return (object["userId"] as? String).map { [$0] } ?? []
     }
 
+    var isReceiptsEvent: Bool {
+        if case .receiptsEvent = self { return true }
+        return false
+    }
+
     static func from(event: String, data: String) -> SyncTrigger {
         let name = event.lowercased()
         if name == "typing" { return .typingEvent(userIds: typingUserIds(in: data)) }
         if name == "viewing" { return .viewingEvent }
+        let object = data.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        if receiptTypes.contains(name) || receiptTypes.contains((object?["type"] as? String)?.lowercased() ?? "") {
+            return .receiptsEvent(userId: object?["userId"] as? String)
+        }
         if stateTypes.contains(name) { return .stateEvent }
-        if let payload = data.data(using: .utf8),
-           let object = try? JSONSerialization.jsonObject(with: payload) as? [String: Any],
-           let type = (object["type"] as? String)?.lowercased(),
-           stateTypes.contains(type) {
+        if let type = (object?["type"] as? String)?.lowercased(), stateTypes.contains(type) {
             return .stateEvent
         }
         return .serverEvent
@@ -112,7 +124,7 @@ struct MessageSyncEngine: Sendable {
                     let trigger = SyncTrigger.from(event: frame.event, data: frame.data)
                     // Seuls les événements serveur « rafraîchissent » le compteur de
                     // repli (pas typing/viewing).
-                    if trigger == .serverEvent || trigger == .stateEvent {
+                    if trigger == .serverEvent || trigger == .stateEvent || trigger.isReceiptsEvent {
                         lastRefresh.withLock { $0 = clock.now }
                     }
                     let now = clock.now

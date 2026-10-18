@@ -95,6 +95,8 @@ final class AppServices: ObservableObject {
     let nearbyQuality: NearbyNetworkQualityServicing
     let photos: PhotoServicing
     let messages: MessagesServicing
+    /// Accusés « distribué » déjà envoyés, pour ne jamais renvoyer le même message.
+    let deliveryAcks = DeliveryAcknowledger()
     /// Sessions de partage GPS/radio initiées depuis les conversations. Unique
     /// au niveau application pour que l'envoi continue quand on quitte l'écran
     /// de discussion, tout en restant strictement limité au premier plan.
@@ -280,6 +282,8 @@ final class AppServices: ObservableObject {
         // Même règle que la liste : son propre dernier message ne compte pas.
         let userId = LocalAccountScope.currentUserId
         let unread = conversations.filter { $0.isUnread(currentUserId: userId) }.count
+        // Messages reçus : l'expéditeur les voit « Distribués » sans attendre l'ouverture de la conversation.
+        Task { await deliveryAcks.acknowledgeLatest(of: conversations, currentUserId: userId, using: messages) }
         guard inboxBadgeState.publish(unreadCount: unread, for: ticket) else { return }
         unreadConversations = inboxBadgeState.unreadCount
     }
@@ -311,6 +315,7 @@ final class AppServices: ObservableObject {
     func resetAccountPresentationState() {
         stopMeasurementSessions()
         inboxBadgeState.reset()
+        Task { await deliveryAcks.reset() }
         unreadConversations = 0
         notificationBadgeState.reset()
         unreadNotifications = 0

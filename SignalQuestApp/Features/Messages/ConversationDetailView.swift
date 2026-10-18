@@ -31,6 +31,11 @@ struct ConversationDetailView: View {
     @State private var olderCursor: String?
     @State private var isLoadingOlder = false
     @State private var readReceipts: [ReadReceipt] = []
+    /// Accusés « distribué » des autres membres, et vrai dès que `/receipts` a répondu :
+    /// avant, seul le « Lu » de la page v1 s'affiche, comme auparavant.
+    @State private var deliveryReceipts: [DeliveryReceipt] = []
+    @State private var receiptsKnown = false
+    @State private var receiptsTask: Task<Void, Never>?
     // PERF-MSG-01 : le texte saisi vit dans `MessageComposerBar` (sous-vue) pour que la
     // frappe n'invalide plus le corps de cette vue (et donc la liste des messages) à
     // chaque caractère. Le parent y POUSSE du texte (pré-remplissage édition, vidage
@@ -746,6 +751,7 @@ struct ConversationDetailView: View {
             if usesV2 {
                 await loadV2()
                 guard !Task.isCancelled else { return }
+                await refreshReceipts()
                 await markRead()
                 // Relève en direct (événements du serveur, relevé périodique) et
                 // présence à l'écran, comme en v1 : le serveur ne pousse rien à
@@ -2069,50 +2075,108 @@ struct ConversationDetailView: View {
 
     private static let typingRowId = "typing-indicator"
 
-    /// Qui a lu `message` (mon dernier message) : les autres membres dont la lecture est postérieure.
-    private func receiptReaders(for message: MessageItem) -> [ReadReceipt] {
-        guard let date = message.createdAt else { return [] }
-        return readReceipts.filter { receipt in
-            receipt.userId != currentUserId && (receipt.lastReadAt ?? .distantPast) >= date
-        }
+    /// Statut de `message` (mon dernier message) : Envoyé, Distribué ou Lu. Tant que `/receipts`
+    /// n'a pas répondu, seul le « Lu » existant s'affiche ; derrière une bulle locale encore en
+    /// file, « Envoyé » et « Distribué » seraient trompeurs et restent masqués.
+    private func receiptStatus(for message: MessageItem) -> OwnMessageReceiptStatus? {
+        guard let date = message.createdAt else { return nil }
+        let status = OwnMessageReceiptStatus.resolve(
+            messageDate: date,
+            isGroup: conversation.isGroup,
+            currentUserId: currentUserId,
+            participantIds: conversation.participants.map(\.userId),
+            readReceipts: readReceipts,
+            deliveryReceipts: deliveryReceipts
+        )
+        guard status == .sent || status == .delivered else { return status }
+        if !receiptsKnown { return nil }
+        let pendingMineAfter = messages.last(where: { $0.senderId == currentUserId })?.id.hasPrefix("local-") == true
+        return pendingMineAfter ? nil : status
     }
 
-    /// Change quand le pied « Lu / Vu par » apparaît ou se modifie : sert à rester en bas de la liste.
+    /// Change quand le pied « Envoyé / Distribué / Lu » apparaît ou se modifie : sert à rester en bas de la liste.
     private var receiptFooterKey: String? {
-        guard let last = messages.last(where: { $0.senderId == currentUserId && !$0.id.hasPrefix("local-") }) else { return nil }
-        let readers = receiptReaders(for: last)
-        return readers.isEmpty ? nil : "\(last.id)|\(readers.count)"
+        guard let last = messages.last(where: { $0.senderId == currentUserId && !$0.id.hasPrefix("local-") }),
+              let status = receiptStatus(for: last) else { return nil }
+        return "\(last.id)|\(status)"
     }
 
     @ViewBuilder
     private func readReceiptFooter(for lastMine: MessageItem) -> some View {
-        if lastMine.createdAt != nil {
-            let seenBy = receiptReaders(for: lastMine)
-            if !seenBy.isEmpty {
-                // À deux : « Lu » et la double coche ; en groupe : qui a vu.
-                Group {
-                    if conversation.isGroup {
-                        Text("Vu par \(seenBy.compactMap { $0.name }.joined(separator: ", "))")
-                    } else {
-                        HStack(spacing: 4) {
-                            ZStack(alignment: .leading) {
-                                Image(systemName: "checkmark")
-                                Image(systemName: "checkmark").offset(x: 5)
-                            }
-                            .font(.system(size: 10, weight: .bold))
-                            .padding(.trailing, 5)
-                            .accessibilityHidden(true)
-                            Text("Lu")
+        if let status = receiptStatus(for: lastMine) {
+            // Une coche pour « Envoyé », deux pour « Distribué » et « Lu » (accentuée) ;
+            // en groupe, un lu partiel dit qui a vu. La seconde coche garde sa place
+            // à « Envoyé » : le pied ne change pas de largeur.
+            Group {
+                if case .seenBy(let names) = status {
+                    Text("Vu par \(names.joined(separator: ", "))")
+                } else {
+                    HStack(spacing: 4) {
+                        ZStack(alignment: .leading) {
+                            Image(systemName: "checkmark")
+                            Image(systemName: "checkmark").offset(x: 5).opacity(status == .sent ? 0 : 1)
+                        }
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.trailing, 5)
+                        .accessibilityHidden(true)
+                        switch status {
+                        case .delivered: Text("Distribué")
+                        case .read: Text("Lu")
+                        default: Text("Envoyé")
                         }
                     }
                 }
-                .font(SQType.micro)
-                .foregroundStyle(SQColor.labelSecondary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.top, SQSpace.xs)
-                .accessibilityIdentifier("conversation.readReceipt")
             }
+            .font(SQType.micro)
+            .foregroundStyle(status == .read ? SQColor.accentInk : SQColor.labelSecondary)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.top, SQSpace.xs)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(receiptAccessibilityLabel(status))
+            .accessibilityIdentifier("conversation.readReceipt")
         }
+    }
+
+    private func receiptAccessibilityLabel(_ status: OwnMessageReceiptStatus) -> String {
+        switch status {
+        case .sent: return String(localized: "Message envoyé")
+        case .delivered: return String(localized: "Message distribué")
+        case .read: return String(localized: "Message lu")
+        case .seenBy(let names): return String(localized: "Vu par \(names.joined(separator: ", "))")
+        }
+    }
+
+    /// Relit les accusés des autres membres (`/receipts`, v1 et v2). Faux si la route répond
+    /// une erreur : les accusés déjà là restent, rien ne casse.
+    @discardableResult
+    private func refreshReceipts() async -> Bool {
+        guard !AppEnvironment.usesDemoData,
+              let fresh = try? await service.receipts(conversationId: conversation.id) else { return false }
+        if fresh.readReceipts != readReceipts { readReceipts = fresh.readReceipts }
+        if fresh.deliveryReceipts != deliveryReceipts { deliveryReceipts = fresh.deliveryReceipts }
+        receiptsKnown = true
+        return true
+    }
+
+    /// Un accusé d'un autre membre est arrivé par le flux : on relit `/receipts` après
+    /// 400 ms (les événements se suivent par rafales), sans relire les messages. Si la
+    /// route échoue, une conversation v1 relit la dernière page, comme avant.
+    private func scheduleReceiptsRefresh() {
+        receiptsTask?.cancel()
+        receiptsTask = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            if await refreshReceipts() { return }
+            if !usesV2 { await refreshLatestPageState() }
+        }
+    }
+
+    /// Accuse réception du plus récent message d'autrui d'une conversation v1 ; une seule
+    /// fois par message, échec silencieux. La v2 est accusée depuis la liste (id d'enveloppe).
+    private func acknowledgeDelivery() async {
+        guard !AppEnvironment.usesDemoData, !usesV2, let currentUserId,
+              let last = messages.last(where: { !$0.id.hasPrefix("local-") && $0.senderId != currentUserId }) else { return }
+        await services.deliveryAcks.acknowledge(conversationId: conversation.id, messageId: last.id, using: service)
     }
 
     @ViewBuilder
@@ -2393,12 +2457,14 @@ struct ConversationDetailView: View {
             let localPending = messages.filter { pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil }
             messages = Self.normalized(page.messages + localPending + (await restoredFailedMessages()) + (await restoredPendingAttachments()))
             olderCursor = (page.hasMore ?? (page.nextCursor != nil)) ? page.nextCursor : nil
-            readReceipts = page.readReceipts ?? []
+            if !receiptsKnown { readReceipts = page.readReceipts ?? [] }
             errorMessage = nil
             advanceLastSync(with: page.messages)
             await refreshE2EEState()
             await decryptLoadedMessages()
             refreshPolls()
+            await acknowledgeDelivery()
+            await refreshReceipts()
         } catch {
             errorMessage = error.userFacingMessage
         }
@@ -2533,8 +2599,12 @@ struct ConversationDetailView: View {
                     }
                 case .viewingEvent:
                     await refreshViewers()
+                case .receiptsEvent(let userId):
+                    // Notre propre « lu » ou « distribué » revient aussi par le flux : sans objet.
+                    if let userId, userId == currentUserId { continue }
+                    scheduleReceiptsRefresh()
                 case .stateEvent:
-                    // Le `read_state` que provoque notre propre « lu » revient dans la seconde :
+                    // Les événements d'état que provoque notre propre « lu » reviennent dans la seconde :
                     // on laisse passer ce délai plutôt que de relire 80 messages pour rien.
                     let sinceOwnRead = Date().timeIntervalSince(readGate.lastMarkReadAt)
                     if sinceOwnRead < 1 { try? await Task.sleep(nanoseconds: UInt64((1 - sinceOwnRead) * 1_000_000_000)) }
@@ -2556,6 +2626,8 @@ struct ConversationDetailView: View {
     private func stopSync() {
         syncTask?.cancel()
         syncTask = nil
+        receiptsTask?.cancel()
+        receiptsTask = nil
     }
 
     /// Présence « actif sur la conversation » (parité Android) : on signale au
@@ -2628,6 +2700,7 @@ struct ConversationDetailView: View {
             if !confirmed.isEmpty { messages.removeAll { confirmed.contains($0.id) } }
             refreshPolls()
             await loadPinned()
+            await acknowledgeDelivery()
             await markRead()
         } catch {
             MessageSyncLog.logger.error("delta erreur: \(error.localizedDescription, privacy: .public)")
@@ -3266,7 +3339,7 @@ struct ConversationDetailView: View {
             // N'assigner que si quelque chose a changé : une liste identique redessinait tout le fil.
             let merged = Self.normalized(messages + fresh)
             if merged != messages { messages = merged }
-            if let receipts = page.readReceipts, receipts != readReceipts { readReceipts = receipts }
+            if !receiptsKnown, let receipts = page.readReceipts, receipts != readReceipts { readReceipts = receipts }
             advanceLastSync(with: fresh)
             await decryptLoadedMessages()
             let confirmed = localIdsConfirmed(by: fresh.filter { !knownIds.contains($0.id) })

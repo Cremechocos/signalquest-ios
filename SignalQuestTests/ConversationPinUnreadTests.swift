@@ -217,6 +217,84 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertNil(model.conversations.first?.pinnedAt, "L'épingle revient à son état")
     }
 
+    func testDeliveredAndReceiptsUseTheServerRoutes() async throws {
+        var calls: [(method: String?, path: String?, body: [String: Any])] = []
+        MockURLProtocol.requestHandler = { request in
+            let body = (try? JSONSerialization.jsonObject(with: Self.requestBody(request) ?? Data())) as? [String: Any] ?? [:]
+            calls.append((request.httpMethod, request.url?.path, body))
+            let json = request.url?.path.hasSuffix("/receipts") == true
+                ? #"{"readReceipts":[],"deliveryReceipts":[{"userId":"u2","name":"Léa","lastDeliveredAt":"2026-10-18T10:00:00.000Z"}]}"#
+                : #"{"ok":true,"deliveredAt":null}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(json.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("delivered-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let service = MessagesService(api: api)
+
+        try await service.markDelivered(conversationId: "conv-1", messageId: "m-9")
+        let receipts = try await service.receipts(conversationId: "conv-1")
+
+        XCTAssertEqual(calls.count, 2)
+        XCTAssertEqual(calls[0].method, "POST")
+        XCTAssertEqual(calls[0].path, "/api/messages/conversations/conv-1/delivered")
+        XCTAssertEqual(calls[0].body["messageId"] as? String, "m-9")
+        XCTAssertEqual(calls[1].method, "GET")
+        XCTAssertEqual(calls[1].path, "/api/messages/conversations/conv-1/receipts")
+        XCTAssertEqual(receipts.deliveryReceipts.map(\.userId), ["u2"])
+        XCTAssertNotNil(receipts.deliveryReceipts.first?.lastDeliveredAt)
+    }
+
+    /// Un seul accusé par message, jamais d'id local, et un échec (route absente) reste silencieux.
+    func testDeliveryAcknowledgerSendsEachMessageOnceAndSwallowsFailures() async throws {
+        var bodies: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            let body = (try? JSONSerialization.jsonObject(with: Self.requestBody(request) ?? Data())) as? [String: Any] ?? [:]
+            bodies.append("\(request.url?.path ?? "")|\(body["messageId"] as? String ?? "")")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data(#"{"error":"NOT_FOUND"}"#.utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("acknowledger-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let service = MessagesService(api: api)
+        let acknowledger = DeliveryAcknowledger()
+
+        await acknowledger.acknowledge(conversationId: "c1", messageId: "m1", using: service)
+        await acknowledger.acknowledge(conversationId: "c1", messageId: "m1", using: service)
+        await acknowledger.acknowledge(conversationId: "c1", messageId: "local-1", using: service)
+        await acknowledger.acknowledge(conversationId: "c2", messageId: "m1", using: service)
+        await acknowledger.acknowledge(conversationId: "c1", messageId: "m2", using: service)
+
+        XCTAssertEqual(bodies, [
+            "/api/messages/conversations/c1/delivered|m1",
+            "/api/messages/conversations/c2/delivered|m1",
+            "/api/messages/conversations/c1/delivered|m2"
+        ])
+    }
+
+    func testOnlyUnreadMessagesFromOthersAreAcknowledgedFromTheList() throws {
+        let now = Date()
+        let fromOther = conversation("a", lastMessageAt: now, senderId: "other")
+        let alreadyRead = conversation("b", lastMessageAt: now, lastReadAt: now, senderId: "other")
+        let mine = conversation("c", lastMessageAt: now, senderId: "me")
+        let v2 = try JSONDecoder.signalQuest.decode(MessageConversation.self, from: Data(#"""
+        {"id":"d","isGroup":false,"participants":[],"e2eeV2":{"lastMessage":{"envelopeId":"envelope_7","sequence":"4","senderUserId":"other","senderDeviceId":"device_1","serverTimeMs":"1791190800000"},"unreadCount":"1"}}
+        """#.utf8))
+        let list = [fromOther, alreadyRead, mine, v2]
+
+        let acks = DeliveryAcknowledger.latestIncoming(in: list, currentUserId: "me")
+        XCTAssertEqual(acks.map { "\($0.0)=\($0.1)" }, ["a=m-a", "d=envelope_7"])
+        XCTAssertTrue(DeliveryAcknowledger.latestIncoming(in: list, currentUserId: nil).isEmpty)
+    }
+
     private func conversation(
         _ id: String,
         lastMessageAt: Date?,

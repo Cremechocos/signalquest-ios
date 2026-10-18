@@ -428,6 +428,77 @@ struct ReadReceipt: Codable, Equatable {
     let lastReadAt: Date?
 }
 
+/// Dernier message reçu par un autre participant (max du distribué et du lu côté serveur).
+struct DeliveryReceipt: Codable, Equatable {
+    let userId: String
+    let name: String?
+    let lastDeliveredAt: Date?
+}
+
+/// Réponse de `GET …/conversations/{id}/receipts` : les autres participants seulement.
+/// Une clé absente vaut une liste vide.
+struct ConversationReceipts: Decodable, Equatable {
+    let readReceipts: [ReadReceipt]
+    let deliveryReceipts: [DeliveryReceipt]
+
+    private enum CodingKeys: String, CodingKey { case readReceipts, deliveryReceipts }
+
+    init(readReceipts: [ReadReceipt] = [], deliveryReceipts: [DeliveryReceipt] = []) {
+        self.readReceipts = readReceipts
+        self.deliveryReceipts = deliveryReceipts
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        readReceipts = (try? c.decodeIfPresent([ReadReceipt].self, forKey: .readReceipts)) ?? []
+        deliveryReceipts = (try? c.decodeIfPresent([DeliveryReceipt].self, forKey: .deliveryReceipts)) ?? []
+    }
+}
+
+/// Statut affiché sous mon dernier message : Envoyé, Distribué ou Lu.
+enum OwnMessageReceiptStatus: Equatable {
+    case sent
+    case delivered
+    case read
+    /// Groupe, lecture partielle : les prénoms de ceux qui l'ont lu.
+    case seenBy([String])
+
+    /// Calcul pur. `participantIds` sert à savoir si TOUS les autres ont reçu ou lu
+    /// (groupe) ; sans lui, les identifiants des accusés tiennent lieu d'autres membres.
+    /// Un lu vaut aussi un distribué : sans `deliveryReceipts`, seul le lu avance le statut.
+    static func resolve(
+        messageDate: Date,
+        isGroup: Bool,
+        currentUserId: String?,
+        participantIds: [String],
+        readReceipts: [ReadReceipt],
+        deliveryReceipts: [DeliveryReceipt]
+    ) -> OwnMessageReceiptStatus {
+        let readers = readReceipts.filter {
+            $0.userId != currentUserId && ($0.lastReadAt ?? .distantPast) >= messageDate
+        }
+        let readerIds = Set(readers.map(\.userId))
+        let deliveredIds = readerIds.union(
+            deliveryReceipts
+                .filter { $0.userId != currentUserId && ($0.lastDeliveredAt ?? .distantPast) >= messageDate }
+                .map(\.userId)
+        )
+        guard isGroup else {
+            if !readerIds.isEmpty { return .read }
+            return deliveredIds.isEmpty ? .sent : .delivered
+        }
+        var others = Set(participantIds).subtracting([currentUserId].compactMap { $0 })
+        if others.isEmpty {
+            others = Set(readReceipts.map(\.userId) + deliveryReceipts.map(\.userId)).subtracting([currentUserId].compactMap { $0 })
+        }
+        if !others.isEmpty, others.isSubset(of: readerIds) { return .read }
+        let names = readers.compactMap(\.name)
+        if !names.isEmpty { return .seenBy(names) }
+        if !others.isEmpty, others.isSubset(of: deliveredIds) { return .delivered }
+        return .sent
+    }
+}
+
 struct MessageAttachment: Decodable, Identifiable, Equatable {
     let id: String?
     let kind: String

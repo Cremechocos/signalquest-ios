@@ -76,6 +76,10 @@ protocol MessagesServicing: Sendable {
     /// Lit jusqu'au message le plus récent, v1 et v2 (lot serveur A7) : une
     /// conversation v2 n'a pas d'identifiant de message v1 à donner.
     func markReadToLatest(conversationId: String) async throws
+    /// Accuse réception du message d'autrui le plus récent (v1 : id de message, v2 : id d'enveloppe).
+    func markDelivered(conversationId: String, messageId: String) async throws
+    /// Accusés « distribué » et « lu » des autres participants, v1 comme v2.
+    func receipts(conversationId: String) async throws -> ConversationReceipts
     /// Remet la conversation en non lu pour soi (plan 3, vague 2).
     func markUnread(conversationId: String) async throws
     /// Épingle ou désépingle la conversation pour soi ; renvoie la date d'épinglage.
@@ -177,6 +181,39 @@ extension MessagesServicing {
             e2ee: e2ee,
             ttlSeconds: ttlSeconds
         )
+    }
+}
+
+/// Envoie l'accusé « distribué » une seule fois par message : le dernier id envoyé
+/// est gardé par conversation. Un échec (route absente, réseau) reste silencieux et
+/// ne se rejoue pas pour le même message.
+actor DeliveryAcknowledger {
+    private var lastSent: [String: String] = [:]
+
+    func acknowledge(conversationId: String, messageId: String, using service: MessagesServicing) async {
+        guard !messageId.hasPrefix("local-"), lastSent[conversationId] != messageId else { return }
+        lastSent[conversationId] = messageId
+        try? await service.markDelivered(conversationId: conversationId, messageId: messageId)
+    }
+
+    /// Pour chaque conversation non lue dont le dernier message vient d'autrui : un seul appel.
+    func acknowledgeLatest(of conversations: [MessageConversation], currentUserId: String?, using service: MessagesServicing) async {
+        for (conversationId, messageId) in Self.latestIncoming(in: conversations, currentUserId: currentUserId) {
+            await acknowledge(conversationId: conversationId, messageId: messageId, using: service)
+        }
+    }
+
+    func reset() { lastSent = [:] }
+
+    /// Messages d'autrui à accuser : id de message en v1, id d'enveloppe en v2.
+    static func latestIncoming(in conversations: [MessageConversation], currentUserId: String?) -> [(String, String)] {
+        guard currentUserId != nil else { return [] }
+        return conversations.compactMap { conversation in
+            guard conversation.isUnread(currentUserId: currentUserId) else { return nil }
+            if let last = conversation.e2eeV2?.lastMessage { return (conversation.id, last.envelopeId) }
+            guard let id = conversation.lastMessage?.id, !id.hasPrefix("local-") else { return nil }
+            return (conversation.id, id)
+        }
     }
 }
 
@@ -1006,6 +1043,21 @@ final class MessagesService: MessagesServicing {
             "/api/messages/conversations/\(conversationId)/read-state",
             method: .patch,
             body: ["state": "read"]
+        )
+    }
+
+    func markDelivered(conversationId: String, messageId: String) async throws {
+        if AppEnvironment.usesDemoData { return }
+        try await api.requestJSON(
+            "/api/messages/conversations/\(conversationId)/delivered",
+            body: ["messageId": messageId]
+        )
+    }
+
+    func receipts(conversationId: String) async throws -> ConversationReceipts {
+        try await api.request(
+            APIEndpoint(path: "/api/messages/conversations/\(conversationId)/receipts"),
+            as: ConversationReceipts.self
         )
     }
 

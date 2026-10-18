@@ -2277,6 +2277,38 @@
         }
       }
     },
+    "10 Go" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 GB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 Go"
+          }
+        }
+      }
+    },
+    "100 Go" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100 GB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100 Go"
+          }
+        }
+      }
+    },
     "13 à 20 dB" : {
       "localizations" : {
         "en" : {
@@ -2293,6 +2325,22 @@
         }
       }
     },
+    "25 Go" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "25 GB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "25 Go"
+          }
+        }
+      }
+    },
     "3 ans" : {
       "localizations" : {
         "en" : {
@@ -2305,6 +2353,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "3 ans"
+          }
+        }
+      }
+    },
+    "50 Go" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "50 GB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "50 Go"
           }
         }
       }
@@ -4663,6 +4727,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dispo. 30 j"
+          }
+        }
+      }
+    },
+    "Distribué" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delivered"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distribué"
           }
         }
       }
@@ -7880,6 +7960,22 @@
         }
       }
     },
+    "Message distribué" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message delivered"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message distribué"
+          }
+        }
+      }
+    },
     "Message d’origine" : {
       "localizations" : {
         "en" : {
@@ -7892,6 +7988,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Message d’origine"
+          }
+        }
+      }
+    },
+    "Message envoyé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message sent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message envoyé"
+          }
+        }
+      }
+    },
+    "Message lu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message read"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message lu"
           }
         }
       }

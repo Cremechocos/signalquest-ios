@@ -13,7 +13,7 @@ final class SSEClient: Sendable {
 
     /// Événements relayés — même liste qu'Android.
     private static let knownEvents: Set<String> = [
-        "update", "message", "read_state", "feature_sync", "thread_reply",
+        "update", "message", "read_state", "delivered_state", "feature_sync", "thread_reply",
         "poll_created", "poll_voted", "poll_closed",
         "task_created", "task_updated", "task_completed",
         "mention", "typing", "viewing", "reaction"

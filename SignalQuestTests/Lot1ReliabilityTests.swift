@@ -11,7 +11,8 @@ final class Lot1ReliabilityTests: XCTestCase {
         // Le serveur double un vote : `poll_voted`, puis un `update` qui porte le même type.
         XCTAssertEqual(SyncTrigger.from(event: "poll_voted", data: "{}"), .stateEvent)
         XCTAssertEqual(SyncTrigger.from(event: "update", data: #"{"type":"message_reaction","messageId":"m1"}"#), .stateEvent)
-        XCTAssertEqual(SyncTrigger.from(event: "update", data: #"{"type":"read_state"}"#), .stateEvent)
+        // Les accusés ont leur propre déclencheur : ils ne font pas relire les messages.
+        XCTAssertEqual(SyncTrigger.from(event: "update", data: #"{"type":"read_state"}"#), .receiptsEvent(userId: nil))
         XCTAssertEqual(SyncTrigger.from(event: "update", data: #"{"type":"message_created"}"#), .serverEvent)
         XCTAssertEqual(SyncTrigger.from(event: "message", data: "not json"), .serverEvent)
         XCTAssertEqual(SyncTrigger.from(event: "typing", data: "{}"), .typingEvent(userIds: []))
@@ -19,6 +20,18 @@ final class Lot1ReliabilityTests: XCTestCase {
                        .typingEvent(userIds: ["me", "u2"]))
         XCTAssertEqual(SyncTrigger.from(event: "typing", data: #"{"userId":"u2"}"#), .typingEvent(userIds: ["u2"]))
         XCTAssertEqual(SyncTrigger.from(event: "viewing", data: "{}"), .viewingEvent)
+    }
+
+    func testReceiptEventsCarryTheirAuthorAndNeverReloadMessages() {
+        XCTAssertEqual(SyncTrigger.from(event: "delivered_state", data: #"{"type":"delivered_state","userId":"u2","at":"2026-10-18T10:00:00.000Z"}"#),
+                       .receiptsEvent(userId: "u2"))
+        XCTAssertEqual(SyncTrigger.from(event: "read_state", data: #"{"type":"read_state","userId":"u3"}"#), .receiptsEvent(userId: "u3"))
+        XCTAssertEqual(SyncTrigger.from(event: "update", data: #"{"type":"delivered_state","userId":"u2"}"#), .receiptsEvent(userId: "u2"))
+        XCTAssertEqual(SyncTrigger.from(event: "delivered_state", data: "not json"), .receiptsEvent(userId: nil))
+        XCTAssertTrue(SyncTrigger.relayedEvents.contains("delivered_state"))
+        XCTAssertTrue(SyncTrigger.relayedEvents.contains("read_state"))
+        XCTAssertTrue(SyncTrigger.receiptsEvent(userId: nil).isReceiptsEvent)
+        XCTAssertFalse(SyncTrigger.stateEvent.isReceiptsEvent)
     }
 
     // MARK: SOC-02 / SOC-04 — refus définitifs
