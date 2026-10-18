@@ -43,13 +43,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SignalQuest uses the camera during video calls that you start or accept, and to scan the code of a device you approve."
+            "value" : "SignalQuest uses the camera to take a photo to send in a conversation, during video calls that you start or accept, and to scan the code of a device you approve."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "SignalQuest utilise la caméra pendant les appels vidéo que tu démarres ou acceptes, et pour scanner le code d’un appareil que tu approuves."
+            "value" : "SignalQuest utilise la caméra pour prendre une photo à envoyer dans une conversation, pendant les appels vidéo que tu démarres ou acceptes, et pour scanner le code d’un appareil que tu approuves."
           }
         }
       }
