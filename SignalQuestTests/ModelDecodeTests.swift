@@ -699,6 +699,219 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(ReceivedShareSheet.mergedDraft(existing: "Regarde\nhttps://a.fr", shared: "https://a.fr"), "Regarde\nhttps://a.fr")
     }
 
+    // MARK: - P2-47 — site partagé en texte (format commun web / iOS / Android)
+
+    private static let siteBase = URL(string: "https://signalquest.fr")!
+
+    private static let gerlandLines = [
+        "Antenne Orange (eNB 812345)",
+        "Opérateur: Orange",
+        "Technologies: 4G, 5G",
+        "eNB: 812345",
+        "PCI: 211",
+        "Support: 1234567",
+        "ANFR: 0691234567",
+        "Marché: FR",
+        "Adresse: 45, rue de Gerland, 69007 Lyon",
+        "Position: 45.72869, 4.83312",
+        "Lien: https://signalquest.fr/carte?lat=45.72869&lng=4.83312&siteId=1234567&market=FR&operator=ORANGE&open=antenna",
+    ]
+
+    private static let gerland = SiteShareCard(
+        operatorName: "Orange", technologies: ["5G", "4G"], enb: "812345", pci: "211",
+        supportId: "1234567", anfr: "0691234567", market: "FR",
+        address: "45, rue de Gerland, 69007 Lyon",
+        coordinate: SiteShareCoordinate(latitude: 45.72869, longitude: 4.83312)
+    )
+
+    func testSiteShareWriterProducesTheCommonFormatLineByLine() {
+        XCTAssertEqual(Self.gerland.shareText(baseURL: Self.siteBase), Self.gerlandLines.joined(separator: "\n"))
+    }
+
+    func testSiteShareRoundTripWriterToReader() throws {
+        let text = Self.gerland.shareText(baseURL: Self.siteBase)
+        let card = try XCTUnwrap(SiteShareCard.parse(text))
+        XCTAssertEqual(card.operatorName, "Orange")
+        XCTAssertEqual(card.technologies, ["4G", "5G"])
+        XCTAssertEqual(card.enb, "812345")
+        XCTAssertEqual(card.pci, "211")
+        XCTAssertEqual(card.supportId, "1234567")
+        XCTAssertEqual(card.anfr, "0691234567")
+        XCTAssertEqual(card.market, "FR")
+        XCTAssertEqual(card.address, "45, rue de Gerland, 69007 Lyon")
+        XCTAssertEqual(card.coordinate, SiteShareCoordinate(latitude: 45.72869, longitude: 4.83312))
+        XCTAssertEqual(card.link, Self.gerlandLines.last?.replacingOccurrences(of: "Lien: ", with: ""))
+    }
+
+    func testSiteShareReaderReadsTheTextTheWebWrites() throws {
+        // Texte du test du web (`formatAntennaShareText`), origine absolue.
+        let card = try XCTUnwrap(SiteShareCard.parse(Self.gerlandLines.filter { !$0.hasPrefix("PCI") }.joined(separator: "\n")))
+        XCTAssertNil(card.pci)
+        XCTAssertEqual(card.enb, "812345")
+        XCTAssertEqual(card.coordinate?.latitude, 45.72869)
+    }
+
+    func testSiteShareHeaderCarriesENBThenANFRThenNothing() {
+        var card = SiteShareCard(operatorName: "Orange", enb: "812345", anfr: "0691234567", market: "FR")
+        XCTAssertEqual(card.shareText(baseURL: Self.siteBase).components(separatedBy: "\n").first, "Antenne Orange (eNB 812345)")
+        card.enb = nil
+        XCTAssertEqual(card.shareText(baseURL: Self.siteBase).components(separatedBy: "\n").first, "Antenne Orange (ANFR 0691234567)")
+        card.anfr = nil
+        XCTAssertEqual(card.shareText(baseURL: Self.siteBase).components(separatedBy: "\n").first, "Antenne Orange")
+        card.operatorName = nil
+        XCTAssertEqual(card.shareText(baseURL: Self.siteBase).components(separatedBy: "\n").first, "Antenne")
+    }
+
+    func testSiteShareWriterOmitsUnknownDataAndNeverWritesZeroZero() {
+        let text = SiteShareCard(supportId: "1234567", market: "FR").shareText(baseURL: Self.siteBase)
+        XCTAssertEqual(text, [
+            "Antenne",
+            "Support: 1234567",
+            "Marché: FR",
+            "Lien: https://signalquest.fr/carte?siteId=1234567&market=FR&open=antenna",
+        ].joined(separator: "\n"))
+        XCTAssertFalse(text.contains("Position"))
+        XCTAssertFalse(text.lowercased().contains("inconnu"))
+        // 0, 0 n'est pas une coordonnée : le lecteur comme l'écrivain la refusent.
+        XCTAssertNil(SiteShareCoordinate(latitude: 0, longitude: 0))
+        XCTAssertNil(SiteShareCoordinate(latitude: 91, longitude: 4))
+        XCTAssertNil(SiteShareCoordinate(latitude: 45, longitude: .nan))
+    }
+
+    func testSiteShareWriterKeepsEachValueOnOneLine() throws {
+        let card = SiteShareCard(supportId: "1", market: "FR", address: "12 rue X\nLyon")
+        let text = card.shareText(baseURL: Self.siteBase)
+        XCTAssertTrue(text.contains("\nAdresse: 12 rue X Lyon\n"))
+        XCTAssertEqual(try XCTUnwrap(SiteShareCard.parse(text)).address, "12 rue X Lyon")
+    }
+
+    func testSiteShareSeveralOperatorsGiveABareHeaderAndNoOperatorKey() throws {
+        let card = SiteShareCard(operatorName: "Orange, SFR", supportId: "1234567", market: "FR")
+        let lines = card.shareText(baseURL: Self.siteBase).components(separatedBy: "\n")
+        XCTAssertEqual(lines.first, "Antenne")
+        XCTAssertTrue(lines.contains("Opérateur: Orange, SFR"))
+        XCTAssertFalse(lines.last?.contains("operator=") ?? true)
+        XCTAssertTrue(try XCTUnwrap(SiteShareCard.parse(lines.joined(separator: "\n"))).hasSeveralOperators)
+    }
+
+    func testSiteShareOperatorNamesAndLinkKeys() {
+        XCTAssertEqual(SiteShareCard.metropolitanOperatorName(forKey: "ORANGE"), "Orange")
+        XCTAssertEqual(SiteShareCard.metropolitanOperatorName(forKey: "bouygues"), "Bouygues Telecom")
+        XCTAssertEqual(SiteShareCard.metropolitanOperatorName(forKey: "BYTEL"), "Bouygues Telecom")
+        XCTAssertEqual(SiteShareCard.metropolitanOperatorName(forKey: "FREE"), "Free Mobile")
+        XCTAssertEqual(SiteShareCard.metropolitanOperatorName(forKey: "SFR"), "SFR")
+        XCTAssertNil(SiteShareCard.metropolitanOperatorName(forKey: "ROGERS"), "hors métropole, le nom du site")
+        XCTAssertEqual(SiteShareCard.linkOperatorKey("Bouygues Telecom"), "BOUYGUES")
+        XCTAssertEqual(SiteShareCard.linkOperatorKey("Free Mobile"), "FREE")
+        XCTAssertEqual(SiteShareCard.linkOperatorKey("Rogers Communications"), "ROGERS_COMMUNICATIONS")
+        XCTAssertEqual(SiteShareCard.linkOperatorKey("Free-Caraïbes"), "FREE_CARAÏBES")
+        XCTAssertNil(SiteShareCard.linkOperatorKey("ALL"))
+        XCTAssertNil(SiteShareCard.linkOperatorKey("  "))
+        let abroad = SiteShareCard(operatorName: "Rogers", supportId: "9", market: "CA").shareText(baseURL: Self.siteBase)
+        XCTAssertTrue(abroad.hasPrefix("Antenne Rogers\nOpérateur: Rogers"))
+        XCTAssertTrue(abroad.hasSuffix("siteId=9&market=CA&operator=ROGERS&open=antenna"))
+    }
+
+    func testSiteShareReaderToleratesCommasSemicolonsAndRejectsBadPositions() throws {
+        func position(_ value: String) -> SiteShareCoordinate? {
+            SiteShareCard.parse("Antenne Orange\nSupport: 1\nPosition: \(value)")?.coordinate
+        }
+        let expected = SiteShareCoordinate(latitude: 45.72869, longitude: 4.83312)
+        XCTAssertEqual(position("45.72869, 4.83312"), expected)
+        XCTAssertEqual(position("45,72869; 4,83312"), expected, "virgule décimale")
+        XCTAssertEqual(position("45.72869;4.83312"), expected, "« ; » comme séparateur")
+        XCTAssertEqual(position("45,72869, 4,83312"), expected)
+        XCTAssertEqual(position(" -21.1151 ; 55.5364 "), SiteShareCoordinate(latitude: -21.1151, longitude: 55.5364))
+        // Pas de coordonnée : pas de vignette, mais la carte reste.
+        XCTAssertNil(position("0, 0"))
+        XCTAssertNil(position("0.00000, 0.00000"))
+        XCTAssertNil(position("91, 4.8"))
+        XCTAssertNil(position("45.7, 181"))
+        XCTAssertNil(position("quelque part"))
+        let card = try XCTUnwrap(SiteShareCard.parse("Antenne Orange\nSupport: 1\nPosition: 0, 0"))
+        XCTAssertEqual(card.supportId, "1")
+        XCTAssertNil(card.coordinate)
+    }
+
+    func testSiteShareReaderIgnoresUnknownLabelsAndUnknownValues() throws {
+        let card = try XCTUnwrap(SiteShareCard.parse("""
+        Antenne Orange (eNB 812345)
+        Humeur: joyeuse
+        Opérateur: Orange
+        Hauteur: 30 m
+        PCI: inconnu
+        """))
+        XCTAssertEqual(card.operatorName, "Orange")
+        XCTAssertNil(card.pci, "« inconnu » n'est pas une donnée")
+        XCTAssertEqual(card.enb, "812345", "l'eNB de l'en-tête sert à défaut de ligne")
+    }
+
+    func testSiteShareFreeTextStartingWithAntenneIsNotACard() {
+        XCTAssertNil(SiteShareCard.parse("Antenne cassée chez moi depuis hier, quelqu'un d'autre ?"))
+        XCTAssertNil(SiteShareCard.parse("Antenne\nvoici ce que j'ai vu: rien du tout"))
+        XCTAssertNil(SiteShareCard.parse("Antenne Orange (eNB 812345)"), "un en-tête seul ne suffit pas")
+        XCTAssertNil(SiteShareCard.parse("Antenne\nLien: https://signalquest.fr/carte"), "un lien seul ne suffit pas")
+        XCTAssertNil(SiteShareCard.parse("Antennes de Lyon\nOpérateur: Orange"), "« Antennes » n'est pas l'en-tête")
+        XCTAssertNil(SiteShareCard.parse("Bonjour\nOpérateur: Orange\nSupport: 1"), "pas d'en-tête")
+        XCTAssertNil(SiteShareCard.parse(""))
+        XCTAssertNil(SiteShareCard.parse("Antenne\nSupport: " + String(repeating: "1", count: 2_000)), "trop long pour un partage")
+        // Un en-tête décoré (emoji, casse) reste un en-tête.
+        XCTAssertNotNil(SiteShareCard.parse("📡 ANTENNE Orange\nSupport: 1"))
+    }
+
+    func testSiteShareLinkOpensOnlyWhenHTTPSAndSignalQuest() throws {
+        let card = try XCTUnwrap(SiteShareCard.parse(Self.gerlandLines.joined(separator: "\n")))
+        let url = try XCTUnwrap(card.openURL)
+        XCTAssertTrue(ShareCardData.isSignalQuestURL(url))
+        // Lien d'un autre domaine : lisible, mais jamais ouvert sans confirmation.
+        let foreign = try XCTUnwrap(SiteShareCard.parse("Antenne\nSupport: 1\nLien: https://exemple.test/carte"))
+        XCTAssertNotNil(foreign.openURL)
+        XCTAssertFalse(ShareCardData.isSignalQuestURL(try XCTUnwrap(foreign.openURL)))
+        // http en clair : pas de lien du tout.
+        XCTAssertNil(SiteShareCard.parse("Antenne\nSupport: 1\nLien: http://signalquest.fr/carte")?.openURL)
+        XCTAssertNil(SiteShareCard.parse("Antenne\nSupport: 1")?.openURL)
+    }
+
+    func testSiteShareOldWebFormatKeepsTheENBAndNoOperator() throws {
+        let card = try XCTUnwrap(SiteShareCard.parse(
+            "Antenne SFR (eNB 812345)\nSupport: 1234567\nAdresse: 12 rue X, 69007 Lyon\nLien: https://signalquest.fr/?search=1234567"
+        ))
+        XCTAssertNil(card.operatorName, "l'ancien en-tête disait « SFR » quel que soit le site")
+        XCTAssertEqual(card.enb, "812345")
+        XCTAssertNil(card.coordinate)
+        XCTAssertEqual(card.supportId, "1234567")
+    }
+
+    func testSiteShareTechnologiesAreCanonicalAndAscending() {
+        XCTAssertEqual(SiteShareCard.generations(in: ["5G", "4G"]), ["4G", "5G"])
+        XCTAssertEqual(SiteShareCard.generations(in: ["LTE 800", "5G NR 3500", "GSM 900", "UMTS 2100"]), ["2G", "3G", "4G", "5G"])
+        XCTAssertEqual(SiteShareCard.generations(in: ["4G", "4G"]), ["4G"])
+        XCTAssertEqual(SiteShareCard.generations(in: ["Wi-Fi", ""]), [])
+        XCTAssertEqual(SiteShareCard.parse("Antenne\nTechnologies: 5G · 3G / 4G")?.technologies, ["3G", "4G", "5G"])
+    }
+
+    func testANFRSupportConversationTextNamesOneOperatorOrNone() throws {
+        func antenna(_ id: String, _ op: String) -> ANFRMapAntenna {
+            ANFRMapAntenna(id: id, supId: "0123456", operatorRaw: op, system: "LTE 1800", generationRaw: "4G", modTypeRaw: "added",
+                           statut: "En service", dateMaj: "", latitude: nil, longitude: nil, city: nil, address: "12 RUE DES LILAS")
+        }
+        let one = ANFRMapSite(supId: "0123456", latitude: 45.72869, longitude: 4.83312, city: "LYON 07", antennas: [antenna("a", "ORANGE")])
+        let oneText = ANFRSiteDetailSheet.conversationShareText(for: one, baseURL: Self.siteBase)
+        XCTAssertTrue(oneText.hasPrefix("Antenne Orange\nOpérateur: Orange\nSupport: 0123456\nMarché: FR\n"))
+        XCTAssertTrue(oneText.contains("Position: 45.72869, 4.83312"))
+        XCTAssertTrue(oneText.contains("Adresse: 12 Rue des Lilas, Lyon 07"))
+        XCTAssertFalse(oneText.contains("Technologies"), "le relevé ne liste que les antennes modifiées")
+        let card = try XCTUnwrap(SiteShareCard.parse(oneText))
+        XCTAssertEqual(card.supportId, "0123456")
+        XCTAssertEqual(card.operatorName, "Orange")
+
+        let two = ANFRMapSite(supId: "0123456", latitude: 45.72869, longitude: 4.83312, city: "LYON 07",
+                              antennas: [antenna("a", "ORANGE"), antenna("b", "SFR")])
+        let twoLines = ANFRSiteDetailSheet.conversationShareText(for: two, baseURL: Self.siteBase).components(separatedBy: "\n")
+        XCTAssertEqual(twoLines.first, "Antenne")
+        XCTAssertTrue(twoLines.contains("Opérateur: Orange, SFR"))
+    }
+
     private static let mapJSON = """
     {"timestamp":"2026-05-11T10:00:00.000Z","friends":[],"photos":[],"validations":[],"sessions":[],"coveragePoints":[],"speedtests":[{"id":"sp1","userId":"u1","latitude":48.85,"longitude":2.35,"averageSpeed":210,"uploadAvg":42,"pingAvg":18,"timestamp":"2026-05-11T10:00:00.000Z","networkType":"WIFI","mobileOperator":"SignalQuest"}],"photosCount":0,"validationsCount":0,"sessionsCount":0,"coveragePointsCount":0,"speedtestsCount":1,"rawCoveragePointsCount":0,"logicalCoveragePointsCount":0}
     """

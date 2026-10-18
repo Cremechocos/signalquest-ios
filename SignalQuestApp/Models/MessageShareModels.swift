@@ -302,3 +302,298 @@ struct MessageLocationData: Equatable {
 private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
+
+// MARK: - Site partagé en texte (P2-47)
+//
+// Format d'échange commun au web, à iOS et à Android (arrêté le 18/10) : un site
+// partagé dans une conversation est un TEXTE « Libellé: valeur », une paire par
+// ligne, dont la première ligne est l'en-tête « Antenne… ». Le texte voyage tel
+// quel, y compris en conversation chiffrée ; le destinataire le relit pour
+// dessiner une vraie carte avec une vignette de plan.
+//
+//   Antenne Orange (eNB 812345)
+//   Opérateur: Orange
+//   Technologies: 4G, 5G
+//   eNB: 812345
+//   PCI: 211
+//   Support: 1234567
+//   ANFR: 0691234567
+//   Marché: FR
+//   Adresse: 45, rue de Gerland, 69007 Lyon
+//   Position: 45.72869, 4.83312
+//   Lien: https://signalquest.fr/carte?lat=…&lng=…&siteId=…&market=FR&operator=ORANGE&open=antenna
+//
+// Les libellés sont toujours en français (ce n'est pas de l'affichage). Une ligne
+// absente veut dire « donnée inconnue » : jamais « inconnu », jamais 0, 0. Le
+// lecteur est tolérant, l'écrivain strict. Toute évolution se fait des trois
+// côtés à la fois, sans quoi un site partagé retombe en texte brut.
+
+/// Coordonnée WGS84 lue dans un partage. Valide par construction : finie, dans
+/// les bornes et différente de 0, 0 (qui n'est jamais un site).
+struct SiteShareCoordinate: Equatable {
+    let latitude: Double
+    let longitude: Double
+
+    init?(latitude: Double, longitude: Double) {
+        guard latitude.isFinite, longitude.isFinite,
+              (-90...90).contains(latitude), (-180...180).contains(longitude),
+              latitude != 0 || longitude != 0 else { return nil }
+        self.latitude = latitude
+        self.longitude = longitude
+    }
+}
+
+struct SiteShareCard: Equatable {
+    var operatorName: String?
+    /// Générations canoniques « 2G » à « 5G », de la plus ancienne à la plus récente.
+    var technologies: [String] = []
+    var enb: String?
+    var pci: String?
+    var supportId: String?
+    var anfr: String?
+    var market: String?
+    var address: String?
+    var coordinate: SiteShareCoordinate?
+    var link: String?
+
+    /// Le lien vient de l'expéditeur : seul `https` est retenu (même règle que
+    /// `ShareCardData.openURL`).
+    var openURL: URL? {
+        guard let url = link.flatMap(URL.init(string:)),
+              url.scheme?.lowercased() == "https",
+              url.host?.isEmpty == false else { return nil }
+        return url
+    }
+
+    /// Plusieurs opérateurs sur un support (fiche ANFR) : une liste, pas un nom de marque.
+    var hasSeveralOperators: Bool { operatorName?.contains(",") == true }
+
+    // MARK: Lecture
+
+    /// Un message plus long n'est pas un partage de site : l'écrivain tient en
+    /// quelques centaines de caractères.
+    private static let maxTextLength = 1_500
+
+    /// Relit le texte d'un message. `nil` si ce n'est pas un partage de site : il
+    /// faut l'en-tête « Antenne… » ET au moins une ligne de donnée connue, pour
+    /// qu'un texte libre qui commence par « Antenne » reste un texte.
+    static func parse(_ raw: String) -> SiteShareCard? {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text.count <= maxTextLength else { return nil }
+        let lines = text.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !isSeparator($0) }
+        guard let first = lines.first, let header = parseHeader(first) else { return nil }
+
+        var card = SiteShareCard()
+        var known = 0
+        for line in lines.dropFirst() {
+            if let url = firstURL(in: line) {
+                if card.link == nil { card.link = url }
+                continue
+            }
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let label = folded(String(line[..<colon]))
+            let value = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+            guard let content = meaningful(value) else { continue }
+            switch label {
+            case "operateur", "operator":
+                card.operatorName = clipped(content, 80)
+            case "technologies", "technologie", "technology":
+                card.technologies = generations(in: [content])
+            case "enb":
+                card.enb = clipped(content, 24)
+            case "pci":
+                card.pci = clipped(content, 12)
+            case "support":
+                card.supportId = clipped(content, 48)
+            case "anfr":
+                card.anfr = clipped(content, 24)
+            case "marche", "market":
+                card.market = clipped(content.uppercased(), 8)
+            case "adresse", "address":
+                card.address = clipped(content, 200)
+            case "position":
+                card.coordinate = parseCoordinate(content)
+            default:
+                // Libellé inconnu (ou « Lien » sans adresse lisible) : ignoré.
+                continue
+            }
+            known += 1
+        }
+        guard known > 0 else { return nil }
+        // L'eNB de l'en-tête sert quand la ligne « eNB » manque (anciens partages).
+        if card.enb == nil { card.enb = header.enb }
+        return card
+    }
+
+    private struct Header { let enb: String? }
+
+    /// `nil` si la ligne n'est pas un en-tête « Antenne… ». Renvoie l'eNB que la
+    /// parenthèse porte éventuellement. « Antennes de Lyon » n'en est pas un.
+    private static func parseHeader(_ line: String) -> Header? {
+        // Décoration de tête (emoji, puce) ignorée, comme le web.
+        let stripped = line.drop { !$0.isLetter && !$0.isNumber }
+        let head = folded(String(stripped.prefix(7)))
+        guard head == "antenne" else { return nil }
+        let rest = stripped.dropFirst(7)
+        if let next = rest.first, next.isLetter || next.isNumber { return nil }
+        return Header(enb: firstMatch(#"\beNB\s+(\d+)"#, in: String(rest)))
+    }
+
+    private static func isSeparator(_ line: String) -> Bool {
+        let core = line.filter { !$0.isWhitespace }
+        return core.count >= 3 && core.allSatisfy { "-_=━".contains($0) }
+    }
+
+    /// Minuscules sans accents : « Opérateur » et « operateur » se valent.
+    private static func folded(_ text: String) -> String {
+        text.drop { !$0.isLetter && !$0.isNumber }
+            .trimmingCharacters(in: .whitespaces)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+    }
+
+    /// Valeur lisible, ou `nil` pour un vide ou un « inconnu » que d'autres
+    /// clients auraient écrit malgré le format.
+    private static func meaningful(_ value: String) -> String? {
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        return ["inconnu", "unknown", "-", "—", "n/a", "null"].contains(text.lowercased()) ? nil : text
+    }
+
+    private static func clipped(_ text: String, _ limit: Int) -> String {
+        text.count > limit ? String(text.prefix(limit)) : text
+    }
+
+    private static func firstURL(in line: String) -> String? {
+        line.range(of: #"https?://\S+"#, options: [.regularExpression, .caseInsensitive]).map { String(line[$0]) }
+    }
+
+    private static func firstMatch(_ pattern: String, in text: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              match.numberOfRanges > 1, let range = Range(match.range(at: 1), in: text) else { return nil }
+        return String(text[range])
+    }
+
+    /// « 45.72869, 4.83312 », avec « ; » à la place de la virgule de séparation
+    /// et des virgules décimales (« 45,72869; 4,83312 ») tolérés. Hors bornes ou
+    /// 0, 0 : pas de coordonnée, donc pas de vignette — la carte reste.
+    static func parseCoordinate(_ value: String) -> SiteShareCoordinate? {
+        let number = #"(-?\d+(?:[.,]\d+)?)"#
+        let pattern = "^\\s*\(number)\\s*(?:[;,]|\\s)\\s*\(number)\\s*$"
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)),
+              match.numberOfRanges == 3,
+              let latRange = Range(match.range(at: 1), in: value),
+              let lngRange = Range(match.range(at: 2), in: value),
+              let latitude = Double(value[latRange].replacingOccurrences(of: ",", with: ".")),
+              let longitude = Double(value[lngRange].replacingOccurrences(of: ",", with: ".")) else { return nil }
+        return SiteShareCoordinate(latitude: latitude, longitude: longitude)
+    }
+
+    /// Les générations « 2G » à « 5G » d'une liste de systèmes (« 4G », « LTE 800 »,
+    /// « 5G NR 3500 »…), dédoublonnées et de la plus ancienne à la plus récente.
+    static func generations(in systems: [String]) -> [String] {
+        var found = Set<String>()
+        for system in systems {
+            for word in system.uppercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }) {
+                switch word {
+                case "2G", "GSM", "EDGE": found.insert("2G")
+                case "3G", "UMTS", "HSPA", "WCDMA": found.insert("3G")
+                case "4G", "LTE": found.insert("4G")
+                case "5G", "NR": found.insert("5G")
+                default: break
+                }
+            }
+        }
+        return ["2G", "3G", "4G", "5G"].filter(found.contains)
+    }
+
+    // MARK: Écriture
+
+    /// Nom affiché d'un opérateur de la métropole ; `nil` pour tout autre, dont le
+    /// nom est alors celui que porte le site.
+    static func metropolitanOperatorName(forKey key: String?) -> String? {
+        switch linkOperatorKey(key) {
+        case "ORANGE": return "Orange"
+        case "SFR": return "SFR"
+        case "BOUYGUES": return "Bouygues Telecom"
+        case "FREE": return "Free Mobile"
+        default: return nil
+        }
+    }
+
+    /// Clé `operator` du lien : ORANGE, SFR, BOUYGUES, FREE (comme le web), sinon
+    /// le nom en majuscules, les blancs et tirets devenus `_`.
+    static func linkOperatorKey(_ name: String?) -> String? {
+        let key = name?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+            .replacingOccurrences(of: #"[\s-]+"#, with: "_", options: .regularExpression)
+        guard let key, !key.isEmpty, key != "ALL" else { return nil }
+        switch key {
+        case "BOUYGUES_TELECOM", "BYTEL": return "BOUYGUES"
+        case "FREE_MOBILE": return "FREE"
+        default: return key
+        }
+    }
+
+    /// Le texte d'échange de ce site, ligne pour ligne. `linkSiteId` est
+    /// l'identifiant que le lien porte quand il diffère du support (empreinte d'un
+    /// site canadien) ; `baseURL`, l'origine du site web.
+    func shareText(baseURL: URL, linkSiteId: String? = nil) -> String {
+        func line(_ label: String, _ value: String?) -> String? {
+            // Une valeur sur une seule ligne : un retour à la ligne casserait le format.
+            let flat = value?.split(whereSeparator: \.isNewline).joined(separator: " ")
+                .trimmingCharacters(in: .whitespaces)
+            return flat.flatMap { $0.isEmpty ? nil : "\(label): \($0)" }
+        }
+        let name = operatorName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let enbNumber = enb?.trimmingCharacters(in: .whitespaces).nilIfEmpty
+        let anfrNumber = anfr?.trimmingCharacters(in: .whitespaces).nilIfEmpty
+        let support = supportId?.trimmingCharacters(in: .whitespaces).nilIfEmpty
+        let marketCode = market?.trimmingCharacters(in: .whitespaces).uppercased().nilIfEmpty
+        let generations = Self.generations(in: technologies)
+
+        // L'en-tête reste « Antenne … » : les anciens lecteurs le classent encore.
+        let tag = enbNumber.map { "eNB \($0)" } ?? anfrNumber.map { "ANFR \($0)" }
+        // Plusieurs opérateurs (fiche ANFR d'un support) : l'en-tête n'en nomme aucun.
+        let headerName = hasSeveralOperators ? nil : name
+        let header = "Antenne" + (headerName.map { " \($0)" } ?? "") + (tag.map { " (\($0))" } ?? "")
+
+        var query: [(String, String)] = []
+        if let coordinate {
+            query.append(("lat", Self.coordinateText(coordinate.latitude)))
+            query.append(("lng", Self.coordinateText(coordinate.longitude)))
+        }
+        if let id = (linkSiteId ?? support)?.nilIfEmpty { query.append(("siteId", id)) }
+        if let marketCode { query.append(("market", marketCode)) }
+        if !hasSeveralOperators, let key = Self.linkOperatorKey(name) { query.append(("operator", key)) }
+        query.append(("open", "antenna"))
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        let encoded = query.map { key, value in
+            "\(key)=\(value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value)"
+        }.joined(separator: "&")
+        let base = baseURL.absoluteString.hasSuffix("/") ? String(baseURL.absoluteString.dropLast()) : baseURL.absoluteString
+
+        return [
+            header,
+            line("Opérateur", name),
+            generations.isEmpty ? nil : "Technologies: \(generations.joined(separator: ", "))",
+            line("eNB", enbNumber),
+            line("PCI", pci),
+            line("Support", support),
+            line("ANFR", anfrNumber),
+            line("Marché", marketCode),
+            line("Adresse", address),
+            coordinate.map { "Position: \(Self.coordinateText($0.latitude)), \(Self.coordinateText($0.longitude))" },
+            "Lien: \(base)/carte?\(encoded)",
+        ].compactMap { $0 }.joined(separator: "\n")
+    }
+
+    /// 5 décimales, point décimal, quelle que soit la langue de l'appareil.
+    private static func coordinateText(_ value: Double) -> String {
+        String(format: "%.5f", locale: Locale(identifier: "en_US_POSIX"), value)
+    }
+}

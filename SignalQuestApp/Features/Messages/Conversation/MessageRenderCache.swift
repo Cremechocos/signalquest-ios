@@ -58,6 +58,17 @@ final class MessageRenderCache {
         return value
     }
 
+    /// Site partagé en texte (P2-47) : le texte « Antenne … » relu en carte, mémoïsé
+    /// par message comme les liens (le lecteur n'est relancé que si le texte change).
+    var sites: [String: (text: String, value: SiteShareCard?)] = [:]
+
+    func siteShare(_ text: String, id: String) -> SiteShareCard? {
+        if let cached = sites[id], cached.text == text { return cached.value }
+        let value = SiteShareCard.parse(text)
+        sites[id] = (text, value)
+        return value
+    }
+
     private static func makeLinkedText(_ text: String) -> AttributedString? {
         guard text.contains("http") || text.contains("www."),
               let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return nil }

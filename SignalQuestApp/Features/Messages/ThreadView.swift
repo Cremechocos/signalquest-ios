@@ -13,6 +13,7 @@ struct ThreadView: View {
     var refreshToken = 0
 
     @EnvironmentObject private var session: AuthSessionViewModel
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.dismiss) private var dismiss
 
     @State private var parent: MessageItem?
@@ -102,7 +103,9 @@ struct ThreadView: View {
                     .foregroundStyle(SQColor.label)
             }
             let text = displayedContent(for: source)
-            if !text.isEmpty {
+            if let site = SiteShareCard.parse(text) {
+                siteBubble(site, mine: false)
+            } else if !text.isEmpty {
                 Text(text)
                     .font(SQType.body)
                     .foregroundStyle(SQColor.label)
@@ -134,13 +137,19 @@ struct ThreadView: View {
                         .font(SQType.micro.weight(.semibold))
                         .foregroundStyle(SQColor.labelSecondary)
                 }
-                Text(displayedContent(for: reply))
-                    .font(SQType.body)
-                    .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
-                    .padding(.vertical, 11)
-                    .padding(.horizontal, 15)
-                    .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine))
-                    .sqShadowSoft()
+                Group {
+                    if let site = SiteShareCard.parse(displayedContent(for: reply)) {
+                        siteBubble(site, mine: mine)
+                    } else {
+                        Text(displayedContent(for: reply))
+                            .font(SQType.body)
+                            .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
+                    }
+                }
+                .padding(.vertical, 11)
+                .padding(.horizontal, 15)
+                .background(mine ? SQColor.label : SQColor.surface, in: bubbleShape(mine: mine))
+                .sqShadowSoft()
                 if let date = reply.createdAt {
                     Text(date.formatted(date: .omitted, time: .shortened))
                         .font(SQType.micro)
@@ -251,6 +260,15 @@ struct ThreadView: View {
         if let parent { targets.append(parent) }
         for message in targets where message.isEncrypted && decrypted[message.id] == nil {
             decrypted[message.id] = try? await e2ee.decryptText(conversationId: conversation.id, message: message)
+        }
+    }
+
+    /// Site partagé en texte (P2-47) : la carte, comme dans la conversation. Ouvrir le site
+    /// ferme le fil, sans quoi il resterait posé sur la carte.
+    private func siteBubble(_ site: SiteShareCard, mine: Bool) -> some View {
+        SiteShareCardBubble(card: site, mine: mine) { siteId, market in
+            dismiss()
+            router.route(toSite: siteId, market: market)
         }
     }
 

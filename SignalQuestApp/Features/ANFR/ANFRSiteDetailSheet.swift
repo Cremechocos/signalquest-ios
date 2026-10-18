@@ -47,6 +47,8 @@ struct ANFRSiteDetailSheet: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
     @State private var copiedCoordinates = false
+    /// Texte du site à envoyer dans une conversation (P2-47) ; non nil = sélecteur ouvert.
+    @State private var siteShareDraft: SiteShareDraft?
 
     init(site: ANFRMapSite, service: ANFRServicing, snapshotDate: String? = nil,
          reorientations: [ANFRReorientation] = [], showsChanges: Bool = true) {
@@ -65,8 +67,12 @@ struct ANFRSiteDetailSheet: View {
                     actionsRow
                     if !reorientations.isEmpty { reorientationCard }
                     if showsChanges {
-                        currentAntennasCard
-                        if !site.sectorsByOperator.isEmpty { sectorsCard }
+                        if let summary = site.summary {
+                            summaryCard(summary)
+                        } else {
+                            currentAntennasCard
+                            if !site.sectorsByOperator.isEmpty { sectorsCard }
+                        }
                     }
                     timelineSection
                 }
@@ -87,6 +93,8 @@ struct ANFRSiteDetailSheet: View {
         .presentationDetents([.medium, .large])
         .presentationBackgroundCompat(SQColor.bg)
         .presentationBackgroundInteractionCompat()
+        // Le texte arrive prérempli dans la conversation choisie, qui s'ouvre : la fiche se ferme.
+        .siteSharePicker($siteShareDraft) { dismiss() }
         .task { await model.load(supId: site.supId) }
         .onAppear {
             withAnimation(reduceMotion ? nil : SQMotion.standard.delay(0.05)) { appeared = true }
@@ -166,6 +174,15 @@ struct ANFRSiteDetailSheet: View {
             ShareLink(item: Self.shareText(for: site, baseURL: AppConfig.current.appBaseURL)) {
                 actionLabel("Partager", systemImage: "square.and.arrow.up")
             }
+
+            Button {
+                Haptics.selection()
+                siteShareDraft = SiteShareDraft(text: Self.conversationShareText(for: site, baseURL: AppConfig.current.appBaseURL))
+            } label: {
+                actionLabel("Envoyer dans une conversation", systemImage: "paperplane")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("anfr.detail.sendToConversation")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -236,6 +253,65 @@ struct ANFRSiteDetailSheet: View {
                 Text("Aucune antenne modifiée dans ce relevé.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
+            }
+        }
+        .padding(SQSpace.lg)
+        .sqCardBackground()
+    }
+
+    // MARK: Relevé léger
+
+    /// Relevé léger ou comparaison : les compteurs du support, le détail par antenne
+    /// étant dans l'historique.
+    private func summaryCard(_ summary: ANFRSiteChangeSummary) -> some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            sectionTitle(summary.lastChangeDate == nil ? "Changements de ce relevé" : "Changements sur la période",
+                         systemImage: "antenna.radiowaves.left.and.right")
+            Group {
+                if let last = summary.lastChangeDate.flatMap({ ANFRText.date($0) }) {
+                    Text("Bilan net de la comparaison, dernier changement au relevé du \(last). Le détail par antenne est dans l’historique.")
+                } else {
+                    Text("Ce relevé ne liste pas les antennes. Le détail par antenne est dans l’historique.")
+                }
+            }
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            if !summary.operators.isEmpty || summary.hasOtherOperator {
+                ANFRFlowLayout(spacing: SQSpace.xs2) {
+                    ForEach(summary.operators) { op in
+                        SQEditorialTag(text: op.label, color: op.color)
+                    }
+                    if summary.hasOtherOperator {
+                        SQEditorialTag(text: String(localized: "Autre opérateur"), color: SQColor.labelSecondary)
+                    }
+                }
+            }
+            ForEach(summary.presentTypes) { type in
+                HStack(spacing: SQSpace.sm) {
+                    modTypeBadge(type)
+                    Text(type.label)
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(SQColor.label)
+                    Spacer()
+                    Text("\(summary.count(for: type)) antennes")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .monospacedDigit()
+                }
+                .accessibilityElement(children: .combine)
+                .padding(.vertical, SQSpace.sm)
+                .padding(.horizontal, SQSpace.md)
+                .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            }
+            if summary.catchUp > 0 {
+                HStack(spacing: SQSpace.sm) {
+                    catchUpTag
+                    Text("Dont \(summary.catchUp) en rattrapage")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+                .accessibilityElement(children: .combine)
             }
         }
         .padding(SQSpace.lg)
@@ -468,6 +544,28 @@ struct ANFRSiteDetailSheet: View {
         let id = site.supId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? site.supId
         lines.append("Lien: \(base)/carte?lat=\(posix(site.latitude))&lng=\(posix(site.longitude))&siteId=\(id)&market=FR&open=antenna")
         return lines.joined(separator: "\n")
+    }
+
+    /// Le support tel qu'on l'écrit dans une conversation (P2-47, format commun au web, à iOS
+    /// et à Android) : support, position, adresse et opérateurs du relevé. En-tête « Antenne
+    /// <opérateur> » pour un seul opérateur, « Antenne » sinon. Le relevé ne liste que les
+    /// antennes modifiées : ni technologies ni identifiants radio ne sont écrits.
+    nonisolated static func conversationShareText(for site: ANFRMapSite, baseURL: URL) -> String {
+        let names = site.operators.compactMap { SiteShareCard.metropolitanOperatorName(forKey: $0.rawValue) }
+        // Adresse ANFR (capitales, sans accents) remise en casse, puis la commune.
+        let street = site.antennas.lazy.compactMap(\.address).first.map(ANFRText.city)
+        let city = site.city.isEmpty ? nil : ANFRText.city(site.city)
+        let address = [street, city.flatMap { name in
+            street?.localizedCaseInsensitiveContains(name) == true ? nil : name
+        }].compactMap { $0 }.joined(separator: ", ")
+        let card = SiteShareCard(
+            operatorName: names.isEmpty ? nil : names.joined(separator: ", "),
+            supportId: site.supId.isEmpty ? nil : site.supId,
+            market: "FR",
+            address: address.isEmpty ? nil : address,
+            coordinate: SiteShareCoordinate(latitude: site.latitude, longitude: site.longitude)
+        )
+        return card.shareText(baseURL: baseURL)
     }
 
     private func modTypeBadge(_ type: ANFRModType) -> some View {

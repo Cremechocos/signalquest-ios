@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 // MARK: - Cartes de partage & localisation (parité Android)
 //
@@ -6,6 +7,7 @@ import SwiftUI
 //  - partage générique (speedtest / session / post social) → ShareCardBubble
 //  - mesure de signal enrichie (RSRP/score/bande/site)      → SignalCardBubble
 //  - localisation                                            → LocationBubble
+//  - site (antenne) partagé en texte, format commun (P2-47) → SiteShareCardBubble
 // Toutes adaptent leurs couleurs selon `mine` (bulle envoyée = fond encre,
 // textes en `onInk`).
 
@@ -525,6 +527,302 @@ private struct ShareCardOpenButton: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Ouvrir le partage")
+        }
+        .padding(.top, 1)
+    }
+}
+
+// MARK: Carte « Site » (P2-47)
+
+/// Vignettes de plan des sites partagés : un `MKMapSnapshotter` par site, par thème
+/// et par largeur, gardé en mémoire. Une conversation qui défile redessine ses bulles à
+/// chaque passage ; sans cache, chacune relancerait un rendu de carte.
+@MainActor
+final class SiteMapSnapshotCache {
+    static let shared = SiteMapSnapshotCache()
+
+    private let images: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 60
+        return cache
+    }()
+    /// Rendus en cours : deux bulles du même site attendent le même snapshot.
+    private var inFlight: [String: Task<UIImage?, Never>] = [:]
+
+    static func key(_ coordinate: SiteShareCoordinate, dark: Bool) -> String {
+        let posix = Locale(identifier: "en_US_POSIX")
+        return "\(String(format: "%.5f", locale: posix, coordinate.latitude)),\(String(format: "%.5f", locale: posix, coordinate.longitude)),\(dark ? "dark" : "light")"
+    }
+
+    func cached(_ key: String) -> UIImage? { images.object(forKey: key as NSString) }
+
+    func snapshot(of coordinate: SiteShareCoordinate, size: CGSize, dark: Bool, key: String) async -> UIImage? {
+        if let image = cached(key) { return image }
+        if let running = inFlight[key] { return await running.value }
+        let task = Task<UIImage?, Never> { @MainActor in
+            let options = MKMapSnapshotter.Options()
+            // ~500 m de large : le site et les rues qui l'entourent.
+            let meters = 500.0
+            options.region = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude),
+                latitudinalMeters: meters * Double(size.height / size.width),
+                longitudinalMeters: meters
+            )
+            options.size = size
+            options.mapType = .mutedStandard
+            options.pointOfInterestFilter = .excludingAll
+            options.traitCollection = UITraitCollection(userInterfaceStyle: dark ? .dark : .light)
+            return try? await MKMapSnapshotter(options: options).start().image
+        }
+        inFlight[key] = task
+        let image = await task.value
+        inFlight[key] = nil
+        if let image { images.setObject(image, forKey: key as NSString) }
+        return image
+    }
+}
+
+/// Vignette de plan centrée sur le site, avec l'épingle à la couleur de l'opérateur.
+/// Hors ligne ou en attente, l'aplat reste et l'épingle aussi : la carte n'est
+/// jamais vide.
+private struct SiteMapThumbnail: View {
+    let coordinate: SiteShareCoordinate
+    let pinColor: Color
+    let mine: Bool
+
+    private static let height: CGFloat = 112
+
+    var body: some View {
+        // Le plan est rendu à la largeur réelle de la bulle : ni recadré (la mention
+        // « Plans » de l'image reste entière) ni étiré, et l'épingle est au centre.
+        GeometryReader { proxy in
+            SiteMapSnapshotLayer(
+                coordinate: coordinate, pinColor: pinColor, mine: mine,
+                size: CGSize(width: max(proxy.size.width.rounded(), 1), height: Self.height)
+            )
+        }
+        .frame(height: Self.height)
+        .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        // Décoratif : la carte dit déjà où elle est (adresse, identifiants).
+        .accessibilityHidden(true)
+    }
+}
+
+private struct SiteMapSnapshotLayer: View {
+    let coordinate: SiteShareCoordinate
+    let pinColor: Color
+    let mine: Bool
+    let size: CGSize
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var image: UIImage?
+
+    private var dark: Bool { colorScheme == .dark }
+    private var key: String { "\(SiteMapSnapshotCache.key(coordinate, dark: dark)),\(Int(size.width))" }
+
+    var body: some View {
+        Rectangle()
+            .fill(mine ? SQColor.onInk.opacity(0.14) : SQColor.surfaceMuted)
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .transition(.opacity)
+                }
+            }
+            .overlay { pin }
+            .task(id: key) { await load() }
+    }
+
+    private var pin: some View {
+        ZStack {
+            Circle().fill(pinColor)
+            Circle().strokeBorder(Color.white, lineWidth: 2.5)
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(SQBrand.operatorBadgeForeground(for: pinColor, colorScheme: colorScheme))
+        }
+        .frame(width: 32, height: 32)
+        .shadow(color: .black.opacity(0.28), radius: 3, y: 1)
+    }
+
+    private func load() async {
+        if let cached = SiteMapSnapshotCache.shared.cached(key) {
+            image = cached
+            return
+        }
+        guard let rendered = await SiteMapSnapshotCache.shared.snapshot(of: coordinate, size: size, dark: dark, key: key),
+              !Task.isCancelled else { return }
+        withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { image = rendered }
+    }
+}
+
+/// Site (antenne) partagé dans une conversation : le texte du format commun
+/// (`SiteShareCard`) dessiné en vraie carte. Vignette de plan quand la position
+/// est connue, opérateur, technologies, identifiants, adresse, puis « Voir sur la
+/// carte ». Le toucher ouvre le site DANS l'app avec son support ; à défaut, le
+/// lien https s'il est de SignalQuest (sinon après confirmation du domaine). Le
+/// texte brut reste copiable par le menu contextuel de la bulle.
+struct SiteShareCardBubble: View {
+    let card: SiteShareCard
+    let mine: Bool
+    /// Ouvre la fiche du site sur la carte : support, marché.
+    let onOpenSite: (_ siteId: String, _ market: String?) -> Void
+    /// Faux pour un aperçu (feuille d'envoi) : rien ne s'ouvre.
+    var interactive = true
+    @Environment(\.openURL) private var openURL
+    @State private var externalURL: URL?
+
+    private var canOpen: Bool { interactive && (card.supportId != nil || card.openURL != nil) }
+
+    private func open() {
+        Haptics.selection()
+        if let support = card.supportId {
+            onOpenSite(support, card.market)
+        } else if let url = card.openURL {
+            if ShareCardData.isSignalQuestURL(url) { openURL(url) } else { externalURL = url }
+        }
+    }
+
+    /// Plusieurs opérateurs (liste) ou nom inconnu de la palette : l'épingle reste neutre.
+    private var pinColor: Color {
+        if card.hasSeveralOperators || SQBrand.operatorName(card.operatorName) == nil { return SQBrand.defaultOperator.solid }
+        return SQBrand.operatorColor(card.operatorName)
+    }
+
+    private var primary: Color { mine ? SQColor.onInk : SQColor.label }
+    private var secondary: Color { mine ? SQColor.onInk : SQColor.labelSecondary }
+
+    /// Une phrase par carte pour VoiceOver, pas dix éléments épars.
+    private var spokenLabel: String {
+        var parts = [card.operatorName.map { String(localized: "Site \($0)") } ?? String(localized: "Site")]
+        if !card.technologies.isEmpty {
+            parts.append("\(String(localized: "Technologies")) : \(card.technologies.joined(separator: ", "))")
+        }
+        if let enb = card.enb { parts.append("eNB \(enb)") }
+        if let pci = card.pci { parts.append("PCI \(pci)") }
+        if let support = card.supportId { parts.append(String(localized: "Support \(support)")) }
+        if let anfr = card.anfr { parts.append("ANFR \(anfr)") }
+        if let address = card.address { parts.append("\(String(localized: "Adresse")) : \(address)") }
+        return parts.joined(separator: ". ")
+    }
+
+    var body: some View {
+        Group {
+            if canOpen {
+                Button(action: open) { content }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Montre le site sur la carte")
+            } else {
+                content
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: spokenLabel))
+        .confirmsExternalLink($externalURL)
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            if let coordinate = card.coordinate {
+                SiteMapThumbnail(coordinate: coordinate, pinColor: pinColor, mine: mine)
+            }
+            HStack(spacing: SQSpace.sm) {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(mine ? SQColor.onInk : SQColor.accentInk)
+                    .frame(width: 32, height: 32)
+                    .background(mine ? SQColor.onInk.opacity(0.16) : SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Site")
+                        .font(SQType.micro)
+                        .foregroundStyle(secondary)
+                    Text(verbatim: card.operatorName ?? String(localized: "Antenne"))
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(primary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+            if !card.technologies.isEmpty {
+                ANFRFlowLayout(spacing: SQSpace.xs2) {
+                    ForEach(card.technologies, id: \.self) { technology in
+                        HStack(spacing: 4) {
+                            Circle().fill(SQBrand.techColor(technology)).frame(width: 6, height: 6)
+                            Text(verbatim: technology)
+                                .font(SQType.micro)
+                                .foregroundStyle(secondary)
+                        }
+                        .padding(.horizontal, SQSpace.sm)
+                        .padding(.vertical, 3)
+                        .background(mine ? SQColor.onInk.opacity(0.14) : SQColor.surfaceMuted, in: Capsule())
+                    }
+                }
+            }
+            identifiers
+            if let address = card.address {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.xs2) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 11))
+                        .foregroundStyle(secondary)
+                    Text(verbatim: address)
+                        .font(SQType.caption)
+                        .foregroundStyle(primary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+            if canOpen { openRow }
+        }
+        .frame(maxWidth: 280, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    /// eNB, PCI, support et ANFR : une ligne « libellé · valeur » chacune, comme les
+    /// autres cartes de partage.
+    @ViewBuilder
+    private var identifiers: some View {
+        if card.enb != nil || card.pci != nil || card.supportId != nil || card.anfr != nil {
+            VStack(spacing: SQSpace.xs + 1) {
+                if let enb = card.enb { identifierRow(Text(verbatim: "eNB"), enb) }
+                if let pci = card.pci { identifierRow(Text(verbatim: "PCI"), pci) }
+                if let support = card.supportId { identifierRow(Text("Support"), support) }
+                if let anfr = card.anfr { identifierRow(Text(verbatim: "ANFR"), anfr) }
+            }
+        }
+    }
+
+    private func identifierRow(_ label: Text, _ value: String) -> some View {
+        HStack {
+            label
+                .font(SQType.micro)
+                .foregroundStyle(secondary)
+            Spacer(minLength: SQSpace.sm)
+            Text(verbatim: value)
+                .font(SQType.caption.weight(.medium))
+                .foregroundStyle(primary)
+                .monospacedDigit()
+                .multilineTextAlignment(.trailing)
+        }
+    }
+
+    /// « Voir sur la carte » : hairline puis rangée pleine largeur de 44 pt.
+    private var openRow: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Rectangle()
+                .fill(mine ? SQColor.onInk.opacity(0.22) : SQColor.separator)
+                .frame(height: 0.5)
+            HStack(spacing: SQSpace.xs) {
+                Text("Voir sur la carte")
+                    .font(SQType.caption.weight(.semibold))
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundStyle(mine ? SQColor.onInk : SQColor.accentInk)
+            .frame(minHeight: 44)
         }
         .padding(.top, 1)
     }

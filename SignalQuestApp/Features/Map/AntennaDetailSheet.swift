@@ -134,6 +134,8 @@ struct AntennaDetailSheet: View {
     @State private var showPhotoOperatorPicker = false
     @State private var tab: AntennaDetailTab = .essential
     @State private var showReportSheet = false
+    /// Texte du site à envoyer dans une conversation (P2-47) ; non nil = sélecteur ouvert.
+    @State private var siteShareDraft: SiteShareDraft?
     /// Type présélectionné à l'ouverture du signalement (lien « opérateur porteur »).
     @State private var reportInitialType: AntennaReportType = .other
     /// Pannes communautaires ouvertes sur ce site, rechargées à chaque changement d'opérateur :
@@ -286,6 +288,8 @@ struct AntennaDetailSheet: View {
         } message: { _ in
             Text("Elle disparaîtra de la carte pour tout le monde, tout de suite. On ne peut pas revenir en arrière.")
         }
+        // Le texte arrive prérempli dans la conversation choisie, qui s'ouvre : la fiche se ferme.
+        .siteSharePicker($siteShareDraft) { close() }
         .sheet(isPresented: $showOutageReport) {
             OutageReportSheet(
                 siteId: site.writeSiteId,
@@ -454,6 +458,49 @@ struct AntennaDetailSheet: View {
                 }
             }
         }
+        if !isCustomSite {
+            GradientButton(String(localized: "Envoyer dans une conversation"), systemImage: "paperplane",
+                           style: .secondary, allowsMultiline: true) {
+                Haptics.selection()
+                siteShareDraft = SiteShareDraft(text: siteShareText)
+            }
+            .accessibilityIdentifier("antenna.detail.sendToConversation")
+        }
+    }
+
+    /// Le site tel qu'on l'écrit dans une conversation (P2-47, format commun au web, à iOS
+    /// et à Android) : une donnée inconnue omet sa ligne. L'opérateur est celui de la fiche
+    /// affichée ; sur un support partagé sans choix, la carte n'en nomme aucun.
+    private var siteShareText: String {
+        let core = model.details?.core
+        let operatorKey = selectedOperator.caseInsensitiveCompare("ALL") == .orderedSame
+            ? (site.operators.count == 1 ? site.operators.first : nil)
+            : selectedOperator
+        // Orange, SFR, Bouygues Telecom, Free Mobile en métropole ; ailleurs, le nom du site.
+        let operatorName = operatorKey.flatMap { key in
+            SiteShareCard.metropolitanOperatorName(forKey: key)
+                ?? marketEntry?.operatorEntry(forKey: key)?.label
+                ?? core?.rawLicenseeName.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
+                ?? key
+        }
+        let identifiers = core?.cellIdentifiers
+        // Un PCI par secteur : on n'en écrit un que s'il est le seul du site, jamais un au hasard.
+        let pcis = Set((identifiers?.pci ?? []).map(\.value))
+        let isFrance = market.caseInsensitiveCompare("FR") == .orderedSame
+        let supportId = (core?.supId).flatMap { $0.isEmpty ? nil : $0 } ?? site.siteId
+        let anfr = isFrance ? ((core?.anfrCode).flatMap { $0.isEmpty ? nil : $0 } ?? site.anfrCode) : nil
+        let card = SiteShareCard(
+            operatorName: operatorName,
+            technologies: SiteShareCard.generations(in: displayedTechnologies),
+            enb: identifiers?.enb.first ?? customSite?.radio?.enb,
+            pci: pcis.count == 1 ? pcis.first : nil,
+            supportId: supportId,
+            anfr: anfr,
+            market: market,
+            address: locationLine,
+            coordinate: siteCoordinate.flatMap { SiteShareCoordinate(latitude: $0.latitude, longitude: $0.longitude) }
+        )
+        return card.shareText(baseURL: AppConfig.current.appBaseURL, linkSiteId: site.writeSiteId)
     }
 
     /// Identité radio permettant d'isoler les mesures de CE site.

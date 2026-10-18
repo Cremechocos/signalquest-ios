@@ -2560,8 +2560,32 @@ extension MessageItem {
                 sender: MessageUser(id: "demo-user", name: "Camille", email: "camille@signalquest.fr", avatarUrl: nil),
                 attachments: [],
                 reactions: []
+            ),
+            // Sites partagés au format commun (P2-47) : l'un reçu, l'autre envoyé.
+            demoSiteMessage(
+                id: "demo-site-1", senderId: "demo-user", name: "Camille", minutesAgo: 6,
+                text: ["Antenne Orange (eNB 812345)", "Opérateur: Orange", "Technologies: 4G, 5G", "eNB: 812345", "PCI: 211",
+                       "Support: 1234567", "ANFR: 0691234567", "Marché: FR", "Adresse: 45, rue de Gerland, 69007 Lyon",
+                       "Position: 45.72869, 4.83312",
+                       "Lien: https://signalquest.fr/carte?lat=45.72869&lng=4.83312&siteId=1234567&market=FR&operator=ORANGE&open=antenna"]
+            ),
+            demoSiteMessage(
+                id: "demo-site-2", senderId: "mock-user", name: "SignalQuest iOS", minutesAgo: 2,
+                text: ["Antenne Bouygues Telecom (ANFR 0381234567)", "Opérateur: Bouygues Telecom", "Technologies: 4G", "Support: 7654321",
+                       "ANFR: 0381234567", "Marché: FR", "Adresse: Rue du Port, 38000 Grenoble"]
             )
         ]
+    }
+
+    private static func demoSiteMessage(id: String, senderId: String, name: String, minutesAgo: Double, text: [String]) -> MessageItem {
+        MessageItem(
+            id: id, conversationId: "demo-conv-1", senderId: senderId, kind: "TEXT",
+            content: text.joined(separator: "\n"), e2eeVersion: nil, e2eeIvB64: nil, e2eeCiphertextB64: nil, e2eeAadB64: nil,
+            metadata: nil, createdAt: Date().addingTimeInterval(-minutesAgo * 60), editedAt: nil, deletedAt: nil, replyToId: nil,
+            threadReplyCount: 0,
+            sender: MessageUser(id: senderId, name: name, email: "demo@signalquest.fr", avatarUrl: nil),
+            attachments: [], reactions: []
+        )
     }
 }
 
@@ -2711,12 +2735,17 @@ struct ConversationAvatar: View {
 /// prérempli (texte par le brouillon, pièces jointes mises en attente) ; choisir
 /// le fil ouvre le composer de publication. L'envoi reste celui de ces écrans,
 /// chiffrement compris.
+///
+/// En mode `isOutgoing` (P2-47), la feuille sert de sélecteur de conversation à un
+/// texte écrit par l'app elle-même (un site à envoyer) : pas de fil, « Annuler » à
+/// la place d'« Ignorer », même remise par le brouillon.
 struct ReceivedShareSheet: View {
     let entry: ShareInbox.Entry
     /// Brouillon écrit, pièces jointes lues : la conversation peut s'ouvrir.
     let onDelivered: (MessageConversation, [ShareHandoffAttachment]) -> Void
     let onFeed: (ComposerSharedContent) -> Void
     let onIgnore: () -> Void
+    var isOutgoing = false
 
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -2764,17 +2793,19 @@ struct ReceivedShareSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
                 MessageSheetHeader(
-                    title: "Partage reçu",
-                    subtitle: String(localized: "Choisis où le déposer. Rien ne part sans ton accord."),
+                    title: isOutgoing ? "Envoyer dans une conversation" : "Partage reçu",
+                    subtitle: isOutgoing
+                        ? String(localized: "Choisis la conversation. Tu relis le message avant de l’envoyer.")
+                        : String(localized: "Choisis où le déposer. Rien ne part sans ton accord."),
                     closeIdentifier: "share.close"
                 ) { dismiss() }
                 previewCard
                 conversationsSection
-                feedSection
+                if !isOutgoing { feedSection }
                 Button(role: .destructive) { onIgnore() } label: {
-                    Text("Ignorer")
+                    Text(isOutgoing ? LocalizedStringKey("Annuler") : LocalizedStringKey("Ignorer"))
                         .font(SQType.body.weight(.semibold))
-                        .foregroundStyle(SQColor.dangerInk)
+                        .foregroundStyle(isOutgoing ? SQColor.accentInk : SQColor.dangerInk)
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .contentShape(Rectangle())
                 }
@@ -2794,7 +2825,10 @@ struct ReceivedShareSheet: View {
 
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            if let text = manifest.text {
+            if isOutgoing, let text = manifest.text, let site = SiteShareCard.parse(text) {
+                // Ce qui va partir, tel que le destinataire le verra.
+                SiteShareCardBubble(card: site, mine: false, onOpenSite: { _, _ in }, interactive: false)
+            } else if let text = manifest.text {
                 Text(verbatim: text)
                     .font(SQType.body)
                     .foregroundStyle(SQColor.label)
@@ -3080,5 +3114,52 @@ struct ReceivedShareSheet: View {
                 return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary).map { UIImage(cgImage: $0) }
             }
         }.value
+    }
+}
+
+// MARK: Envoi d'un site dans une conversation (P2-47)
+
+/// Texte de site à envoyer, prêt pour le sélecteur de conversation.
+struct SiteShareDraft: Identifiable, Equatable {
+    let id = UUID()
+    let text: String
+}
+
+private struct SiteSharePickerModifier: ViewModifier {
+    @Binding var draft: SiteShareDraft?
+    /// Appelé une fois la conversation choisie : la fiche d'où part le site se ferme.
+    let onDelivered: () -> Void
+    @EnvironmentObject private var router: AppRouter
+
+    func body(content: Content) -> some View {
+        content.sheet(item: $draft) { draft in
+            ReceivedShareSheet(
+                // Un dépôt sans fichier : seul le texte compte, le dossier n'est jamais lu.
+                entry: ShareInbox.Entry(
+                    manifest: ShareInbox.Manifest(id: draft.id.uuidString, createdAt: Date(), text: draft.text, url: nil, items: []),
+                    directory: FileManager.default.temporaryDirectory
+                ),
+                onDelivered: { conversation, _ in
+                    // Le texte est déjà dans le brouillon de la conversation : elle s'ouvre,
+                    // l'utilisateur relit et envoie lui-même.
+                    self.draft = nil
+                    router.pendingShare = ShareHandoff(conversationId: conversation.id, attachments: [])
+                    router.route(toConversation: conversation.id)
+                    onDelivered()
+                },
+                onFeed: { _ in },
+                onIgnore: { self.draft = nil },
+                isOutgoing: true
+            )
+        }
+    }
+}
+
+extension View {
+    /// Présente le sélecteur de conversation d'un site à envoyer (P2-47). Le texte
+    /// arrive prérempli dans le compositeur de la conversation choisie, chiffrée
+    /// comprise : c'est du texte.
+    func siteSharePicker(_ draft: Binding<SiteShareDraft?>, onDelivered: @escaping () -> Void) -> some View {
+        modifier(SiteSharePickerModifier(draft: draft, onDelivered: onDelivered))
     }
 }

@@ -1566,6 +1566,7 @@ struct ConversationDetailView: View {
 
     private func classicBubble(for message: MessageItem, mine: Bool, isGroupStart: Bool, isGroupEnd: Bool) -> some View {
             let card = shareCard(for: message)
+            let site = siteShare(for: message, hasCard: card != nil)
             // Contenu interactif dans la bulle (embed de publication, photo
             // tappable) : on garde les éléments d'accessibilité séparés
             // (.contain) pour que VoiceOver atteigne les boutons ; sinon la
@@ -1577,6 +1578,8 @@ struct ConversationDetailView: View {
                 || (!isE2EE && message.deletedAt == nil && displayedContent(for: message).contains("http"))
                 // Citation de repli « Message d’origine » : un bouton.
                 || (message.replyToId != nil && message.deletedAt == nil && quotedMessage(for: message) == nil)
+                // Site partagé : la carte entière est un bouton, qui porte son propre libellé.
+                || site != nil
             let spokenSummary = spokenTextSummary(for: message, mine: mine, card: card)
             return VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs + 1) {
                 if !mine, conversation.isGroup, isGroupStart, let name = message.sender?.displayName {
@@ -1679,6 +1682,12 @@ struct ConversationDetailView: View {
                         onVote: { ids in Task { await vote(messageId: message.id, pollId: poll.pollId, optionIds: ids) } },
                         onClose: { Task { await closePoll(messageId: message.id, pollId: poll.pollId) } }
                     )
+                } else if let site {
+                    // Site partagé en texte (P2-47), clair ou déchiffré : le texte brut
+                    // reste copiable par le menu contextuel.
+                    SiteShareCardBubble(card: site, mine: mine) { siteId, market in
+                        router.route(toSite: siteId, market: market)
+                    }
                 } else {
                     let text = displayedContent(for: message)
                     if !text.isEmpty {
@@ -2660,6 +2669,17 @@ struct ConversationDetailView: View {
     private func shareCard(for message: MessageItem) -> ShareCardData? {
         guard message.deletedAt == nil, message.metadata != nil else { return nil }
         return renderCache.shareCard(for: message)
+    }
+
+    /// Site partagé en texte (P2-47) : « Antenne … » du format commun, relu en carte. Il
+    /// faut l'en-tête ET une ligne de donnée connue, sans quoi le texte reste un texte.
+    /// Le texte clair ou déchiffré est lu ; mémoïsé par message dans `renderCache`.
+    private func siteShare(for message: MessageItem, hasCard: Bool) -> SiteShareCard? {
+        guard !hasCard, message.deletedAt == nil,
+              location(for: message) == nil, pollsByMessageId[message.id] == nil else { return nil }
+        let text = displayedContent(for: message)
+        guard text.range(of: "antenne", options: .caseInsensitive) != nil else { return nil }
+        return renderCache.siteShare(text, id: message.id)
     }
 
     /// Localisation partagée (kind LOCATION) portée par le metadata. PERF-MSG-03 —

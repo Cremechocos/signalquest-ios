@@ -4341,6 +4341,22 @@
         }
       }
     },
+    "Bilan net de la comparaison, dernier changement au relevé du %@. Le détail par antenne est dans l’historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Net result of the comparison, last change in the survey of %@. The antenna details are in the history."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilan net de la comparaison, dernier changement au relevé du %@. Le détail par antenne est dans l’historique."
+          }
+        }
+      }
+    },
     "Bloquant" : {
       "localizations" : {
         "en" : {
@@ -4741,6 +4757,22 @@
         }
       }
     },
+    "Ce relevé ne liste pas les antennes. Le détail par antenne est dans l’historique." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This survey does not list the antennas. The antenna details are in the history."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce relevé ne liste pas les antennes. Le détail par antenne est dans l’historique."
+          }
+        }
+      }
+    },
     "Ce résultat n’a pas pu être sauvegardé." : {
       "localizations" : {
         "en" : {
@@ -5091,6 +5123,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changements nets, %lld relevés cumulés"
+          }
+        }
+      }
+    },
+    "Changements sur la période" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes over the period"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changements sur la période"
           }
         }
       }
@@ -6575,6 +6623,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Données"
+          }
+        }
+      }
+    },
+    "Dont %lld en rattrapage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Including %lld catch-ups"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dont %lld en rattrapage"
           }
         }
       }
@@ -81475,6 +81539,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déverrouille le chiffrement pour lire et écrire. Tes messages restent illisibles en dehors de tes appareils."
+          }
+        }
+      }
+    },
+    "Envoyer dans une conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send in a conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer dans une conversation"
+          }
+        }
+      }
+    },
+    "Choisis la conversation. Tu relis le message avant de l’envoyer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a conversation. You review the message before sending it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis la conversation. Tu relis le message avant de l’envoyer."
           }
         }
       }
