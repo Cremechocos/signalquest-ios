@@ -263,6 +263,173 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(none.barSegments(for: empty).map(\.fraction), [0, 0, 0, 0], "Zone vide : pas de division par zéro")
     }
 
+    // MARK: - Lot 2 messagerie
+
+    /// Archivage sans quitter : seule la présence de `shelvedSummary` dit que le serveur sait archiver.
+    func testShelvedSummaryIsOptionalAndTolerant() throws {
+        func decode(_ json: String) throws -> ConversationsResponse {
+            try JSONDecoder.signalQuest.decode(ConversationsResponse.self, from: Data(json.utf8))
+        }
+        XCTAssertNil(try decode(#"{"conversations":[]}"#).shelvedSummary)
+        XCTAssertEqual(try decode(#"{"conversations":[],"shelvedSummary":{"count":3,"unreadCount":1}}"#).shelvedSummary,
+                       ShelvedSummary(count: 3, unreadCount: 1))
+        XCTAssertEqual(try decode(#"{"conversations":[],"shelvedSummary":{}}"#).shelvedSummary,
+                       ShelvedSummary(count: 0, unreadCount: 0), "Une valeur manquante vaut 0, la clé reste présente")
+        XCTAssertEqual(try decode(#"{"conversations":[],"shelvedSummary":{"count":-4,"unreadCount":"x"}}"#).shelvedSummary,
+                       ShelvedSummary(count: 0, unreadCount: 0))
+    }
+
+    func testConversationCarriesShelvedFlagAndDate() throws {
+        func decode(_ extra: String) throws -> MessageConversation {
+            try JSONDecoder.signalQuest.decode(MessageConversation.self, from: Data(#"{"id":"c1","participants":[]\#(extra)}"#.utf8))
+        }
+        XCTAssertFalse(try decode("").shelved)
+        XCTAssertTrue(try decode(#","shelved":true"#).shelved)
+        let dated = try decode(#","shelvedAt":"2026-10-01T10:00:00.000Z""#)
+        XCTAssertTrue(dated.shelved, "Une date d’archivage suffit quand le drapeau manque")
+        XCTAssertNotNil(dated.shelvedAt)
+        XCTAssertFalse(try decode(#","shelved":false"#).shelved)
+    }
+
+    /// Les liens dossier ↔ conversation ne viennent que de la liste des dossiers.
+    func testConversationFoldersDecodeLinksAndSkipBrokenEntries() throws {
+        let json = """
+        {"categories":[
+          {"id":"f1","name":"Terrain","links":[{"conversationId":"c1"},{"conversationId":"c2"},{"x":1}]},
+          {"id":"f2","name":42},
+          {"name":"sans identifiant"}
+        ]}
+        """
+        let response = try JSONDecoder.signalQuest.decode(ConversationFoldersResponse.self, from: Data(json.utf8))
+        XCTAssertEqual(response.categories.map(\.id), ["f1", "f2"])
+        XCTAssertEqual(response.categories[0].conversationIds, ["c1", "c2"])
+        XCTAssertEqual(response.categories[1].conversationIds, [])
+    }
+
+    func testFocusSessionRunningDependsOnEndAndActiveFlag() throws {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        XCTAssertTrue(MessageFocusSession(conversationIds: ["c1"], endsAt: nil).isRunning(at: now))
+        XCTAssertTrue(MessageFocusSession(conversationIds: ["c1"], endsAt: now.addingTimeInterval(60)).isRunning(at: now))
+        XCTAssertFalse(MessageFocusSession(conversationIds: ["c1"], endsAt: now.addingTimeInterval(-1)).isRunning(at: now),
+                       "Une session échue reste marquée active côté serveur")
+        XCTAssertFalse(MessageFocusSession(conversationIds: ["c1"], endsAt: nil, active: false).isRunning(at: now))
+        let none = try JSONDecoder.signalQuest.decode(MessageFocusResponse.self, from: Data(#"{"focusSession":null}"#.utf8))
+        XCTAssertNil(none.focusSession)
+        let some = try JSONDecoder.signalQuest.decode(MessageFocusResponse.self, from: Data(
+            #"{"focusSession":{"id":"s1","conversationIds":["c1","c2"],"endsAt":"2030-01-01T00:00:00.000Z"}}"#.utf8))
+        XCTAssertEqual(some.focusSession?.conversationIds, ["c1", "c2"])
+        XCTAssertTrue(some.focusSession?.active ?? false, "Un champ absent prend la valeur par défaut")
+    }
+
+    func testSecretPolicyDecodesWithDefaultsAndEncodesItsFields() throws {
+        let empty = try JSONDecoder.signalQuest.decode(ConversationSecretPolicyResponse.self, from: Data(#"{"policy":null}"#.utf8))
+        XCTAssertNil(empty.policy)
+        let policy = try JSONDecoder.signalQuest.decode(ConversationSecretPolicyResponse.self, from: Data(
+            #"{"policy":{"requireBiometric":true,"autoDeleteSeconds":3600}}"#.utf8)).policy
+        XCTAssertEqual(policy, ConversationSecretPolicy(requireBiometric: true, blockScreenshots: false, autoDeleteSeconds: 3600))
+        XCTAssertEqual(policy?.outgoingTTLSeconds, 3600)
+        XCTAssertFalse(policy?.isInactive ?? true)
+        XCTAssertTrue(ConversationSecretPolicy().isInactive)
+        // Le PUT remplace l'ensemble des champs ; un délai absent se lit « sans limite » côté serveur.
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(ConversationSecretPolicy(autoDeleteSeconds: 60))) as? [String: Any]
+        XCTAssertEqual(Set(object?.keys.map { $0 } ?? []), ["requireBiometric", "blockScreenshots", "autoDeleteSeconds", "ephemeralDefault"])
+    }
+
+    private static let callEventJSON = """
+    {"callId":"k1","mode":"video","outcome":"missed","startedAt":"2026-10-18T10:00:00.000Z","durationSec":null,"callerId":"other"}
+    """
+
+    func testCallThreadEventDecodingIsTolerant() throws {
+        let event = try JSONDecoder.signalQuest.decode(CallThreadEvent.self, from: Data(Self.callEventJSON.utf8))
+        XCTAssertEqual(event.callId, "k1")
+        XCTAssertEqual(event.mode, .video)
+        XCTAssertEqual(event.outcome, .missed)
+        XCTAssertNil(event.durationSec)
+        // Un mode inconnu se lit comme un appel vocal ; une issue inconnue écarte l'entrée sans casser la page.
+        let page = try JSONDecoder.signalQuest.decode(CallThreadHistoryPage.self, from: Data("""
+        {"events":[
+          {"callId":"a","mode":"hologram","outcome":"completed","startedAt":"2026-10-18T10:00:00.000Z","durationSec":240},
+          {"callId":"b","mode":"audio","outcome":"exploded","startedAt":"2026-10-18T10:05:00.000Z"},
+          {"callId":"c","mode":"audio","outcome":"declined","startedAt":"2026-10-18T10:06:00.000Z"}
+        ],"nextBefore":"2026-10-18T09:00:00.000Z"}
+        """.utf8))
+        XCTAssertEqual(page.events.map(\.callId), ["a", "c"])
+        XCTAssertEqual(page.events.first?.mode, .audio)
+        XCTAssertEqual(page.nextBefore, "2026-10-18T09:00:00.000Z")
+        let last = try JSONDecoder.signalQuest.decode(CallThreadHistoryPage.self, from: Data(#"{"events":[],"nextBefore":null}"#.utf8))
+        XCTAssertNil(last.nextBefore)
+    }
+
+    /// L'issue se lit selon `callerId` : un « annulé » est « manqué » chez l'appelé, « annulé » chez l'appelant.
+    func testCallThreadWordingFollowsTheCaller() {
+        let at = Date(timeIntervalSince1970: 1_790_000_000)
+        func event(_ outcome: CallThreadEvent.Outcome, mode: CallThreadEvent.Mode = .audio, duration: Int? = nil) -> CallThreadEvent {
+            CallThreadEvent(callId: "k", mode: mode, outcome: outcome, startedAt: at, durationSec: duration, callerId: "me")
+        }
+        let cancelled = event(.cancelled)
+        XCTAssertEqual(cancelled.summary(currentUserId: "me"), String(localized: "Appel vocal annulé"))
+        XCTAssertEqual(cancelled.summary(currentUserId: "other"), String(localized: "Appel vocal manqué"))
+        XCTAssertTrue(cancelled.isMissedForReader(currentUserId: "other"))
+        XCTAssertFalse(cancelled.isMissedForReader(currentUserId: "me"))
+        XCTAssertEqual(event(.missed).summary(currentUserId: "me"), String(localized: "Appel vocal sans réponse"))
+        XCTAssertEqual(event(.missed, mode: .video).summary(currentUserId: "other"), String(localized: "Appel vidéo manqué"))
+        XCTAssertEqual(event(.declined).summary(currentUserId: "me"), String(localized: "Appel vocal refusé"))
+        XCTAssertFalse(event(.declined).isMissedForReader(currentUserId: "other"))
+        XCTAssertEqual(event(.completed).summary(currentUserId: "me"), String(localized: "Appel vocal"))
+        XCTAssertEqual(CallThreadEvent.durationLabel(240), CallThreadEvent.durationLabel(240))
+        XCTAssertNotEqual(event(.completed, duration: 240).summary(currentUserId: "me"), String(localized: "Appel vocal"),
+                          "Une durée connue se lit dans la phrase")
+        XCTAssertEqual(event(.completed, mode: .video).systemImage, "video.fill")
+    }
+
+    func testCallThreadPlacementInsertsByDateAndDeduplicatesByCallId() {
+        let base = Date(timeIntervalSince1970: 1_790_000_000)
+        func message(_ id: String, _ seconds: TimeInterval) -> MessageItem {
+            MessageItem(
+                id: id, conversationId: "c1", senderId: "other", kind: "TEXT", content: "x",
+                e2eeVersion: nil, e2eeIvB64: nil, e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil,
+                createdAt: base.addingTimeInterval(seconds), editedAt: nil, deletedAt: nil, replyToId: nil, threadReplyCount: 0,
+                sender: nil, attachments: [], reactions: []
+            )
+        }
+        func call(_ id: String, _ seconds: TimeInterval, _ outcome: CallThreadEvent.Outcome = .completed) -> CallThreadEvent {
+            CallThreadEvent(callId: id, mode: .audio, outcome: outcome, startedAt: base.addingTimeInterval(seconds))
+        }
+        let messages = [message("m1", 10), message("m2", 20), message("m3", 30)]
+        let placement = CallThreadPlacement.make(messages: messages, events: [call("late", 99), call("b", 25), call("a", 15), call("a2", 15)])
+        XCTAssertEqual(placement.before["m2"]?.map(\.callId), ["a", "a2"])
+        XCTAssertEqual(placement.before["m3"]?.map(\.callId), ["b"])
+        XCTAssertEqual(placement.trailing.map(\.callId), ["late"])
+        XCTAssertEqual(CallThreadPlacement.make(messages: messages, events: []), .empty)
+
+        // Historique puis temps réel : le même callId remplace, il ne s'ajoute pas.
+        let merged = CallThreadPlacement.merge([call("a", 15, .missed), call("b", 25)], with: [call("a", 15, .completed), call("c", 5)])
+        XCTAssertEqual(merged.map(\.callId), ["b", "a", "c"], "Du plus récent au plus ancien")
+        XCTAssertEqual(merged.first { $0.callId == "a" }?.outcome, .completed)
+    }
+
+    func testCallEventStreamPayloadBecomesATrigger() {
+        let data = #"{"type":"call_event","conversationId":"c1","at":"2026-10-18T10:00:00.000Z","call":\#(Self.callEventJSON)}"#
+        guard case .callEvent(let event) = SyncTrigger.from(event: "call_event", data: data) else {
+            return XCTFail("L’événement call_event doit produire un déclencheur dédié")
+        }
+        XCTAssertEqual(event?.callId, "k1")
+        guard case .callEvent(let broken) = SyncTrigger.from(event: "call_event", data: "pas du JSON") else {
+            return XCTFail("Un corps illisible reste un call_event, sans appel")
+        }
+        XCTAssertNil(broken)
+    }
+
+    /// Siri : la recherche ne touche que le nom ; l'entité ne porte ni contenu ni autre champ.
+    func testConversationIntentDirectoryMatchesByNameOnly() {
+        typealias Item = SQConversationIntentDirectory.Item
+        let items = [Item(id: "1", name: "Équipe terrain", isEncrypted: false), Item(id: "2", name: "Camille", isEncrypted: true)]
+        XCTAssertEqual(SQConversationIntentDirectory.matching(items, name: "equipe").map(\.id), ["1"])
+        XCTAssertEqual(SQConversationIntentDirectory.matching(items, name: "  ").count, 2)
+        XCTAssertTrue(SQConversationIntentDirectory.matching(items, name: "zzz").isEmpty)
+        XCTAssertEqual(Set(Mirror(reflecting: ConversationEntity(items[0])).children.compactMap(\.label)), ["id", "name"])
+    }
+
     private static let mapJSON = """
     {"timestamp":"2026-05-11T10:00:00.000Z","friends":[],"photos":[],"validations":[],"sessions":[],"coveragePoints":[],"speedtests":[{"id":"sp1","userId":"u1","latitude":48.85,"longitude":2.35,"averageSpeed":210,"uploadAvg":42,"pingAvg":18,"timestamp":"2026-05-11T10:00:00.000Z","networkType":"WIFI","mobileOperator":"SignalQuest"}],"photosCount":0,"validationsCount":0,"sessionsCount":0,"coveragePointsCount":0,"speedtestsCount":1,"rawCoveragePointsCount":0,"logicalCoveragePointsCount":0}
     """

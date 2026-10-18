@@ -62,6 +62,16 @@ final class CallConversationDirectory: @unchecked Sendable {
         return loadLocked(ownerScopeId: ownerScopeId).entries[conversationId]
     }
 
+    /// Les conversations connues de ce compte, les plus récemment vues d'abord :
+    /// nom et chiffrement seulement. Alimente les suggestions de Siri et Raccourcis.
+    func allEntries(ownerScopeId: String) -> [(id: String, entry: Entry)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return loadLocked(ownerScopeId: ownerScopeId).entries
+            .sorted { $0.value.seenAtMs != $1.value.seenAtMs ? $0.value.seenAtMs > $1.value.seenAtMs : $0.key < $1.key }
+            .map { (id: $0.key, entry: $0.value) }
+    }
+
     /// Conversations vues dans la messagerie, avec le nom que l'app leur donne.
     func record(
         _ conversations: [MessageConversation],

@@ -2341,6 +2341,22 @@
         }
       }
     },
+    "1 h" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 h"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 h"
+          }
+        }
+      }
+    },
     "1 nouveau message" : {
       "localizations" : {
         "en" : {
@@ -2501,6 +2517,22 @@
         }
       }
     },
+    "4 h" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4 h"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4 h"
+          }
+        }
+      }
+    },
     "50 Go" : {
       "localizations" : {
         "en" : {
@@ -2545,6 +2577,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Active le chiffrement sur cet appareil pour créer une conversation chiffrée."
+          }
+        }
+      }
+    },
+    "Activer le mode focus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on focus mode"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer le mode focus"
           }
         }
       }
@@ -2755,6 +2803,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajouter des captures"
+          }
+        }
+      }
+    },
+    "Alerte de capture d’écran" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screenshot alert"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alerte de capture d’écran"
           }
         }
       }
@@ -3035,6 +3099,182 @@
         }
       }
     },
+    "Appel vidéo annulé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video call canceled"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vidéo annulé"
+          }
+        }
+      }
+    },
+    "Appel vidéo manqué" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missed video call"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vidéo manqué"
+          }
+        }
+      }
+    },
+    "Appel vidéo refusé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video call declined"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vidéo refusé"
+          }
+        }
+      }
+    },
+    "Appel vidéo sans réponse" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video call, no answer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vidéo sans réponse"
+          }
+        }
+      }
+    },
+    "Appel vidéo · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video call · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vidéo · %@"
+          }
+        }
+      }
+    },
+    "Appel vocal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice call"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vocal"
+          }
+        }
+      }
+    },
+    "Appel vocal annulé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice call canceled"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vocal annulé"
+          }
+        }
+      }
+    },
+    "Appel vocal manqué" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missed voice call"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vocal manqué"
+          }
+        }
+      }
+    },
+    "Appel vocal refusé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice call declined"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vocal refusé"
+          }
+        }
+      }
+    },
+    "Appel vocal sans réponse" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice call, no answer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vocal sans réponse"
+          }
+        }
+      }
+    },
+    "Appel vocal · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice call · %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appel vocal · %@"
+          }
+        }
+      }
+    },
     "Application" : {
       "localizations" : {
         "en" : {
@@ -3067,6 +3307,22 @@
         }
       }
     },
+    "Archiver" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archiver"
+          }
+        }
+      }
+    },
     "Archives locales · %lld" : {
       "localizations" : {
         "en" : {
@@ -3079,6 +3335,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Archives locales · %lld"
+          }
+        }
+      }
+    },
+    "Archivées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivées"
+          }
+        }
+      }
+    },
+    "Archivées : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivées : %lld"
+          }
+        }
+      }
+    },
+    "Archivées : %lld, non lues : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived: %lld, unread: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivées : %lld, non lues : %lld"
           }
         }
       }
@@ -3207,6 +3511,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun badge débloqué pour l’instant. Ceux qui restent à gagner sont dans « À débloquer »."
+          }
+        }
+      }
+    },
+    "Aucun dossier pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No folders yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun dossier pour l’instant."
           }
         }
       }
@@ -3495,6 +3815,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune bande en service."
+          }
+        }
+      }
+    },
+    "Aucune conversation archivée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No archived conversations"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune conversation archivée"
           }
         }
       }
@@ -3885,6 +4221,22 @@
         }
       }
     },
+    "Capture d’écran détectée dans cette conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screenshot detected in this conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture d’écran détectée dans cette conversation."
+          }
+        }
+      }
+    },
     "Capture jointe, toucher pour agrandir" : {
       "localizations" : {
         "en" : {
@@ -4190,6 +4542,22 @@
         }
       }
     },
+    "Cet appareil n’a ni Face ID ni code : le verrouillage n’est pas disponible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device has neither Face ID nor a passcode: locking is not available."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil n’a ni Face ID ni code : le verrouillage n’est pas disponible."
+          }
+        }
+      }
+    },
     "Cet appareil n’est pas encore prêt pour le chiffrement de bout en bout." : {
       "localizations" : {
         "en" : {
@@ -4202,6 +4570,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cet appareil n’est pas encore prêt pour le chiffrement de bout en bout."
+          }
+        }
+      }
+    },
+    "Cette conversation est chiffrée : SignalQuest n’y envoie pas de message depuis Siri ou Raccourcis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This conversation is encrypted: SignalQuest does not send messages to it from Siri or Shortcuts."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette conversation est chiffrée : SignalQuest n’y envoie pas de message depuis Siri ou Raccourcis."
           }
         }
       }
@@ -4399,6 +4783,22 @@
         }
       }
     },
+    "Chargement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement"
+          }
+        }
+      }
+    },
     "Chargement de la discussion…" : {
       "localizations" : {
         "en" : {
@@ -4555,6 +4955,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisir sur la carte"
+          }
+        }
+      }
+    },
+    "Choisis une conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisis une conversation"
           }
         }
       }
@@ -4918,6 +5334,22 @@
         }
       }
     },
+    "Confirme pour protéger cette conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm to protect this conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirme pour protéger cette conversation."
+          }
+        }
+      }
+    },
     "Confirme ton compte" : {
       "localizations" : {
         "en" : {
@@ -4978,6 +5410,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connecte-toi pour envoyer un signalement"
+          }
+        }
+      }
+    },
+    "Connecte-toi à SignalQuest pour envoyer un message." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to SignalQuest to send a message."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi à SignalQuest pour envoyer un message."
           }
         }
       }
@@ -5059,6 +5507,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contribution"
+          }
+        }
+      }
+    },
+    "Conversation archivée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversation archived"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversation archivée"
+          }
+        }
+      }
+    },
+    "Conversation non chiffrée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unencrypted conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversation non chiffrée"
+          }
+        }
+      }
+    },
+    "Conversation protégée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protected conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversation protégée"
+          }
+        }
+      }
+    },
+    "Conversations : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversations: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversations : %lld"
           }
         }
       }
@@ -5236,6 +5748,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Coupures"
+          }
+        }
+      }
+    },
+    "Créer le dossier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create folder"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer le dossier"
           }
         }
       }
@@ -5499,6 +6027,22 @@
         }
       }
     },
+    "Dossiers" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folders"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dossiers"
+          }
+        }
+      }
+    },
     "Durée de chaque sens" : {
       "localizations" : {
         "en" : {
@@ -5595,6 +6139,22 @@
         }
       }
     },
+    "Désarchiver" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unarchive"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désarchiver"
+          }
+        }
+      }
+    },
     "Désélectionner" : {
       "localizations" : {
         "en" : {
@@ -5659,6 +6219,38 @@
         }
       }
     },
+    "Déverrouille avec %@ pour lire ce fil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock with %@ to read this thread."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouille avec %@ pour lire ce fil."
+          }
+        }
+      }
+    },
+    "Déverrouille cette conversation protégée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock this protected conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouille cette conversation protégée."
+          }
+        }
+      }
+    },
     "D’abord ceux que tu captes le plus" : {
       "localizations" : {
         "en" : {
@@ -5719,6 +6311,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Elle rejoint la galerie une fois vérifiée par la modération."
+          }
+        }
+      }
+    },
+    "Elle s’affiche ici, à côté de ta liste." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It shows up here, next to your list."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle s’affiche ici, à côté de ta liste."
           }
         }
       }
@@ -5916,6 +6524,22 @@
         }
       }
     },
+    "Enregistrement d’écran en cours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screen recording in progress"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrement d’écran en cours"
+          }
+        }
+      }
+    },
     "Enregistré le %@" : {
       "localizations" : {
         "en" : {
@@ -5948,6 +6572,22 @@
         }
       }
     },
+    "Envoie un message texte dans une conversation non chiffrée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sends a text message in an unencrypted conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoie un message texte dans une conversation non chiffrée."
+          }
+        }
+      }
+    },
     "Envoyer l'idée" : {
       "localizations" : {
         "en" : {
@@ -5976,6 +6616,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Envoyer la photo"
+          }
+        }
+      }
+    },
+    "Envoyer un message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send a message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer un message"
           }
         }
       }
@@ -6173,6 +6829,22 @@
         }
       }
     },
+    "Focus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus"
+          }
+        }
+      }
+    },
     "Forte" : {
       "localizations" : {
         "en" : {
@@ -6201,6 +6873,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fournisseurs"
+          }
+        }
+      }
+    },
+    "Garde en avant les conversations qui comptent." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep the conversations that matter up front."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garde en avant les conversations qui comptent."
           }
         }
       }
@@ -6402,6 +7090,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grouper par opérateur"
+          }
+        }
+      }
+    },
+    "Gérer les dossiers" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage folders"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérer les dossiers"
           }
         }
       }
@@ -7436,6 +8140,38 @@
         }
       }
     },
+    "Jusqu’à demain matin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Until tomorrow morning"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jusqu’à demain matin"
+          }
+        }
+      }
+    },
+    "Jusqu’à l’arrêt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Until I stop it"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jusqu’à l’arrêt"
+          }
+        }
+      }
+    },
     "J’ai retrouvé mon mot de passe" : {
       "localizations" : {
         "en" : {
@@ -7513,6 +8249,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La confirmation de ton compte a échoué. Vérifie le mot de passe du compte, ou reprends avec Apple."
+          }
+        }
+      }
+    },
+    "La conversation n’a pas pu être archivée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversation could not be archived."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation n’a pas pu être archivée."
+          }
+        }
+      }
+    },
+    "La conversation n’a pas pu être désarchivée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversation could not be unarchived."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation n’a pas pu être désarchivée."
           }
         }
       }
@@ -7872,6 +8640,70 @@
         }
       }
     },
+    "Le dossier n’a pas pu être créé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The folder could not be created."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier n’a pas pu être créé."
+          }
+        }
+      }
+    },
+    "Le dossier n’a pas pu être modifié." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The folder could not be changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier n’a pas pu être modifié."
+          }
+        }
+      }
+    },
+    "Le dossier n’a pas pu être renommé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The folder could not be renamed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier n’a pas pu être renommé."
+          }
+        }
+      }
+    },
+    "Le dossier n’a pas pu être supprimé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The folder could not be deleted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier n’a pas pu être supprimé."
+          }
+        }
+      }
+    },
     "Le débit dépend aussi du serveur : plus il est proche, plus la mesure est juste." : {
       "localizations" : {
         "en" : {
@@ -7905,6 +8737,38 @@
         }
       }
     },
+    "Le fil est masqué tant que l’écran est enregistré ou diffusé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The thread stays hidden while the screen is being recorded or mirrored."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fil est masqué tant que l’écran est enregistré ou diffusé."
+          }
+        }
+      }
+    },
+    "Le fil reste masqué tant que tu ne l’as pas déverrouillé avec Face ID ou ton code, et dès que tu quittes l’app." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The thread stays hidden until you unlock it with Face ID or your passcode, and as soon as you leave the app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le fil reste masqué tant que tu ne l’as pas déverrouillé avec Face ID ou ton code, et dès que tu quittes l’app."
+          }
+        }
+      }
+    },
     "Le journal se remplit avec l’app Android, qui capte les antennes pendant tes trajets." : {
       "localizations" : {
         "en" : {
@@ -7921,6 +8785,22 @@
         }
       }
     },
+    "Le message est vide." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The message is empty."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le message est vide."
+          }
+        }
+      }
+    },
     "Le message ne sera pas envoyé." : {
       "localizations" : {
         "en" : {
@@ -7933,6 +8813,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le message ne sera pas envoyé."
+          }
+        }
+      }
+    },
+    "Le mode focus n’a pas pu être activé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus mode could not be turned on."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode focus n’a pas pu être activé."
+          }
+        }
+      }
+    },
+    "Le mode focus n’a pas pu être désactivé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus mode could not be turned off."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode focus n’a pas pu être désactivé."
           }
         }
       }
@@ -7981,6 +8893,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le relevé affiché reste celui du %@."
+          }
+        }
+      }
+    },
+    "Le réglage n’a pas pu être enregistré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The setting could not be saved."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le réglage n’a pas pu être enregistré."
           }
         }
       }
@@ -8210,6 +9138,22 @@
         }
       }
     },
+    "Les conversations ne sont pas supprimées : elles quittent seulement le dossier." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversations are not deleted: they just leave the folder."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les conversations ne sont pas supprimées : elles quittent seulement le dossier."
+          }
+        }
+      }
+    },
     "Les erreurs que tu as signalées sur une fiche d’antenne, et les réponses de l’équipe." : {
       "localizations" : {
         "en" : {
@@ -8318,6 +9262,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les messages de cette conversation apparaîtront ici."
+          }
+        }
+      }
+    },
+    "Les messages que tu envoies depuis cet appareil disparaissent après le délai choisi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages you send from this device disappear after the chosen delay."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les messages que tu envoies depuis cet appareil disparaissent après le délai choisi."
           }
         }
       }
@@ -9112,6 +10072,22 @@
         }
       }
     },
+    "Message envoyé à %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message sent to %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message envoyé à %@."
+          }
+        }
+      }
+    },
     "Message lu" : {
       "localizations" : {
         "en" : {
@@ -9140,6 +10116,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Message transféré."
+          }
+        }
+      }
+    },
+    "Messages éphémères · disparaissent après %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disappearing messages · vanish after %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages éphémères · disparaissent après %@"
           }
         }
       }
@@ -9284,6 +10276,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Missions à réclamer"
+          }
+        }
+      }
+    },
+    "Mode focus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus mode"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode focus"
+          }
+        }
+      }
+    },
+    "Mode focus · jusqu’à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus mode · until %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode focus · jusqu’à %@"
+          }
+        }
+      }
+    },
+    "Modifier le mode focus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit focus mode"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier le mode focus"
           }
         }
       }
@@ -9451,6 +10491,22 @@
         }
       }
     },
+    "Nom du dossier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folder name"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom du dossier"
+          }
+        }
+      }
+    },
     "Non enregistré" : {
       "localizations" : {
         "en" : {
@@ -9547,6 +10603,38 @@
         }
       }
     },
+    "Nouveau dossier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New folder"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau dossier"
+          }
+        }
+      }
+    },
+    "Nouveau dossier…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New folder…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau dossier…"
+          }
+        }
+      }
+    },
     "Nouveau mot de passe de chiffrement" : {
       "localizations" : {
         "en" : {
@@ -9639,6 +10727,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Option %lld"
+          }
+        }
+      }
+    },
+    "Options de la liste" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List options"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options de la liste"
+          }
+        }
+      }
+    },
+    "Options du dossier %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ folder options"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options du dossier %@"
           }
         }
       }
@@ -9803,6 +10923,22 @@
         }
       }
     },
+    "Ouvre une conversation de la messagerie SignalQuest." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens a SignalQuest messaging conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre une conversation de la messagerie SignalQuest."
+          }
+        }
+      }
+    },
     "Ouvre-le pour suivre ses mesures, ou arrête-le avant un test simple." : {
       "localizations" : {
         "en" : {
@@ -9879,6 +11015,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir un lien externe ?"
+          }
+        }
+      }
+    },
+    "Ouvrir une conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir une conversation"
           }
         }
       }
@@ -10880,6 +12032,38 @@
         }
       }
     },
+    "Range tes conversations et retrouve-les d’une puce." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sort your conversations and find them with one chip."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Range tes conversations et retrouve-les d’une puce."
+          }
+        }
+      }
+    },
+    "Ranger dans un dossier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File in a folder"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ranger dans un dossier"
+          }
+        }
+      }
+    },
     "Rappeler en vidéo" : {
       "localizations" : {
         "en" : {
@@ -11213,6 +12397,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remplacer ma clé"
+          }
+        }
+      }
+    },
+    "Renommer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer"
+          }
+        }
+      }
+    },
+    "Renommer le dossier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename folder"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer le dossier"
           }
         }
       }
@@ -12447,6 +13663,22 @@
         }
       }
     },
+    "Suppression automatique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-delete"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suppression automatique"
+          }
+        }
+      }
+    },
     "Suppression impossible. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -12459,6 +13691,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suppression impossible. Réessaie."
+          }
+        }
+      }
+    },
+    "Supprimer ce dossier ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this folder?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ce dossier ?"
           }
         }
       }
@@ -12735,6 +13983,22 @@
         }
       }
     },
+    "Tant que le mode est actif, la liste n’affiche que ces conversations. Les autres restent à un toucher, dans « Toutes »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While the mode is on, the list only shows these conversations. The others stay one tap away, under “All”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tant que le mode est actif, la liste n’affiche que ces conversations. Les autres restent à un toucher, dans « Toutes »."
+          }
+        }
+      }
+    },
     "Te suit" : {
       "localizations" : {
         "en" : {
@@ -12779,6 +14043,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tendance"
+          }
+        }
+      }
+    },
+    "Terminer le mode focus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End focus mode"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminer le mode focus"
           }
         }
       }
@@ -12907,6 +14187,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tes appareils sont listés ici. Le nouveau chiffrement de bout en bout s’activera quand il sera disponible sur iPhone, Android et le web."
+          }
+        }
+      }
+    },
+    "Tes dossiers" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your folders"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes dossiers"
           }
         }
       }
@@ -13894,6 +15190,38 @@
         }
       }
     },
+    "Une bannière t’avertit quand tu fais une capture d’écran de cette conversation, et le fil se masque pendant un enregistrement d’écran. iOS ne permet pas de bloquer une capture." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A banner warns you when you take a screenshot of this conversation, and the thread is hidden during a screen recording. iOS cannot block a screenshot."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une bannière t’avertit quand tu fais une capture d’écran de cette conversation, et le fil se masque pendant un enregistrement d’écran. iOS ne permet pas de bloquer une capture."
+          }
+        }
+      }
+    },
+    "Une conversation archivée revient dans ta liste au prochain message, sauf si elle est en sourdine." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An archived conversation comes back to your list on the next message, unless it is muted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une conversation archivée revient dans ta liste au prochain message, sauf si elle est en sourdine."
+          }
+        }
+      }
+    },
     "Une conversation chiffrée n’accepte que du texte : ni photo, ni fichier, ni vocal, ni sondage, ni réaction." : {
       "localizations" : {
         "en" : {
@@ -14093,6 +15421,22 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Verrouillage à l’ouverture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock on open"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verrouillage à l’ouverture"
           }
         }
       }

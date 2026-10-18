@@ -692,3 +692,196 @@ struct SuccessorPickerSheet: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
+
+/// Réglages « conversation protégée » : verrouillage à l'ouverture, alerte de
+/// capture d'écran et suppression automatique des messages envoyés. Personnels
+/// au compte : le serveur les garde par conversation et par membre.
+struct ProtectedConversationSheet: View {
+    let conversationId: String
+    var subtitle: String? = nil
+    let service: MessagesServicing
+    let initial: ConversationSecretPolicy
+    /// Réglage enregistré, et vrai quand l'appareil vient d'authentifier le propriétaire.
+    let onChange: (ConversationSecretPolicy, Bool) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var policy: ConversationSecretPolicy
+    @State private var isBusy = false
+    @State private var errorMessage: String?
+
+    /// Délais proposés pour la suppression automatique, en secondes.
+    static let autoDeleteOptions = [3_600, 86_400, 604_800]
+
+    init(
+        conversationId: String,
+        subtitle: String? = nil,
+        service: MessagesServicing,
+        initial: ConversationSecretPolicy,
+        onChange: @escaping (ConversationSecretPolicy, Bool) -> Void
+    ) {
+        self.conversationId = conversationId
+        self.subtitle = subtitle
+        self.service = service
+        self.initial = initial
+        self.onChange = onChange
+        _policy = State(initialValue: initial)
+    }
+
+    /// « 1 h », « 24 h », « 7 jours » : la durée d'un message éphémère.
+    static func durationLabel(_ seconds: Int) -> String {
+        switch seconds {
+        case 3_600: return "1 h"
+        case 86_400: return "24 h"
+        case 604_800: return String(localized: "7 jours")
+        default: return CallThreadEvent.durationLabel(seconds)
+        }
+    }
+
+    private var cardShape: RoundedRectangle { RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous) }
+    private var canLock: Bool { BiometricAuth.canAuthenticateDeviceOwner }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(
+                    title: "Conversation protégée",
+                    subtitle: subtitle,
+                    closeIdentifier: "protection.close"
+                ) { dismiss() }
+
+                VStack(spacing: 0) {
+                    Toggle(isOn: Binding(
+                        get: { policy.requireBiometric },
+                        set: { value in Task { await setLock(value) } }
+                    )) {
+                        Label("Verrouillage à l’ouverture", systemImage: BiometricAuth.kind.systemImage)
+                            .font(SQType.body(.semibold))
+                            .foregroundStyle(SQColor.label)
+                    }
+                    .tint(SQColor.brandRed)
+                    .disabled(isBusy || (!canLock && !policy.requireBiometric))
+                    .padding(.horizontal, SQSpace.md)
+                    .frame(minHeight: 56)
+                    .accessibilityIdentifier("protection.lock")
+                    Divider().padding(.leading, SQSpace.md)
+                    Toggle(isOn: Binding(
+                        get: { policy.blockScreenshots },
+                        set: { value in Task { await update { $0.blockScreenshots = value } } }
+                    )) {
+                        Label("Alerte de capture d’écran", systemImage: "camera.viewfinder")
+                            .font(SQType.body(.semibold))
+                            .foregroundStyle(SQColor.label)
+                    }
+                    .tint(SQColor.brandRed)
+                    .disabled(isBusy)
+                    .padding(.horizontal, SQSpace.md)
+                    .frame(minHeight: 56)
+                    .accessibilityIdentifier("protection.capture")
+                    Divider().padding(.leading, SQSpace.md)
+                    autoDeleteRow
+                }
+                .sqSurface(SQColor.surface, in: cardShape)
+
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    note(canLock
+                         ? "Le fil reste masqué tant que tu ne l’as pas déverrouillé avec Face ID ou ton code, et dès que tu quittes l’app."
+                         : "Cet appareil n’a ni Face ID ni code : le verrouillage n’est pas disponible.")
+                    note("Une bannière t’avertit quand tu fais une capture d’écran de cette conversation, et le fil se masque pendant un enregistrement d’écran. iOS ne permet pas de bloquer une capture.")
+                    note("Les messages que tu envoies depuis cet appareil disparaissent après le délai choisi.")
+                }
+                .padding(.horizontal, SQSpace.xs)
+
+                if let errorMessage {
+                    Text(verbatim: errorMessage)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("protection.error")
+                }
+            }
+            .padding(SQSpace.lg)
+        }
+        .sqSheet(background: SQColor.bg)
+    }
+
+    private func note(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.labelSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var autoDeleteRow: some View {
+        HStack(spacing: SQSpace.md) {
+            Label("Suppression automatique", systemImage: "timer")
+                .font(SQType.body(.semibold))
+                .foregroundStyle(SQColor.label)
+            Spacer(minLength: SQSpace.sm)
+            Menu {
+                Button { Task { await setAutoDelete(nil) } } label: {
+                    Label("Désactivée", systemImage: policy.outgoingTTLSeconds == 0 ? "checkmark" : "")
+                }
+                ForEach(Self.autoDeleteOptions, id: \.self) { seconds in
+                    Button { Task { await setAutoDelete(seconds) } } label: {
+                        Label(Self.durationLabel(seconds), systemImage: policy.outgoingTTLSeconds == seconds ? "checkmark" : "")
+                    }
+                }
+            } label: {
+                Text(verbatim: policy.outgoingTTLSeconds > 0
+                     ? Self.durationLabel(policy.outgoingTTLSeconds)
+                     : String(localized: "Désactivée"))
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .disabled(isBusy)
+            .accessibilityIdentifier("protection.autoDelete")
+        }
+        .padding(.horizontal, SQSpace.md)
+        .frame(minHeight: 56)
+    }
+
+    private func setAutoDelete(_ seconds: Int?) async {
+        await update {
+            $0.autoDeleteSeconds = seconds
+            // Les messages éphémères deviennent le réglage par défaut avec un délai choisi.
+            $0.ephemeralDefault = (seconds ?? 0) > 0
+        }
+    }
+
+    /// Activer le verrou demande d'abord de s'authentifier : on ne s'enferme pas dehors.
+    private func setLock(_ enabled: Bool) async {
+        guard !isBusy else { return }
+        var authenticated = false
+        if enabled {
+            authenticated = await BiometricAuth.authenticate(
+                reason: String(localized: "Confirme pour protéger cette conversation."),
+                allowPasscode: true
+            )
+            guard authenticated else { return }
+        }
+        await update(authenticated: authenticated) { $0.requireBiometric = enabled }
+    }
+
+    private func update(authenticated: Bool = false, _ change: (inout ConversationSecretPolicy) -> Void) async {
+        guard !isBusy else { return }
+        var next = policy
+        change(&next)
+        let previous = policy
+        policy = next
+        isBusy = true
+        errorMessage = nil
+        defer { isBusy = false }
+        do {
+            let saved = try await service.saveSecretPolicy(next, conversationId: conversationId)
+            policy = saved
+            Haptics.success()
+            onChange(saved, authenticated)
+        } catch {
+            policy = previous
+            if !error.isCancellation { errorMessage = String(localized: "Le réglage n’a pas pu être enregistré.") }
+            Haptics.error()
+        }
+    }
+}

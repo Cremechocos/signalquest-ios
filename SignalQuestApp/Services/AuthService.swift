@@ -371,6 +371,7 @@ final class AuthService: AuthServicing {
             RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
             PrivateImageDiskCache.purge(ownerScopeId: ownerScopeId)
             CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
+            ConversationSecretPolicyCache.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
@@ -408,6 +409,7 @@ final class AuthService: AuthServicing {
             RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
             PrivateImageDiskCache.purge(ownerScopeId: ownerScopeId)
             CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
+            ConversationSecretPolicyCache.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()

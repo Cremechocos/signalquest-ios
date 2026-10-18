@@ -7,8 +7,11 @@ struct ConversationsResponse: Decodable {
     /// Nombre maximal de conversations épinglées par compte (P2-46, clé
     /// additive) ; lue de façon tolérante, `nil` si le serveur ne la sert pas.
     let pinLimit: Int?
+    /// Archivées sans avoir quitté : nombre et non-lues, servis avec la liste par
+    /// défaut seulement. Absent sur un serveur qui ne propose pas l'archivage.
+    let shelvedSummary: ShelvedSummary?
 
-    private enum CodingKeys: String, CodingKey { case conversations, hasMore, nextCursor, pinLimit }
+    private enum CodingKeys: String, CodingKey { case conversations, hasMore, nextCursor, pinLimit, shelvedSummary }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -17,6 +20,27 @@ struct ConversationsResponse: Decodable {
         nextCursor = try? c.decodeIfPresent(String.self, forKey: .nextCursor)
         pinLimit = (try? c.decodeIfPresent(Int.self, forKey: .pinLimit))
             ?? (try? c.decodeIfPresent(String.self, forKey: .pinLimit)).flatMap { $0.flatMap(Int.init) }
+        shelvedSummary = (try? c.decodeIfPresent(ShelvedSummary.self, forKey: .shelvedSummary)) ?? nil
+    }
+}
+
+/// `{count, unreadCount}` de la ligne « Archivées ». Une valeur manquante vaut 0 ;
+/// seule la présence de la clé dit que le serveur sait archiver.
+struct ShelvedSummary: Decodable, Equatable, Sendable {
+    let count: Int
+    let unreadCount: Int
+
+    private enum CodingKeys: String, CodingKey { case count, unreadCount }
+
+    init(count: Int, unreadCount: Int) {
+        self.count = max(0, count)
+        self.unreadCount = max(0, unreadCount)
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        count = max(0, (try? c.decodeIfPresent(Int.self, forKey: .count)) ?? 0)
+        unreadCount = max(0, (try? c.decodeIfPresent(Int.self, forKey: .unreadCount)) ?? 0)
     }
 }
 
@@ -27,6 +51,8 @@ struct ConversationList: Sendable {
     /// Page suivante disponible côté serveur (B01) : `nextCursor` la désigne.
     var hasMore = false
     var nextCursor: String? = nil
+    /// Présent seulement quand le serveur sait archiver une conversation.
+    var shelvedSummary: ShelvedSummary? = nil
 }
 
 struct MessageConversation: Decodable, Identifiable, Equatable {
@@ -53,6 +79,9 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
     /// le serveur ne voit pas les mentions et une conversation coupée l'est en entier.
     var muted = false
     var mentionsMuted = false
+    /// Archivée pour soi, sans avoir quitté (clé additive de la liste).
+    var shelved = false
+    var shelvedAt: Date? = nil
 
     /// Membres v1 d'une genèse de migration (§14.2, v0.4.20) : dans un
     /// tête-à-tête, les deux participants même archivés ; dans un groupe, les
@@ -96,7 +125,7 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, isGroup, e2eeEnabled, groupPhotoUrl, createdAt, updatedAt, lastMessageAt, lastReadAt, pinnedAt, participants, lastMessage
-        case directPeerUserId, e2eeV2, muted, mentionsMuted
+        case directPeerUserId, e2eeV2, muted, mentionsMuted, shelved, shelvedAt
     }
 
     init(
@@ -149,6 +178,8 @@ struct MessageConversation: Decodable, Identifiable, Equatable {
         e2eeV2 = try? c.decodeIfPresent(E2EEV2ConversationListState.self, forKey: .e2eeV2)
         muted = ((try? c.decodeIfPresent(Bool.self, forKey: .muted)) ?? nil) ?? false
         mentionsMuted = ((try? c.decodeIfPresent(Bool.self, forKey: .mentionsMuted)) ?? nil) ?? false
+        shelvedAt = (try? c.decodeIfPresent(Date.self, forKey: .shelvedAt)) ?? nil
+        shelved = ((try? c.decodeIfPresent(Bool.self, forKey: .shelved)) ?? nil) ?? (shelvedAt != nil)
     }
 }
 
@@ -599,6 +630,8 @@ extension MessageConversation {
         )
         copy.muted = muted
         copy.mentionsMuted = mentionsMuted
+        copy.shelved = shelved
+        copy.shelvedAt = shelvedAt
         return copy
     }
 }
@@ -1345,5 +1378,313 @@ extension MessagePoll {
             totalVotes: totalVotes,
             votesByMe: votesByMe
         )
+    }
+}
+
+// MARK: - Dossiers de conversations
+
+/// Dossier de conversations, propre au compte. Le serveur ne porte pas le dossier
+/// sur la conversation : la liste des dossiers donne, pour chacun, les
+/// conversations qu'il contient (`links`).
+struct ConversationFolder: Decodable, Identifiable, Equatable, Sendable {
+    /// Même borne que le serveur (`name` : 80 caractères au plus).
+    static let maxNameLength = 80
+
+    let id: String
+    var name: String
+    var conversationIds: [String]
+
+    private enum CodingKeys: String, CodingKey { case id, name, links }
+    private struct Link: Decodable { let conversationId: String? }
+
+    init(id: String, name: String, conversationIds: [String] = []) {
+        self.id = id
+        self.name = name
+        self.conversationIds = conversationIds
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = c.decodeFlexibleString(forKey: .name) ?? ""
+        let links = c.decodeLossyArray([Link].self, forKey: .links)
+        conversationIds = links.compactMap(\.conversationId)
+    }
+}
+
+struct ConversationFoldersResponse: Decodable {
+    let categories: [ConversationFolder]
+
+    private enum CodingKeys: String, CodingKey { case categories }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        categories = c.decodeLossyArray([ConversationFolder].self, forKey: .categories)
+    }
+}
+
+struct ConversationFolderResponse: Decodable {
+    let category: ConversationFolder
+}
+
+// MARK: - Mode focus
+
+/// Session « focus » du compte : les conversations à garder en avant, jusqu'à
+/// une heure de fin éventuelle. Le serveur la conserve telle quelle.
+struct MessageFocusSession: Decodable, Equatable, Sendable {
+    let id: String?
+    let name: String?
+    let conversationIds: [String]
+    let startedAt: Date?
+    let endsAt: Date?
+    let active: Bool
+
+    private enum CodingKeys: String, CodingKey { case id, name, conversationIds, startedAt, endsAt, active }
+
+    init(id: String? = nil, name: String? = nil, conversationIds: [String], startedAt: Date? = nil, endsAt: Date? = nil, active: Bool = true) {
+        self.id = id
+        self.name = name
+        self.conversationIds = conversationIds
+        self.startedAt = startedAt
+        self.endsAt = endsAt
+        self.active = active
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.decodeFlexibleString(forKey: .id)
+        name = c.decodeFlexibleString(forKey: .name)
+        conversationIds = (try? c.decodeIfPresent([String].self, forKey: .conversationIds)) ?? []
+        startedAt = (try? c.decodeIfPresent(Date.self, forKey: .startedAt)) ?? nil
+        endsAt = (try? c.decodeIfPresent(Date.self, forKey: .endsAt)) ?? nil
+        active = ((try? c.decodeIfPresent(Bool.self, forKey: .active)) ?? nil) ?? true
+    }
+
+    /// Le serveur garde une session échue marquée active : l'heure de fin se lit ici.
+    func isRunning(at now: Date = Date()) -> Bool {
+        guard active else { return false }
+        guard let endsAt else { return true }
+        return endsAt > now
+    }
+}
+
+struct MessageFocusResponse: Decodable {
+    let focusSession: MessageFocusSession?
+
+    private enum CodingKeys: String, CodingKey { case focusSession }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        focusSession = (try? c.decodeIfPresent(MessageFocusSession.self, forKey: .focusSession)) ?? nil
+    }
+}
+
+// MARK: - Conversation protégée
+
+/// Réglage « protégée » d'une conversation, personnel au compte. `PUT` remplace
+/// l'ensemble des champs : on renvoie toujours les quatre.
+struct ConversationSecretPolicy: Codable, Equatable, Sendable {
+    var requireBiometric = false
+    var blockScreenshots = false
+    var autoDeleteSeconds: Int? = nil
+    var ephemeralDefault = false
+
+    /// Aucun réglage actif : équivaut à l'absence de réglage.
+    var isInactive: Bool {
+        !requireBiometric && !blockScreenshots && (autoDeleteSeconds ?? 0) <= 0 && !ephemeralDefault
+    }
+
+    /// Durée de vie des messages envoyés, en secondes ; 0 = sans limite.
+    var outgoingTTLSeconds: Int { max(0, autoDeleteSeconds ?? 0) }
+
+    init(requireBiometric: Bool = false, blockScreenshots: Bool = false, autoDeleteSeconds: Int? = nil, ephemeralDefault: Bool = false) {
+        self.requireBiometric = requireBiometric
+        self.blockScreenshots = blockScreenshots
+        self.autoDeleteSeconds = autoDeleteSeconds
+        self.ephemeralDefault = ephemeralDefault
+    }
+
+    private enum CodingKeys: String, CodingKey { case requireBiometric, blockScreenshots, autoDeleteSeconds, ephemeralDefault }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        requireBiometric = ((try? c.decodeIfPresent(Bool.self, forKey: .requireBiometric)) ?? nil) ?? false
+        blockScreenshots = ((try? c.decodeIfPresent(Bool.self, forKey: .blockScreenshots)) ?? nil) ?? false
+        autoDeleteSeconds = (try? c.decodeIfPresent(Int.self, forKey: .autoDeleteSeconds)) ?? nil
+        ephemeralDefault = ((try? c.decodeIfPresent(Bool.self, forKey: .ephemeralDefault)) ?? nil) ?? false
+    }
+}
+
+struct ConversationSecretPolicyResponse: Decodable {
+    let policy: ConversationSecretPolicy?
+
+    private enum CodingKeys: String, CodingKey { case policy }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        policy = (try? c.decodeIfPresent(ConversationSecretPolicy.self, forKey: .policy)) ?? nil
+    }
+}
+
+// MARK: - Appels dans le fil
+
+/// Un appel terminé, tel que le serveur le place dans le fil d'une conversation
+/// (`GET /api/calls/history?conversationId=` et événement `call_event`). Aucun
+/// message n'est stocké : l'app l'insère par date parmi les messages.
+struct CallThreadEvent: Decodable, Identifiable, Equatable, Sendable {
+    enum Mode: String, Sendable { case audio, video }
+    enum Outcome: String, Sendable { case completed, missed, declined, cancelled }
+
+    let callId: String
+    let mode: Mode
+    let outcome: Outcome
+    let startedAt: Date
+    let durationSec: Int?
+    let callerId: String?
+
+    var id: String { callId }
+
+    private enum CodingKeys: String, CodingKey { case callId, mode, outcome, startedAt, durationSec, callerId }
+
+    init(callId: String, mode: Mode, outcome: Outcome, startedAt: Date, durationSec: Int? = nil, callerId: String? = nil) {
+        self.callId = callId
+        self.mode = mode
+        self.outcome = outcome
+        self.startedAt = startedAt
+        self.durationSec = durationSec
+        self.callerId = callerId
+    }
+
+    /// Une entrée sans identifiant, issue connue ou date est ignorée par la
+    /// lecture tolérante de la liste ; un mode inconnu se lit comme un appel vocal.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let callId = c.decodeFlexibleString(forKey: .callId),
+              let outcome = c.decodeFlexibleString(forKey: .outcome).flatMap(Outcome.init(rawValue:)),
+              let startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "call event"))
+        }
+        self.callId = callId
+        self.outcome = outcome
+        self.startedAt = startedAt
+        mode = c.decodeFlexibleString(forKey: .mode).flatMap(Mode.init(rawValue:)) ?? .audio
+        durationSec = (try? c.decodeIfPresent(Int.self, forKey: .durationSec)) ?? nil
+        callerId = c.decodeFlexibleString(forKey: .callerId)
+    }
+
+    /// L'appel a été passé par ce compte.
+    func isOutgoing(currentUserId: String?) -> Bool {
+        guard let currentUserId, let callerId else { return false }
+        return callerId == currentUserId
+    }
+
+    /// Manqué du point de vue de celui qui lit : un appel sonné sans réponse, ou
+    /// raccroché par l'appelant avant qu'on décroche, se lit « manqué » chez l'appelé.
+    func isMissedForReader(currentUserId: String?) -> Bool {
+        guard !isOutgoing(currentUserId: currentUserId) else { return false }
+        return outcome == .missed || outcome == .cancelled
+    }
+
+    /// Une durée courte et lisible : « 42 s », « 4 min », « 1 h 05 min ».
+    static func durationLabel(_ seconds: Int) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .abbreviated
+        formatter.allowedUnits = seconds >= 3_600 ? [.hour, .minute] : (seconds >= 60 ? [.minute] : [.second])
+        formatter.maximumUnitCount = 2
+        formatter.zeroFormattingBehavior = .dropLeading
+        return formatter.string(from: TimeInterval(max(seconds, 1))) ?? "\(seconds) s"
+    }
+
+    /// Phrase de la rangée du fil, selon l'issue de l'appel et qui l'a passé.
+    func summary(currentUserId: String?) -> String {
+        let outgoing = isOutgoing(currentUserId: currentUserId)
+        let video = mode == .video
+        switch outcome {
+        case .completed:
+            guard let durationSec, durationSec > 0 else {
+                return video ? String(localized: "Appel vidéo") : String(localized: "Appel vocal")
+            }
+            let label = Self.durationLabel(durationSec)
+            return video ? String(localized: "Appel vidéo · \(label)") : String(localized: "Appel vocal · \(label)")
+        case .missed:
+            if outgoing { return video ? String(localized: "Appel vidéo sans réponse") : String(localized: "Appel vocal sans réponse") }
+            return video ? String(localized: "Appel vidéo manqué") : String(localized: "Appel vocal manqué")
+        case .cancelled:
+            if outgoing { return video ? String(localized: "Appel vidéo annulé") : String(localized: "Appel vocal annulé") }
+            return video ? String(localized: "Appel vidéo manqué") : String(localized: "Appel vocal manqué")
+        case .declined:
+            return video ? String(localized: "Appel vidéo refusé") : String(localized: "Appel vocal refusé")
+        }
+    }
+
+    var systemImage: String { mode == .video ? "video.fill" : "phone.fill" }
+}
+
+struct CallThreadHistoryPage: Decodable {
+    let events: [CallThreadEvent]
+    /// Date de départ de la page suivante, plus ancienne ; `nil` à la fin de l'historique.
+    let nextBefore: String?
+
+    private enum CodingKeys: String, CodingKey { case events, nextBefore }
+
+    init(events: [CallThreadEvent], nextBefore: String?) {
+        self.events = events
+        self.nextBefore = nextBefore
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        events = c.decodeLossyArray([CallThreadEvent].self, forKey: .events)
+        nextBefore = c.decodeFlexibleString(forKey: .nextBefore)
+    }
+}
+
+/// Corps de l'événement `call_event` du flux d'une conversation.
+struct CallThreadStreamPayload: Decodable {
+    let conversationId: String?
+    let call: CallThreadEvent?
+
+    private enum CodingKeys: String, CodingKey { case conversationId, call }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        conversationId = c.decodeFlexibleString(forKey: .conversationId)
+        call = (try? c.decodeIfPresent(CallThreadEvent.self, forKey: .call)) ?? nil
+    }
+}
+
+/// Où insérer les appels parmi les messages : devant le premier message plus
+/// récent qu'eux, ou à la suite du dernier.
+enum CallThreadPlacement {
+    struct Result: Equatable {
+        var before: [String: [CallThreadEvent]] = [:]
+        var trailing: [CallThreadEvent] = []
+        static let empty = Result()
+    }
+
+    /// `events` en ordre quelconque ; `messages` du plus ancien au plus récent.
+    /// Un message sans date ne sert pas de repère.
+    static func make(messages: [MessageItem], events: [CallThreadEvent]) -> Result {
+        guard !events.isEmpty else { return .empty }
+        let ordered = events.sorted { $0.startedAt != $1.startedAt ? $0.startedAt < $1.startedAt : $0.callId < $1.callId }
+        var result = Result()
+        var next = 0
+        for message in messages {
+            guard let date = message.createdAt else { continue }
+            while next < ordered.count, ordered[next].startedAt <= date {
+                result.before[message.id, default: []].append(ordered[next])
+                next += 1
+            }
+            if next == ordered.count { break }
+        }
+        result.trailing = Array(ordered[next...])
+        return result
+    }
+
+    /// Ajoute ou remplace par `callId` ; le résultat reste du plus récent au plus ancien.
+    static func merge(_ existing: [CallThreadEvent], with incoming: [CallThreadEvent]) -> [CallThreadEvent] {
+        var byId = Dictionary(existing.map { ($0.callId, $0) }, uniquingKeysWith: { _, new in new })
+        for event in incoming { byId[event.callId] = event }
+        return byId.values.sorted { $0.startedAt != $1.startedAt ? $0.startedAt > $1.startedAt : $0.callId > $1.callId }
     }
 }

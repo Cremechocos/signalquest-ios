@@ -11,3 +11,7 @@
 "Mon dernier speedtest ${applicationName}" = "My latest ${applicationName} speedtest";
 "Ouvre une antenne suivie avec ${applicationName}" = "Open a followed antenna with ${applicationName}";
 "Mes antennes suivies ${applicationName}" = "My followed antennas in ${applicationName}";
+"Ouvre une conversation avec ${applicationName}" = "Open a conversation with ${applicationName}";
+"Ouvre un message ${applicationName}" = "Open a message in ${applicationName}";
+"Envoie un message avec ${applicationName}" = "Send a message with ${applicationName}";
+"Écris un message ${applicationName}" = "Write a message in ${applicationName}";

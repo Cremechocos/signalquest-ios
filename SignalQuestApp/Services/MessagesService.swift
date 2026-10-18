@@ -9,6 +9,26 @@ protocol MessagesServicing: Sendable {
     /// `nextCursor` de la page précédente.
     func conversationPage(cursor: String?, take: Int) async throws -> ConversationList
     func conversation(id: String) async throws -> MessageConversation
+    /// Conversations archivées pour soi (`?shelved=only`), page par page jusqu'à la borne.
+    func shelvedConversations() async throws -> [MessageConversation]
+    /// Archive ou désarchive pour soi, sans quitter la conversation.
+    func setConversationShelved(_ shelved: Bool, conversationId: String) async throws
+    // Dossiers de conversations
+    func conversationFolders() async throws -> [ConversationFolder]
+    func createConversationFolder(name: String) async throws -> ConversationFolder
+    func renameConversationFolder(id: String, name: String) async throws -> ConversationFolder
+    func deleteConversationFolder(id: String) async throws
+    /// Remplace les dossiers d'une conversation.
+    func setConversationFolders(_ folderIds: [String], conversationId: String) async throws
+    // Mode focus
+    func focusSession() async throws -> MessageFocusSession?
+    func startFocus(name: String?, conversationIds: [String], endsAt: Date?) async throws -> MessageFocusSession?
+    func endFocus() async throws
+    // Conversation protégée
+    func secretPolicy(conversationId: String) async throws -> ConversationSecretPolicy
+    func saveSecretPolicy(_ policy: ConversationSecretPolicy, conversationId: String) async throws -> ConversationSecretPolicy
+    // Appels dans le fil
+    func callThreadHistory(conversationId: String, before: String?, limit: Int) async throws -> CallThreadHistoryPage
     func createConversation(participantIds: [String], title: String?, e2ee: Bool) async throws -> CreateConversationResponse
     func searchUsers(query: String) async throws -> [MessageSearchUser]
     func messages(conversationId: String, cursor: String?) async throws -> MessagesPageResponse
@@ -367,8 +387,146 @@ final class MessagesService: MessagesServicing {
             conversations: response.conversations,
             pinLimit: response.pinLimit,
             hasMore: response.hasMore ?? false,
-            nextCursor: response.nextCursor
+            nextCursor: response.nextCursor,
+            shelvedSummary: response.shelvedSummary
         )
+    }
+
+    func shelvedConversations() async throws -> [MessageConversation] {
+        if AppEnvironment.usesDemoData { return [] }
+        let session = LocalAccountScope.sessionSnapshot()
+        var all: [MessageConversation] = []
+        var seen = Set<String>()
+        var cursor: String?
+        for _ in 0..<Self.conversationMaxPages {
+            var query = [
+                URLQueryItem(name: "take", value: String(Self.conversationPageSize)),
+                URLQueryItem(name: "shelved", value: "only")
+            ]
+            if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+            let page: ConversationsResponse
+            do {
+                page = try await api.request(
+                    APIEndpoint(path: "/api/messages/conversations", query: query), as: ConversationsResponse.self
+                )
+            } catch {
+                if all.isEmpty || error.isCancellation { throw error }
+                break
+            }
+            for conversation in page.conversations where seen.insert(conversation.id).inserted {
+                all.append(conversation)
+            }
+            guard page.hasMore ?? false, let next = page.nextCursor, next != cursor else { break }
+            cursor = next
+        }
+        rememberForCalls(all, session: session)
+        return all
+    }
+
+    func setConversationShelved(_ shelved: Bool, conversationId: String) async throws {
+        if AppEnvironment.usesDemoData { return }
+        let _: SuccessResponse = try await api.requestJSON(
+            "/api/messages/conversations/\(conversationId)/shelf",
+            method: shelved ? .post : .delete,
+            body: [String: String]()
+        )
+    }
+
+    func conversationFolders() async throws -> [ConversationFolder] {
+        if AppEnvironment.usesDemoData { return ConversationFolder.demo }
+        return try await api.request(
+            APIEndpoint(path: "/api/messages/categories"), as: ConversationFoldersResponse.self
+        ).categories
+    }
+
+    func createConversationFolder(name: String) async throws -> ConversationFolder {
+        if AppEnvironment.usesDemoData { return ConversationFolder(id: "demo-folder-\(UUID().uuidString)", name: name) }
+        let response: ConversationFolderResponse = try await api.requestJSON(
+            "/api/messages/categories", body: ["name": name]
+        )
+        return response.category
+    }
+
+    func renameConversationFolder(id: String, name: String) async throws -> ConversationFolder {
+        if AppEnvironment.usesDemoData { return ConversationFolder(id: id, name: name) }
+        let response: ConversationFolderResponse = try await api.requestJSON(
+            "/api/messages/categories/\(id)", method: .patch, body: ["name": name]
+        )
+        return response.category
+    }
+
+    func deleteConversationFolder(id: String) async throws {
+        if AppEnvironment.usesDemoData { return }
+        try await api.request(APIEndpoint(path: "/api/messages/categories/\(id)", method: .delete))
+    }
+
+    func setConversationFolders(_ folderIds: [String], conversationId: String) async throws {
+        if AppEnvironment.usesDemoData { return }
+        let _: SuccessResponse = try await api.requestJSON(
+            "/api/messages/conversations/\(conversationId)/categories",
+            method: .put,
+            body: ["categoryIds": folderIds]
+        )
+    }
+
+    func focusSession() async throws -> MessageFocusSession? {
+        if AppEnvironment.usesDemoData { return nil }
+        return try await api.request(APIEndpoint(path: "/api/messages/focus"), as: MessageFocusResponse.self).focusSession
+    }
+
+    func startFocus(name: String?, conversationIds: [String], endsAt: Date?) async throws -> MessageFocusSession? {
+        if AppEnvironment.usesDemoData {
+            return MessageFocusSession(name: name, conversationIds: conversationIds, startedAt: Date(), endsAt: endsAt)
+        }
+        struct Request: Encodable {
+            let name: String?
+            let conversationIds: [String]
+            let endsAt: String?
+            let active = true
+        }
+        let response: MessageFocusResponse = try await api.requestJSON(
+            "/api/messages/focus",
+            method: .put,
+            body: Request(name: name, conversationIds: conversationIds, endsAt: endsAt.map(Self.iso))
+        )
+        return response.focusSession
+    }
+
+    func endFocus() async throws {
+        if AppEnvironment.usesDemoData { return }
+        try await api.request(APIEndpoint(path: "/api/messages/focus", method: .delete))
+    }
+
+    func secretPolicy(conversationId: String) async throws -> ConversationSecretPolicy {
+        if AppEnvironment.usesDemoData { return ConversationSecretPolicy() }
+        return try await api.request(
+            APIEndpoint(path: "/api/messages/conversations/\(conversationId)/secret-policy"),
+            as: ConversationSecretPolicyResponse.self
+        ).policy ?? ConversationSecretPolicy()
+    }
+
+    func saveSecretPolicy(_ policy: ConversationSecretPolicy, conversationId: String) async throws -> ConversationSecretPolicy {
+        if AppEnvironment.usesDemoData { return policy }
+        let path = "/api/messages/conversations/\(conversationId)/secret-policy"
+        // Aucun réglage actif : on retire la ligne plutôt que d'en garder une vide.
+        if policy.isInactive {
+            try await api.request(APIEndpoint(path: path, method: .delete))
+            return ConversationSecretPolicy()
+        }
+        let response: ConversationSecretPolicyResponse = try await api.requestJSON(path, method: .put, body: policy)
+        return response.policy ?? policy
+    }
+
+    func callThreadHistory(conversationId: String, before: String?, limit: Int) async throws -> CallThreadHistoryPage {
+        if AppEnvironment.usesDemoData {
+            return CallThreadHistoryPage(events: CallThreadEvent.demo(conversationId: conversationId), nextBefore: nil)
+        }
+        var query = [
+            URLQueryItem(name: "conversationId", value: conversationId),
+            URLQueryItem(name: "limit", value: String(min(max(limit, 1), 50)))
+        ]
+        if let before { query.append(URLQueryItem(name: "before", value: before)) }
+        return try await api.request(APIEndpoint(path: "/api/calls/history", query: query), as: CallThreadHistoryPage.self)
     }
 
     func conversation(id: String) async throws -> MessageConversation {
@@ -2249,5 +2407,40 @@ actor MessageAttachmentOutboxStore {
             [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
             ofItemAtPath: url.path
         )
+    }
+}
+
+/// Dernier réglage « protégée » connu de chaque conversation, gardé sur l'appareil :
+/// le voile d'une conversation verrouillée est ainsi en place dès la première image,
+/// avant la réponse du serveur. Ce sont des interrupteurs, jamais du contenu.
+enum ConversationSecretPolicyCache {
+    private static func key(_ ownerScopeId: String) -> String { "sq.messages.secretPolicy.v1.\(ownerScopeId)" }
+
+    static func policy(
+        conversationId: String,
+        ownerScopeId: String = LocalAccountScope.currentOwnerScopeId,
+        defaults: UserDefaults = .standard
+    ) -> ConversationSecretPolicy? {
+        guard let data = defaults.data(forKey: key(ownerScopeId)),
+              let all = try? JSONDecoder().decode([String: ConversationSecretPolicy].self, from: data) else { return nil }
+        return all[conversationId]
+    }
+
+    static func store(
+        _ policy: ConversationSecretPolicy,
+        conversationId: String,
+        ownerScopeId: String = LocalAccountScope.currentOwnerScopeId,
+        defaults: UserDefaults = .standard
+    ) {
+        var all = defaults.data(forKey: key(ownerScopeId))
+            .flatMap { try? JSONDecoder().decode([String: ConversationSecretPolicy].self, from: $0) } ?? [:]
+        guard all[conversationId] != policy else { return }
+        all[conversationId] = policy
+        if let data = try? JSONEncoder().encode(all) { defaults.set(data, forKey: key(ownerScopeId)) }
+    }
+
+    /// À la déconnexion ou au retrait d'un compte.
+    static func purge(ownerScopeId: String, defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key(ownerScopeId))
     }
 }

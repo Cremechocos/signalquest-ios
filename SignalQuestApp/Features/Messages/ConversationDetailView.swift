@@ -14,6 +14,18 @@ struct ConversationDetailView: View {
     /// Message sur lequel la conversation s'ouvre (résultat de la recherche de la liste).
     var focusMessageId: String? = nil
 
+    init(conversation: MessageConversation, service: MessagesServicing, e2ee: E2EEServicing?, focusMessageId: String? = nil) {
+        self.conversation = conversation
+        self.service = service
+        self.e2ee = e2ee
+        self.focusMessageId = focusMessageId
+        // Le dernier réglage connu de cet appareil : le voile d'une conversation
+        // protégée est en place dès la première image.
+        _secretPolicy = State(initialValue: AppEnvironment.usesDemoData
+            ? ConversationSecretPolicy()
+            : ConversationSecretPolicyCache.policy(conversationId: conversation.id))
+    }
+
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
     /// Masque le dock flottant global le temps de la conversation
@@ -162,7 +174,12 @@ struct ConversationDetailView: View {
     /// (texte, photo, note vocale, position) porte un TTL de 24 h (le backend
     /// pose `expiresAt`).
     @State private var ephemeralEnabled = false
-    private var ephemeralTTL: Int { ephemeralEnabled ? 86_400 : 0 }
+    /// 24 h par défaut ; la durée choisie dans les réglages « protégée » quand il y en a une.
+    private var ephemeralTTL: Int {
+        guard ephemeralEnabled else { return 0 }
+        let chosen = secretPolicy?.outgoingTTLSeconds ?? 0
+        return chosen > 0 ? chosen : 86_400
+    }
     @State private var isSharingLocation = false
     @State private var showLiveShare = false
     @State private var showSchedulePicker = false
@@ -196,6 +213,33 @@ struct ConversationDetailView: View {
     /// ne réassigne pas le `@State` (référence inchangée) → ni warning « state
     /// during view update » ni re-render.
     @State private var renderCache = MessageRenderCache()
+
+    // Appels dans le fil : insérés par date parmi les messages (lecture seule).
+    @State private var callEvents: [CallThreadEvent] = []
+    @State private var callsNextBefore: String?
+    @State private var callsExhausted = false
+    @State private var callsFetchedOnce = false
+    /// Route absente ou refusée : aucun appel n'est affiché, sans erreur.
+    @State private var callsUnavailable = false
+    @State private var callsLoading = false
+    @State private var lastCallRefresh: Date = .distantPast
+
+    // Conversation protégée : Face ID, voile, alerte de capture, suppression automatique.
+    @State private var secretPolicy: ConversationSecretPolicy?
+    @State private var protectionUnlocked = false
+    @State private var isAuthenticating = false
+    @State private var isScreenCaptured = false
+    @State private var policyFetchGaveUp = false
+    @State private var ephemeralDefaultApplied = false
+    @State private var showProtection = false
+    /// Posé quand la conversation s'affiche à côté de la liste (iPad) : pas de retour.
+    @Environment(\.sqMessagesCloseDetail) private var closeSplitDetail
+    private var inSplitDetail: Bool { closeSplitDetail != nil }
+
+    /// Quitte la conversation : retour en arrière sur iPhone, sélection levée à côté de la liste (iPad).
+    private func closeConversation() {
+        if let closeSplitDetail { closeSplitDetail() } else { dismiss() }
+    }
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
     private var canSend: Bool {
@@ -359,12 +403,19 @@ struct ConversationDetailView: View {
                         // seulement quand la structure de la liste change.
                         // Le pied « Lu / Vu par » suit MON dernier message, pas le bas de la liste.
                         let receiptMessageId = messages.last { $0.senderId == currentUserId && !$0.id.hasPrefix("local-") }?.id
+                        // Appels placés par date : devant le premier message plus récent, ou à la suite.
+                        let callPlacement = CallThreadPlacement.make(messages: messages, events: callsUnavailable ? [] : callEvents)
                         ForEach(messages) { message in
                             let index = renderCache.index(of: message, in: messages)
                             let previous = index > 0 ? messages[index - 1] : nil
                             let next = index + 1 < messages.count ? messages[index + 1] : nil
                             let stamp = sectionStamp(for: message, previous: previous)
+                            let callsBefore = callPlacement.before[message.id] ?? []
+                            let nextHasCalls = next.map { callPlacement.before[$0.id]?.isEmpty == false } ?? false
                             VStack(spacing: 0) {
+                                ForEach(callsBefore) { event in
+                                    callRow(event)
+                                }
                                 if let stamp {
                                     Text(stamp)
                                         .font(SQType.micro)
@@ -382,8 +433,8 @@ struct ConversationDetailView: View {
                                 messageBubble(
                                     message,
                                     isGroupStart: stamp != nil || previous == nil || previous?.senderId != message.senderId
-                                        || unreadDivider?.messageId == message.id,
-                                    isGroupEnd: isGroupEnd(message, next: next)
+                                        || unreadDivider?.messageId == message.id || !callsBefore.isEmpty,
+                                    isGroupEnd: isGroupEnd(message, next: next) || nextHasCalls
                                 )
                                 if message.id == receiptMessageId {
                                     readReceiptFooter(for: message)
@@ -398,6 +449,9 @@ struct ConversationDetailView: View {
                                     .fill(SQColor.brandRed.opacity(highlightedMessageId == message.id ? 0.14 : 0))
                             )
                             .sqAnimation(SQMotion.standard, value: highlightedMessageId)
+                        }
+                        ForEach(callPlacement.trailing) { event in
+                            callRow(event)
                         }
                         // Frappe : dernier élément de la liste, pour qu'elle pousse le contenu
                         // au lieu de rétrécir la zone visible (parité Android).
@@ -444,6 +498,12 @@ struct ConversationDetailView: View {
                     } else {
                         hasUnseenMessages = true
                     }
+                }
+                // Un appel qui se termine ajoute une ligne en bas : on y reste si on y était.
+                .onChangeCompat(of: callEvents.first?.callId) { _, _ in
+                    guard isNearBottom, let last = messages.last, let newest = callEvents.first,
+                          let lastDate = last.createdAt, newest.startedAt > lastDate else { return }
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.typingRowId, anchor: .bottom) }
                 }
                 // La frappe ou le « Lu » ajoutent une ligne en bas : on y reste si on y était.
                 .onChangeCompat(of: typingUntil != nil) { _, visible in
@@ -723,7 +783,22 @@ struct ConversationDetailView: View {
 
     var body: some View {
         conversationBase
-        .sheet(isPresented: $showGroupSettings, onDismiss: { if leftGroup { dismiss() } }) {
+        .accessibilityHidden(showsProtectionVeil)
+        .overlay {
+            if showsProtectionVeil { protectionVeil }
+        }
+        .sheet(isPresented: $showProtection) {
+            ProtectedConversationSheet(
+                conversationId: conversation.id,
+                subtitle: sheetSubtitle,
+                service: service,
+                initial: secretPolicy ?? ConversationSecretPolicy()
+            ) { updated, authenticated in
+                applySecretPolicy(updated)
+                if authenticated { protectionUnlocked = true }
+            }
+        }
+        .sheet(isPresented: $showGroupSettings, onDismiss: { if leftGroup { closeConversation() } }) {
             GroupSettingsView(conversation: conversation, service: service, e2ee: e2ee,
                               onRenamed: { renamedTitle = $0 },
                               onMembersChanged: { updatedMemberCount = $0 }) {
@@ -764,7 +839,10 @@ struct ConversationDetailView: View {
         // §13 : l'aperçu du sélecteur d'apps ne montre jamais une conversation
         // chiffrée, même sans verrouillage de l'app.
         .background {
-            if EncryptedConversationSurfaces.hidesSnapshot(of: conversation) { AppSensitiveContentMarker() }
+            if EncryptedConversationSurfaces.hidesSnapshot(of: conversation)
+                || secretPolicy?.requireBiometric == true || secretPolicy?.blockScreenshots == true {
+                AppSensitiveContentMarker()
+            }
         }
         // Clavier de l'iPad : ⌘F cherche dans la conversation, Échap ferme (citation, modification, puis l'écran).
         .background { keyboardShortcutButtons }
@@ -784,6 +862,30 @@ struct ConversationDetailView: View {
             // Laisse le défilement initial vers le bas se terminer avant d'aller au message.
             try? await Task.sleep(for: .milliseconds(350))
             handleSearchSelection(target)
+        }
+        // Historique d'appels une fois le premier chargement répondu.
+        .task(id: hasLoadedOnce) {
+            guard hasLoadedOnce else { return }
+            await syncCallHistory()
+        }
+        .task(id: conversation.id) { await refreshSecretPolicy() }
+        // Face ID à l'ouverture, et au retour au premier plan.
+        .task(id: shouldPromptUnlock) {
+            guard shouldPromptUnlock else { return }
+            await unlockProtection()
+        }
+        .onAppear { isScreenCaptured = ScreenCaptureState.isCaptured }
+        .onReceive(NotificationCenter.default.publisher(for: UIScreen.capturedDidChangeNotification)) { _ in
+            isScreenCaptured = ScreenCaptureState.isCaptured
+        }
+        // Capture d'écran faite sur cet appareil : bannière dans la conversation.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
+            guard isOnScreen, secretPolicy?.blockScreenshots == true, !holdsProtection else { return }
+            inAppNotifications.show(SQInAppNotificationItem(
+                body: String(localized: "Capture d’écran détectée dans cette conversation."),
+                variant: .warning,
+                duration: .seconds(5)
+            ))
         }
         .task(id: router.pendingCall) {
             guard let pending = router.pendingCall, pending.conversationId == conversation.id else { return }
@@ -866,6 +968,10 @@ struct ConversationDetailView: View {
                 stopSync()
                 stopActivePing(sendLeave: true)
                 if let draftAutosaver { Task { await draftAutosaver.flush() } }
+                if phase == .background, secretPolicy?.requireBiometric == true {
+                    protectionUnlocked = false
+                    dismissContentPresentations()
+                }
             }
         }
         .sheet(isPresented: $showUnlockSheet) {
@@ -889,7 +995,9 @@ struct ConversationDetailView: View {
     /// Appeler et ⋯ en boutons ronds, sur le fond de page avec un filet.
     private var topBar: some View {
         HStack(spacing: SQSpace.sm2) {
-            MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "conversation.back") { dismiss() }
+            if !inSplitDetail {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "conversation.back") { dismiss() }
+            }
 
             // Avatar, nom et statut forment un seul élément VoiceOver : seule,
             // l'initiale masquée de l'avatar restait un texte non exposé. En
@@ -1020,6 +1128,10 @@ struct ConversationDetailView: View {
                     }
                     .accessibilityIdentifier("conversation.encryption.info")
                 }
+                Button { showProtection = true } label: {
+                    Label("Conversation protégée", systemImage: "lock.shield")
+                }
+                .accessibilityIdentifier("conversation.protection")
                 Divider()
                 if conversation.isGroup {
                     Button { showGroupSettings = true } label: {
@@ -1115,7 +1227,9 @@ struct ConversationDetailView: View {
             if ephemeralEnabled {
                 HStack(spacing: SQSpace.xs) {
                     Image(systemName: "timer").font(.system(size: 11)).accessibilityHidden(true)
-                    Text("Messages éphémères · disparaissent après 24 h")
+                    Text(ephemeralTTL == 86_400
+                         ? String(localized: "Messages éphémères · disparaissent après 24 h")
+                         : String(localized: "Messages éphémères · disparaissent après \(ProtectedConversationSheet.durationLabel(ephemeralTTL))"))
                         .font(SQType.micro)
                         .foregroundStyle(SQColor.accentInk)
                     Spacer(minLength: SQSpace.sm)
@@ -1220,7 +1334,7 @@ struct ConversationDetailView: View {
         } else if replyTarget != nil {
             replyTarget = nil
         } else {
-            dismiss()
+            closeConversation()
         }
     }
 
@@ -2831,6 +2945,7 @@ struct ConversationDetailView: View {
             prependAnchorId = anchorId                      // réancre le scroll (MSG-FLUIDITY-01)
             await decryptLoadedMessages()
             refreshPolls()
+            await syncCallHistory()
         } catch {
             // Silencieux : l'historique déjà chargé reste utilisable.
         }
@@ -2845,6 +2960,7 @@ struct ConversationDetailView: View {
         v2Limit += E2EEV2ThreadWindow.pageSize
         await loadV2()
         prependAnchorId = anchorId
+        await syncCallHistory()
     }
 
     private func advanceLastSync(with items: [MessageItem]) {
@@ -2883,6 +2999,8 @@ struct ConversationDetailView: View {
                     }
                 case .viewingEvent:
                     await refreshViewers()
+                case .callEvent(let event):
+                    await MainActor.run { acceptCallEvent(event) }
                 case .receiptsEvent(let userId):
                     // Notre propre « lu » ou « distribué » revient aussi par le flux : sans objet.
                     if let userId, userId == currentUserId { continue }
@@ -2897,6 +3015,8 @@ struct ConversationDetailView: View {
                     if usesV2 { await loadV2() } else { await refreshLatestPageState() }
                 case .serverEvent, .polling:
                     await MainActor.run { if threadTarget != nil { threadRefreshToken &+= 1 } }
+                    // Le flux ne rejoue pas les appels terminés pendant une coupure : on relit les plus récents.
+                    if trigger == .polling { await refreshRecentCalls() }
                     if usesV2 {
                         await loadV2()
                         await markReadIfLastIncoming()
@@ -2992,6 +3112,258 @@ struct ConversationDetailView: View {
             MessageSyncLog.logger.error("delta erreur: \(error.localizedDescription, privacy: .public)")
             SQDiagnostics.record(error, area: .messageSync)
         }
+    }
+
+    // MARK: Appels dans le fil
+
+    /// Rangée centrée d'un appel terminé : toucher rappelle, dans le même mode.
+    private func callRow(_ event: CallThreadEvent) -> some View {
+        let missed = event.isMissedForReader(currentUserId: currentUserId)
+        let summary = event.summary(currentUserId: currentUserId)
+        let time = event.startedAt.formatted(date: .omitted, time: .shortened)
+        let canRecall = SQFeatures.callsEnabled && networkPath.isOnline
+        return Button {
+            Haptics.selection()
+            startCall(mode: event.mode == .video ? "video" : "audio")
+        } label: {
+            HStack(spacing: SQSpace.xs) {
+                Image(systemName: event.systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text(verbatim: summary)
+                    .font(SQType.micro)
+                Text(verbatim: time)
+                    .font(SQType.micro(.regular))
+                    .monospacedDigit()
+                    .opacity(0.8)
+            }
+            .foregroundStyle(missed ? SQColor.dangerInk : SQColor.chipInk)
+            .padding(.horizontal, SQSpace.sm2)
+            .padding(.vertical, 4)
+            .background(missed ? SQColor.dangerSoft : SQColor.chip, in: Capsule(style: .continuous))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!canRecall)
+        .frame(maxWidth: .infinity)
+        .id("call-\(event.callId)")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: "\(summary), \(time)"))
+        .accessibilityHint(canRecall ? Text("Rappeler") : Text(verbatim: ""))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("conversation.callRow")
+    }
+
+    /// Route absente ou refusée : le fil reste sans appels, sans message d'erreur.
+    private func callsAreUnavailable(_ error: Error) -> Bool {
+        guard case APIError.http(let status, _, _, _, _) = error else { return false }
+        return [403, 404, 405, 501].contains(status)
+    }
+
+    /// Charge l'historique d'appels jusqu'à couvrir la plage de dates des messages
+    /// chargés ; tout l'historique quand il n'y a plus de messages plus anciens.
+    private func syncCallHistory() async {
+        guard !callsUnavailable, !callsLoading, !callsExhausted else { return }
+        callsLoading = true
+        defer { callsLoading = false }
+        let hasOlderMessages = usesV2 ? v2HasOlder : olderCursor != nil
+        let coverFrom: Date? = hasOlderMessages ? messages.compactMap(\.createdAt).min() : nil
+        for _ in 0..<5 {
+            if let coverFrom, callsFetchedOnce, let oldest = callEvents.last?.startedAt, oldest <= coverFrom { break }
+            do {
+                let page = try await service.callThreadHistory(conversationId: conversation.id, before: callsNextBefore, limit: 50)
+                guard !Task.isCancelled else { return }
+                callEvents = CallThreadPlacement.merge(callEvents, with: page.events)
+                callsFetchedOnce = true
+                callsNextBefore = page.nextBefore
+                if page.nextBefore == nil || page.events.isEmpty {
+                    callsExhausted = true
+                    break
+                }
+            } catch {
+                if callsAreUnavailable(error) {
+                    callsUnavailable = true
+                    callEvents = []
+                }
+                break
+            }
+        }
+    }
+
+    /// Relit la page la plus récente : après une coupure du flux, ou un appel dont le corps n'a pas pu être lu.
+    private func refreshRecentCalls() async {
+        guard !callsUnavailable, !AppEnvironment.usesDemoData,
+              Date().timeIntervalSince(lastCallRefresh) > 30 else { return }
+        lastCallRefresh = Date()
+        do {
+            let page = try await service.callThreadHistory(conversationId: conversation.id, before: nil, limit: 20)
+            callEvents = CallThreadPlacement.merge(callEvents, with: page.events)
+        } catch {
+            if callsAreUnavailable(error) {
+                callsUnavailable = true
+                callEvents = []
+            }
+        }
+    }
+
+    /// Appel annoncé par le flux : inséré, sans doublon avec l'historique déjà chargé.
+    private func acceptCallEvent(_ event: CallThreadEvent?) {
+        guard !callsUnavailable else { return }
+        guard let event else {
+            lastCallRefresh = .distantPast
+            Task { await refreshRecentCalls() }
+            return
+        }
+        callEvents = CallThreadPlacement.merge(callEvents, with: [event])
+    }
+
+    // MARK: Conversation protégée
+
+    /// Face ID n'est exigé que si l'appareil sait authentifier son propriétaire.
+    private var protectionRequiresUnlock: Bool {
+        secretPolicy?.requireBiometric == true && BiometricAuth.canAuthenticateDeviceOwner
+    }
+
+    /// Réglage jamais lu sur cet appareil : le fil reste masqué le temps de le lire.
+    private var policyIsUnresolved: Bool {
+        secretPolicy == nil && !policyFetchGaveUp && !AppEnvironment.usesDemoData
+    }
+
+    /// Le fil ne doit être ni lu ni marqué comme lu.
+    private var holdsProtection: Bool {
+        policyIsUnresolved || (protectionRequiresUnlock && !protectionUnlocked)
+    }
+
+    private var showsProtectionVeil: Bool {
+        holdsProtection
+            || (protectionRequiresUnlock && scenePhase != .active)
+            || (secretPolicy?.blockScreenshots == true && isScreenCaptured)
+    }
+
+    private var shouldPromptUnlock: Bool {
+        protectionRequiresUnlock && !protectionUnlocked && scenePhase == .active && !policyIsUnresolved
+    }
+
+    private var protectionVeil: some View {
+        let recording = secretPolicy?.blockScreenshots == true && isScreenCaptured && !holdsProtection
+        return ZStack {
+            SQColor.bg.ignoresSafeArea()
+            if policyIsUnresolved {
+                SQSpinner().tint(SQColor.brandRed)
+                    .accessibilityLabel("Chargement")
+            } else if recording {
+                protectionMessage(
+                    systemImage: "record.circle",
+                    title: "Enregistrement d’écran en cours",
+                    detail: String(localized: "Le fil est masqué tant que l’écran est enregistré ou diffusé."),
+                    unlockable: false
+                )
+            } else if protectionRequiresUnlock && !protectionUnlocked {
+                protectionMessage(
+                    systemImage: BiometricAuth.kind.systemImage,
+                    title: "Conversation protégée",
+                    detail: String(localized: "Déverrouille avec \(BiometricAuth.kind.label) pour lire ce fil."),
+                    unlockable: scenePhase == .active
+                )
+            } else {
+                Image(systemName: "lock.shield")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if !inSplitDetail {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "conversation.veil.back") { closeConversation() }
+                    .padding(SQSpace.lg)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("conversation.veil")
+    }
+
+    private func protectionMessage(systemImage: String, title: LocalizedStringKey, detail: String, unlockable: Bool) -> some View {
+        VStack(spacing: SQSpace.md) {
+            Image(systemName: systemImage)
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 64, height: 64)
+                .background(SQColor.chip, in: RoundedRectangle(cornerRadius: SQRadius.xl, style: .continuous))
+                .accessibilityHidden(true)
+            Text(title)
+                .font(SQType.stateTitle)
+                .foregroundStyle(SQColor.label)
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
+            Text(verbatim: detail)
+                .font(SQType.callout)
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if unlockable {
+                GradientButton(String(localized: "Déverrouiller"), systemImage: BiometricAuth.kind.systemImage, isBusy: isAuthenticating) {
+                    Task { await unlockProtection() }
+                }
+                .fixedSize()
+                .accessibilityIdentifier("conversation.veil.unlock")
+            }
+        }
+        .padding(SQSpace.xl)
+        .frame(maxWidth: 420)
+    }
+
+    private func unlockProtection() async {
+        guard !isAuthenticating, protectionRequiresUnlock else { return }
+        isAuthenticating = true
+        defer { isAuthenticating = false }
+        let granted = await BiometricAuth.authenticate(
+            reason: String(localized: "Déverrouille cette conversation protégée."),
+            allowPasscode: true
+        )
+        guard granted else { return }
+        protectionUnlocked = true
+        // Le fil est lisible : la lecture et l'accusé reprennent là où ils étaient retenus.
+        await acknowledgeDelivery()
+        await markReadIfLastIncoming()
+    }
+
+    /// Lit le réglage du serveur et garde-le pour la prochaine ouverture.
+    private func refreshSecretPolicy() async {
+        guard !AppEnvironment.usesDemoData else { return }
+        if let known = secretPolicy { applySecretPolicy(known) }
+        do {
+            let fresh = try await service.secretPolicy(conversationId: conversation.id)
+            ConversationSecretPolicyCache.store(fresh, conversationId: conversation.id)
+            applySecretPolicy(fresh)
+        } catch {
+            // Sans réglage connu ni réseau, le fil s'ouvre : rien ne dit qu'il est protégé.
+            if secretPolicy == nil { policyFetchGaveUp = true }
+        }
+    }
+
+    private func applySecretPolicy(_ policy: ConversationSecretPolicy) {
+        secretPolicy = policy
+        ConversationSecretPolicyCache.store(policy, conversationId: conversation.id)
+        if policy.ephemeralDefault, !ephemeralDefaultApplied {
+            ephemeralDefaultApplied = true
+            ephemeralEnabled = true
+        }
+    }
+
+    /// Fenêtres qui montrent du contenu du fil : refermées quand le fil se reverrouille.
+    private func dismissContentPresentations() {
+        threadTarget = nil
+        selectableText = nil
+        forwardTarget = nil
+        imageViewer = nil
+        sharedPostComments = nil
+        sharedPostDetail = nil
+        showSearch = false
+        showMedia = false
+        showScheduled = false
+        showReminders = false
+        showSaved = false
     }
 
     private func signalTypingIfNeeded() {
@@ -3752,6 +4124,8 @@ struct ConversationDetailView: View {
     }
 
     private func markRead() async {
+        // Tant que le fil est masqué, il n'est pas lu : l'autre personne ne verrait pas « Vu » à tort.
+        guard !holdsProtection else { return }
         // Une bulle encore locale n'existe pas côté serveur : on lit jusqu'au dernier vrai message.
         let lastServerId = messages.last { !$0.id.hasPrefix("local-") }?.id
         readGate.lastMarkReadAt = Date()
@@ -3926,7 +4300,7 @@ struct ConversationDetailView: View {
                 body: String(localized: "\(conversationTitle) est bloqué. Tu peux le débloquer depuis Amis."),
                 variant: .success
             ))
-            dismiss()
+            closeConversation()
         } catch {
             showActionError(error.userFacingMessage)
             Haptics.error()
@@ -5019,5 +5393,28 @@ private struct ForwardMessageSheet: View {
 
     private struct ForwardFailure: Error {
         let message: String
+    }
+}
+
+
+/// Écran enregistré ou diffusé (AirPlay compris), lu sur les scènes de l'app.
+enum ScreenCaptureState {
+    @MainActor static var isCaptured: Bool {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .contains { $0.screen.isCaptured }
+    }
+}
+
+private struct SQMessagesCloseDetailKey: EnvironmentKey {
+    static var defaultValue: (() -> Void)? { nil }
+}
+
+extension EnvironmentValues {
+    /// Posé quand la conversation s'affiche à droite de la liste (iPad) : il lève la
+    /// sélection, et la conversation n'a plus de bouton retour. `nil` sur iPhone.
+    var sqMessagesCloseDetail: (() -> Void)? {
+        get { self[SQMessagesCloseDetailKey.self] }
+        set { self[SQMessagesCloseDetailKey.self] = newValue }
     }
 }

@@ -20,13 +20,16 @@ enum SyncTrigger: Sendable, Equatable {
     /// Auteurs annoncés par l'événement : le serveur le renvoie aussi à celui qui écrit.
     case typingEvent(userIds: [String])
     case viewingEvent
+    /// Un appel vient de se terminer dans la conversation : l'appel annoncé, ou
+    /// `nil` si le corps n'a pas pu être lu (la page récente est alors relue).
+    case callEvent(CallThreadEvent?)
 
     /// Événements relayés par le flux de la conversation.
     static let relayedEvents: Set<String> = [
         "update", "message", "read_state", "delivered_state", "feature_sync", "thread_reply",
         "poll_created", "poll_voted", "poll_closed",
         "task_created", "task_updated", "task_completed",
-        "mention", "typing", "viewing", "reaction"
+        "mention", "typing", "viewing", "reaction", "call_event"
     ]
 
     /// Types d'événement (champ `type` du payload) qui changent l'état d'un
@@ -61,6 +64,10 @@ enum SyncTrigger: Sendable, Equatable {
         let name = event.lowercased()
         if name == "typing" { return .typingEvent(userIds: typingUserIds(in: data)) }
         if name == "viewing" { return .viewingEvent }
+        if name == "call_event" {
+            let payload = data.data(using: .utf8).flatMap { try? JSONDecoder.signalQuest.decode(CallThreadStreamPayload.self, from: $0) }
+            return .callEvent(payload?.call)
+        }
         let object = data.data(using: .utf8).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         if receiptTypes.contains(name) || receiptTypes.contains((object?["type"] as? String)?.lowercased() ?? "") {
             return .receiptsEvent(userId: object?["userId"] as? String)

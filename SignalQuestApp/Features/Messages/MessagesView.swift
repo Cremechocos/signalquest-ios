@@ -15,6 +15,17 @@ final class MessagesViewModel: ObservableObject {
     /// D'autres conversations existent côté serveur au-delà de celles chargées (B01).
     @Published private(set) var hasMoreConversations = false
     @Published private(set) var isLoadingMore = false
+    /// Dossiers du compte et leurs conversations.
+    @Published private(set) var folders: [ConversationFolder] = []
+    /// Session focus en cours (échue ou inactive : `nil`).
+    @Published private(set) var focus: MessageFocusSession?
+    /// Nombre d'archivées, servi avec la liste par défaut. `nil` : le serveur ne
+    /// sait pas archiver, et aucune action d'archivage ne se propose.
+    @Published private(set) var shelvedSummary: ShelvedSummary?
+    /// Archivées chargées à l'ouverture de l'écran « Archivées ».
+    @Published private(set) var shelvedConversations: [MessageConversation] = []
+    @Published private(set) var isLoadingShelved = false
+    private var organizationSeededForDemo = false
     private var nextCursor: String?
     /// Pages déjà chargées : une relecture périodique les refait toutes, sinon elle
     /// ferait disparaître les plus anciennes que l'on vient de faire défiler.
@@ -34,9 +45,18 @@ final class MessagesViewModel: ObservableObject {
         self.service = service
     }
 
+    /// L'archivage n'existe côté serveur que s'il a servi `shelvedSummary`.
+    var supportsShelving: Bool { shelvedSummary != nil }
+
     func load() async {
         if AppEnvironment.usesDemoData {
-            conversations = Array.demo.inDisplayOrder()
+            conversations = Array.demo.inDisplayOrder().filter { demo in
+                !shelvedConversations.contains { $0.id == demo.id }
+            }
+            if !organizationSeededForDemo {
+                shelvedSummary = ShelvedSummary(count: Array.demoShelved.count, unreadCount: 1)
+                shelvedConversations = Array.demoShelved
+            }
             errorMessage = nil
             return
         }
@@ -61,6 +81,7 @@ final class MessagesViewModel: ObservableObject {
             loadedPages = pages
             conversations = all.inDisplayOrder()
             pinLimit = first.pinLimit
+            shelvedSummary = first.shelvedSummary
             hasMoreConversations = last.hasMore && last.nextCursor != nil
             nextCursor = last.nextCursor
             errorMessage = nil
@@ -69,12 +90,181 @@ final class MessagesViewModel: ObservableObject {
         }
     }
 
+    // MARK: Dossiers, focus, archivées
+
+    /// Dossiers et session focus : relus à l'ouverture, au retour et au tirer-pour-rafraîchir.
+    /// Un échec garde l'état affiché (la liste reste utilisable sans eux).
+    func loadOrganization() async {
+        if AppEnvironment.usesDemoData {
+            if !organizationSeededForDemo {
+                organizationSeededForDemo = true
+                folders = ConversationFolder.demo
+            }
+            return
+        }
+        if let list = try? await service.conversationFolders() { folders = list }
+        do {
+            let session = try await service.focusSession()
+            focus = session?.isRunning() == true ? session : nil
+        } catch {
+            // Session inconnue : on garde l'état précédent.
+        }
+    }
+
+    func folderIds(for conversationId: String) -> Set<String> {
+        Set(folders.filter { $0.conversationIds.contains(conversationId) }.map(\.id))
+    }
+
+    /// Crée un dossier ; `nil` si le nom est vide ou si le serveur refuse.
+    @discardableResult
+    func createFolder(named name: String) async -> ConversationFolder? {
+        let trimmed = Self.cleanFolderName(name)
+        guard !trimmed.isEmpty else { return nil }
+        do {
+            let folder = try await service.createConversationFolder(name: trimmed)
+            folders.append(folder)
+            return folder
+        } catch {
+            if !error.isCancellation { actionError = String(localized: "Le dossier n’a pas pu être créé.") }
+            return nil
+        }
+    }
+
+    func renameFolder(_ folder: ConversationFolder, to name: String) async {
+        let trimmed = Self.cleanFolderName(name)
+        guard !trimmed.isEmpty, trimmed != folder.name else { return }
+        let previous = folders
+        update(folder: folder.id) { $0.name = trimmed }
+        do {
+            _ = try await service.renameConversationFolder(id: folder.id, name: trimmed)
+        } catch {
+            folders = previous
+            if !error.isCancellation { actionError = String(localized: "Le dossier n’a pas pu être renommé.") }
+        }
+    }
+
+    func deleteFolder(_ folder: ConversationFolder) async {
+        let previous = folders
+        folders.removeAll { $0.id == folder.id }
+        do {
+            try await service.deleteConversationFolder(id: folder.id)
+        } catch {
+            folders = previous
+            if !error.isCancellation { actionError = String(localized: "Le dossier n’a pas pu être supprimé.") }
+        }
+    }
+
+    /// Range ou retire une conversation d'un dossier (un dossier à la fois ; la
+    /// conversation peut figurer dans plusieurs dossiers).
+    func setConversation(_ conversationId: String, in folder: ConversationFolder, contained: Bool) async {
+        let previous = folders
+        var ids = folderIds(for: conversationId)
+        if contained { ids.insert(folder.id) } else { ids.remove(folder.id) }
+        update(folder: folder.id) { value in
+            value.conversationIds.removeAll { $0 == conversationId }
+            if contained { value.conversationIds.append(conversationId) }
+        }
+        do {
+            try await service.setConversationFolders(Array(ids), conversationId: conversationId)
+        } catch {
+            folders = previous
+            if !error.isCancellation { actionError = String(localized: "Le dossier n’a pas pu être modifié.") }
+        }
+    }
+
+    private func update(folder id: String, _ transform: (inout ConversationFolder) -> Void) {
+        guard let index = folders.firstIndex(where: { $0.id == id }) else { return }
+        transform(&folders[index])
+    }
+
+    static func cleanFolderName(_ name: String) -> String {
+        String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(ConversationFolder.maxNameLength))
+    }
+
+    func startFocus(conversationIds: [String], endsAt: Date?) async {
+        do {
+            let session = try await service.startFocus(name: nil, conversationIds: conversationIds, endsAt: endsAt)
+            focus = session?.isRunning() == true ? session : nil
+        } catch {
+            if !error.isCancellation { actionError = String(localized: "Le mode focus n’a pas pu être activé.") }
+        }
+    }
+
+    func endFocus() async {
+        let previous = focus
+        focus = nil
+        do {
+            try await service.endFocus()
+        } catch {
+            focus = previous
+            if !error.isCancellation { actionError = String(localized: "Le mode focus n’a pas pu être désactivé.") }
+        }
+    }
+
+    /// Archive (ou désarchive) pour soi. La conversation quitte tout de suite la
+    /// liste affichée ; elle revient si le serveur refuse. `true` si c'est fait.
+    @discardableResult
+    func setShelved(_ shelved: Bool, _ conversation: MessageConversation, isUnread: Bool) async -> Bool {
+        guard supportsShelving else { return false }
+        let previousSummary = shelvedSummary
+        let previousList = conversations
+        let previousShelved = shelvedConversations
+        if shelved {
+            conversations.removeAll { $0.id == conversation.id }
+            if let summary = shelvedSummary {
+                shelvedSummary = ShelvedSummary(count: summary.count + 1, unreadCount: summary.unreadCount + (isUnread ? 1 : 0))
+            }
+        } else {
+            shelvedConversations.removeAll { $0.id == conversation.id }
+            if let summary = shelvedSummary {
+                shelvedSummary = ShelvedSummary(count: summary.count - 1, unreadCount: summary.unreadCount - (isUnread ? 1 : 0))
+            }
+        }
+        do {
+            try await service.setConversationShelved(shelved, conversationId: conversation.id)
+            return true
+        } catch {
+            conversations = previousList
+            shelvedConversations = previousShelved
+            shelvedSummary = previousSummary
+            if !error.isCancellation {
+                actionError = shelved
+                    ? String(localized: "La conversation n’a pas pu être archivée.")
+                    : String(localized: "La conversation n’a pas pu être désarchivée.")
+            }
+            return false
+        }
+    }
+
+    /// Les archivées, lues à l'ouverture de leur écran.
+    func loadShelved() async {
+        if AppEnvironment.usesDemoData { return }
+        isLoadingShelved = true
+        defer { isLoadingShelved = false }
+        do {
+            shelvedConversations = try await service.shelvedConversations().inDisplayOrder()
+            errorMessage = nil
+        } catch {
+            if !error.isCancellation { actionError = error.userFacingMessage }
+        }
+    }
+
     /// Une conversation hors des pages chargées (notification, lien) : elle est
     /// lue seule et ajoutée à la liste, pour pouvoir être ouverte (B01).
     func ensureLoaded(id: String) async {
-        guard !conversations.contains(where: { $0.id == id }),
+        guard openableConversation(id: id) == nil,
               let conversation = try? await service.conversation(id: id) else { return }
-        conversations = (conversations + [conversation]).inDisplayOrder()
+        // Une conversation archivée s'ouvre sans reparaître dans la liste par défaut.
+        if conversation.shelved {
+            shelvedConversations = (shelvedConversations + [conversation]).inDisplayOrder()
+        } else {
+            conversations = (conversations + [conversation]).inDisplayOrder()
+        }
+    }
+
+    /// Une conversation que l'on peut ouvrir : de la liste, ou des archivées chargées.
+    func openableConversation(id: String) -> MessageConversation? {
+        conversations.first { $0.id == id } ?? shelvedConversations.first { $0.id == id }
     }
 
     /// Page suivante de la liste, au défilement en bas (B01).
@@ -172,6 +362,13 @@ final class MessagesViewModel: ObservableObject {
 
     /// Change une conversation, puis remet la liste dans son ordre d'affichage.
     private func update(_ id: String, _ transform: (MessageConversation) -> MessageConversation) {
+        if conversations.firstIndex(where: { $0.id == id }) == nil,
+           let shelvedIndex = shelvedConversations.firstIndex(where: { $0.id == id }) {
+            var updated = shelvedConversations
+            updated[shelvedIndex] = transform(updated[shelvedIndex])
+            shelvedConversations = updated.inDisplayOrder()
+            return
+        }
         guard let index = conversations.firstIndex(where: { $0.id == id }) else { return }
         var updated = conversations
         updated[index] = transform(updated[index])
@@ -190,6 +387,7 @@ final class MessagesViewModel: ObservableObject {
                 try await service.leaveConversation(id: conversation.id)
             }
             conversations.removeAll { $0.id == conversation.id }
+            shelvedConversations.removeAll { $0.id == conversation.id }
         } catch {
             if !error.isCancellation { actionError = error.userFacingMessage }
         }
@@ -206,6 +404,9 @@ struct MessagesView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// Dernière conversation ouverte à côté de la liste (iPad), rétablie au lancement suivant.
+    @SceneStorage("sq.messages.selectedConversationId") private var persistedSelection = ""
     private let service: MessagesServicing
     private let e2ee: E2EEServicing?
     @State private var showNewConversation = false
@@ -234,17 +435,33 @@ struct MessagesView: View {
     @State private var messageSearchTask: Task<Void, Never>?
     @State private var routedFocusMessageId: String?
     @State private var searchFocusRequest = 0
+    /// Dossier choisi dans les puces ; `nil` quand une puce de filtre l'est.
+    @State private var folderFilterId: String?
+    /// Écran « Archivées » : même liste, alimentée par les conversations archivées.
+    @State private var showingShelved = false
+    @State private var folderSheet: FolderSheetRequest?
+    @State private var showFocusSheet = false
 
     enum InboxFilter: String, CaseIterable {
         case all, unread, groups
+        /// Conversations du mode focus en cours ; sans puce quand aucun focus ne court.
+        case focus
 
         var title: LocalizedStringKey {
             switch self {
             case .all: "Toutes"
             case .unread: "Non lues"
             case .groups: "Groupes"
+            case .focus: "Focus"
             }
         }
+    }
+
+    /// Ouverture de la feuille des dossiers, avec la conversation à y ranger dès
+    /// la création d'un dossier (menu « Ranger dans un dossier › Nouveau dossier »).
+    struct FolderSheetRequest: Identifiable {
+        let id = UUID()
+        var fileConversationId: String?
     }
 
     /// Insets des rangées : gap vertical de 14 pt entre cartes (2 × 7),
@@ -260,7 +477,7 @@ struct MessagesView: View {
     }
 
     /// Relecture périodique de la liste : app au premier plan, aucune conversation ouverte.
-    private var listIsPolling: Bool { scenePhase == .active && routedConversationId == nil }
+    private var listIsPolling: Bool { scenePhase == .active && (usesSplitLayout || routedConversationId == nil) }
 
     private func refreshV2Activation() {
         guard services.e2eeV2Messaging.writesEnabled, let current = LocalAccountScope.sessionSnapshot() else {
@@ -304,7 +521,79 @@ struct MessagesView: View {
         .accessibilityElement(children: .contain)
     }
 
+    /// iPad en largeur régulière : la liste à gauche, la conversation à droite.
+    /// L'iPhone, même large en paysage, garde la pile.
+    private var usesSplitLayout: Bool {
+        horizontalSizeClass == .regular && UIDevice.current.userInterfaceIdiom == .pad
+    }
+
     var body: some View {
+        if usesSplitLayout {
+            NavigationSplitView(columnVisibility: .constant(.all)) {
+                listColumn
+                    .navigationSplitViewColumnWidth(min: 340, ideal: 400, max: 460)
+            } detail: {
+                splitDetail
+            }
+            .navigationSplitViewStyle(.balanced)
+            // Poussée dans la pile du Feed : la barre de cette pile reste masquée,
+            // le retour rond de la liste suffit.
+            .toolbar(.hidden, for: .navigationBar)
+            .sqKeepsSwipeBack()
+            .task { restorePersistedSelection() }
+            .onChangeCompat(of: routedConversationId) { _, id in persistSelection(id) }
+        } else {
+            listColumn
+                .navigationDestinationItemCompat($routedConversationId) { id in
+                    if let conversation = model.openableConversation(id: id) {
+                        ConversationDetailView(
+                            conversation: conversation, service: service, e2ee: e2ee,
+                            focusMessageId: routedFocusMessageId
+                        )
+                    }
+                }
+        }
+    }
+
+    /// Colonne de droite : la conversation choisie, ou l'invitation à en choisir une.
+    @ViewBuilder
+    private var splitDetail: some View {
+        if let id = routedConversationId, let conversation = model.openableConversation(id: id) {
+            ConversationDetailView(
+                conversation: conversation, service: service, e2ee: e2ee,
+                focusMessageId: routedFocusMessageId
+            )
+            .id(id)
+            .environment(\.sqMessagesCloseDetail, { routedConversationId = nil })
+        } else {
+            EmptyStateView(
+                title: "Choisis une conversation",
+                message: "Elle s’affiche ici, à côté de ta liste.",
+                systemImage: "bubble.left.and.bubble.right"
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .signalQuestBackground()
+            .accessibilityIdentifier("messages.split.placeholder")
+        }
+    }
+
+    /// La conversation ouverte est gardée entre deux lancements (iPad seulement).
+    private func persistSelection(_ id: String?) {
+        persistedSelection = id ?? ""
+    }
+
+    private func restorePersistedSelection() {
+        guard routedConversationId == nil, !persistedSelection.isEmpty else { return }
+        let id = persistedSelection
+        Task {
+            if model.conversations.isEmpty { await model.load() }
+            guard routedConversationId == nil else { return }
+            await model.ensureLoaded(id: id)
+            if model.openableConversation(id: id) != nil, routedConversationId == nil { routedConversationId = id }
+        }
+    }
+
+    private var listColumn: some View {
         List {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 header
@@ -318,7 +607,10 @@ struct MessagesView: View {
                 if E2EEV2RuntimeReadGate.enabled {
                     E2EEV2NotificationPreviewNotice()
                 }
-                if !model.conversations.isEmpty {
+                if let focus = model.focus, !showingShelved {
+                    focusBanner(focus)
+                }
+                if !model.conversations.isEmpty || showingShelved {
                     // Aux tailles d'accessibilité, l'intitulé long ne tient pas sur une ligne.
                     SQSearchField(
                         text: $query,
@@ -326,7 +618,10 @@ struct MessagesView: View {
                         focusRequest: searchFocusRequest
                     )
                         .accessibilityIdentifier("messages.search")
-                    filterChips
+                    if !showingShelved { filterChips }
+                }
+                if !showingShelved, let summary = model.shelvedSummary, summary.count > 0 {
+                    shelvedRow(summary)
                 }
             }
                 .listRowBackground(Color.clear)
@@ -348,11 +643,13 @@ struct MessagesView: View {
                     conversationRow(conversation, isFirst: index == 0)
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(usesSplitLayout && routedConversationId == conversation.id ? .isSelected : [])
                 // Une seule carte pour toute la liste : chaque rangée en porte un
                 // morceau, arrondi en haut pour la première, en bas pour la dernière.
+                // À côté de la conversation (iPad), la rangée ouverte est teintée.
                 .listRowBackground(
                     MessagesCardSegment(top: index == 0, bottom: index == visible.count - 1)
-                        .fill(SQColor.surface)
+                        .fill(usesSplitLayout && routedConversationId == conversation.id ? SQColor.accentSoft : SQColor.surface)
                         .overlay {
                             MessagesCardSegment(top: index == 0, bottom: index == visible.count - 1)
                                 .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
@@ -382,11 +679,15 @@ struct MessagesView: View {
                     } label: {
                         Label("Quitter", systemImage: "rectangle.portrait.and.arrow.right")
                     }
+                    shelveButton(conversation)
+                        .tint(SQColor.info)
                 }
                 // Mêmes actions à l'appui long, et au clic secondaire sur iPad.
                 .contextMenu {
                     pinButton(conversation)
                     muteButtons(conversation)
+                    shelveButton(conversation)
+                    folderMenu(conversation)
                     if isUnread(conversation) {
                         Button { setRead(true, conversation) } label: {
                             Label("Marquer comme lu", systemImage: "checkmark.message")
@@ -406,7 +707,7 @@ struct MessagesView: View {
             if !messageHits.isEmpty {
                 messageResultsSection
             }
-            if model.hasMoreConversations {
+            if model.hasMoreConversations && !showingShelved {
                 // Page suivante au défilement ; la tâche repart à chaque page reçue,
                 // de sorte qu'un filtre encore vide continue de chercher (B01).
                 HStack {
@@ -422,7 +723,17 @@ struct MessagesView: View {
                 .accessibilityIdentifier("messages.loadingMore")
                 .task(id: model.conversations.count) { await model.loadMore() }
             }
-            if !model.conversations.isEmpty && visible.isEmpty && !model.hasMoreConversations {
+            if showingShelved && model.shelvedConversations.isEmpty && !model.isLoadingShelved {
+                EmptyStateView(
+                    title: "Aucune conversation archivée",
+                    message: "Une conversation archivée revient dans ta liste au prochain message, sauf si elle est en sourdine.",
+                    systemImage: "archivebox"
+                )
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .accessibilityIdentifier("messages.shelved.empty")
+            } else if !listSource.isEmpty && visible.isEmpty && (showingShelved || !model.hasMoreConversations) {
                 Text("Aucune conversation ne correspond.")
                     .font(SQType.callout)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -432,7 +743,7 @@ struct MessagesView: View {
                     .listRowSeparator(.hidden)
                     .accessibilityIdentifier("messages.noMatch")
             }
-            if !model.isLoading && model.conversations.isEmpty && model.errorMessage == nil {
+            if !showingShelved && !model.isLoading && model.conversations.isEmpty && model.errorMessage == nil {
                 EmptyStateView(
                     title: "Aucune conversation",
                     message: "Démarre une discussion avec un membre de la communauté.",
@@ -475,6 +786,7 @@ struct MessagesView: View {
         .task {
             await reloadDrafts()
             if model.conversations.isEmpty { await model.load() }
+            await model.loadOrganization()
             await maybePresentE2EEUnlock()
             openNewConversationIfRequested()
             await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
@@ -514,12 +826,15 @@ struct MessagesView: View {
             guard !model.conversations.isEmpty else { return }
             Task {
                 await model.load()
+                await model.loadOrganization()
                 await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
                 await services.applyLoadedInbox(model.conversations, isComplete: !model.hasMoreConversations)
             }
         }
         .refreshable {
             await model.load()
+            await model.loadOrganization()
+            if showingShelved { await model.loadShelved() }
             await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
         }
         .onReceive(NotificationCenter.default.publisher(for: MessageDraftStore.didChange)) { _ in
@@ -559,14 +874,6 @@ struct MessagesView: View {
                     await model.leave(request.conversation, v2: services.e2eeV2Messaging, naming: successor)
                     await services.refreshInboxBadge(force: true)
                 }
-            }
-        }
-        .navigationDestinationItemCompat($routedConversationId) { id in
-            if let conversation = model.conversations.first(where: { $0.id == id }) {
-                ConversationDetailView(
-                    conversation: conversation, service: service, e2ee: e2ee,
-                    focusMessageId: routedFocusMessageId
-                )
             }
         }
         .onChangeCompat(of: routedConversationId) { _, id in
@@ -633,6 +940,21 @@ struct MessagesView: View {
                 unlockUserId: currentUserId,
                 unlockService: e2ee
             )
+        }
+        .sheet(item: $folderSheet) { request in
+            ConversationFoldersSheet(model: model, fileConversationId: request.fileConversationId)
+        }
+        .sheet(isPresented: $showFocusSheet) {
+            FocusSheet(model: model, currentUserId: currentUserId) {
+                filter = .focus
+                folderFilterId = nil
+            }
+        }
+        .onChangeCompat(of: model.folders) { _, folders in
+            if let id = folderFilterId, !folders.contains(where: { $0.id == id }) { folderFilterId = nil }
+        }
+        .onChangeCompat(of: model.focus == nil) { _, ended in
+            if ended, filter == .focus { filter = .all }
         }
         .sheet(isPresented: $showE2EEUnlock, onDismiss: openNewConversationIfRequested) {
             if let e2ee = e2ee, case .authenticated(let user) = session.state {
@@ -704,31 +1026,42 @@ struct MessagesView: View {
     /// le grand titre et le nombre de conversations non lues.
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            HStack {
-                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "messages.back") { dismiss() }
-                Spacer(minLength: SQSpace.sm)
-                Button {
-                    Haptics.light()
-                    showNewConversation = true
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(SQColor.onInk)
-                        .frame(width: 44, height: 44)
-                        .background(SQColor.label, in: Circle())
-                        .contentShape(Circle())
+            HStack(spacing: SQSpace.sm) {
+                MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "messages.back") {
+                    if showingShelved { showingShelved = false } else { dismiss() }
                 }
-                .buttonStyle(SQPressButtonStyle())
-                .accessibilityLabel("Nouvelle conversation")
-                .accessibilityIdentifier("messages.new")
+                Spacer(minLength: SQSpace.sm)
+                if !showingShelved {
+                    listMenu
+                    Button {
+                        Haptics.light()
+                        showNewConversation = true
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(SQColor.onInk)
+                            .frame(width: 44, height: 44)
+                            .background(SQColor.label, in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(SQPressButtonStyle())
+                    .accessibilityLabel("Nouvelle conversation")
+                    .accessibilityIdentifier("messages.new")
+                }
             }
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text("Messages")
+                Text(showingShelved ? "Archivées" : "Messages")
                     .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
                     .foregroundStyle(SQColor.label)
                     .sqHeader()
                 let unread = model.conversations.filter(isUnread).count
-                if unread > 0 {
+                if showingShelved {
+                    Text("Une conversation archivée revient dans ta liste au prochain message, sauf si elle est en sourdine.")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("messages.shelved.note")
+                } else if unread > 0 {
                     Text("\(unread) conversations non lues")
                         .font(SQType.callout)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -738,19 +1071,86 @@ struct MessagesView: View {
         }
     }
 
+    /// Menu de la liste : dossiers et mode focus.
+    private var listMenu: some View {
+        Menu {
+            Button {
+                folderSheet = FolderSheetRequest()
+            } label: {
+                Label("Gérer les dossiers", systemImage: "folder")
+            }
+            if model.focus != nil {
+                Button { showFocusSheet = true } label: {
+                    Label("Modifier le mode focus", systemImage: "scope")
+                }
+                Button(role: .destructive) {
+                    Task { await endFocus() }
+                } label: {
+                    Label("Terminer le mode focus", systemImage: "xmark.circle")
+                }
+            } else {
+                Button { showFocusSheet = true } label: {
+                    Label("Mode focus", systemImage: "scope")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(SQColor.label)
+                .frame(width: 44, height: 44)
+                .sqSurface(SQColor.chip, in: Circle())
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("Options de la liste")
+        .accessibilityIdentifier("messages.menu")
+    }
+
+    /// Une puce de la rangée de filtres.
+    private enum ListChip: Hashable {
+        case filter(InboxFilter)
+        case folder(String)
+    }
+
+    private var listChips: [ListChip] {
+        var chips: [ListChip] = []
+        if model.focus != nil { chips.append(.filter(.focus)) }
+        chips += [.filter(.all), .filter(.unread), .filter(.groups)]
+        chips += model.folders.map { ListChip.folder($0.id) }
+        return chips
+    }
+
+    private func isSelected(_ chip: ListChip) -> Bool {
+        switch chip {
+        case .filter(let option): return folderFilterId == nil && filter == option
+        case .folder(let id): return folderFilterId == id
+        }
+    }
+
+    private func select(_ chip: ListChip) {
+        Haptics.selection()
+        switch chip {
+        case .filter(let option):
+            folderFilterId = nil
+            filter = option
+        case .folder(let id):
+            filter = .all
+            folderFilterId = id
+        }
+    }
+
     /// Filtres de la liste en pastilles : la pastille active est pleine encre.
+    /// Les dossiers suivent les filtres, dans le même style.
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SQSpace.sm) {
-                ForEach(InboxFilter.allCases, id: \.self) { option in
-                    let selected = filter == option
-                    let count = option == .unread ? model.conversations.filter(isUnread).count : 0
+                ForEach(listChips, id: \.self) { chip in
+                    let selected = isSelected(chip)
                     Button {
-                        Haptics.selection()
-                        filter = option
+                        select(chip)
                     } label: {
                         HStack(spacing: SQSpace.xs) {
-                            Text(option.title)
+                            chipTitle(chip)
+                            let count = chipCount(chip)
                             if count > 0 { Text(verbatim: "\(count)").monospacedDigit() }
                         }
                         .font(SQType.subhead(.semibold))
@@ -765,12 +1165,132 @@ struct MessagesView: View {
                     }
                     .buttonStyle(SQPressButtonStyle(scale: 0.97))
                     .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-                    .accessibilityIdentifier("messages.filter.\(option.rawValue)")
+                    .accessibilityIdentifier(chipIdentifier(chip))
                 }
             }
             .padding(.horizontal, SQSpace.xl)
         }
         .padding(.horizontal, -SQSpace.xl)
+    }
+
+    @ViewBuilder
+    private func chipTitle(_ chip: ListChip) -> some View {
+        switch chip {
+        case .filter(let option): Text(option.title)
+        case .folder(let id): Text(verbatim: model.folders.first { $0.id == id }?.name ?? "")
+        }
+    }
+
+    private func chipCount(_ chip: ListChip) -> Int {
+        guard case .filter(.unread) = chip else { return 0 }
+        return model.conversations.filter(isUnread).count
+    }
+
+    private func chipIdentifier(_ chip: ListChip) -> String {
+        switch chip {
+        case .filter(let option): return "messages.filter.\(option.rawValue)"
+        case .folder(let id): return "messages.folder.\(id)"
+        }
+    }
+
+    /// Mode focus en cours : rappel discret au-dessus des filtres, avec de quoi le terminer.
+    private func focusBanner(_ focus: MessageFocusSession) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: "scope")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(SQColor.accentInk)
+                .accessibilityHidden(true)
+            Group {
+                if let endsAt = focus.endsAt {
+                    Text("Mode focus · jusqu’à \(endsAt.formatted(date: .omitted, time: .shortened))")
+                } else {
+                    Text("Mode focus")
+                }
+            }
+            .font(SQType.subhead(.semibold))
+            .foregroundStyle(SQColor.accentInk)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                Task { await endFocus() }
+            } label: {
+                Text("Terminer")
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("messages.focus.end")
+        }
+        .padding(.leading, SQSpace.md)
+        .padding(.trailing, SQSpace.sm)
+        .background(SQColor.accentSoft, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("messages.focus.banner")
+    }
+
+    /// Ligne « Archivées » en tête de liste : le nombre, et celui des non lues.
+    private func shelvedRow(_ summary: ShelvedSummary) -> some View {
+        Button {
+            Haptics.selection()
+            showingShelved = true
+            filter = .all
+            folderFilterId = nil
+            query = ""
+            Task { await model.loadShelved() }
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: "archivebox")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.chipInk)
+                    .frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
+                Text("Archivées")
+                    .font(SQType.body(.semibold))
+                    .foregroundStyle(SQColor.label)
+                Spacer(minLength: SQSpace.sm)
+                if summary.unreadCount > 0 {
+                    Text(verbatim: "\(summary.unreadCount)")
+                        .font(SQType.micro(.heavy))
+                        .monospacedDigit()
+                        .foregroundStyle(SQColor.onAccent)
+                        .padding(.horizontal, 6)
+                        .frame(minWidth: 20, minHeight: 20)
+                        .background(SQColor.brandRed, in: Capsule())
+                        .accessibilityHidden(true)
+                }
+                Text(verbatim: "\(summary.count)")
+                    .font(SQType.subhead)
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .accessibilityHidden(true)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 48)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle(scale: 0.99))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(shelvedRowLabel(summary))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("messages.shelved.row")
+    }
+
+    private func shelvedRowLabel(_ summary: ShelvedSummary) -> String {
+        if summary.unreadCount > 0 {
+            return String(localized: "Archivées : \(summary.count), non lues : \(summary.unreadCount)")
+        }
+        return String(localized: "Archivées : \(summary.count)")
+    }
+
+    private func endFocus() async {
+        await model.endFocus()
+        if filter == .focus { filter = .all }
     }
 
     /// Recherche dans le texte des messages, après une courte pause de frappe. Le mot cherché part
@@ -859,14 +1379,23 @@ struct MessagesView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// La liste affichée : les conversations, ou les archivées sur leur écran.
+    private var listSource: [MessageConversation] {
+        showingShelved ? model.shelvedConversations : model.conversations
+    }
+
     /// Conversations après le filtre et la recherche (titre, puis aperçu).
     private var visibleConversations: [MessageConversation] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return model.conversations.filter { conversation in
+        let focusIds = Set(model.focus?.conversationIds ?? [])
+        let folderIds = folderFilterId.flatMap { id in model.folders.first { $0.id == id }?.conversationIds }.map(Set.init)
+        return listSource.filter { conversation in
+            if let folderIds { guard folderIds.contains(conversation.id) else { return false } }
             switch filter {
             case .all: break
             case .unread: guard isUnread(conversation) else { return false }
             case .groups: guard conversation.isGroup else { return false }
+            case .focus: guard focusIds.contains(conversation.id) else { return false }
             }
             guard !needle.isEmpty else { return true }
             return conversation.displayTitle(excluding: currentUserId).localizedStandardContains(needle)
@@ -1033,8 +1562,9 @@ struct MessagesView: View {
     @ViewBuilder
     private func pinButton(_ conversation: MessageConversation) -> some View {
         let pinned = conversation.pinnedAt != nil
-        // Limite d'épinglage atteinte (P2-46) : seul « Désépingler » reste.
-        if pinned || model.canPinMore {
+        // Limite d'épinglage atteinte (P2-46) : seul « Désépingler » reste. Une
+        // conversation archivée ne s'épingle pas : archiver retire l'épingle.
+        if !showingShelved && (pinned || model.canPinMore) {
             Button {
                 Haptics.light()
                 Task { await model.setPinned(!pinned, conversation) }
@@ -1064,6 +1594,78 @@ struct MessagesView: View {
         }
     }
 
+    /// « Archiver » / « Désarchiver » : seulement quand le serveur sait archiver.
+    @ViewBuilder
+    private func shelveButton(_ conversation: MessageConversation) -> some View {
+        if model.supportsShelving {
+            if showingShelved {
+                Button {
+                    unshelve(conversation)
+                } label: {
+                    Label("Désarchiver", systemImage: "tray.and.arrow.up")
+                }
+            } else {
+                Button {
+                    shelve(conversation)
+                } label: {
+                    Label("Archiver", systemImage: "archivebox")
+                }
+            }
+        }
+    }
+
+    /// Archive, puis propose d'annuler : la conversation revient d'un toucher.
+    private func shelve(_ conversation: MessageConversation) {
+        let unread = isUnread(conversation)
+        Haptics.light()
+        Task {
+            guard await model.setShelved(true, conversation, isUnread: unread) else { return }
+            await services.refreshInboxBadge(force: true)
+            inAppNotifications.showUndo(
+                body: String(localized: "Conversation archivée"),
+                actionLabel: String(localized: "Annuler")
+            ) {
+                Task {
+                    await model.setShelved(false, conversation, isUnread: unread)
+                    await model.load()
+                    await services.refreshInboxBadge(force: true)
+                }
+            }
+        }
+    }
+
+    private func unshelve(_ conversation: MessageConversation) {
+        let unread = isUnread(conversation)
+        Haptics.light()
+        Task {
+            guard await model.setShelved(false, conversation, isUnread: unread) else { return }
+            await model.load()
+            await services.refreshInboxBadge(force: true)
+        }
+    }
+
+    /// « Ranger dans un dossier » : une coche par dossier, et la création d'un nouveau.
+    @ViewBuilder
+    private func folderMenu(_ conversation: MessageConversation) -> some View {
+        Menu {
+            ForEach(model.folders) { folder in
+                Toggle(isOn: Binding(
+                    get: { folder.conversationIds.contains(conversation.id) },
+                    set: { contained in Task { await model.setConversation(conversation.id, in: folder, contained: contained) } }
+                )) {
+                    Text(verbatim: folder.name)
+                }
+            }
+            Button {
+                folderSheet = FolderSheetRequest(fileConversationId: conversation.id)
+            } label: {
+                Label("Nouveau dossier…", systemImage: "folder.badge.plus")
+            }
+        } label: {
+            Label("Ranger dans un dossier", systemImage: "folder")
+        }
+    }
+
     private func setRead(_ read: Bool, _ conversation: MessageConversation) {
         Task {
             if read { await model.markRead(conversation) } else { await model.markUnread(conversation) }
@@ -1080,6 +1682,327 @@ struct MessagesView: View {
     /// au marqueur de lecture courant.
     private func isUnread(_ conversation: MessageConversation) -> Bool {
         conversation.isUnread(currentUserId: currentUserId)
+    }
+}
+
+// MARK: - Dossiers
+
+/// Gestion des dossiers : création, renommage, suppression. Ouverte aussi depuis
+/// « Ranger dans un dossier › Nouveau dossier… », où le dossier créé reçoit la conversation.
+private struct ConversationFoldersSheet: View {
+    @ObservedObject var model: MessagesViewModel
+    var fileConversationId: String? = nil
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var newName = ""
+    @State private var isCreating = false
+    @State private var renaming: ConversationFolder?
+    @State private var renameText = ""
+    @State private var pendingDelete: ConversationFolder?
+
+    private var cardShape: RoundedRectangle { RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous) }
+    private var canCreate: Bool { !MessagesViewModel.cleanFolderName(newName).isEmpty && !isCreating }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(
+                    title: "Dossiers",
+                    subtitle: String(localized: "Range tes conversations et retrouve-les d’une puce."),
+                    closeIdentifier: "folders.close"
+                ) { dismiss() }
+
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text("Nouveau dossier")
+                        .sqKicker()
+                        .padding(.leading, SQSpace.xs)
+                        .accessibilityAddTraits(.isHeader)
+                    TextField("Nom du dossier", text: $newName)
+                        .submitLabel(.done)
+                        .onSubmit { Task { await create() } }
+                        .sqHaloField()
+                        .accessibilityIdentifier("folders.name")
+                    GradientButton(String(localized: "Créer le dossier"), systemImage: "folder.badge.plus", isBusy: isCreating) {
+                        Task { await create() }
+                    }
+                    .disabled(!canCreate)
+                    .accessibilityIdentifier("folders.create")
+                }
+
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text("Tes dossiers")
+                        .sqKicker()
+                        .padding(.leading, SQSpace.xs)
+                        .accessibilityAddTraits(.isHeader)
+                    if model.folders.isEmpty {
+                        Text("Aucun dossier pour l’instant.")
+                            .font(SQType.callout)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .padding(.horizontal, SQSpace.xs)
+                            .accessibilityIdentifier("folders.empty")
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(model.folders.enumerated()), id: \.element.id) { index, folder in
+                                if index > 0 { Divider().padding(.leading, SQSpace.md + 28 + SQSpace.md) }
+                                folderRow(folder)
+                            }
+                        }
+                        .sqSurface(SQColor.surface, in: cardShape)
+                    }
+                }
+            }
+            .padding(SQSpace.lg)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .sqSheet(background: SQColor.bg)
+        .onChangeCompat(of: newName) { _, value in
+            if value.count > ConversationFolder.maxNameLength { newName = String(value.prefix(ConversationFolder.maxNameLength)) }
+        }
+        .alert("Renommer le dossier", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Nom du dossier", text: $renameText)
+            Button("Renommer") {
+                if let folder = renaming { Task { await model.renameFolder(folder, to: renameText) } }
+                renaming = nil
+            }
+            Button("Annuler", role: .cancel) { renaming = nil }
+        }
+        .confirmationDialog(
+            "Supprimer ce dossier ?",
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingDelete
+        ) { folder in
+            Button("Supprimer", role: .destructive) {
+                pendingDelete = nil
+                Task { await model.deleteFolder(folder) }
+            }
+            Button("Annuler", role: .cancel) { pendingDelete = nil }
+        } message: { _ in
+            Text("Les conversations ne sont pas supprimées : elles quittent seulement le dossier.")
+        }
+    }
+
+    private func folderRow(_ folder: ConversationFolder) -> some View {
+        HStack(spacing: SQSpace.md) {
+            Image(systemName: "folder")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(SQColor.chipInk)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: folder.name)
+                    .font(SQType.body(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(2)
+                Text("Conversations : \(folder.conversationIds.count)")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Menu {
+                Button {
+                    renameText = folder.name
+                    renaming = folder
+                } label: {
+                    Label("Renommer", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    pendingDelete = folder
+                } label: {
+                    Label("Supprimer", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.label)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Options du dossier \(folder.name)")
+        }
+        .padding(.leading, SQSpace.md)
+        .frame(minHeight: 56)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("folders.row")
+    }
+
+    private func create() async {
+        guard canCreate else { return }
+        isCreating = true
+        defer { isCreating = false }
+        guard let folder = await model.createFolder(named: newName) else { return }
+        newName = ""
+        Haptics.success()
+        if let fileConversationId {
+            await model.setConversation(fileConversationId, in: folder, contained: true)
+            dismiss()
+        }
+    }
+}
+
+// MARK: - Mode focus
+
+/// Durées proposées au lancement du mode focus.
+enum FocusDuration: String, CaseIterable, Identifiable {
+    case oneHour, fourHours, untilTomorrow, untilStopped
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringKey {
+        switch self {
+        case .oneHour: "1 h"
+        case .fourHours: "4 h"
+        case .untilTomorrow: "Jusqu’à demain matin"
+        case .untilStopped: "Jusqu’à l’arrêt"
+        }
+    }
+
+    /// Heure de fin ; `nil` : le mode dure jusqu'à ce qu'on le termine.
+    func endsAt(from now: Date, calendar: Calendar = .current) -> Date? {
+        switch self {
+        case .oneHour: return now.addingTimeInterval(3_600)
+        case .fourHours: return now.addingTimeInterval(4 * 3_600)
+        case .untilTomorrow:
+            return calendar.nextDate(after: now, matching: DateComponents(hour: 8, minute: 0), matchingPolicy: .nextTime)
+        case .untilStopped: return nil
+        }
+    }
+}
+
+/// Mode focus : on choisit les conversations à garder en avant et pour combien de
+/// temps. La liste n'affiche alors que celles-là, les autres restent dans « Toutes ».
+private struct FocusSheet: View {
+    @ObservedObject var model: MessagesViewModel
+    let currentUserId: String?
+    let onStarted: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected: Set<String>
+    @State private var duration: FocusDuration = .fourHours
+    @State private var isBusy = false
+
+    init(model: MessagesViewModel, currentUserId: String?, onStarted: @escaping () -> Void) {
+        self.model = model
+        self.currentUserId = currentUserId
+        self.onStarted = onStarted
+        let current = model.focus?.conversationIds ?? model.conversations.filter { $0.pinnedAt != nil }.map(\.id)
+        _selected = State(initialValue: Set(current))
+    }
+
+    private var cardShape: RoundedRectangle { RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous) }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(
+                    title: "Mode focus",
+                    subtitle: String(localized: "Garde en avant les conversations qui comptent."),
+                    closeIdentifier: "focus.close"
+                ) { dismiss() }
+
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text("Conversations")
+                        .sqKicker()
+                        .padding(.leading, SQSpace.xs)
+                        .accessibilityAddTraits(.isHeader)
+                    VStack(spacing: 0) {
+                        ForEach(Array(model.conversations.enumerated()), id: \.element.id) { index, conversation in
+                            if index > 0 { Divider().padding(.leading, SQSpace.md + 36 + SQSpace.md) }
+                            conversationRow(conversation)
+                        }
+                    }
+                    .sqSurface(SQColor.surface, in: cardShape)
+                }
+
+                VStack(alignment: .leading, spacing: SQSpace.sm) {
+                    Text("Durée")
+                        .sqKicker()
+                        .padding(.leading, SQSpace.xs)
+                        .accessibilityAddTraits(.isHeader)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: SQSpace.sm) {
+                            ForEach(FocusDuration.allCases) { option in
+                                durationChip(option)
+                            }
+                        }
+                    }
+                }
+
+                Text("Tant que le mode est actif, la liste n’affiche que ces conversations. Les autres restent à un toucher, dans « Toutes ».")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                GradientButton(String(localized: "Activer le mode focus"), systemImage: "scope", isBusy: isBusy) {
+                    Task { await start() }
+                }
+                .disabled(selected.isEmpty || isBusy)
+                .accessibilityIdentifier("focus.start")
+            }
+            .padding(SQSpace.lg)
+        }
+        .sqSheet(background: SQColor.bg)
+    }
+
+    private func durationChip(_ option: FocusDuration) -> some View {
+        let isSelected = duration == option
+        return Button {
+            Haptics.selection()
+            duration = option
+        } label: {
+            Text(option.title)
+                .font(SQType.subhead(.semibold))
+                .sqSingleLine()
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, SQSpace.md2)
+                .frame(minHeight: 34)
+                .foregroundStyle(isSelected ? SQColor.onInk : SQColor.chipInk)
+                .background(isSelected ? SQColor.label : SQColor.chip, in: Capsule(style: .continuous))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle(scale: 0.97))
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func conversationRow(_ conversation: MessageConversation) -> some View {
+        let isSelected = selected.contains(conversation.id)
+        let title = conversation.displayTitle(excluding: currentUserId)
+        return Button {
+            Haptics.selection()
+            if isSelected { selected.remove(conversation.id) } else { selected.insert(conversation.id) }
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                ConversationAvatar(conversation: conversation, currentUserId: currentUserId, size: 36)
+                    .accessibilityHidden(true)
+                Text(verbatim: title.isEmpty ? String(localized: "Conversation") : title)
+                    .font(SQType.body(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(isSelected ? SQColor.accentInk : SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func start() async {
+        isBusy = true
+        defer { isBusy = false }
+        // Dans l'ordre de la liste, pour un envoi stable.
+        let ids = model.conversations.map(\.id).filter { selected.contains($0) }
+        await model.startFocus(conversationIds: ids, endsAt: duration.endsAt(from: Date()))
+        guard model.focus != nil else { return }
+        Haptics.success()
+        onStarted()
+        dismiss()
     }
 }
 
@@ -1539,6 +2462,77 @@ extension Array where Element == MessageConversation {
                     attachments: [], reactions: []
                 )
             )
+        ]
+    }
+}
+
+extension Array where Element == MessageConversation {
+    /// Conversations archivées du mode démo.
+    static var demoShelved: [MessageConversation] {
+        [
+            MessageConversation(
+                id: "demo-conv-shelved-1",
+                title: "Collectif ANFR",
+                isGroup: true,
+                e2eeEnabled: false,
+                groupPhotoUrl: nil,
+                createdAt: Date(),
+                updatedAt: Date(),
+                lastMessageAt: Date().addingTimeInterval(-259_200),
+                lastReadAt: nil,
+                pinnedAt: nil,
+                participants: [
+                    ConversationParticipant(
+                        userId: "mock-user", role: "member", joinedAt: Date(), lastReadAt: nil,
+                        user: MessageUser(id: "mock-user", name: "SignalQuest iOS", email: "ios@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    ),
+                    ConversationParticipant(
+                        userId: "demo-user", role: "member", joinedAt: Date(), lastReadAt: nil,
+                        user: MessageUser(id: "demo-user", name: "Camille", email: "camille@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    )
+                ],
+                lastMessage: MessageItem(
+                    id: "demo-shelved-message-1", conversationId: "demo-conv-shelved-1", senderId: "demo-user", kind: "TEXT",
+                    content: "Le relevé de jeudi est dans le dossier partagé.", e2eeVersion: nil, e2eeIvB64: nil,
+                    e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil,
+                    createdAt: Date().addingTimeInterval(-259_200), editedAt: nil, deletedAt: nil, replyToId: nil,
+                    threadReplyCount: 0,
+                    sender: MessageUser(id: "demo-user", name: "Camille", email: "camille@signalquest.fr", avatarUrl: nil),
+                    attachments: [], reactions: []
+                )
+            )
+        ].map { conversation in
+            var archived = conversation
+            archived.shelved = true
+            archived.shelvedAt = Date()
+            return archived
+        }
+    }
+}
+
+extension ConversationFolder {
+    /// Dossiers du mode démo.
+    static var demo: [ConversationFolder] {
+        [
+            ConversationFolder(id: "demo-folder-1", name: "Terrain", conversationIds: ["demo-conv-3"]),
+            ConversationFolder(id: "demo-folder-2", name: "Amis", conversationIds: ["demo-conv-1", "demo-conv-2"])
+        ]
+    }
+}
+
+extension CallThreadEvent {
+    /// Appels du mode démo : un appel passé, un manqué, un refusé, pour la conversation donnée.
+    static func demo(conversationId: String) -> [CallThreadEvent] {
+        let peerId = conversationId == "demo-conv-3" ? "demo-user-2" : "demo-user"
+        return [
+            CallThreadEvent(callId: "demo-call-\(conversationId)-1", mode: .audio, outcome: .completed,
+                            startedAt: Date().addingTimeInterval(-5_400), durationSec: 252, callerId: "mock-user"),
+            CallThreadEvent(callId: "demo-call-\(conversationId)-2", mode: .video, outcome: .missed,
+                            startedAt: Date().addingTimeInterval(-1_800), durationSec: nil, callerId: peerId),
+            CallThreadEvent(callId: "demo-call-\(conversationId)-3", mode: .audio, outcome: .declined,
+                            startedAt: Date().addingTimeInterval(-600), durationSec: nil, callerId: "mock-user")
         ]
     }
 }
