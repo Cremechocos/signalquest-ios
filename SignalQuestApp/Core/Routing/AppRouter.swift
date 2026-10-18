@@ -108,6 +108,8 @@ final class AppRouter: ObservableObject {
     @Published var openProfileScreen: ProfileScreen?
     /// Mise à jour ANFR : l'écran ANFR de l'onglet Carte, consommé par la carte.
     @Published var openANFRMap = false
+    /// Relevé et zone visés par la notification, lus par la carte ANFR à son ouverture.
+    @Published var pendingANFRFocus: ANFRFocus?
     /// Coordonnée à cadrer sur la carte (posée depuis un test de l'historique,
     /// consommée par MapExplorerView une fois l'onglet carte actif).
     @Published var pendingMapFocus: Coordinates?
@@ -229,7 +231,8 @@ final class AppRouter: ObservableObject {
         targetId: String? = nil,
         outageId: String? = nil,
         e2eeDeviceApprovalId: String? = nil,
-        bugId: String? = nil
+        bugId: String? = nil,
+        anfrFocus: ANFRFocus? = nil
     ) {
         switch rawType?.lowercased() {
         // Types réellement émis par le serveur : préfixés `message_*` et
@@ -272,6 +275,8 @@ final class AppRouter: ObservableObject {
             route(toSite: siteId)
         case "anfr_update":
             selectedTab = .map
+            // Sans relevé ni zone dans la charge, l'écran s'ouvre comme avant.
+            pendingANFRFocus = anfrFocus
             openANFRMap = true
         // Retiré d'un groupe : la boîte de réception, pas une conversation devenue illisible.
         case "group_member_removed":

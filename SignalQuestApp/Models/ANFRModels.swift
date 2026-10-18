@@ -66,7 +66,8 @@ enum ANFROperator: String, CaseIterable, Identifiable, Sendable, Hashable {
 // MARK: - Modification type
 
 /// Type de modification d'une antenne entre deux relevés ANFR.
-/// Ports d'Android `AnfrModType` (priorité NEW > DELETED > ADDED > ACTIVATED).
+/// Priorité du type dominant d'un site : la règle du web (nouveau > ajoutée >
+/// mise en service > retirée), pour qu'un même support ait le même repère partout.
 enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
     case new
     case activated
@@ -78,9 +79,9 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
     var label: String {
         switch self {
         case .new: return String(localized: "Nouveau support")
-        case .activated: return String(localized: "Activée")
-        case .deleted: return String(localized: "Supprimée")
-        case .added: return String(localized: "Modifiée")
+        case .activated: return String(localized: "Mise en service")
+        case .deleted: return String(localized: "Antenne retirée")
+        case .added: return String(localized: "Antenne ajoutée")
         }
     }
 
@@ -102,13 +103,13 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
         }
     }
 
-    /// Rang de priorité pour choisir le type dominant d'un site (cf. Android).
+    /// Rang de priorité pour choisir le type dominant d'un site (ordre du web).
     var priority: Int {
         switch self {
         case .new: return 4
-        case .deleted: return 3
-        case .added: return 2
-        case .activated: return 1
+        case .added: return 3
+        case .activated: return 2
+        case .deleted: return 1
         }
     }
 
@@ -343,13 +344,16 @@ struct ANFRTerritoryMetric: Decodable, Sendable, Identifiable {
 
 // MARK: - Map snapshot (GET /api/anfr/map-snapshot)
 
-/// Snapshot carte ANFR : liste de sites, chacun groupant ses antennes.
+/// Snapshot carte ANFR : le DIFFÉRENTIEL d'une semaine (les supports qui ont
+/// changé, et pour chacun seulement ses antennes modifiées), pas le parc entier.
 struct ANFRMapSnapshot: Decodable, Sendable {
     let source: String?
     let snapshotDate: String?
     let lastUpdate: String?
     let siteCount: Int
     let sites: [ANFRMapSite]
+    /// Vrai quand la copie vient du disque faute de réseau (relevé courant).
+    var servedFromCache = false
 
     enum CodingKeys: String, CodingKey {
         case source, snapshotDate, lastUpdate, siteCount, sites
@@ -375,7 +379,7 @@ struct ANFRMapSnapshot: Decodable, Sendable {
     }
 }
 
-/// Un site ANFR (un support) et ses antennes au relevé courant.
+/// Un site ANFR (un support) et ses antennes modifiées au relevé.
 struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
     let supId: String
     let latitude: Double
@@ -441,8 +445,9 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
     }
 
     /// Opérateur dominant : plus grand nombre d'antennes, départage par ordre
-    /// d'enum (le plus petit ordinal gagne, comme Android).
-    var dominantOperator: ANFROperator {
+    /// d'enum (le plus petit ordinal gagne, comme Android). `nil` quand aucune
+    /// antenne n'est d'un des quatre opérateurs suivis.
+    var dominantOperator: ANFROperator? {
         let counts = Dictionary(grouping: antennas.compactMap(\.operator), by: { $0 })
             .mapValues(\.count)
         // `allCases` est déjà en ordre d'enum : `max(by:)` renvoie le dernier
@@ -451,10 +456,10 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
             guard let count = counts[op] else { return best }
             guard let best, let bestCount = counts[best] else { return op }
             return count > bestCount ? op : best
-        } ?? .sfr
+        }
     }
 
-    /// Type de modification dominant (priorité NEW > DELETED > ADDED > ACTIVATED).
+    /// Type de modification dominant (priorité : voir `ANFRModType.priority`).
     var dominantModType: ANFRModType {
         antennas.map(\.modType).max { $0.priority < $1.priority } ?? .activated
     }
@@ -478,11 +483,19 @@ struct ANFRMapAntenna: Decodable, Sendable, Equatable, Identifiable {
     let latitude: Double?
     let longitude: Double?
     let city: String?
-    let address: String?
+    /// Date réelle du changement (AAAA-MM-JJ) : la mise en service déclarée, pas
+    /// la date de publication. Absente des anciennes réponses et des retraits.
+    let changeDate: String?
+    /// Rattrapage : mise en service déclarée plus de 30 jours après sa date réelle.
+    let catchUp: Bool
+    /// Morceaux d'adresse bruts, assemblés à la demande (`address`).
+    private let addressLieu: String?
+    private let addressLine: String?
+    private let postalCode: String?
 
     enum CodingKeys: String, CodingKey {
         case id, sup_id, adm_lb_nom, emr_lb_systeme, generation, type, statut, date_maj
-        case lat, lon, city
+        case lat, lon, city, changeDate, catchUp
         case adr_lb_lieu, adr_lb_add1, adr_nm_cp
     }
 
@@ -499,15 +512,15 @@ struct ANFRMapAntenna: Decodable, Sendable, Equatable, Identifiable {
         latitude = Double(c.optional(String.self, .lat) ?? "")
         longitude = Double(c.optional(String.self, .lon) ?? "")
         city = c.optional(String.self, .city)
-        let lieu = c.optional(String.self, .adr_lb_lieu)
-        let add1 = c.optional(String.self, .adr_lb_add1)
-        let cp = c.optional(String.self, .adr_nm_cp)
-        address = [lieu, add1, cp]
-            .compactMap { $0?.isEmpty == false ? $0 : nil }
-            .joined(separator: ", ")
+        changeDate = c.optional(String.self, .changeDate)
+        catchUp = c.value(Bool.self, .catchUp, false)
+        addressLieu = c.optional(String.self, .adr_lb_lieu)
+        addressLine = c.optional(String.self, .adr_lb_add1)
+        postalCode = c.optional(String.self, .adr_nm_cp)
     }
 
-    init(id: String, supId: String?, operatorRaw: String, system: String, generationRaw: String, modTypeRaw: String, statut: String, dateMaj: String, latitude: Double?, longitude: Double?, city: String?, address: String?) {
+    init(id: String, supId: String?, operatorRaw: String, system: String, generationRaw: String, modTypeRaw: String, statut: String, dateMaj: String, latitude: Double?, longitude: Double?, city: String?, address: String?,
+         changeDate: String? = nil, catchUp: Bool = false) {
         self.id = id
         self.supId = supId
         self.operatorRaw = operatorRaw
@@ -519,7 +532,19 @@ struct ANFRMapAntenna: Decodable, Sendable, Equatable, Identifiable {
         self.latitude = latitude
         self.longitude = longitude
         self.city = city
-        self.address = address
+        self.changeDate = changeDate
+        self.catchUp = catchUp
+        addressLieu = address
+        addressLine = nil
+        postalCode = nil
+    }
+
+    /// « Lieu, adresse, code postal », ou rien.
+    var address: String? {
+        let text = [addressLieu, addressLine, postalCode]
+            .compactMap { $0?.isEmpty == false ? $0 : nil }
+            .joined(separator: ", ")
+        return text.isEmpty ? nil : text
     }
 
     var `operator`: ANFROperator? { ANFROperator.from(raw: operatorRaw) }
@@ -534,16 +559,16 @@ struct ANFRMapAntenna: Decodable, Sendable, Equatable, Identifiable {
 /// Recette visuelle d'un marqueur ANFR, dérivée du domaine (opérateur dominant,
 /// type de modif, génération, multi-opérateur). Pure data, sans Color/UIView.
 struct ANFRMarkerStyle: Equatable {
+    /// Vide quand le site n'a que des antennes d'un autre opérateur que les quatre suivis.
     let operators: [ANFROperator]
-    let dominantOperator: ANFROperator
+    let dominantOperator: ANFROperator?
     let modType: ANFRModType
     let generation: ANFRGeneration?
 
     var isMultiOperator: Bool { operators.count > 1 }
 
     init(site: ANFRMapSite) {
-        let ops = site.operators
-        operators = ops.isEmpty ? [.sfr] : ops
+        operators = site.operators
         dominantOperator = site.dominantOperator
         modType = site.dominantModType
         generation = site.highestGeneration
@@ -563,4 +588,197 @@ extension ANFRSiteHistoryChange {
 extension ANFRSiteHistoryEntry {
     var operatorEnums: [ANFROperator] { operators.compactMap { ANFROperator.from(raw: $0) } }
     var modTypeEnums: [ANFRModType] { modTypes.map { ANFRModType.from(raw: $0) } }
+}
+
+// MARK: - Semaines (GET /api/anfr/archives?weeks=N)
+
+/// Les changements d'une semaine ANFR par type : une antenne du différentiel = un
+/// changement. `catchUp` recoupe les quatre types et n'entre pas dans `total`.
+struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
+    let date: String
+    let new: Int
+    let added: Int
+    let activated: Int
+    let deleted: Int
+    let catchUp: Int
+    let total: Int
+
+    var id: String { date }
+
+    private enum CodingKeys: String, CodingKey { case date, counts, total }
+    private enum CountKeys: String, CodingKey { case new, added, activated, deleted, catchUp }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = c.value(String.self, .date, "")
+        let counts = try? c.nestedContainer(keyedBy: CountKeys.self, forKey: .counts)
+        new = counts?.value(Int.self, .new, 0) ?? 0
+        added = counts?.value(Int.self, .added, 0) ?? 0
+        activated = counts?.value(Int.self, .activated, 0) ?? 0
+        deleted = counts?.value(Int.self, .deleted, 0) ?? 0
+        catchUp = counts?.value(Int.self, .catchUp, 0) ?? 0
+        total = c.value(Int.self, .total, new + added + activated + deleted)
+    }
+
+    init(date: String, new: Int, added: Int, activated: Int, deleted: Int, catchUp: Int = 0, total: Int? = nil) {
+        self.date = date
+        self.new = new
+        self.added = added
+        self.activated = activated
+        self.deleted = deleted
+        self.catchUp = catchUp
+        self.total = total ?? new + added + activated + deleted
+    }
+
+    func count(for type: ANFRModType) -> Int {
+        switch type {
+        case .new: return new
+        case .added: return added
+        case .activated: return activated
+        case .deleted: return deleted
+        }
+    }
+}
+
+/// Réponse de `/api/anfr/archives?weeks=N` : seule la clé `weeks` nous sert.
+struct ANFRArchiveWeeks: Decodable, Sendable {
+    let weeks: [ANFRWeekSummary]
+
+    private enum CodingKeys: String, CodingKey { case weeks }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        weeks = c.value([ANFRWeekSummary].self, .weeks, []).filter { !$0.date.isEmpty }
+    }
+
+    init(weeks: [ANFRWeekSummary]) { self.weeks = weeks }
+}
+
+// MARK: - Ouverture ciblée (notification `anfr_update`)
+
+/// Ce que la notification de mise à jour ANFR demande d'ouvrir : un relevé précis
+/// et/ou une zone surveillée. Tout champ absent ou illisible est ignoré : sans rien
+/// d'utilisable l'écran s'ouvre comme avant, sur le dernier relevé et toute la France.
+struct ANFRFocus: Equatable, Sendable {
+    var date: String?
+    var zoneLatitude: Double?
+    var zoneLongitude: Double?
+    var radiusMeters: Double?
+
+    var hasZone: Bool { zoneLatitude != nil && zoneLongitude != nil }
+
+    /// Rayon d'une zone sans rayon annoncé.
+    static let defaultRadiusMeters: Double = 5_000
+
+    static func parse(date: String?, latitude: String?, longitude: String?, radiusMeters: String?) -> ANFRFocus? {
+        var focus = ANFRFocus()
+        if let date, ANFRMapPolicy.isISODate(date) { focus.date = date }
+        if let lat = number(latitude), let lon = number(longitude),
+           (-90...90).contains(lat), (-180...180).contains(lon), !(lat == 0 && lon == 0) {
+            focus.zoneLatitude = lat
+            focus.zoneLongitude = lon
+            if let radius = number(radiusMeters), radius > 0 {
+                focus.radiusMeters = min(max(radius, 200), 100_000)
+            }
+        }
+        return focus.date == nil && !focus.hasZone ? nil : focus
+    }
+
+    private static func number(_ raw: String?) -> Double? {
+        guard let raw = raw?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        guard let value = Double(raw.replacingOccurrences(of: ",", with: ".")), value.isFinite else { return nil }
+        return value
+    }
+}
+
+// MARK: - Règles du relevé
+
+enum ANFRMapPolicy {
+    /// Première date d'une série hebdomadaire régulière. Les relevés antérieurs
+    /// (mai 2022) sont l'état complet du parc, des dizaines de milliers de supports,
+    /// et non un différentiel : la carte ne les ouvre pas.
+    static let firstWeeklyDate = "2025-10-01"
+
+    static func isISODate(_ raw: String) -> Bool {
+        let chars = Array(raw.utf8)
+        guard chars.count == 10 else { return false }
+        for (index, char) in chars.enumerated() {
+            if index == 4 || index == 7 {
+                guard char == 45 else { return false }
+            } else {
+                guard (48...57).contains(char) else { return false }
+            }
+        }
+        return ANFRDateParser.date(from: raw) != nil
+    }
+
+    /// Relevé d'état complet (et non d'un différentiel hebdomadaire) à ne pas charger.
+    static func isFullStateDate(_ raw: String) -> Bool {
+        isISODate(raw) && raw < firstWeeklyDate
+    }
+}
+
+// MARK: - Textes ANFR
+
+enum ANFRText {
+    private static let lowercaseWords: Set<String> = ["en", "et", "le", "la", "les", "lès", "de", "du", "des", "sur", "sous", "aux", "au", "à"]
+
+    /// L'ANFR écrit les communes en capitales sans accents (« ST REMY EN ROLLAT ») :
+    /// remises en casse française (« St Remy en Rollat », « L’Isle-d’Abeau »),
+    /// comme le web. Les accents ne se devinent pas.
+    static func city(_ raw: String) -> String {
+        let words = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            .split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        return words.enumerated().map { wordIndex, word -> String in
+            if wordIndex > 0, lowercaseWords.contains(word) { return word }
+            return word.split(separator: "-", omittingEmptySubsequences: false).enumerated().map { segmentIndex, segment -> String in
+                let text = String(segment)
+                let first = wordIndex == 0 && segmentIndex == 0
+                if text.count > 2, let elided = elision(text) {
+                    return (first ? elided.head.uppercased() : elided.head) + capitalized(elided.rest)
+                }
+                if !first, lowercaseWords.contains(text) { return text }
+                return capitalized(text)
+            }.joined(separator: "-")
+        }.joined(separator: " ")
+    }
+
+    /// « d'abeau » → ("d’", "abeau") : l'élision d'un nom, apostrophe typographique.
+    private static func elision(_ text: String) -> (head: String, rest: String)? {
+        for apostrophe in ["'", "\u{2019}"] {
+            for letter in ["d", "l"] where text.hasPrefix(letter + apostrophe) {
+                return (letter + "\u{2019}", String(text.dropFirst(2)))
+            }
+        }
+        return nil
+    }
+
+    private static func capitalized(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        return first.uppercased() + text.dropFirst()
+    }
+
+    /// « 5G NR 3500 » devient « 5G 3,5 GHz » ; « LTE 700 » devient « 4G 700 » (le séparateur suit la langue).
+    static func technology(system: String, generation: String) -> String {
+        let label = generation.isEmpty ? (system.split(separator: " ").first.map(String.init) ?? "") : generation
+        var frequency: Int?
+        for token in system.split(whereSeparator: { !$0.isNumber }) where (3...5).contains(token.count) {
+            frequency = Int(token)
+            break
+        }
+        guard let frequency, frequency > 0 else { return label.isEmpty ? system : label }
+        let band = frequency >= 3000
+            ? (Double(frequency) / 1000).formatted(.number.precision(.fractionLength(0...2))) + "\u{00A0}GHz"
+            : String(frequency)
+        return "\(label) \(band)".trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Une date AAAA-MM-JJ du relevé, dite dans le fuseau du serveur : l'heure locale
+    /// d'un téléphone à l'ouest de Greenwich afficherait la veille.
+    static func date(_ raw: String?, month: Date.FormatStyle.Symbol.Month = .wide, year: Bool = true) -> String? {
+        guard let raw, let date = ANFRDateParser.date(from: String(raw.prefix(10))) else { return nil }
+        var style = Date.FormatStyle(timeZone: TimeZone(identifier: "UTC") ?? .gmt).day().month(month)
+        if year { style = style.year() }
+        return date.formatted(style)
+    }
 }

@@ -20,7 +20,15 @@ enum ANFRFilterType: String, CaseIterable, Identifiable {
         }
     }
     
-    var label: String { rawValue }
+    /// Libellé affiché : « 5G 3,5 GHz » devient « 5G 3.5 GHz » en anglais.
+    var label: String {
+        switch self {
+        case .g4: return String(localized: "4G")
+        case .g5_3500: return String(localized: "5G 3,5 GHz")
+        case .g5_2100: return String(localized: "5G 2,1 GHz")
+        case .g5_700: return String(localized: "5G 700 MHz")
+        }
+    }
 }
 
 // MARK: - ViewModel
@@ -230,6 +238,8 @@ struct ANFRStatsView: View {
                         .sqFadeUp()
                     bandsLink
                         .sqFadeUp()
+                    changesMapLink
+                        .sqFadeUp()
                     operatorSection
                         .sqFadeUp()
                     trendSection
@@ -253,7 +263,7 @@ struct ANFRStatsView: View {
                     // Réponse reçue mais sans relevé : un état vide, pas un chargement sans fin.
                     EmptyStateView(
                         title: "Aucune statistique disponible",
-                        message: "Les relevés ANFR ne sont pas encore disponibles. Tire l'écran vers le bas pour actualiser.",
+                        message: "Les relevés ANFR ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser.",
                         systemImage: "chart.bar"
                     )
                 } else {
@@ -439,6 +449,36 @@ struct ANFRStatsView: View {
         }
         .buttonStyle(SQPressButtonStyle(scale: 0.98))
         .accessibilityIdentifier("anfr.stats.bands")
+    }
+
+    /// Les chiffres de la semaine, vus sur la carte : les supports qui ont changé.
+    private var changesMapLink: some View {
+        NavigationLink {
+            ANFRMapView(service: service)
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                SQIconPastille(systemImage: "map.fill", size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Changements de la semaine")
+                        .font(SQType.heading)
+                        .foregroundStyle(SQColor.label)
+                    Text("Les supports modifiés par l’ANFR, sur la carte")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(SQSpace.lg)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .sqCardBackground()
+        }
+        .buttonStyle(SQPressButtonStyle(scale: 0.98))
+        .accessibilityIdentifier("anfr.stats.changes")
     }
 
     /// Variation sur 7 jours dite en mots : « +3 en 7 j », « −3 en 7 j », « stable ».
@@ -966,19 +1006,25 @@ private struct ANFRTrendChart: View {
                 drawn = false
                 withAnimation(.easeInOut(duration: 0.7)) { drawn = true }
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(accessibilitySummary)
+            // Un résumé par série (début et fin) : un élément par point faisait lire
+            // plusieurs centaines de lignes au graphique en plein écran.
             .accessibilityRepresentation {
                 VStack(alignment: .leading) {
                     Text(accessibilitySummary)
                         .accessibilityAddTraits(.isHeader)
                     ForEach(series) { s in
-                        ForEach(visible(s.points)) { point in
-                            Text("\(s.op.label), \(point.date.formatted(.dateTime.month().year())) : \(point.value.formatted()) supports")
-                        }
+                        if let line = seriesSummary(s) { Text(line) }
                     }
                 }
             }
+    }
+
+    private func seriesSummary(_ series: ANFRTrendSeries) -> String? {
+        let points = visible(series.points)
+        guard let first = points.first, let last = points.last else { return nil }
+        let start = first.date.formatted(.dateTime.month().year())
+        let end = last.date.formatted(.dateTime.month().year())
+        return String(localized: "\(series.op.label) : \(first.value.formatted()) supports en \(start), \(last.value.formatted()) en \(end)")
     }
 
     private var chart: some View {

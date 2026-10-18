@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 
 // MARK: - ViewModel
 
@@ -41,6 +42,7 @@ struct ANFRSiteDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
+    @State private var copiedCoordinates = false
 
     init(site: ANFRMapSite, service: ANFRServicing, snapshotDate: String? = nil) {
         self.site = site
@@ -53,6 +55,7 @@ struct ANFRSiteDetailSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     header
+                    actionsRow
                     currentAntennasCard
                     timelineSection
                 }
@@ -72,6 +75,7 @@ struct ANFRSiteDetailSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationBackgroundCompat(SQColor.bg)
+        .presentationBackgroundInteractionCompat()
         .task { await model.load(supId: site.supId) }
         .onAppear {
             withAnimation(reduceMotion ? nil : SQMotion.standard.delay(0.05)) { appeared = true }
@@ -82,7 +86,7 @@ struct ANFRSiteDetailSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text(site.city.isEmpty ? String(localized: "Support \(site.supId)") : site.city.capitalized)
+            Text(site.city.isEmpty ? String(localized: "Support \(site.supId)") : ANFRText.city(site.city))
                 .font(SQType.title)
                 .sqHeader()
                 .foregroundStyle(SQColor.label)
@@ -93,10 +97,13 @@ struct ANFRSiteDetailSheet: View {
                 Image(systemName: "mappin.circle.fill")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(SQColor.brandRed)
-                Text(String(format: "%.5f, %.5f", site.latitude, site.longitude))
+                    .accessibilityHidden(true)
+                Text(Self.coordinateText(site))
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("Latitude \(Self.decimal(site.latitude)), longitude \(Self.decimal(site.longitude))"))
             // Pastilles opérateurs + générations présents.
             HStack(spacing: SQSpace.xs2) {
                 ForEach(site.operators) { op in
@@ -111,24 +118,90 @@ struct ANFRSiteDetailSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // MARK: Actions
+
+    private var actionsRow: some View {
+        ANFRFlowLayout(spacing: SQSpace.sm) {
+            Button {
+                Haptics.light()
+                let item = MKMapItem(placemark: MKPlacemark(coordinate: site.coordinate))
+                item.name = site.city.isEmpty ? String(localized: "Support \(site.supId)") : ANFRText.city(site.city)
+                item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
+            } label: {
+                actionLabel("Itinéraire", systemImage: "arrow.triangle.turn.up.right.diamond")
+            }
+            .buttonStyle(.plain)
+
+            if let url = Self.cartoradioURL(site) {
+                Link(destination: url) {
+                    actionLabel("Cartoradio", systemImage: "arrow.up.right.square")
+                }
+            }
+
+            Button {
+                Haptics.light()
+                UIPasteboard.general.string = Self.posixCoordinates(site)
+                copiedCoordinates = true
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    copiedCoordinates = false
+                }
+            } label: {
+                actionLabel(copiedCoordinates ? "Coordonnées copiées" : "Copier les coordonnées",
+                            systemImage: copiedCoordinates ? "checkmark" : "doc.on.doc")
+            }
+            .buttonStyle(.plain)
+
+            ShareLink(item: Self.shareText(for: site, baseURL: AppConfig.current.appBaseURL)) {
+                actionLabel("Partager", systemImage: "square.and.arrow.up")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func actionLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(SQType.subhead(.semibold))
+            .foregroundStyle(SQColor.accentInk)
+            .padding(.horizontal, SQSpace.md)
+            .frame(minHeight: 44)
+            .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+            .contentShape(Capsule(style: .continuous))
+    }
+
     // MARK: Current antennas
 
     private var currentAntennasCard: some View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
-            sectionTitle("Antennes au relevé", systemImage: "antenna.radiowaves.left.and.right")
+            sectionTitle("Changements de ce relevé", systemImage: "antenna.radiowaves.left.and.right")
+            // Le relevé ne liste que ce qui a changé : ce n'est pas le parc du pylône.
+            Text("Seules les antennes modifiées pendant la période sont listées, pas toutes celles du support.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
             ForEach(site.antennas) { antenna in
                 HStack(spacing: SQSpace.sm) {
                     Circle()
                         .fill((antenna.operator?.color) ?? SQColor.labelSecondary)
                         .frame(width: 10, height: 10)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(antenna.system.isEmpty ? (antenna.operator?.label ?? String(localized: "Antenne")) : antenna.system)
-                            .font(SQFont.body(14, .semibold))
-                            .foregroundStyle(SQColor.label)
+                        ANFRFlowLayout(spacing: SQSpace.xs2) {
+                            Text(antenna.system.isEmpty
+                                 ? (antenna.operator?.label ?? String(localized: "Antenne"))
+                                 : ANFRText.technology(system: antenna.system, generation: antenna.generationRaw))
+                                .font(SQType.callout(.semibold))
+                                .foregroundStyle(SQColor.label)
+                            if antenna.catchUp { catchUpTag }
+                        }
                         // Statuts ANFR connus traduits ; toute autre valeur reste affichée telle quelle.
                         Text(LocalizedStringKey(antenna.statut))
                             .font(SQType.micro)
                             .foregroundStyle(SQColor.labelSecondary)
+                        if antenna.modType != .deleted, let date = ANFRText.date(antenna.changeDate) {
+                            Text("Mise en service le \(date)")
+                                .font(SQType.micro)
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
                     }
                     Spacer()
                     if let gen = antenna.generationEnum {
@@ -143,7 +216,7 @@ struct ANFRSiteDetailSheet: View {
                 .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
             }
             if site.antennas.isEmpty {
-                Text("Aucune antenne au relevé courant.")
+                Text("Aucune antenne modifiée dans ce relevé.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
             }
@@ -162,7 +235,7 @@ struct ANFRSiteDetailSheet: View {
             if model.isLoading {
                 HStack(spacing: SQSpace.sm) {
                     SQSpinner().tint(SQColor.brandRed)
-                    Text("Chargement de l'historique…")
+                    Text("Chargement de l’historique…")
                         .font(SQType.subhead)
                         .foregroundStyle(SQColor.labelSecondary)
                 }
@@ -223,6 +296,52 @@ struct ANFRSiteDetailSheet: View {
                 .foregroundStyle(SQColor.label)
                 .sqHeader()
         }
+    }
+
+    /// Un rattrapage est une antenne déclarée tard : sa mise en service date de plus de 30 jours.
+    private var catchUpTag: some View {
+        Text("Rattrapage")
+            .font(SQType.micro)
+            .foregroundStyle(SQColor.labelSecondary)
+            .padding(.horizontal, SQSpace.sm)
+            .padding(.vertical, 2)
+            .background(SQColor.chip, in: Capsule(style: .continuous))
+    }
+
+    // Formats : l'écran suit la langue, la copie et les liens restent universels (point décimal).
+    static func decimal(_ value: Double) -> String {
+        value.formatted(.number.grouping(.never).precision(.fractionLength(5)))
+    }
+
+    static func coordinateText(_ site: ANFRMapSite) -> String {
+        "\(decimal(site.latitude)) · \(decimal(site.longitude))"
+    }
+
+    private static func posix(_ value: Double) -> String {
+        String(format: "%.5f", locale: Locale(identifier: "en_US_POSIX"), value)
+    }
+
+    static func posixCoordinates(_ site: ANFRMapSite) -> String {
+        "\(posix(site.latitude)), \(posix(site.longitude))"
+    }
+
+    static func cartoradioURL(_ site: ANFRMapSite) -> URL? {
+        URL(string: "https://cartoradio.fr/index.html#/cartographie/lonlat/\(posix(site.longitude))/\(posix(site.latitude))")
+    }
+
+    /// Texte partagé : libellés français d'échange (comme les autres partages de site),
+    /// une ligne absente pour une donnée inconnue.
+    static func shareText(for site: ANFRMapSite, baseURL: URL) -> String {
+        var lines = ["Support ANFR \(site.supId)" + (site.city.isEmpty ? "" : " (\(ANFRText.city(site.city)))")]
+        let operators = site.operators
+        if operators.count == 1, let only = operators.first { lines.append("Opérateur: \(only.label)") }
+        lines.append("Support: \(site.supId)")
+        lines.append("Marché: FR")
+        lines.append("Position: \(posixCoordinates(site))")
+        let base = baseURL.absoluteString.hasSuffix("/") ? String(baseURL.absoluteString.dropLast()) : baseURL.absoluteString
+        let id = site.supId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? site.supId
+        lines.append("Lien: \(base)/carte?lat=\(posix(site.latitude))&lng=\(posix(site.longitude))&siteId=\(id)&market=FR&open=antenna")
+        return lines.joined(separator: "\n")
     }
 
     private func modTypeBadge(_ type: ANFRModType) -> some View {
@@ -301,12 +420,18 @@ private struct ANFRTimelineRow: View {
                             .accessibilityHidden(true) // le libellé du type est lu juste à côté
                         VStack(alignment: .leading, spacing: 1) {
                             Text(changeText(change))
-                                .font(SQFont.body(13, .semibold))
+                                .font(SQType.subhead(.semibold))
                                 .foregroundStyle(SQColor.label)
                                 .lineLimit(2)
                             Text(change.modType.label)
                                 .font(SQType.micro)
                                 .foregroundStyle(SQColor.labelSecondary)
+                            if let note = effectiveNote(change) {
+                                Text(note)
+                                    .font(SQType.micro)
+                                    .foregroundStyle(SQColor.labelSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                         Spacer()
                         if let gen = change.generationEnum {
@@ -324,11 +449,35 @@ private struct ANFRTimelineRow: View {
 
     private func changeText(_ change: ANFRSiteHistoryChange) -> String {
         let op = change.operator?.label ?? change.operatorRaw.capitalized
-        let tech = change.technology.isEmpty ? "" : " · \(change.technology)"
-        return "\(op)\(tech)"
+        let technology = ANFRText.technology(system: change.technology, generation: change.generation)
+        return technology.isEmpty ? op : "\(op) · \(technology)"
+    }
+
+    /// La date réelle du changement quand elle diffère de celle du relevé : un
+    /// rattrapage a été publié cette semaine-là mais mis en service bien avant.
+    private func effectiveNote(_ change: ANFRSiteHistoryChange) -> String? {
+        guard change.modType != .deleted,
+              let effective = change.effectiveDate, effective.prefix(10) != entry.archiveDate.prefix(10),
+              let date = ANFRText.date(effective) else { return nil }
+        return change.catchUp
+            ? String(localized: "Rattrapage · mis en service le \(date)")
+            : String(localized: "Mise en service le \(date)")
     }
 
     private func prettyDate(_ raw: String) -> String {
-        ANFRDateParser.date(from: raw)?.formatted(.dateTime.day().month(.wide).year()) ?? raw
+        ANFRText.date(raw) ?? raw
+    }
+}
+
+private extension View {
+    /// Garde la carte utilisable derrière la fiche à hauteur moyenne (iOS 16.4+) : on
+    /// peut déplacer la carte et toucher un autre repère sans la refermer.
+    @ViewBuilder
+    func presentationBackgroundInteractionCompat() -> some View {
+        if #available(iOS 16.4, *) {
+            self.presentationBackgroundInteraction(.enabled(upThrough: .medium))
+        } else {
+            self
+        }
     }
 }

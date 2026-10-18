@@ -33,6 +33,22 @@
         }
       }
     },
+    "%@ : %@ supports en %@, %@ en %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@ sites in %3$@, %4$@ in %5$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ : %@ supports en %@, %@ en %@"
+          }
+        }
+      }
+    },
     "%@ a créé la conversation." : {
       "localizations" : {
         "en" : {
@@ -1831,6 +1847,22 @@
         }
       }
     },
+    "%lld supports regroupés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld sites grouped"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld supports regroupés"
+          }
+        }
+      }
+    },
     "%lld tests terminés ✓" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2373,6 +2405,22 @@
         }
       }
     },
+    "5G 700 MHz" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G 700 MHz"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5G 700 MHz"
+          }
+        }
+      }
+    },
     "Active le chiffrement sur cet appareil pour créer une conversation chiffrée." : {
       "localizations" : {
         "en" : {
@@ -2707,6 +2755,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annuler l’envoi"
+          }
+        }
+      }
+    },
+    "Antenne ajoutée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna added"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenne ajoutée"
+          }
+        }
+      }
+    },
+    "Antenne retirée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenna removed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Antenne retirée"
           }
         }
       }
@@ -3099,6 +3179,70 @@
         }
       }
     },
+    "Aucun support modifié dans ce relevé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No changed site in this survey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun support modifié dans ce relevé"
+          }
+        }
+      }
+    },
+    "Aucun support modifié pour ces filtres" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No changed site for these filters"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun support modifié pour ces filtres"
+          }
+        }
+      }
+    },
+    "Aucun support modifié à afficher." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No changed site to show."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun support modifié à afficher."
+          }
+        }
+      }
+    },
+    "Aucun support ne correspond à ta recherche." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No site matches your search."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun support ne correspond à ta recherche."
+          }
+        }
+      }
+    },
     "Aucun test sur cet iPhone pour l'instant" : {
       "localizations" : {
         "en" : {
@@ -3159,6 +3303,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun trajet pour l’instant"
+          }
+        }
+      }
+    },
+    "Aucune antenne modifiée dans ce relevé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No antenna changed in this survey."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune antenne modifiée dans ce relevé."
           }
         }
       }
@@ -3239,6 +3399,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune statistique disponible"
+          }
+        }
+      }
+    },
+    "Autre opérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other operator"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre opérateur"
           }
         }
       }
@@ -3549,6 +3725,22 @@
         }
       }
     },
+    "Cartoradio" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartoradio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartoradio"
+          }
+        }
+      }
+    },
     "Ce lien mène hors de SignalQuest, vers %@." : {
       "localizations" : {
         "en" : {
@@ -3839,6 +4031,54 @@
         }
       }
     },
+    "Changements : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changements : %@"
+          }
+        }
+      }
+    },
+    "Changements de ce relevé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes in this survey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changements de ce relevé"
+          }
+        }
+      }
+    },
+    "Changements de la semaine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This week’s changes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changements de la semaine"
+          }
+        }
+      }
+    },
     "Chaque point de couverture que tu as relevé, sur la carte." : {
       "localizations" : {
         "en" : {
@@ -3883,6 +4123,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chargement de la discussion…"
+          }
+        }
+      }
+    },
+    "Chargement de l’historique…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading history…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement de l’historique…"
+          }
+        }
+      }
+    },
+    "Chargement des changements ANFR…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading ANFR changes…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement des changements ANFR…"
+          }
+        }
+      }
+    },
+    "Chargement du relevé du %@…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading the survey of %@…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement du relevé du %@…"
           }
         }
       }
@@ -4145,6 +4433,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Commun"
+          }
+        }
+      }
+    },
+    "Commune, code du support ou adresse" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Town, site code or address"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commune, code du support ou adresse"
           }
         }
       }
@@ -4423,6 +4727,38 @@
         }
       }
     },
+    "Coordonnées copiées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordinates copied"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordonnées copiées"
+          }
+        }
+      }
+    },
+    "Copier les coordonnées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy coordinates"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier les coordonnées"
+          }
+        }
+      }
+    },
     "Correction proposée · facultatif" : {
       "localizations" : {
         "en" : {
@@ -4678,6 +5014,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Depuis toujours"
+          }
+        }
+      }
+    },
+    "Dernier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier"
           }
         }
       }
@@ -5714,6 +6066,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Haut-parleur"
+          }
+        }
+      }
+    },
+    "Hors ligne : copie enregistrée sur cet iPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline: copy saved on this iPhone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors ligne : copie enregistrée sur cet iPhone"
           }
         }
       }
@@ -6830,6 +7198,22 @@
         }
       }
     },
+    "Latitude %@, longitude %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latitude %1$@, longitude %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latitude %@, longitude %@"
+          }
+        }
+      }
+    },
     "Le Drive Test s'arrêtait au changement d'antenne" : {
       "localizations" : {
         "en" : {
@@ -7053,6 +7437,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le problème revient ? Réponds ici…"
+          }
+        }
+      }
+    },
+    "Le relevé affiché reste celui du %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The survey shown is still the one of %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le relevé affiché reste celui du %@."
           }
         }
       }
@@ -7362,6 +7762,22 @@
         }
       }
     },
+    "Les nombres comptent les supports concernés, pour les autres filtres choisis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numbers count the sites concerned, given the other filters you chose."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les nombres comptent les supports concernés, pour les autres filtres choisis."
+          }
+        }
+      }
+    },
     "Les photos d’antennes partagées par la communauté, et les tiennes." : {
       "localizations" : {
         "en" : {
@@ -7490,6 +7906,54 @@
         }
       }
     },
+    "Les relevés ANFR ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR surveys are not available yet. Pull down to refresh."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les relevés ANFR ne sont pas encore disponibles. Tire l’écran vers le bas pour actualiser."
+          }
+        }
+      }
+    },
+    "Les relevés complets de 2022 arriveront avec une prochaine version." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The full 2022 surveys will arrive in a future version."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les relevés complets de 2022 arriveront avec une prochaine version."
+          }
+        }
+      }
+    },
+    "Les supports modifiés par l’ANFR, sur la carte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites changed by ANFR, on the map"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les supports modifiés par l’ANFR, sur la carte"
+          }
+        }
+      }
+    },
     "Lieu recherché" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7503,6 +7967,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lieu recherché"
+          }
+        }
+      }
+    },
+    "Liste des supports modifiés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List of changed sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liste des supports modifiés"
           }
         }
       }
@@ -7615,6 +8095,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’ANFR publie un relevé par semaine. La carte montre les antennes à la date choisie et marque celles qui ont changé."
+          }
+        }
+      }
+    },
+    "L’ANFR publie un relevé à peu près chaque semaine. La carte montre ce qui a changé depuis le relevé précédent : nouveaux supports, antennes mises en service, ajoutées ou retirées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR publishes a survey roughly every week. The map shows what changed since the previous survey: new sites, antennas put into service, added or removed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ANFR publie un relevé à peu près chaque semaine. La carte montre ce qui a changé depuis le relevé précédent : nouveaux supports, antennes mises en service, ajoutées ou retirées."
           }
         }
       }
@@ -7733,6 +8229,22 @@
         }
       }
     },
+    "Masquer les rattrapages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide catch-ups"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer les rattrapages"
+          }
+        }
+      }
+    },
     "Masquer mes listes" : {
       "localizations" : {
         "en" : {
@@ -7794,6 +8306,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mauvais"
+          }
+        }
+      }
+    },
+    "Me localiser" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show my location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Me localiser"
           }
         }
       }
@@ -8116,6 +8644,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Min · max"
+          }
+        }
+      }
+    },
+    "Mise en service le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Put into service on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise en service le %@"
           }
         }
       }
@@ -9214,6 +9758,22 @@
         }
       }
     },
+    "Position indisponible. Vérifie l’autorisation de localisation dans les Réglages." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location unavailable. Check the location permission in Settings."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position indisponible. Vérifie l’autorisation de localisation dans les Réglages."
+          }
+        }
+      }
+    },
     "Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction. Les appels y dépendent de la conversation : ils peuvent être indisponibles, ou partir après confirmation, sans chiffrement de bout en bout." : {
       "localizations" : {
         "en" : {
@@ -9648,6 +10208,54 @@
         }
       }
     },
+    "Rattrapage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catch-up"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rattrapage"
+          }
+        }
+      }
+    },
+    "Rattrapage · mis en service le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catch-up · put into service on %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rattrapage · mis en service le %@"
+          }
+        }
+      }
+    },
+    "Rattrapages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catch-ups"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rattrapages"
+          }
+        }
+      }
+    },
     "Rayon Fresnel max." : {
       "localizations" : {
         "en" : {
@@ -9741,6 +10349,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relevé du %@"
+          }
+        }
+      }
+    },
+    "Relevé du %@ : %@ supports modifiés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Survey of %1$@: %2$@ changed sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relevé du %@ : %@ supports modifiés"
+          }
+        }
+      }
+    },
+    "Relevé du %@, %lld changements" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Survey of %1$@, %2$lld changes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relevé du %@, %lld changements"
+          }
+        }
+      }
+    },
+    "Relevé précédent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous survey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relevé précédent"
+          }
+        }
+      }
+    },
+    "Relevé suivant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next survey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relevé suivant"
           }
         }
       }
@@ -10409,6 +11081,22 @@
         }
       }
     },
+    "Seules les antennes modifiées pendant la période sont listées, pas toutes celles du support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only the antennas changed during the period are listed, not every antenna on the site."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seules les antennes modifiées pendant la période sont listées, pas toutes celles du support."
+          }
+        }
+      }
+    },
     "Si la caméra n’est pas disponible, copie le contenu du QR depuis l’autre appareil." : {
       "localizations" : {
         "en" : {
@@ -10815,6 +11503,70 @@
         }
       }
     },
+    "Supports modifiés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changed sites"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports modifiés"
+          }
+        }
+      }
+    },
+    "Supports modifiés : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changed sites: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports modifiés : %@"
+          }
+        }
+      }
+    },
+    "Supports modifiés affichés : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changed sites shown: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports modifiés affichés : %lld"
+          }
+        }
+      }
+    },
+    "Supports à cet emplacement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites at this location"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports à cet emplacement"
+          }
+        }
+      }
+    },
     "Suppression impossible. Réessaie." : {
       "localizations" : {
         "en" : {
@@ -10939,6 +11691,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sur la carte, un repère prend la couleur de l’opérateur dominant du site ; son symbole est le type de modification le plus marquant."
+          }
+        }
+      }
+    },
+    "Sur la carte, un repère prend la couleur de l’opérateur dominant du support ; son symbole est le type de modification le plus marquant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the map, a marker takes the colour of the site’s main operator; its symbol is the most notable type of change."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur la carte, un repère prend la couleur de l’opérateur dominant du support ; son symbole est le type de modification le plus marquant."
           }
         }
       }
@@ -12022,6 +12790,22 @@
         }
       }
     },
+    "Un rattrapage est une antenne déclarée tard : sa mise en service date de plus de 30 jours avant le relevé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A catch-up is an antenna declared late: it went live more than 30 days before the survey."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un rattrapage est une antenne déclarée tard : sa mise en service date de plus de 30 jours avant le relevé."
+          }
+        }
+      }
+    },
     "Un seul passage : il en faut au moins deux, écartés, pour situer l’antenne." : {
       "localizations" : {
         "en" : {
@@ -12463,6 +13247,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zoome pour compter les carrés"
+          }
+        }
+      }
+    },
+    "Zoome sur ce groupe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom in on this group"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoome sur ce groupe"
           }
         }
       }

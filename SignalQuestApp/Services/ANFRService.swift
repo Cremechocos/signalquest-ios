@@ -82,10 +82,13 @@ struct ANFRSiteHistoryChange: Decodable, Sendable, Identifiable {
     let generation: String
     let modTypeRaw: String
     let statut: String
+    /// Date du changement : sa date réelle (mise en service déclarée), sinon celle du relevé.
     let effectiveDate: String?
+    /// Rattrapage : la date réelle précède de plus de 30 jours le relevé.
+    let catchUp: Bool
 
     enum CodingKeys: String, CodingKey {
-        case id, technology, generation, statut, effectiveDate
+        case id, technology, generation, statut, effectiveDate, catchUp
         case operatorRaw = "operator"
         case modTypeRaw = "modType"
     }
@@ -99,9 +102,10 @@ struct ANFRSiteHistoryChange: Decodable, Sendable, Identifiable {
         modTypeRaw = (try? c.decodeIfPresent(String.self, forKey: .modTypeRaw)) ?? ""
         statut = (try? c.decodeIfPresent(String.self, forKey: .statut)) ?? ""
         effectiveDate = (try? c.decodeIfPresent(String.self, forKey: .effectiveDate)) ?? nil
+        catchUp = (try? c.decodeIfPresent(Bool.self, forKey: .catchUp)) ?? false
     }
 
-    init(id: String, operatorRaw: String, technology: String, generation: String, modTypeRaw: String, statut: String, effectiveDate: String?) {
+    init(id: String, operatorRaw: String, technology: String, generation: String, modTypeRaw: String, statut: String, effectiveDate: String?, catchUp: Bool = false) {
         self.id = id
         self.operatorRaw = operatorRaw
         self.technology = technology
@@ -109,6 +113,7 @@ struct ANFRSiteHistoryChange: Decodable, Sendable, Identifiable {
         self.modTypeRaw = modTypeRaw
         self.statut = statut
         self.effectiveDate = effectiveDate
+        self.catchUp = catchUp
     }
 }
 
@@ -147,11 +152,22 @@ protocol ANFRServicing: Sendable {
     func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot
     /// Dates d'archives disponibles + relevé courant (sélecteur de date carte).
     func archiveDates() async throws -> ANFRArchiveDates
+    /// Les `count` dernières semaines avec leurs compteurs par type (barres de la carte).
+    func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary]
+}
+
+extension ANFRServicing {
+    /// Les services qui n'affichent pas de barres n'ont rien à fournir.
+    func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary] { [] }
 }
 
 final class ANFRService: ANFRServicing {
     private let api: APIClient
-    init(api: APIClient) { self.api = api }
+    private let diskCache: ANFRSnapshotDiskCache
+    init(api: APIClient, diskCache: ANFRSnapshotDiskCache = ANFRSnapshotDiskCache()) {
+        self.api = api
+        self.diskCache = diskCache
+    }
 
     func current() async throws -> ANFRDataset {
         try await api.request(APIEndpoint(path: "/api/anfr/current"), as: ANFRDataset.self)
@@ -194,15 +210,86 @@ final class ANFRService: ANFRServicing {
         return try await api.request(APIEndpoint(path: "/api/anfr/stats", query: query), as: ANFRBandStats.self)
     }
 
+    /// Un relevé daté est immuable : lu sur le disque quand il y est, sinon
+    /// téléchargé puis gardé. Le relevé courant se revalide à chaque appel et ne
+    /// sert depuis le disque qu'à défaut de réseau (`servedFromCache`).
     func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot {
+        if let date, let cached = diskCache.read(key: date), let snapshot = Self.decode(cached) {
+            return snapshot
+        }
         let query = date.map { [URLQueryItem(name: "date", value: $0)] } ?? []
-        return try await api.request(
-            APIEndpoint(path: "/api/anfr/map-snapshot", query: query),
-            as: ANFRMapSnapshot.self
-        )
+        let data: Data
+        do {
+            data = try await api.requestData(APIEndpoint(path: "/api/anfr/map-snapshot", query: query))
+        } catch {
+            if date == nil, !error.isCancellation, var cached = diskCache.read(key: Self.currentKey).flatMap(Self.decode) {
+                cached.servedFromCache = true
+                return cached
+            }
+            throw error
+        }
+        guard let snapshot = Self.decode(data) else { throw APIError.decoding("map-snapshot") }
+        diskCache.write(data, key: date ?? Self.currentKey)
+        return snapshot
+    }
+
+    private static let currentKey = "current"
+
+    private static func decode(_ data: Data) -> ANFRMapSnapshot? {
+        try? JSONDecoder.signalQuest.decode(ANFRMapSnapshot.self, from: data)
     }
 
     func archiveDates() async throws -> ANFRArchiveDates {
         try await api.request(APIEndpoint(path: "/api/anfr/archives"), as: ANFRArchiveDates.self)
+    }
+
+    func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary] {
+        let weeks = min(max(count, 1), 26)
+        return try await api.request(
+            APIEndpoint(path: "/api/anfr/archives", query: [URLQueryItem(name: "weeks", value: String(weeks))]),
+            as: ANFRArchiveWeeks.self
+        ).weeks
+    }
+}
+
+/// Copies disque des relevés de la carte. Données publiques de l'ANFR, sans lien
+/// avec un compte : un dossier du système, que iOS peut purger quand la place manque.
+struct ANFRSnapshotDiskCache: Sendable {
+    let directory: URL
+    /// Nombre de relevés gardés ; les plus anciens (par date de modification) partent.
+    let maxFiles: Int
+
+    init(directory: URL? = nil, maxFiles: Int = 12) {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        self.directory = directory ?? base.appendingPathComponent("SignalQuestANFRMap", isDirectory: true)
+        self.maxFiles = maxFiles
+    }
+
+    private func url(for key: String) -> URL {
+        let safe = key.filter { $0.isLetter || $0.isNumber || $0 == "-" }
+        return directory.appendingPathComponent("map-\(safe).json")
+    }
+
+    func read(key: String) -> Data? {
+        try? Data(contentsOf: url(for: key))
+    }
+
+    func write(_ data: Data, key: String) {
+        let manager = FileManager.default
+        try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? data.write(to: url(for: key), options: .atomic)
+        trim()
+    }
+
+    private func trim() {
+        let manager = FileManager.default
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey]
+        guard let files = try? manager.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys)),
+              files.count > maxFiles else { return }
+        let dated = files.map { ($0, (try? $0.resourceValues(forKeys: keys).contentModificationDate) ?? Date.distantPast) }
+        for (file, _) in dated.sorted(by: { $0.1 < $1.1 }).prefix(files.count - maxFiles) {
+            try? manager.removeItem(at: file)
+        }
     }
 }

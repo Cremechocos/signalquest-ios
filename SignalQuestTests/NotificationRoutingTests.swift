@@ -116,6 +116,39 @@ final class NotificationRoutingTests: XCTestCase {
         XCTAssertTrue(router.hasPendingContentRoute)
     }
 
+    func testANFRUpdateWithoutDetailsKeepsTheCurrentBehaviour() {
+        let router = AppRouter()
+        router.handle(type: "anfr_update", conversationId: nil, postId: nil)
+        XCTAssertNil(router.pendingANFRFocus)
+    }
+
+    func testANFRUpdateCarriesTheWeekAndTheWatchedZone() {
+        let focus = ANFRFocus.parse(date: "2026-10-08", latitude: "45.7578", longitude: "4.832", radiusMeters: "1500")
+        let router = AppRouter()
+        router.handle(type: "anfr_update", conversationId: nil, postId: nil, anfrFocus: focus)
+        XCTAssertTrue(router.openANFRMap)
+        XCTAssertEqual(router.pendingANFRFocus?.date, "2026-10-08")
+        XCTAssertEqual(router.pendingANFRFocus?.zoneLatitude, 45.7578)
+        XCTAssertEqual(router.pendingANFRFocus?.zoneLongitude, 4.832)
+        XCTAssertEqual(router.pendingANFRFocus?.radiusMeters, 1500)
+    }
+
+    func testANFRFocusIgnoresUnusableFields() {
+        XCTAssertNil(ANFRFocus.parse(date: "", latitude: nil, longitude: nil, radiusMeters: nil))
+        XCTAssertNil(ANFRFocus.parse(date: "not-a-date", latitude: "x", longitude: "y", radiusMeters: "z"))
+        // Une latitude sans longitude, ou hors bornes, ou 0/0 : pas de zone, mais le relevé reste.
+        XCTAssertNil(ANFRFocus.parse(date: nil, latitude: "45.7", longitude: nil, radiusMeters: "500"))
+        XCTAssertNil(ANFRFocus.parse(date: nil, latitude: "95", longitude: "4", radiusMeters: nil))
+        XCTAssertNil(ANFRFocus.parse(date: nil, latitude: "0", longitude: "0", radiusMeters: nil))
+        let dateOnly = ANFRFocus.parse(date: "2026-10-08", latitude: "999", longitude: "4", radiusMeters: nil)
+        XCTAssertEqual(dateOnly?.date, "2026-10-08")
+        XCTAssertFalse(dateOnly?.hasZone ?? true)
+        // Décimale à la virgule et rayon borné.
+        let comma = ANFRFocus.parse(date: nil, latitude: "45,5", longitude: "4,5", radiusMeters: "5")
+        XCTAssertEqual(comma?.zoneLatitude, 45.5)
+        XCTAssertEqual(comma?.radiusMeters, 200)
+    }
+
     func testSentinelleNotificationsOpenTheBox() {
         for type in ["sentinelle", "sentinelle_incident"] {
             let router = AppRouter()

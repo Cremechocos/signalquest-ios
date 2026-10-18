@@ -896,6 +896,11 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         // cette extraction, le tap ouvrait la fiche du SITE — la panne, elle, restait à retrouver.
         let outageId = Self.string(info, "outageId", "outage_id")
         let bugId = Self.string(info, "bugId", "bug_id")
+        // Mise à jour ANFR : relevé (`date`) et zone surveillée, tous facultatifs.
+        let anfrFocus = ANFRFocus.parse(
+            date: Self.string(info, "date"), latitude: Self.string(info, "zoneLat"),
+            longitude: Self.string(info, "zoneLon"), radiusMeters: Self.string(info, "zoneRadiusMeters")
+        )
         let e2eeDeviceApprovalId = Self.e2eeDeviceApprovalID(info)
         if type?.lowercased() == "e2ee_v2_device_approval", e2eeDeviceApprovalId == nil {
             center.removeDeliveredNotifications(withIdentifiers: [identifier])
@@ -929,7 +934,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
                     targetId: targetId,
                     outageId: outageId,
                     e2eeDeviceApprovalId: e2eeDeviceApprovalId,
-                    bugId: bugId
+                    bugId: bugId,
+                    anfrFocus: anfrFocus
                 )
                 UNUserNotificationCenter.current().setBadgeCountCompat(0)
             }

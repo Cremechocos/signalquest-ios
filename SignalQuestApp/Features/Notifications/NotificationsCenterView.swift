@@ -419,7 +419,28 @@ struct NotificationsCenterView: View {
             // site — et le seul chemin qui atteigne une panne déjà rétablie, qu'aucune liste ne
             // rend plus.
             outageId: metaString(meta, "outageId", "outage_id"),
-            bugId: metaString(meta, "bugId", "bug_id")
+            bugId: metaString(meta, "bugId", "bug_id"),
+            anfrFocus: item.type?.lowercased() == "anfr_update" ? anfrFocus(meta) : nil
+        )
+    }
+
+    /// Relevé et zone d'une mise à jour ANFR : la metadata en base écrit la zone
+    /// `zoneLatitude` / `zoneLongitude` / `zoneRadius`, en nombres (`metaString` les
+    /// tronquerait en entiers).
+    private func anfrFocus(_ metadata: [String: JSONValue]?) -> ANFRFocus? {
+        func text(_ keys: String...) -> String? {
+            for key in keys {
+                switch metadata?[key] {
+                case .string(let value)? where !value.isEmpty: return value
+                case .number(let value)?: return String(value)
+                default: continue
+                }
+            }
+            return nil
+        }
+        return ANFRFocus.parse(
+            date: text("date"), latitude: text("zoneLatitude", "zoneLat"),
+            longitude: text("zoneLongitude", "zoneLon"), radiusMeters: text("zoneRadius", "zoneRadiusMeters")
         )
     }
 
