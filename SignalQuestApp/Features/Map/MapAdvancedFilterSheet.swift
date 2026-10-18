@@ -5,6 +5,8 @@ import MapKit
 enum MapANFRDestination {
     case map
     case stats
+    /// Comparatif d'opérateurs autour du centre de la carte (équivalent de l'appui long).
+    case zoneCompare
 }
 
 extension MapFilterSelection {

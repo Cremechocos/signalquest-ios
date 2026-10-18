@@ -308,6 +308,18 @@ final class ANFRMapViewModelTests: XCTestCase {
         XCTAssertEqual(dominant(["activated", "added"]), .added)
         XCTAssertEqual(dominant(["added", "new", "deleted"]), .new)
         XCTAssertEqual(dominant(["deleted"]), .deleted)
+        XCTAssertEqual(dominant(["modified", "deleted"]), .modified)
+        XCTAssertEqual(dominant(["modified", "activated"]), .activated)
+    }
+
+    /// `modified` (retour d'« En service » à un projet) a son propre type, et non « ajoutée ».
+    func testModifiedIsItsOwnTypeAndCountedInTheWeek() throws {
+        XCTAssertEqual(ANFRModType.from(raw: "modified"), .modified)
+        XCTAssertEqual(ANFRModType.from(raw: "inconnu"), .added)
+        let json = #"{"weeks":[{"date":"2026-10-15","counts":{"new":1,"modified":3}}]}"#
+        let week = try XCTUnwrap(JSONDecoder().decode(ANFRArchiveWeeks.self, from: Data(json.utf8)).weeks.first)
+        XCTAssertEqual(week.count(for: .modified), 3)
+        XCTAssertEqual(week.total, 4)
     }
 
     func testFullStateRelevésAreRecognisedByTheirDate() {
@@ -653,5 +665,316 @@ private final class LockedFlag: @unchecked Sendable {
     var value: Bool {
         get { lock.withLock { flag } }
         set { lock.withLock { flag = newValue } }
+    }
+}
+
+// MARK: - Comparateur de zone (CMP-1)
+
+/// Requête, erreurs et états de l'onglet Antennes du comparateur d'opérateurs.
+@MainActor
+final class ANFRZoneCompareTests: XCTestCase {
+    private final class ZoneService: ANFRServicing, @unchecked Sendable {
+        struct Call: Equatable {
+            let latitude: Double
+            let longitude: Double
+            let radius: Int
+            let market: String
+            let bands: Bool
+        }
+        private let lock = NSLock()
+        private var recorded: [Call] = []
+        var failure: Error?
+        var calls: [Call] { lock.withLock { recorded } }
+
+        func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
+                         market: String, includeBands: Bool) async throws -> ANFRZoneCompare {
+            lock.withLock {
+                recorded.append(Call(latitude: latitude, longitude: longitude, radius: radius.kilometers,
+                                     market: market, bands: includeBands))
+            }
+            if let failure { throw failure }
+            let bands = includeBands ? [ANFRZoneBandCount(band: "B20", count: 3)] : nil
+            return ANFRZoneCompare(
+                market: market, activeDefinition: "def", snapshotDate: "2026-09-24", snapshotSource: "ANFR",
+                radiusKm: radius.kilometers, totalActive: 10, totalPlanned: 2, totalByGeneration: .zero,
+                operators: [ANFRZoneOperator(key: "ORANGE", active: 10, planned: 2, generations: .zero, bands: bands)]
+            )
+        }
+
+        func current() async throws -> ANFRDataset { throw URLError(.unsupportedURL) }
+        func archives() async throws -> [ANFRDataset] { throw URLError(.unsupportedURL) }
+        func search(query: String) async throws -> [AntennaSite] { throw URLError(.unsupportedURL) }
+        func siteHistory(supId: String) async throws -> ANFRSiteHistory { throw URLError(.unsupportedURL) }
+        func stats() async throws -> ANFRStats { throw URLError(.unsupportedURL) }
+        func bandStats(weeks: Int?, generation: String?, operatorKey: String?) async throws -> ANFRBandStats {
+            throw URLError(.unsupportedURL)
+        }
+        func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot { throw URLError(.unsupportedURL) }
+        func archiveDates() async throws -> ANFRArchiveDates { throw URLError(.unsupportedURL) }
+    }
+
+    /// Un marché par code ; `nil` pour une position hors de tout marché.
+    private struct FixedMarkets: MarketRegistryServicing {
+        let code: String?
+        func registry() async -> MarketRegistryPayload { .empty }
+        func market(forCode code: String?) async -> MarketRegistryEntry? { entry(code) }
+        func marketForLocation(latitude: Double, longitude: Double) async -> MarketRegistryEntry? { entry(code) }
+        func marketAreaContainsLocation(marketCode: String?, latitude: Double, longitude: Double) -> Bool { false }
+        func franceHysteresisContains(latitude: Double, longitude: Double) -> Bool { false }
+        private func entry(_ code: String?) -> MarketRegistryEntry? {
+            guard let code else { return nil }
+            let json = ##"{"code":"\##(code)","marketCode":"\##(code)","label":"\##(code)","operators":[{"key":"ORANGE","label":"Orange","color":"#FF7900"}]}"##
+            return try? JSONDecoder.signalQuest.decode(MarketRegistryEntry.self, from: Data(json.utf8))
+        }
+    }
+
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        super.tearDown()
+    }
+
+    private func makeModel(_ service: ZoneService, market: String? = "FR",
+                           latitude: Double = 45.7640, longitude: Double = 4.8357) -> ZoneCompareModel {
+        let model = ZoneCompareModel(latitude: latitude, longitude: longitude)
+        model.attach(service: service, markets: FixedMarkets(code: market))
+        return model
+    }
+
+    private func httpError(_ status: Int, _ code: String?) -> APIError {
+        .http(status: status, code: code, message: "", requestId: "req", retryAfter: nil)
+    }
+
+    // MARK: Requête
+
+    func testTheRequestCarriesTheCenterTheRadiusTierAndTheMarketOnAPublicRoute() throws {
+        for tier in ANFRZoneRadius.presets {
+            let endpoint = ANFRService.zoneCompareEndpoint(latitude: 45.76401, longitude: 4.83569, radius: tier,
+                                                           market: "FR", includeBands: false)
+            XCTAssertEqual(endpoint.path, "/api/anfr/zone-compare")
+            XCTAssertFalse(endpoint.authenticated, "Route publique : ni cookie ni rafraîchissement de session")
+            let query = Dictionary(uniqueKeysWithValues: endpoint.query.map { ($0.name, $0.value ?? "") })
+            XCTAssertEqual(query, ["lat": "45.764", "lon": "4.836", "radiusKm": String(tier.kilometers), "market": "FR"])
+        }
+        XCTAssertEqual(ANFRZoneRadius.presets.map(\.kilometers), [20, 50, 100])
+        XCTAssertEqual(ANFRZoneRadius.default, .km50)
+        // Échelle du serveur : au km jusqu'à 20, puis par pas de 5.
+        XCTAssertEqual([0, 1, 7, 20, 21, 23, 24, 37, 38, 99, 140].map { ANFRZoneRadius(kilometers: $0).kilometers },
+                       [1, 1, 7, 20, 20, 25, 25, 35, 40, 100, 100])
+        XCTAssertEqual(ANFRZoneRadius.steps.count, 36)
+        XCTAssertEqual(ANFRZoneRadius.km50.gridDegrees, 0.05, accuracy: 1e-9)
+        XCTAssertEqual(ANFRZoneRadius(kilometers: 7).gridDegrees, 0.007, accuracy: 1e-9)
+        let bands = ANFRService.zoneCompareEndpoint(latitude: -21.1, longitude: 55.5, radius: .km20, market: "DROM", includeBands: true)
+        let names = bands.query.map(\.name)
+        XCTAssertEqual(names, ["lat", "lon", "radiusKm", "market", "bands"])
+        XCTAssertEqual(bands.query.first { $0.name == "bands" }?.value, "1")
+        XCTAssertEqual(bands.query.first { $0.name == "lat" }?.value, "-21.100", "Séparateur décimal fixe, quelle que soit la langue")
+        XCTAssertEqual(bands.query.first { $0.name == "market" }?.value, "DROM")
+    }
+
+    func testTheServiceDecodesTheServerAnswerOverTheWire() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                            session: URLSession(configuration: configuration))
+        let body = Data(#"{"market":"FR","total":{"active":4,"planned":1},"radiusKm":20,"operators":[{"key":"SFR","active":4}]}"#.utf8)
+        let seen = LockedRequests()
+        MockURLProtocol.requestHandler = { request in
+            seen.append(request, body: [:])
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                    headerFields: ["Content-Type": "application/json"])!, body)
+        }
+        let zone = try await ANFRService(api: api).zoneCompare(latitude: 45.7, longitude: 4.8, radius: .km20,
+                                                               market: "FR", includeBands: true)
+        XCTAssertEqual(zone.totalActive, 4)
+        XCTAssertEqual(zone.operators.map(\.key), ["SFR"])
+        let url = try XCTUnwrap(seen.first?.0.url)
+        XCTAssertEqual(url.path, "/api/anfr/zone-compare")
+        let query = Dictionary(uniqueKeysWithValues: (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [])
+            .map { ($0.name, $0.value ?? "") })
+        XCTAssertEqual(query, ["lat": "45.700", "lon": "4.800", "radiusKm": "20", "market": "FR", "bands": "1"])
+        XCTAssertNil(seen.first?.0.value(forHTTPHeaderField: "Cookie"))
+    }
+
+    // MARK: Erreurs
+
+    func testServerErrorsMapToTheirStates() async throws {
+        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(404, nil)), .comingSoon, "Route pas encore servie : neutre")
+        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(404, "NOT_FOUND")), .comingSoon)
+        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(422, "MARKET_NO_ANTENNA_DATA")), .noAntennaData)
+        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(422, "OUT_OF_MARKET")), .outOfMarket)
+        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(400, "INVALID_PARAMS")), .failed)
+        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(400, "INVALID_MARKET")), .failed)
+        XCTAssertEqual(ZoneCompareModel.phase(for: httpError(503, nil)), .failed)
+        XCTAssertEqual(ZoneCompareModel.phase(for: APIError.transport("offline")), .failed)
+        XCTAssertEqual(ZoneCompareModel.phase(for: APIError.decoding("zone")), .failed)
+        XCTAssertNil(ZoneCompareModel.phase(for: APIError.cancelled), "Une annulation n'est jamais un échec")
+        XCTAssertNil(ZoneCompareModel.phase(for: CancellationError()))
+    }
+
+    func testTheErrorBodyOfTheRealClientReachesTheMapping() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let api = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                            session: URLSession(configuration: configuration))
+        func fail(status: Int, body: String) async -> Error? {
+            MockURLProtocol.requestHandler = { request in
+                (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
+                                 headerFields: ["Content-Type": "application/json"])!, Data(body.utf8))
+            }
+            do {
+                _ = try await ANFRService(api: api).zoneCompare(latitude: 1, longitude: 2, radius: .km50, market: "FR", includeBands: false)
+                return nil
+            } catch { return error }
+        }
+        let missing = await fail(status: 404, body: "<html>404</html>")
+        XCTAssertEqual(missing.flatMap { ZoneCompareModel.phase(for: $0) }, .comingSoon)
+        let noData = await fail(status: 422, body: #"{"code":"MARKET_NO_ANTENNA_DATA","message":"x","requestId":"r"}"#)
+        XCTAssertEqual(noData.flatMap { ZoneCompareModel.phase(for: $0) }, .noAntennaData)
+        let outside = await fail(status: 422, body: #"{"code":"OUT_OF_MARKET","message":"x","requestId":"r"}"#)
+        XCTAssertEqual(outside.flatMap { ZoneCompareModel.phase(for: $0) }, .outOfMarket)
+    }
+
+    func testTheDefaultImplementationOfAFakeReadsAsComingSoon() async {
+        final class Bare: ANFRServicing, @unchecked Sendable {
+            func current() async throws -> ANFRDataset { throw URLError(.unsupportedURL) }
+            func archives() async throws -> [ANFRDataset] { throw URLError(.unsupportedURL) }
+            func search(query: String) async throws -> [AntennaSite] { throw URLError(.unsupportedURL) }
+            func siteHistory(supId: String) async throws -> ANFRSiteHistory { throw URLError(.unsupportedURL) }
+            func stats() async throws -> ANFRStats { throw URLError(.unsupportedURL) }
+            func bandStats(weeks: Int?, generation: String?, operatorKey: String?) async throws -> ANFRBandStats {
+                throw URLError(.unsupportedURL)
+            }
+            func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot { throw URLError(.unsupportedURL) }
+            func archiveDates() async throws -> ANFRArchiveDates { throw URLError(.unsupportedURL) }
+        }
+        do {
+            _ = try await Bare().zoneCompare(latitude: 0, longitude: 0, radius: .km50, market: "FR", includeBands: false)
+            XCTFail("L'implémentation par défaut ne sert rien")
+        } catch {
+            XCTAssertEqual(ZoneCompareModel.phase(for: error), .comingSoon)
+        }
+    }
+
+    // MARK: États et chargements
+
+    func testFranceLoadsOnceAndAZoneAlreadySeenComesFromMemory() async throws {
+        let service = ZoneService()
+        let model = makeModel(service)
+        await model.load()
+        guard case .loaded(let zone) = model.phase else { return XCTFail("attendu : chargé, reçu \(model.phase)") }
+        XCTAssertEqual(zone.totalActive, 10)
+        XCTAssertEqual(service.calls, [.init(latitude: 45.7640, longitude: 4.8357, radius: 50, market: "FR", bands: false)])
+        XCTAssertEqual(model.marketEntry?.code, "FR")
+
+        await model.load()
+        XCTAssertEqual(service.calls.count, 1, "Même case, même rayon : rien à redemander")
+
+        model.radius = .km100
+        await model.load()
+        XCTAssertEqual(service.calls.map(\.radius), [50, 100])
+        model.radius = .km50
+        await model.load()
+        XCTAssertEqual(service.calls.count, 2, "Le rayon déjà vu se relit en mémoire")
+
+        model.reload()
+        await model.load()
+        XCTAssertEqual(service.calls.count, 3, "Réessayer vide la mémoire")
+    }
+
+    func testTwoPointsOfTheSameGridCellShareTheCacheKeyAndTwoCellsDoNot() {
+        let a = ZoneCompareModel.cacheKey(market: "FR", radius: .km50, latitude: 45.761, longitude: 4.801, bands: false)
+        let b = ZoneCompareModel.cacheKey(market: "FR", radius: .km50, latitude: 45.789, longitude: 4.823, bands: false)
+        let c = ZoneCompareModel.cacheKey(market: "FR", radius: .km50, latitude: 45.81, longitude: 4.801, bands: false)
+        XCTAssertEqual(a, b)
+        XCTAssertNotEqual(a, c)
+        XCTAssertNotEqual(a, ZoneCompareModel.cacheKey(market: "FR", radius: .km20, latitude: 45.761, longitude: 4.801, bands: false))
+        XCTAssertNotEqual(a, ZoneCompareModel.cacheKey(market: "DROM", radius: .km50, latitude: 45.761, longitude: 4.801, bands: false))
+        XCTAssertNotEqual(a, ZoneCompareModel.cacheKey(market: "FR", radius: .km50, latitude: 45.761, longitude: 4.801, bands: true))
+    }
+
+    func testTheBandDetailReloadsOnDemandWithoutEmptyingTheList() async throws {
+        let service = ZoneService()
+        let model = makeModel(service)
+        await model.load()
+        XCTAssertEqual(service.calls.map(\.bands), [false])
+        model.wantsBands = true
+        await model.load()
+        XCTAssertEqual(service.calls.map(\.bands), [false, true])
+        guard case .loaded(let zone) = model.phase else { return XCTFail("la liste reste affichée") }
+        XCTAssertTrue(zone.hasBands)
+        XCTAssertFalse(model.bandsLoading)
+        XCTAssertFalse(model.bandsFailed)
+
+        model.wantsBands = false
+        await model.load()
+        XCTAssertEqual(service.calls.count, 2, "Le détail déjà chargé répond aussi à la liste simple")
+    }
+
+    func testABandDetailFailureKeepsTheListAndSaysSo() async {
+        let service = ZoneService()
+        let model = makeModel(service)
+        await model.load()
+        service.failure = APIError.transport("offline")
+        model.wantsBands = true
+        await model.load()
+        XCTAssertTrue(model.bandsFailed)
+        if case .loaded = model.phase {} else { XCTFail("la liste reste affichée") }
+    }
+
+    func testEachServerErrorLandsOnItsState() async {
+        let cases: [(Error, ZoneCompareModel.Phase)] = [
+            (httpError(404, nil), .comingSoon),
+            (httpError(422, "MARKET_NO_ANTENNA_DATA"), .noAntennaData),
+            (httpError(422, "OUT_OF_MARKET"), .outOfMarket),
+            (APIError.transport("offline"), .failed),
+        ]
+        for (error, expected) in cases {
+            let service = ZoneService()
+            service.failure = error
+            let model = makeModel(service)
+            await model.load()
+            XCTAssertEqual(model.phase, expected)
+        }
+    }
+
+    func testOnlyFranceAndOverseasAreQueriedTheOtherMarketsStopLocally() async {
+        let service = ZoneService()
+        let canada = makeModel(service, market: "CA")
+        await canada.load()
+        XCTAssertEqual(canada.phase, .noAntennaData)
+        let sea = makeModel(service, market: nil)
+        await sea.load()
+        XCTAssertEqual(sea.phase, .outOfMarket)
+        XCTAssertTrue(service.calls.isEmpty, "Ni le Canada ni le large ne partent au serveur")
+
+        let overseas = makeModel(service, market: "DROM", latitude: 16.24, longitude: -61.53)
+        await overseas.load()
+        XCTAssertEqual(service.calls.map(\.market), ["DROM"])
+        XCTAssertEqual(ANFRZoneMarket.apiCode(forMarket: " fr "), "FR")
+        XCTAssertNil(ANFRZoneMarket.apiCode(forMarket: "BE"))
+        XCTAssertNil(ANFRZoneMarket.apiCode(forMarket: nil))
+    }
+
+    /// Le registre réel (embarqué) et ses aires : Lyon et Pointe-à-Pitre sont interrogeables, Montréal et l'Atlantique non.
+    func testTheBundledRegistryResolvesTheMarketFromTheGPS() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        MockURLProtocol.requestHandler = { _ in throw URLError(.notConnectedToInternet) }
+        let api = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                            session: URLSession(configuration: configuration))
+        let markets = MarketRegistryService(api: api, cache: DiskCache(folderName: "ZoneCompareTests-\(UUID())"))
+        func code(_ latitude: Double, _ longitude: Double) async -> String? {
+            await markets.marketForLocation(latitude: latitude, longitude: longitude)?.code
+        }
+        let lyon = await code(45.764, 4.8357)
+        let guadeloupe = await code(16.24, -61.53)
+        let reunion = await code(-21.115, 55.536)
+        let montreal = await code(45.5019, -73.5674)
+        let atlantic = await code(30.0, -40.0)
+        XCTAssertEqual(lyon, "FR")
+        XCTAssertEqual(guadeloupe, "DROM")
+        XCTAssertEqual(reunion, "DROM")
+        XCTAssertEqual(montreal, "CA")
+        XCTAssertNil(atlantic)
     }
 }

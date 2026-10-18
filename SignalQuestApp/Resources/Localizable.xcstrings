@@ -49,6 +49,22 @@
         }
       }
     },
+    "%@ : en service %lld, en projet %lld. %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: in service %2$lld, planned %3$lld. %4$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ : en service %lld, en projet %lld. %@."
+          }
+        }
+      }
+    },
     "%@ a créé la conversation." : {
       "localizations" : {
         "en" : {
@@ -77,6 +93,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ au total"
+          }
+        }
+      }
+    },
+    "%@ aucun" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ none"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ aucun"
           }
         }
       }
@@ -2099,6 +2131,22 @@
         }
       }
     },
+    "%lld km" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld km"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld km"
+          }
+        }
+      }
+    },
     "(vide)" : {
       "localizations" : {
         "en" : {
@@ -2168,6 +2216,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "**Conflit** : un autre site a plus de validations sur cette antenne."
+          }
+        }
+      }
+    },
+    "+ %@ en projet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+ %@ planned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+ %@ en projet"
           }
         }
       }
@@ -3195,6 +3259,22 @@
         }
       }
     },
+    "Aucun opérateur à comparer dans ce rayon pour l’instant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No operator to compare in this radius yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun opérateur à comparer dans ce rayon pour l’instant."
+          }
+        }
+      }
+    },
     "Aucun signalement dans ce filtre." : {
       "localizations" : {
         "en" : {
@@ -3403,6 +3483,22 @@
         }
       }
     },
+    "Aucune bande en service." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No band in service."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune bande en service."
+          }
+        }
+      }
+    },
     "Aucune des sessions de cette page n’a de position. Passe à la page suivante." : {
       "localizations" : {
         "en" : {
@@ -3463,6 +3559,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune statistique disponible"
+          }
+        }
+      }
+    },
+    "Autour de ce point" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Around this point"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autour de ce point"
           }
         }
       }
@@ -3609,6 +3721,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bandes · %@"
+          }
+        }
+      }
+    },
+    "Bientôt disponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coming soon"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bientôt disponible"
           }
         }
       }
@@ -4223,6 +4351,22 @@
         }
       }
     },
+    "Chaque barre compte les sites par génération ; un site qui en émet plusieurs compte dans chacune." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each bar counts sites by generation; a site that transmits in several is counted in each one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque barre compte les sites par génération ; un site qui en émet plusieurs compte dans chacune."
+          }
+        }
+      }
+    },
     "Chaque point de couverture que tu as relevé, sur la carte." : {
       "localizations" : {
         "en" : {
@@ -4283,6 +4427,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chargement de l’historique…"
+          }
+        }
+      }
+    },
+    "Chargement des antennes de la zone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading antennas in the area"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement des antennes de la zone"
           }
         }
       }
@@ -4641,6 +4801,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Compare cette empreinte sur le nouvel appareil avant d’approuver."
+          }
+        }
+      }
+    },
+    "Comparer les opérateurs ici" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare operators here"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparer les opérateurs ici"
           }
         }
       }
@@ -5431,6 +5607,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Désélectionner"
+          }
+        }
+      }
+    },
+    "Détail par bande" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band breakdown"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Détail par bande"
+          }
+        }
+      }
+    },
+    "Détail par bande indisponible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Band breakdown unavailable."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Détail par bande indisponible."
           }
         }
       }
@@ -6717,6 +6925,22 @@
         }
       }
     },
+    "Impossible de charger les antennes de la zone. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not load the antennas in the area. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger les antennes de la zone. Réessaie."
+          }
+        }
+      }
+    },
     "Impossible de charger les statistiques pour l’instant. Vérifie ta connexion, puis réessaie." : {
       "localizations" : {
         "en" : {
@@ -7596,6 +7820,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le code est invalide, expiré ou ne correspond plus à cet appareil."
+          }
+        }
+      }
+    },
+    "Le comparatif des antennes couvre la France métropolitaine et l’outre-mer. Cette position est en dehors." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The antenna comparison covers mainland France and the overseas territories. This position is outside."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le comparatif des antennes couvre la France métropolitaine et l’outre-mer. Cette position est en dehors."
+          }
+        }
+      }
+    },
+    "Le comparatif des antennes d’une zone arrive prochainement." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The area antenna comparison is coming soon."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le comparatif des antennes d’une zone arrive prochainement."
           }
         }
       }
@@ -9774,6 +10030,38 @@
         }
       }
     },
+    "Pas de données d’antennes officielles pour ce pays." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No official antenna data for this country."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de données d’antennes officielles pour ce pays."
+          }
+        }
+      }
+    },
+    "Pas de détail par bande pour cette zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No band breakdown for this area."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de détail par bande pour cette zone."
+          }
+        }
+      }
+    },
     "Pas de série en cours" : {
       "localizations" : {
         "en" : {
@@ -9834,6 +10122,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pas encore vue"
+          }
+        }
+      }
+    },
+    "Pays non couvert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Country not covered"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pays non couvert"
           }
         }
       }
@@ -10720,6 +11024,22 @@
         }
       }
     },
+    "Rayon · %lld km" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Radius · %lld km"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rayon · %lld km"
+          }
+        }
+      }
+    },
     "Recommandé · le plus proche à chaque test" : {
       "localizations" : {
         "en" : {
@@ -10765,6 +11085,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relais hertzien"
+          }
+        }
+      }
+    },
+    "Relevé %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ survey"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relevé %@"
+          }
+        }
+      }
+    },
+    "Relevé %@ du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ survey of %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relevé %@ du %@"
           }
         }
       }
@@ -10861,6 +11213,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remplacer ma clé"
+          }
+        }
+      }
+    },
+    "Repassée en projet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back to planned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repassée en projet"
           }
         }
       }
@@ -11818,6 +12186,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Site probable"
+          }
+        }
+      }
+    },
+    "Sites en service dans %lld km" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites in service within %lld km"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites en service dans %lld km"
+          }
+        }
+      }
+    },
+    "Sites en service dans %lld km : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites in service within %lld km: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sites en service dans %lld km : %lld"
           }
         }
       }
@@ -13478,6 +13878,22 @@
         }
       }
     },
+    "Un site qui émet en 4G et en 5G ne compte qu’une fois." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A site that transmits in 4G and 5G is counted only once."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un site qui émet en 4G et en 5G ne compte qu’une fois."
+          }
+        }
+      }
+    },
     "Une conversation chiffrée n’accepte que du texte : ni photo, ni fichier, ni vocal, ni sondage, ni réaction." : {
       "localizations" : {
         "en" : {
@@ -13891,6 +14307,22 @@
         }
       }
     },
+    "Zone non couverte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Area not covered"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zone non couverte"
+          }
+        }
+      }
+    },
     "Zone sensible" : {
       "localizations" : {
         "en" : {
@@ -14264,6 +14696,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "eNB et gNB croissants"
+          }
+        }
+      }
+    },
+    "en projet : %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "planned: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en projet : %lld"
           }
         }
       }

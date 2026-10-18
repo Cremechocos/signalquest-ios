@@ -148,6 +148,121 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(anonymous, .sent)
     }
 
+    // MARK: Comparateur de zone (CMP-1)
+
+    private static let zoneJSON = """
+    {"market":"FR","unit":"site","activeDefinition":"Sites au statut En service.",
+     "snapshot":{"date":"2026-09-24","source":"ANFR"},"center":{"lat":45.76,"lon":4.84},"radiusKm":50,
+     "total":{"active":540,"planned":78},"totalByGeneration":{"2G":230,"3G":310,"4G":530,"5G":300},
+     "operators":[
+      {"key":"ORANGE","active":402,"planned":36,"generations":{"2G":211,"3G":190,"4G":396,"5G":172}},
+      {"key":"FREE","active":0,"planned":0,"generations":{}},
+      {"active":5},
+      {"key":"SFR","active":296}
+     ],"requestId":"req-1"}
+    """
+
+    func testZoneCompareDecodesTheFullContractInRegistryOrder() throws {
+        let zone = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(Self.zoneJSON.utf8))
+        XCTAssertEqual(zone.market, "FR")
+        XCTAssertEqual(zone.unit, "site")
+        XCTAssertEqual(zone.snapshotDate, "2026-09-24")
+        XCTAssertEqual(zone.snapshotSource, "ANFR")
+        XCTAssertEqual(zone.activeDefinition, "Sites au statut En service.")
+        XCTAssertEqual(zone.radiusKm, 50)
+        XCTAssertEqual(zone.totalActive, 540)
+        XCTAssertEqual(zone.totalPlanned, 78)
+        XCTAssertEqual(zone.totalByGeneration, ANFRZoneGenerations(g2: 230, g3: 310, g4: 530, g5: 300))
+        XCTAssertEqual(zone.requestId, "req-1")
+        XCTAssertEqual(zone.operators.map(\.key), ["ORANGE", "FREE", "SFR"], "Ordre du serveur, ligne sans clé ignorée")
+        XCTAssertEqual(zone.operators[0].generations.g5, 172)
+        XCTAssertFalse(zone.hasBands)
+    }
+
+    func testZoneCompareMissingKeysFallBackToZeroNeverAnError() throws {
+        let zone = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(Self.zoneJSON.utf8))
+        let free = try XCTUnwrap(zone.operators.first { $0.key == "FREE" })
+        XCTAssertEqual(free.active, 0)
+        XCTAssertEqual(free.generations, .zero, "Un opérateur à 0 reste dans la liste")
+        let sfr = try XCTUnwrap(zone.operators.first { $0.key == "SFR" })
+        XCTAssertEqual(sfr.planned, 0)
+        XCTAssertEqual(sfr.generations, .zero)
+        XCTAssertNil(sfr.bands)
+
+        let empty = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data("{}".utf8))
+        XCTAssertEqual(empty.totalActive, 0)
+        XCTAssertEqual(empty.totalPlanned, 0)
+        XCTAssertEqual(empty.totalByGeneration, .zero)
+        XCTAssertTrue(empty.operators.isEmpty)
+        XCTAssertNil(empty.snapshotDate)
+
+        let partial = try JSONDecoder.signalQuest.decode(
+            ANFRZoneCompare.self, from: Data(#"{"totalByGeneration":{"4G":12},"total":{"active":3}}"#.utf8))
+        XCTAssertEqual(partial.totalByGeneration, ANFRZoneGenerations(g2: 0, g3: 0, g4: 12, g5: 0), "Générations absentes = 0")
+        XCTAssertEqual(partial.totalActive, 3)
+        XCTAssertEqual(partial.totalPlanned, 0)
+    }
+
+    func testZoneCompareBandsDecodeGroupedByGenerationAndSortByGeneration() throws {
+        func decode(_ bands: String) throws -> [ANFRZoneBandCount]? {
+            let json = #"{"operators":[{"key":"ORANGE","active":1,"bands":"# + bands + "}]}"
+            return try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(json.utf8)).operators.first?.bands
+        }
+        let grouped = try XCTUnwrap(decode(
+            #"{"2G":{"GSM900":211},"3G":{"U900":37,"U1":120},"4G":{"B20":390,"B3":392,"B28":12},"5G":{"n78":150}}"#))
+        XCTAssertEqual(ANFRZoneBandCount.sorted(grouped).map(\.band), ["GSM900", "U900", "U1", "B28", "B20", "B3", "n78"],
+                       "Par génération puis fréquence : U1 est l'UMTS 2100, B28 le 700 MHz")
+        XCTAssertEqual(grouped.first { $0.band == "U1" }?.displayName, "3G 2100")
+        XCTAssertEqual(grouped.first { $0.band == "U1" }?.spokenName, "3G 2100 MHz")
+        XCTAssertEqual(ANFRZoneBandCount(band: "X9", count: 1).displayName, "X9")
+        XCTAssertEqual(grouped.first { $0.band == "B20" }?.count, 390)
+        XCTAssertEqual(ANFRZoneBandCount.sorted(grouped).compactMap(\.generation), ["2G", "3G", "3G", "4G", "4G", "4G", "5G"])
+
+        XCTAssertEqual(try decode(#"{"5G":{"n78":4}}"#), [ANFRZoneBandCount(band: "n78", count: 4)], "Génération absente = omise")
+        XCTAssertEqual(try decode("{}"), [], "Aucune bande active")
+        XCTAssertNil(try decode(#"{"B20":7}"#), "Forme inattendue : pas de détail, pas d'erreur")
+        XCTAssertNil(try decode(#""n/a""#), "Forme inconnue : pas de détail, pas d'erreur")
+        XCTAssertNil(ANFRZoneBandCount.generation(ofBand: "X7"))
+    }
+
+    /// Tableau bandes × opérateurs : une ligne par bande vue chez au moins un opérateur,
+    /// groupée par génération puis par fréquence ; une bande absente d'un opérateur = aucun site.
+    func testZoneBandGroupsBuildOneRowPerBandAcrossOperators() throws {
+        let json = #"""
+        {"operators":[
+          {"key":"ORANGE","bands":{"4G":{"B20":38,"B3":38},"5G":{"n78":15}}},
+          {"key":"FREE","bands":{"3G":{"U1":12},"4G":{"B28":21,"B3":33}}},
+          {"key":"SFR"}
+        ]}
+        """#
+        let zone = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(json.utf8))
+        let groups = zone.bandGroups
+        XCTAssertEqual(groups.map(\.generation), ["3G", "4G", "5G"])
+        XCTAssertEqual(groups[1].rows.map(\.band.band), ["B28", "B20", "B3"])
+        XCTAssertEqual(groups[1].rows[2].counts, ["ORANGE": 38, "FREE": 33])
+        XCTAssertNil(groups[1].rows[0].counts["ORANGE"], "Bande absente chez Orange : aucun site")
+        XCTAssertEqual(groups[1].rows[1].band.frequencyLabel, "800 MHz")
+        XCTAssertEqual(zone.bandCellMax, 38)
+    }
+
+    func testZoneBarSegmentsAreProportionalToTheLargestOperatorSum() throws {
+        let big = ANFRZoneOperator(key: "A", active: 10, planned: 0, generations: ANFRZoneGenerations(g2: 0, g3: 20, g4: 60, g5: 20))
+        let small = ANFRZoneOperator(key: "B", active: 5, planned: 0, generations: ANFRZoneGenerations(g2: 0, g3: 0, g4: 25, g5: 25))
+        let empty = ANFRZoneOperator(key: "C", active: 0, planned: 0, generations: .zero)
+        let zone = ANFRZoneCompare(market: "FR", activeDefinition: "", snapshotDate: nil, snapshotSource: nil, radiusKm: 50,
+                                   totalActive: 12, totalPlanned: 0, totalByGeneration: .zero, operators: [big, small, empty])
+        XCTAssertEqual(zone.barSegments(for: big).map(\.fraction), [0, 0.2, 0.6, 0.2])
+        XCTAssertEqual(zone.barSegments(for: big).map(\.generation), ["2G", "3G", "4G", "5G"])
+        XCTAssertEqual(zone.barSegments(for: small).map(\.fraction), [0, 0, 0.25, 0.25])
+        XCTAssertEqual(zone.barSegments(for: small).map(\.count), [0, 0, 25, 25])
+        XCTAssertEqual(zone.barSegments(for: empty).map(\.fraction), [0, 0, 0, 0])
+        XCTAssertLessThanOrEqual(zone.barSegments(for: big).map(\.fraction).reduce(0, +), 1.000_001)
+
+        let none = ANFRZoneCompare(market: "FR", activeDefinition: "", snapshotDate: nil, snapshotSource: nil, radiusKm: 20,
+                                   totalActive: 0, totalPlanned: 0, totalByGeneration: .zero, operators: [empty])
+        XCTAssertEqual(none.barSegments(for: empty).map(\.fraction), [0, 0, 0, 0], "Zone vide : pas de division par zéro")
+    }
+
     private static let mapJSON = """
     {"timestamp":"2026-05-11T10:00:00.000Z","friends":[],"photos":[],"validations":[],"sessions":[],"coveragePoints":[],"speedtests":[{"id":"sp1","userId":"u1","latitude":48.85,"longitude":2.35,"averageSpeed":210,"uploadAvg":42,"pingAvg":18,"timestamp":"2026-05-11T10:00:00.000Z","networkType":"WIFI","mobileOperator":"SignalQuest"}],"photosCount":0,"validationsCount":0,"sessionsCount":0,"coveragePointsCount":0,"speedtestsCount":1,"rawCoveragePointsCount":0,"logicalCoveragePointsCount":0}
     """

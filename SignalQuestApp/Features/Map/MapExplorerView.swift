@@ -687,6 +687,9 @@ final class MapExplorerViewModel: ObservableObject {
 
     /// Le centre sert à la recherche de lieux et aux territoires DROM.
     /// Un déplacement ne déclenche ni résolution de pays ni changement du choix manuel.
+    /// Centre de la carte tel que vu en dernier.
+    var viewportCenter: CLLocationCoordinate2D? { lastCenter }
+
     func recordViewportCenter(_ center: CLLocationCoordinate2D) {
         lastCenter = center
         updateDromRegion(for: center)
@@ -1557,6 +1560,12 @@ private enum MapLocationIssue {
     }
 }
 
+/// Un point choisi par appui long sur la carte.
+private struct ZoneCompareTarget: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+}
+
 struct MapExplorerView: View {
     private struct FriendsStreamTaskKey: Hashable {
         let enabled: Bool
@@ -1636,6 +1645,8 @@ struct MapExplorerView: View {
     @State private var viewportRefreshID = 0
     @State private var seenPrivacyZoneMapRevision: UInt64 = 0
     @State private var showFilterSheet = false
+    /// Point touché longuement sur la carte : ouvre le comparatif d'opérateurs de la zone.
+    @State private var zoneCompareTarget: ZoneCompareTarget?
     /// Feuille Carte : opérateur, couches, fond, pays, légende et registre ANFR.
     @State private var showLayersSheet = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -1692,6 +1703,15 @@ struct MapExplorerView: View {
             ANFRStatsView(service: services.anfr)
         }
         .sheet(item: $selectedItem) { item in MapItemSheet(item: item) }
+        .sheet(item: $zoneCompareTarget) { target in
+            NearbyOperatorComparisonSheet(
+                metric: .download,
+                latitude: target.coordinate.latitude,
+                longitude: target.coordinate.longitude,
+                startsOnAntennas: true,
+                isChosenPoint: true
+            )
+        }
         .sheet(item: $selectedOutage) { site in
             OutageDetailSheet(site: site, operatorLabel: model.operatorLabel)
         }
@@ -2129,7 +2149,8 @@ struct MapExplorerView: View {
                 model.recordViewportCenter(region.center)
                 if changed { scheduleCurrentViewport() }
             },
-            onSelect: selectAnnotation
+            onSelect: selectAnnotation,
+            onLongPress: { coordinate in zoneCompareTarget = ZoneCompareTarget(coordinate: coordinate) }
         )
         // La carte file sous la barre de statut / Dynamic Island (comme Plans),
         // au lieu de laisser une bande systemBackground non-crème en haut (UI-09).
@@ -2817,6 +2838,8 @@ struct MapExplorerView: View {
         switch destination {
         case .map: showsANFRMap = true
         case .stats: showsANFRStats = true
+        case .zoneCompare:
+            if let center = model.viewportCenter { zoneCompareTarget = ZoneCompareTarget(coordinate: center) }
         }
     }
 

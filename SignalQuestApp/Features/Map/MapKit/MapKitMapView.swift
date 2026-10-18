@@ -51,13 +51,17 @@ struct MapKitMapView: UIViewRepresentable {
     @Binding var zoom: Double
     let onMoveEnd: (MapViewportSnapshot, MKCoordinateRegion) -> Void
     let onSelect: (MapAnnotationPayload) -> Void
+    /// Appui long sur un fond de carte (hors marqueur) : le point touché.
+    var onLongPress: ((CLLocationCoordinate2D) -> Void)? = nil
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     var backdrop: MapBackdrop { MapBackdrop.resolve(backdropRaw) }
 
     static let referenceWidth: CGFloat = 390
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(center: $center, zoom: $zoom, onMoveEnd: onMoveEnd, onSelect: onSelect)
+        let coordinator = Coordinator(center: $center, zoom: $zoom, onMoveEnd: onMoveEnd, onSelect: onSelect)
+        coordinator.onLongPress = onLongPress
+        return coordinator
     }
 
     func makeUIView(context: Context) -> SQMapKitContainerView {
@@ -92,6 +96,10 @@ struct MapKitMapView: UIViewRepresentable {
         tap.delegate = context.coordinator
         tap.cancelsTouchesInView = false
         map.addGestureRecognizer(tap)
+        let longPress = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
+        longPress.delegate = context.coordinator
+        longPress.minimumPressDuration = 0.6
+        map.addGestureRecognizer(longPress)
         context.coordinator.installSpeedtestAccessibility(on: map, in: container)
         let region = MKCoordinateRegion(center: center, span: Coordinator.span(forZoom: zoom, width: Self.referenceWidth))
         map.setRegion(region, animated: false)
@@ -103,6 +111,7 @@ struct MapKitMapView: UIViewRepresentable {
     func updateUIView(_ container: SQMapKitContainerView, context: Context) {
         let map = container.mapView
         applyOrnamentInsets(to: map)
+        context.coordinator.onLongPress = onLongPress
         context.coordinator.applyBackdrop(backdrop, on: map)
         // PERF-MAP-03 : ne resynchroniser les couches que si les données ont changé.
         // Un simple déplacement caméra (pan/zoom) réévalue `updateUIView` mais ne doit
@@ -129,6 +138,7 @@ struct MapKitMapView: UIViewRepresentable {
         @Binding var zoom: Double
         let onMoveEnd: (MapViewportSnapshot, MKCoordinateRegion) -> Void
         let onSelect: (MapAnnotationPayload) -> Void
+        var onLongPress: ((CLLocationCoordinate2D) -> Void)?
         var annotationsById: [String: SQMapKitAnnotation] = [:]
         var payloadsById: [String: MapAnnotationPayload] = [:]
         /// Horodatage du dernier déplacement reçu par ami : sert à caler la durée
@@ -428,6 +438,22 @@ struct MapKitMapView: UIViewRepresentable {
                 if d < bestDist { bestDist = d; best = f }
             }
             if let best { onSelect(speedtestPayload(from: best)) }
+        }
+
+        /// Un appui long sur le fond de carte donne le point à comparer. Sur un marqueur, la
+        /// sélection reste seule maîtresse : on ne répond qu'au fond.
+        @objc func handleLongPress(_ recognizer: UILongPressGestureRecognizer) {
+            guard recognizer.state == .began, let map = recognizer.view as? MKMapView, let onLongPress else { return }
+            let point = recognizer.location(in: map)
+            var hit = map.hitTest(point, with: nil)
+            while let view = hit {
+                if view is MKAnnotationView || view is MKCompassButton { return }
+                hit = view.superview
+            }
+            let coordinate = map.convert(point, toCoordinateFrom: map)
+            guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+            Haptics.medium()
+            onLongPress(coordinate)
         }
 
         func speedtestPayload(from speedtest: SpeedtestFeature) -> MapAnnotationPayload {

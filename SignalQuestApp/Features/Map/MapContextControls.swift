@@ -395,6 +395,11 @@ struct MapLayersSheet: View {
                         dismiss()
                     } label: { Label("Statistiques ANFR", systemImage: "chart.bar.xaxis") }
                         .accessibilityIdentifier("map.filters.anfr.stats")
+                    Button {
+                        onOpenANFR(.zoneCompare)
+                        dismiss()
+                    } label: { Label("Comparer les opérateurs ici", systemImage: "chart.bar.doc.horizontal") }
+                        .accessibilityIdentifier("map.filters.anfr.zoneCompare")
                 } label: {
                     MapSheetRow(title: String(localized: "Registre ANFR"),
                                 subtitle: String(localized: "Carte et statistiques")) {

@@ -61,6 +61,7 @@ private extension ANFRModType {
         case .activated: return 2
         case .deleted: return 4
         case .added: return 8
+        case .modified: return 16
         }
     }
 }

@@ -154,11 +154,21 @@ protocol ANFRServicing: Sendable {
     func archiveDates() async throws -> ANFRArchiveDates
     /// Les `count` dernières semaines avec leurs compteurs par type (barres de la carte).
     func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary]
+    /// Sites ANFR en service et en projet autour d'un point, par opérateur du marché
+    /// (`market` : `FR` ou `DROM`). `includeBands` ajoute le détail par bande.
+    func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
+                     market: String, includeBands: Bool) async throws -> ANFRZoneCompare
 }
 
 extension ANFRServicing {
     /// Les services qui n'affichent pas de barres n'ont rien à fournir.
     func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary] { [] }
+
+    /// Les services qui ne comparent pas les opérateurs d'une zone n'ont rien à fournir.
+    func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
+                     market: String, includeBands: Bool) async throws -> ANFRZoneCompare {
+        throw APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil)
+    }
 }
 
 final class ANFRService: ANFRServicing {
@@ -241,6 +251,29 @@ final class ANFRService: ANFRServicing {
 
     func archiveDates() async throws -> ANFRArchiveDates {
         try await api.request(APIEndpoint(path: "/api/anfr/archives"), as: ANFRArchiveDates.self)
+    }
+
+    /// Route publique : pas de cookie, pas de rafraîchissement de session. Le centre part à
+    /// trois décimales (environ 110 m) ; le serveur l'arrondit à sa propre grille.
+    static func zoneCompareEndpoint(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
+                                    market: String, includeBands: Bool) -> APIEndpoint {
+        var query = [
+            URLQueryItem(name: "lat", value: String(format: "%.3f", latitude)),
+            URLQueryItem(name: "lon", value: String(format: "%.3f", longitude)),
+            URLQueryItem(name: "radiusKm", value: String(radius.kilometers)),
+            URLQueryItem(name: "market", value: market)
+        ]
+        if includeBands { query.append(URLQueryItem(name: "bands", value: "1")) }
+        return APIEndpoint(path: "/api/anfr/zone-compare", query: query, authenticated: false)
+    }
+
+    func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
+                     market: String, includeBands: Bool) async throws -> ANFRZoneCompare {
+        try await api.request(
+            Self.zoneCompareEndpoint(latitude: latitude, longitude: longitude, radius: radius,
+                                     market: market, includeBands: includeBands),
+            as: ANFRZoneCompare.self
+        )
     }
 
     func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary] {

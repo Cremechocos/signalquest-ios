@@ -294,5 +294,36 @@ enum ANFRDemoData {
         // Construite ici, au format du contrat : un échec serait un défaut de ce fichier.
         return try! JSONDecoder.signalQuest.decode(ANFRBandStats.self, from: data)
     }
+
+    // MARK: Comparateur de zone
+
+    /// Zone de Lyon, ordre du registre FR. Les chiffres suivent le rayon (1 à 100 km).
+    static func zoneCompare(radius: ANFRZoneRadius, includeBands: Bool) -> ANFRZoneCompare {
+        // 0,22 à 20 km, 1 à 50 km, 3,1 à 100 km : la densité baisse loin de la ville.
+        let scale = pow(Double(radius.kilometers) / 50, 1.63)
+        func n(_ value: Int) -> Int { Int((Double(value) * scale).rounded()) }
+        // (clé, actifs, projets, 2G, 3G, 4G, 5G, bandes)
+        let table: [(String, Int, Int, Int, Int, Int, Int, [(String, Int)])] = [
+            ("BOUYGUES", 331, 29, 0, 18, 325, 148, [("B20", 321), ("B3", 318), ("B1", 190), ("B28", 140), ("n78", 118), ("n1", 60)]),
+            ("ORANGE", 402, 36, 211, 190, 396, 172, [("GSM900", 211), ("U900", 190), ("B20", 390), ("B3", 392), ("B7", 240), ("n78", 150), ("n28", 60)]),
+            ("FREE", 349, 44, 0, 120, 341, 205, [("U1", 120), ("B1", 330), ("B3", 335), ("B7", 150), ("B28", 210), ("n78", 190), ("n28", 95)]),
+            ("SFR", 296, 24, 0, 160, 288, 131, [("U1", 160), ("B20", 280), ("B3", 286), ("B7", 120), ("n78", 120), ("n1", 45)]),
+        ]
+        let operators = table.map { row in
+            ANFRZoneOperator(
+                key: row.0, active: n(row.1), planned: n(row.2),
+                generations: ANFRZoneGenerations(g2: n(row.3), g3: n(row.4), g4: n(row.5), g5: n(row.6)),
+                bands: includeBands ? row.7.map { ANFRZoneBandCount(band: $0.0, count: n($0.1)) } : nil
+            )
+        }
+        return ANFRZoneCompare(
+            market: "FR",
+            activeDefinition: "Sites au statut « En service » dans le relevé ANFR ; « Techniquement opérationnel » et « Projet approuvé » comptent en projet.",
+            snapshotDate: "2026-09-24", snapshotSource: "ANFR",
+            radiusKm: radius.kilometers, totalActive: n(540), totalPlanned: n(78),
+            totalByGeneration: ANFRZoneGenerations(g2: n(230), g3: n(310), g4: n(530), g5: n(300)),
+            operators: operators
+        )
+    }
 }
 #endif

@@ -73,6 +73,8 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
     case activated
     case deleted
     case added
+    /// Antenne revenue de « En service » à un statut de projet.
+    case modified
 
     var id: String { rawValue }
 
@@ -82,6 +84,7 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
         case .activated: return String(localized: "Mise en service")
         case .deleted: return String(localized: "Antenne retirée")
         case .added: return String(localized: "Antenne ajoutée")
+        case .modified: return String(localized: "Repassée en projet")
         }
     }
 
@@ -91,6 +94,7 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
         case .activated: return "checkmark"
         case .deleted: return "xmark"
         case .added: return "plus"
+        case .modified: return "arrow.uturn.backward"
         }
     }
 
@@ -100,15 +104,17 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
         case .activated: return SQColor.success
         case .deleted: return SQColor.danger
         case .added: return SQColor.label
+        case .modified: return SQColor.warning
         }
     }
 
     /// Rang de priorité pour choisir le type dominant d'un site (ordre du web).
     var priority: Int {
         switch self {
-        case .new: return 4
-        case .added: return 3
-        case .activated: return 2
+        case .new: return 5
+        case .added: return 4
+        case .activated: return 3
+        case .modified: return 2
         case .deleted: return 1
         }
     }
@@ -118,6 +124,7 @@ enum ANFRModType: String, CaseIterable, Identifiable, Sendable, Hashable {
         case "activated": return .activated
         case "deleted": return .deleted
         case "new": return .new
+        case "modified": return .modified
         default: return .added
         }
     }
@@ -600,13 +607,14 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
     let added: Int
     let activated: Int
     let deleted: Int
+    let modified: Int
     let catchUp: Int
     let total: Int
 
     var id: String { date }
 
     private enum CodingKeys: String, CodingKey { case date, counts, total }
-    private enum CountKeys: String, CodingKey { case new, added, activated, deleted, catchUp }
+    private enum CountKeys: String, CodingKey { case new, added, activated, deleted, modified, catchUp }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -616,18 +624,20 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
         added = counts?.value(Int.self, .added, 0) ?? 0
         activated = counts?.value(Int.self, .activated, 0) ?? 0
         deleted = counts?.value(Int.self, .deleted, 0) ?? 0
+        modified = counts?.value(Int.self, .modified, 0) ?? 0
         catchUp = counts?.value(Int.self, .catchUp, 0) ?? 0
-        total = c.value(Int.self, .total, new + added + activated + deleted)
+        total = c.value(Int.self, .total, new + added + activated + deleted + modified)
     }
 
-    init(date: String, new: Int, added: Int, activated: Int, deleted: Int, catchUp: Int = 0, total: Int? = nil) {
+    init(date: String, new: Int, added: Int, activated: Int, deleted: Int, modified: Int = 0, catchUp: Int = 0, total: Int? = nil) {
         self.date = date
         self.new = new
         self.added = added
         self.activated = activated
         self.deleted = deleted
+        self.modified = modified
         self.catchUp = catchUp
-        self.total = total ?? new + added + activated + deleted
+        self.total = total ?? new + added + activated + deleted + modified
     }
 
     func count(for type: ANFRModType) -> Int {
@@ -636,6 +646,7 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
         case .added: return added
         case .activated: return activated
         case .deleted: return deleted
+        case .modified: return modified
         }
     }
 }
@@ -780,5 +791,326 @@ enum ANFRText {
         var style = Date.FormatStyle(timeZone: TimeZone(identifier: "UTC") ?? .gmt).day().month(month)
         if year { style = style.year() }
         return date.formatted(style)
+    }
+}
+
+// MARK: - Comparateur d'opérateurs de zone (CMP-1)
+
+/// Rayon du comparateur (`radiusKm` de `GET /api/anfr/zone-compare`), sur l'échelle du
+/// serveur : au kilomètre de 1 à 20, puis par pas de 5 jusqu'à 100.
+struct ANFRZoneRadius: Hashable, Identifiable, Sendable {
+    let kilometers: Int
+
+    /// Ramène une valeur quelconque sur la marche la plus proche de l'échelle.
+    init(kilometers: Int) {
+        let clamped = min(max(kilometers, 1), 100)
+        self.kilometers = Self.steps.min { abs($0 - clamped) < abs($1 - clamped) } ?? clamped
+    }
+
+    static let km20 = ANFRZoneRadius(kilometers: 20)
+    static let km50 = ANFRZoneRadius(kilometers: 50)
+    static let km100 = ANFRZoneRadius(kilometers: 100)
+    /// Raccourcis proposés à côté du curseur.
+    static let presets: [ANFRZoneRadius] = [.km20, .km50, .km100]
+    static let `default`: ANFRZoneRadius = .km50
+    /// Toutes les marches : 1…20, puis 25…100.
+    static let steps: [Int] = Array(1...20) + Array(stride(from: 25, through: 100, by: 5))
+
+    var id: Int { kilometers }
+
+    /// Pas de la grille sur laquelle le serveur arrondit le centre (`radiusKm` × 0,001°) :
+    /// deux points de la même case reçoivent la même réponse, donc le même cache mémoire.
+    var gridDegrees: Double { Double(kilometers) * 0.001 }
+}
+
+/// Marchés dont l'ANFR publie les antennes : seuls ceux-là sont interrogés.
+enum ANFRZoneMarket {
+    static let supported: Set<String> = ["FR", "DROM"]
+
+    /// `FR` ou `DROM` pour un code de marché du registre, `nil` sinon.
+    static func apiCode(forMarket code: String?) -> String? {
+        guard let normalized = code?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
+              supported.contains(normalized) else { return nil }
+        return normalized
+    }
+}
+
+/// Sites distincts par génération. Une génération absente de la réponse vaut 0.
+struct ANFRZoneGenerations: Decodable, Equatable, Sendable {
+    let g2: Int
+    let g3: Int
+    let g4: Int
+    let g5: Int
+
+    static let zero = ANFRZoneGenerations(g2: 0, g3: 0, g4: 0, g5: 0)
+
+    enum CodingKeys: String, CodingKey {
+        case g2 = "2G", g3 = "3G", g4 = "4G", g5 = "5G"
+    }
+
+    init(g2: Int, g3: Int, g4: Int, g5: Int) {
+        self.g2 = g2
+        self.g3 = g3
+        self.g4 = g4
+        self.g5 = g5
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        g2 = max(c.value(Int.self, .g2, 0), 0)
+        g3 = max(c.value(Int.self, .g3, 0), 0)
+        g4 = max(c.value(Int.self, .g4, 0), 0)
+        g5 = max(c.value(Int.self, .g5, 0), 0)
+    }
+
+    /// Du plus ancien au plus récent, avec le libellé de génération.
+    var ordered: [(label: String, count: Int)] {
+        [("2G", g2), ("3G", g3), ("4G", g4), ("5G", g5)]
+    }
+
+    /// Somme des quatre compteurs : un site qui émet en 4G et en 5G y compte deux fois.
+    var sum: Int { g2 + g3 + g4 + g5 }
+}
+
+/// Sites actifs d'une bande (identifiant 3GPP : `B20`, `n78`, `GSM900`, `U1`…).
+struct ANFRZoneBandCount: Equatable, Identifiable, Sendable {
+    let band: String
+    let count: Int
+
+    var id: String { band }
+
+    /// Génération déduite de l'identifiant 3GPP ; `nil` si le préfixe est inconnu.
+    var generation: String? { Self.generation(ofBand: band) }
+
+    static func generation(ofBand band: String) -> String? {
+        let id = band.trimmingCharacters(in: .whitespaces).uppercased()
+        if id.hasPrefix("GSM") || id.hasPrefix("DCS") || id.hasPrefix("EGSM") { return "2G" }
+        guard let first = id.first, id.dropFirst().first?.isNumber == true else { return nil }
+        switch first {
+        case "U": return "3G"
+        case "B": return "4G"
+        case "N": return "5G"
+        default: return nil
+        }
+    }
+
+    /// Fréquence en MHz des identifiants du registre de bandes du serveur
+    /// (« U1 » est l'UMTS 2100, « n78 » couvre 3500 et 3700).
+    static let megahertz: [String: Int] = [
+        "GSM900": 900, "DCS1800": 1800,
+        "U900": 900, "U1": 2100,
+        "B28": 700, "B20": 800, "B8": 900, "B3": 1800, "B1": 2100, "B7": 2600,
+        "n28": 700, "n8": 900, "n3": 1800, "n1": 2100, "n7": 2600, "n78": 3500
+    ]
+
+    var megahertz: Int? { Self.megahertz[band] }
+
+    /// « 4G 800 » sur une pastille ; l'identifiant brut pour une bande hors registre.
+    var displayName: String {
+        guard let mhz = megahertz, let generation else { return band }
+        return "\(generation) \(mhz)"
+    }
+
+    /// « 800 MHz » sous l'intitulé de sa génération ; l'identifiant brut hors registre.
+    var frequencyLabel: String {
+        megahertz.map { "\($0) MHz" } ?? band
+    }
+
+    /// « 4G 800 MHz », pour VoiceOver.
+    var spokenName: String {
+        guard let mhz = megahertz, let generation else { return band }
+        return "\(generation) \(mhz) MHz"
+    }
+
+    /// De la génération la plus ancienne à la plus récente, puis par fréquence croissante.
+    static func sorted(_ bands: [ANFRZoneBandCount]) -> [ANFRZoneBandCount] {
+        func rank(_ band: ANFRZoneBandCount) -> Int {
+            ["2G": 2, "3G": 3, "4G": 4, "5G": 5][band.generation ?? ""] ?? 9
+        }
+        func number(_ band: ANFRZoneBandCount) -> Int {
+            band.megahertz ?? Int(band.band.filter(\.isNumber)) ?? 0
+        }
+        return bands.sorted { a, b in
+            (rank(a), number(a), a.band) < (rank(b), number(b), b.band)
+        }
+    }
+}
+
+/// Un opérateur du comparateur de zone. Clés absentes = 0 ; `bands` seulement avec `bands=1`.
+struct ANFRZoneOperator: Decodable, Equatable, Identifiable, Sendable {
+    let key: String
+    let active: Int
+    let planned: Int
+    let generations: ANFRZoneGenerations
+    let bands: [ANFRZoneBandCount]?
+
+    var id: String { key }
+
+    enum CodingKeys: String, CodingKey { case key, active, planned, generations, bands }
+
+    init(key: String, active: Int, planned: Int, generations: ANFRZoneGenerations, bands: [ANFRZoneBandCount]? = nil) {
+        self.key = key
+        self.active = active
+        self.planned = planned
+        self.generations = generations
+        self.bands = bands
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let rawKey = try c.decode(String.self, forKey: .key).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawKey.isEmpty else {
+            throw DecodingError.dataCorruptedError(forKey: .key, in: c, debugDescription: "empty operator key")
+        }
+        key = rawKey
+        active = max(c.value(Int.self, .active, 0), 0)
+        planned = max(c.value(Int.self, .planned, 0), 0)
+        generations = c.value(ANFRZoneGenerations.self, .generations, .zero)
+        bands = Self.decodeBands(c)
+    }
+
+    /// `{"4G": {"B20": 120, "B3": 98}, "5G": {"n78": 44}}` : sites actifs par bande, groupés par
+    /// génération ; une génération ou une bande à 0 est omise. Absente ou illisible : `nil`.
+    private static func decodeBands(_ c: KeyedDecodingContainer<CodingKeys>) -> [ANFRZoneBandCount]? {
+        guard let byGeneration = try? c.decodeIfPresent([String: [String: Int]].self, forKey: .bands) else { return nil }
+        return byGeneration.values.flatMap { bands in
+            bands.map { ANFRZoneBandCount(band: $0.key, count: max($0.value, 0)) }
+        }
+    }
+}
+
+/// `GET /api/anfr/zone-compare` : sites ANFR en service et en projet autour d'un point.
+struct ANFRZoneCompare: Decodable, Equatable, Sendable {
+    let market: String
+    /// Unité comptée (`site` : un support ANFR, quel que soit son nombre d'antennes).
+    let unit: String
+    /// Définition de « en service », affichée telle que le serveur la donne.
+    let activeDefinition: String
+    let snapshotDate: String?
+    let snapshotSource: String?
+    let radiusKm: Int
+    let totalActive: Int
+    let totalPlanned: Int
+    let totalByGeneration: ANFRZoneGenerations
+    let operators: [ANFRZoneOperator]
+    let requestId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case market, unit, activeDefinition, snapshot, radiusKm, total, totalByGeneration, operators, requestId
+    }
+
+    private struct Snapshot: Decodable {
+        let date: String?
+        let source: String?
+    }
+
+    private struct Total: Decodable {
+        let active: Int
+        let planned: Int
+
+        static let zero = Total(active: 0, planned: 0)
+
+        enum CodingKeys: String, CodingKey { case active, planned }
+        init(active: Int, planned: Int) {
+            self.active = active
+            self.planned = planned
+        }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            active = max(c.value(Int.self, .active, 0), 0)
+            planned = max(c.value(Int.self, .planned, 0), 0)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        market = c.value(String.self, .market, "")
+        unit = c.value(String.self, .unit, "site")
+        activeDefinition = c.value(String.self, .activeDefinition, "")
+        let snapshot = c.optional(Snapshot.self, .snapshot)
+        snapshotDate = snapshot?.date
+        snapshotSource = snapshot?.source
+        radiusKm = c.value(Int.self, .radiusKm, 0)
+        let total = c.value(Total.self, .total, Total.zero)
+        totalActive = total.active
+        totalPlanned = total.planned
+        totalByGeneration = c.value(ANFRZoneGenerations.self, .totalByGeneration, .zero)
+        operators = c.decodeLossyArray([ANFRZoneOperator].self, forKey: .operators)
+        requestId = c.optional(String.self, .requestId)
+    }
+
+    init(market: String, unit: String = "site", activeDefinition: String, snapshotDate: String?, snapshotSource: String?,
+         radiusKm: Int, totalActive: Int, totalPlanned: Int, totalByGeneration: ANFRZoneGenerations,
+         operators: [ANFRZoneOperator], requestId: String? = nil) {
+        self.market = market
+        self.unit = unit
+        self.activeDefinition = activeDefinition
+        self.snapshotDate = snapshotDate
+        self.snapshotSource = snapshotSource
+        self.radiusKm = radiusKm
+        self.totalActive = totalActive
+        self.totalPlanned = totalPlanned
+        self.totalByGeneration = totalByGeneration
+        self.operators = operators
+        self.requestId = requestId
+    }
+
+    /// Vrai si la réponse porte le détail par bande (`bands=1`).
+    var hasBands: Bool { operators.contains { $0.bands != nil } }
+
+    /// Une ligne du tableau des bandes : les sites actifs de chaque opérateur sur cette bande.
+    struct BandRow: Identifiable, Equatable, Sendable {
+        let band: ANFRZoneBandCount
+        /// Clé d'opérateur → sites actifs ; absent = aucun.
+        let counts: [String: Int]
+        var id: String { band.band }
+    }
+
+    struct BandGroup: Identifiable, Equatable, Sendable {
+        let generation: String
+        let rows: [BandRow]
+        var id: String { generation }
+    }
+
+    /// Tableau bandes × opérateurs, groupé de la 2G à la 5G puis par fréquence.
+    var bandGroups: [BandGroup] {
+        var counts: [String: [String: Int]] = [:]
+        for item in operators {
+            for band in item.bands ?? [] where band.count > 0 {
+                counts[band.band, default: [:]][item.key] = band.count
+            }
+        }
+        let sorted = ANFRZoneBandCount.sorted(counts.keys.map { ANFRZoneBandCount(band: $0, count: 0) })
+        var groups: [BandGroup] = []
+        for band in sorted {
+            let row = BandRow(band: band, counts: counts[band.band] ?? [:])
+            let generation = band.generation ?? "?"
+            if let last = groups.last, last.generation == generation {
+                groups[groups.count - 1] = BandGroup(generation: generation, rows: last.rows + [row])
+            } else {
+                groups.append(BandGroup(generation: generation, rows: [row]))
+            }
+        }
+        return groups
+    }
+
+    /// Plus grand nombre de sites d'une case du tableau : il fixe la densité des teintes.
+    var bandCellMax: Int {
+        operators.flatMap { $0.bands ?? [] }.map(\.count).max() ?? 0
+    }
+
+    /// Largeur de barre de chaque opérateur : part de la plus grande somme de générations de
+    /// la zone, découpée en segments 2G/3G/4G/5G. Les fractions d'un opérateur totalisent au plus 1.
+    struct BarSegment: Equatable, Sendable {
+        let generation: String
+        let count: Int
+        let fraction: Double
+    }
+
+    func barSegments(for item: ANFRZoneOperator) -> [BarSegment] {
+        let scale = max(operators.map { $0.generations.sum }.max() ?? 0, 1)
+        return item.generations.ordered.map {
+            BarSegment(generation: $0.label, count: $0.count, fraction: min(max(Double($0.count) / Double(scale), 0), 1))
+        }
     }
 }
