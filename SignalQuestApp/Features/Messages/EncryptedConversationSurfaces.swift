@@ -58,6 +58,53 @@ enum EncryptedConversationSurfaces {
         !isV2
     }
 
+    /// Transférer un message (U01) : une cible chiffrée est toujours sûre puisque l'envoi y
+    /// chiffre ; seul « chiffré vers clair » est interdit, il ferait sortir un texte lisible
+    /// d'une conversation chiffrée.
+    static func allowsForward(fromEncrypted: Bool, toEncrypted: Bool) -> Bool {
+        !fromEncrypted || toEncrypted
+    }
+
+    /// Par où le texte transféré part, selon la cible. Jamais par le presse-papiers.
+    enum ForwardRoute: Equatable {
+        /// Conversation non chiffrée : l'envoi de texte ordinaire.
+        case plain
+        /// Chiffrée v1 : `sendText` avec le service E2EE (déverrouillé).
+        case legacyEncrypted
+        /// Chiffrée v2 : la messagerie v2.
+        case v2
+        /// Chiffrée v2 mais fermée dans cette version : rien n'y part.
+        case unavailable
+    }
+
+    static func forwardRoute(toEncrypted: Bool, targetIsV2: Bool, v2Enabled: Bool) -> ForwardRoute {
+        guard toEncrypted else { return .plain }
+        guard targetIsV2 else { return .legacyEncrypted }
+        return v2Enabled ? .v2 : .unavailable
+    }
+
+    /// Ce que dit l'app quand un envoi v2 ne part pas ; `nil` quand le serveur l'a accepté.
+    /// Les messages restent gardés sur l'appareil (file durable) : le texte le dit sans promettre une heure.
+    /// `keptForRetry` : le texte reste gardé avec un bouton Renvoyer (le fil) ; sinon rien n'est gardé (le transfert).
+    static func v2SendFailureMessage(_ result: E2EEV2MessageSendResultV2, keptForRetry: Bool = true) -> String? {
+        switch result {
+        case .sent, .alreadyAccepted:
+            return nil
+        case .capabilityMissing:
+            return keptForRetry
+                ? String(localized: "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Il reste gardé ici : touche Renvoyer quand ce sera fait.")
+                : String(localized: "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Réessaie quand ce sera fait.")
+        case .membersNotTrusted:
+            return String(localized: "Un membre a un nouveau numéro de sécurité. Vérifie-le avant d’envoyer.")
+        case .needsEpoch, .needsRotation:
+            return String(localized: "La conversation chiffrée se met à jour. Réessaie dans un instant.")
+        case .failure(let failure):
+            return failure.kind == .retryable
+                ? String(localized: "Connexion instable. Réessaie.")
+                : String(localized: "Ce message chiffré n’a pas pu être envoyé.")
+        }
+    }
+
     /// L'aperçu du sélecteur d'apps est masqué tant qu'un écran montre le
     /// contenu déchiffré d'une conversation chiffrée.
     static func hidesSnapshot(of conversation: MessageConversation) -> Bool {

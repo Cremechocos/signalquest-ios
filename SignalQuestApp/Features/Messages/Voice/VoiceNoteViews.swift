@@ -108,11 +108,10 @@ struct VoiceNoteDraftBar: View {
         VStack(spacing: SQSpace.sm) {
             HStack(spacing: SQSpace.sm) {
                 Button { player.toggle(url: url) } label: {
-                    // Le toucher arrête la lecture, qui repartirait du début : pas d'icône pause.
-                    Image(systemName: player.isPlaying(url) ? "stop.fill" : "play.fill")
+                    Image(systemName: player.isPlaying(url) ? "pause.fill" : "play.fill")
                         .frame(width: 44, height: 44)
                 }
-                .accessibilityLabel(player.isPlaying(url) ? "Toucher pour arrêter la lecture" : "Toucher pour écouter")
+                .accessibilityLabel(player.isPlaying(url) ? "Mettre en pause" : (player.isActive(url) ? "Reprendre la lecture" : "Toucher pour écouter"))
                 .accessibilityIdentifier("voiceNote.preview")
 
                 Text("Note vocale")
@@ -158,16 +157,25 @@ struct VoiceNoteBubble: View {
     let duration: TimeInterval
     /// Bulle envoyée par l'utilisateur (fond brique).
     let mine: Bool
+    /// Identifiant de la pièce jointe, pour enchaîner la note suivante du fil.
+    var sequenceKey: String? = nil
 
     @ObservedObject private var player = VoiceNotePlayer.shared
 
+    private var summary: String {
+        player.isActive(url)
+            ? String(localized: "\(VoiceNotePlayer.formatted(player.elapsed)) sur \(VoiceNotePlayer.formatted(player.duration))")
+            : VoiceNotePlayer.formatted(duration)
+    }
+
     var body: some View {
+        let active = player.isActive(url)
         HStack(spacing: SQSpace.md) {
             Button {
                 Haptics.selection()
-                player.toggle(url: url)
+                player.toggle(url: url, key: sequenceKey)
             } label: {
-                Image(systemName: player.isPlaying(url) ? "stop.fill" : "play.fill")
+                Image(systemName: player.isPlaying(url) ? "pause.fill" : "play.fill")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(mine ? SQColor.label : SQColor.onAccent)
                     .frame(width: 34, height: 34)
@@ -181,28 +189,77 @@ struct VoiceNoteBubble: View {
 
             VoiceWaveform(
                 levels: levels,
-                progress: player.isPlaying(url) ? player.progress : 0,
+                progress: active ? player.progress : 0,
                 tint: mine ? SQColor.onInk : SQColor.brandRed,
                 inactive: mine ? SQColor.onInk.opacity(0.35) : SQColor.labelTertiary
             )
             .frame(height: 26)
+            // Glisser le doigt sur la forme d'onde déplace la lecture ; le geste est
+            // simultané pour ne pas bloquer le défilement vertical du fil.
+            .overlay {
+                GeometryReader { geometry in
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 8)
+                                .onChanged { value in
+                                    guard active, geometry.size.width > 0,
+                                          abs(value.translation.width) > abs(value.translation.height) else { return }
+                                    player.seek(toFraction: value.location.x / geometry.size.width)
+                                }
+                        )
+                }
+            }
 
-            Text(VoiceNotePlayer.formatted(player.isPlaying(url) ? player.duration : duration))
+            Text(VoiceNotePlayer.formatted(active ? player.elapsed : duration))
                 .font(SQType.micro)
                 .monospacedDigit()
                 .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+
+            if active {
+                Button {
+                    Haptics.selection()
+                    player.cycleRate()
+                } label: {
+                    Text(verbatim: VoiceNotePlayer.rateLabel(player.rate))
+                        .font(SQType.micro.weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(mine ? SQColor.onInk : SQColor.labelSecondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(mine ? SQColor.onInk.opacity(0.18) : SQColor.surfaceMuted, in: Capsule())
+                        // Zone tactile de 44 pt autour de la pastille.
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                        .padding(.vertical, -12)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("voiceNote.rate")
+            }
         }
         .frame(minWidth: 180)
-        // Annoncé d'un bloc : « Note vocale, 0:14 ». Balayer la forme d'onde
-        // barre par barre n'aurait aucun sens.
+        // Annoncé d'un bloc : « Note vocale, 0:07 sur 0:14 ». Balayer la forme d'onde
+        // barre par barre n'aurait aucun sens ; haut/bas avance ou recule de 10 s.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Note vocale")
-        .accessibilityValue(VoiceNotePlayer.formatted(player.isPlaying(url) ? player.duration : duration))
-        .accessibilityHint(player.isPlaying(url) ? "Toucher pour arrêter la lecture" : "Toucher pour écouter")
+        .accessibilityValue(summary)
+        .accessibilityHint(player.isPlaying(url) ? "Toucher pour mettre en pause" : (active ? "Toucher pour reprendre" : "Toucher pour écouter"))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
             Haptics.selection()
-            player.toggle(url: url)
+            player.toggle(url: url, key: sequenceKey)
+        }
+        .accessibilityAdjustableAction { direction in
+            guard active else { return }
+            switch direction {
+            case .increment: player.skip(by: 10)
+            case .decrement: player.skip(by: -10)
+            @unknown default: break
+            }
+        }
+        .accessibilityAction(named: Text("Changer la vitesse de lecture")) {
+            guard active else { return }
+            player.cycleRate()
         }
     }
 }

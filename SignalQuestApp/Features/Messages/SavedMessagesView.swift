@@ -10,6 +10,8 @@ struct SavedMessagesView: View {
     /// Conversation ouverte derrière la feuille : toucher un enregistré qui en
     /// vient ferme juste la feuille, sans rouvrir la même conversation.
     var currentConversationId: String? = nil
+    /// Message touché dans la conversation ouverte derrière la feuille : le parent y défile.
+    var onSelectMessage: ((String) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var router: AppRouter
@@ -98,12 +100,12 @@ struct SavedMessagesView: View {
             // Le message mène à sa conversation quand le serveur la renseigne.
             if let conversationId = entry.conversation?.id, !conversationId.isEmpty {
                 Button {
-                    open(conversationId)
+                    open(conversationId, messageId: message.id)
                 } label: {
                     info.contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Ouvrir la conversation")
+                .accessibilityHint("Ouvrir le message dans la conversation")
             } else {
                 info
             }
@@ -118,7 +120,7 @@ struct SavedMessagesView: View {
             }
             .buttonStyle(.plain)
             .disabled(removing.contains(message.id))
-            .accessibilityLabel("Retirer des enregistrés")
+            .accessibilityLabel(String(localized: "Retirer des enregistrés : \(snippet(message))"))
         }
         .padding(.leading, SQSpace.md)
         .padding(.trailing, SQSpace.xs)
@@ -126,11 +128,13 @@ struct SavedMessagesView: View {
         .opacity(removing.contains(message.id) ? 0.4 : 1)
     }
 
-    private func open(_ conversationId: String) {
+    private func open(_ conversationId: String, messageId: String) {
         Haptics.light()
         dismiss()
         if conversationId != currentConversationId {
-            router.route(toConversation: conversationId)
+            router.route(toConversation: conversationId, messageId: messageId)
+        } else {
+            onSelectMessage?(messageId)
         }
     }
 

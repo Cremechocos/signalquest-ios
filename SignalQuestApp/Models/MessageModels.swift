@@ -24,6 +24,9 @@ struct ConversationsResponse: Decodable {
 struct ConversationList: Sendable {
     let conversations: [MessageConversation]
     let pinLimit: Int?
+    /// Page suivante disponible côté serveur (B01) : `nextCursor` la désigne.
+    var hasMore = false
+    var nextCursor: String? = nil
 }
 
 struct MessageConversation: Decodable, Identifiable, Equatable {
@@ -1060,6 +1063,13 @@ struct ThreadPage: Decodable {
 
     enum CodingKeys: String, CodingKey { case parent, replies, page }
     enum PageKeys: String, CodingKey { case hasMore, nextCursor }
+
+    init(parent: MessageItem?, replies: [MessageItem], hasMore: Bool?, nextCursor: String?) {
+        self.parent = parent
+        self.replies = replies
+        self.hasMore = hasMore
+        self.nextCursor = nextCursor
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)

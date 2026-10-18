@@ -28,6 +28,12 @@ struct MessageComposerBar: View {
     let onLiveShare: () -> Void
     /// Photos choisies dans la photothèque (10 au plus), avec le texte déjà tapé en légende.
     let onPickPhotos: ([PhotosPickerItem], String) -> Void
+    /// Document choisi dans Fichiers, avec le texte déjà tapé en légende.
+    var onPickFile: (URL, String) -> Void = { _, _ in }
+    /// Fichier demandé dans une conversation chiffrée : le parent explique pourquoi c'est impossible.
+    var onFilesUnavailable: () -> Void = {}
+    /// ↑ dans un champ vide (clavier de l'iPad) : modifier le dernier message envoyé.
+    var onEditLast: () -> Void = {}
     /// Photo prise avec l'appareil (JPEG), avec le texte déjà tapé en légende.
     let onCapturePhoto: (Data, String) -> Void
     /// Note vocale enregistrée : fichier m4a et durée mesurée.
@@ -45,6 +51,7 @@ struct MessageComposerBar: View {
     @FocusState private var fieldFocused: Bool
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showsCamera = false
+    @State private var showsFileImporter = false
     @StateObject private var recorder = VoiceNoteRecorder()
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
@@ -147,6 +154,13 @@ struct MessageComposerBar: View {
                         Label("Partager en direct", systemImage: "dot.radiowaves.left.and.right")
                     }
                 }
+                // Documents et vidéos : par la route des pièces jointes, jamais chiffrés.
+                Button {
+                    if isE2EE { onFilesUnavailable() } else { showsFileImporter = true }
+                } label: {
+                    Label("Joindre un fichier", systemImage: "doc")
+                }
+                .disabled(isEditing)
                 Divider()
                 Toggle(isOn: $ephemeralEnabled) {
                     Label("Messages éphémères (24 h)", systemImage: "timer")
@@ -194,7 +208,7 @@ struct MessageComposerBar: View {
                         .accessibilityLabel("Prendre une photo")
                         .accessibilityIdentifier("composer.camera")
                     }
-                    PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: .images) {
+                    PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
                         Image(systemName: "paperclip")
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(SQColor.labelSecondary)
@@ -202,7 +216,7 @@ struct MessageComposerBar: View {
                             .contentShape(Rectangle())
                     }
                     .disabled(!canSend || isSending || isEditing)
-                    .accessibilityLabel("Joindre des photos")
+                    .accessibilityLabel("Joindre des photos ou des vidéos")
                 }
             }
             // Toute la capsule ouvre le clavier, pas seulement la ligne de
@@ -272,6 +286,20 @@ struct MessageComposerBar: View {
         .fullScreenCover(isPresented: $showsCamera) {
             CameraCapturePicker(isPresented: $showsCamera) { data in onCapturePhoto(data, text) }
                 .ignoresSafeArea()
+        }
+        .fileImporter(isPresented: $showsFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first { onPickFile(url, text) }
+        }
+        // ↑ dans un champ vide : modifier le dernier message. Désactivé dès qu'il y a du texte,
+        // pour que la flèche reste celle du curseur.
+        .background {
+            Button("") { onEditLast() }
+                .keyboardShortcut(.upArrow, modifiers: [])
+                .disabled(!text.isEmpty || isEditing || !canSend)
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 

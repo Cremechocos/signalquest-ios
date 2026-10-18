@@ -38,7 +38,7 @@ struct NewPollView: View {
 
     private func optionPlaceholder(for option: PollOption) -> String {
         let position = (options.firstIndex { $0.id == option.id } ?? 0) + 1
-        return "Option \(position)"
+        return String(localized: "Option \(position)")
     }
 
     private var canCreate: Bool {
@@ -106,7 +106,7 @@ struct NewPollView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Supprimer l'option \(optionPlaceholder(for: option))")
+                        .accessibilityLabel(String(localized: "Supprimer l’option \((options.firstIndex { $0.id == option.id } ?? 0) + 1)"))
                     }
                 }
                 .padding(.leading, SQSpace.md)

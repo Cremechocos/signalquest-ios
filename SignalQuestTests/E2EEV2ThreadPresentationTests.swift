@@ -50,6 +50,44 @@ final class E2EEV2ThreadPresentationTests: XCTestCase {
         XCTAssertTrue(thread.notices.isEmpty)
     }
 
+    /// P03 : seuls les derniers messages deviennent des bulles ; les plus anciens se présentent à la demande.
+    func testOnlyTheLatestMessagesArePresentedWhenAWindowIsGiven() {
+        let all = (1...5).map { index in
+            stored("ref_window_\(index)_000000000000000000000000000", sequence: Int64(index), sender: bruno.id,
+                   text: "Message \(index)", serverTimeMs: 1_790_000_000_000 + Int64(index) * 1_000)
+        }
+        let result = E2EEV2MessagesV2(snapshot: .init(cursor: 5, messages: all, equivocalRefs: []),
+                                      unsupported: [], missingByDevice: [:], waitingForEpoch: false)
+        let windowed = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [bruno.id: bruno], deviceOwners: [:], limit: 2
+        )
+        XCTAssertEqual(windowed.messages.map(\.content), ["Message 4", "Message 5"])
+        XCTAssertTrue(windowed.hasOlder)
+        XCTAssertEqual(windowed.clientRequestIds.count, 5, "Les envois déjà acceptés se reconnaissent même hors fenêtre")
+
+        let full = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [bruno.id: bruno], deviceOwners: [:], limit: 10
+        )
+        XCTAssertEqual(full.messages.count, 5)
+        XCTAssertFalse(full.hasOlder)
+    }
+
+    /// U05 : l'enveloppe du dernier message reçu sert à accuser « distribué » depuis le fil.
+    func testTheLastIncomingEnvelopeIgnoresOwnAndDeletedMessages() {
+        let incoming = stored("ref_in_00000000000000000000000000000001", sequence: 1, sender: bruno.id, text: "Salut", serverTimeMs: 1_790_000_000_000)
+        let mine = stored("ref_me_00000000000000000000000000000002", sequence: 2, sender: carla.id, text: "Coucou", serverTimeMs: 1_790_000_010_000)
+        let deleted = stored("ref_gone_0000000000000000000000000000003", sequence: 3, sender: bruno.id, text: nil,
+                             serverTimeMs: 1_790_000_020_000, editedAtMs: 1_790_000_030_000, deleted: true)
+        let result = E2EEV2MessagesV2(snapshot: .init(cursor: 3, messages: [incoming, mine, deleted], equivocalRefs: []),
+                                      unsupported: [], missingByDevice: [:], waitingForEpoch: false)
+
+        let thread = E2EEV2ThreadPresenter.present(
+            result, conversationId: conversationId, members: [:], deviceOwners: [:], ownUserId: carla.id
+        )
+        XCTAssertEqual(thread.lastIncomingEnvelopeId, incoming.envelopeId)
+        XCTAssertNil(E2EEV2ThreadPresenter.present(result, conversationId: conversationId, members: [:], deviceOwners: [:]).lastIncomingEnvelopeId)
+    }
+
     /// AF-MSG-01 : le fil v2 présenté se lit et s'écrit à l'écran. Le
     /// présentateur marque ses bulles `e2eeVersion: 2` avec le texte en clair ;
     /// l'écran les traitait comme du v1 encore chiffré (« Message chiffré »,

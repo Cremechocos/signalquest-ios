@@ -61,6 +61,36 @@ final class EncryptedConversationSurfacesTests: XCTestCase {
         defaults.removePersistentDomain(forName: "EncryptedConversationSurfacesTests.hidden")
     }
 
+    /// U01 : une cible chiffrée est toujours sûre ; seul « chiffré vers clair » est interdit.
+    func testForwardNeverTurnsAnEncryptedMessageIntoPlainText() {
+        typealias Surfaces = EncryptedConversationSurfaces
+        XCTAssertFalse(Surfaces.allowsForward(fromEncrypted: true, toEncrypted: false))
+        XCTAssertTrue(Surfaces.allowsForward(fromEncrypted: true, toEncrypted: true))
+        XCTAssertTrue(Surfaces.allowsForward(fromEncrypted: false, toEncrypted: true))
+        XCTAssertTrue(Surfaces.allowsForward(fromEncrypted: false, toEncrypted: false))
+    }
+
+    /// U01 : chaque cible reçoit le texte par son propre chemin d'envoi.
+    func testForwardRouteFollowsTheTarget() {
+        typealias Surfaces = EncryptedConversationSurfaces
+        XCTAssertEqual(Surfaces.forwardRoute(toEncrypted: false, targetIsV2: false, v2Enabled: false), .plain)
+        XCTAssertEqual(Surfaces.forwardRoute(toEncrypted: false, targetIsV2: true, v2Enabled: true), .plain)
+        XCTAssertEqual(Surfaces.forwardRoute(toEncrypted: true, targetIsV2: false, v2Enabled: true), .legacyEncrypted)
+        XCTAssertEqual(Surfaces.forwardRoute(toEncrypted: true, targetIsV2: true, v2Enabled: true), .v2)
+        XCTAssertEqual(Surfaces.forwardRoute(toEncrypted: true, targetIsV2: true, v2Enabled: false), .unavailable,
+                       "Une cible v2 fermée dans cette version ne reçoit jamais le texte en clair")
+    }
+
+    func testV2SendFailureMessageDependsOnWhetherTheTextIsKept() throws {
+        typealias Surfaces = EncryptedConversationSurfaces
+        XCTAssertNil(Surfaces.v2SendFailureMessage(.alreadyAccepted(messageRef: "ref")))
+        let kept = try XCTUnwrap(Surfaces.v2SendFailureMessage(.capabilityMissing(["u"])))
+        let notKept = try XCTUnwrap(Surfaces.v2SendFailureMessage(.capabilityMissing(["u"]), keptForRetry: false))
+        XCTAssertNotEqual(kept, notKept, "Le transfert ne garde rien : il ne promet pas de bouton Renvoyer")
+        XCTAssertNotNil(Surfaces.v2SendFailureMessage(.needsEpoch))
+        XCTAssertNotNil(Surfaces.v2SendFailureMessage(.membersNotTrusted(["u"])))
+    }
+
     private func conversation(_ id: String, encrypted: Bool) -> MessageConversation {
         MessageConversation(
             id: id, title: "Fixture", isGroup: false, e2eeEnabled: encrypted, groupPhotoUrl: nil, createdAt: nil,

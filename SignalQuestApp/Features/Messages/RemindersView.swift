@@ -111,11 +111,18 @@ struct RemindersView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Supprimer le rappel")
+            .accessibilityLabel(deleteAccessibilityLabel(for: item))
         }
         .padding(.leading, SQSpace.md)
         .padding(.trailing, SQSpace.xs)
         .padding(.vertical, SQSpace.sm2)
+    }
+
+    /// « Supprimer le rappel du 12 oct. 14:40 » : la date distingue les boutons les uns des autres.
+    private func deleteAccessibilityLabel(for item: MessageReminder) -> String {
+        guard let date = item.remindAt else { return String(localized: "Supprimer le rappel") }
+        let when = date.formatted(date: .abbreviated, time: .shortened)
+        return String(localized: "Supprimer le rappel du \(when)")
     }
 
     private func content(for item: MessageReminder) -> String {

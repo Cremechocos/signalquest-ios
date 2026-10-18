@@ -418,6 +418,9 @@ struct SQSearchField: View {
     /// restait en français dans l'app anglaise (TRX-06).
     var placeholder: String = "Rechercher"
     var onSubmit: (() -> Void)? = nil
+    /// Change de valeur pour mettre le curseur dans le champ (raccourci clavier).
+    var focusRequest: Int = 0
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: SQSpace.sm) {
@@ -427,6 +430,8 @@ struct SQSearchField: View {
                 .accessibilityHidden(true)
             TextField(LocalizedStringKey(placeholder), text: $text)
                 .font(SQType.body)
+                .focused($isFocused)
+                .onChangeCompat(of: focusRequest) { _, _ in isFocused = true }
                 .submitLabel(.search)
                 .onSubmit { onSubmit?() }
                 .foregroundStyle(SQColor.label)

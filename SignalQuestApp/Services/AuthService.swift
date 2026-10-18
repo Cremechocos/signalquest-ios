@@ -369,6 +369,7 @@ final class AuthService: AuthServicing {
             HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
             E2EEV2HiddenMessagesStore.purge(ownerScopeId: ownerScopeId)
             RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
+            PrivateImageDiskCache.purge(ownerScopeId: ownerScopeId)
             CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
@@ -405,6 +406,7 @@ final class AuthService: AuthServicing {
             HiddenStoryAuthorsStore.purge(ownerScopeId: ownerScopeId)
             E2EEV2HiddenMessagesStore.purge(ownerScopeId: ownerScopeId)
             RecentlyViewedStore.purge(ownerScopeId: ownerScopeId)
+            PrivateImageDiskCache.purge(ownerScopeId: ownerScopeId)
             CallConversationDirectory.shared.purge(ownerScopeId: ownerScopeId)
         }
         LocalAccountScope.deactivate()
@@ -436,6 +438,7 @@ final class AuthService: AuthServicing {
             HiddenStoryAuthorsStore.purge(ownerScopeId: previousScope)
             E2EEV2HiddenMessagesStore.purge(ownerScopeId: previousScope)
             RecentlyViewedStore.purge(ownerScopeId: previousScope)
+            PrivateImageDiskCache.purge(ownerScopeId: previousScope)
             CarPlayDestinationStore.reset()
             Task { await MessageDraftStore.shared.purge(ownerScopeId: previousScope) }
         }

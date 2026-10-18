@@ -279,6 +279,22 @@
         }
       }
     },
+    "%@ sur %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ of %2$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sur %@"
+          }
+        }
+      }
+    },
     "%@ sur 30 j" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1124,6 +1140,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld ne répond plus"
+          }
+        }
+      }
+    },
+    "%lld nouveaux messages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld new messages"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld nouveaux messages"
           }
         }
       }
@@ -2245,6 +2277,22 @@
         }
       }
     },
+    "1 nouveau message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 new message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 nouveau message"
+          }
+        }
+      }
+    },
     "1 panne" : {
       "localizations" : {
         "en" : {
@@ -2755,6 +2803,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annuler l’envoi"
+          }
+        }
+      }
+    },
+    "Annuler l’envoi du %@ : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel the message scheduled for %@: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler l’envoi du %@ : %@"
           }
         }
       }
@@ -3741,6 +3805,38 @@
         }
       }
     },
+    "Ce fichier dépasse 10 Mo." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file is larger than 10 MB."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier dépasse 10 Mo."
+          }
+        }
+      }
+    },
+    "Ce fichier est illisible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file can’t be read."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier est illisible."
+          }
+        }
+      }
+    },
     "Ce lien mène hors de SignalQuest, vers %@." : {
       "localizations" : {
         "en" : {
@@ -3999,6 +4095,38 @@
         }
       }
     },
+    "Cette vidéo dépasse 10 Mo. Choisis-en une plus courte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video is larger than 10 MB. Pick a shorter one."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette vidéo dépasse 10 Mo. Choisis-en une plus courte."
+          }
+        }
+      }
+    },
+    "Cette vidéo est illisible." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video can’t be read."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette vidéo est illisible."
+          }
+        }
+      }
+    },
     "Change de segment ou de filtres pour voir les autres signalements." : {
       "localizations" : {
         "en" : {
@@ -4075,6 +4203,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changements de la semaine"
+          }
+        }
+      }
+    },
+    "Changer la vitesse de lecture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change playback speed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer la vitesse de lecture"
           }
         }
       }
@@ -4171,6 +4315,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chargement du relevé du %@…"
+          }
+        }
+      }
+    },
+    "Chargement d’autres conversations" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading more conversations"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement d’autres conversations"
+          }
+        }
+      }
+    },
+    "Chargement d’autres médias" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading more media"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement d’autres médias"
           }
         }
       }
@@ -4921,6 +5097,22 @@
         }
       }
     },
+    "Dans 1 h" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In 1 h"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans 1 h"
+          }
+        }
+      }
+    },
     "Dans cette zone" : {
       "localizations" : {
         "en" : {
@@ -4933,6 +5125,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dans cette zone"
+          }
+        }
+      }
+    },
+    "Dans les messages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In messages"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans les messages"
           }
         }
       }
@@ -5368,6 +5576,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En France, le secteur se déduit du PCI. Ton choix ici est indicatif."
+          }
+        }
+      }
+    },
+    "En attente de connexion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for connection"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente de connexion"
           }
         }
       }
@@ -6066,6 +6290,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Haut-parleur"
+          }
+        }
+      }
+    },
+    "Hors connexion : tes messages partiront au retour du réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’re offline: your messages will be sent when the network is back."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors connexion : tes messages partiront au retour du réseau."
           }
         }
       }
@@ -6907,6 +7147,38 @@
         }
       }
     },
+    "Joindre des photos ou des vidéos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attach photos or videos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joindre des photos ou des vidéos"
+          }
+        }
+      }
+    },
+    "Joindre un fichier" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attach a file"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joindre un fichier"
+          }
+        }
+      }
+    },
     "Joint au signalement" : {
       "localizations" : {
         "en" : {
@@ -7554,6 +7826,22 @@
         }
       }
     },
+    "Le texte d’un envoi chiffré ne se modifie pas : seule l’heure change." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The text of an encrypted scheduled message can’t be edited: only the time changes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le texte d’un envoi chiffré ne se modifie pas : seule l’heure change."
+          }
+        }
+      }
+    },
     "Le transfert ne vise que les conversations non chiffrées." : {
       "localizations" : {
         "en" : {
@@ -7650,6 +7938,22 @@
         }
       }
     },
+    "Les conversations chiffrées ne sont pas incluses : leurs messages ne se lisent que sur ton téléphone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted conversations aren’t included: their messages can only be read on your phone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les conversations chiffrées ne sont pas incluses : leurs messages ne se lisent que sur ton téléphone."
+          }
+        }
+      }
+    },
     "Les erreurs que tu as signalées sur une fiche d’antenne, et les réponses de l’équipe." : {
       "localizations" : {
         "en" : {
@@ -7662,6 +7966,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les erreurs que tu as signalées sur une fiche d’antenne, et les réponses de l’équipe."
+          }
+        }
+      }
+    },
+    "Les fichiers et les vidéos ne sont pas encore disponibles dans une conversation chiffrée : seul le texte l’est." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Files and videos aren’t available in an encrypted conversation yet: only text is."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les fichiers et les vidéos ne sont pas encore disponibles dans une conversation chiffrée : seul le texte l’est."
           }
         }
       }
@@ -8616,6 +8936,22 @@
         }
       }
     },
+    "Mettre en pause" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettre en pause"
+          }
+        }
+      }
+    },
     "Micro" : {
       "localizations" : {
         "en" : {
@@ -8708,6 +9044,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modifier l’adresse"
+          }
+        }
+      }
+    },
+    "Modifier l’envoi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit scheduled message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier l’envoi"
           }
         }
       }
@@ -9019,6 +9371,22 @@
         }
       }
     },
+    "Option %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Option %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Option %lld"
+          }
+        }
+      }
+    },
     "Oui, en 5G aussi." : {
       "localizations" : {
         "en" : {
@@ -9223,6 +9591,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir le graphique en plein écran"
+          }
+        }
+      }
+    },
+    "Ouvrir le message dans la conversation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the message in the conversation"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir le message dans la conversation"
           }
         }
       }
@@ -9518,6 +9902,22 @@
         }
       }
     },
+    "Photo en cours d’envoi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo en cours d’envoi"
+          }
+        }
+      }
+    },
     "Photo illisible" : {
       "localizations" : {
         "en" : {
@@ -9530,6 +9930,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Photo illisible"
+          }
+        }
+      }
+    },
+    "Photo indisponible. Réessaie avec du réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo unavailable. Try again with a network connection."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo indisponible. Réessaie avec du réseau."
+          }
+        }
+      }
+    },
+    "Photo non envoyée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo not sent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo non envoyée"
           }
         }
       }
@@ -10433,6 +10865,22 @@
         }
       }
     },
+    "Reprendre la lecture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resume playback"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprendre la lecture"
+          }
+        }
+      }
+    },
     "Restauration terminée : %lld clé(s) restaurée(s), %lld indisponible(s)." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10462,6 +10910,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer cet abonné ?"
+          }
+        }
+      }
+    },
+    "Retirer des enregistrés : %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from saved: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer des enregistrés : %@"
           }
         }
       }
@@ -10735,6 +11199,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réponse de l'équipe"
+          }
+        }
+      }
+    },
+    "Réponse non envoyée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply not sent"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse non envoyée"
           }
         }
       }
@@ -11647,6 +12127,22 @@
         }
       }
     },
+    "Supprimer le rappel du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete the reminder for %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le rappel du %@"
+          }
+        }
+      }
+    },
     "Supprimer le signalement" : {
       "localizations" : {
         "en" : {
@@ -11659,6 +12155,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer le signalement"
+          }
+        }
+      }
+    },
+    "Supprimer l’option %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete option %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer l’option %lld"
           }
         }
       }
@@ -11787,6 +12299,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ta position et ton réseau, en continu, dans %@."
+          }
+        }
+      }
+    },
+    "Ta réponse n’a pas pu être envoyée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your reply couldn’t be sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta réponse n’a pas pu être envoyée."
+          }
+        }
+      }
+    },
+    "Ta réponse à %@ n’a pas pu être envoyée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your reply to %@ couldn’t be sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta réponse à %@ n’a pas pu être envoyée."
           }
         }
       }
@@ -12385,6 +12929,38 @@
         }
       }
     },
+    "Toucher pour mettre en pause" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to pause"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toucher pour mettre en pause"
+          }
+        }
+      }
+    },
+    "Toucher pour reprendre" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to resume"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toucher pour reprendre"
+          }
+        }
+      }
+    },
     "Tous les signalements de l'app iPhone, d'Android et du site. Seule l'équipe voit cet espace." : {
       "localizations" : {
         "en" : {
@@ -12676,6 +13252,22 @@
         }
       }
     },
+    "Tu n’as pas d’autre conversation où transférer ce message." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You have no other conversation to forward this message to."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu n’as pas d’autre conversation où transférer ce message."
+          }
+        }
+      }
+    },
     "Tu peux confirmer avec la 168 ?" : {
       "localizations" : {
         "en" : {
@@ -12774,6 +13366,54 @@
         }
       }
     },
+    "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Il reste gardé ici : touche Renvoyer quand ce sera fait." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member needs to update SignalQuest to receive this message. It stays saved here: tap Resend once they have."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Il reste gardé ici : touche Renvoyer quand ce sera fait."
+          }
+        }
+      }
+    },
+    "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Réessaie quand ce sera fait." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A member needs to update SignalQuest to receive this message. Try again once they have."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Réessaie quand ce sera fait."
+          }
+        }
+      }
+    },
+    "Un message chiffré ne se transfère que vers une autre conversation chiffrée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An encrypted message can only be forwarded to another encrypted conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un message chiffré ne se transfère que vers une autre conversation chiffrée."
+          }
+        }
+      }
+    },
     "Un pylône partagé compte une fois par opérateur." : {
       "localizations" : {
         "en" : {
@@ -12834,6 +13474,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un site après l’autre, tu t’arrêtes quand tu veux."
+          }
+        }
+      }
+    },
+    "Une conversation chiffrée n’accepte que du texte : ni photo, ni fichier, ni vocal, ni sondage, ni réaction." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An encrypted conversation only accepts text: no photos, files, voice notes, polls or reactions."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une conversation chiffrée n’accepte que du texte : ni photo, ni fichier, ni vocal, ni sondage, ni réaction."
           }
         }
       }
@@ -13053,6 +13709,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vidéo"
+          }
+        }
+      }
+    },
+    "Vidéo indisponible. Réessaie avec du réseau." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video unavailable. Try again with a network connection."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vidéo indisponible. Réessaie avec du réseau."
           }
         }
       }
@@ -14477,6 +15149,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Échantillon : %lld affichées sur %lld"
+          }
+        }
+      }
+    },
+    "Échec d’envoi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending failed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec d’envoi"
           }
         }
       }

@@ -20,10 +20,29 @@ actor MessageDraftStore {
         let updatedAtMs: Int64
     }
 
+    /// Texte d'une conversation chiffrée v2 pas encore accepté par le serveur (B02). Il est
+    /// gardé ici, scellé comme un brouillon, pour être rejoué sous le MÊME identifiant :
+    /// l'enveloppe déjà signée repart alors à l'octet, jamais deux signatures pour un message.
+    /// Effacé dès l'accusé du serveur, ou par « Supprimer ».
+    struct PendingV2Send: Codable, Equatable, Sendable {
+        let clientRequestId: String
+        let conversationId: String
+        let isGroup: Bool
+        let participantIds: [String]
+        let text: String
+        let replyToRef: String?
+        let ttlSeconds: Int
+        let createdAtMs: Int64
+    }
+
     private struct DraftFile: Codable {
         var version = 1
         var drafts: [String: Draft] = [:]
+        /// Absent des fichiers plus anciens.
+        var v2Outbox: [PendingV2Send]? = nil
     }
+    /// Au-delà, les plus anciens tombent : une file jamais vidée ne grossit pas.
+    static let maxPendingV2Sends = 50
 
     private static let folderName = "MessageDraftsV1"
     private static let keyService = "fr.signalquest.ios.message-drafts"
@@ -80,6 +99,35 @@ actor MessageDraftStore {
         Self.announce()
     }
 
+    /// Garde un texte v2 à rejouer ; le même identifiant remplace l'entrée existante.
+    func stageV2Send(_ send: PendingV2Send, ownerScopeId: String) throws {
+        var file = (try? read(ownerScopeId: ownerScopeId)) ?? DraftFile()
+        var outbox = (file.v2Outbox ?? []).filter { $0.clientRequestId != send.clientRequestId }
+        outbox.append(send)
+        if outbox.count > Self.maxPendingV2Sends {
+            outbox = Array(outbox.sorted { $0.createdAtMs < $1.createdAtMs }.suffix(Self.maxPendingV2Sends))
+        }
+        file.v2Outbox = outbox
+        try write(file, ownerScopeId: ownerScopeId)
+    }
+
+    /// Textes v2 restés à envoyer, du plus ancien au plus récent ; ceux d'une seule
+    /// conversation si `conversationId` est donné.
+    func pendingV2Sends(ownerScopeId: String, conversationId: String? = nil) -> [PendingV2Send] {
+        let outbox = (try? read(ownerScopeId: ownerScopeId))?.v2Outbox ?? []
+        return outbox
+            .filter { conversationId == nil || $0.conversationId == conversationId }
+            .sorted { $0.createdAtMs < $1.createdAtMs }
+    }
+
+    /// Accepté par le serveur, ou abandonné par l'utilisateur.
+    func removeV2Send(clientRequestId: String, ownerScopeId: String) {
+        guard var file = try? read(ownerScopeId: ownerScopeId),
+              let outbox = file.v2Outbox, outbox.contains(where: { $0.clientRequestId == clientRequestId }) else { return }
+        file.v2Outbox = outbox.filter { $0.clientRequestId != clientRequestId }
+        try? write(file, ownerScopeId: ownerScopeId)
+    }
+
     /// À la déconnexion : le fichier et sa clé partent avec le compte.
     func purge(ownerScopeId: String) {
         let directory = ownerDirectory(ownerScopeId)
@@ -107,7 +155,7 @@ actor MessageDraftStore {
 
     private func write(_ file: DraftFile, ownerScopeId: String) throws {
         let fileURL = encryptedFileURL(ownerScopeId: ownerScopeId)
-        if file.drafts.isEmpty {
+        if file.drafts.isEmpty && (file.v2Outbox ?? []).isEmpty {
             if fileManager.fileExists(atPath: fileURL.path) {
                 try fileManager.removeItem(at: fileURL)
             }

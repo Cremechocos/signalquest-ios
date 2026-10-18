@@ -14,10 +14,14 @@ struct PollBubble: View {
 
     /// La clôture est définitive : elle se confirme avant de partir.
     @State private var confirmsClose = false
+    /// Horloge du rendu : avancée à l'échéance du sondage, sans quoi un sondage qui
+    /// expire sous les yeux resterait votable jusqu'au prochain rendu (B11).
+    @State private var now = Date()
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var totalVotes: Int { max(1, poll.totalVotes) }
     /// POLL-UX-01 : un sondage dont l'échéance est dépassée est traité comme clos.
-    private var isExpired: Bool { poll.endsAt.map { $0 < Date() } ?? false }
+    private var isExpired: Bool { poll.endsAt.map { $0 < now } ?? false }
     private var effectivelyClosed: Bool { poll.isClosed || isExpired }
 
     var body: some View {
@@ -76,7 +80,14 @@ struct PollBubble: View {
                 }
             }
         }
-        .frame(maxWidth: 280, alignment: .leading)
+        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : 280, alignment: .leading)
+        .task(id: poll.endsAt) {
+            now = Date()
+            guard let endsAt = poll.endsAt, endsAt > now else { return }
+            // Une seconde de marge : le réveil ne tombe jamais avant l'échéance.
+            try? await Task.sleep(nanoseconds: UInt64(endsAt.timeIntervalSince(now) * 1_000_000_000) + 1_000_000_000)
+            if !Task.isCancelled { now = Date() }
+        }
     }
 
     private var metaLine: String {
@@ -113,7 +124,7 @@ struct PollBubble: View {
                     Text(option.text.isEmpty ? option.id : option.text)
                         .font(SQType.caption.weight(votedByMe ? .semibold : .regular))
                         .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     Spacer(minLength: SQSpace.sm)
                     Text("\(option.count)")
                         .font(SQType.caption.weight(.semibold))

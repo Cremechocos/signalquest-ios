@@ -39,6 +39,53 @@ final class MessageDraftStoreTests: XCTestCase {
         XCTAssertNil(other)
     }
 
+    private func pendingV2(_ id: String, conversation: String = "c1", createdAtMs: Int64 = 1_790_000_000_000) -> MessageDraftStore.PendingV2Send {
+        .init(clientRequestId: id, conversationId: conversation, isGroup: false, participantIds: ["a", "b"],
+              text: "Texte secret \(id)", replyToRef: nil, ttlSeconds: 0, createdAtMs: createdAtMs)
+    }
+
+    /// B02 : un texte chiffré v2 refusé reste gardé, scellé, par compte, et se retire à l'accusé.
+    func testPendingV2SendsAreSealedIsolatedAndRemovedOnceAccepted() async throws {
+        let root = temporaryRoot()
+        let keys = InMemoryTokenStore()
+        let store = MessageDraftStore(rootURL: root, keyStore: keys)
+        try await store.stageV2Send(pendingV2("req-1"), ownerScopeId: alice)
+        try await store.stageV2Send(pendingV2("req-2", conversation: "c2"), ownerScopeId: alice)
+        try await store.stageV2Send(pendingV2("req-1"), ownerScopeId: alice)
+
+        let file = try XCTUnwrap(draftFiles(in: root).first)
+        XCTAssertFalse(String(decoding: try Data(contentsOf: file), as: UTF8.self).contains("Texte secret"))
+
+        let relaunched = MessageDraftStore(rootURL: root, keyStore: keys)
+        let all = await relaunched.pendingV2Sends(ownerScopeId: alice)
+        XCTAssertEqual(all.map(\.clientRequestId).sorted(), ["req-1", "req-2"], "Le même identifiant ne se range qu'une fois")
+        let inC2 = await relaunched.pendingV2Sends(ownerScopeId: alice, conversationId: "c2")
+        XCTAssertEqual(inC2.map(\.clientRequestId), ["req-2"])
+        let others = await relaunched.pendingV2Sends(ownerScopeId: bruno)
+        XCTAssertTrue(others.isEmpty)
+
+        await relaunched.removeV2Send(clientRequestId: "req-1", ownerScopeId: alice)
+        await relaunched.removeV2Send(clientRequestId: "req-2", ownerScopeId: alice)
+        let left = await relaunched.pendingV2Sends(ownerScopeId: alice)
+        XCTAssertTrue(left.isEmpty)
+        XCTAssertTrue(draftFiles(in: root).isEmpty, "Plus rien à garder : le fichier disparaît")
+    }
+
+    func testPendingV2SendsKeepTheMostRecentOnesAndDieWithTheAccountPurge() async throws {
+        let store = MessageDraftStore(rootURL: temporaryRoot(), keyStore: InMemoryTokenStore())
+        for index in 0..<(MessageDraftStore.maxPendingV2Sends + 3) {
+            try await store.stageV2Send(pendingV2("req-\(index)", createdAtMs: 1_790_000_000_000 + Int64(index)), ownerScopeId: alice)
+        }
+        let kept = await store.pendingV2Sends(ownerScopeId: alice)
+        XCTAssertEqual(kept.count, MessageDraftStore.maxPendingV2Sends)
+        XCTAssertFalse(kept.contains { $0.clientRequestId == "req-0" })
+        XCTAssertTrue(kept.contains { $0.clientRequestId == "req-\(MessageDraftStore.maxPendingV2Sends + 2)" })
+
+        await store.purge(ownerScopeId: alice)
+        let afterPurge = await store.pendingV2Sends(ownerScopeId: alice)
+        XCTAssertTrue(afterPurge.isEmpty)
+    }
+
     func testBlankTextRemovesTheDraftAndTheFile() async throws {
         let root = temporaryRoot()
         let store = MessageDraftStore(rootURL: root, keyStore: InMemoryTokenStore())

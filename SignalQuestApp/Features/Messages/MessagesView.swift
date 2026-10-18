@@ -12,6 +12,15 @@ final class MessagesViewModel: ObservableObject {
     @Published var decryptedPreviews: [String: String] = [:]
     /// Limite d'épinglage du compte (P2-46), quand le serveur la sert.
     @Published var pinLimit: Int?
+    /// D'autres conversations existent côté serveur au-delà de celles chargées (B01).
+    @Published private(set) var hasMoreConversations = false
+    @Published private(set) var isLoadingMore = false
+    private var nextCursor: String?
+    /// Pages déjà chargées : une relecture périodique les refait toutes, sinon elle
+    /// ferait disparaître les plus anciennes que l'on vient de faire défiler.
+    private var loadedPages = 1
+    static let pageSize = 50
+    static let maxPages = 40
 
     /// « Épingler » ne se propose plus une fois la limite atteinte.
     var canPinMore: Bool {
@@ -37,13 +46,48 @@ final class MessagesViewModel: ObservableObject {
             try? await Task.sleep(for: .seconds(4))
         }
         do {
-            let list = try await service.conversationList()
-            conversations = list.conversations.inDisplayOrder()
-            pinLimit = list.pinLimit
+            let first = try await service.conversationPage(cursor: nil, take: Self.pageSize)
+            var all = first.conversations
+            var seen = Set(all.map(\.id))
+            var last = first
+            var pages = 1
+            // Relit les pages déjà défilées ; une page qui échoue garde ce qui précède.
+            while pages < loadedPages, last.hasMore, let cursor = last.nextCursor {
+                guard let page = try? await service.conversationPage(cursor: cursor, take: Self.pageSize) else { break }
+                all += page.conversations.filter { seen.insert($0.id).inserted }
+                last = page
+                pages += 1
+            }
+            loadedPages = pages
+            conversations = all.inDisplayOrder()
+            pinLimit = first.pinLimit
+            hasMoreConversations = last.hasMore && last.nextCursor != nil
+            nextCursor = last.nextCursor
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
+    }
+
+    /// Une conversation hors des pages chargées (notification, lien) : elle est
+    /// lue seule et ajoutée à la liste, pour pouvoir être ouverte (B01).
+    func ensureLoaded(id: String) async {
+        guard !conversations.contains(where: { $0.id == id }),
+              let conversation = try? await service.conversation(id: id) else { return }
+        conversations = (conversations + [conversation]).inDisplayOrder()
+    }
+
+    /// Page suivante de la liste, au défilement en bas (B01).
+    func loadMore() async {
+        guard hasMoreConversations, !isLoadingMore, loadedPages < Self.maxPages, let cursor = nextCursor else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        guard let page = try? await service.conversationPage(cursor: cursor, take: Self.pageSize) else { return }
+        let known = Set(conversations.map(\.id))
+        conversations = (conversations + page.conversations.filter { !known.contains($0.id) }).inDisplayOrder()
+        loadedPages += 1
+        hasMoreConversations = page.hasMore && page.nextCursor != nil && loadedPages < Self.maxPages
+        nextCursor = page.nextCursor
     }
 
     /// Déchiffre les aperçus des derniers messages des conversations E2EE une
@@ -158,6 +202,7 @@ struct MessagesView: View {
     @EnvironmentObject private var session: AuthSessionViewModel
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
+    @EnvironmentObject private var networkPath: NetworkPathMonitor
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
@@ -184,6 +229,11 @@ struct MessagesView: View {
     /// Recherche et filtre de la liste, appliqués sur l'appareil.
     @State private var query = ""
     @State private var filter: InboxFilter = .all
+    /// Recherche dans le texte des messages (hors conversations chiffrées, lisibles seulement ici).
+    @State private var messageHits: [MessageSearchResult] = []
+    @State private var messageSearchTask: Task<Void, Never>?
+    @State private var routedFocusMessageId: String?
+    @State private var searchFocusRequest = 0
 
     enum InboxFilter: String, CaseIterable {
         case all, unread, groups
@@ -258,6 +308,10 @@ struct MessagesView: View {
         List {
             VStack(alignment: .leading, spacing: SQSpace.md) {
                 header
+                if !networkPath.isOnline {
+                    MessagesOfflineBanner()
+                        .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                }
                 if needsV2Activation {
                     v2ActivationCard
                 }
@@ -266,7 +320,11 @@ struct MessagesView: View {
                 }
                 if !model.conversations.isEmpty {
                     // Aux tailles d'accessibilité, l'intitulé long ne tient pas sur une ligne.
-                    SQSearchField(text: $query, placeholder: dynamicTypeSize.isAccessibilitySize ? "Rechercher" : "Rechercher une conversation")
+                    SQSearchField(
+                        text: $query,
+                        placeholder: dynamicTypeSize.isAccessibilitySize ? "Rechercher" : "Rechercher une conversation",
+                        focusRequest: searchFocusRequest
+                    )
                         .accessibilityIdentifier("messages.search")
                     filterChips
                 }
@@ -345,7 +403,26 @@ struct MessagesView: View {
                     }
                 }
             }
-            if !model.conversations.isEmpty && visible.isEmpty {
+            if !messageHits.isEmpty {
+                messageResultsSection
+            }
+            if model.hasMoreConversations {
+                // Page suivante au défilement ; la tâche repart à chaque page reçue,
+                // de sorte qu'un filtre encore vide continue de chercher (B01).
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .padding(.vertical, SQSpace.md)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Chargement d’autres conversations")
+                .accessibilityIdentifier("messages.loadingMore")
+                .task(id: model.conversations.count) { await model.loadMore() }
+            }
+            if !model.conversations.isEmpty && visible.isEmpty && !model.hasMoreConversations {
                 Text("Aucune conversation ne correspond.")
                     .font(SQType.callout)
                     .foregroundStyle(SQColor.labelSecondary)
@@ -415,7 +492,7 @@ struct MessagesView: View {
             Task {
                 await model.load()
                 await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
-                await services.refreshInboxBadge(force: true)
+                await services.applyLoadedInbox(model.conversations, isComplete: !model.hasMoreConversations)
             }
         }
         // Pas de flux au niveau de la boîte : la liste se relit toutes les ~15 s
@@ -428,7 +505,7 @@ struct MessagesView: View {
                 guard !Task.isCancelled else { break }
                 await model.load()
                 await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
-                await services.refreshInboxBadge(force: true)
+                await services.applyLoadedInbox(model.conversations, isComplete: !model.hasMoreConversations)
             }
         }
         // Au retour d'une conversation : la liste restait figée jusqu'au
@@ -438,7 +515,7 @@ struct MessagesView: View {
             Task {
                 await model.load()
                 await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
-                await services.refreshInboxBadge(force: true)
+                await services.applyLoadedInbox(model.conversations, isComplete: !model.hasMoreConversations)
             }
         }
         .refreshable {
@@ -486,8 +563,24 @@ struct MessagesView: View {
         }
         .navigationDestinationItemCompat($routedConversationId) { id in
             if let conversation = model.conversations.first(where: { $0.id == id }) {
-                ConversationDetailView(conversation: conversation, service: service, e2ee: e2ee)
+                ConversationDetailView(
+                    conversation: conversation, service: service, e2ee: e2ee,
+                    focusMessageId: routedFocusMessageId
+                )
             }
+        }
+        .onChangeCompat(of: routedConversationId) { _, id in
+            if id == nil { routedFocusMessageId = nil }
+        }
+        .onChangeCompat(of: query) { _, _ in scheduleMessageSearch() }
+        // ⌘F : le curseur va dans la recherche de la liste.
+        .background {
+            Button("") { searchFocusRequest += 1 }
+                .keyboardShortcut("f", modifiers: .command)
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
         .onChangeCompat(of: router.openConversationId) { _, _ in
             Task { await openRoutedConversationIfNeeded() }
@@ -533,6 +626,7 @@ struct MessagesView: View {
                 onOpenExisting: { id in
                     Task {
                         if !model.conversations.contains(where: { $0.id == id }) { await model.load() }
+                        await model.ensureLoaded(id: id)
                         routedConversationId = id
                     }
                 },
@@ -580,13 +674,17 @@ struct MessagesView: View {
     private func openRoutedConversationIfNeeded() async {
         guard let id = router.openConversationId else { return }
         router.openConversationId = nil
+        let focusId = router.openMessageId
+        router.openMessageId = nil
         // Recharger si la liste est vide OU si le fil ciblé n'y est pas encore : le
         // cas fréquent d'une notification pour un NOUVEAU fil (premier message d'un
         // nouveau contact) échouait sinon en silence (UXP-10).
         if model.conversations.isEmpty || !model.conversations.contains(where: { $0.id == id }) {
             await model.load()
         }
+        await model.ensureLoaded(id: id)
         if model.conversations.contains(where: { $0.id == id }) {
+            routedFocusMessageId = focusId
             routedConversationId = id
         } else if router.pendingCall?.conversationId == id {
             // Conversation introuvable : le rappel demandé ne part jamais plus tard.
@@ -673,6 +771,92 @@ struct MessagesView: View {
             .padding(.horizontal, SQSpace.xl)
         }
         .padding(.horizontal, -SQSpace.xl)
+    }
+
+    /// Recherche dans le texte des messages, après une courte pause de frappe. Le mot cherché part
+    /// au serveur pour les conversations ordinaires ; les conversations chiffrées n'y sont pas
+    /// incluses (leur texte ne se lit que sur l'appareil, et la liste n'en garde que l'aperçu).
+    private func scheduleMessageSearch() {
+        messageSearchTask?.cancel()
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard needle.count >= 3, !AppEnvironment.usesDemoData else {
+            messageHits = []
+            return
+        }
+        messageSearchTask = Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+            let found = (try? await service.searchMessages(query: needle, filters: .empty, take: 20)) ?? []
+            guard !Task.isCancelled else { return }
+            messageHits = found.filter {
+                !$0.message.isEncrypted && $0.message.deletedAt == nil && $0.conversation?.id.isEmpty == false
+            }
+        }
+    }
+
+    private var messageResultsSection: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            Text("Dans les messages")
+                .sqKicker()
+                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 0) {
+                ForEach(messageHits) { hit in
+                    if hit.id != messageHits.first?.id { Divider().padding(.leading, SQSpace.md) }
+                    messageHitRow(hit)
+                }
+            }
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            Text("Les conversations chiffrées ne sont pas incluses : leurs messages ne se lisent que sur ton téléphone.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .listRowInsets(cardRowInsets)
+        .accessibilityIdentifier("messages.searchResults")
+    }
+
+    private func messageHitRow(_ hit: MessageSearchResult) -> some View {
+        let message = hit.message
+        let title = hit.conversation?.title.flatMap { $0.isEmpty ? nil : $0 }
+            ?? message.sender?.displayName ?? String(localized: "Conversation")
+        return Button {
+            guard let conversationId = hit.conversation?.id else { return }
+            Task {
+                await model.ensureLoaded(id: conversationId)
+                guard model.conversations.contains(where: { $0.id == conversationId }) else { return }
+                routedFocusMessageId = message.id
+                routedConversationId = conversationId
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(SQType.caption.weight(.bold))
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
+                    Spacer(minLength: SQSpace.sm)
+                    if let date = message.createdAt {
+                        Text(date.formatted(date: .abbreviated, time: .shortened))
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+                Text(message.content ?? "")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm2)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
     }
 
     /// Conversations après le filtre et la recherche (titre, puis aperçu).
@@ -981,7 +1165,7 @@ private struct NewConversationSheet: View {
                     // La limite se dit AVANT de créer : on la découvrait au premier
                     // envoi de photo refusé (SOC-07).
                     if e2ee {
-                        Text("Une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage.")
+                        Text("Une conversation chiffrée n’accepte que du texte : ni photo, ni fichier, ni vocal, ni sondage, ni réaction.")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)

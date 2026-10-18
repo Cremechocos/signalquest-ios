@@ -118,6 +118,41 @@ final class VoiceNoteTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "Le parent possède désormais le fichier")
     }
 
+    func testPlaybackRateCyclesThroughOneOnePointFiveAndTwo() {
+        XCTAssertEqual(VoiceNotePlayer.rates, [1, 1.5, 2])
+        XCTAssertEqual(VoiceNotePlayer.nextRate(after: 1), 1.5)
+        XCTAssertEqual(VoiceNotePlayer.nextRate(after: 1.5), 2)
+        XCTAssertEqual(VoiceNotePlayer.nextRate(after: 2), 1)
+        XCTAssertEqual(VoiceNotePlayer.nextRate(after: 0.75), 1, "Une valeur inconnue revient à la vitesse normale")
+        XCTAssertEqual(VoiceNotePlayer.rateLabel(2), "2×")
+        XCTAssertTrue(VoiceNotePlayer.rateLabel(1.5).hasPrefix("1"))
+        XCTAssertTrue(VoiceNotePlayer.rateLabel(1.5).hasSuffix("5×"))
+    }
+
+    func testSeekingStaysInsideTheNote() {
+        XCTAssertEqual(VoiceNotePlayer.clampedTime(fraction: 0.5, duration: 30), 15)
+        XCTAssertEqual(VoiceNotePlayer.clampedTime(fraction: -0.4, duration: 30), 0)
+        XCTAssertEqual(VoiceNotePlayer.clampedTime(fraction: 3, duration: 30), 30)
+        XCTAssertEqual(VoiceNotePlayer.clampedTime(fraction: .nan, duration: 30), 0)
+        XCTAssertEqual(VoiceNotePlayer.clampedTime(fraction: 0.5, duration: 0), 0)
+    }
+
+    func testChainingOnlyFollowsDirectlyAdjacentReceivedNotes() throws {
+        func item(_ key: String, incoming: Bool = true, follows: Bool = true) throws -> VoiceNotePlayer.SequenceItem {
+            .init(key: key, remoteURL: try XCTUnwrap(URL(string: "https://cdn.example/\(key).m4a")), incoming: incoming, followsPrevious: follows)
+        }
+        let sequence = [
+            try item("a", follows: false), try item("b"), try item("mine", incoming: false),
+            try item("c", follows: false), try item("d"), try item("e")
+        ]
+        XCTAssertEqual(VoiceNotePlayer.nextToChain(after: "a", in: sequence)?.key, "b")
+        XCTAssertNil(VoiceNotePlayer.nextToChain(after: "b", in: sequence), "Une note envoyée par soi ne s'enchaîne pas")
+        XCTAssertNil(VoiceNotePlayer.nextToChain(after: "mine", in: sequence))
+        XCTAssertNil(VoiceNotePlayer.nextToChain(after: "c", in: Array(sequence.prefix(4))), "Rien après la dernière note")
+        XCTAssertEqual(VoiceNotePlayer.nextToChain(after: "d", in: sequence)?.key, "e")
+        XCTAssertNil(VoiceNotePlayer.nextToChain(after: "unknown", in: sequence))
+    }
+
     @MainActor
     func testDeletingFinishedDraftRemovesItsFile() throws {
         let url = FileManager.default.temporaryDirectory

@@ -301,7 +301,8 @@ struct AppRootView: View {
                 case .active:
                     // Les routes venues de l'extérieur vont à cette fenêtre.
                     services.routing.activate(windowRouter)
-                    UNUserNotificationCenter.current().setBadgeCountCompat(0)
+                    // Badge de l'icône : le nombre de conversations non lues connu, et non 0 (M16).
+                    services.syncIconBadge()
                     // Verrouillage / déconnexion par inactivité au retour au 1er plan.
                     var locksOut = false
                     if case .authenticated = session.state, appLock.willEnterForeground() {
@@ -333,6 +334,11 @@ struct AppRootView: View {
                         }
                     }
                 case .background:
+                    // Badge de l'icône recalculé à la mise en arrière-plan (M16).
+                    services.syncIconBadge()
+                    if case .authenticated = session.state {
+                        Task { await services.refreshInboxBadge(force: true) }
+                    }
                     // On ne coupe QUE si plus aucune fenêtre n'est visible.
                     // `scenePhase` est par scène, mais `appLock` et `services`
                     // sont uniques au process : depuis que plusieurs scènes

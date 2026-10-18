@@ -51,6 +51,13 @@ final class ConversationMentionsAndMediaTests: XCTestCase {
         XCTAssertEqual(query["limit"], "10")
     }
 
+    func testAttachmentSizeLimitIsTheServersTenMebibytes() {
+        XCTAssertTrue(MessageAttachmentOutboxStore.fits(1))
+        XCTAssertTrue(MessageAttachmentOutboxStore.fits(10 * 1_024 * 1_024))
+        XCTAssertFalse(MessageAttachmentOutboxStore.fits(10 * 1_024 * 1_024 + 1))
+        XCTAssertFalse(MessageAttachmentOutboxStore.fits(0), "Un fichier vide ne part pas")
+    }
+
     func testMediaGalleryTellsPhotosFromFiles() throws {
         let decoder = JSONDecoder()
         func attachment(_ json: String) throws -> MessageAttachment {

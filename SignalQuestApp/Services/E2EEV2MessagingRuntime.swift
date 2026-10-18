@@ -387,7 +387,7 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
 
     /// Relève la conversation, puis la présente : messages sous la forme
     /// commune, avis à poser dans le fil (identité changée, messages manquants…).
-    func thread(conversationId: String, isGroup: Bool, participants: [ConversationParticipant]) async -> ThreadResult {
+    func thread(conversationId: String, isGroup: Bool, participants: [ConversationParticipant], limit: Int? = nil) async -> ThreadResult {
         guard readsEnabled else { return .failure(Self.closed) }
         guard let parts = current() else { return .failure(Self.noSession) }
         let participantIds = participants.map(\.userId)
@@ -417,7 +417,9 @@ final class E2EEV2MessagingRuntime: @unchecked Sendable {
             )
             return .thread(E2EEV2ThreadPresenter.present(
                 result, conversationId: conversationId, members: members, deviceOwners: owners,
-                refusals: used.refusals.filter { participantIds.contains($0.key) }
+                refusals: used.refusals.filter { participantIds.contains($0.key) },
+                ownUserId: LocalAccountScope.currentUserId,
+                limit: limit
             ))
         }
     }

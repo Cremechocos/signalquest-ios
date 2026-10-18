@@ -842,10 +842,12 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         // conversation (§2.6) ; l'écran ouvert sur une conversation v2 se relève.
         if Self.string(info, "type")?.lowercased() == "e2ee_v2_envelope" {
             NotificationCenter.default.post(name: Self.e2eeV2EnvelopeReceived, object: nil)
+            Task { @MainActor in await AppServicesHolder.services.refreshInboxBadge(force: true) }
         }
         // Message v1 reçu app ouverte : la liste des conversations se recharge.
         if Self.string(info, "type")?.lowercased().hasPrefix("message_") == true {
             NotificationCenter.default.post(name: Self.inboxMessageReceived, object: nil)
+            Task { @MainActor in await AppServicesHolder.services.refreshInboxBadge(force: true) }
         }
         // La conversation est déjà à l'écran : ni bannière ni son pour elle,
         // la synchro l'affiche déjà (SOC-24).
@@ -937,7 +939,7 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
                     bugId: bugId,
                     anfrFocus: anfrFocus
                 )
-                UNUserNotificationCenter.current().setBadgeCountCompat(0)
+                AppServicesHolder.services.syncIconBadge()
             }
             completion()
             Task { @MainActor in await AppServicesHolder.services.refreshNotificationBadge(force: true) }
@@ -963,7 +965,18 @@ extension PushNotificationService {
             let conversation = (try? await messages.conversation(id: conversationId))
                 ?? MessageConversation.replyTarget(id: conversationId)
             guard conversation.e2eeEnabled != true else { return }
-            _ = try? await messages.sendText(text, in: conversation, replyToId: nil, e2ee: nil, idempotencyKey: nil, ttlSeconds: 0)
+            do {
+                _ = try await messages.sendText(text, in: conversation, replyToId: nil, e2ee: nil, idempotencyKey: nil, ttlSeconds: 0)
+            } catch where error.isPermanentRequestFailure {
+                // Refus définitif (exclu du groupe, conversation supprimée) : rien ne repartira,
+                // et l'écran verrouillé ne dit pas que la réponse est perdue (U04).
+                await Self.postReplyFailureNotice(
+                    conversationId: conversationId,
+                    conversationTitle: conversation.displayTitle(excluding: LocalAccountScope.currentUserId)
+                )
+            } catch {
+                // Réseau ou serveur : la file d'envoi reprend la réponse plus tard.
+            }
         }
         // Répondre vaut lecture, comme dans les messageries courantes.
         if let messageId {
@@ -973,6 +986,32 @@ extension PushNotificationService {
             try? await messages.markReadToLatest(conversationId: conversationId)
         }
         await AppServicesHolder.services.refreshInboxBadge(force: true)
+    }
+}
+
+extension PushNotificationService {
+    /// Contenu du rappel local « Ta réponse n'a pas pu être envoyée » ; il mène au fil
+    /// comme une notification de message.
+    nonisolated static func replyFailureContent(conversationId: String, conversationTitle: String?) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "Réponse non envoyée")
+        if let title = conversationTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+            content.body = String(localized: "Ta réponse à \(title) n’a pas pu être envoyée.")
+        } else {
+            content.body = String(localized: "Ta réponse n’a pas pu être envoyée.")
+        }
+        content.userInfo = ["type": "message_new", "conversationId": conversationId]
+        content.sound = .default
+        return content
+    }
+
+    private static func postReplyFailureNotice(conversationId: String, conversationTitle: String?) async {
+        let request = UNNotificationRequest(
+            identifier: "reply-failure-\(conversationId)",
+            content: replyFailureContent(conversationId: conversationId, conversationTitle: conversationTitle),
+            trigger: nil
+        )
+        try? await UNUserNotificationCenter.current().add(request)
     }
 }
 

@@ -47,6 +47,19 @@ struct E2EEV2ThreadPresentation: Equatable {
 
     let messages: [MessageItem]
     let notices: [Notice]
+    /// Enveloppe du dernier message d'un autre membre : de quoi accuser « distribué »
+    /// depuis le fil (U05), sans toucher à `MessageItem` dont l'identifiant est le `messageRef`.
+    var lastIncomingEnvelopeId: String? = nil
+    /// Identifiants de requête des messages déjà acceptés : une bulle locale « non envoyé »
+    /// qui y figure est déjà partie (B02).
+    var clientRequestIds: Set<String> = []
+    /// Des messages plus anciens existent dans le magasin local mais ne sont pas présentés.
+    var hasOlder: Bool = false
+}
+
+/// Taille de la fenêtre du fil v2 : les derniers messages d'abord, puis des pages de même taille.
+enum E2EEV2ThreadWindow {
+    static let pageSize = 200
 }
 
 enum E2EEV2ThreadPresenter {
@@ -59,9 +72,14 @@ enum E2EEV2ThreadPresenter {
         conversationId: String,
         members: [String: MessageUser],
         deviceOwners: [String: String],
-        refusals: [String: E2EEV2IdentityVerification.Failure] = [:]
+        refusals: [String: E2EEV2IdentityVerification.Failure] = [:],
+        ownUserId: String? = nil,
+        limit: Int? = nil
     ) -> E2EEV2ThreadPresentation {
-        let messages = result.snapshot.messages.map { stored in
+        // Le magasin garde jusqu'à des milliers de messages : seuls les derniers deviennent des
+        // `MessageItem`, les précédents se présentent par pages (P03).
+        let shown = limit.map { Array(result.snapshot.messages.suffix($0)) } ?? result.snapshot.messages
+        let messages = shown.map { stored in
             MessageItem(
                 id: stored.messageRef,
                 conversationId: conversationId,
@@ -105,7 +123,15 @@ enum E2EEV2ThreadPresenter {
             notices.append(.missing(senderName: userId.flatMap { members[$0]?.displayName }, count: count))
         }
         if !result.unsupported.isEmpty { notices.append(.unsupported(count: result.unsupported.count)) }
-        return E2EEV2ThreadPresentation(messages: messages, notices: notices)
+        let lastIncoming = ownUserId.flatMap { own in
+            result.snapshot.messages.last { $0.senderUserId != own && !$0.deleted }?.envelopeId
+        }
+        return E2EEV2ThreadPresentation(
+            messages: messages, notices: notices,
+            lastIncomingEnvelopeId: lastIncoming,
+            clientRequestIds: Set(result.snapshot.messages.map(\.clientRequestId)),
+            hasOlder: shown.count < result.snapshot.messages.count
+        )
     }
 
     private static func date(_ milliseconds: Int64) -> Date {

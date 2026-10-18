@@ -216,6 +216,15 @@ struct SendTimePicker: View {
     let label: LocalizedStringKey
     @Binding var date: Date
     @State private var showsCalendar = false
+    /// Échéance « Dans 1 h » : celle des feuilles à l'ouverture, pour qu'un préréglage
+    /// soit sélectionné d'emblée plutôt que « Autre… ».
+    @State private var inOneHour: Date
+
+    init(label: LocalizedStringKey, date: Binding<Date>) {
+        self.label = label
+        _date = date
+        _inOneHour = State(initialValue: date.wrappedValue)
+    }
 
     private struct Preset: Hashable {
         let title: String
@@ -227,6 +236,9 @@ struct SendTimePicker: View {
         let now = Date()
         func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }
         var list: [Preset] = []
+        if inOneHour > now.addingTimeInterval(60) {
+            list.append(Preset(title: String(localized: "Dans 1 h"), date: inOneHour))
+        }
         if let tonight = calendar.date(bySettingHour: 20, minute: 0, second: 0, of: now), tonight > now.addingTimeInterval(60) {
             list.append(Preset(title: String(localized: "Ce soir \(time(tonight))"), date: tonight))
         }
@@ -258,7 +270,13 @@ struct SendTimePicker: View {
                             selectedFill: SQColor.label,
                             selectedInk: SQColor.onInk
                         ) {
-                            date = preset.date
+                            // « Dans 1 h » se recalcule au toucher : il reste une heure devant.
+                            if preset.date == inOneHour {
+                                inOneHour = Date().addingTimeInterval(3600)
+                                date = inOneHour
+                            } else {
+                                date = preset.date
+                            }
                             showsCalendar = false
                         }
                     }

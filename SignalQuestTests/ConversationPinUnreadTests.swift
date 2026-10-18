@@ -250,14 +250,17 @@ final class ConversationPinUnreadTests: XCTestCase {
     }
 
     /// Un seul accusé par message, jamais d'id local, et un échec (route absente) reste silencieux.
-    func testDeliveryAcknowledgerSendsEachMessageOnceAndSwallowsFailures() async throws {
+    /// B08 : un accusé accepté n'est pas renvoyé ; un accusé refusé (réseau, serveur) n'est pas
+    /// mémorisé, le passage suivant le rejoue. Un message local n'est jamais accusé.
+    func testDeliveryAcknowledgerSendsEachAcceptedMessageOnceAndRetriesFailures() async throws {
         var bodies: [String] = []
+        var status = 200
         MockURLProtocol.requestHandler = { request in
             let body = (try? JSONSerialization.jsonObject(with: Self.requestBody(request) ?? Data())) as? [String: Any] ?? [:]
             bodies.append("\(request.url?.path ?? "")|\(body["messageId"] as? String ?? "")")
-            let response = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil,
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
                                            headerFields: ["Content-Type": "application/json"])!
-            return (response, Data(#"{"error":"NOT_FOUND"}"#.utf8))
+            return (response, Data(status == 200 ? #"{"ok":true}"#.utf8 : #"{"error":"NOT_FOUND"}"#.utf8))
         }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
@@ -267,6 +270,9 @@ final class ConversationPinUnreadTests: XCTestCase {
         let service = MessagesService(api: api)
         let acknowledger = DeliveryAcknowledger()
 
+        status = 404
+        await acknowledger.acknowledge(conversationId: "c1", messageId: "m1", using: service)
+        status = 200
         await acknowledger.acknowledge(conversationId: "c1", messageId: "m1", using: service)
         await acknowledger.acknowledge(conversationId: "c1", messageId: "m1", using: service)
         await acknowledger.acknowledge(conversationId: "c1", messageId: "local-1", using: service)
@@ -274,6 +280,7 @@ final class ConversationPinUnreadTests: XCTestCase {
         await acknowledger.acknowledge(conversationId: "c1", messageId: "m2", using: service)
 
         XCTAssertEqual(bodies, [
+            "/api/messages/conversations/c1/delivered|m1",
             "/api/messages/conversations/c1/delivered|m1",
             "/api/messages/conversations/c2/delivered|m1",
             "/api/messages/conversations/c1/delivered|m2"
@@ -293,6 +300,95 @@ final class ConversationPinUnreadTests: XCTestCase {
         let acks = DeliveryAcknowledger.latestIncoming(in: list, currentUserId: "me")
         XCTAssertEqual(acks.map { "\($0.0)=\($0.1)" }, ["a=m-a", "d=envelope_7"])
         XCTAssertTrue(DeliveryAcknowledger.latestIncoming(in: list, currentUserId: nil).isEmpty)
+    }
+
+    // MARK: Messagerie, seconde passe (B01, B04, M05, M16)
+
+    private func makeService(token: String) throws -> MessagesService {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken(token)
+        return MessagesService(api: APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration)))
+    }
+
+    private func json(_ request: URLRequest, _ body: String) -> (HTTPURLResponse, Data) {
+        (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
+         Data(body.utf8))
+    }
+
+    private func queryValue(_ request: URLRequest, _ name: String) -> String? {
+        URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == name }?.value
+    }
+
+    /// B01 : la liste suivait une seule page ; elle suit le curseur jusqu'à la dernière, sans doublon.
+    func testConversationListFollowsTheCursorUntilTheLastPage() async throws {
+        var cursors: [String?] = []
+        MockURLProtocol.requestHandler = { [self] request in
+            let cursor = queryValue(request, "cursor")
+            cursors.append(cursor)
+            return json(request, cursor == nil
+                ? #"{"conversations":[{"id":"c1","isGroup":false,"participants":[]}],"hasMore":true,"nextCursor":"page-2"}"#
+                : #"{"conversations":[{"id":"c2","isGroup":false,"participants":[]},{"id":"c1","isGroup":false,"participants":[]}],"hasMore":false}"#)
+        }
+        let all = try await makeService(token: "pages-access-token").conversations()
+
+        XCTAssertEqual(all.map(\.id), ["c1", "c2"])
+        XCTAssertEqual(cursors, [nil, "page-2"])
+    }
+
+    /// B04 : toutes les réponses d'un fil, page par page, au lieu de la première seulement.
+    func testThreadRepliesAreReadPageByPage() async throws {
+        func reply(_ id: String) -> String {
+            #"{"id":"\#(id)","conversationId":"c1","senderId":"u1","kind":"TEXT","content":"réponse","createdAt":"2026-10-01T10:00:00.000Z"}"#
+        }
+        var cursors: [String?] = []
+        MockURLProtocol.requestHandler = { [self] request in
+            let cursor = queryValue(request, "cursor")
+            cursors.append(cursor)
+            return json(request, cursor == nil
+                ? #"{"replies":[\#(reply("r1")),\#(reply("r2"))],"page":{"hasMore":true,"nextCursor":"after-r2"}}"#
+                : #"{"replies":[\#(reply("r3"))],"page":{"hasMore":false}}"#)
+        }
+        let page = try await makeService(token: "thread-access-token").allThreadReplies(parentMessageId: "parent-1", pageSize: 2)
+
+        XCTAssertEqual(page.replies.map(\.id), ["r1", "r2", "r3"])
+        XCTAssertEqual(cursors, [nil, "after-r2"])
+        XCTAssertEqual(page.hasMore, false)
+    }
+
+    /// M05 : le repère « N nouveaux messages » se pose sur le premier message reçu après la dernière lecture.
+    func testUnreadDividerStartsAtTheFirstIncomingMessageAfterTheLastRead() {
+        let read = Date(timeIntervalSince1970: 1_790_000_000)
+        func message(_ id: String, from sender: String, after seconds: TimeInterval, deleted: Bool = false) -> MessageItem {
+            MessageItem(
+                id: id, conversationId: "c1", senderId: sender, kind: "TEXT", content: "x",
+                e2eeVersion: nil, e2eeIvB64: nil, e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil,
+                createdAt: read.addingTimeInterval(seconds), editedAt: nil,
+                deletedAt: deleted ? read.addingTimeInterval(seconds) : nil, replyToId: nil, threadReplyCount: 0,
+                sender: nil, attachments: [], reactions: []
+            )
+        }
+        let thread = [
+            message("old", from: "other", after: -60),
+            message("mine", from: "me", after: 5),
+            message("new-1", from: "other", after: 10),
+            message("gone", from: "other", after: 15, deleted: true),
+            message("local-pending", from: "other", after: 20),
+            message("new-2", from: "other", after: 30)
+        ]
+
+        let divider = UnreadDivider.make(messages: thread, lastReadAt: read, currentUserId: "me")
+        XCTAssertEqual(divider, UnreadDivider(messageId: "new-1", count: 2))
+        XCTAssertNil(UnreadDivider.make(messages: thread, lastReadAt: nil, currentUserId: "me"), "Sans date de lecture, tout paraîtrait nouveau")
+        XCTAssertNil(UnreadDivider.make(messages: Array(thread.prefix(2)), lastReadAt: read, currentUserId: "me"))
+    }
+
+    /// M16 : le badge de l'icône compte les conversations non lues du compte connecté, 0 sans session.
+    func testIconBadgeCountsUnreadConversationsOfTheSignedInAccount() {
+        XCTAssertEqual(AppServices.iconBadgeCount(unreadConversations: 3, isSignedIn: true), 3)
+        XCTAssertEqual(AppServices.iconBadgeCount(unreadConversations: 3, isSignedIn: false), 0)
+        XCTAssertEqual(AppServices.iconBadgeCount(unreadConversations: -2, isSignedIn: true), 0)
     }
 
     private func conversation(

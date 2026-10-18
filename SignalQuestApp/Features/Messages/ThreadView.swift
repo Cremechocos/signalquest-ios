@@ -8,6 +8,9 @@ struct ThreadView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
     let e2ee: E2EEServicing?
+    /// Change quand la conversation reçoit un événement du serveur : le fil se relit
+    /// alors, sans attendre sa réouverture (B04).
+    var refreshToken = 0
 
     @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.dismiss) private var dismiss
@@ -22,6 +25,8 @@ struct ThreadView: View {
     /// Échec d'envoi d'une réponse : dit près du champ, le brouillon reste.
     @State private var sendError: String?
     @State private var decrypted: [String: String] = [:]
+    /// Réponses envoyées depuis cet écran : gardées jusqu'à ce que le serveur les rende.
+    @State private var sentHere: Set<String> = []
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
 
@@ -78,6 +83,9 @@ struct ThreadView: View {
         }
         .sqSheet(background: SQColor.bg)
         .task { await load() }
+        .onChangeCompat(of: refreshToken) { _, _ in
+            Task { await load() }
+        }
     }
 
     // MARK: Sections
@@ -199,17 +207,22 @@ struct ThreadView: View {
 
     // MARK: Données
 
+    /// Relit tout le fil, page par page : au-delà de 80 réponses, les plus anciennes
+    /// restaient hors d'atteinte (B04). Une relecture en direct ne remplace pas le fil
+    /// affiché par un spinner, et un échec n'efface pas ce qui est déjà là.
     private func load() async {
-        isLoading = true
+        isLoading = replies.isEmpty
         defer { isLoading = false }
         do {
-            let page = try await service.thread(parentMessageId: parentMessage.id, take: 80, cursor: nil)
+            let page = try await service.allThreadReplies(parentMessageId: parentMessage.id)
             parent = page.parent ?? parentMessage
-            replies = page.replies
+            // Une réponse envoyée à l'instant et pas encore relue ne disparaît pas.
+            let known = Set(page.replies.map(\.id))
+            replies = page.replies + replies.filter { !known.contains($0.id) && $0.createdAt != nil && sentHere.contains($0.id) }
             errorMessage = nil
             await decryptAll()
         } catch {
-            errorMessage = error.userFacingMessage
+            if replies.isEmpty { errorMessage = error.userFacingMessage }
         }
     }
 
@@ -223,6 +236,7 @@ struct ThreadView: View {
             let sent = try await service.sendThreadReply(parentMessageId: parentMessage.id, text: text, in: conversation, e2ee: e2ee)
             if sent.isEncrypted { decrypted[sent.id] = text }
             replies.append(sent)
+            sentHere.insert(sent.id)
             draft = ""
             Haptics.success()
         } catch {

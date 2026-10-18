@@ -4,6 +4,7 @@ import CoreLocation
 // scènes (CarPlay, fenêtres iPad), le cycle de vie ne peut plus se déduire du
 // seul `scenePhase` d'une vue. Voir « Cycle de vie de la scène » plus bas.
 import UIKit
+import UserNotifications
 
 /// État de présentation du badge Messages, borné à la session authentifiée qui
 /// a lancé son rafraîchissement. Une réponse de A ne peut ainsi jamais publier
@@ -155,6 +156,7 @@ final class AppServices: ObservableObject {
             { [weak self] in await self?.feed.retryPendingPosts() },
             { [weak self] in await self?.messages.retryPendingTextMessages() },
             { [weak self] in await self?.messages.retryPendingAttachments() },
+            { [weak self] in await self?.retryPendingV2Sends() },
             { [weak self] in await self?.customSites.retryPending() },
             { [weak self] in await self?.bugReports.retryPending() },
         ])
@@ -279,6 +281,19 @@ final class AppServices: ObservableObject {
     func refreshInboxBadge(force: Bool = false) async {
         guard let ticket = inboxBadgeState.beginRefresh(force: force) else { return }
         guard let conversations = try? await messages.conversations() else { return }
+        applyInbox(conversations, ticket: ticket)
+    }
+
+    /// La liste des conversations vient de lire le serveur : le badge s'en déduit sans
+    /// refaire le même appel (P02). Une liste incomplète (pages restantes) retombe
+    /// sur la lecture complète, qui suit les curseurs.
+    func applyLoadedInbox(_ conversations: [MessageConversation], isComplete: Bool) async {
+        guard isComplete else { return await refreshInboxBadge(force: true) }
+        guard let ticket = inboxBadgeState.beginRefresh(force: true) else { return }
+        applyInbox(conversations, ticket: ticket)
+    }
+
+    private func applyInbox(_ conversations: [MessageConversation], ticket: InboxBadgePresentationState.RefreshTicket) {
         // Même règle que la liste : son propre dernier message ne compte pas.
         let userId = LocalAccountScope.currentUserId
         let unread = conversations.filter { $0.isUnread(currentUserId: userId) }.count
@@ -286,6 +301,51 @@ final class AppServices: ObservableObject {
         Task { await deliveryAcks.acknowledgeLatest(of: conversations, currentUserId: userId, using: messages) }
         guard inboxBadgeState.publish(unreadCount: unread, for: ticket) else { return }
         unreadConversations = inboxBadgeState.unreadCount
+        syncIconBadge()
+    }
+
+    /// Au-delà, l'enveloppe signée gardée par la messagerie v2 a expiré : le texte n'est plus rejoué.
+    nonisolated static let pendingV2MaxAgeMs: Int64 = 7 * 24 * 3_600 * 1_000
+
+    /// Rejoue les textes chiffrés v2 restés dans la file durable (B02), sous leur identifiant
+    /// d'origine : l'enveloppe déjà signée repart telle quelle, jamais deux signatures pour un
+    /// message. Un texte accepté (ou déjà accepté) quitte la file ; les autres issues le gardent.
+    func retryPendingV2Sends(store: MessageDraftStore = .shared, now: Date = Date()) async {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              e2eeV2Messaging.writesEnabled else { return }
+        let nowMs = Int64(now.timeIntervalSince1970 * 1_000)
+        for pending in await store.pendingV2Sends(ownerScopeId: session.ownerScopeId) {
+            guard session.isCurrent else { return }
+            if nowMs - pending.createdAtMs > Self.pendingV2MaxAgeMs {
+                await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: session.ownerScopeId)
+                continue
+            }
+            let result = await e2eeV2Messaging.send(
+                .init(body: .text(pending.text), replyToRef: pending.replyToRef, mentions: [], ttlSeconds: pending.ttlSeconds),
+                clientRequestId: pending.clientRequestId, conversationId: pending.conversationId,
+                isGroup: pending.isGroup, participantIds: pending.participantIds
+            )
+            switch result {
+            case .sent, .alreadyAccepted:
+                await store.removeV2Send(clientRequestId: pending.clientRequestId, ownerScopeId: session.ownerScopeId)
+            default:
+                break
+            }
+        }
+    }
+
+    /// Valeur du badge de l'icône : les conversations non lues du compte connecté,
+    /// 0 sans session (M16).
+    nonisolated static func iconBadgeCount(unreadConversations: Int, isSignedIn: Bool) -> Int {
+        isSignedIn ? max(0, unreadConversations) : 0
+    }
+
+    /// Recale le badge de l'icône sur le nombre de conversations non lues connu, au
+    /// lieu de le remettre à 0 à chaque activation (M16).
+    func syncIconBadge() {
+        UNUserNotificationCenter.current().setBadgeCountCompat(
+            Self.iconBadgeCount(unreadConversations: unreadConversations, isSignedIn: LocalAccountScope.sessionSnapshot() != nil)
+        )
     }
 
     func refreshNotificationBadge(force: Bool = false) async {

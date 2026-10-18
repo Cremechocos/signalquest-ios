@@ -40,6 +40,8 @@ final class AppRouter: ObservableObject {
     @Published var selectedTab: AppTab
     /// Set to request opening a specific conversation on the Messages tab.
     @Published var openConversationId: String?
+    /// Message sur lequel s'ouvre `openConversationId` (messages enregistrés).
+    @Published var openMessageId: String?
     /// Ouvre la boîte Messages dans l'onglet Communauté, même sans conversation ciblée.
     @Published var openMessagesInbox = false
     /// Set to request opening a specific post on the Feed tab.
@@ -360,6 +362,11 @@ final class AppRouter: ObservableObject {
         selectedTab = .community
         openMessagesInbox = true
         if let id { openConversationId = id }
+    }
+
+    func route(toConversation id: String?, messageId: String?) {
+        if id != nil { openMessageId = messageId }
+        route(toConversation: id)
     }
 
     func route(toCallBack conversationId: String, video: Bool) {

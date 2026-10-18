@@ -71,6 +71,19 @@ final class MessageNotificationCategoryTests: XCTestCase {
         XCTAssertEqual(encrypted.actions.map(\.identifier), [MessageNotificationCategory.markReadAction])
     }
 
+    /// U04 : une réponse refusée par le serveur prévient, et le toucher mène au fil.
+    func testFailedReplyNoticeNamesTheConversationAndOpensIt() {
+        let named = PushNotificationService.replyFailureContent(conversationId: "conv-1", conversationTitle: "Camille")
+        XCTAssertEqual(named.userInfo["type"] as? String, "message_new")
+        XCTAssertEqual(named.userInfo["conversationId"] as? String, "conv-1")
+        XCTAssertTrue(named.body.contains("Camille"))
+
+        let anonymous = PushNotificationService.replyFailureContent(conversationId: "conv-1", conversationTitle: "  ")
+        XCTAssertFalse(anonymous.body.isEmpty)
+        XCTAssertNotEqual(anonymous.body, named.body)
+        XCTAssertEqual(anonymous.userInfo["conversationId"] as? String, "conv-1")
+    }
+
     func testOfflineReplyTargetIsAPlainConversation() {
         let target = MessageConversation.replyTarget(id: "c1")
         XCTAssertEqual(target.id, "c1")

@@ -6,6 +6,28 @@ import XCTest
 /// forme d'onde tirées du fichier.
 final class VoiceNoteCacheTests: XCTestCase {
 
+    /// P04 : au-delà du plafond, les notes les plus anciennes partent, jamais celle qu'on vient d'écrire.
+    func testTrimDropsTheOldestNotesAndKeepsTheOneJustWritten() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("voice-trim-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        func write(_ name: String, modified: TimeInterval) throws -> URL {
+            let url = directory.appendingPathComponent(name)
+            try Data(repeating: 1, count: 40).write(to: url)
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: modified)], ofItemAtPath: url.path)
+            return url
+        }
+        let oldest = try write("a.m4a", modified: 1_000)
+        let middle = try write("b.m4a", modified: 2_000)
+        let newest = try write("c.m4a", modified: 3_000)
+
+        VoiceNoteCache.trimIfNeeded(directory: directory, keeping: oldest, limit: 100)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: oldest.path), "La note qu'on vient d'écrire reste")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: middle.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: newest.path))
+    }
+
     /// L'adresse signée change de paramètres d'une réponse à l'autre : le nom
     /// ne doit dépendre que de la pièce jointe.
     func testCacheNameIgnoresSignedQuery() throws {

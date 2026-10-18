@@ -183,7 +183,9 @@ struct GroupSettingsView: View {
         }
         .task { refreshChainRoles() }
         .confirmationDialog(
-            participantToRemove.map { "Retirer \($0.user.displayName) du groupe ?" } ?? "Retirer du groupe ?",
+            // `String(localized:)` : un titre calculé en `String` ne passe pas par le catalogue.
+            participantToRemove.map { String(localized: "Retirer \($0.user.displayName) du groupe ?") }
+                ?? String(localized: "Retirer du groupe ?"),
             isPresented: Binding(get: { participantToRemove != nil }, set: { if !$0 { participantToRemove = nil } }),
             titleVisibility: .visible
         ) {

@@ -5,11 +5,14 @@ import UniformTypeIdentifiers
 import CoreLocation
 import MapKit
 import CryptoKit
+import CoreTransferable
 
 struct ConversationDetailView: View {
     let conversation: MessageConversation
     let service: MessagesServicing
     let e2ee: E2EEServicing?
+    /// Message sur lequel la conversation s'ouvre (résultat de la recherche de la liste).
+    var focusMessageId: String? = nil
 
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -28,7 +31,11 @@ struct ConversationDetailView: View {
     /// Vrai dès que le premier chargement a répondu (succès ou échec) : tant qu'il
     /// ne l'est pas, une liste vide veut dire « pas encore là », pas « vide ».
     @State private var hasLoadedOnce = false
+    @State private var focusHandled = false
     @State private var olderCursor: String?
+    /// Fil v2 : nombre de messages présentés (les plus récents) et existence de plus anciens.
+    @State private var v2Limit = E2EEV2ThreadWindow.pageSize
+    @State private var v2HasOlder = false
     @State private var isLoadingOlder = false
     @State private var readReceipts: [ReadReceipt] = []
     /// Accusés « distribué » des autres membres, et vrai dès que `/receipts` a répondu :
@@ -138,6 +145,13 @@ struct ConversationDetailView: View {
     /// lecture quand on charge des messages plus anciens.
     @State private var prependAnchorId: String?
     @State private var threadTarget: MessageItem?
+    /// Incrémenté à chaque événement du serveur : un fil ouvert se relit (B04).
+    @State private var threadRefreshToken = 0
+    /// Repère « N nouveaux messages », calculé une fois à l'ouverture (M05).
+    @State private var unreadDivider: UnreadDivider?
+    @State private var unreadDividerComputed = false
+    /// Enveloppe du dernier message reçu en v2 : de quoi accuser « distribué » depuis le fil (U05).
+    @State private var v2LastIncomingEnvelopeId: String?
     @State private var showSearch = false
     @State private var showScheduled = false
     @State private var showReminders = false
@@ -220,9 +234,15 @@ struct ConversationDetailView: View {
         return role == "owner" || role == "admin"
     }
 
-    var body: some View {
+    /// Le corps est coupé en deux : la chaîne de modificateurs entière dépassait ce que le
+    /// compilateur type-check en un temps raisonnable.
+    private var conversationBase: some View {
         VStack(spacing: 0) {
             topBar
+
+            if !networkPath.isOnline {
+                MessagesOfflineBanner()
+            }
 
             if EncryptedConversationSurfaces.showsLegacyUnlockBanner(
                 isEncrypted: isE2EE, v2Resolved: v2Resolved, isV2: conversationIsV2, legacyUnlocked: isE2EEUnlocked
@@ -288,7 +308,7 @@ struct ConversationDetailView: View {
                         // Plus fiable que l'onAppear du premier message (qui se
                         // redéclenchait à chaque insertion). Le garde isLoadingOlder
                         // + olderCursor (dans loadOlder) évite les appels en doublon.
-                        if olderCursor != nil {
+                        if olderCursor != nil || v2HasOlder {
                             Color.clear
                                 .frame(height: 1)
                                 .onAppear { Task { await loadOlder() } }
@@ -356,9 +376,13 @@ struct ConversationDetailView: View {
                                         .padding(.vertical, SQSpace.sm)
                                         .accessibilityIdentifier("conversation.stamp")
                                 }
+                                if let unreadDivider, unreadDivider.messageId == message.id {
+                                    unreadDividerRow(unreadDivider)
+                                }
                                 messageBubble(
                                     message,
-                                    isGroupStart: stamp != nil || previous == nil || previous?.senderId != message.senderId,
+                                    isGroupStart: stamp != nil || previous == nil || previous?.senderId != message.senderId
+                                        || unreadDivider?.messageId == message.id,
                                     isGroupEnd: isGroupEnd(message, next: next)
                                 )
                                 if message.id == receiptMessageId {
@@ -406,7 +430,14 @@ struct ConversationDetailView: View {
                         if old == nil || replacesLocal {
                             var transaction = Transaction(animation: nil)
                             transaction.disablesAnimations = true
-                            withTransaction(transaction) { proxy.scrollTo(last.id, anchor: .bottom) }
+                            withTransaction(transaction) {
+                                // Beaucoup de nouveautés : l'ouverture se place sur le repère, pas en bas.
+                                if old == nil, let divider = unreadDivider, divider.count >= UnreadDivider.scrollsToDividerFrom {
+                                    proxy.scrollTo(divider.messageId, anchor: .top)
+                                } else {
+                                    proxy.scrollTo(last.id, anchor: .bottom)
+                                }
+                            }
                         } else {
                             withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
                         }
@@ -524,7 +555,8 @@ struct ConversationDetailView: View {
             RemindersView(conversation: conversation, service: service, e2ee: e2ee, subtitle: conversationTitle)
         }
         .sheet(item: $threadTarget) { target in
-            ThreadView(parentMessage: target, conversation: conversation, service: service, e2ee: e2ee)
+            ThreadView(parentMessage: target, conversation: conversation, service: service, e2ee: e2ee,
+                       refreshToken: threadRefreshToken)
         }
         // SOC-22 : supprimer ou bloquer ne partent plus d'un seul toucher.
         .confirmationDialog(
@@ -615,7 +647,9 @@ struct ConversationDetailView: View {
         .sheet(item: $forwardTarget) { payload in
             ForwardMessageSheet(
                 text: payload.text,
+                sourceIsEncrypted: payload.sourceIsEncrypted,
                 service: service,
+                e2ee: e2ee,
                 currentUserId: currentUserId,
                 excludedConversationId: conversation.id
             ) {
@@ -685,6 +719,10 @@ struct ConversationDetailView: View {
                 try await report(message, reason: reason, comment: comment)
             }
         }
+    }
+
+    var body: some View {
+        conversationBase
         .sheet(isPresented: $showGroupSettings, onDismiss: { if leftGroup { dismiss() } }) {
             GroupSettingsView(conversation: conversation, service: service, e2ee: e2ee,
                               onRenamed: { renamedTitle = $0 },
@@ -694,7 +732,10 @@ struct ConversationDetailView: View {
             }
         }
         .sheet(isPresented: $showSaved) {
-            SavedMessagesView(service: service, currentUserId: currentUserId, e2ee: e2ee, currentConversationId: conversation.id)
+            SavedMessagesView(
+                service: service, currentUserId: currentUserId, e2ee: e2ee, currentConversationId: conversation.id,
+                onSelectMessage: { handleSearchSelection($0) }
+            )
         }
         // Photo de la conversation en plein écran (zoom + glisser pour fermer).
         .fullScreenCover(item: $imageViewer) { session in
@@ -725,6 +766,11 @@ struct ConversationDetailView: View {
         .background {
             if EncryptedConversationSurfaces.hidesSnapshot(of: conversation) { AppSensitiveContentMarker() }
         }
+        // Clavier de l'iPad : ⌘F cherche dans la conversation, Échap ferme (citation, modification, puis l'écran).
+        .background { keyboardShortcutButtons }
+        // Les notes vocales se suivent : le lecteur connaît celles du fil ouvert (M15).
+        .onChangeCompat(of: messages.count) { _, _ in registerVoiceSequence() }
+        .onChangeCompat(of: messages.last?.id) { _, _ in registerVoiceSequence() }
         .onAppear {
             // Le dock flottant global est masqué le temps de la conversation.
             router.isDockHidden = true
@@ -732,6 +778,13 @@ struct ConversationDetailView: View {
         }
         // Rappel depuis les Récents de Téléphone : mêmes contrôles qu'un appui
         // sur le bouton d'appel.
+        .task(id: hasLoadedOnce) {
+            guard hasLoadedOnce, !focusHandled, let target = focusMessageId else { return }
+            focusHandled = true
+            // Laisse le défilement initial vers le bas se terminer avant d'aller au message.
+            try? await Task.sleep(for: .milliseconds(350))
+            handleSearchSelection(target)
+        }
         .task(id: router.pendingCall) {
             guard let pending = router.pendingCall, pending.conversationId == conversation.id else { return }
             router.pendingCall = nil
@@ -792,6 +845,7 @@ struct ConversationDetailView: View {
         .onDisappear {
             isOnScreen = false
             router.isDockHidden = false
+            VoiceNotePlayer.shared.sequence = []
             stopSync()
             stopActivePing(sendLeave: true)
             if let draftAutosaver { Task { await draftAutosaver.flush() } }
@@ -944,17 +998,21 @@ struct ConversationDetailView: View {
                 Button { showSearch = true } label: {
                     Label("Rechercher", systemImage: "magnifyingglass")
                 }
-                Button { showMedia = true } label: {
-                    Label("Médias et fichiers", systemImage: "photo.on.rectangle")
-                }
-                Button { showScheduled = true } label: {
-                    Label("Messages programmés", systemImage: "clock")
-                }
-                Button { showReminders = true } label: {
-                    Label("Rappels", systemImage: "bell")
-                }
-                Button { showSaved = true } label: {
-                    Label("Messages enregistrés", systemImage: "bookmark")
+                // En v2, ces écrans passent par des routes qui ne connaissent pas les messages
+                // chiffrés : ils s'ouvriraient vides (U03).
+                if !conversationIsV2 {
+                    Button { showMedia = true } label: {
+                        Label("Médias et fichiers", systemImage: "photo.on.rectangle")
+                    }
+                    Button { showScheduled = true } label: {
+                        Label("Messages programmés", systemImage: "clock")
+                    }
+                    Button { showReminders = true } label: {
+                        Label("Rappels", systemImage: "bell")
+                    }
+                    Button { showSaved = true } label: {
+                        Label("Messages enregistrés", systemImage: "bookmark")
+                    }
                 }
                 if isE2EE {
                     Button { showEncryptionInfo = true } label: {
@@ -1102,6 +1160,9 @@ struct ConversationDetailView: View {
                 onShareLocation: { confirmsLocationShare = true },
                 onLiveShare: { showLiveShare = true },
                 onPickPhotos: { items, caption in Task { await sendPhotos(items, caption: caption) } },
+                onPickFile: { url, caption in Task { await sendFile(at: url, caption: caption) } },
+                onFilesUnavailable: { showFilesUnavailable() },
+                onEditLast: { beginEditOfLastOwnMessage() },
                 onCapturePhoto: { data, caption in Task { await sendCapturedPhoto(data, caption: caption) } },
                 onVoiceNote: { url, duration in Task { await sendVoiceNote(url: url, duration: duration) } },
                 mentionSuggestions: mentionSuggestionProvider
@@ -1112,6 +1173,105 @@ struct ConversationDetailView: View {
                 .overlay(alignment: .top) { Rectangle().fill(SQColor.separator).frame(height: 1) }
                 .ignoresSafeArea(edges: .bottom)
         }
+    }
+
+    /// « N nouveaux messages » au-dessus du premier message reçu depuis la dernière lecture (M05).
+    @ViewBuilder
+    private func unreadDividerRow(_ divider: UnreadDivider) -> some View {
+        HStack(spacing: SQSpace.sm) {
+            Rectangle().fill(SQColor.accentInk.opacity(0.35)).frame(height: 1)
+            if divider.count == 1 {
+                Text("1 nouveau message")
+                    .font(SQType.micro.weight(.semibold))
+                    .foregroundStyle(SQColor.accentInk)
+            } else {
+                Text("\(divider.count) nouveaux messages")
+                    .font(SQType.micro.weight(.semibold))
+                    .foregroundStyle(SQColor.accentInk)
+            }
+            Rectangle().fill(SQColor.accentInk.opacity(0.35)).frame(height: 1)
+        }
+        .padding(.vertical, SQSpace.sm)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("conversation.unreadDivider")
+    }
+
+    /// Boutons invisibles qui portent les raccourcis du clavier de l'iPad. Le raccourci ⌘N
+    /// (nouveau message) est global et déjà en place.
+    private var keyboardShortcutButtons: some View {
+        ZStack {
+            Button("") { showSearch = true }
+                .keyboardShortcut("f", modifiers: .command)
+            Button("") { handleEscape() }
+                .keyboardShortcut(.cancelAction)
+        }
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    /// Échap : ferme d'abord la citation ou la modification en cours, puis la conversation.
+    private func handleEscape() {
+        if editTarget != nil {
+            editTarget = nil
+            restoreComposerAfterEdit()
+        } else if replyTarget != nil {
+            replyTarget = nil
+        } else {
+            dismiss()
+        }
+    }
+
+    /// ↑ dans un champ vide : modifie le dernier message envoyé (texte seulement).
+    private func beginEditOfLastOwnMessage() {
+        guard let currentUserId, editTarget == nil,
+              let last = messages.last(where: { $0.senderId == currentUserId && textOnlyContent(for: $0) != nil }),
+              let text = textOnlyContent(for: last) else { return }
+        replyTarget = nil
+        editTarget = last
+        seedComposer(text)
+    }
+
+    /// Les notes vocales du fil, dans l'ordre, pour enchaîner la suivante (M15).
+    private func registerVoiceSequence() {
+        guard let currentUserId else { return }
+        var items: [VoiceNotePlayer.SequenceItem] = []
+        var previousWasVoice = false
+        for message in messages {
+            if let attachment = message.attachments.first(where: { isAudioAttachment($0) && $0.url != nil }),
+               let url = attachment.url, let key = attachment.id {
+                items.append(.init(
+                    key: key, remoteURL: url,
+                    incoming: message.senderId != currentUserId, followsPrevious: previousWasVoice
+                ))
+                previousWasVoice = true
+            } else {
+                previousWasVoice = false
+            }
+        }
+        VoiceNotePlayer.shared.sequence = items
+    }
+
+    /// Texte seul d'un message envoyé ou reçu (ni carte, ni position, ni sondage, ni pièce jointe),
+    /// lisible par cet appareil. `nil` pour tout le reste, y compris le cadenas d'un message
+    /// chiffré pas encore déchiffré.
+    private func textOnlyContent(for message: MessageItem) -> String? {
+        guard message.deletedAt == nil, !message.id.hasPrefix("local-"),
+              message.attachments.isEmpty,
+              shareCard(for: message) == nil,
+              location(for: message) == nil,
+              pollsByMessageId[message.id] == nil else { return nil }
+        if message.isEncrypted && !isReadableV2(message) && decryptedMessages[message.id] == nil { return nil }
+        let text = displayedContent(for: message)
+        return text.isEmpty ? nil : text
+    }
+
+    /// Fichiers et vidéos : pas encore dans une conversation chiffrée (la route des pièces jointes ne les chiffre pas).
+    private func showFilesUnavailable() {
+        showActionError(String(localized: "Les fichiers et les vidéos ne sont pas encore disponibles dans une conversation chiffrée : seul le texte l’est."))
+        Haptics.error()
     }
 
     /// Clé « Répondre à %@ » : le titre construit en `String` cherchait
@@ -1341,7 +1501,7 @@ struct ConversationDetailView: View {
                 }
                 attachmentsView(for: message, mine: mine)
                 if let pendingAttachment = pendingAttachmentSends[message.id] {
-                    pendingAttachmentRow(pendingAttachment, mine: mine)
+                    pendingAttachmentRow(pendingAttachment, mine: mine, localId: message.id)
                 }
                 if message.deletedAt != nil {
                     Text("Message supprimé")
@@ -1452,18 +1612,42 @@ struct ConversationDetailView: View {
         }
     }
 
-    /// Photo ou note vocale pas encore partie : la bulle dit ce qu'elle porte, la légende suit.
-    private func pendingAttachmentRow(_ attachment: PendingAttachmentSend, mine: Bool) -> some View {
-        let isAudio = attachment.kind.uppercased() == "AUDIO"
-        return Label {
-            isAudio ? Text("Note vocale") : Text("Photo")
-        } icon: {
-            Image(systemName: isAudio ? "waveform" : "photo")
+    /// Photo, fichier ou note vocale pas encore partie : miniature de la photo (avec un voile
+    /// et un indicateur pendant l'envoi), sinon la bulle dit ce qu'elle porte ; la légende suit.
+    @ViewBuilder
+    private func pendingAttachmentRow(_ attachment: PendingAttachmentSend, mine: Bool, localId: String) -> some View {
+        let kind = attachment.kind.uppercased()
+        if kind == "IMAGE", let data = attachment.data, let thumbnail = PendingThumbnailCache.image(for: localId, data: data) {
+            Image(uiImage: thumbnail)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 140, height: 140)
+                .clipShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                .overlay {
+                    if sendStatus[localId] == .sending {
+                        RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                            .fill(SQColor.label.opacity(0.35))
+                            .overlay { SQSpinner().tint(SQColor.onInk) }
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(sendStatus[localId] == .sending ? "Photo en cours d’envoi" : "Photo non envoyée")
+                .accessibilityIdentifier("message.pendingAttachment")
+        } else {
+            Label {
+                switch kind {
+                case "AUDIO": Text("Note vocale")
+                case "FILE": Text(verbatim: attachment.filename)
+                default: Text("Photo")
+                }
+            } icon: {
+                Image(systemName: kind == "AUDIO" ? "waveform" : (kind == "FILE" ? "doc" : "photo"))
+            }
+            .font(SQType.subhead(.semibold))
+            .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
+            .frame(minWidth: 120, alignment: .leading)
+            .accessibilityIdentifier("message.pendingAttachment")
         }
-        .font(SQType.subhead(.semibold))
-        .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
-        .frame(minWidth: 120, alignment: .leading)
-        .accessibilityIdentifier("message.pendingAttachment")
     }
 
     /// Ce que VoiceOver lit pour une bulle de texte : qui a écrit, le texte,
@@ -1546,16 +1730,39 @@ struct ConversationDetailView: View {
     @ViewBuilder
     private func sendStatusIndicator(for message: MessageItem) -> some View {
         if sendStatus[message.id] == .sending {
-            SQSpinner()
-                .controlSize(.mini)
-                .tint(SQColor.onInk.opacity(0.8))
-                .accessibilityLabel("Envoi en cours")
+            if networkPath.isOnline {
+                SQSpinner()
+                    .controlSize(.mini)
+                    .tint(SQColor.onInk.opacity(0.8))
+                    .accessibilityLabel("Envoi en cours")
+            } else {
+                // Hors connexion, l'envoi attend le réseau : pas un spinner qui tourne sans fin (U02).
+                Label("En attente de connexion", systemImage: "wifi.slash")
+                    .font(SQType.micro(.regular))
+                    .foregroundStyle(SQColor.onInk)
+                    .accessibilityIdentifier("message.waitingForNetwork")
+            }
         }
     }
 
     /// Échec d'envoi : capsule dangerSoft sous la bulle, tappable pour rejouer
     /// l'envoi (même Idempotency-Key, donc sans doublon serveur).
     private func failedRetryRow(for message: MessageItem) -> some View {
+        let cause = pendingSends[message.id]?.failureReason ?? pendingAttachmentSends[message.id]?.failureReason
+        return VStack(alignment: .trailing, spacing: 0) {
+            failedRetryButtons(for: message)
+            if let cause, !cause.isEmpty {
+                Text(verbatim: cause)
+                    .font(SQType.micro(.regular))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(3)
+                    .accessibilityIdentifier("message.failureReason")
+            }
+        }
+    }
+
+    private func failedRetryButtons(for message: MessageItem) -> some View {
         HStack(spacing: SQSpace.xs) {
             Button {
                 Haptics.medium()
@@ -1701,22 +1908,21 @@ struct ConversationDetailView: View {
             } label: {
                 Label("Copier", systemImage: "doc.on.doc")
             }
-            // Pas en conversation chiffrée : la sélection système contournerait la copie bornée ci-dessus,
-            // et un texte déchiffré ne part jamais en clair vers une autre conversation. Le transfert
-            // ne vise que les conversations non chiffrées, où l'envoi de texte existant suffit.
+            // Pas en conversation chiffrée : la sélection système contournerait la copie bornée ci-dessus.
             if !isE2EE {
                 Button {
                     selectableText = SelectableText(text: displayedContent(for: message))
                 } label: {
                     Label("Sélectionner le texte", systemImage: "text.cursor")
                 }
-                if !isLocal {
-                    Button {
-                        forwardTarget = ForwardPayload(text: displayedContent(for: message))
-                    } label: {
-                        Label("Transférer", systemImage: "arrowshape.turn.up.right")
-                    }
-                }
+            }
+        }
+        // Transférer : le texte seul, vers une conversation chiffrée si la source l'est (jamais l'inverse).
+        if let forwardable = textOnlyContent(for: message) {
+            Button {
+                forwardTarget = ForwardPayload(text: forwardable, sourceIsEncrypted: isE2EE)
+            } label: {
+                Label("Transférer", systemImage: "arrowshape.turn.up.right")
             }
         }
         if message.deletedAt == nil, serverActions {
@@ -2171,11 +2377,16 @@ struct ConversationDetailView: View {
         }
     }
 
-    /// Accuse réception du plus récent message d'autrui d'une conversation v1 ; une seule
-    /// fois par message, échec silencieux. La v2 est accusée depuis la liste (id d'enveloppe).
+    /// Accuse réception du plus récent message d'autrui ; une seule fois par message, échec
+    /// silencieux. En v1 l'identifiant est celui du message, en v2 celui de son enveloppe.
     private func acknowledgeDelivery() async {
-        guard !AppEnvironment.usesDemoData, !usesV2, let currentUserId,
-              let last = messages.last(where: { !$0.id.hasPrefix("local-") && $0.senderId != currentUserId }) else { return }
+        guard !AppEnvironment.usesDemoData, let currentUserId else { return }
+        if usesV2 {
+            guard let envelopeId = v2LastIncomingEnvelopeId else { return }
+            await services.deliveryAcks.acknowledge(conversationId: conversation.id, messageId: envelopeId, using: service)
+            return
+        }
+        guard let last = messages.last(where: { !$0.id.hasPrefix("local-") && $0.senderId != currentUserId }) else { return }
         await services.deliveryAcks.acknowledge(conversationId: conversation.id, messageId: last.id, using: service)
     }
 
@@ -2390,19 +2601,32 @@ struct ConversationDetailView: View {
     private func loadV2Once() async {
         defer { hasLoadedOnce = true }
         switch await services.e2eeV2Messaging.thread(
-            conversationId: conversation.id, isGroup: conversation.isGroup, participants: conversation.participants
+            conversationId: conversation.id, isGroup: conversation.isGroup, participants: conversation.participants,
+            limit: v2Limit
         ) {
         case .thread(let presentation):
+            v2HasOlder = presentation.hasOlder
+            // Un texte local que le serveur a déjà accepté (renvoyé par la reprise en arrière-plan,
+            // ou passé juste avant la coupure) n'a plus à rester « non envoyé » (B02).
+            let accepted = presentation.clientRequestIds
+            for (localId, pending) in pendingSends where accepted.contains(pending.idempotencyKey) {
+                pendingSends[localId] = nil
+                sendStatus[localId] = nil
+            }
             let localPending = messages.filter { pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil }
+            let restored = await restoredV2Messages(accepted: accepted)
             let hidden = E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: conversation.id)
             let knownIds = Set(messages.map(\.id))
             let thread = presentation.messages.filter { !hidden.contains($0.id) }
-            let merged = Self.normalized(thread + localPending)
+            let merged = Self.normalized(thread + localPending + restored)
             // Le message envoyé peut arriver par le flux avant l'accusé : sa bulle locale s'efface alors.
             let confirmed = localIdsConfirmed(by: thread.filter { !knownIds.contains($0.id) })
             let next = confirmed.isEmpty ? merged : merged.filter { !confirmed.contains($0.id) }
             if next != messages { messages = next }
             v2Notices = presentation.notices
+            v2LastIncomingEnvelopeId = presentation.lastIncomingEnvelopeId
+            computeUnreadDividerIfNeeded()
+            Task { await acknowledgeDelivery() }
             errorMessage = nil
         case .failure(let failure):
             errorMessage = failure.kind == .retryable
@@ -2419,22 +2643,66 @@ struct ConversationDetailView: View {
             clientRequestId: clientRequestId, conversationId: conversation.id, isGroup: conversation.isGroup,
             participantIds: conversation.participants.map(\.userId)
         )
-        switch result {
-        case .sent, .alreadyAccepted:
-            await loadV2()
-            return true
-        case .capabilityMissing:
-            showActionError(String(localized: "Un membre doit mettre à jour SignalQuest pour recevoir ce message. Il partira dès que possible."))
-        case .membersNotTrusted:
-            showActionError(String(localized: "Un membre a un nouveau numéro de sécurité. Vérifie-le avant d’envoyer."))
-        case .needsEpoch, .needsRotation:
-            showActionError(String(localized: "La conversation chiffrée se met à jour. Réessaie dans un instant."))
-        case .failure(let failure):
-            showActionError(failure.kind == .retryable
-                ? String(localized: "Connexion instable. Réessaie.")
-                : String(localized: "Ce message chiffré n’a pas pu être envoyé."))
+        if let failure = EncryptedConversationSurfaces.v2SendFailureMessage(result) {
+            showActionError(failure)
+            return false
         }
-        return false
+        await loadV2()
+        return true
+    }
+
+    // MARK: Envois v2 gardés (B02)
+
+    /// Garde le texte dans la file durable avant l'envoi : s'il échoue, il survit à la sortie de
+    /// l'écran, et la reprise en arrière-plan le rejoue sous le même identifiant.
+    private func stageV2Send(_ pending: PendingSend) async {
+        guard let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else { return }
+        try? await MessageDraftStore.shared.stageV2Send(
+            .init(
+                clientRequestId: pending.idempotencyKey, conversationId: conversation.id, isGroup: conversation.isGroup,
+                participantIds: conversation.participants.map(\.userId), text: pending.text, replyToRef: pending.replyToId,
+                ttlSeconds: pending.ttlSeconds, createdAtMs: Int64(Date().timeIntervalSince1970 * 1_000)
+            ),
+            ownerScopeId: scope
+        )
+    }
+
+    private func removeV2Send(clientRequestId: String) async {
+        guard let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else { return }
+        await MessageDraftStore.shared.removeV2Send(clientRequestId: clientRequestId, ownerScopeId: scope)
+    }
+
+    /// Textes v2 restés dans la file durable (envoi refusé, appli quittée) : ils reviennent en bulles
+    /// « Non envoyé » avec Renvoyer / Supprimer. Ceux que le serveur a déjà acceptés quittent la file.
+    private func restoredV2Messages(accepted: Set<String>) async -> [MessageItem] {
+        guard let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId else { return [] }
+        let known = Set(pendingSends.values.map(\.idempotencyKey))
+        var restored: [MessageItem] = []
+        for record in await MessageDraftStore.shared.pendingV2Sends(ownerScopeId: scope, conversationId: conversation.id) {
+            if accepted.contains(record.clientRequestId) {
+                await MessageDraftStore.shared.removeV2Send(clientRequestId: record.clientRequestId, ownerScopeId: scope)
+                continue
+            }
+            guard !known.contains(record.clientRequestId) else { continue }
+            let localId = "local-\(record.clientRequestId)"
+            pendingSends[localId] = PendingSend(
+                text: record.text, replyToId: record.replyToRef, idempotencyKey: record.clientRequestId,
+                ttlSeconds: record.ttlSeconds, restored: true
+            )
+            sendStatus[localId] = .failed
+            restored.append(makeOptimisticMessage(
+                id: localId, text: record.text, replyToId: record.replyToRef,
+                createdAt: Date(timeIntervalSince1970: Double(record.createdAtMs) / 1_000)
+            ))
+        }
+        return restored
+    }
+
+    /// Calculé une fois, à la première lecture : les messages qui arrivent ensuite ne déplacent pas le repère.
+    private func computeUnreadDividerIfNeeded() {
+        guard !unreadDividerComputed, messages.contains(where: { !$0.id.hasPrefix("local-") }) else { return }
+        unreadDividerComputed = true
+        unreadDivider = UnreadDivider.make(messages: messages, lastReadAt: conversation.lastReadAt, currentUserId: currentUserId)
     }
 
     private func load() async {
@@ -2456,6 +2724,7 @@ struct ConversationDetailView: View {
             // faire disparaître.
             let localPending = messages.filter { pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil }
             messages = Self.normalized(page.messages + localPending + (await restoredFailedMessages()) + (await restoredPendingAttachments()))
+            computeUnreadDividerIfNeeded()
             olderCursor = (page.hasMore ?? (page.nextCursor != nil)) ? page.nextCursor : nil
             if !receiptsKnown { readReceipts = page.readReceipts ?? [] }
             errorMessage = nil
@@ -2544,6 +2813,10 @@ struct ConversationDetailView: View {
     /// préfixe à la liste (cf. audit COMPLETENESS-04). En cas d'absence de
     /// curseur (début de l'historique atteint), ne fait rien.
     private func loadOlder() async {
+        if usesV2 {
+            await loadOlderV2()
+            return
+        }
         guard !AppEnvironment.usesDemoData, !isLoadingOlder, let cursor = olderCursor else { return }
         isLoadingOlder = true
         defer { isLoadingOlder = false }
@@ -2561,6 +2834,17 @@ struct ConversationDetailView: View {
         } catch {
             // Silencieux : l'historique déjà chargé reste utilisable.
         }
+    }
+
+    /// Fil v2 : la page précédente vient du magasin local, sans réseau.
+    private func loadOlderV2() async {
+        guard v2HasOlder, !isLoadingOlder else { return }
+        isLoadingOlder = true
+        defer { isLoadingOlder = false }
+        let anchorId = messages.first?.id
+        v2Limit += E2EEV2ThreadWindow.pageSize
+        await loadV2()
+        prependAnchorId = anchorId
     }
 
     private func advanceLastSync(with items: [MessageItem]) {
@@ -2604,6 +2888,7 @@ struct ConversationDetailView: View {
                     if let userId, userId == currentUserId { continue }
                     scheduleReceiptsRefresh()
                 case .stateEvent:
+                    await MainActor.run { if threadTarget != nil { threadRefreshToken &+= 1 } }
                     // Les événements d'état que provoque notre propre « lu » reviennent dans la seconde :
                     // on laisse passer ce délai plutôt que de relire 80 messages pour rien.
                     let sinceOwnRead = Date().timeIntervalSince(readGate.lastMarkReadAt)
@@ -2611,6 +2896,7 @@ struct ConversationDetailView: View {
                     // Une conversation v2 ne se relit jamais par la page v1.
                     if usesV2 { await loadV2() } else { await refreshLatestPageState() }
                 case .serverEvent, .polling:
+                    await MainActor.run { if threadTarget != nil { threadRefreshToken &+= 1 } }
                     if usesV2 {
                         await loadV2()
                         await markReadIfLastIncoming()
@@ -2727,7 +3013,7 @@ struct ConversationDetailView: View {
         // première page ne menait à rien (SOC-21).
         Task {
             var pages = 0
-            while !messages.contains(where: { $0.id == messageId }), olderCursor != nil, pages < 10 {
+            while !messages.contains(where: { $0.id == messageId }), olderCursor != nil || v2HasOlder, pages < 10 {
                 while isLoadingOlder { try? await Task.sleep(for: .milliseconds(100)) }
                 await loadOlder()
                 pages += 1
@@ -2975,12 +3261,15 @@ struct ConversationDetailView: View {
         }
         sendStatus[localId] = .sending
         if usesV2 {
-            // Même clientRequestId à chaque essai : l'enveloppe gardée repart à l'octet.
+            // Gardé sur l'appareil avant l'envoi (B02), puis même clientRequestId à chaque essai :
+            // l'enveloppe gardée repart à l'octet.
+            await stageV2Send(pending)
             if await sendV2(.text(pending.text), replyToId: pending.replyToId, ttlSeconds: pending.ttlSeconds,
                             clientRequestId: pending.idempotencyKey) {
                 messages.removeAll { $0.id == localId }
                 sendStatus[localId] = nil
                 pendingSends[localId] = nil
+                await removeV2Send(clientRequestId: pending.idempotencyKey)
             } else {
                 withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
                 Haptics.error()
@@ -3016,7 +3305,8 @@ struct ConversationDetailView: View {
         } catch {
             // On conserve la bulle et les données de rejeu : l'utilisateur peut
             // réessayer d'un tap. Pas de bannière d'erreur globale ici — le
-            // feedback est porté par la bulle elle-même.
+            // feedback est porté par la bulle elle-même, avec la cause.
+            pendingSends[localId]?.failureReason = error.userFacingMessage
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
             Haptics.error()
         }
@@ -3036,7 +3326,7 @@ struct ConversationDetailView: View {
             let text = record.request.content ?? ""
             pendingSends[localId] = PendingSend(
                 text: text, replyToId: record.request.replyToId, idempotencyKey: record.clientRequestId,
-                ttlSeconds: record.request.ttlSeconds ?? 0, restored: true
+                ttlSeconds: record.request.ttlSeconds ?? 0, restored: true, failureReason: record.failureReason
             )
             sendStatus[localId] = .failed
             let shown = record.request.e2ee != nil ? String(localized: "Message chiffré non envoyé") : text
@@ -3049,6 +3339,8 @@ struct ConversationDetailView: View {
     private func discardFailed(localId: String) async {
         if let pending = pendingSends[localId] {
             await service.discardPendingText(clientRequestId: pending.idempotencyKey)
+            // Un texte v2 abandonné ne doit plus repartir avec la reprise en arrière-plan.
+            await removeV2Send(clientRequestId: pending.idempotencyKey)
         }
         if let attachment = pendingAttachmentSends[localId] {
             await discardOutboxRecords(for: attachment)
@@ -3123,12 +3415,84 @@ struct ConversationDetailView: View {
             guard !isE2EE else {
                 throw E2EEError.unsupported(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
             }
-            guard let raw = try await item.loadTransferable(type: Data.self) else { return }
+            if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
+                await sendVideo(item: item, caption: rawCaption)
+                return
+            }
+            guard let raw = try await item.loadTransferable(type: Data.self) else {
+                // Photo pas encore téléchargée d'iCloud, ou réseau coupé : le dire (B10).
+                showActionError(String(localized: "Photo indisponible. Réessaie avec du réseau."))
+                Haptics.error()
+                return
+            }
             await sendPhoto(rawData: raw, caption: rawCaption)
         } catch {
             showActionError(error.userFacingMessage)
             Haptics.error()
         }
+    }
+
+    /// Vidéo de la photothèque : copiée dans un fichier temporaire (jamais chargée entière en
+    /// mémoire avant d'en connaître la taille), puis envoyée comme fichier.
+    private func sendVideo(item: PhotosPickerItem, caption rawCaption: String) async {
+        guard let movie = try? await item.loadTransferable(type: PickedMovie.self) else {
+            showActionError(String(localized: "Vidéo indisponible. Réessaie avec du réseau."))
+            Haptics.error()
+            return
+        }
+        defer { try? FileManager.default.removeItem(at: movie.url) }
+        let size = (try? movie.url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        guard MessageAttachmentOutboxStore.fits(size), let data = try? Data(contentsOf: movie.url, options: .mappedIfSafe),
+              MessageAttachmentOutboxStore.fits(data.count) else {
+            showActionError(size > 0
+                ? String(localized: "Cette vidéo dépasse 10 Mo. Choisis-en une plus courte.")
+                : String(localized: "Cette vidéo est illisible."))
+            Haptics.error()
+            return
+        }
+        let ext = movie.url.pathExtension.isEmpty ? "mov" : movie.url.pathExtension
+        await queueAttachment(
+            PendingAttachmentSend(
+                data: data, filename: "video.\(ext)",
+                mimeType: UTType(filenameExtension: ext)?.preferredMIMEType ?? "video/quicktime", kind: "FILE",
+                caption: rawCaption.trimmingCharacters(in: .whitespacesAndNewlines), width: nil, height: nil,
+                replyToId: replyTarget?.id, ttlSeconds: ephemeralTTL
+            )
+        )
+        draftAutosaver?.discard()
+        clearComposer()
+        replyTarget = nil
+    }
+
+    /// Document choisi dans Fichiers : part tel quel, en pièce jointe « fichier » (téléchargement
+    /// forcé côté serveur), dans la limite de 10 Mo.
+    private func sendFile(at url: URL, caption rawCaption: String) async {
+        guard !isE2EE else {
+            showFilesUnavailable()
+            return
+        }
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        guard MessageAttachmentOutboxStore.fits(size), let data = try? Data(contentsOf: url),
+              MessageAttachmentOutboxStore.fits(data.count) else {
+            showActionError(size > MessageAttachmentOutboxStore.maximumSourceBytes
+                ? String(localized: "Ce fichier dépasse 10 Mo.")
+                : String(localized: "Ce fichier est illisible."))
+            Haptics.error()
+            return
+        }
+        await queueAttachment(
+            PendingAttachmentSend(
+                data: data, filename: url.lastPathComponent,
+                mimeType: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream",
+                kind: "FILE", caption: rawCaption.trimmingCharacters(in: .whitespacesAndNewlines),
+                width: nil, height: nil, replyToId: replyTarget?.id, ttlSeconds: ephemeralTTL
+            )
+        )
+        draftAutosaver?.discard()
+        clearComposer()
+        replyTarget = nil
     }
 
     /// Photo prise avec l'appareil : même chemin que celles de la photothèque.
@@ -3185,8 +3549,17 @@ struct ConversationDetailView: View {
         guard let attachment = pendingAttachmentSends[localId] else { return }
         withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .sending }
         guard let data = attachment.data else {
-            // Venue de la file durable : le service sait la rejouer, pas cette vue.
-            await service.retryPendingAttachments()
+            // Venue de la file durable : le service sait la rejouer, pas cette vue. « Renvoyer » vise
+            // cette pièce précisément, même si un refus définitif l'avait mise de côté (B03).
+            if let requestId = attachment.clientRequestId {
+                do {
+                    _ = try await service.resendPendingAttachment(clientRequestId: requestId)
+                } catch {
+                    pendingAttachmentSends[localId]?.failureReason = error.userFacingMessage
+                }
+            } else {
+                await service.retryPendingAttachments()
+            }
             await pruneSettledRestoredAttachments()
             if pendingAttachmentSends[localId] != nil {
                 withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
@@ -3219,6 +3592,7 @@ struct ConversationDetailView: View {
             sendStatus[localId] = nil
             pendingAttachmentSends[localId] = nil
         } catch {
+            pendingAttachmentSends[localId]?.failureReason = error.userFacingMessage
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
             showActionError(error.userFacingMessage)
             Haptics.error()
@@ -3239,7 +3613,7 @@ struct ConversationDetailView: View {
                 data: nil, filename: record.filename, mimeType: record.mimeType, kind: record.kind,
                 caption: record.caption, width: record.width, height: record.height,
                 replyToId: record.replyToId, ttlSeconds: record.ttlSeconds ?? 0,
-                clientRequestId: record.clientRequestId
+                clientRequestId: record.clientRequestId, failureReason: record.failureReason
             )
             sendStatus[localId] = .failed
             restored.append(makeOptimisticMessage(
@@ -4333,6 +4707,36 @@ private struct PendingAttachmentSend {
     let replyToId: String?
     let ttlSeconds: Int
     var clientRequestId: String?
+    /// Cause du dernier refus, montrée sous la bulle « Non envoyé » (U06).
+    var failureReason: String? = nil
+}
+
+/// Miniature d'une photo en attente d'envoi, calculée une fois par bulle.
+private enum PendingThumbnailCache {
+    @MainActor private static let cache = NSCache<NSString, UIImage>()
+
+    @MainActor static func image(for id: String, data: Data) -> UIImage? {
+        if let cached = cache.object(forKey: id as NSString) { return cached }
+        guard let image = ImagePipeline.downsample(data: data, maxPixel: 280) else { return nil }
+        cache.setObject(image, forKey: id as NSString)
+        return image
+    }
+}
+
+/// Vidéo choisie dans la photothèque : copiée en fichier temporaire à l'import.
+private struct PickedMovie: Transferable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .movie) { movie in
+            SentTransferredFile(movie.url)
+        } importing: { received in
+            let copy = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(UUID().uuidString).\(received.file.pathExtension)")
+            try FileManager.default.copyItem(at: received.file, to: copy)
+            return PickedMovie(url: copy)
+        }
+    }
 }
 
 /// Glisser une rangée de message vers la droite pour y répondre. L'état du glissement vit dans ce
@@ -4401,6 +4805,8 @@ private struct ImageViewerSession: Identifiable {
 private struct ForwardPayload: Identifiable {
     let id = UUID()
     let text: String
+    /// Le message vient d'une conversation chiffrée : il ne peut aller que vers une autre conversation chiffrée.
+    let sourceIsEncrypted: Bool
 }
 
 /// Emojis courants pour réagir à un message au-delà des six de la palette rapide. Pas de
@@ -4449,24 +4855,44 @@ private struct EmojiReactionSheet: View {
     }
 }
 
-/// Transfert d'un texte vers une autre conversation. Seules les conversations non chiffrées sont
-/// proposées : l'envoi de texte existant y suffit, sans logique de chiffrement supplémentaire.
+/// Transfert d'un texte vers une autre conversation. Une cible chiffrée est toujours permise (l'envoi
+/// y chiffre) ; depuis une conversation chiffrée, seules les cibles chiffrées sont proposées, car un
+/// texte déchiffré ne part jamais en clair. Chaque cible reçoit le texte par son propre chemin d'envoi :
+/// ordinaire, chiffré v1 ou messagerie v2. Rien ne passe par le presse-papiers.
 private struct ForwardMessageSheet: View {
     let text: String
+    let sourceIsEncrypted: Bool
     let service: MessagesServicing
+    let e2ee: E2EEServicing?
     let currentUserId: String?
     let excludedConversationId: String
     let onSent: () -> Void
 
+    @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
     @State private var conversations: [MessageConversation] = []
+    /// Chemin d'envoi de chaque cible, établi une fois au chargement (l'état v2 se lit sur disque).
+    @State private var routes: [String: EncryptedConversationSurfaces.ForwardRoute] = [:]
     @State private var hasLoaded = false
     @State private var loadError: String?
     @State private var sendingId: String?
     @State private var sendError: String?
 
     private var targets: [MessageConversation] {
-        conversations.filter { $0.e2eeEnabled != true && $0.id != excludedConversationId }
+        conversations.filter {
+            $0.id != excludedConversationId
+                && EncryptedConversationSurfaces.allowsForward(fromEncrypted: sourceIsEncrypted, toEncrypted: $0.e2eeEnabled == true)
+                && routes[$0.id] != .unavailable
+        }
+    }
+
+    private func route(for target: MessageConversation) -> EncryptedConversationSurfaces.ForwardRoute {
+        let encrypted = target.e2eeEnabled == true
+        return EncryptedConversationSurfaces.forwardRoute(
+            toEncrypted: encrypted,
+            targetIsV2: encrypted && EncryptedConversationSurfaces.isV2(target),
+            v2Enabled: services.e2eeV2Messaging.readsEnabled && services.e2eeV2Messaging.writesEnabled
+        )
     }
 
     var body: some View {
@@ -4500,7 +4926,9 @@ private struct ForwardMessageSheet: View {
         } else if targets.isEmpty {
             EmptyStateView(
                 title: "Aucune conversation",
-                message: "Le transfert ne vise que les conversations non chiffrées.",
+                message: sourceIsEncrypted
+                    ? "Un message chiffré ne se transfère que vers une autre conversation chiffrée."
+                    : "Tu n’as pas d’autre conversation où transférer ce message.",
                 systemImage: "bubble.left.and.bubble.right"
             )
         } else {
@@ -4543,7 +4971,9 @@ private struct ForwardMessageSheet: View {
     private func load() async {
         loadError = nil
         do {
-            conversations = try await service.conversations()
+            let loaded = try await service.conversations()
+            conversations = loaded
+            routes = Dictionary(loaded.map { ($0.id, route(for: $0)) }, uniquingKeysWith: { first, _ in first })
             hasLoaded = true
         } catch {
             loadError = error.userFacingMessage
@@ -4555,15 +4985,39 @@ private struct ForwardMessageSheet: View {
         sendingId = target.id
         sendError = nil
         do {
-            _ = try await service.sendText(
-                text, in: target, replyToId: nil, e2ee: nil, idempotencyKey: UUID().uuidString, ttlSeconds: 0
-            )
+            switch routes[target.id] ?? .plain {
+            case .plain:
+                _ = try await service.sendText(
+                    text, in: target, replyToId: nil, e2ee: nil, idempotencyKey: UUID().uuidString, ttlSeconds: 0
+                )
+            case .legacyEncrypted:
+                // Le service chiffre avec la clé v1 ; verrouillée, il refuse et rien ne part en clair.
+                _ = try await service.sendText(
+                    text, in: target, replyToId: nil, e2ee: e2ee ?? services.e2ee,
+                    idempotencyKey: UUID().uuidString, ttlSeconds: 0
+                )
+            case .v2:
+                let result = await services.e2eeV2Messaging.send(
+                    .init(body: .text(text), replyToRef: nil, mentions: [], ttlSeconds: 0),
+                    clientRequestId: UUID().uuidString, conversationId: target.id, isGroup: target.isGroup,
+                    participantIds: target.participants.map(\.userId)
+                )
+                if let failure = EncryptedConversationSurfaces.v2SendFailureMessage(result, keptForRetry: false) {
+                    throw ForwardFailure(message: failure)
+                }
+            case .unavailable:
+                throw ForwardFailure(message: String(localized: "Cette conversation chiffrée n’est pas disponible dans cette version de SignalQuest."))
+            }
             onSent()
             dismiss()
         } catch {
-            sendError = error.userFacingMessage
+            sendError = (error as? ForwardFailure)?.message ?? error.userFacingMessage
             sendingId = nil
             Haptics.error()
         }
+    }
+
+    private struct ForwardFailure: Error {
+        let message: String
     }
 }

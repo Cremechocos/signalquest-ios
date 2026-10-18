@@ -5,6 +5,9 @@ protocol MessagesServicing: Sendable {
     func conversations() async throws -> [MessageConversation]
     /// La liste avec la limite d'épinglage (P2-46).
     func conversationList() async throws -> ConversationList
+    /// Une page de la liste (B01) : `cursor` nil pour la première, puis le
+    /// `nextCursor` de la page précédente.
+    func conversationPage(cursor: String?, take: Int) async throws -> ConversationList
     func conversation(id: String) async throws -> MessageConversation
     func createConversation(participantIds: [String], title: String?, e2ee: Bool) async throws -> CreateConversationResponse
     func searchUsers(query: String) async throws -> [MessageSearchUser]
@@ -72,6 +75,8 @@ protocol MessagesServicing: Sendable {
     func pendingAttachments(conversationId: String) async -> [MessageAttachmentOutboxRecord]
     /// Abandonne définitivement une pièce jointe en file : elle ne repartira plus.
     func discardPendingAttachment(clientRequestId: String) async
+    /// Renvoie une pièce jointe restée en file (geste « Renvoyer »), refusée ou non.
+    func resendPendingAttachment(clientRequestId: String) async throws -> MessageItem
     func markRead(conversationId: String, lastMessageId: String) async throws
     /// Lit jusqu'au message le plus récent, v1 et v2 (lot serveur A7) : une
     /// conversation v2 n'a pas d'identifiant de message v1 à donner.
@@ -108,6 +113,9 @@ protocol MessagesServicing: Sendable {
     func scheduledMessages(conversationId: String) async throws -> [ScheduledMessage]
     func createScheduledMessage(sendAt: Date, text: String, in conversation: MessageConversation, replyToId: String?, senderId: String?, e2ee: E2EEServicing?) async throws -> ScheduledMessage
     func deleteScheduledMessage(conversationId: String, scheduledId: String) async throws
+    /// Change l'heure et/ou le texte d'un envoi programmé (`PATCH`). En conversation
+    /// chiffrée, le serveur n'accepte que l'heure.
+    func updateScheduledMessage(conversationId: String, scheduledId: String, sendAt: Date?, content: String?) async throws -> ScheduledMessage
     func pinnedMessages(conversationId: String) async throws -> [PinnedMessage]
     func pin(conversationId: String, messageId: String) async throws
     func unpin(conversationId: String, messageId: String) async throws
@@ -136,6 +144,25 @@ extension MessagesServicing {
         return conversation
     }
 
+    /// Toutes les réponses d'un fil, page par page (B04) : la route est paginée par curseur
+    /// et ne rend qu'une page ; au-delà de `maxPages` pages, le reste n'est pas chargé.
+    func allThreadReplies(parentMessageId: String, pageSize: Int = 100, maxPages: Int = 10) async throws -> ThreadPage {
+        var replies: [MessageItem] = []
+        var seen = Set<String>()
+        var parent: MessageItem?
+        var cursor: String?
+        var hasMore = false
+        for _ in 0..<max(1, maxPages) {
+            let page = try await thread(parentMessageId: parentMessageId, take: pageSize, cursor: cursor)
+            parent = parent ?? page.parent
+            replies += page.replies.filter { seen.insert($0.id).inserted }
+            hasMore = page.hasMore ?? (page.nextCursor != nil)
+            guard hasMore, let next = page.nextCursor, next != cursor else { hasMore = false; break }
+            cursor = next
+        }
+        return ThreadPage(parent: parent, replies: replies, hasMore: hasMore, nextCursor: cursor)
+    }
+
     func activeLiveShareSessions() async throws -> [LiveShareSession] { [] }
     func retryPendingTextMessages() async {}
     func pendingTextMessages(conversationId: String) async -> [MessageTextOutboxRecord] { [] }
@@ -144,6 +171,7 @@ extension MessagesServicing {
     func retryPendingAttachments() async {}
     func pendingAttachments(conversationId: String) async -> [MessageAttachmentOutboxRecord] { [] }
     func discardPendingAttachment(clientRequestId: String) async {}
+    func resendPendingAttachment(clientRequestId: String) async throws -> MessageItem { throw CancellationError() }
 
     func sendAttachmentData(
         _ data: Data,
@@ -184,16 +212,25 @@ extension MessagesServicing {
     }
 }
 
-/// Envoie l'accusé « distribué » une seule fois par message : le dernier id envoyé
-/// est gardé par conversation. Un échec (route absente, réseau) reste silencieux et
-/// ne se rejoue pas pour le même message.
+/// Envoie l'accusé « distribué » une seule fois par message réussi : le dernier id
+/// accepté est gardé par conversation. Un échec (réseau, route absente) reste
+/// silencieux mais ne marque rien : le rafraîchissement suivant retente (B08).
 actor DeliveryAcknowledger {
     private var lastSent: [String: String] = [:]
+    /// Accusés en vol : deux déclencheurs rapprochés n'envoient pas deux fois le même.
+    private var inFlight: Set<String> = []
 
     func acknowledge(conversationId: String, messageId: String, using service: MessagesServicing) async {
         guard !messageId.hasPrefix("local-"), lastSent[conversationId] != messageId else { return }
-        lastSent[conversationId] = messageId
-        try? await service.markDelivered(conversationId: conversationId, messageId: messageId)
+        let key = "\(conversationId)|\(messageId)"
+        guard inFlight.insert(key).inserted else { return }
+        defer { inFlight.remove(key) }
+        do {
+            try await service.markDelivered(conversationId: conversationId, messageId: messageId)
+            lastSent[conversationId] = messageId
+        } catch {
+            // Rien n'est mémorisé : le prochain passage rejoue l'accusé.
+        }
     }
 
     /// Pour chaque conversation non lue dont le dernier message vient d'autrui : un seul appel.
@@ -284,17 +321,54 @@ final class MessagesService: MessagesServicing {
         e2eeV2LiveShareEventsClient = E2EEV2LiveShareEventClient(api: api)
     }
 
+    /// Taille d'une page demandée au serveur (maximum accepté : 100) et borne du
+    /// nombre de pages suivies par `conversations()`.
+    static let conversationPageSize = 100
+    static let conversationMaxPages = 10
+
+    /// Toutes les conversations (jusqu'à la borne), en suivant les curseurs : la
+    /// recherche, le badge, les cibles de Transférer et l'entrée « Écrire » des
+    /// amis ne s'arrêtent plus aux 50 premières (B01).
     func conversations() async throws -> [MessageConversation] {
-        try await conversationList().conversations
+        var all: [MessageConversation] = []
+        var seen = Set<String>()
+        var cursor: String?
+        for _ in 0..<Self.conversationMaxPages {
+            let page: ConversationList
+            do {
+                page = try await conversationPage(cursor: cursor, take: Self.conversationPageSize)
+            } catch {
+                // Une page suivante qui échoue ne retire pas ce qui est déjà là.
+                if all.isEmpty || error.isCancellation { throw error }
+                break
+            }
+            for conversation in page.conversations where seen.insert(conversation.id).inserted {
+                all.append(conversation)
+            }
+            guard page.hasMore, let next = page.nextCursor, next != cursor else { break }
+            cursor = next
+        }
+        return all
     }
 
     func conversationList() async throws -> ConversationList {
+        try await conversationPage(cursor: nil, take: 50)
+    }
+
+    func conversationPage(cursor: String?, take: Int) async throws -> ConversationList {
         let session = LocalAccountScope.sessionSnapshot()
+        var query = [URLQueryItem(name: "take", value: String(min(max(take, 1), 100)))]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
         let response = try await api.request(
-            APIEndpoint(path: "/api/messages/conversations"), as: ConversationsResponse.self
+            APIEndpoint(path: "/api/messages/conversations", query: query), as: ConversationsResponse.self
         )
         rememberForCalls(response.conversations, session: session)
-        return ConversationList(conversations: response.conversations, pinLimit: response.pinLimit)
+        return ConversationList(
+            conversations: response.conversations,
+            pinLimit: response.pinLimit,
+            hasMore: response.hasMore ?? false,
+            nextCursor: response.nextCursor
+        )
     }
 
     func conversation(id: String) async throws -> MessageConversation {
@@ -889,6 +963,9 @@ final class MessagesService: MessagesServicing {
                 && $0.kind == kind.uppercased() && $0.caption == cleanCaption
                 && $0.replyToId == replyToId
         }) {
+            if existing.failureReason != nil {
+                try? await attachmentOutbox.setFailure(nil, session: session, clientRequestId: existing.clientRequestId)
+            }
             return try await submitPreparedAttachment(existing, session: session)
         }
         let requestId = "attachment-\(UUID().uuidString.lowercased())"
@@ -928,17 +1005,52 @@ final class MessagesService: MessagesServicing {
     func retryPendingAttachments() async {
         guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return }
         guard let records = try? await attachmentOutbox.pending(session: session) else { return }
-        for record in records {
+        // Comme la file des textes : l'ordre ne compte qu'au sein d'une conversation.
+        // Un refus définitif marque la pièce « non envoyée » et la file continue ;
+        // une issue inconnue (réseau, serveur) ne retient que sa propre conversation (B03).
+        var blockedConversations = Set<String>()
+        for record in records where record.failureReason == nil {
             guard session.isCurrent else { return }
+            guard !blockedConversations.contains(record.conversationId) else { continue }
             do {
                 _ = try await submitPreparedAttachment(record, session: session)
+            } catch where error.isPermanentAttachmentFailure {
+                continue
             } catch {
-                return
+                blockedConversations.insert(record.conversationId)
             }
         }
     }
 
+    /// Renvoie une pièce jointe de la file avec son identifiant d'origine : le
+    /// serveur la dédoublonne si elle était finalement passée.
+    func resendPendingAttachment(clientRequestId: String) async throws -> MessageItem {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent,
+              let record = try await attachmentOutbox.record(session: session, clientRequestId: clientRequestId) else {
+            throw CancellationError()
+        }
+        try await attachmentOutbox.setFailure(nil, session: session, clientRequestId: clientRequestId)
+        return try await submitPreparedAttachment(record, session: session)
+    }
+
+    /// Un refus définitif, ou une source disparue, range la pièce en « non envoyée »
+    /// au lieu de la rejouer à chaque reprise.
     private func submitPreparedAttachment(
+        _ stagedRecord: MessageAttachmentOutboxRecord,
+        session: LocalAccountSession
+    ) async throws -> MessageItem {
+        do {
+            return try await sendPreparedAttachment(stagedRecord, session: session)
+        } catch where error.isPermanentAttachmentFailure {
+            try? await attachmentOutbox.setFailure(
+                error.localizedDescription, session: session, clientRequestId: stagedRecord.clientRequestId
+            )
+            SQDiagnostics.record(error, area: .messageOutbox)
+            throw error
+        }
+    }
+
+    private func sendPreparedAttachment(
         _ stagedRecord: MessageAttachmentOutboxRecord,
         session: LocalAccountSession
     ) async throws -> MessageItem {
@@ -1000,7 +1112,8 @@ final class MessagesService: MessagesServicing {
                 contentSha256: record.contentSha256,
                 uploadedAttachment: attachment,
                 createdAt: record.createdAt,
-                ttlSeconds: record.ttlSeconds
+                ttlSeconds: record.ttlSeconds,
+                failureReason: record.failureReason
             )
         }
         let payload = SendMessageRequest(
@@ -1380,6 +1493,24 @@ final class MessagesService: MessagesServicing {
             method: .delete,
             body: [String: String]()
         )
+    }
+
+    func updateScheduledMessage(
+        conversationId: String,
+        scheduledId: String,
+        sendAt: Date?,
+        content: String?
+    ) async throws -> ScheduledMessage {
+        struct Request: Encodable {
+            let sendAt: String?
+            let content: String?
+        }
+        let response: ScheduledMessageResponse = try await api.requestJSON(
+            "/api/messages/conversations/\(conversationId)/scheduled/\(scheduledId)",
+            method: .patch,
+            body: Request(sendAt: sendAt.map(Self.iso), content: content)
+        )
+        return response.scheduledMessage
     }
 
     func pinnedMessages(conversationId: String) async throws -> [PinnedMessage] {
@@ -1845,6 +1976,18 @@ enum MessageAttachmentOutboxError: Error, Equatable {
     case sourceTooLarge
 }
 
+private extension Error {
+    /// Refus du serveur pour de bon, ou source locale perdue : rejouer à l'identique
+    /// échouera toujours. Un changement de session n'en est pas un.
+    var isPermanentAttachmentFailure: Bool {
+        if isPermanentRequestFailure { return true }
+        switch self as? MessageAttachmentOutboxError {
+        case .sourceMissing, .sourceCorrupted, .sourceTooLarge: return true
+        default: return false
+        }
+    }
+}
+
 struct MessageAttachmentOutboxRecord: Codable, Equatable, Sendable {
     let ownerScopeId: String
     let sessionId: String
@@ -1862,10 +2005,19 @@ struct MessageAttachmentOutboxRecord: Codable, Equatable, Sendable {
     let createdAt: Date
     /// Mode éphémère au moment de l'envoi ; absent des fichiers plus anciens.
     var ttlSeconds: Int? = nil
+    /// Refus définitif (ou source disparue) : la reprise automatique l'ignore et
+    /// la conversation l'affiche « non envoyé ». Absent des fichiers plus anciens.
+    var failureReason: String? = nil
 }
 
 actor MessageAttachmentOutboxStore {
-    private static let maximumSourceBytes = 10 * 1_024 * 1_024
+    /// Taille maximale d'une pièce jointe : celle du serveur (10 Mio).
+    static let maximumSourceBytes = 10 * 1_024 * 1_024
+
+    /// Vrai si un fichier de cette taille peut partir.
+    static func fits(_ byteCount: Int) -> Bool {
+        byteCount > 0 && byteCount <= maximumSourceBytes
+    }
     private let root: URL
     private let currentSession: MessageTextOutboxStore.CurrentSession
     private let publisher: MessageTextOutboxStore.Publisher
@@ -2009,10 +2161,28 @@ actor MessageAttachmentOutboxStore {
             contentSha256: current.contentSha256,
             uploadedAttachment: attachment,
             createdAt: current.createdAt,
-            ttlSeconds: current.ttlSeconds
+            ttlSeconds: current.ttlSeconds,
+            failureReason: current.failureReason
         )
         let url = metadataURL(clientRequestId, ownerNamespace: session.ownerNamespace)
         let data = try encoder.encode(updated)
+        try publisher(session) {
+            try data.write(to: url, options: [.atomic])
+            Self.protect(url)
+        }
+    }
+
+    /// Marque la pièce refusée pour de bon (`reason`), ou la remet en attente (`nil`).
+    func setFailure(
+        _ reason: String?,
+        session: LocalAccountSession,
+        clientRequestId: String
+    ) throws {
+        guard var current = try record(session: session, clientRequestId: clientRequestId),
+              current.failureReason != reason else { return }
+        current.failureReason = reason
+        let url = metadataURL(clientRequestId, ownerNamespace: session.ownerNamespace)
+        let data = try encoder.encode(current)
         try publisher(session) {
             try data.write(to: url, options: [.atomic])
             Self.protect(url)

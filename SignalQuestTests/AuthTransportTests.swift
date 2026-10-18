@@ -429,6 +429,46 @@ private final class RequestLog: @unchecked Sendable {
 
 @MainActor
 final class ImagePipelineAccountScopeTests: XCTestCase {
+    /// P01 : un dossier par compte, nom stable malgré l'adresse signée, jamais partagé, supprimé à la déconnexion.
+    func testPrivateDiskCacheIsPerAccountAndPurgedWithTheAccount() {
+        let alice = "user:" + String(repeating: "a", count: 64)
+        let bruno = "user:" + String(repeating: "b", count: 64)
+        defer {
+            PrivateImageDiskCache.purge(ownerScopeId: alice)
+            PrivateImageDiskCache.purge(ownerScopeId: bruno)
+        }
+        let aliceNamespace = LocalAccountScope.storageNamespace(for: alice)
+        let brunoNamespace = LocalAccountScope.storageNamespace(for: bruno)
+        let first = URL(string: "https://cdn.example/messages/att-1.jpg?sig=one")!
+        let signedAgain = URL(string: "https://cdn.example/messages/att-1.jpg?sig=two")!
+
+        PrivateImageDiskCache.store(Data("photo".utf8), for: first, ownerNamespace: aliceNamespace)
+
+        XCTAssertEqual(PrivateImageDiskCache.data(for: signedAgain, ownerNamespace: aliceNamespace), Data("photo".utf8))
+        XCTAssertNil(PrivateImageDiskCache.data(for: first, ownerNamespace: brunoNamespace), "Jamais partagé entre comptes")
+
+        PrivateImageDiskCache.store(Data("photo de bruno".utf8), for: first, ownerNamespace: brunoNamespace)
+        PrivateImageDiskCache.purge(ownerScopeId: alice)
+        XCTAssertNil(PrivateImageDiskCache.data(for: first, ownerNamespace: aliceNamespace))
+        XCTAssertNotNil(PrivateImageDiskCache.data(for: first, ownerNamespace: brunoNamespace), "La purge ne touche que le compte qui part")
+    }
+
+    func testPrivateDiskCacheDropsTheOldestImagesPastItsLimit() throws {
+        let owner = "user:" + String(repeating: "c", count: 64)
+        defer { PrivateImageDiskCache.purge(ownerScopeId: owner) }
+        let namespace = LocalAccountScope.storageNamespace(for: owner)
+        let urls = (1...3).map { URL(string: "https://cdn.example/messages/att-\($0).jpg")! }
+        for url in urls {
+            PrivateImageDiskCache.store(Data(repeating: 7, count: 40), for: url, ownerNamespace: namespace, limit: 100)
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        XCTAssertNil(PrivateImageDiskCache.data(for: urls[0], ownerNamespace: namespace), "La plus ancienne a laissé la place")
+        XCTAssertNotNil(PrivateImageDiskCache.data(for: urls[1], ownerNamespace: namespace))
+        XCTAssertNotNil(PrivateImageDiskCache.data(for: urls[2], ownerNamespace: namespace))
+        PrivateImageDiskCache.store(Data(repeating: 1, count: 500), for: urls[0], ownerNamespace: namespace, limit: 100)
+        XCTAssertNil(PrivateImageDiskCache.data(for: urls[0], ownerNamespace: namespace), "Un fichier plus gros que le plafond n'est pas gardé")
+    }
+
     private let url = URL(string: "https://cdn.signalquest.test/private/same-image")!
 
     func testPrivateTransportHasNoSharedURLCacheOrCookieJar() {

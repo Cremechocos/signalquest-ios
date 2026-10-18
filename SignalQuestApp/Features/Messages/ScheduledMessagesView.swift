@@ -17,6 +17,8 @@ struct ScheduledMessagesView: View {
     @State private var decrypted: [String: String] = [:]
     /// Envoi programmé dont l'annulation attend confirmation (irréversible).
     @State private var deletionTarget: ScheduledMessage?
+    /// Envoi programmé dont l'heure ou le texte se modifie.
+    @State private var editTarget: ScheduledMessage?
 
     private var isE2EE: Bool { conversation.e2eeEnabled == true }
 
@@ -72,7 +74,17 @@ struct ScheduledMessagesView: View {
         } message: { _ in
             Text("Le message ne sera pas envoyé.")
         }
+        .sheet(item: $editTarget) { item in
+            ScheduledMessageEditSheet(
+                item: item,
+                plainText: item.isEncrypted ? nil : (item.content ?? ""),
+                subtitle: subtitle
+            ) { sendAt, content in
+                try await update(item, sendAt: sendAt, content: content)
+            }
+        }
         .task { await load() }
+        .refreshable { await load() }
     }
 
     private func row(_ item: ScheduledMessage) -> some View {
@@ -109,7 +121,15 @@ struct ScheduledMessagesView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Annuler l’envoi")
+            .accessibilityLabel(cancelAccessibilityLabel(for: item))
+        }
+        // Modifier l'heure (et le texte hors conversation chiffrée), sur la ligne entière.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if canEdit(item) { editTarget = item }
+        }
+        .accessibilityAction(named: Text("Modifier")) {
+            if canEdit(item) { editTarget = item }
         }
         .padding(.leading, SQSpace.md)
         .padding(.trailing, SQSpace.xs)
@@ -122,13 +142,38 @@ struct ScheduledMessagesView: View {
         return value.isEmpty ? String(localized: "(vide)") : value
     }
 
+    /// Seuls les envois encore en attente se modifient.
+    private func canEdit(_ item: ScheduledMessage) -> Bool {
+        item.status == nil || item.status == "scheduled"
+    }
+
+    /// « Annuler l'envoi du 18 oct. à 18:00 : Salut… » : N boutons identiques ne disent
+    /// pas lequel (A01).
+    private func cancelAccessibilityLabel(for item: ScheduledMessage) -> String {
+        let when = item.sendAt.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? ""
+        let text = String(content(for: item).prefix(40))
+        return String(localized: "Annuler l’envoi du \(when) : \(text)")
+    }
+
     private func statusLabel(_ status: String) -> String {
         switch status {
         case "dispatching": return String(localized: "Envoi en cours…")
-        case "failed_membership", "failed_validation", "failed_dispatch": return String(localized: "Échec d'envoi")
-        case "canceled": return String(localized: "Annulé")
-        default: return status
+        case "failed_membership", "failed_validation", "failed_dispatch", "failed": return String(localized: "Échec d’envoi")
+        case "canceled", "cancelled": return String(localized: "Annulé")
+        case "sent": return String(localized: "Envoyé")
+        default: return String(localized: "État inconnu")
         }
+    }
+
+    private func update(_ item: ScheduledMessage, sendAt: Date, content: String?) async throws {
+        let saved = try await service.updateScheduledMessage(
+            conversationId: conversation.id,
+            scheduledId: item.id,
+            sendAt: sendAt,
+            content: content
+        )
+        if let index = items.firstIndex(where: { $0.id == item.id }) { items[index] = saved }
+        Haptics.success()
     }
 
     private func load() async {
@@ -177,6 +222,85 @@ struct ScheduledMessagesView: View {
             try await service.deleteScheduledMessage(conversationId: conversation.id, scheduledId: target.id)
             items.removeAll { $0.id == target.id }
             Haptics.success()
+        } catch {
+            errorMessage = error.userFacingMessage
+            Haptics.error()
+        }
+    }
+}
+
+/// Modification d'un envoi programmé : l'heure, et le texte quand la conversation n'est
+/// pas chiffrée (le serveur refuse de changer le texte d'un envoi chiffré).
+struct ScheduledMessageEditSheet: View {
+    let item: ScheduledMessage
+    /// `nil` : envoi chiffré, seule l'heure se change.
+    let plainText: String?
+    let subtitle: String?
+    let onSave: (Date, String?) async throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var text: String
+    @State private var sendAt: Date
+    @State private var isBusy = false
+    @State private var errorMessage: String?
+
+    init(item: ScheduledMessage, plainText: String?, subtitle: String?, onSave: @escaping (Date, String?) async throws -> Void) {
+        self.item = item
+        self.plainText = plainText
+        self.subtitle = subtitle
+        self.onSave = onSave
+        _text = State(initialValue: plainText ?? "")
+        _sendAt = State(initialValue: max(item.sendAt ?? Date(), Date().addingTimeInterval(120)))
+    }
+
+    private var canSave: Bool {
+        sendAt > Date() && (plainText == nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(title: "Modifier l’envoi", subtitle: subtitle, closeIdentifier: "scheduled.edit.cancel") { dismiss() }
+                if plainText != nil {
+                    VStack(alignment: .leading, spacing: SQSpace.sm) {
+                        Text("Message")
+                            .sqKicker()
+                            .padding(.leading, SQSpace.xs)
+                        TextField("Message à envoyer", text: $text, axis: .vertical)
+                            .lineLimit(2...5)
+                            .sqHaloField()
+                    }
+                } else {
+                    Label("Le texte d’un envoi chiffré ne se modifie pas : seule l’heure change.", systemImage: "lock.fill")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                SendTimePicker(label: "Envoyer le", date: $sendAt)
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.dangerInk)
+                }
+                GradientButton("Enregistrer", systemImage: "checkmark", isBusy: isBusy) {
+                    Task { await save() }
+                }
+                .disabled(!canSave || isBusy)
+            }
+            .padding(SQSpace.lg)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .sqSheet(background: SQColor.bg)
+    }
+
+    private func save() async {
+        guard canSave else { return }
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            try await onSave(sendAt, plainText == nil || trimmed == plainText ? nil : trimmed)
+            dismiss()
         } catch {
             errorMessage = error.userFacingMessage
             Haptics.error()

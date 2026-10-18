@@ -17,7 +17,7 @@ struct RemoteVoiceNoteBubble: View {
     var body: some View {
         Group {
             if let prepared {
-                VoiceNoteBubble(url: prepared.url, levels: prepared.levels, duration: prepared.duration, mine: mine)
+                VoiceNoteBubble(url: prepared.url, levels: prepared.levels, duration: prepared.duration, mine: mine, sequenceKey: attachment.id)
             } else {
                 placeholder
             }
@@ -100,9 +100,37 @@ actor VoiceNoteCache {
             try? FileManager.default.removeItem(at: destination)
             try FileManager.default.moveItem(at: temporary, to: destination)
         }
-        let file = try Self.analyze(destination)
+        let file = try await Self.analyzeOffActor(destination)
         memory[destination.path] = file
+        Self.trimIfNeeded(directory: directory, keeping: destination)
         return file
+    }
+
+    /// Plafond du dossier du compte : au-delà, les notes les plus anciennement
+    /// ouvertes partent (elles se retéléchargent à la demande).
+    static let maxDirectoryBytes = 200 * 1024 * 1024
+
+    /// L'analyse lit le fichier : elle tourne hors de l'acteur, sans quoi les notes
+    /// d'un fil se traiteraient l'une après l'autre (P04).
+    private nonisolated static func analyzeOffActor(_ url: URL) async throws -> VoiceNoteFile {
+        try await Task.detached(priority: .userInitiated) { try analyze(url) }.value
+    }
+
+    /// Éviction par ancienneté de modification jusqu'à repasser sous le plafond.
+    static func trimIfNeeded(directory: URL, keeping: URL, limit: Int = VoiceNoteCache.maxDirectoryBytes) {
+        let fileManager = FileManager.default
+        let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey]
+        guard let urls = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys) else { return }
+        var entries: [(url: URL, size: Int, date: Date)] = urls.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
+            return (url, values.fileSize ?? 0, values.contentModificationDate ?? .distantPast)
+        }
+        var total = entries.reduce(0) { $0 + $1.size }
+        guard total > limit else { return }
+        entries.sort { $0.date < $1.date }
+        for entry in entries where total > limit && entry.url != keeping {
+            if (try? fileManager.removeItem(at: entry.url)) != nil { total -= entry.size }
+        }
     }
 
     private static func directory() throws -> URL {

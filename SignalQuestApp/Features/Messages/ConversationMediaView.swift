@@ -14,6 +14,9 @@ struct ConversationMediaView: View {
     @State private var messages: [MessageItem] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    /// Une page pleine laisse penser qu'il en reste : la suivante part de la date du plus ancien.
+    @State private var hasMore = false
+    @State private var isLoadingMore = false
     @State private var imageViewerTarget: MessageImageTarget?
     /// `nil` : l'onglet par défaut, Photos s'il y en a.
     @State private var tab: Tab?
@@ -58,6 +61,13 @@ struct ConversationMediaView: View {
                         if photos.isEmpty { emptyTab("Aucune photo dans cette conversation.") } else { photosSection }
                     case .files:
                         if files.isEmpty { emptyTab("Aucun fichier ni note vocale dans cette conversation.") } else { filesSection }
+                    }
+                    if hasMore {
+                        SQSpinner()
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Chargement d’autres médias")
+                            .task(id: messages.count) { await loadMore() }
                     }
                 }
             }
@@ -225,10 +235,38 @@ struct ConversationMediaView: View {
             var filters = MessageSearchFilters()
             filters.conversationId = conversation.id
             filters.hasAttachment = true
-            messages = try await service.searchMessages(query: "", filters: filters, take: Self.pageSize).map(\.message)
+            let page = try await service.searchMessages(query: "", filters: filters, take: Self.pageSize).map(\.message)
+            messages = page
+            hasMore = page.count >= Self.pageSize
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }
+        }
+    }
+
+    /// Page suivante : les messages à pièce jointe antérieurs au plus ancien déjà chargé.
+    /// Une page sans rien de nouveau (bornes comprises) clôt la liste.
+    private func loadMore() async {
+        guard hasMore, !isLoadingMore, !AppEnvironment.usesDemoData,
+              let oldest = messages.compactMap(\.createdAt).min() else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        do {
+            var filters = MessageSearchFilters()
+            filters.conversationId = conversation.id
+            filters.hasAttachment = true
+            filters.to = oldest
+            let page = try await service.searchMessages(query: "", filters: filters, take: Self.pageSize).map(\.message)
+            let known = Set(messages.map(\.id))
+            let fresh = page.filter { !known.contains($0.id) }
+            guard !fresh.isEmpty else {
+                hasMore = false
+                return
+            }
+            messages = (messages + fresh).sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
+            hasMore = page.count >= Self.pageSize
+        } catch {
+            if !error.isCancellation { hasMore = false }
         }
     }
 }

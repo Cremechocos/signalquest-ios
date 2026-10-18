@@ -1,4 +1,5 @@
 import SwiftUI
+import CryptoKit
 import ImageIO
 import UIKit
 
@@ -33,6 +34,74 @@ enum ImageCacheScope: Equatable, Sendable {
     }
 }
 
+/// Cache disque des images privées (photos de conversation), un dossier par compte.
+/// Les octets ne sont jamais partagés entre comptes : le dossier porte l'empreinte du
+/// propriétaire, il est protégé tant que l'appareil est verrouillé, hors sauvegarde, plafonné,
+/// et supprimé à la déconnexion ou au changement de compte.
+enum PrivateImageDiskCache {
+    /// Au-delà, les fichiers les plus anciennement écrits partent (ils se retéléchargent).
+    static let maxBytesPerAccount = 150 * 1024 * 1024
+
+    private static func root() -> URL? {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("sq-private-images", isDirectory: true)
+    }
+
+    private static func directory(ownerNamespace: String) -> URL? {
+        root()?.appendingPathComponent(ownerNamespace, isDirectory: true)
+    }
+
+    /// Nom stable : l'adresse sans ses paramètres (une adresse signée en change d'une réponse à l'autre).
+    static func fileName(for url: URL) -> String {
+        let source = (url.host ?? "") + url.path
+        return SHA256.hash(data: Data(source.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func data(for url: URL, ownerNamespace: String) -> Data? {
+        guard let file = directory(ownerNamespace: ownerNamespace)?.appendingPathComponent(fileName(for: url)),
+              let data = try? Data(contentsOf: file), !data.isEmpty else { return nil }
+        return data
+    }
+
+    static func store(_ data: Data, for url: URL, ownerNamespace: String, limit: Int = maxBytesPerAccount) {
+        guard !data.isEmpty, data.count <= limit, let directory = directory(ownerNamespace: ownerNamespace) else { return }
+        let fileManager = FileManager.default
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        var folder = directory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? folder.setResourceValues(values)
+        let file = directory.appendingPathComponent(fileName(for: url))
+        guard (try? data.write(to: file, options: [.atomic, .completeFileProtectionUnlessOpen])) != nil else { return }
+        trim(directory: directory, keeping: file, limit: limit)
+    }
+
+    /// Éviction par ancienneté jusqu'à repasser sous le plafond.
+    static func trim(directory: URL, keeping: URL?, limit: Int) {
+        let fileManager = FileManager.default
+        let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey]
+        guard let urls = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys) else { return }
+        var entries: [(url: URL, size: Int, date: Date)] = urls.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
+            return (url, values.fileSize ?? 0, values.contentModificationDate ?? .distantPast)
+        }
+        var total = entries.reduce(0) { $0 + $1.size }
+        guard total > limit else { return }
+        entries.sort { $0.date < $1.date }
+        for entry in entries where total > limit && entry.url != keeping {
+            if (try? fileManager.removeItem(at: entry.url)) != nil { total -= entry.size }
+        }
+    }
+
+    /// Déconnexion ou changement de compte : tout le dossier du compte disparaît.
+    static func purge(ownerScopeId: String) {
+        let namespace = LocalAccountScope.storageNamespace(for: ownerScopeId)
+        if let directory = directory(ownerNamespace: namespace) {
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+}
+
 /// Chargeur d'images partagé : cache d'octets sur disque (URLCache dédié),
 /// cache mémoire d'images DÉCODÉES (NSCache) et surtout downsampling via
 /// ImageIO — on ne décode jamais à la résolution source. Remplace l'usage direct
@@ -59,13 +128,21 @@ final class ImagePipeline: @unchecked Sendable {
                 let (data, response) = try await publicSession.data(for: request)
                 try Self.requireSuccessfulHTTP(response)
                 return data
-            case .privateAccount:
+            case .privateAccount(let account):
                 // Cette session n'a aucun URLCache ni cookie jar partagé. La
                 // requête explicite également le bypass afin qu'une évolution de
                 // configuration ne puisse pas réactiver un cache HTTP privé global.
+                // Le cache disque est celui du compte, jamais partagé (P01).
+                if !reload, account.isCurrent,
+                   let stored = PrivateImageDiskCache.data(for: url, ownerNamespace: account.ownerNamespace) {
+                    return stored
+                }
                 let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
                 let (data, response) = try await privateSession.data(for: request)
                 try Self.requireSuccessfulHTTP(response)
+                if account.isCurrent {
+                    PrivateImageDiskCache.store(data, for: url, ownerNamespace: account.ownerNamespace)
+                }
                 return data
             }
         }
