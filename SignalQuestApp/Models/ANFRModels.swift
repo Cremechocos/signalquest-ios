@@ -475,6 +475,57 @@ struct ANFRMapSite: Decodable, Sendable, Identifiable, Equatable {
     var highestGeneration: ANFRGeneration? {
         antennas.compactMap(\.generationEnum).max { $0.rank < $1.rank }
     }
+
+    /// Azimuts des antennes de ce relevé, réunis par opérateur (ordre de l'enum).
+    /// Les opérateurs sans azimut publié sont omis.
+    var sectorsByOperator: [ANFRSiteSectors] {
+        operators.compactMap { op in
+            let azimuths = ANFRAzimuth.normalize(antennas.filter { $0.operator == op }.flatMap(\.azimuths).map(Double.init))
+            return azimuths.isEmpty ? nil : ANFRSiteSectors(operator: op, azimuths: azimuths)
+        }
+    }
+}
+
+/// Les azimuts d'un opérateur sur un support.
+struct ANFRSiteSectors: Identifiable, Equatable, Sendable {
+    let `operator`: ANFROperator
+    let azimuths: [Int]
+    var id: ANFROperator { `operator` }
+}
+
+// MARK: - Azimuts
+
+/// Nombre lu tel que le serveur l'écrit : nombre ou chaîne.
+struct ANFRLooseNumber: Decodable, Sendable {
+    let value: Double?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if let number = try? c.decode(Double.self) {
+            value = number
+        } else if let text = try? c.decode(String.self) {
+            value = Double(text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."))
+        } else {
+            value = nil
+        }
+    }
+}
+
+enum ANFRAzimuth {
+    /// Degrés entiers 0-359 (360 se lit 0), triés, sans doublon ; le reste est écarté.
+    static func normalize(_ raw: [Double]) -> [Int] {
+        let values = raw.compactMap { value -> Int? in
+            guard value.isFinite, value >= 0, value <= 360 else { return nil }
+            let degrees = Int(value.rounded())
+            return degrees == 360 ? 0 : degrees
+        }
+        return Array(Set(values)).sorted()
+    }
+
+    /// « 20°, 140°, 260° ».
+    static func list(_ azimuths: [Int]) -> String {
+        azimuths.map { "\($0)°" }.joined(separator: ", ")
+    }
 }
 
 /// Une antenne au sein d'un site ANFR.
@@ -495,6 +546,9 @@ struct ANFRMapAntenna: Decodable, Sendable, Equatable, Identifiable {
     let changeDate: String?
     /// Rattrapage : mise en service déclarée plus de 30 jours après sa date réelle.
     let catchUp: Bool
+    /// Azimuts déclarés des secteurs, en degrés 0-359 (0 = nord), triés et sans
+    /// doublon. Vide quand l'ANFR n'en publie pas ou que la copie est ancienne.
+    let azimuths: [Int]
     /// Morceaux d'adresse bruts, assemblés à la demande (`address`).
     private let addressLieu: String?
     private let addressLine: String?
@@ -502,7 +556,7 @@ struct ANFRMapAntenna: Decodable, Sendable, Equatable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, sup_id, adm_lb_nom, emr_lb_systeme, generation, type, statut, date_maj
-        case lat, lon, city, changeDate, catchUp
+        case lat, lon, city, changeDate, catchUp, azimuts
         case adr_lb_lieu, adr_lb_add1, adr_nm_cp
     }
 
@@ -521,13 +575,14 @@ struct ANFRMapAntenna: Decodable, Sendable, Equatable, Identifiable {
         city = c.optional(String.self, .city)
         changeDate = c.optional(String.self, .changeDate)
         catchUp = c.value(Bool.self, .catchUp, false)
+        azimuths = ANFRAzimuth.normalize(c.value([ANFRLooseNumber].self, .azimuts, []).compactMap(\.value))
         addressLieu = c.optional(String.self, .adr_lb_lieu)
         addressLine = c.optional(String.self, .adr_lb_add1)
         postalCode = c.optional(String.self, .adr_nm_cp)
     }
 
     init(id: String, supId: String?, operatorRaw: String, system: String, generationRaw: String, modTypeRaw: String, statut: String, dateMaj: String, latitude: Double?, longitude: Double?, city: String?, address: String?,
-         changeDate: String? = nil, catchUp: Bool = false) {
+         changeDate: String? = nil, catchUp: Bool = false, azimuths: [Int] = []) {
         self.id = id
         self.supId = supId
         self.operatorRaw = operatorRaw
@@ -541,6 +596,7 @@ struct ANFRMapAntenna: Decodable, Sendable, Equatable, Identifiable {
         self.city = city
         self.changeDate = changeDate
         self.catchUp = catchUp
+        self.azimuths = ANFRAzimuth.normalize(azimuths.map(Double.init))
         addressLieu = address
         addressLine = nil
         postalCode = nil
@@ -610,10 +666,13 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
     let modified: Int
     let catchUp: Int
     let total: Int
+    /// Supports réorientés cette semaine, hors `total`. Absent tant que la semaine
+    /// n'est pas archivée ou que le calcul n'existe pas.
+    let reoriented: Int?
 
     var id: String { date }
 
-    private enum CodingKeys: String, CodingKey { case date, counts, total }
+    private enum CodingKeys: String, CodingKey { case date, counts, total, reoriented }
     private enum CountKeys: String, CodingKey { case new, added, activated, deleted, modified, catchUp }
 
     init(from decoder: Decoder) throws {
@@ -627,9 +686,11 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
         modified = counts?.value(Int.self, .modified, 0) ?? 0
         catchUp = counts?.value(Int.self, .catchUp, 0) ?? 0
         total = c.value(Int.self, .total, new + added + activated + deleted + modified)
+        reoriented = c.optional(Int.self, .reoriented)
     }
 
-    init(date: String, new: Int, added: Int, activated: Int, deleted: Int, modified: Int = 0, catchUp: Int = 0, total: Int? = nil) {
+    init(date: String, new: Int, added: Int, activated: Int, deleted: Int, modified: Int = 0, catchUp: Int = 0, total: Int? = nil,
+         reoriented: Int? = nil) {
         self.date = date
         self.new = new
         self.added = added
@@ -638,6 +699,7 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
         self.modified = modified
         self.catchUp = catchUp
         self.total = total ?? new + added + activated + deleted + modified
+        self.reoriented = reoriented
     }
 
     func count(for type: ANFRModType) -> Int {
@@ -663,6 +725,98 @@ struct ANFRArchiveWeeks: Decodable, Sendable {
     }
 
     init(weeks: [ANFRWeekSummary]) { self.weeks = weeks }
+}
+
+// MARK: - Réorientations (GET /api/anfr/reorientations?date=)
+
+/// Un opérateur dont les azimuts ont changé sur un support d'une semaine à l'autre.
+/// Un support partagé revient une fois par opérateur.
+struct ANFRReorientation: Decodable, Sendable, Identifiable, Equatable {
+    let supId: String
+    let latitude: Double
+    let longitude: Double
+    let city: String
+    let operatorRaw: String
+    let systems: [String]
+    /// Azimuts de la semaine précédente et de celle-ci, triés, sans appariement.
+    let before: [Int]
+    let after: [Int]
+
+    var id: String { "\(supId)|\(operatorRaw)" }
+    var `operator`: ANFROperator? { ANFROperator.from(raw: operatorRaw) }
+
+    private enum CodingKeys: String, CodingKey {
+        case sup_id, lat, lon, city, `operator`, systems, before, after
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        supId = c.optional(String.self, .sup_id) ?? c.optional(Int.self, .sup_id).map(String.init) ?? ""
+        latitude = c.optional(ANFRLooseNumber.self, .lat)?.value ?? .nan
+        longitude = c.optional(ANFRLooseNumber.self, .lon)?.value ?? .nan
+        city = c.value(String.self, .city, "")
+        operatorRaw = c.value(String.self, .operator, "")
+        systems = c.value([String].self, .systems, [])
+        before = ANFRAzimuth.normalize(c.value([ANFRLooseNumber].self, .before, []).compactMap(\.value))
+        after = ANFRAzimuth.normalize(c.value([ANFRLooseNumber].self, .after, []).compactMap(\.value))
+    }
+
+    init(supId: String, latitude: Double, longitude: Double, city: String, operatorRaw: String, systems: [String], before: [Int], after: [Int]) {
+        self.supId = supId
+        self.latitude = latitude
+        self.longitude = longitude
+        self.city = city
+        self.operatorRaw = operatorRaw
+        self.systems = systems
+        self.before = ANFRAzimuth.normalize(before.map(Double.init))
+        self.after = ANFRAzimuth.normalize(after.map(Double.init))
+    }
+}
+
+/// Une semaine comparée à la précédente.
+struct ANFRReorientationsWeek: Decodable, Sendable, Equatable {
+    let date: String?
+    let previousDate: String?
+    let reorientations: [ANFRReorientation]
+
+    private enum CodingKeys: String, CodingKey { case date, previousDate, reorientations }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = c.optional(String.self, .date)
+        previousDate = c.optional(String.self, .previousDate)
+        reorientations = c.value([ANFRReorientation].self, .reorientations, []).filter { !$0.supId.isEmpty }
+    }
+
+    init(date: String?, previousDate: String?, reorientations: [ANFRReorientation]) {
+        self.date = date
+        self.previousDate = previousDate
+        self.reorientations = reorientations
+    }
+
+    /// Un support par repère : les opérateurs d'un support partagé se rejoignent.
+    /// L'antenne de chaque opérateur porte ses azimuts d'après.
+    var sites: [ANFRMapSite] {
+        var order: [String] = []
+        var grouped: [String: [ANFRReorientation]] = [:]
+        for item in reorientations {
+            if grouped[item.supId] == nil { order.append(item.supId) }
+            grouped[item.supId, default: []].append(item)
+        }
+        return order.compactMap { supId in
+            guard let items = grouped[supId], let first = items.first else { return nil }
+            let antennas = items.map { item in
+                ANFRMapAntenna(
+                    id: item.id, supId: supId, operatorRaw: item.operatorRaw,
+                    system: item.systems.first ?? "", generationRaw: "", modTypeRaw: "modified",
+                    statut: "", dateMaj: date ?? "", latitude: item.latitude, longitude: item.longitude,
+                    city: item.city, address: nil, azimuths: item.after
+                )
+            }
+            let site = ANFRMapSite(supId: supId, latitude: first.latitude, longitude: first.longitude, city: first.city, antennas: antennas)
+            return site.hasValidCoordinate ? site : nil
+        }
+    }
 }
 
 // MARK: - Ouverture ciblée (notification `anfr_update`)

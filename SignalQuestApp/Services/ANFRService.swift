@@ -154,6 +154,9 @@ protocol ANFRServicing: Sendable {
     func archiveDates() async throws -> ANFRArchiveDates
     /// Les `count` dernières semaines avec leurs compteurs par type (barres de la carte).
     func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary]
+    /// Supports réorientés au relevé `date` (le dernier si `nil`) ; `nil` quand
+    /// aucune réorientation n'est connue pour cette semaine.
+    func reorientations(date: String?) async throws -> ANFRReorientationsWeek?
     /// Sites ANFR en service et en projet autour d'un point, par opérateur du marché
     /// (`market` : `FR` ou `DROM`). `includeBands` ajoute le détail par bande.
     func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
@@ -163,6 +166,9 @@ protocol ANFRServicing: Sendable {
 extension ANFRServicing {
     /// Les services qui n'affichent pas de barres n'ont rien à fournir.
     func archiveWeeks(count: Int) async throws -> [ANFRWeekSummary] { [] }
+
+    /// Les services sans couche des réorientations n'en connaissent aucune.
+    func reorientations(date: String?) async throws -> ANFRReorientationsWeek? { nil }
 
     /// Les services qui ne comparent pas les opérateurs d'une zone n'ont rien à fournir.
     func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
@@ -282,6 +288,16 @@ final class ANFRService: ANFRServicing {
             APIEndpoint(path: "/api/anfr/archives", query: [URLQueryItem(name: "weeks", value: String(weeks))]),
             as: ANFRArchiveWeeks.self
         ).weeks
+    }
+
+    /// 404 : semaine inconnue ou pas encore calculée, donc aucune réorientation connue.
+    func reorientations(date: String?) async throws -> ANFRReorientationsWeek? {
+        let query = date.map { [URLQueryItem(name: "date", value: $0)] } ?? []
+        do {
+            return try await api.request(APIEndpoint(path: "/api/anfr/reorientations", query: query), as: ANFRReorientationsWeek.self)
+        } catch APIError.http(let status, _, _, _, _) where status == 404 {
+            return nil
+        }
     }
 }
 

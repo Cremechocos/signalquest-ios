@@ -38,15 +38,22 @@ struct ANFRSiteDetailSheet: View {
     /// Date du relevé affiché sur la carte : repère, dans l'historique, la ligne
     /// que l'utilisateur regarde.
     let snapshotDate: String?
+    /// Opérateurs dont les azimuts ont changé sur ce support au relevé affiché.
+    let reorientations: [ANFRReorientation]
+    /// Faux quand le support n'a que des réorientations : aucun changement à lister.
+    let showsChanges: Bool
     @StateObject private var model: ANFRSiteDetailViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
     @State private var copiedCoordinates = false
 
-    init(site: ANFRMapSite, service: ANFRServicing, snapshotDate: String? = nil) {
+    init(site: ANFRMapSite, service: ANFRServicing, snapshotDate: String? = nil,
+         reorientations: [ANFRReorientation] = [], showsChanges: Bool = true) {
         self.site = site
         self.snapshotDate = snapshotDate
+        self.reorientations = reorientations
+        self.showsChanges = showsChanges
         _model = StateObject(wrappedValue: ANFRSiteDetailViewModel(service: service))
     }
 
@@ -56,7 +63,11 @@ struct ANFRSiteDetailSheet: View {
                 VStack(alignment: .leading, spacing: SQSpace.lg) {
                     header
                     actionsRow
-                    currentAntennasCard
+                    if !reorientations.isEmpty { reorientationCard }
+                    if showsChanges {
+                        currentAntennasCard
+                        if !site.sectorsByOperator.isEmpty { sectorsCard }
+                    }
                     timelineSection
                 }
                 .padding(SQSpace.lg)
@@ -202,6 +213,12 @@ struct ANFRSiteDetailSheet: View {
                                 .font(SQType.micro)
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
+                        if !antenna.azimuths.isEmpty {
+                            Text("Azimuts : \(ANFRAzimuth.list(antenna.azimuths))")
+                                .font(SQType.micro)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .monospacedDigit()
+                        }
                     }
                     Spacer()
                     if let gen = antenna.generationEnum {
@@ -223,6 +240,115 @@ struct ANFRSiteDetailSheet: View {
         }
         .padding(SQSpace.lg)
         .sqCardBackground()
+    }
+
+    // MARK: Secteurs
+
+    /// Orientation des antennes de ce relevé, un éventail par opérateur.
+    private var sectorsCard: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            sectionTitle("Orientation des secteurs", systemImage: "safari")
+            Text("Azimuts déclarés à l’ANFR pour les antennes de ce relevé ; 0° indique le nord.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ANFRFlowLayout(spacing: SQSpace.md) {
+                ForEach(site.sectorsByOperator) { entry in
+                    VStack(spacing: SQSpace.xs) {
+                        AzimuthFanView(azimuths: entry.azimuths.map(Double.init), color: entry.operator.color)
+                            .frame(width: 150, height: 150)
+                            .accessibilityHidden(true)
+                        Text(entry.operator.label)
+                            .font(SQType.caption(.semibold))
+                            .foregroundStyle(SQColor.label)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("\(entry.operator.label), azimuts \(ANFRAzimuth.list(entry.azimuths))"))
+                }
+            }
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground()
+    }
+
+    // MARK: Réorientation
+
+    /// Avant et après, par opérateur : les azimuts ne sont pas appariés secteur à
+    /// secteur, on montre donc les deux éventails côte à côte.
+    private var reorientationCard: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            sectionTitle("Réorientation", systemImage: ANFRMapLayer.reorientationGlyph)
+            Text("Les azimuts de ces antennes ont changé depuis le relevé précédent.")
+                .font(SQType.caption)
+                .foregroundStyle(SQColor.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(orderedReorientations) { item in
+                reorientationRow(item)
+            }
+        }
+        .padding(SQSpace.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sqCardBackground()
+    }
+
+    /// Dans l'ordre des opérateurs de la carte ; un opérateur non suivi passe en dernier.
+    private var orderedReorientations: [ANFRReorientation] {
+        let rank = { (item: ANFRReorientation) in item.operator.flatMap { ANFROperator.allCases.firstIndex(of: $0) } ?? Int.max }
+        return reorientations.sorted { rank($0) < rank($1) }
+    }
+
+    private func reorientationRow(_ item: ANFRReorientation) -> some View {
+        let tint = item.operator?.color ?? SQColor.labelSecondary
+        let name = item.operator?.label ?? ANFRText.city(item.operatorRaw)
+        return VStack(alignment: .leading, spacing: SQSpace.sm) {
+            HStack(spacing: SQSpace.sm) {
+                SQEditorialTag(text: name, color: tint)
+                if !item.systems.isEmpty {
+                    Text(item.systems.joined(separator: ", "))
+                        .font(SQType.micro)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            HStack(alignment: .top, spacing: SQSpace.sm) {
+                reorientationFan(title: "Avant", azimuths: item.before, color: SQColor.labelTertiary)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .padding(.top, 60)
+                    .accessibilityHidden(true)
+                reorientationFan(title: "Après", azimuths: item.after, color: tint)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(SQSpace.md)
+        .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(name) : avant \(Self.spokenAzimuths(item.before)), après \(Self.spokenAzimuths(item.after))"))
+    }
+
+    private func reorientationFan(title: LocalizedStringKey, azimuths: [Int], color: Color) -> some View {
+        VStack(spacing: SQSpace.xs) {
+            Text(title)
+                .font(SQType.caption(.semibold))
+                .foregroundStyle(SQColor.labelSecondary)
+            // Plus large que haut : les étiquettes d'angle débordent du cercle sur les côtés.
+            AzimuthFanView(azimuths: azimuths.map(Double.init), color: color)
+                .frame(width: 136, height: 116)
+                .accessibilityHidden(true)
+            Text(azimuths.isEmpty ? String(localized: "Aucun azimut") : ANFRAzimuth.list(azimuths))
+                .font(SQType.micro)
+                .foregroundStyle(SQColor.label)
+                .monospacedDigit()
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private static func spokenAzimuths(_ azimuths: [Int]) -> String {
+        azimuths.isEmpty ? String(localized: "aucun azimut") : ANFRAzimuth.list(azimuths)
     }
 
     // MARK: Timeline

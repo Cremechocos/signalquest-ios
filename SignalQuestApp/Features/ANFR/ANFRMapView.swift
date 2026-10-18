@@ -118,6 +118,25 @@ struct ANFRWeekBar: Identifiable, Equatable {
     var id: String { date ?? "current" }
 }
 
+/// Ce que la carte des évolutions dessine : les changements du relevé, ou les
+/// supports dont un opérateur a changé les azimuts.
+enum ANFRMapLayer: String, CaseIterable, Identifiable {
+    case changes, reorientations
+    var id: String { rawValue }
+
+    /// Symbole et couleur d'un support réorienté (repère, amas, liste, légende).
+    static let reorientationGlyph = "arrow.triangle.2.circlepath"
+    static var reorientationColor: Color { SQColor.brandRed }
+}
+
+/// Chargement des réorientations du relevé affiché.
+enum ANFRReorientationState: Equatable {
+    case idle, loading, loaded
+    /// Aucune réorientation connue pour cette semaine (pas encore calculée).
+    case unknown
+    case failed(String)
+}
+
 // MARK: - ViewModel
 
 @MainActor
@@ -143,6 +162,16 @@ final class ANFRMapViewModel: ObservableObject {
     @Published var selectedGenerations: Set<ANFRGeneration> = Set(ANFRGeneration.allCases) { didSet { scheduleRecompute() } }
     /// Masque les rattrapages : mises en service déclarées longtemps après coup.
     @Published var hidesCatchUp = false { didSet { scheduleRecompute() } }
+    @Published var layer: ANFRMapLayer = .changes {
+        didSet {
+            guard layer != oldValue else { return }
+            recomputeNow()
+            if layer == .reorientations { Task { await loadReorientations() } }
+        }
+    }
+    @Published private(set) var reorientationState: ANFRReorientationState = .idle
+    /// Supports réorientés du dernier relevé, une fois chargés (absent de `weeks`).
+    @Published private(set) var currentWeekReoriented: Int?
 
     /// Dates d'archive d'un même relevé groupées par année, de la plus récente à la
     /// plus ancienne : la liste fait plusieurs dizaines de lignes (hebdomadaires).
@@ -178,6 +207,13 @@ final class ANFRMapViewModel: ObservableObject {
     private var snapshotTask: Task<Void, Never>?
     private var cameraCounter = 0
     private var displayedSnapshotISO: String?
+    /// Réorientations du relevé affiché : un repère par support, et par support
+    /// les opérateurs concernés pour la fiche.
+    private var reorientationSites: [ANFRMapSite] = []
+    private var reorientationLookup: [String: [ANFRReorientation]] = [:]
+    /// Semaines déjà demandées (immuables une fois calculées) ; `nil` = aucune connue.
+    private var reorientationMemory: [String: ANFRReorientationsWeek?] = [:]
+    private var reorientationTask: Task<Void, Never>?
 
     /// Relevés déjà analysés : un aller-retour entre deux semaines ne retélécharge
     /// ni ne redécode rien. Les relevés datés sont immuables ; le dernier se revalide.
@@ -235,6 +271,10 @@ final class ANFRMapViewModel: ObservableObject {
     private func recomputeNow() {
         recomputeTask?.cancel()
         recomputeTask = nil
+        if layer == .reorientations {
+            recomputeReorientations()
+            return
+        }
         let operators = operatorFilters
         let modTypes = selectedModTypes
         let generations = selectedGenerations
@@ -300,6 +340,81 @@ final class ANFRMapViewModel: ObservableObject {
         filteredRevision &+= 1
     }
 
+    /// Couche des réorientations : seul le filtre d'opérateur s'applique.
+    private func recomputeReorientations() {
+        let operators = operatorFilters
+        let everyOperator = operators.count == ANFROperator.allCases.count
+        var result: [ANFRMapSite] = []
+        var perOperator: [ANFROperator: Int] = [:]
+        for site in reorientationSites {
+            for op in site.operators { perOperator[op, default: 0] += 1 }
+            let kept = site.antennas.filter { $0.operator.map(operators.contains) ?? everyOperator }
+            guard !kept.isEmpty else { continue }
+            result.append(kept.count == site.antennas.count ? site : ANFRMapSite(
+                supId: site.supId, latitude: site.latitude, longitude: site.longitude, city: site.city, antennas: kept
+            ))
+        }
+        filteredSites = result
+        modTypeCounts = [:]
+        operatorCounts = perOperator
+        filteredRevision &+= 1
+    }
+
+    /// Les opérateurs réorientés d'un support au relevé affiché (vide hors couche chargée).
+    func reorientations(supId: String) -> [ANFRReorientation] { reorientationLookup[supId] ?? [] }
+
+    // MARK: Réorientations
+
+    /// Réorientations du relevé choisi ; une réponse arrivée après un autre choix est ignorée.
+    func loadReorientations() async {
+        guard layer == .reorientations else { return }
+        reorientationTask?.cancel()
+        let date = selectedDate
+        let task = Task { await fetchReorientations(date: date) }
+        reorientationTask = task
+        await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+    }
+
+    private func fetchReorientations(date: String?) async {
+        let key = date ?? "current"
+        if let remembered = reorientationMemory[key] {
+            applyReorientations(remembered, date: date)
+            return
+        }
+        reorientationState = .loading
+        do {
+            let week: ANFRReorientationsWeek?
+            #if DEBUG
+            if AppEnvironment.usesDemoData {
+                week = date == nil ? ANFRDemoData.reorientations : nil
+            } else {
+                week = try await service.reorientations(date: date)
+            }
+            #else
+            week = try await service.reorientations(date: date)
+            #endif
+            guard !Task.isCancelled, date == selectedDate else { return }
+            // Le dernier relevé peut encore recevoir son calcul : seules les semaines datées restent.
+            if date != nil { reorientationMemory[key] = .some(week) }
+            applyReorientations(week, date: date)
+        } catch {
+            guard !error.isCancellation, date == selectedDate else { return }
+            reorientationSites = []
+            reorientationLookup = [:]
+            reorientationState = .failed(error.userFacingMessage)
+            recomputeNow()
+        }
+    }
+
+    private func applyReorientations(_ week: ANFRReorientationsWeek?, date: String?) {
+        reorientationSites = week?.sites ?? []
+        reorientationLookup = Dictionary(grouping: week?.reorientations ?? [], by: \.supId)
+        reorientationState = week == nil ? .unknown : .loaded
+        if date == nil { currentWeekReoriented = week.map { Set($0.reorientations.map(\.supId)).count } }
+        recomputeNow()
+        loadRevision &+= 1
+    }
+
     // MARK: Dates
 
     private func refreshSelectableDates() {
@@ -346,10 +461,12 @@ final class ANFRMapViewModel: ObservableObject {
     /// récent, puis le dernier relevé.
     var weekBars: [ANFRWeekBar] {
         guard !selectableDates.isEmpty || currentSnapshotDate != nil else { return [] }
+        let reoriented = layer == .reorientations
         var bars: [ANFRWeekBar] = selectableDates.prefix(12).reversed().map { date in
-            ANFRWeekBar(date: date, displayDate: date, total: weeks.first(where: { $0.date == date })?.total)
+            let week = weeks.first(where: { $0.date == date })
+            return ANFRWeekBar(date: date, displayDate: date, total: reoriented ? week?.reoriented : week?.total)
         }
-        bars.append(ANFRWeekBar(date: nil, displayDate: currentSnapshotDate, total: currentWeekTotal))
+        bars.append(ANFRWeekBar(date: nil, displayDate: currentSnapshotDate, total: reoriented ? currentWeekReoriented : currentWeekTotal))
         return bars
     }
 
@@ -511,6 +628,7 @@ final class ANFRMapViewModel: ObservableObject {
     /// « Réessayer » : relit le relevé ET les dates d'archive, que le premier
     /// chargement a pu manquer.
     func reload() async {
+        if layer == .reorientations, case .failed = reorientationState { await loadReorientations() }
         await startSnapshotLoad()
         if availableDates.isEmpty { await loadArchiveDates() }
         if weeks.isEmpty { await loadWeeks() }
@@ -529,7 +647,9 @@ final class ANFRMapViewModel: ObservableObject {
         selectedDate = date
         // Le relevé précédent reste dessiné jusqu'à l'arrivée du nouveau. Les choix
         // successifs annulent la requête précédente au lieu de télécharger plusieurs relevés.
+        async let reorientationsLoad: Void = loadReorientations()
         await startSnapshotLoad()
+        await reorientationsLoad
     }
 
     // MARK: Filtres
@@ -571,6 +691,8 @@ final class ANFRMapViewModel: ObservableObject {
     var activeFilterCount: Int {
         var count = 0
         if operatorFilters.count != ANFROperator.allCases.count { count += 1 }
+        // Types, générations et rattrapages ne s'appliquent pas aux réorientations.
+        if layer == .reorientations { return count }
         if selectedModTypes.count != ANFRModType.allCases.count { count += 1 }
         if selectedGenerations.count != ANFRGeneration.allCases.count { count += 1 }
         if hidesCatchUp { count += 1 }
@@ -581,6 +703,9 @@ final class ANFRMapViewModel: ObservableObject {
 
     /// Phrase lue par VoiceOver à l'arrivée d'un relevé : le nombre de supports et leur répartition.
     var accessibilitySummary: String {
+        if layer == .reorientations {
+            return String(localized: "Relevé du \(dateLabel) : \(filteredSites.count.formatted()) supports réorientés")
+        }
         let counts = ANFRModType.allCases
             .compactMap { type in modTypeCounts[type].map { "\(type.label) : \($0.formatted())" } }
             .joined(separator: ", ")
@@ -609,7 +734,8 @@ struct ANFRSiteRow: Identifiable, Equatable {
 
 /// Filtrage et tri de la liste : l'alternative à la carte pour VoiceOver et l'iPad.
 enum ANFRSiteList {
-    static func rows(from sites: [ANFRMapSite], query: String, sort: ANFRSiteListSort, origin: CLLocationCoordinate2D?) -> [ANFRSiteRow] {
+    static func rows(from sites: [ANFRMapSite], query: String, sort: ANFRSiteListSort, origin: CLLocationCoordinate2D?,
+                     layer: ANFRMapLayer = .changes) -> [ANFRSiteRow] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let originLocation = origin.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) }
         var rows: [ANFRSiteRow] = []
@@ -617,8 +743,13 @@ enum ANFRSiteList {
         for site in sites where matches(site, needle: needle) {
             let operators = site.operators
             let operatorText = operators.isEmpty ? String(localized: "Autre opérateur") : operators.map(\.label).joined(separator: ", ")
-            var detail = "\(operatorText) · \(site.dominantModType.label)"
-            if site.antennas.count > 1 { detail += " · " + String(localized: "\(site.antennas.count) antennes") }
+            var detail: String
+            if layer == .reorientations {
+                detail = "\(operatorText) · " + String(localized: "Réorienté")
+            } else {
+                detail = "\(operatorText) · \(site.dominantModType.label)"
+                if site.antennas.count > 1 { detail += " · " + String(localized: "\(site.antennas.count) antennes") }
+            }
             rows.append(ANFRSiteRow(
                 site: site,
                 title: site.city.isEmpty ? String(localized: "Support \(site.supId)") : ANFRText.city(site.city),
@@ -683,6 +814,10 @@ struct ANFRMapView: View {
 
     private var isRegularWidth: Bool { horizontalSizeClass == .regular }
 
+    private var listTitle: LocalizedStringKey {
+        model.layer == .reorientations ? "Supports réorientés" : "Supports modifiés"
+    }
+
     var body: some View {
         Group {
             if isRegularWidth && showsSidePanel {
@@ -690,8 +825,8 @@ struct ANFRMapView: View {
                     mapStack
                     Divider()
                     ANFRSiteListView(
-                        title: "Supports modifiés", sites: model.filteredSites, revision: model.filteredRevision,
-                        origin: model.userCoordinate, showsSearch: true, onClose: nil
+                        title: listTitle, sites: model.filteredSites, revision: model.filteredRevision,
+                        origin: model.userCoordinate, showsSearch: true, layer: model.layer, onClose: nil
                     ) { site in focus(on: site) }
                         .frame(width: 380)
                         .background(SQColor.bg)
@@ -717,7 +852,7 @@ struct ANFRMapView: View {
                 } label: {
                     Image(systemName: "list.bullet")
                 }
-                .accessibilityLabel("Liste des supports modifiés")
+                .accessibilityLabel(model.layer == .reorientations ? "Liste des supports réorientés" : "Liste des supports modifiés")
                 .accessibilityIdentifier("anfr.map.list")
                 Button {
                     Haptics.light()
@@ -733,8 +868,12 @@ struct ANFRMapView: View {
             ANFRStatsView(service: services.anfr)
         }
         .sheet(item: $selectedSite) { site in
-            ANFRSiteDetailSheet(site: site, service: services.anfr, snapshotDate: model.displayedDate ?? model.currentSnapshotDate)
-                .id(site.supId)
+            ANFRSiteDetailSheet(
+                site: site, service: services.anfr, snapshotDate: model.displayedDate ?? model.currentSnapshotDate,
+                reorientations: model.reorientations(supId: site.supId),
+                showsChanges: model.site(supId: site.supId) != nil
+            )
+            .id(site.supId)
         }
         .sheet(isPresented: $showFilters) {
             ANFRMapFilterSheet(model: model)
@@ -748,8 +887,8 @@ struct ANFRMapView: View {
         }
         .sheet(isPresented: $showList, onDismiss: openPendingSite) {
             ANFRSiteListView(
-                title: "Supports modifiés", sites: model.filteredSites, revision: model.filteredRevision,
-                origin: model.userCoordinate, showsSearch: true, onClose: { showList = false }
+                title: listTitle, sites: model.filteredSites, revision: model.filteredRevision,
+                origin: model.userCoordinate, showsSearch: true, layer: model.layer, onClose: { showList = false }
             ) { site in
                 pendingSite = site
                 showList = false
@@ -760,7 +899,7 @@ struct ANFRMapView: View {
         .sheet(item: $clusterSelection, onDismiss: openPendingSite) { selection in
             ANFRSiteListView(
                 title: "Supports à cet emplacement", sites: selection.sites, revision: 0,
-                origin: model.userCoordinate, showsSearch: false, onClose: { clusterSelection = nil }
+                origin: model.userCoordinate, showsSearch: false, layer: model.layer, onClose: { clusterSelection = nil }
             ) { site in
                 pendingSite = site
                 clusterSelection = nil
@@ -844,6 +983,7 @@ struct ANFRMapView: View {
             camera: model.cameraRequest,
             zone: model.zone,
             showsUserLocation: showsUserLocation,
+            layer: model.layer,
             isCompactWidth: !isRegularWidth,
             bottomInset: SQDock.floatingContentInset,
             onSelectSite: { site in
@@ -867,12 +1007,20 @@ struct ANFRMapView: View {
             // Les pastilles basses réservent la hauteur du dock : sur iOS 16 à 25 il
             // se superpose à la carte au lieu de décaler la zone sûre.
             VStack(spacing: SQSpace.sm) {
-                if model.isLoading {
+                if model.layer == .reorientations {
+                    if model.reorientationState == .loading {
+                        loadingPill
+                    } else if model.filteredSites.isEmpty, model.reorientationState == .loaded || model.reorientationState == .unknown {
+                        emptyPill
+                    }
+                } else if model.isLoading {
                     loadingPill
                 } else if model.hasLoadedSnapshot, model.filteredSites.isEmpty, model.errorMessage == nil {
                     emptyPill
                 }
-                if let error = model.errorMessage {
+                if model.layer == .reorientations, case .failed(let message) = model.reorientationState {
+                    errorPill(message)
+                } else if let error = model.errorMessage {
                     errorPill(error)
                 } else if model.isShowingCachedCopy {
                     cachedCopyPill
@@ -895,7 +1043,7 @@ struct ANFRMapView: View {
 
     @ViewBuilder
     private var topBar: some View {
-        Group {
+        VStack(spacing: SQSpace.xs) {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: SQSpace.sm) {
                     dateButton
@@ -913,9 +1061,19 @@ struct ANFRMapView: View {
                     filterButton
                 }
             }
+            layerPicker
         }
         .padding(SQSpace.xs + 1)
         .sqCardBackground()
+    }
+
+    /// Changements du relevé, ou supports dont les azimuts ont changé.
+    private var layerPicker: some View {
+        SQSegmentedFilter(selection: $model.layer, options: [
+            (value: ANFRMapLayer.changes, label: "Changements", icon: "antenna.radiowaves.left.and.right"),
+            (value: ANFRMapLayer.reorientations, label: "Réorientés", icon: ANFRMapLayer.reorientationGlyph),
+        ])
+        .accessibilityIdentifier("anfr.map.layer")
     }
 
     private var dateButton: some View {
@@ -950,7 +1108,7 @@ struct ANFRMapView: View {
 
     private var countBadge: some View {
         HStack(spacing: SQSpace.xs2) {
-            Image(systemName: "antenna.radiowaves.left.and.right")
+            Image(systemName: model.layer == .reorientations ? ANFRMapLayer.reorientationGlyph : "antenna.radiowaves.left.and.right")
                 .font(.system(size: 12, weight: .semibold))
             // Séparateur de milliers : « 61 234 » se lit, « 61234 » pas.
             Text(model.filteredSites.count.formatted(.number.grouping(.automatic)))
@@ -963,7 +1121,9 @@ struct ANFRMapView: View {
         .frame(minHeight: 48)
         .background(SQColor.brandRed, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Supports modifiés affichés : \(model.filteredSites.count)"))
+        .accessibilityLabel(model.layer == .reorientations
+            ? Text("Supports réorientés affichés : \(model.filteredSites.count)")
+            : Text("Supports modifiés affichés : \(model.filteredSites.count)"))
     }
 
     private var filterButton: some View {
@@ -1113,7 +1273,11 @@ struct ANFRMapView: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(bar.total.map { Text("Relevé du \(spoken), \($0) changements") } ?? Text("Relevé du \(spoken)"))
+        .accessibilityLabel(bar.total.map {
+            model.layer == .reorientations
+                ? Text("Relevé du \(spoken), \($0) supports réorientés")
+                : Text("Relevé du \(spoken), \($0) changements")
+        } ?? Text("Relevé du \(spoken)"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -1121,17 +1285,25 @@ struct ANFRMapView: View {
 
     /// Type de changement = symbole du repère ; opérateur = teinte (puces du haut).
     private var legend: some View {
-        ANFRFlowLayout(spacing: SQSpace.sm) {
-            ForEach(ANFRModType.allCases) { type in
+        Group {
+            if model.layer == .reorientations {
                 HStack(spacing: SQSpace.xs) {
-                    Image(systemName: type.glyph)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(SQColor.onAccent)
-                        .frame(width: 16, height: 16)
-                        .background(type.color, in: Circle())
-                    Text(type.label)
+                    legendGlyph(ANFRMapLayer.reorientationGlyph, color: ANFRMapLayer.reorientationColor)
+                    Text("Azimuts changés depuis le relevé précédent ; avant et après dans la fiche")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                ANFRFlowLayout(spacing: SQSpace.sm) {
+                    ForEach(ANFRModType.allCases) { type in
+                        HStack(spacing: SQSpace.xs) {
+                            legendGlyph(type.glyph, color: type.color)
+                            Text(type.label)
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.label)
+                        }
+                    }
                 }
             }
         }
@@ -1142,13 +1314,23 @@ struct ANFRMapView: View {
         .accessibilityElement(children: .combine)
     }
 
+    private func legendGlyph(_ systemImage: String, color: Color) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(SQColor.onAccent)
+            .frame(width: 16, height: 16)
+            .background(color, in: Circle())
+    }
+
     // MARK: Pastilles d'état
 
     private var loadingPill: some View {
         HStack(spacing: SQSpace.sm) {
             SQSpinner().tint(SQColor.brandRed)
             Group {
-                if model.hasLoadedSnapshot {
+                if model.layer == .reorientations {
+                    Text("Chargement des réorientations du \(model.pendingDateLabel)…")
+                } else if model.hasLoadedSnapshot {
                     Text("Chargement du relevé du \(model.pendingDateLabel)…")
                 } else {
                     Text("Chargement des changements ANFR…")
@@ -1168,8 +1350,14 @@ struct ANFRMapView: View {
     /// soit le relevé lui-même ne contient aucun support modifié.
     private var emptyPill: some View {
         VStack(spacing: SQSpace.xs) {
-            if model.hasActiveFilters {
-                Label("Aucun support modifié pour ces filtres", systemImage: "magnifyingglass")
+            if model.layer == .reorientations, model.reorientationState == .unknown {
+                Label("Aucune réorientation connue pour ce relevé", systemImage: ANFRMapLayer.reorientationGlyph)
+                    .font(SQType.subhead(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .multilineTextAlignment(.center)
+            } else if model.hasActiveFilters {
+                Label(model.layer == .reorientations ? "Aucun support réorienté pour ces filtres" : "Aucun support modifié pour ces filtres",
+                      systemImage: "magnifyingglass")
                     .font(SQType.subhead(.semibold))
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
@@ -1185,7 +1373,8 @@ struct ANFRMapView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Label("Aucun support modifié dans ce relevé", systemImage: "magnifyingglass")
+                Label(model.layer == .reorientations ? "Aucun support réorienté dans ce relevé" : "Aucun support modifié dans ce relevé",
+                      systemImage: "magnifyingglass")
                     .font(SQType.subhead(.semibold))
                     .foregroundStyle(SQColor.labelSecondary)
                     .multilineTextAlignment(.center)
@@ -1311,6 +1500,7 @@ struct ANFRSiteListView: View {
     let revision: Int
     let origin: CLLocationCoordinate2D?
     let showsSearch: Bool
+    let layer: ANFRMapLayer
     let onClose: (() -> Void)?
     let onSelect: (ANFRMapSite) -> Void
 
@@ -1319,12 +1509,13 @@ struct ANFRSiteListView: View {
     @State private var rows: [ANFRSiteRow] = []
 
     init(title: LocalizedStringKey, sites: [ANFRMapSite], revision: Int, origin: CLLocationCoordinate2D?,
-         showsSearch: Bool, onClose: (() -> Void)?, onSelect: @escaping (ANFRMapSite) -> Void) {
+         showsSearch: Bool, layer: ANFRMapLayer = .changes, onClose: (() -> Void)?, onSelect: @escaping (ANFRMapSite) -> Void) {
         self.title = title
         self.sites = sites
         self.revision = revision
         self.origin = origin
         self.showsSearch = showsSearch
+        self.layer = layer
         self.onClose = onClose
         self.onSelect = onSelect
     }
@@ -1357,14 +1548,21 @@ struct ANFRSiteListView: View {
                 .padding(.horizontal, SQSpace.lg)
             }
 
-            Text("Supports modifiés : \(rows.count.formatted())")
+            Group {
+                if layer == .reorientations {
+                    Text("Supports réorientés : \(rows.count.formatted())")
+                } else {
+                    Text("Supports modifiés : \(rows.count.formatted())")
+                }
+            }
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
                 .padding(.horizontal, SQSpace.lg)
                 .accessibilityAddTraits(.updatesFrequently)
 
             if rows.isEmpty {
-                Text(query.isEmpty ? "Aucun support modifié à afficher." : "Aucun support ne correspond à ta recherche.")
+                Text(!query.isEmpty ? "Aucun support ne correspond à ta recherche."
+                     : layer == .reorientations ? "Aucun support réorienté à afficher." : "Aucun support modifié à afficher.")
                     .font(SQType.subhead)
                     .foregroundStyle(SQColor.labelSecondary)
                     .padding(.horizontal, SQSpace.lg)
@@ -1385,6 +1583,7 @@ struct ANFRSiteListView: View {
         .onChangeCompat(of: sort) { _, _ in recompute() }
         .onChangeCompat(of: revision) { _, _ in recompute() }
         .onChangeCompat(of: sites.count) { _, _ in recompute() }
+        .onChangeCompat(of: layer) { _, _ in recompute() }
     }
 
     private var searchField: some View {
@@ -1421,11 +1620,11 @@ struct ANFRSiteListView: View {
             onSelect(row.site)
         } label: {
             HStack(spacing: SQSpace.md) {
-                Image(systemName: row.modType.glyph)
+                Image(systemName: layer == .reorientations ? ANFRMapLayer.reorientationGlyph : row.modType.glyph)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(SQColor.onAccent)
                     .frame(width: 22, height: 22)
-                    .background(row.modType.color, in: Circle())
+                    .background(layer == .reorientations ? ANFRMapLayer.reorientationColor : row.modType.color, in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.title)
@@ -1457,7 +1656,7 @@ struct ANFRSiteListView: View {
 
     private func recompute() {
         if sort == .distance && origin == nil { sort = .type }
-        rows = ANFRSiteList.rows(from: sites, query: query, sort: sort, origin: origin)
+        rows = ANFRSiteList.rows(from: sites, query: query, sort: sort, origin: origin, layer: layer)
     }
 }
 
@@ -1486,6 +1685,12 @@ struct ANFRMapFilterSheet: View {
                     }
                 }
 
+                if model.layer == .reorientations {
+                    Text("Les réorientations se filtrent par opérateur. Les autres filtres s’appliquent aux changements du relevé.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
                 section(title: "Type de modification") {
                     FlexibleChips(ANFRModType.allCases) { type in
                         modTypeChip(type)
@@ -1527,6 +1732,7 @@ struct ANFRMapFilterSheet: View {
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
                 }
 
                 GradientButton("Réinitialiser les filtres", systemImage: "arrow.counterclockwise", style: .secondary) {
@@ -1688,7 +1894,11 @@ struct ANFRDatePickerSheet: View {
 
     /// Les changements de la semaine, quand le bandeau les a chargés.
     private func changesText(_ date: String) -> String? {
-        model.weeks.first(where: { $0.date == date }).map { String(localized: "Changements : \($0.total.formatted())") }
+        model.weeks.first(where: { $0.date == date }).map { week in
+            let changes = String(localized: "Changements : \(week.total.formatted())")
+            guard let reoriented = week.reoriented else { return changes }
+            return changes + " · " + String(localized: "Réorientés : \(reoriented.formatted())")
+        }
     }
 
     private func prettyDate(_ raw: String) -> String {
@@ -1858,6 +2068,8 @@ struct ANFRMapKitView: UIViewRepresentable {
     let camera: ANFRCameraRequest?
     let zone: ANFRZone?
     let showsUserLocation: Bool
+    /// Couche dessinée : le symbole des repères en dépend.
+    let layer: ANFRMapLayer
     let isCompactWidth: Bool
     /// Marge basse réservée au dock : le logo et les mentions d'Apple Plans restent lisibles.
     let bottomInset: CGFloat
@@ -1891,6 +2103,7 @@ struct ANFRMapKitView: UIViewRepresentable {
         coordinator.onSelectSite = onSelectSite
         coordinator.onSelectCluster = onSelectCluster
         coordinator.isCompactWidth = isCompactWidth
+        coordinator.applyLayer(layer, on: map)
         coordinator.applyBackdrop(backdrop, on: map)
         if map.showsUserLocation != showsUserLocation { map.showsUserLocation = showsUserLocation }
         if map.layoutMargins.bottom != bottomInset { map.layoutMargins = UIEdgeInsets(top: 0, left: 0, bottom: bottomInset, right: 0) }
@@ -1926,6 +2139,7 @@ struct ANFRMapKitView: UIViewRepresentable {
         /// Couleur du repère et encre du symbole, par opérateur : leur résolution
         /// analyse le nom de l'opérateur, trop pour chaque repère affiché.
         private var paints: [ANFROperator: (tint: UIColor, ink: UIColor)] = [:]
+        private var layer: ANFRMapLayer = .changes
 
         init(onSelectSite: @escaping (ANFRMapSite) -> Void, onSelectCluster: @escaping ([ANFRMapSite]) -> Void) {
             self.onSelectSite = onSelectSite
@@ -2010,6 +2224,18 @@ struct ANFRMapKitView: UIViewRepresentable {
             }
         }
 
+        /// Changement de couche : un même support n'a plus le même symbole, tous les
+        /// repères sont reposés à la prochaine synchronisation.
+        func applyLayer(_ next: ANFRMapLayer, on map: MKMapView) {
+            guard next != layer else { return }
+            layer = next
+            pendingAdds.removeAll()
+            map.removeAnnotations(Array(annotations.values))
+            annotations = [:]
+            appliedHighlight = nil
+            lastRevision = -1
+        }
+
         // MARK: Repères
 
         /// Met la carte au niveau de `sites` en ne touchant QUE les repères qui
@@ -2085,7 +2311,8 @@ struct ANFRMapKitView: UIViewRepresentable {
                 let members = cluster.memberAnnotations.compactMap { $0 as? ANFRSiteAnnotationMK }
                 let dominant = members.map { $0.style.modType }.max { $0.priority < $1.priority } ?? .added
                 view.configure(
-                    count: members.count, tint: UIColor(dominant.color),
+                    count: members.count,
+                    tint: UIColor(layer == .reorientations ? ANFRMapLayer.reorientationColor : dominant.color),
                     ink: UIColor(SQColor.onAccent)
                 )
                 return view
@@ -2097,7 +2324,7 @@ struct ANFRMapKitView: UIViewRepresentable {
             v.markerTintColor = colors.tint
             // Orange et Bouygues demandent un symbole noir : le blanc par défaut n'y tient pas le contraste.
             v.glyphTintColor = colors.ink
-            v.glyphImage = UIImage(systemName: site.style.modType.glyph)
+            v.glyphImage = UIImage(systemName: layer == .reorientations ? ANFRMapLayer.reorientationGlyph : site.style.modType.glyph)
             v.clusteringIdentifier = "anfr"
             v.displayPriority = .defaultLow
             v.canShowCallout = false

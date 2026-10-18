@@ -130,6 +130,20 @@ enum ANFRDemoData {
         )
     }()
 
+    /// Réorientations du dernier relevé : un support partagé (deux opérateurs) et un seul.
+    static let reorientations = ANFRReorientationsWeek(
+        date: "2026-06-11",
+        previousDate: "2026-06-04",
+        reorientations: [
+            ANFRReorientation(supId: "120044", latitude: 48.8566, longitude: 2.3522, city: "PARIS", operatorRaw: "FREE MOBILE",
+                              systems: ["5G NR 700", "LTE 700"], before: [10, 130, 250], after: [0, 120, 240]),
+            ANFRReorientation(supId: "120044", latitude: 48.8566, longitude: 2.3522, city: "PARIS", operatorRaw: "ORANGE",
+                              systems: ["LTE 800"], before: [40, 200], after: [60, 180, 300]),
+            ANFRReorientation(supId: "150301", latitude: 47.2184, longitude: -1.5536, city: "NANTES", operatorRaw: "SFR",
+                              systems: ["LTE 1800", "5G NR 3500"], before: [20, 140, 260], after: [35, 155, 275])
+        ]
+    )
+
     static let archiveDates = ANFRArchiveDates(
         dates: ["2026-06-04", "2026-05-28", "2026-05-21", "2026-05-14", "2026-05-07"],
         current: "2026-06-11"
@@ -179,12 +193,13 @@ enum ANFRDemoData {
     )
 
     private static let demoSites: [ANFRMapSite] = {
-        func antenna(_ id: String, _ op: String, _ sys: String, _ gen: String, _ type: String, _ statut: String) -> ANFRMapAntenna {
-            ANFRMapAntenna(id: id, supId: nil, operatorRaw: op, system: sys, generationRaw: gen, modTypeRaw: type, statut: statut, dateMaj: "2026-06-11", latitude: nil, longitude: nil, city: nil, address: "Le bourg")
+        func antenna(_ id: String, _ op: String, _ sys: String, _ gen: String, _ type: String, _ statut: String, _ azimuths: [Int] = []) -> ANFRMapAntenna {
+            ANFRMapAntenna(id: id, supId: nil, operatorRaw: op, system: sys, generationRaw: gen, modTypeRaw: type, statut: statut, dateMaj: "2026-06-11", latitude: nil, longitude: nil, city: nil, address: "Le bourg",
+                           azimuths: azimuths)
         }
         return [
             ANFRMapSite(supId: "29847", latitude: 44.5297, longitude: -0.1806, city: "BRANNENS", antennas: [
-                antenna("163", "BOUYGUES TELECOM", "LTE 2100", "4G", "new", "En service")
+                antenna("163", "BOUYGUES TELECOM", "LTE 2100", "4G", "new", "En service", [30, 150, 270])
             ]),
             ANFRMapSite(supId: "71445", latitude: 46.1869, longitude: 5.0689, city: "CHAVEYRIAT", antennas: [
                 antenna("403952", "ORANGE", "5G NR 2100", "5G", "activated", "Techniquement opérationnel")
@@ -200,8 +215,8 @@ enum ANFRDemoData {
                 antenna("405515", "ORANGE", "5G NR 2100", "5G", "new", "Projet approuvé")
             ]),
             ANFRMapSite(supId: "120044", latitude: 48.8566, longitude: 2.3522, city: "PARIS", antennas: [
-                antenna("700001", "FREE MOBILE", "5G NR 700", "5G", "activated", "En service"),
-                antenna("700002", "SFR", "LTE 2600", "4G", "added", "En service")
+                antenna("700001", "FREE MOBILE", "5G NR 700", "5G", "activated", "En service", [0, 120, 240]),
+                antenna("700002", "SFR", "LTE 2600", "4G", "added", "En service", [60, 180, 300])
             ]),
             ANFRMapSite(supId: "130088", latitude: 45.7640, longitude: 4.8357, city: "LYON", antennas: [
                 antenna("700101", "BOUYGUES TELECOM", "5G NR 3500", "5G", "new", "En service")

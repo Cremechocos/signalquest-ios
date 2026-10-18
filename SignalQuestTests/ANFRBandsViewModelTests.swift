@@ -196,8 +196,13 @@ final class ANFRMapViewModelTests: XCTestCase {
         var failing: Set<String> = []
         var dates = ANFRArchiveDates(dates: [], current: nil)
         var weeks: [ANFRWeekSummary] = []
+        var reorientationWeeks: [String: ANFRReorientationsWeek] = [:]
 
         var requests: [String?] { lock.withLock { requested } }
+
+        func reorientations(date: String?) async throws -> ANFRReorientationsWeek? {
+            reorientationWeeks[date ?? "current"]
+        }
 
         func mapSnapshot(date: String?) async throws -> ANFRMapSnapshot {
             let key = date ?? "current"
@@ -656,6 +661,126 @@ final class ANFRMapViewModelTests: XCTestCase {
         } catch {
             XCTAssertFalse(error.isCancellation)
         }
+    }
+}
+
+// MARK: - Azimuts et réorientations (ANFR-AZ)
+
+@MainActor
+extension ANFRMapViewModelTests {
+    func testAzimuthsAreReadAsNumbersOrStringsSortedAndDeduplicated() throws {
+        let json = """
+        {"sites":[{"info":{"sup_id":"1","lat":"45.0","lon":"5.0","city":"LYON"},"antennas":[
+          {"id":"a","adm_lb_nom":"ORANGE","type":"new","azimuts":["240",360,120.4,"x",120,-5,400]},
+          {"id":"b","adm_lb_nom":"ORANGE","type":"added","azimuts":[30]},
+          {"id":"c","adm_lb_nom":"SFR","type":"added"}]}]}
+        """
+        let site = try XCTUnwrap(JSONDecoder().decode(ANFRMapSnapshot.self, from: Data(json.utf8)).sites.first)
+        XCTAssertEqual(site.antennas[0].azimuths, [0, 120, 240], "360 se lit 0 ; les valeurs illisibles ou hors bornes partent")
+        XCTAssertEqual(site.antennas[2].azimuths, [], "une copie sans azimut reste lisible")
+        XCTAssertEqual(site.sectorsByOperator, [ANFRSiteSectors(operator: .orange, azimuths: [0, 30, 120, 240])],
+                       "un opérateur sans azimut publié n'a pas d'éventail")
+        XCTAssertEqual(ANFRAzimuth.list([0, 120]), "0°, 120°")
+    }
+
+    func testTheWeekCarriesItsReorientationsOutsideTheTotal() throws {
+        let json = #"{"weeks":[{"date":"2026-10-08","counts":{"new":2,"added":1,"activated":0,"deleted":0},"total":3,"reoriented":17},{"date":"2026-10-01","counts":{"new":1},"total":1}]}"#
+        let weeks = try JSONDecoder().decode(ANFRArchiveWeeks.self, from: Data(json.utf8)).weeks
+        XCTAssertEqual(weeks[0].total, 3)
+        XCTAssertEqual(weeks[0].reoriented, 17)
+        XCTAssertNil(weeks[1].reoriented, "absent tant que la semaine n'est pas calculée")
+    }
+
+    func testReorientationsJoinTheOperatorsOfASharedSite() throws {
+        let json = """
+        {"date":"2026-10-15","previousDate":"2026-10-08","requestId":"r","reorientations":[
+          {"sup_id":"120044","lat":"48.8566","lon":"2.3522","city":"PARIS","operator":"FREE MOBILE","systems":["5G NR 700"],"before":[10,130,250],"after":[0,120,"240"]},
+          {"sup_id":"120044","lat":"48.8566","lon":"2.3522","city":"PARIS","operator":"ORANGE","systems":["LTE 800"],"before":[40],"after":[60]},
+          {"sup_id":"9","lat":"","lon":"","city":"NULLE PART","operator":"SFR","systems":[],"before":[1],"after":[2]},
+          {"lat":"45","lon":"5","operator":"SFR","before":[],"after":[]}]}
+        """
+        let week = try JSONDecoder().decode(ANFRReorientationsWeek.self, from: Data(json.utf8))
+        XCTAssertEqual(week.previousDate, "2026-10-08")
+        XCTAssertEqual(week.reorientations.count, 3, "une ligne sans support est écartée")
+        XCTAssertEqual(week.reorientations[0].after, [0, 120, 240])
+        XCTAssertEqual(week.reorientations[0].latitude, 48.8566, accuracy: 0.000_1)
+        XCTAssertNotEqual(week.reorientations[0].id, week.reorientations[1].id, "un support partagé revient une fois par opérateur")
+        let sites = week.sites
+        XCTAssertEqual(sites.map(\.supId), ["120044"], "un support sans position valide n'a pas de repère")
+        XCTAssertEqual(sites[0].operators, [.orange, .free])
+        XCTAssertEqual(sites[0].sectorsByOperator.first { $0.operator == .free }?.azimuths, [0, 120, 240])
+    }
+
+    func testTheReorientationLayerDrawsReorientedSitesFilteredByOperator() async {
+        let service = FakeService()
+        service.snapshots["current"] = snapshot(mixedSites)
+        service.weeks = [ANFRWeekSummary(date: "2026-10-08", new: 1, added: 0, activated: 0, deleted: 0, reoriented: 4)]
+        service.dates = ANFRArchiveDates(dates: ["2026-10-08"], current: "2026-10-15")
+        service.reorientationWeeks["current"] = ANFRReorientationsWeek(date: "2026-10-15", previousDate: "2026-10-08", reorientations: [
+            ANFRReorientation(supId: "2", latitude: 45, longitude: 5, city: "VILLEURBANNE", operatorRaw: "ORANGE", systems: [], before: [10], after: [20]),
+            ANFRReorientation(supId: "2", latitude: 45, longitude: 5, city: "VILLEURBANNE", operatorRaw: "FREE MOBILE", systems: [], before: [10], after: [30]),
+            ANFRReorientation(supId: "77", latitude: 46, longitude: 4, city: "MÂCON", operatorRaw: "SFR", systems: [], before: [90], after: [100])
+        ])
+        let model = await loadedModel(service)
+        XCTAssertEqual(model.filteredSites.count, mixedSites.count)
+
+        model.layer = .reorientations
+        await model.loadReorientations()
+        XCTAssertEqual(model.reorientationState, .loaded)
+        XCTAssertEqual(Set(model.filteredSites.map(\.supId)), ["2", "77"])
+        XCTAssertEqual(model.reorientations(supId: "2").count, 2)
+        XCTAssertEqual(model.weekBars.map(\.total), [4, 2], "les barres comptent les supports réorientés")
+        XCTAssertEqual(model.operatorCounts[.orange], 1)
+
+        model.toggleOperator(.sfr)
+        await settle()
+        XCTAssertEqual(model.filteredSites.map(\.supId), ["2"])
+        XCTAssertEqual(model.activeFilterCount, 1)
+
+        model.layer = .changes
+        XCTAssertEqual(model.weekBars.map(\.total), [1, 6], "retour aux changements et aux antennes du relevé")
+        XCTAssertFalse(model.filteredSites.contains { $0.supId == "77" }, "la couche des changements ne montre que le relevé")
+    }
+
+    func testAWeekWithoutKnownReorientationsSaysSo() async {
+        let service = FakeService()
+        service.snapshots["current"] = snapshot(mixedSites)
+        let model = await loadedModel(service)
+        model.layer = .reorientations
+        await model.loadReorientations()
+        XCTAssertEqual(model.reorientationState, .unknown)
+        XCTAssertTrue(model.filteredSites.isEmpty)
+        XCTAssertNil(model.currentWeekReoriented)
+    }
+
+    func testTheServiceReadsAMissingWeekAsNoKnownReorientation() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-anfr-reorientation-reader")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let seen = LockedRequests()
+        let missing = LockedFlag()
+        MockURLProtocol.requestHandler = { request in
+            seen.append(request, body: [:])
+            if missing.value {
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil,
+                                        headerFields: ["Content-Type": "application/json"])!,
+                        Data(#"{"code":"NOT_FOUND","message":"x","requestId":"r"}"#.utf8))
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                    headerFields: ["Content-Type": "application/json"])!,
+                    Data(#"{"date":"2026-10-08","previousDate":"2026-10-01","reorientations":[],"requestId":"r"}"#.utf8))
+        }
+        let service = ANFRService(api: api)
+        let week = try await service.reorientations(date: "2026-10-08")
+        XCTAssertEqual(week?.date, "2026-10-08")
+        let url = try XCTUnwrap(seen.all.first?.0.url)
+        XCTAssertEqual(url.path, "/api/anfr/reorientations")
+        XCTAssertEqual(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems, [URLQueryItem(name: "date", value: "2026-10-08")])
+        missing.value = true
+        let none = try await service.reorientations(date: "2026-09-01")
+        XCTAssertNil(none)
     }
 }
 
