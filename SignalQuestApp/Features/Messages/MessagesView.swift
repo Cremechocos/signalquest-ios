@@ -160,6 +160,7 @@ struct MessagesView: View {
     @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
     private let service: MessagesServicing
     private let e2ee: E2EEServicing?
     @State private var showNewConversation = false
@@ -185,14 +186,13 @@ struct MessagesView: View {
     @State private var filter: InboxFilter = .all
 
     enum InboxFilter: String, CaseIterable {
-        case all, unread, groups, encrypted
+        case all, unread, groups
 
         var title: LocalizedStringKey {
             switch self {
             case .all: "Toutes"
             case .unread: "Non lues"
             case .groups: "Groupes"
-            case .encrypted: "Chiffrées"
             }
         }
     }
@@ -208,6 +208,9 @@ struct MessagesView: View {
         self.e2ee = e2ee
         _model = StateObject(wrappedValue: MessagesViewModel(service: service))
     }
+
+    /// Relecture périodique de la liste : app au premier plan, aucune conversation ouverte.
+    private var listIsPolling: Bool { scenePhase == .active && routedConversationId == nil }
 
     private func refreshV2Activation() {
         guard services.e2eeV2Messaging.writesEnabled, let current = LocalAccountScope.sessionSnapshot() else {
@@ -407,6 +410,27 @@ struct MessagesView: View {
                 await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
             }
         }
+        // Message v1 reçu au premier plan : liste et badge se mettent à jour.
+        .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.inboxMessageReceived)) { _ in
+            Task {
+                await model.load()
+                await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
+                await services.refreshInboxBadge(force: true)
+            }
+        }
+        // Pas de flux au niveau de la boîte : la liste se relit toutes les ~15 s
+        // tant qu'elle est à l'écran (la tâche s'annule quand elle disparaît), app
+        // active et sans conversation ouverte par-dessus.
+        .task(id: listIsPolling) {
+            guard listIsPolling else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                guard !Task.isCancelled else { break }
+                await model.load()
+                await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
+                await services.refreshInboxBadge(force: true)
+            }
+        }
         // Au retour d'une conversation : la liste restait figée jusqu'au
         // tirer-pour-rafraîchir (SOC-23). Le premier affichage passe par `.task`.
         .onAppear {
@@ -511,7 +535,9 @@ struct MessagesView: View {
                         if !model.conversations.contains(where: { $0.id == id }) { await model.load() }
                         routedConversationId = id
                     }
-                }
+                },
+                unlockUserId: currentUserId,
+                unlockService: e2ee
             )
         }
         .sheet(isPresented: $showE2EEUnlock, onDismiss: openNewConversationIfRequested) {
@@ -657,7 +683,6 @@ struct MessagesView: View {
             case .all: break
             case .unread: guard isUnread(conversation) else { return false }
             case .groups: guard conversation.isGroup else { return false }
-            case .encrypted: guard conversation.e2eeEnabled == true else { return false }
             }
             guard !needle.isEmpty else { return true }
             return conversation.displayTitle(excluding: currentUserId).localizedStandardContains(needle)
@@ -666,17 +691,14 @@ struct MessagesView: View {
     }
 
     /// Aperçu du dernier message : déchiffré quand la clé E2EE est disponible,
-    /// cadenas sinon ; mention explicite pour les pièces jointes. Le cadenas des
-    /// conversations chiffrées est rendu en icône (12 pt) devant l'aperçu.
+    /// cadenas sinon ; mention explicite pour les pièces jointes.
     /// Les replis passent par `String(localized:)` : rendus en `Text(String)`,
     /// ils restaient en français dans l'app anglaise.
     private func lastMessagePreview(_ conversation: MessageConversation) -> String {
         // Message v2 : le serveur n'en sert qu'un aperçu vide (lot A7).
         if conversation.e2eeV2?.lastMessage != nil { return String(localized: "Message chiffré") }
         guard let last = conversation.lastMessage else {
-            return conversation.e2eeEnabled == true
-                ? String(localized: "Conversation chiffrée")
-                : String(localized: "Aucun message")
+            return String(localized: "Aucun message")
         }
         if last.deletedAt != nil { return String(localized: "Message supprimé") }
         let attachmentHint = last.attachments.isEmpty ? "" : "📎 "
@@ -753,12 +775,6 @@ struct MessagesView: View {
                         .accessibilityIdentifier("messages.row.title")
                     // Badges de l'interlocuteur, comme dans le fil.
                     SQUserBadges(badges: conversation.otherParticipantBadges(excluding: currentUserId), size: 12)
-                    if conversation.e2eeEnabled == true {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(SQColor.labelSecondary)
-                            .accessibilityLabel("Conversation chiffrée")
-                    }
                     if conversation.muted {
                         Image(systemName: "bell.slash.fill")
                             .font(.system(size: 11, weight: .semibold))
@@ -890,9 +906,18 @@ private struct NewConversationSheet: View {
     /// d'en créer un second (v1 comme v2).
     var existingDirect: (String) -> String? = { _ in nil }
     var onOpenExisting: (String) -> Void = { _ in }
+    /// Repli quand l'activation v2 est impossible : le mot de passe v1 existant.
+    var unlockUserId: String? = nil
+    var unlockService: E2EEServicing? = nil
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
+    /// Parcours d'activation v2 (celui de Messages et de Réglages › Appareils),
+    /// ouvert quand une conversation chiffrée est demandée sans identité v2 prête.
+    @State private var showV2Activation = false
+    @State private var createAfterActivation = false
+    @State private var showUnlock = false
+    @State private var createAfterUnlock = false
     @State private var query = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var title = ""
@@ -956,7 +981,7 @@ private struct NewConversationSheet: View {
                     // La limite se dit AVANT de créer : on la découvrait au premier
                     // envoi de photo refusé (SOC-07).
                     if e2ee {
-                        Text("Pour l’instant, une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage, ni réaction. Les appels y dépendent de la conversation : ils peuvent être indisponibles, ou partir après confirmation, sans chiffrement de bout en bout.")
+                        Text("Une conversation chiffrée n’accepte que du texte : ni photo, ni vocal, ni sondage.")
                             .font(SQType.caption)
                             .foregroundStyle(SQColor.labelSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -999,6 +1024,34 @@ private struct NewConversationSheet: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .sqSheet(background: SQColor.bg)
+        .sheet(isPresented: $showV2Activation, onDismiss: {
+            guard createAfterActivation else { return }
+            createAfterActivation = false
+            Task { await create(afterActivation: true) }
+        }) {
+            E2EEV2ActivationScreen(
+                api: services.api,
+                onFinish: {
+                    createAfterActivation = true
+                    showV2Activation = false
+                },
+                onLater: {
+                    errorMessage = String(localized: "Active le chiffrement sur cet appareil pour créer une conversation chiffrée.")
+                    showV2Activation = false
+                }
+            )
+        }
+        .sheet(isPresented: $showUnlock, onDismiss: {
+            guard createAfterUnlock else { return }
+            createAfterUnlock = false
+            Task { await create(afterActivation: true) }
+        }) {
+            if let unlockUserId, let unlockService {
+                E2EEUnlockSheet(userId: unlockUserId, service: unlockService) {
+                    createAfterUnlock = true
+                }
+            }
+        }
         .onChangeCompat(of: query) { _, _ in
             // Debounce annulable : annule la requête précédente avant d'en relancer
             // une et abandonne si annulée pendant l'attente — évite les rafales
@@ -1121,7 +1174,9 @@ private struct NewConversationSheet: View {
         isSearching = false
     }
 
-    private func create() async {
+    /// `afterActivation` : relance après l'activation v2 ou le déverrouillage ;
+    /// si l'identité v2 n'est toujours pas prête, on le dit au lieu de reboucler.
+    private func create(afterActivation: Bool = false) async {
         isBusy = true
         defer { isBusy = false }
         do {
@@ -1134,8 +1189,20 @@ private struct NewConversationSheet: View {
             }
             // Chiffrée et verrous ouverts : naît en v2 si tous les membres le
             // lisent ; sinon en v1, tant que le serveur l'accepte (v0.4.17).
-            // Un appareil pas encore activé en v2 crée en v1 ; une porte serveur
-            // refermée aussi, rien n'ayant été créé.
+            // Appareil pas encore entré en v2 : on déroule d'abord l'activation
+            // guidée (le serveur refuse la v1 à un compte sans mot de passe de
+            // chiffrement), puis la création repart en v2. Une porte serveur
+            // refermée, elle, crée en v1.
+            if e2ee, services.e2eeV2Messaging.writesEnabled,
+               let session = LocalAccountScope.sessionSnapshot(),
+               services.e2eeV2Messaging.lacksV2Readiness(session) {
+                if afterActivation {
+                    errorMessage = String(localized: "Le chiffrement n’est pas encore prêt sur cet appareil. Réessaie.")
+                } else {
+                    showV2Activation = true
+                }
+                return
+            }
             if e2ee, services.e2eeV2Messaging.writesEnabled,
                let session = LocalAccountScope.sessionSnapshot(),
                !services.e2eeV2Messaging.lacksV2Readiness(session) {
@@ -1175,6 +1242,14 @@ private struct NewConversationSheet: View {
             await onCreated()
             dismiss()
         } catch {
+            // Création v1 refusée faute de mot de passe de chiffrement : la feuille
+            // de création de clé, puis la création repart (au lieu de l'erreur brute).
+            if e2ee, !afterActivation, unlockUserId != nil, unlockService != nil,
+               case APIError.http(let status, _, let message, _, _) = error,
+               status == 400, message.localizedCaseInsensitiveContains("mot de passe de chiffrement") {
+                showUnlock = true
+                return
+            }
             errorMessage = error.userFacingMessage
             Haptics.error()
         }

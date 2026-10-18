@@ -27,7 +27,7 @@ enum ANFRFilterType: String, CaseIterable, Identifiable {
 
 @MainActor
 final class ANFRStatsViewModel: ObservableObject {
-    @Published var stats: ANFRStats?
+    @Published var stats: ANFRStats? { didSet { trendCache.removeAll() } }
     @Published var isLoading = false
     @Published var errorMessage: String?
     /// Opérateur sélectionné pour le graphe d'évolution.
@@ -38,6 +38,11 @@ final class ANFRStatsViewModel: ObservableObject {
     @Published var selectedFilter: ANFRFilterType = .g4
 
     private let service: ANFRServicing
+    /// Séries déjà calculées, par opérateur × filtre × métrique. Lire le doigt sur
+    /// la courbe redessine l'écran à chaque mouvement : sans cache, chaque rendu
+    /// refiltrait, retriait et reparsait des milliers de lignes de la série nationale,
+    /// plusieurs fois (courbe, résumé VoiceOver). Vidé quand les statistiques changent.
+    private var trendCache: [String: [ANFRTrendPoint]] = [:]
     init(service: ANFRServicing) { self.service = service }
 
     func load() async {
@@ -139,6 +144,8 @@ final class ANFRStatsViewModel: ObservableObject {
     /// plusieurs.
     func trendSeries(for op: ANFROperator) -> [ANFRTrendPoint] {
         guard let stats else { return [] }
+        let cacheKey = "\(op.rawValue)|\(selectedFilter.rawValue)|\(showProjected)"
+        if let cached = trendCache[cacheKey] { return cached }
         let band: String
         let gen: ANFRGeneration
         switch selectedFilter {
@@ -147,7 +154,7 @@ final class ANFRStatsViewModel: ObservableObject {
         case .g5_2100: (band, gen) = ("n1", .g5)
         case .g5_700: (band, gen) = ("n28", .g5)
         }
-        return stats.series
+        let points = stats.series
             .filter { $0.operatorKey == op.apiKey && $0.band == band }
             .sorted { $0.date < $1.date }
             .compactMap { row in
@@ -155,6 +162,8 @@ final class ANFRStatsViewModel: ObservableObject {
                     ANFRTrendPoint(date: $0, value: showProjected ? row.total : row.operational, generation: gen)
                 }
             }
+        trendCache[cacheKey] = points
+        return points
     }
 
     /// Variation relative entre le premier et le dernier relevé d'une série.

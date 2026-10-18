@@ -51,7 +51,7 @@ final class E2EEV2MembershipEventsTests: XCTestCase {
         ).map(\.text)
     }
 
-    /// La genèse se résume à qui a activé le chiffrement et aux admins ; la suite
+    /// La genèse se résume à qui a créé la conversation et aux admins ; la suite
     /// suit la chaîne, et un changement sans effet n'annonce rien.
     func testAGroupChainBecomesEventsInChainOrder() throws {
         let changes = try genesis(isGroup: true, memberIds: [alice, bruno, chloe], adminIds: [alice]) + [
@@ -79,7 +79,7 @@ final class E2EEV2MembershipEventsTests: XCTestCase {
         XCTAssertEqual(events.last?.atMs, 2_013)
 
         XCTAssertEqual(try texts(changes, genesisLength: 4, own: outsider, "fr"), [
-            "Alice a activé le chiffrement de bout en bout de cette conversation.",
+            "Alice a créé la conversation.",
             "Admins : Alice.",
             "Alice a ajouté un membre.",
             "Alice a nommé Bruno admin.",
@@ -90,7 +90,7 @@ final class E2EEV2MembershipEventsTests: XCTestCase {
             "Un membre a quitté le groupe.",
         ])
         XCTAssertEqual(try texts(changes, genesisLength: 4, own: outsider, "en"), [
-            "Alice turned on end-to-end encryption for this conversation.",
+            "Alice created the conversation.",
             "Admins: Alice.",
             "Alice added a member.",
             "Alice made Bruno an admin.",
@@ -118,7 +118,7 @@ final class E2EEV2MembershipEventsTests: XCTestCase {
         withBlankName[david] = MessageUser(id: david, name: " ", email: "", avatarUrl: nil)
 
         XCTAssertEqual(try texts(changes, genesisLength: 4, own: alice, members: withBlankName, "fr"), [
-            "Tu as activé le chiffrement de bout en bout de cette conversation.",
+            "Tu as créé la conversation.",
             "Admins : toi.",
             "Tu as ajouté un membre.",
             "Tu as nommé Chloé admin.",
@@ -129,7 +129,7 @@ final class E2EEV2MembershipEventsTests: XCTestCase {
             "Tu as quitté le groupe.",
         ])
         XCTAssertEqual(try texts(changes, genesisLength: 4, own: alice, members: withBlankName, "en"), [
-            "You turned on end-to-end encryption for this conversation.",
+            "You created the conversation.",
             "Admins: you.",
             "You added a member.",
             "You made Chloé an admin.",
@@ -167,13 +167,13 @@ final class E2EEV2MembershipEventsTests: XCTestCase {
             .enabled(by: alice), .browsersExcluded(by: alice), .browsersAllowed(by: bruno), .left(bruno),
         ])
         XCTAssertEqual(try texts(changes, genesisLength: 3, isGroup: false, own: alice, "fr"), [
-            "Tu as activé le chiffrement de bout en bout de cette conversation.",
+            "Tu as créé la conversation.",
             "Tu as exclu les navigateurs de cette conversation.",
             "Bruno a de nouveau autorisé les navigateurs dans cette conversation.",
             "Bruno a quitté la conversation.",
         ])
         XCTAssertEqual(try texts(changes, genesisLength: 3, isGroup: false, own: bruno, "en"), [
-            "Alice turned on end-to-end encryption for this conversation.",
+            "Alice created the conversation.",
             "Alice excluded web browsers from this conversation.",
             "You allowed web browsers in this conversation again.",
             "You left the conversation.",

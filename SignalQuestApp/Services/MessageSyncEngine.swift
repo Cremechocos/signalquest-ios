@@ -14,7 +14,8 @@ enum SyncTrigger: Sendable, Equatable {
     /// Réaction, vote, accusé de lecture, édition ou suppression : le delta ne
     /// porte pas ces changements, la conversation relit sa dernière page (SOC-05).
     case stateEvent
-    case typingEvent
+    /// Auteurs annoncés par l'événement : le serveur le renvoie aussi à celui qui écrit.
+    case typingEvent(userIds: [String])
     case viewingEvent
 
     /// Événements relayés par le flux de la conversation.
@@ -35,9 +36,19 @@ enum SyncTrigger: Sendable, Equatable {
     /// Le serveur envoie un événement nommé (ex. `poll_voted`) PUIS un `update`
     /// générique portant le même `type` : on lit le `type` du payload pour ne pas
     /// traiter une réaction comme un nouveau message.
+    /// `{ userId, typing: [{ userId, name }] }` : la liste si elle est là, sinon l'auteur.
+    static func typingUserIds(in data: String) -> [String] {
+        guard let payload = data.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: payload) as? [String: Any] else { return [] }
+        if let typing = object["typing"] as? [[String: Any]] {
+            return typing.compactMap { $0["userId"] as? String }
+        }
+        return (object["userId"] as? String).map { [$0] } ?? []
+    }
+
     static func from(event: String, data: String) -> SyncTrigger {
         let name = event.lowercased()
-        if name == "typing" { return .typingEvent }
+        if name == "typing" { return .typingEvent(userIds: typingUserIds(in: data)) }
         if name == "viewing" { return .viewingEvent }
         if stateTypes.contains(name) { return .stateEvent }
         if let payload = data.data(using: .utf8),

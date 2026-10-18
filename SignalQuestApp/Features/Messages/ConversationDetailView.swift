@@ -4,6 +4,7 @@ import UIKit
 import UniformTypeIdentifiers
 import CoreLocation
 import MapKit
+import CryptoKit
 
 struct ConversationDetailView: View {
     let conversation: MessageConversation
@@ -89,6 +90,9 @@ struct ConversationDetailView: View {
     /// Données pour rejouer un envoi échoué sans doublon : la même
     /// Idempotency-Key est réutilisée d'une tentative à l'autre.
     @State private var pendingSends: [String: PendingSend] = [:]
+    /// Photos et notes vocales en cours d'envoi, ou restées dans la file durable :
+    /// leur bulle locale porte Renvoyer / Supprimer comme un texte non envoyé.
+    @State private var pendingAttachmentSends: [String: PendingAttachmentSend] = [:]
     /// E2EE-UX-04 — vrai quand une rotation de clé (staleKey/409) a été détectée :
     /// affiche un bandeau « appuie pour resynchroniser » au lieu de bulles muettes.
     @State private var needsKeyResync = false
@@ -98,15 +102,24 @@ struct ConversationDetailView: View {
     /// Posé par les réglages après un départ du groupe : la conversation se ferme.
     @State private var leftGroup = false
     @State private var typingUntil: Date?
+    /// Qui écrit : son avatar, jamais le nôtre.
+    @State private var typingUserId: String?
     @State private var lastTypingSignal: Date = .distantPast
     /// Borne du dernier sync delta — max des dates créé/édité/supprimé vues.
     @State private var lastSync: Date = .distantPast
     /// Présence « actif sur la conversation » : ids des participants regardant la conv.
     @State private var conversationViewers: [String] = []
+    /// Vrai dès qu'un événement de présence a été lu : avant, l'état « en ligne »
+    /// vient de la liste des conversations ; ensuite, des spectateurs en direct.
+    @State private var viewersKnown = false
     @State private var activePingTask: Task<Void, Never>?
+    /// Dates de lecture posées par nous, hors du cycle de rendu (type référence).
+    @State private var readGate = OwnReadGate()
 
     // Messagerie avancée
     @State private var pinnedMessages: [PinnedMessage] = []
+    /// Épinglé affiché dans la barre ; chaque toucher y mène puis passe au suivant.
+    @State private var pinnedIndex = 0
     /// Sondages agrégés par id de message porteur, fusionnant la lecture du
     /// metadata et les réponses de /vote /close.
     @State private var pollsByMessageId: [String: MessagePoll] = [:]
@@ -136,10 +149,16 @@ struct ConversationDetailView: View {
     @State private var showSchedulePicker = false
     @State private var showNewPoll = false
     @State private var reminderTarget: MessageItem?
+    /// Texte ouvert dans une feuille où il se sélectionne librement.
+    @State private var selectableText: SelectableText?
+    /// Message auquel on réagit avec un emoji hors de la palette rapide.
+    @State private var emojiPickerTarget: MessageItem?
+    /// Texte à transférer vers une autre conversation.
+    @State private var forwardTarget: ForwardPayload?
 
     // Photos en grand + publications partagées interactives (parité Android).
     /// Photo de la conversation ouverte en plein écran (tap sur l'image).
-    @State private var imageViewerTarget: MessageImageTarget?
+    @State private var imageViewer: ImageViewerSession?
     /// Cache mémoire des publications partagées (1 fetch par postId) + actions
     /// like/repost optimistes, partagé par toutes les bulles de la conversation.
     @StateObject private var sharedPosts = SharedPostStore()
@@ -254,15 +273,6 @@ struct ConversationDetailView: View {
 
             pinnedBar
 
-            if otherIsViewing {
-                Text("Actif sur la conversation")
-                    .font(SQType.caption)
-                    .foregroundStyle(SQColor.accentInk)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 2)
-                    .transition(.opacity)
-            }
-
             ScrollViewReader { proxy in
                 ScrollView {
                     // Espacement géré par message (groupes 2/10 pt + horodatages
@@ -322,6 +332,8 @@ struct ConversationDetailView: View {
                         // sendStatus, surbrillance…). L'index — nécessaire à l'accès
                         // aux voisins — vient d'une table O(1) mémoïsée, reconstruite
                         // seulement quand la structure de la liste change.
+                        // Le pied « Lu / Vu par » suit MON dernier message, pas le bas de la liste.
+                        let receiptMessageId = messages.last { $0.senderId == currentUserId && !$0.id.hasPrefix("local-") }?.id
                         ForEach(messages) { message in
                             let index = renderCache.index(of: message, in: messages)
                             let previous = index > 0 ? messages[index - 1] : nil
@@ -344,6 +356,9 @@ struct ConversationDetailView: View {
                                     isGroupStart: stamp != nil || previous == nil || previous?.senderId != message.senderId,
                                     isGroupEnd: isGroupEnd(message, next: next)
                                 )
+                                if message.id == receiptMessageId {
+                                    readReceiptFooter(for: message)
+                                }
                             }
                             // Groupes de messages : même auteur = 2 pt, changement
                             // d'auteur = 10 pt (l'horodatage de section gère le sien).
@@ -355,7 +370,10 @@ struct ConversationDetailView: View {
                             )
                             .sqAnimation(SQMotion.standard, value: highlightedMessageId)
                         }
-                        readReceiptFooter
+                        // Frappe : dernier élément de la liste, pour qu'elle pousse le contenu
+                        // au lieu de rétrécir la zone visible (parité Android).
+                        typingIndicator
+                            .id(Self.typingRowId)
                         Color.clear
                             .frame(height: 1)
                             .onAppear { isNearBottom = true; hasUnseenMessages = false }
@@ -373,15 +391,39 @@ struct ConversationDetailView: View {
                 }
                 // On suit le DERNIER id (pas le count) : prepender d'anciens messages
                 // ne doit pas refaire défiler vers le bas.
-                .onChangeCompat(of: messages.last?.id) { _, _ in
+                .onChangeCompat(of: messages.last?.id) { old, _ in
                     guard let last = messages.last else { return }
                     let mine = last.id.hasPrefix("local-") || last.senderId == currentUserId
                     if isNearBottom || mine {
-                        withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
+                        // Ouverture (rien avant) ou bulle locale remplacée par la réponse
+                        // serveur : se placer sans glisser depuis le haut de la liste.
+                        let replacesLocal = old?.hasPrefix("local-") == true && !last.id.hasPrefix("local-")
+                        if old == nil || replacesLocal {
+                            var transaction = Transaction(animation: nil)
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) { proxy.scrollTo(last.id, anchor: .bottom) }
+                        } else {
+                            withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
+                        }
                     } else {
                         hasUnseenMessages = true
                     }
                 }
+                // La frappe ou le « Lu » ajoutent une ligne en bas : on y reste si on y était.
+                .onChangeCompat(of: typingUntil != nil) { _, visible in
+                    guard visible, isNearBottom else { return }
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(Self.typingRowId, anchor: .bottom) }
+                }
+                .onChangeCompat(of: receiptFooterKey) { _, key in
+                    guard key != nil, isNearBottom, let last = messages.last else { return }
+                    proxy.scrollTo(last.id, anchor: .bottom)
+                }
+                // Le clavier réduit la zone visible : on reste collé au dernier message si on y était.
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                    guard isNearBottom, let last = messages.last else { return }
+                    withAnimation(SQMotion.resolve(SQMotion.standard, reduceMotion)) { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
+                .scrollDismissesKeyboard(.interactively)
                 .overlay(alignment: .bottom) {
                     if hasUnseenMessages {
                         Button {
@@ -420,11 +462,6 @@ struct ConversationDetailView: View {
                 }
             }
 
-            // Frappe : ligne compacte épinglée juste au-dessus du composer (parité
-            // Android — auparavant dans l'en-tête, désormais en bas de conversation).
-            typingIndicator
-                .padding(.horizontal)
-                .sqReadableWidth()
             if !isE2EE, let currentUserId {
                 LiveShareConversationBar(
                     coordinator: services.liveShare,
@@ -563,6 +600,30 @@ struct ConversationDetailView: View {
                 )
             }
         }
+        .sheet(item: $emojiPickerTarget) { target in
+            EmojiReactionSheet(
+                chosen: Set(target.reactions.filter { $0.userId == currentUserId }.map(\.emoji))
+            ) { emoji in
+                Task { await toggleReaction(message: target, emoji: emoji) }
+            }
+        }
+        .sheet(item: $forwardTarget) { payload in
+            ForwardMessageSheet(
+                text: payload.text,
+                service: service,
+                currentUserId: currentUserId,
+                excludedConversationId: conversation.id
+            ) {
+                Haptics.success()
+                inAppNotifications.show(SQInAppNotificationItem(
+                    body: String(localized: "Message transféré."),
+                    variant: .success
+                ))
+            }
+        }
+        .sheet(item: $selectableText) { item in
+            SelectableTextSheet(text: item.text)
+        }
         .sheet(item: $reminderTarget) { target in
             AddReminderSheet(conversation: conversation, message: target, service: service, subtitle: sheetSubtitle) {
                 Haptics.success()
@@ -631,8 +692,8 @@ struct ConversationDetailView: View {
             SavedMessagesView(service: service, currentUserId: currentUserId, e2ee: e2ee, currentConversationId: conversation.id)
         }
         // Photo de la conversation en plein écran (zoom + glisser pour fermer).
-        .fullScreenCover(item: $imageViewerTarget) { target in
-            MessageImageViewer(target: target)
+        .fullScreenCover(item: $imageViewer) { session in
+            MessageImageViewer(targets: session.targets, initialIndex: session.initialIndex)
         }
         // Commentaires d'une publication partagée — même sheet que le feed ;
         // au retour, l'embed est rafraîchi (compteur de commentaires).
@@ -737,7 +798,10 @@ struct ConversationDetailView: View {
                 guard isOnScreen else { return }
                 startSync()
                 startActivePing()
-                Task { if usesV2 { await loadV2() } else { await refreshDelta() } }
+                Task {
+                    if usesV2 { await loadV2() } else { await refreshDelta() }
+                    await markReadIfLastIncoming()
+                }
             } else {
                 stopSync()
                 stopActivePing(sendLeave: true)
@@ -769,7 +833,8 @@ struct ConversationDetailView: View {
 
             // Avatar, nom et statut forment un seul élément VoiceOver : seule,
             // l'initiale masquée de l'avatar restait un texte non exposé. En
-            // conversation chiffrée, le double-tap ouvre l'explication.
+            // conversation chiffrée, l'explication reste dans le menu ⋯ et en
+            // action VoiceOver.
             HStack(spacing: SQSpace.sm2) {
                 ConversationAvatar(conversation: conversation, currentUserId: currentUserId, size: 38)
                     .overlay(alignment: .bottomTrailing) {
@@ -798,42 +863,21 @@ struct ConversationDetailView: View {
                             size: 12
                         )
                     }
-                    if otherIsOnline || isE2EE || conversation.isGroup {
-                        HStack(spacing: 4) {
-                            if otherIsOnline {
-                                Text("en ligne")
-                                    .font(SQType.micro)
-                                    .foregroundStyle(SQColor.success)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.6)
-                                    .accessibilityIdentifier("conversation.status")
-                            } else if conversation.isGroup && !isE2EE {
-                                Text("\(updatedMemberCount ?? conversation.participants.count) membres")
-                                    .font(SQType.micro(.regular))
-                                    .foregroundStyle(SQColor.labelSecondary)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.6)
-                                    .accessibilityIdentifier("conversation.members")
-                            }
-                            // La limite du chiffrement reste visible dans la conversation
-                            // même, et s'explique au toucher (SOC-07).
-                            if isE2EE {
-                                // Cible de 44 pt sans grandir l'en-tête : la marge
-                                // appartient au bouton, puis est rendue à la mise en page.
-                                Button { showEncryptionInfo = true } label: {
-                                    Label("Chiffrée · texte seulement", systemImage: "lock.fill")
-                                        .font(SQType.micro(.regular))
-                                        .foregroundStyle(SQColor.labelSecondary)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.6)
-                                        .padding(.vertical, 14)
-                                        .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .padding(.vertical, -14)
-                                .accessibilityHint("Explique ce que protège le chiffrement")
-                                .accessibilityIdentifier("conversation.encryption.info")
-                            }
+                    if otherIsOnline || conversation.isGroup {
+                        if otherIsOnline {
+                            Text("en ligne")
+                                .font(SQType.micro)
+                                .foregroundStyle(SQColor.success)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .accessibilityIdentifier("conversation.status")
+                        } else {
+                            Text("\(updatedMemberCount ?? conversation.participants.count) membres")
+                                .font(SQType.micro(.regular))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .accessibilityIdentifier("conversation.members")
                         }
                     }
                 }
@@ -899,6 +943,12 @@ struct ConversationDetailView: View {
                 Button { showSaved = true } label: {
                     Label("Messages enregistrés", systemImage: "bookmark")
                 }
+                if isE2EE {
+                    Button { showEncryptionInfo = true } label: {
+                        Label("Chiffrement", systemImage: "lock")
+                    }
+                    .accessibilityIdentifier("conversation.encryption.info")
+                }
                 Divider()
                 if conversation.isGroup {
                     Button { showGroupSettings = true } label: {
@@ -933,15 +983,29 @@ struct ConversationDetailView: View {
     }
 
     /// Avatar de l'autre participant (1:1) pour la barre haute.
-    private var otherParticipantAvatarURL: URL? {
-        guard !conversation.isGroup else { return nil }
-        return conversation.participants.first { $0.userId != currentUserId }?.user.avatarUrl
-            ?? conversation.participants.first?.user.avatarUrl
+    private var typingParticipant: ConversationParticipant? {
+        guard let typingUserId else { return nil }
+        return conversation.participants.first { $0.userId == typingUserId }
     }
 
-    /// Présence : l'autre participant (1:1) est en ligne.
+    /// Prénom de celui qui écrit, pour « Léa écrit… » en groupe.
+    private var typingFirstName: String? {
+        guard let name = typingParticipant?.user.displayName,
+              let first = name.split(separator: " ").first.map(String.init), !first.isEmpty else { return nil }
+        return first
+    }
+
+    private var otherParticipantAvatarURL: URL? {
+        guard !conversation.isGroup else { return nil }
+        // Sans repli sur le premier participant : ce peut être nous.
+        return conversation.participants.first { $0.userId != currentUserId }?.user.avatarUrl
+    }
+
+    /// Présence : l'autre participant (1:1) est en ligne. `conversation` est figée
+    /// à l'ouverture ; une fois la présence en direct connue, elle prend le relais.
     private var otherIsOnline: Bool {
         guard !conversation.isGroup else { return false }
+        if viewersKnown { return otherIsViewing }
         return conversation.participants.contains { $0.userId != currentUserId && $0.presence?.isOnline == true }
     }
 
@@ -1008,7 +1072,8 @@ struct ConversationDetailView: View {
                 // suffisait à les envoyer (AF-MSG-09).
                 onShareLocation: { confirmsLocationShare = true },
                 onLiveShare: { showLiveShare = true },
-                onPickPhoto: { item, caption in Task { await sendAttachment(item: item, caption: caption) } },
+                onPickPhotos: { items, caption in Task { await sendPhotos(items, caption: caption) } },
+                onCapturePhoto: { data, caption in Task { await sendCapturedPhoto(data, caption: caption) } },
                 onVoiceNote: { url, duration in Task { await sendVoiceNote(url: url, duration: duration) } },
                 mentionSuggestions: mentionSuggestionProvider
             )
@@ -1091,6 +1156,10 @@ struct ConversationDetailView: View {
             }
             if !mine { Spacer(minLength: 72) }
         }
+        // Glisser la rangée vers la droite répond au message (seulement s'il existe côté serveur).
+        .modifier(SwipeToReply(isEnabled: !message.id.hasPrefix("local-") && message.deletedAt == nil) {
+            beginReply(to: message)
+        })
     }
 
     /// Corps de bulle : contenu classique (texte/carte/sondage/fichier), photo
@@ -1100,15 +1169,18 @@ struct ConversationDetailView: View {
     @ViewBuilder
     private func bubbleBody(for message: MessageItem, mine: Bool, isGroupStart: Bool, isGroupEnd: Bool, photoOnly: Bool, reactions: [MessageReactionSummary]) -> some View {
         Group {
+            // L'ombre reste sur la photo et la carte seules ; une bulle de texte n'en a plus
+            // (un calque d'ombre par bulle coûtait cher au défilement).
             if photoOnly {
                 attachmentsView(for: message, mine: mine, standalone: true)
+                    .sqShadowSoft()
             } else if let embed = sharedPostEmbedTarget(for: message) {
                 standaloneSharedPostEmbed(message: message, card: embed.card, postId: embed.postId, mine: mine, isGroupStart: isGroupStart)
+                    .sqShadowSoft()
             } else {
                 classicBubble(for: message, mine: mine, isGroupStart: isGroupStart, isGroupEnd: isGroupEnd)
             }
         }
-        .sqShadowSoft()
         .opacity(sendStatus[message.id] == .sending ? 0.7 : 1)
         .contextMenu { contextMenu(for: message, mine: mine) }
         .overlay(alignment: mine ? .bottomTrailing : .bottomLeading) {
@@ -1181,6 +1253,8 @@ struct ConversationDetailView: View {
                 || message.attachments.contains { $0.url != nil && isImageAttachment($0) }
                 // Aperçu d'un lien : VoiceOver doit pouvoir l'ouvrir.
                 || (!isE2EE && message.deletedAt == nil && displayedContent(for: message).contains("http"))
+                // Citation de repli « Message d’origine » : un bouton.
+                || (message.replyToId != nil && message.deletedAt == nil && quotedMessage(for: message) == nil)
             let spokenSummary = spokenTextSummary(for: message, mine: mine, card: card)
             return VStack(alignment: mine ? .trailing : .leading, spacing: SQSpace.xs + 1) {
                 if !mine, conversation.isGroup, isGroupStart, let name = message.sender?.displayName {
@@ -1213,8 +1287,33 @@ struct ConversationDetailView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                } else if let replyToId = message.replyToId, message.deletedAt == nil {
+                    // Message d'origine plus ancien que les pages chargées : la citation
+                    // charge l'historique jusqu'à lui au toucher.
+                    Button {
+                        Haptics.selection()
+                        handleSearchSelection(replyToId)
+                    } label: {
+                        HStack(spacing: SQSpace.xs2) {
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(mine ? SQColor.onInk.opacity(0.7) : SQColor.brandRed)
+                                .frame(width: 3)
+                            Text("Message d’origine")
+                                .font(SQType.micro)
+                        }
+                        .opacity(0.75)
+                        .padding(SQSpace.xs2)
+                        .frame(minHeight: 44)
+                        .background((mine ? SQColor.onInk.opacity(0.14) : SQColor.surfaceMuted.opacity(0.6)), in: RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Charge le message d’origine")
                 }
                 attachmentsView(for: message, mine: mine)
+                if let pendingAttachment = pendingAttachmentSends[message.id] {
+                    pendingAttachmentRow(pendingAttachment, mine: mine)
+                }
                 if message.deletedAt != nil {
                     Text("Message supprimé")
                         .font(SQType.caption.italic())
@@ -1261,10 +1360,7 @@ struct ConversationDetailView: View {
                 } else {
                     let text = displayedContent(for: message)
                     if !text.isEmpty {
-                        Text(text)
-                            .font(SQType.body)
-                            .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
-                            .accessibilityIdentifier("message.text")
+                        bubbleText(text, id: message.id, mine: mine)
                         // Aperçu lu par le serveur : jamais dans une conversation chiffrée.
                         if !isE2EE, message.deletedAt == nil, text.contains("http") {
                             MessageLinkPreview(text: text, mine: mine)
@@ -1307,6 +1403,38 @@ struct ConversationDetailView: View {
                 if !mine { bubbleShape(mine: false, first: isGroupStart, last: isGroupEnd).stroke(SQOledPalette.cardStroke, lineWidth: 1) }
             }
             .modifier(SpokenBubble(summary: spokenSummary, interactive: hasInteractiveContent))
+    }
+
+    /// Texte d'une bulle ; les liens y sont cliquables. La sélection libre n'est pas activée
+    /// sur le texte : elle prendrait l'appui long au menu contextuel (« Sélectionner le texte »).
+    @ViewBuilder
+    private func bubbleText(_ text: String, id: String, mine: Bool) -> some View {
+        if let linked = renderCache.linkedText(text, id: id) {
+            Text(linked)
+                .font(SQType.body)
+                .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
+                .tint(mine ? SQColor.onInk : SQColor.accentInk)
+                .accessibilityIdentifier("message.text")
+        } else {
+            Text(text)
+                .font(SQType.body)
+                .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
+                .accessibilityIdentifier("message.text")
+        }
+    }
+
+    /// Photo ou note vocale pas encore partie : la bulle dit ce qu'elle porte, la légende suit.
+    private func pendingAttachmentRow(_ attachment: PendingAttachmentSend, mine: Bool) -> some View {
+        let isAudio = attachment.kind.uppercased() == "AUDIO"
+        return Label {
+            isAudio ? Text("Note vocale") : Text("Photo")
+        } icon: {
+            Image(systemName: isAudio ? "waveform" : "photo")
+        }
+        .font(SQType.subhead(.semibold))
+        .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
+        .frame(minWidth: 120, alignment: .leading)
+        .accessibilityIdentifier("message.pendingAttachment")
     }
 
     /// Ce que VoiceOver lit pour une bulle de texte : qui a écrit, le texte,
@@ -1516,13 +1644,7 @@ struct ConversationDetailView: View {
         let serverActions = EncryptedConversationSurfaces.allowsServerActions(messageId: message.id, isV2: conversationIsV2)
         if !isLocal {
             Button {
-                // Quitter une modification pour répondre : le texte du message
-                // modifié ne devient pas la réponse, le brouillon revient.
-                if editTarget != nil {
-                    editTarget = nil
-                    restoreComposerAfterEdit()
-                }
-                replyTarget = message
+                beginReply(to: message)
             } label: {
                 Label("Répondre", systemImage: "arrowshape.turn.up.left")
             }
@@ -1549,6 +1671,23 @@ struct ConversationDetailView: View {
                 }
             } label: {
                 Label("Copier", systemImage: "doc.on.doc")
+            }
+            // Pas en conversation chiffrée : la sélection système contournerait la copie bornée ci-dessus,
+            // et un texte déchiffré ne part jamais en clair vers une autre conversation. Le transfert
+            // ne vise que les conversations non chiffrées, où l'envoi de texte existant suffit.
+            if !isE2EE {
+                Button {
+                    selectableText = SelectableText(text: displayedContent(for: message))
+                } label: {
+                    Label("Sélectionner le texte", systemImage: "text.cursor")
+                }
+                if !isLocal {
+                    Button {
+                        forwardTarget = ForwardPayload(text: displayedContent(for: message))
+                    } label: {
+                        Label("Transférer", systemImage: "arrowshape.turn.up.right")
+                    }
+                }
             }
         }
         if message.deletedAt == nil, serverActions {
@@ -1630,6 +1769,17 @@ struct ConversationDetailView: View {
         }
     }
 
+    /// Répondre à un message (menu contextuel ou glissement de la bulle). Quitter une
+    /// modification pour répondre : le texte du message modifié ne devient pas la
+    /// réponse, le brouillon revient.
+    private func beginReply(to message: MessageItem) {
+        if editTarget != nil {
+            editTarget = nil
+            restoreComposerAfterEdit()
+        }
+        replyTarget = message
+    }
+
     /// Boutons de réaction du menu contextuel (toggle : re-taper retire MA réaction).
     @ViewBuilder
     private func reactionMenuButtons(for message: MessageItem) -> some View {
@@ -1641,6 +1791,11 @@ struct ConversationDetailView: View {
                 Text(emoji)
             }
             .accessibilityLabel("Réagir avec \(emoji)")
+        }
+        Button {
+            emojiPickerTarget = message
+        } label: {
+            Label("Plus d’emojis", systemImage: "plus")
         }
     }
 
@@ -1692,11 +1847,7 @@ struct ConversationDetailView: View {
             guard let url = attachment.url,
                   case .privateAccount(let accountSession) = privateImageCacheScope else { return }
             Haptics.selection()
-            imageViewerTarget = MessageImageTarget(
-                id: attachment.id ?? url.absoluteString,
-                url: url,
-                accountSession: accountSession
-            )
+            openImageViewer(tappedId: attachment.id ?? url.absoluteString, accountSession: accountSession)
         } label: {
             Group {
                 if let privateImageCacheScope {
@@ -1727,6 +1878,27 @@ struct ConversationDetailView: View {
             ? String(localized: "Ta photo")
             : String(localized: "Photo de \(message.sender?.displayName ?? String(localized: "Membre"))"))
         .accessibilityHint("Toucher pour afficher en plein écran")
+    }
+
+    /// Visionneuse sur toutes les photos de la conversation, ouverte à celle qu'on a touchée :
+    /// on y passe de l'une à l'autre en balayant.
+    private func openImageViewer(tappedId: String, accountSession: LocalAccountSession) {
+        var targets: [MessageImageTarget] = []
+        var initialIndex = 0
+        for message in messages where message.deletedAt == nil {
+            for attachment in message.attachments where isImageAttachment(attachment) {
+                guard let url = attachment.url else { continue }
+                let target = MessageImageTarget(
+                    id: attachment.id ?? url.absoluteString,
+                    url: url,
+                    accountSession: accountSession
+                )
+                if target.id == tappedId { initialIndex = targets.count }
+                targets.append(target)
+            }
+        }
+        guard !targets.isEmpty else { return }
+        imageViewer = ImageViewerSession(targets: targets, initialIndex: initialIndex)
     }
 
     /// Taille d'affichage d'une photo : ratio préservé, plus grand côté ≤ 240 pt,
@@ -1781,7 +1953,6 @@ struct ConversationDetailView: View {
                         .font(SQType.subhead(.semibold))
                         .foregroundStyle(mine ? SQColor.onInk : SQColor.label)
                         .lineLimit(1)
-                            .truncationMode(.middle)
                         .truncationMode(.middle)
                     Text(fileMetaLine(attachment))
                         .font(SQType.micro)
@@ -1823,10 +1994,13 @@ struct ConversationDetailView: View {
 
     @ViewBuilder
     private var pinnedBar: some View {
-        if let pinned = pinnedMessages.first {
+        if !pinnedMessages.isEmpty {
+            let pinned = pinnedMessages[min(pinnedIndex, pinnedMessages.count - 1)]
             Button {
-                scrollTargetId = pinned.messageId
                 Haptics.selection()
+                // Aussi pour un message plus ancien que les pages chargées, que le défilement seul n'atteint pas.
+                handleSearchSelection(pinned.messageId)
+                pinnedIndex = (min(pinnedIndex, pinnedMessages.count - 1) + 1) % pinnedMessages.count
             } label: {
                 HStack(spacing: SQSpace.sm2) {
                     Image(systemName: "pin.fill")
@@ -1870,13 +2044,27 @@ struct ConversationDetailView: View {
         return value.isEmpty ? String(localized: "Pièce jointe") : value
     }
 
+    private static let typingRowId = "typing-indicator"
+
+    /// Qui a lu `message` (mon dernier message) : les autres membres dont la lecture est postérieure.
+    private func receiptReaders(for message: MessageItem) -> [ReadReceipt] {
+        guard let date = message.createdAt else { return [] }
+        return readReceipts.filter { receipt in
+            receipt.userId != currentUserId && (receipt.lastReadAt ?? .distantPast) >= date
+        }
+    }
+
+    /// Change quand le pied « Lu / Vu par » apparaît ou se modifie : sert à rester en bas de la liste.
+    private var receiptFooterKey: String? {
+        guard let last = messages.last(where: { $0.senderId == currentUserId && !$0.id.hasPrefix("local-") }) else { return nil }
+        let readers = receiptReaders(for: last)
+        return readers.isEmpty ? nil : "\(last.id)|\(readers.count)"
+    }
+
     @ViewBuilder
-    private var readReceiptFooter: some View {
-        if let lastMine = messages.last(where: { $0.senderId == currentUserId }),
-           let lastDate = lastMine.createdAt {
-            let seenBy = readReceipts.filter { receipt in
-                receipt.userId != currentUserId && (receipt.lastReadAt ?? .distantPast) >= lastDate
-            }
+    private func readReceiptFooter(for lastMine: MessageItem) -> some View {
+        if lastMine.createdAt != nil {
+            let seenBy = receiptReaders(for: lastMine)
             if !seenBy.isEmpty {
                 // À deux : « Lu » et la double coche ; en groupe : qui a vu.
                 Group {
@@ -1909,18 +2097,27 @@ struct ConversationDetailView: View {
         if let typingUntil, typingUntil > Date() {
             HStack(alignment: .bottom, spacing: SQSpace.sm) {
                 SQAvatar(
-                    url: conversation.groupPhotoUrl ?? otherParticipantAvatarURL,
-                    name: conversationTitle,
+                    url: typingParticipant?.user.avatarUrl ?? conversation.groupPhotoUrl ?? otherParticipantAvatarURL,
+                    name: typingParticipant?.user.displayName ?? conversationTitle,
                     size: 24
                 )
                 .accessibilityHidden(true)
-                TypingDotsView()
-                    .padding(.horizontal, SQSpace.md)
-                    .padding(.vertical, SQSpace.sm2)
-                    .background(SQColor.surface, in: bubbleShape(mine: false))
-                    .sqShadowSoft()
+                VStack(alignment: .leading, spacing: 2) {
+                    // En groupe, dire qui écrit (prénom seulement, pour rester court).
+                    if conversation.isGroup, let name = typingFirstName {
+                        Text("\(name) écrit…")
+                            .font(SQType.micro(.regular))
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .lineLimit(1)
+                    }
+                    TypingDotsView()
+                        .padding(.horizontal, SQSpace.md)
+                        .padding(.vertical, SQSpace.sm2)
+                        .background(SQColor.surface, in: bubbleShape(mine: false))
+                }
                 Spacer(minLength: 0)
             }
+            .padding(.top, SQSpace.sm)
             .padding(.bottom, SQSpace.xs)
             .transition(
                 reduceMotion
@@ -1931,7 +2128,9 @@ struct ConversationDetailView: View {
                     )
             )
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("En train d’écrire")
+            .accessibilityLabel(conversation.isGroup && typingFirstName != nil
+                ? String(localized: "\(typingFirstName ?? "") est en train d’écrire")
+                : String(localized: "En train d’écrire"))
             // Disparition en douceur à l'échéance : sans ce timer, la condition
             // `typingUntil > Date()` n'était réévaluée qu'au prochain re-render.
             .task(id: typingUntil) {
@@ -1948,12 +2147,16 @@ struct ConversationDetailView: View {
 
     private func quotedMessage(for message: MessageItem) -> MessageItem? {
         guard let replyToId = message.replyToId else { return nil }
-        return messages.first { $0.id == replyToId }
+        return renderCache.message(withId: replyToId, in: messages)
     }
 
     /// Horodatage de section centré (« Aujourd’hui 14:32 ») : affiché en tête de
     /// conversation, au changement de jour, ou après plus d'une heure de silence.
     private func sectionStamp(for message: MessageItem, previous: MessageItem?) -> String? {
+        renderCache.stamp(for: message, previous: previous) { computeSectionStamp(for: message, previous: previous) }
+    }
+
+    private func computeSectionStamp(for message: MessageItem, previous: MessageItem?) -> String? {
         guard let date = message.createdAt else { return nil }
         if let previousDate = previous?.createdAt {
             let sameDay = Calendar.current.isDate(date, inSameDayAs: previousDate)
@@ -2103,9 +2306,15 @@ struct ConversationDetailView: View {
             conversationId: conversation.id, isGroup: conversation.isGroup, participants: conversation.participants
         ) {
         case .thread(let presentation):
-            let localPending = messages.filter { pendingSends[$0.id] != nil }
+            let localPending = messages.filter { pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil }
             let hidden = E2EEV2HiddenMessagesStore.hiddenRefs(conversationId: conversation.id)
-            messages = Self.normalized(presentation.messages.filter { !hidden.contains($0.id) } + localPending)
+            let knownIds = Set(messages.map(\.id))
+            let thread = presentation.messages.filter { !hidden.contains($0.id) }
+            let merged = Self.normalized(thread + localPending)
+            // Le message envoyé peut arriver par le flux avant l'accusé : sa bulle locale s'efface alors.
+            let confirmed = localIdsConfirmed(by: thread.filter { !knownIds.contains($0.id) })
+            let next = confirmed.isEmpty ? merged : merged.filter { !confirmed.contains($0.id) }
+            if next != messages { messages = next }
             v2Notices = presentation.notices
             errorMessage = nil
         case .failure(let failure):
@@ -2150,17 +2359,16 @@ struct ConversationDetailView: View {
         }
         // La reprise ne doit jamais retarder l'ouverture de la conversation. Le backend
         // deduplique par clientRequestId si deux ouvertures reveillent la meme ligne.
-        Task {
-            await service.retryPendingTextMessages()
-            await service.retryPendingAttachments()
-        }
+        // Les pièces jointes en file ne repartent plus en silence ici : elles reviennent
+        // en bulles « Non envoyé » (Renvoyer / Supprimer), voir `restoredPendingAttachments`.
+        Task { await service.retryPendingTextMessages() }
         do {
             let page = try await service.messages(conversationId: conversation.id, cursor: nil)
             // Les bulles locales encore en cours d'envoi (ou en échec, rejouables)
             // ne sont pas encore sur le serveur : un rechargement ne doit pas les
             // faire disparaître.
-            let localPending = messages.filter { pendingSends[$0.id] != nil }
-            messages = Self.normalized(page.messages + localPending + (await restoredFailedMessages()))
+            let localPending = messages.filter { pendingSends[$0.id] != nil || pendingAttachmentSends[$0.id] != nil }
+            messages = Self.normalized(page.messages + localPending + (await restoredFailedMessages()) + (await restoredPendingAttachments()))
             olderCursor = (page.hasMore ?? (page.nextCursor != nil)) ? page.nextCursor : nil
             readReceipts = page.readReceipts ?? []
             errorMessage = nil
@@ -2171,6 +2379,34 @@ struct ConversationDetailView: View {
         } catch {
             errorMessage = error.userFacingMessage
         }
+    }
+
+    /// Bulles locales « en cours d'envoi » dont le message serveur vient d'arriver par le flux
+    /// avant la réponse HTTP : sans ça, le texte s'affichait deux fois un instant. Chaque message
+    /// serveur n'en confirme qu'une (deux « ok » d'affilée), et seuls les messages nouveaux comptent.
+    private func localIdsConfirmed(by arrived: [MessageItem]) -> Set<String> {
+        var free = arrived.filter { $0.senderId == currentUserId && !$0.id.hasPrefix("local-") }
+        guard !free.isEmpty else { return [] }
+        var confirmed = Set<String>()
+        for local in messages where sendStatus[local.id] == .sending {
+            if let pending = pendingSends[local.id] {
+                guard let hit = free.firstIndex(where: {
+                    $0.replyToId == pending.replyToId && displayedContent(for: $0) == pending.text
+                }) else { continue }
+                free.remove(at: hit)
+                confirmed.insert(local.id)
+            } else if let attachment = pendingAttachmentSends[local.id], attachment.clientRequestId == nil {
+                let kind = attachment.kind.uppercased()
+                guard let hit = free.firstIndex(where: { item in
+                    item.replyToId == attachment.replyToId
+                        && displayedContent(for: item) == attachment.caption
+                        && item.attachments.contains { $0.kind.uppercased() == kind }
+                }) else { continue }
+                free.remove(at: hit)
+                confirmed.insert(local.id)
+            }
+        }
+        return confirmed
     }
 
     /// Erreur d'une action (envoi, réaction, appel…) : bandeau passager. Seul
@@ -2264,17 +2500,30 @@ struct ConversationDetailView: View {
                 if Task.isCancelled { return }
                 MessageSyncLog.logger.debug("trigger \(String(describing: trigger), privacy: .public)")
                 switch trigger {
-                case .typingEvent:
+                case .typingEvent(let userIds):
                     await MainActor.run {
+                        // Le serveur renvoie aussi notre propre frappe : seule celle des autres compte.
+                        let others = userIds.filter { $0 != currentUserId }
+                        guard let typer = others.first else { return }
+                        typingUserId = typer
                         withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { typingUntil = Date().addingTimeInterval(5) }
                     }
                 case .viewingEvent:
                     await refreshViewers()
                 case .stateEvent:
+                    // Le `read_state` que provoque notre propre « lu » revient dans la seconde :
+                    // on laisse passer ce délai plutôt que de relire 80 messages pour rien.
+                    let sinceOwnRead = Date().timeIntervalSince(readGate.lastMarkReadAt)
+                    if sinceOwnRead < 1 { try? await Task.sleep(nanoseconds: UInt64((1 - sinceOwnRead) * 1_000_000_000)) }
                     // Une conversation v2 ne se relit jamais par la page v1.
                     if usesV2 { await loadV2() } else { await refreshLatestPageState() }
                 case .serverEvent, .polling:
-                    if usesV2 { await loadV2() } else { await refreshDelta() }
+                    if usesV2 {
+                        await loadV2()
+                        await markReadIfLastIncoming()
+                    } else {
+                        await refreshDelta()
+                    }
                 }
             }
             MessageSyncLog.logger.debug("sync stream ended \(conversationId, privacy: .public)")
@@ -2313,6 +2562,7 @@ struct ConversationDetailView: View {
     private func refreshViewers() async {
         let viewers = await service.conversationViewers(conversationId: conversation.id)
         await MainActor.run {
+            viewersKnown = true
             withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { conversationViewers = viewers }
         }
     }
@@ -2351,6 +2601,8 @@ struct ConversationDetailView: View {
                 advanceLastSync(with: delta)
             }
             await decryptLoadedMessages()
+            let confirmed = localIdsConfirmed(by: fresh.filter { !knownIds.contains($0.id) })
+            if !confirmed.isEmpty { messages.removeAll { confirmed.contains($0.id) } }
             refreshPolls()
             await loadPinned()
             await markRead()
@@ -2580,9 +2832,12 @@ struct ConversationDetailView: View {
             do {
                 try await service.editMessage(messageId: editTarget.id, text: text, in: conversation, e2ee: e2ee)
                 decryptedMessages[editTarget.id] = text
+                let edited = editTarget
                 self.editTarget = nil
                 restoreComposerAfterEdit()
-                await load()
+                // Mise à jour sur place : relire la première page effaçait l'historique déjà paginé.
+                messages = messages.map { $0.id == edited.id ? Self.copy(of: $0, content: $0.isEncrypted ? nil : text, editedAt: Date()) : $0 }
+                await refreshLatestPageState()
                 Haptics.success()
             } catch {
                 showActionError(error.userFacingMessage)
@@ -2613,6 +2868,10 @@ struct ConversationDetailView: View {
     /// Idempotency-Key à chaque tentative pour qu'un rejeu après échec réseau ne
     /// crée jamais de doublon côté serveur.
     private func performSend(localId: String) async {
+        if pendingAttachmentSends[localId] != nil {
+            await performAttachmentSend(localId: localId)
+            return
+        }
         guard let pending = pendingSends[localId] else { return }
         guard !v2Unavailable else {
             sendStatus[localId] = .failed
@@ -2626,7 +2885,6 @@ struct ConversationDetailView: View {
                 messages.removeAll { $0.id == localId }
                 sendStatus[localId] = nil
                 pendingSends[localId] = nil
-                Haptics.success()
             } else {
                 withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
                 Haptics.error()
@@ -2655,7 +2913,7 @@ struct ConversationDetailView: View {
             }
             sendStatus[localId] = nil
             pendingSends[localId] = nil
-            Haptics.success()
+            // Pas de second retour haptique ici : le léger de l'envoi suffit.
             // Premier message envoyé : le bon moment pour proposer d'être
             // prévenu des réponses (TRX-01), une seule fois par appareil.
             Task { await services.notificationPriming.considerPriming(after: .messageSent) }
@@ -2696,7 +2954,11 @@ struct ConversationDetailView: View {
         if let pending = pendingSends[localId] {
             await service.discardPendingText(clientRequestId: pending.idempotencyKey)
         }
+        if let attachment = pendingAttachmentSends[localId] {
+            await discardOutboxRecords(for: attachment)
+        }
         pendingSends[localId] = nil
+        pendingAttachmentSends[localId] = nil
         sendStatus[localId] = nil
         withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { messages.removeAll { $0.id == localId } }
     }
@@ -2735,79 +2997,188 @@ struct ConversationDetailView: View {
     /// contenu dans son outbox protégée, donc un échec ou kill processus reste reprenable.
     private func sendVoiceNote(url: URL, duration: TimeInterval) async {
         defer { try? FileManager.default.removeItem(at: url) }
-        isSending = true
-        defer { isSending = false }
+        // Même limite que les images : le chiffrement des pièces jointes
+        // n'est pas encore disponible partout. Le dire plutôt que d'envoyer
+        // un audio en clair dans une conversation chiffrée.
+        guard !isE2EE else {
+            showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
+            Haptics.error()
+            return
+        }
+        guard let data = try? Data(contentsOf: url), !data.isEmpty else { return }
+        await queueAttachment(
+            PendingAttachmentSend(
+                data: data, filename: url.lastPathComponent, mimeType: "audio/m4a", kind: "AUDIO",
+                caption: "", width: nil, height: nil, replyToId: replyTarget?.id, ttlSeconds: ephemeralTTL
+            )
+        )
+        replyTarget = nil
+    }
+
+    /// Plusieurs photos choisies d'un coup : envoyées l'une après l'autre, la légende sur la première.
+    private func sendPhotos(_ items: [PhotosPickerItem], caption: String) async {
+        for (index, item) in items.enumerated() {
+            await sendAttachment(item: item, caption: index == 0 ? caption : "")
+        }
+    }
+
+    private func sendAttachment(item: PhotosPickerItem, caption rawCaption: String) async {
         do {
-            // Même limite que les images : le chiffrement des pièces jointes
-            // n'est pas encore disponible partout. Le dire plutôt que d'envoyer
-            // un audio en clair dans une conversation chiffrée.
             guard !isE2EE else {
                 throw E2EEError.unsupported(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
             }
-            guard let data = try? Data(contentsOf: url), !data.isEmpty else { return }
-            let sent = try await service.sendAttachmentData(
-                data,
-                filename: url.lastPathComponent,
-                mimeType: "audio/m4a",
-                kind: "AUDIO",
-                caption: "",
-                width: nil,
-                height: nil,
-                in: conversation,
-                replyToId: replyTarget?.id,
-                e2ee: e2ee,
-                ttlSeconds: ephemeralTTL
-            )
-            messages = Self.normalized(messages + [sent])
-            replyTarget = nil
-            Haptics.success()
+            guard let raw = try await item.loadTransferable(type: Data.self) else { return }
+            await sendPhoto(rawData: raw, caption: rawCaption)
         } catch {
             showActionError(error.userFacingMessage)
             Haptics.error()
         }
     }
 
-    private func sendAttachment(item: PhotosPickerItem, caption rawCaption: String) async {
-        isSending = true
-        defer { isSending = false }
-        do {
-            guard !isE2EE else {
-                throw E2EEError.unsupported(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
-            }
-            guard let raw = try await item.loadTransferable(type: Data.self) else { return }
-            // Décodage/redimensionnement/encodage hors du main thread pour ne pas
-            // geler l'UI pendant l'envoi (image plein format).
-            guard let prepared = await Task.detached(priority: .userInitiated, operation: {
-                Self.preparedJPEG(from: raw)
-            }).value else {
-                throw E2EEError.unsupported(String(localized: "Image illisible."))
-            }
-            let caption = rawCaption.trimmingCharacters(in: .whitespacesAndNewlines)
-            let sent = try await service.sendAttachmentData(
-                prepared.data,
-                filename: "photo.jpg",
-                mimeType: "image/jpeg",
-                kind: "IMAGE",
-                caption: caption,
-                width: prepared.width,
-                height: prepared.height,
-                in: conversation,
-                replyToId: replyTarget?.id,
-                e2ee: e2ee,
-                ttlSeconds: ephemeralTTL
+    /// Photo prise avec l'appareil : même chemin que celles de la photothèque.
+    private func sendCapturedPhoto(_ data: Data, caption: String) async {
+        guard !isE2EE else {
+            showActionError(String(localized: "Les pièces jointes chiffrées ne sont pas encore disponibles sur tous tes appareils."))
+            Haptics.error()
+            return
+        }
+        await sendPhoto(rawData: data, caption: caption)
+    }
+
+    private func sendPhoto(rawData raw: Data, caption rawCaption: String) async {
+        // Décodage/redimensionnement/encodage hors du main thread pour ne pas
+        // geler l'UI pendant l'envoi (image plein format).
+        guard let prepared = await Task.detached(priority: .userInitiated, operation: {
+            Self.preparedJPEG(from: raw)
+        }).value else {
+            showActionError(String(localized: "Image illisible."))
+            Haptics.error()
+            return
+        }
+        let caption = rawCaption.trimmingCharacters(in: .whitespacesAndNewlines)
+        await queueAttachment(
+            PendingAttachmentSend(
+                data: prepared.data, filename: "photo.jpg", mimeType: "image/jpeg", kind: "IMAGE",
+                caption: caption, width: prepared.width, height: prepared.height,
+                replyToId: replyTarget?.id, ttlSeconds: ephemeralTTL
             )
-            messages = Self.normalized(messages + [sent])
-            if sent.isEncrypted, !caption.isEmpty {
-                decryptedMessages[sent.id] = caption
+        )
+        // La légende envoyée ne doit pas revenir comme brouillon.
+        draftAutosaver?.discard()
+        clearComposer()
+        replyTarget = nil
+    }
+
+    /// Pose tout de suite la bulle de la pièce jointe (en cours d'envoi), puis la téléverse.
+    /// Le téléversement ne bloque plus la barre de saisie : on peut continuer à écrire.
+    private func queueAttachment(_ attachment: PendingAttachmentSend) async {
+        let localId = "local-att-\(UUID().uuidString)"
+        pendingAttachmentSends[localId] = attachment
+        sendStatus[localId] = .sending
+        let optimistic = makeOptimisticMessage(
+            id: localId, text: attachment.caption, replyToId: attachment.replyToId, ttlSeconds: attachment.ttlSeconds
+        )
+        messages = Self.normalized(messages + [optimistic])
+        Haptics.light()
+        await performAttachmentSend(localId: localId)
+    }
+
+    /// Envoie (ou renvoie) une pièce jointe. Les mêmes octets repartent avec le même
+    /// enregistrement de la file durable (même identifiant de requête côté service) : pas de doublon.
+    private func performAttachmentSend(localId: String) async {
+        guard let attachment = pendingAttachmentSends[localId] else { return }
+        withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .sending }
+        guard let data = attachment.data else {
+            // Venue de la file durable : le service sait la rejouer, pas cette vue.
+            await service.retryPendingAttachments()
+            await pruneSettledRestoredAttachments()
+            if pendingAttachmentSends[localId] != nil {
+                withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
+                Haptics.error()
+            } else {
+                await refreshLatestPageState()
             }
-            // La légende envoyée ne doit pas revenir comme brouillon.
-            draftAutosaver?.discard()
-            clearComposer()
-            replyTarget = nil
-            Haptics.success()
+            return
+        }
+        do {
+            let sent = try await service.sendAttachmentData(
+                data,
+                filename: attachment.filename,
+                mimeType: attachment.mimeType,
+                kind: attachment.kind,
+                caption: attachment.caption,
+                width: attachment.width,
+                height: attachment.height,
+                in: conversation,
+                replyToId: attachment.replyToId,
+                e2ee: e2ee,
+                ttlSeconds: attachment.ttlSeconds
+            )
+            var next = messages.filter { $0.id != localId }
+            next.append(sent)
+            messages = Self.normalized(next)
+            if sent.isEncrypted, !attachment.caption.isEmpty {
+                decryptedMessages[sent.id] = attachment.caption
+            }
+            sendStatus[localId] = nil
+            pendingAttachmentSends[localId] = nil
         } catch {
+            withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { sendStatus[localId] = .failed }
             showActionError(error.userFacingMessage)
             Haptics.error()
+        }
+    }
+
+    /// Pièces jointes restées dans la file durable pour cette conversation : elles reviennent en
+    /// bulles « Non envoyé ». Ignorées tant qu'un envoi de cette vue est en cours, car sa propre
+    /// ligne de file ne se distingue pas d'une ligne restée d'une session précédente.
+    private func restoredPendingAttachments() async -> [MessageItem] {
+        guard !pendingAttachmentSends.values.contains(where: { $0.clientRequestId == nil }) else { return [] }
+        let known = Set(pendingAttachmentSends.values.compactMap(\.clientRequestId))
+        var restored: [MessageItem] = []
+        for record in await service.pendingAttachments(conversationId: conversation.id)
+        where !known.contains(record.clientRequestId) {
+            let localId = "local-\(record.clientRequestId)"
+            pendingAttachmentSends[localId] = PendingAttachmentSend(
+                data: nil, filename: record.filename, mimeType: record.mimeType, kind: record.kind,
+                caption: record.caption, width: record.width, height: record.height,
+                replyToId: record.replyToId, ttlSeconds: record.ttlSeconds ?? 0,
+                clientRequestId: record.clientRequestId
+            )
+            sendStatus[localId] = .failed
+            restored.append(makeOptimisticMessage(
+                id: localId, text: record.caption, replyToId: record.replyToId, createdAt: record.createdAt
+            ))
+        }
+        return restored
+    }
+
+    /// Retire les bulles restaurées dont la pièce jointe a quitté la file (envoyée ailleurs, par
+    /// la reprise en arrière-plan de l'app) : elles resteraient « Non envoyé » à tort.
+    private func pruneSettledRestoredAttachments() async {
+        let restored = pendingAttachmentSends.filter { $0.value.clientRequestId != nil }
+        guard !restored.isEmpty else { return }
+        let live = Set(await service.pendingAttachments(conversationId: conversation.id).map(\.clientRequestId))
+        for (localId, attachment) in restored {
+            guard let requestId = attachment.clientRequestId, !live.contains(requestId) else { continue }
+            pendingAttachmentSends[localId] = nil
+            sendStatus[localId] = nil
+            messages.removeAll { $0.id == localId }
+        }
+    }
+
+    /// « Supprimer » : l'enregistrement quitte aussi la file durable, sinon la reprise de l'app
+    /// enverrait plus tard une photo que l'utilisateur a abandonnée.
+    private func discardOutboxRecords(for attachment: PendingAttachmentSend) async {
+        if let requestId = attachment.clientRequestId {
+            await service.discardPendingAttachment(clientRequestId: requestId)
+            return
+        }
+        guard let data = attachment.data else { return }
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        for record in await service.pendingAttachments(conversationId: conversation.id)
+        where record.contentSha256 == digest {
+            await service.discardPendingAttachment(clientRequestId: record.clientRequestId)
         }
     }
 
@@ -2868,10 +3239,16 @@ struct ConversationDetailView: View {
         do {
             let page = try await service.messages(conversationId: conversation.id, cursor: nil)
             let fresh = Self.normalized(page.messages)
-            messages = Self.normalized(messages + fresh)
-            if let receipts = page.readReceipts { readReceipts = receipts }
+            let knownIds = Set(messages.map(\.id))
+            // N'assigner que si quelque chose a changé : une liste identique redessinait tout le fil.
+            let merged = Self.normalized(messages + fresh)
+            if merged != messages { messages = merged }
+            if let receipts = page.readReceipts, receipts != readReceipts { readReceipts = receipts }
             advanceLastSync(with: fresh)
             await decryptLoadedMessages()
+            let confirmed = localIdsConfirmed(by: fresh.filter { !knownIds.contains($0.id) })
+            if !confirmed.isEmpty { messages.removeAll { confirmed.contains($0.id) } }
+            await pruneSettledRestoredAttachments()
             refreshPolls()
         } catch {
             MessageSyncLog.logger.error("état erreur: \(error.localizedDescription, privacy: .public)")
@@ -2893,7 +3270,9 @@ struct ConversationDetailView: View {
         do {
             try await service.deleteMessage(messageId: message.id, forEveryone: forEveryone)
             if forEveryone {
-                await load()
+                // Même raison que pour l'édition : pas de rechargement complet de la liste.
+                messages = messages.map { $0.id == message.id ? Self.copy(of: $0, deletedAt: Date()) : $0 }
+                await refreshLatestPageState()
             } else {
                 messages.removeAll { $0.id == message.id }
             }
@@ -2903,15 +3282,29 @@ struct ConversationDetailView: View {
     }
 
     private func markRead() async {
+        // Une bulle encore locale n'existe pas côté serveur : on lit jusqu'au dernier vrai message.
+        let lastServerId = messages.last { !$0.id.hasPrefix("local-") }?.id
+        readGate.lastMarkReadAt = Date()
+        readGate.lastMarkedMessageId = lastServerId
         if usesV2 {
             // Lot serveur A7 : lecture jusqu'au dernier message, v1 et v2.
             try? await service.markReadToLatest(conversationId: conversation.id)
         } else {
-            guard let last = messages.last else { return }
-            try? await service.markRead(conversationId: conversation.id, lastMessageId: last.id)
+            guard let lastServerId else { return }
+            try? await service.markRead(conversationId: conversation.id, lastMessageId: lastServerId)
         }
         // Le badge restait allumé jusqu'au prochain rafraîchissement (SOC-23).
         await services.refreshInboxBadge(force: true)
+    }
+
+    /// Après un relevé (flux, relevé périodique, retour au premier plan) : un message reçu
+    /// pendant que la conversation est à l'écran doit être marqué lu, une seule fois.
+    private func markReadIfLastIncoming() async {
+        guard isOnScreen, scenePhase == .active,
+              let last = messages.last(where: { !$0.id.hasPrefix("local-") }),
+              last.senderId != currentUserId,
+              last.id != readGate.lastMarkedMessageId else { return }
+        await markRead()
     }
 
     // MARK: Partage de position (parité Android)
@@ -3152,6 +3545,31 @@ struct ConversationDetailView: View {
         await decryptLoadedMessages()
         await decryptPinnedIfNeeded()
         if !needsKeyResync { Haptics.success() }
+    }
+
+    /// Copie d'un message avec le texte, l'édition ou la suppression mis à jour sur place.
+    private static func copy(of item: MessageItem, content: String? = nil, editedAt: Date? = nil, deletedAt: Date? = nil) -> MessageItem {
+        MessageItem(
+            id: item.id,
+            conversationId: item.conversationId,
+            senderId: item.senderId,
+            kind: item.kind,
+            content: content ?? item.content,
+            e2eeVersion: item.e2eeVersion,
+            e2eeIvB64: item.e2eeIvB64,
+            e2eeCiphertextB64: item.e2eeCiphertextB64,
+            e2eeAadB64: item.e2eeAadB64,
+            metadata: item.metadata,
+            createdAt: item.createdAt,
+            editedAt: editedAt ?? item.editedAt,
+            deletedAt: deletedAt ?? item.deletedAt,
+            expiresAt: item.expiresAt,
+            replyToId: item.replyToId,
+            threadReplyCount: item.threadReplyCount,
+            sender: item.sender,
+            attachments: item.attachments,
+            reactions: item.reactions
+        )
     }
 
     /// De-duplicates messages by id (latest copy wins, original position kept for
@@ -3730,8 +4148,8 @@ private struct LiveShareMapPoint: Identifiable {
 }
 
 /// Suppression demandée depuis le menu d'un message, en attente de confirmation.
-/// Action VoiceOver nommée de l'en-tête d'une conversation chiffrée : le
-/// bouton « Chiffrée · texte seulement » est fondu dans l'élément combiné.
+/// Action VoiceOver nommée de l'en-tête d'une conversation chiffrée : l'explication
+/// du chiffrement, aussi disponible dans le menu ⋯.
 private struct EncryptionInfoAction: ViewModifier {
     let isEnabled: Bool
     let action: () -> Void
@@ -3767,4 +4185,289 @@ private struct SpokenBubble: ViewModifier {
 private struct PendingMessageDeletion {
     let message: MessageItem
     let forEveryone: Bool
+}
+
+/// Repères de lecture posés par cet appareil. Type référence rangé dans un `@State` :
+/// les muter ne redessine pas la conversation.
+private final class OwnReadGate {
+    /// Dernier envoi de « lu » : l'événement `read_state` qu'il provoque revient dans la seconde.
+    var lastMarkReadAt: Date = .distantPast
+    /// Dernier message déjà marqué lu, pour ne pas le renvoyer à chaque relevé.
+    var lastMarkedMessageId: String?
+}
+
+private struct SelectableText: Identifiable {
+    let id = UUID()
+    let text: String
+}
+
+/// Le texte d'un message, sélectionnable à la main (copier un passage, chercher un mot).
+private struct SelectableTextSheet: View {
+    let text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(title: "Sélectionner le texte", closeIdentifier: "message.select.close") { dismiss() }
+                Text(verbatim: text)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(SQSpace.lg)
+        }
+        .sqSheet(background: SQColor.bg)
+        .presentationDetents([.medium, .large])
+    }
+}
+
+/// Tout ce qu'il faut pour renvoyer une photo ou une note vocale sans doublon : les mêmes octets
+/// repartent avec le même enregistrement de la file durable. `data` est nil pour une pièce jointe
+/// restaurée de cette file (`clientRequestId` renseigné) : le service sait alors la rejouer seul.
+private struct PendingAttachmentSend {
+    let data: Data?
+    let filename: String
+    let mimeType: String
+    let kind: String
+    let caption: String
+    let width: Int?
+    let height: Int?
+    let replyToId: String?
+    let ttlSeconds: Int
+    var clientRequestId: String?
+}
+
+/// Glisser une rangée de message vers la droite pour y répondre. L'état du glissement vit dans ce
+/// modificateur : seule la rangée touchée se redessine, pas toute la conversation. Le geste est
+/// simultané avec le défilement et ne démarre que sur un mouvement nettement horizontal, donc le
+/// défilement vertical et l'appui long (menu contextuel) restent intacts.
+private struct SwipeToReply: ViewModifier {
+    let isEnabled: Bool
+    let onReply: () -> Void
+
+    @State private var offset: CGFloat = 0
+    @State private var armed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Distance à partir de laquelle le relâchement déclenche la réponse.
+    private let threshold: CGFloat = 56
+
+    func body(content: Content) -> some View {
+        content
+            .offset(x: offset)
+            .background(alignment: .leading) {
+                Image(systemName: "arrowshape.turn.up.left.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(armed ? SQColor.onAccent : SQColor.labelSecondary)
+                    .frame(width: 30, height: 30)
+                    .background(armed ? SQColor.brandRed : SQColor.chip, in: Circle())
+                    .opacity(Double(min(offset / threshold, 1)))
+                    .accessibilityHidden(true)
+            }
+            .simultaneousGesture(drag, including: isEnabled ? .all : .subviews)
+    }
+
+    private var drag: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                let t = value.translation
+                // Départ : vers la droite et nettement plus horizontal que vertical.
+                guard offset > 0 || (t.width > 0 && t.width > abs(t.height) * 1.5) else { return }
+                let raw = max(t.width, 0)
+                // Résistance au-delà du seuil.
+                offset = raw <= threshold ? raw : threshold + (raw - threshold) * 0.3
+                let nowArmed = offset >= threshold
+                if nowArmed != armed {
+                    armed = nowArmed
+                    if nowArmed { Haptics.light() }
+                }
+            }
+            .onEnded { _ in
+                let shouldReply = armed
+                armed = false
+                if offset != 0 {
+                    withAnimation(SQMotion.resolve(SQMotion.snappy, reduceMotion)) { offset = 0 }
+                }
+                if shouldReply { onReply() }
+            }
+    }
+}
+
+/// Photos de la conversation ouvertes dans la visionneuse, avec celle qu'on a touchée.
+private struct ImageViewerSession: Identifiable {
+    let id = UUID()
+    let targets: [MessageImageTarget]
+    let initialIndex: Int
+}
+
+private struct ForwardPayload: Identifiable {
+    let id = UUID()
+    let text: String
+}
+
+/// Emojis courants pour réagir à un message au-delà des six de la palette rapide. Pas de
+/// sélecteur système : il n'existe pas en SwiftUI, et une grille fixe évite toute dépendance.
+private struct EmojiReactionSheet: View {
+    let chosen: Set<String>
+    let onPick: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    private static let emojis = [
+        "👍", "👎", "❤️", "😂", "😮", "😢", "🙏", "👏", "🔥", "🎉", "😍", "🥰",
+        "😘", "😎", "🤩", "🤔", "😅", "😭", "😡", "🥳", "😴", "🙄", "🤯", "😱",
+        "🙌", "👌", "✌️", "🤝", "💪", "👀", "🤞", "🫡", "😬", "🤗", "🥹", "😇",
+        "🧡", "💛", "💚", "💙", "💜", "🖤", "💔", "💯", "✅", "❌", "⚡", "🚀",
+        "📡", "📶", "📍", "🗼", "🛰️", "📱", "🔋", "💡", "⭐", "🏆", "🎯", "☕",
+        "🍕", "🍻", "🌞", "🌧️"
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(title: "Choisir un emoji", closeIdentifier: "emoji.close") { dismiss() }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 48), spacing: SQSpace.xs)], spacing: SQSpace.xs) {
+                    ForEach(Self.emojis, id: \.self) { emoji in
+                        Button {
+                            Haptics.light()
+                            onPick(emoji)
+                            dismiss()
+                        } label: {
+                            Text(emoji)
+                                .font(.title2)
+                                .frame(width: 48, height: 48)
+                                .background(chosen.contains(emoji) ? SQColor.accentSoft : Color.clear, in: Circle())
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Réagir avec \(emoji)")
+                    }
+                }
+            }
+            .padding(SQSpace.lg)
+        }
+        .sqSheet(background: SQColor.bg)
+        .presentationDetents([.medium, .large])
+    }
+}
+
+/// Transfert d'un texte vers une autre conversation. Seules les conversations non chiffrées sont
+/// proposées : l'envoi de texte existant y suffit, sans logique de chiffrement supplémentaire.
+private struct ForwardMessageSheet: View {
+    let text: String
+    let service: MessagesServicing
+    let currentUserId: String?
+    let excludedConversationId: String
+    let onSent: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var conversations: [MessageConversation] = []
+    @State private var hasLoaded = false
+    @State private var loadError: String?
+    @State private var sendingId: String?
+    @State private var sendError: String?
+
+    private var targets: [MessageConversation] {
+        conversations.filter { $0.e2eeEnabled != true && $0.id != excludedConversationId }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                MessageSheetHeader(
+                    title: "Transférer",
+                    subtitle: String(text.prefix(80)),
+                    closeIdentifier: "forward.close"
+                ) { dismiss() }
+                content
+            }
+            .padding(SQSpace.lg)
+        }
+        .sqSheet(background: SQColor.bg)
+        .presentationDetents([.medium, .large])
+        .task { await load() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let loadError {
+            ErrorStateView(title: "Conversations indisponibles", message: loadError) {
+                Task { await load() }
+            }
+        } else if !hasLoaded {
+            SQSpinner()
+                .tint(SQColor.brandRed)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, SQSpace.xl)
+        } else if targets.isEmpty {
+            EmptyStateView(
+                title: "Aucune conversation",
+                message: "Le transfert ne vise que les conversations non chiffrées.",
+                systemImage: "bubble.left.and.bubble.right"
+            )
+        } else {
+            VStack(spacing: 0) {
+                ForEach(targets) { target in
+                    if target.id != targets.first?.id { Divider().padding(.leading, 64) }
+                    Button {
+                        Task { await send(to: target) }
+                    } label: {
+                        HStack(spacing: SQSpace.md) {
+                            ConversationAvatar(conversation: target, currentUserId: currentUserId, size: 40)
+                                .accessibilityHidden(true)
+                            Text(verbatim: target.displayTitle(excluding: currentUserId))
+                                .font(SQType.rowTitle)
+                                .foregroundStyle(SQColor.label)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if sendingId == target.id {
+                                SQSpinner().tint(SQColor.brandRed)
+                            }
+                        }
+                        .padding(.horizontal, SQSpace.md)
+                        .frame(minHeight: 56)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(sendingId != nil)
+                }
+            }
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            if let sendError {
+                Text(verbatim: sendError)
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.dangerInk)
+                    .accessibilityIdentifier("forward.error")
+            }
+        }
+    }
+
+    private func load() async {
+        loadError = nil
+        do {
+            conversations = try await service.conversations()
+            hasLoaded = true
+        } catch {
+            loadError = error.userFacingMessage
+        }
+    }
+
+    private func send(to target: MessageConversation) async {
+        guard sendingId == nil else { return }
+        sendingId = target.id
+        sendError = nil
+        do {
+            _ = try await service.sendText(
+                text, in: target, replyToId: nil, e2ee: nil, idempotencyKey: UUID().uuidString, ttlSeconds: 0
+            )
+            onSent()
+            dismiss()
+        } catch {
+            sendError = error.userFacingMessage
+            sendingId = nil
+            Haptics.error()
+        }
+    }
 }

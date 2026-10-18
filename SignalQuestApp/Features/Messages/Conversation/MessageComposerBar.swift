@@ -26,7 +26,10 @@ struct MessageComposerBar: View {
     let onSchedule: (String) -> Void
     let onShareLocation: () -> Void
     let onLiveShare: () -> Void
-    let onPickPhoto: (PhotosPickerItem, String) -> Void
+    /// Photos choisies dans la photothèque (10 au plus), avec le texte déjà tapé en légende.
+    let onPickPhotos: ([PhotosPickerItem], String) -> Void
+    /// Photo prise avec l'appareil (JPEG), avec le texte déjà tapé en légende.
+    let onCapturePhoto: (Data, String) -> Void
     /// Note vocale enregistrée : fichier m4a et durée mesurée.
     let onVoiceNote: (URL, TimeInterval) -> Void
     /// Membres à proposer après « @ » (plan 3, vague 2) ; `nil` hors des
@@ -34,10 +37,14 @@ struct MessageComposerBar: View {
     var mentionSuggestions: ((String) async -> [MentionCandidate])? = nil
 
     @State private var text = ""
+    /// Texte posé par le parent (brouillon, début d'édition) : le `onChange` qu'il
+    /// déclenche ne doit pas passer pour de la frappe, sinon l'autre voit un faux « écrit… ».
+    @State private var seededValue: String?
     @State private var mentionCandidates: [MentionCandidate] = []
     @State private var mentionTask: Task<Void, Never>?
     @FocusState private var fieldFocused: Bool
-    @State private var pickerItem: PhotosPickerItem?
+    @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var showsCamera = false
     @StateObject private var recorder = VoiceNoteRecorder()
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
@@ -173,7 +180,21 @@ struct MessageComposerBar: View {
                 // Le trombone vit dans le champ ; la photo part avec le texte
                 // déjà tapé en légende.
                 if !isE2EE {
-                    PhotosPicker(selection: $pickerItem, matching: .images) {
+                    // Absent sur simulateur et sur les appareils sans caméra.
+                    if Self.cameraAvailable {
+                        Button { showsCamera = true } label: {
+                            Image(systemName: "camera")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canSend || isSending || isEditing)
+                        .accessibilityLabel("Prendre une photo")
+                        .accessibilityIdentifier("composer.camera")
+                    }
+                    PhotosPicker(selection: $pickerItems, maxSelectionCount: 10, matching: .images) {
                         Image(systemName: "paperclip")
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(SQColor.labelSecondary)
@@ -181,7 +202,7 @@ struct MessageComposerBar: View {
                             .contentShape(Rectangle())
                     }
                     .disabled(!canSend || isSending || isEditing)
-                    .accessibilityLabel("Joindre une photo")
+                    .accessibilityLabel("Joindre des photos")
                 }
             }
             // Toute la capsule ouvre le clavier, pas seulement la ligne de
@@ -234,15 +255,28 @@ struct MessageComposerBar: View {
         .padding(.horizontal, SQSpace.md)
         .padding(.vertical, SQSpace.sm)
         .onChangeCompat(of: text) { _, newValue in
-            onTyping(newValue)
+            let wasSeeded = seededValue == newValue
+            seededValue = nil
+            if !wasSeeded { onTyping(newValue) }
             refreshMentions()
         }
-        .onChangeCompat(of: seedToken) { _, _ in text = seedText }
-        .onChangeCompat(of: pickerItem) { _, item in
-            guard let item else { return }
-            onPickPhoto(item, text)
-            pickerItem = nil
+        .onChangeCompat(of: seedToken) { _, _ in
+            seededValue = seedText
+            text = seedText
         }
+        .onChangeCompat(of: pickerItems) { _, items in
+            guard !items.isEmpty else { return }
+            onPickPhotos(items, text)
+            pickerItems = []
+        }
+        .fullScreenCover(isPresented: $showsCamera) {
+            CameraCapturePicker(isPresented: $showsCamera) { data in onCapturePhoto(data, text) }
+                .ignoresSafeArea()
+        }
+    }
+
+    private static var cameraAvailable: Bool {
+        UIImagePickerController.isSourceTypeAvailable(.camera)
     }
 
     /// Suggestions au-dessus du champ, une pastille par membre.
@@ -302,5 +336,40 @@ struct MessageComposerBar: View {
         mentionTask?.cancel()
         text = MentionAutocomplete.apply(candidate.handle, to: text, token: token).text
         mentionCandidates = []
+    }
+}
+
+/// Appareil photo du système (`UIImagePickerController`) : une photo, rendue en JPEG, puis la feuille se ferme.
+private struct CameraCapturePicker: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
+    let onCapture: (Data) -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+
+    @MainActor
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        private let parent: CameraCapturePicker
+
+        init(parent: CameraCapturePicker) { self.parent = parent }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage, let data = image.jpegData(compressionQuality: 0.9) {
+                parent.onCapture(data)
+            }
+            parent.isPresented = false
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.isPresented = false
+        }
     }
 }

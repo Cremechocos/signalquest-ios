@@ -164,9 +164,9 @@ struct CallHistoryView: View {
                         .contextMenu {
                             if let conversationId = call.conversationId {
                                 Button {
-                                    router.route(toConversation: conversationId)
+                                    router.route(toCallBack: conversationId, video: call.mode == "video")
                                 } label: {
-                                    Label("Ouvrir la conversation pour rappeler", systemImage: "phone.arrow.up.right")
+                                    Label("Rappeler", systemImage: "phone.arrow.up.right")
                                 }
                             }
                         }
@@ -265,8 +265,10 @@ struct CallHistoryView: View {
                         .monospacedDigit()
                 }
                 if let conversationId = call.conversationId {
+                    // Lance l'appel pour de vrai : la conversation s'ouvre et applique
+                    // ses règles (chiffrement, participants) avant de composer.
                     Button {
-                        router.route(toConversation: conversationId)
+                        router.route(toCallBack: conversationId, video: call.mode == "video")
                     } label: {
                         Image(systemName: call.mode == "video" ? "video.fill" : "phone.fill")
                             .font(.system(size: 14, weight: .semibold))
@@ -277,7 +279,7 @@ struct CallHistoryView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
-                    .accessibilityLabel("Ouvrir la conversation pour rappeler")
+                    .accessibilityLabel(call.mode == "video" ? Text("Rappeler en vidéo") : Text("Rappeler"))
                 }
             }
             .padding(.vertical, SQSpace.sm)

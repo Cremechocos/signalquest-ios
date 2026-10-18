@@ -68,6 +68,10 @@ protocol MessagesServicing: Sendable {
         ttlSeconds: Int
     ) async throws -> MessageItem
     func retryPendingAttachments() async
+    /// Pièces jointes restées en file pour cette conversation (envoi échoué).
+    func pendingAttachments(conversationId: String) async -> [MessageAttachmentOutboxRecord]
+    /// Abandonne définitivement une pièce jointe en file : elle ne repartira plus.
+    func discardPendingAttachment(clientRequestId: String) async
     func markRead(conversationId: String, lastMessageId: String) async throws
     /// Lit jusqu'au message le plus récent, v1 et v2 (lot serveur A7) : une
     /// conversation v2 n'a pas d'identifiant de message v1 à donner.
@@ -134,6 +138,8 @@ extension MessagesServicing {
     func discardPendingText(clientRequestId: String) async {}
     func resendPendingText(clientRequestId: String) async throws -> MessageItem { throw CancellationError() }
     func retryPendingAttachments() async {}
+    func pendingAttachments(conversationId: String) async -> [MessageAttachmentOutboxRecord] { [] }
+    func discardPendingAttachment(clientRequestId: String) async {}
 
     func sendAttachmentData(
         _ data: Data,
@@ -836,6 +842,18 @@ final class MessagesService: MessagesServicing {
         guard !data.isEmpty, let session = LocalAccountScope.sessionSnapshot() else {
             throw CancellationError()
         }
+        let digest = Self.sha256Hex(data)
+        let cleanCaption = caption.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Réessai de la même pièce jointe : on rejoue l'enregistrement en file (même
+        // requestId, donc dédoublonné par le serveur) au lieu d'en créer un second.
+        if let existing = (try? await attachmentOutbox.pending(session: session))?.first(where: {
+            $0.conversationId == conversation.id && $0.contentSha256 == digest
+                && $0.filename == filename && $0.mimeType == mimeType
+                && $0.kind == kind.uppercased() && $0.caption == cleanCaption
+                && $0.replyToId == replyToId
+        }) {
+            return try await submitPreparedAttachment(existing, session: session)
+        }
         let requestId = "attachment-\(UUID().uuidString.lowercased())"
         let record = MessageAttachmentOutboxRecord(
             ownerScopeId: session.ownerScopeId,
@@ -845,17 +863,29 @@ final class MessagesService: MessagesServicing {
             filename: filename,
             mimeType: mimeType,
             kind: kind.uppercased(),
-            caption: caption.trimmingCharacters(in: .whitespacesAndNewlines),
+            caption: cleanCaption,
             replyToId: replyToId,
             width: width,
             height: height,
-            contentSha256: Self.sha256Hex(data),
+            contentSha256: digest,
             uploadedAttachment: nil,
             createdAt: Date(),
             ttlSeconds: ttlSeconds > 0 ? ttlSeconds : nil
         )
         try await attachmentOutbox.stage(record, source: data, session: session)
         return try await submitPreparedAttachment(record, session: session)
+    }
+
+    func pendingAttachments(conversationId: String) async -> [MessageAttachmentOutboxRecord] {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return [] }
+        let records = (try? await attachmentOutbox.pending(session: session)) ?? []
+        return records.filter { $0.conversationId == conversationId }
+    }
+
+    /// Supprime définitivement une pièce jointe restée en file (geste « Supprimer »).
+    func discardPendingAttachment(clientRequestId: String) async {
+        guard let session = LocalAccountScope.sessionSnapshot(), session.isCurrent else { return }
+        try? await attachmentOutbox.acknowledge(session: session, clientRequestId: clientRequestId)
     }
 
     func retryPendingAttachments() async {

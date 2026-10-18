@@ -38,7 +38,6 @@ struct ScheduleMessageSheet: View {
         _text = State(initialValue: initialText)
     }
 
-    private var isE2EE: Bool { conversation.e2eeEnabled == true }
     private var canSchedule: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && sendAt > Date()
     }
@@ -47,15 +46,6 @@ struct ScheduleMessageSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SQSpace.lg) {
                 MessageSheetHeader(title: "Programmer l'envoi", subtitle: subtitle, closeIdentifier: "schedule.cancel") { dismiss() }
-
-                if isE2EE {
-                    Label("Message chiffré de bout en bout — programmé en toute sécurité.", systemImage: "lock.shield")
-                        .font(SQType.caption.weight(.semibold))
-                        .foregroundStyle(SQColor.success)
-                        .padding(SQSpace.md)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(SQColor.successSoft, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                }
 
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
                     Text("Message")

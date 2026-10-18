@@ -24,7 +24,8 @@ final class ANFRSiteDetailViewModel: ObservableObject {
         do {
             history = try await service.siteHistory(supId: supId)
         } catch {
-            errorMessage = error.userFacingMessage
+            // Fiche refermée pendant le chargement : pas un échec à afficher.
+            if !error.isCancellation { errorMessage = error.userFacingMessage }
         }
     }
 }
@@ -33,13 +34,17 @@ final class ANFRSiteDetailViewModel: ObservableObject {
 
 struct ANFRSiteDetailSheet: View {
     let site: ANFRMapSite
+    /// Date du relevé affiché sur la carte : repère, dans l'historique, la ligne
+    /// que l'utilisateur regarde.
+    let snapshotDate: String?
     @StateObject private var model: ANFRSiteDetailViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
 
-    init(site: ANFRMapSite, service: ANFRServicing) {
+    init(site: ANFRMapSite, service: ANFRServicing, snapshotDate: String? = nil) {
         self.site = site
+        self.snapshotDate = snapshotDate
         _model = StateObject(wrappedValue: ANFRSiteDetailViewModel(service: service))
     }
 
@@ -61,7 +66,7 @@ struct ANFRSiteDetailSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fermer") { dismiss() }
                         .font(SQType.button)
-                        .foregroundStyle(SQColor.brandRed)
+                        .foregroundStyle(SQColor.accentInk)
                 }
             }
         }
@@ -131,6 +136,8 @@ struct ANFRSiteDetailSheet: View {
                     }
                     modTypeBadge(antenna.modType)
                 }
+                // Une seule phrase par antenne pour VoiceOver, pas cinq éléments épars.
+                .accessibilityElement(children: .combine)
                 .padding(.vertical, SQSpace.sm)
                 .padding(.horizontal, SQSpace.md)
                 .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
@@ -167,7 +174,8 @@ struct ANFRSiteDetailSheet: View {
                         ANFRTimelineRow(
                             entry: entry,
                             isFirst: index == 0,
-                            isLast: index == history.entries.count - 1
+                            isLast: index == history.entries.count - 1,
+                            isShownOnMap: entry.archiveDate == snapshotDate
                         )
                         .opacity(appeared ? 1 : 0)
                         .offset(y: appeared ? 0 : 10)
@@ -181,7 +189,7 @@ struct ANFRSiteDetailSheet: View {
                 VStack(alignment: .leading, spacing: SQSpace.sm) {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(SQType.caption)
-                        .foregroundStyle(SQColor.warning)
+                        .foregroundStyle(SQColor.dangerInk)
                     Button {
                         Haptics.light()
                         Task { await model.load(supId: site.supId) }
@@ -223,6 +231,8 @@ struct ANFRSiteDetailSheet: View {
             .foregroundStyle(SQColor.onAccent)
             .frame(width: 18, height: 18)
             .background(type.color, in: Circle())
+            // Seul porteur du type de modification dans la ligne : VoiceOver lisait le nom du symbole.
+            .accessibilityLabel(type.label)
     }
 }
 
@@ -232,6 +242,8 @@ private struct ANFRTimelineRow: View {
     let entry: ANFRSiteHistoryEntry
     let isFirst: Bool
     let isLast: Bool
+    /// Cette ligne est le relevé que la carte affiche.
+    let isShownOnMap: Bool
 
     private var dominantModType: ANFRModType {
         entry.modTypeEnums.max { $0.priority < $1.priority } ?? .added
@@ -269,6 +281,14 @@ private struct ANFRTimelineRow: View {
                             .padding(.vertical, 2)
                             .background(SQColor.accentSoft, in: Capsule(style: .continuous))
                     }
+                    if isShownOnMap {
+                        Text("Sur la carte")
+                            .font(SQType.micro)
+                            .foregroundStyle(SQColor.accentInk)
+                            .padding(.horizontal, SQSpace.sm)
+                            .padding(.vertical, 2)
+                            .background(SQColor.accentSoft, in: Capsule(style: .continuous))
+                    }
                     Spacer()
                 }
                 ForEach(entry.changes) { change in
@@ -278,6 +298,7 @@ private struct ANFRTimelineRow: View {
                             .foregroundStyle(SQColor.onAccent)
                             .frame(width: 18, height: 18)
                             .background(change.modType.color, in: Circle())
+                            .accessibilityHidden(true) // le libellé du type est lu juste à côté
                         VStack(alignment: .leading, spacing: 1) {
                             Text(changeText(change))
                                 .font(SQFont.body(13, .semibold))
@@ -294,6 +315,7 @@ private struct ANFRTimelineRow: View {
                                 .foregroundStyle(SQColor.labelSecondary)
                         }
                     }
+                    .accessibilityElement(children: .combine)
                 }
             }
             .padding(.bottom, SQSpace.lg)

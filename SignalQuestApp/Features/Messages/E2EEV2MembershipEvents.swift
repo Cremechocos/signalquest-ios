@@ -118,8 +118,8 @@ enum E2EEV2MembershipEvents {
             switch kind {
             case .enabled(let by):
                 return isOwn(by)
-                    ? String(localized: "Tu as activé le chiffrement de bout en bout de cette conversation.", bundle: bundle)
-                    : String(localized: "\(subject(by)) a activé le chiffrement de bout en bout de cette conversation.", bundle: bundle)
+                    ? String(localized: "Tu as créé la conversation.", bundle: bundle)
+                    : String(localized: "\(subject(by)) a créé la conversation.", bundle: bundle)
             case .admins(let userIds):
                 let list = userIds
                     .map { isOwn($0) ? String(localized: "toi", bundle: bundle) : object($0) }

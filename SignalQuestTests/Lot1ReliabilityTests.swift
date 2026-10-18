@@ -14,7 +14,10 @@ final class Lot1ReliabilityTests: XCTestCase {
         XCTAssertEqual(SyncTrigger.from(event: "update", data: #"{"type":"read_state"}"#), .stateEvent)
         XCTAssertEqual(SyncTrigger.from(event: "update", data: #"{"type":"message_created"}"#), .serverEvent)
         XCTAssertEqual(SyncTrigger.from(event: "message", data: "not json"), .serverEvent)
-        XCTAssertEqual(SyncTrigger.from(event: "typing", data: "{}"), .typingEvent)
+        XCTAssertEqual(SyncTrigger.from(event: "typing", data: "{}"), .typingEvent(userIds: []))
+        XCTAssertEqual(SyncTrigger.from(event: "typing", data: #"{"type":"typing","userId":"me","typing":[{"userId":"me"},{"userId":"u2","name":"Paul"}]}"#),
+                       .typingEvent(userIds: ["me", "u2"]))
+        XCTAssertEqual(SyncTrigger.from(event: "typing", data: #"{"userId":"u2"}"#), .typingEvent(userIds: ["u2"]))
         XCTAssertEqual(SyncTrigger.from(event: "viewing", data: "{}"), .viewingEvent)
     }
 

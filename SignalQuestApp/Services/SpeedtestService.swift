@@ -2554,7 +2554,10 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             APIEndpoint(path: "/api/speedtests/\(encodedId)", authenticated: false),
             fixedAuthToken: token, expectedSession: session)
         guard (200..<300).contains(http.statusCode) else {
-            throw APIError.http(status: http.statusCode, code: nil, message: "", requestId: nil, retryAfter: nil)
+            // Le code distingue un détail réservé à l'auteur (zone privée) d'un test introuvable.
+            let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let code = body?["code"] as? String ?? (body?["error"] as? [String: Any])?["code"] as? String
+            throw APIError.http(status: http.statusCode, code: code, message: "", requestId: nil, retryAfter: nil)
         }
         guard owner == LocalAccountScope.currentOwnerScopeId else { throw CancellationError() }
         if owner != "guest" {

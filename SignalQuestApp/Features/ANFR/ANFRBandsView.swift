@@ -218,7 +218,7 @@ struct ANFRBandsView: View {
                         VStack(alignment: .leading, spacing: SQSpace.xs) {
                             Label(error, systemImage: "exclamationmark.triangle")
                                 .font(SQType.caption)
-                                .foregroundStyle(SQColor.warning)
+                                .foregroundStyle(SQColor.dangerInk)
                             Button {
                                 Task { await model.refresh() }
                             } label: {

@@ -45,6 +45,57 @@ final class MessageRenderCache {
         return value
     }
 
+    // MARK: Liens cliquables et horodatages de section
+
+    /// Texte avec ses liens détectés, mémoïsé par message (le détecteur n'est
+    /// relancé que si le texte change). `nil` : aucun lien, la bulle reste un `Text` simple.
+    var links: [String: (text: String, value: AttributedString?)] = [:]
+
+    func linkedText(_ text: String, id: String) -> AttributedString? {
+        if let cached = links[id], cached.text == text { return cached.value }
+        let value = Self.makeLinkedText(text)
+        links[id] = (text, value)
+        return value
+    }
+
+    private static func makeLinkedText(_ text: String) -> AttributedString? {
+        guard text.contains("http") || text.contains("www."),
+              let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return nil }
+        var attributed = AttributedString(text)
+        var found = false
+        for match in detector.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            guard let url = match.url, url.scheme == "https" || url.scheme == "http",
+                  let range = Range(match.range, in: text) else { continue }
+            // Décalage en caractères : les index de `String` et d'`AttributedString` ne se mélangent pas.
+            let start = text.distance(from: text.startIndex, to: range.lowerBound)
+            let length = text.distance(from: range.lowerBound, to: range.upperBound)
+            let lower = attributed.characters.index(attributed.startIndex, offsetBy: start)
+            let upper = attributed.characters.index(lower, offsetBy: length)
+            attributed[lower..<upper].link = url
+            attributed[lower..<upper].underlineStyle = .single
+            found = true
+        }
+        return found ? attributed : nil
+    }
+
+    /// Horodatage de section d'un message : calculé une fois par (message,
+    /// voisin précédent, jour courant) au lieu de trois fois par rendu.
+    var stamps: [String: (previousId: String?, createdAt: Date?, previousCreatedAt: Date?, day: Date, value: String?)] = [:]
+
+    func stamp(for message: MessageItem, previous: MessageItem?, compute: () -> String?) -> String? {
+        let day = Calendar.current.startOfDay(for: Date())
+        if let cached = stamps[message.id],
+           cached.previousId == previous?.id,
+           cached.createdAt == message.createdAt,
+           cached.previousCreatedAt == previous?.createdAt,
+           cached.day == day {
+            return cached.value
+        }
+        let value = compute()
+        stamps[message.id] = (previous?.id, message.createdAt, previous?.createdAt, day, value)
+        return value
+    }
+
     // MARK: PERF-MSG-04 — index O(1) dans la liste
 
     struct ListSignature: Equatable {
@@ -81,6 +132,18 @@ final class MessageRenderCache {
         // `message` provient toujours de `messages` : après reconstruction, son
         // index est nécessairement présent (le repli 0 est donc inatteignable).
         return indexByID[message.id] ?? 0
+    }
+
+    /// Message d'identifiant `id` dans `messages` (citations), par la même table que
+    /// `index(of:in:)` plutôt qu'un parcours linéaire par bulle citée.
+    func message(withId id: String, in messages: [MessageItem]) -> MessageItem? {
+        let signature = ListSignature(count: messages.count, first: messages.first?.id, last: messages.last?.id)
+        if signature != indexSignature {
+            rebuild(from: messages)
+            indexSignature = signature
+        }
+        guard let idx = indexByID[id], idx < messages.count, messages[idx].id == id else { return nil }
+        return messages[idx]
     }
 
     func rebuild(from messages: [MessageItem]) {

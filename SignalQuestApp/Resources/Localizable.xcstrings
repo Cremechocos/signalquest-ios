@@ -33,6 +33,22 @@
         }
       }
     },
+    "%@ a créé la conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ created the conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a créé la conversation."
+          }
+        }
+      }
+    },
     "%@ au total" : {
       "localizations" : {
         "en" : {
@@ -126,6 +142,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ en upload"
+          }
+        }
+      }
+    },
+    "%@ est en train d’écrire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is typing"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est en train d’écrire"
           }
         }
       }
@@ -326,6 +358,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ · sites communautaires"
+          }
+        }
+      }
+    },
+    "%@ écrit…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is typing…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ écrit…"
           }
         }
       }
@@ -2261,6 +2309,22 @@
         }
       }
     },
+    "Active le chiffrement sur cet appareil pour créer une conversation chiffrée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on encryption on this device to create an encrypted conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active le chiffrement sur cet appareil pour créer une conversation chiffrée."
+          }
+        }
+      }
+    },
     "Actualisation impossible. Tire vers le bas pour réessayer." : {
       "localizations" : {
         "en" : {
@@ -2923,6 +2987,22 @@
         }
       }
     },
+    "Aucun site pour ce relevé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No site in this reading"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun site pour ce relevé"
+          }
+        }
+      }
+    },
     "Aucun test sur cet iPhone pour l'instant" : {
       "localizations" : {
         "en" : {
@@ -2983,6 +3063,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun trajet pour l’instant"
+          }
+        }
+      }
+    },
+    "Aucune autre date disponible pour le moment." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No other date available right now."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune autre date disponible pour le moment."
           }
         }
       }
@@ -3647,6 +3743,22 @@
         }
       }
     },
+    "Charge le message d’origine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loads the original message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Charge le message d’origine"
+          }
+        }
+      }
+    },
     "Chargement de la discussion…" : {
       "localizations" : {
         "en" : {
@@ -3675,6 +3787,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Charger plus de publications"
+          }
+        }
+      }
+    },
+    "Chiffrement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encryption"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiffrement"
           }
         }
       }
@@ -4151,6 +4279,22 @@
         }
       }
     },
+    "Conversations indisponibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversations unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversations indisponibles"
+          }
+        }
+      }
+    },
     "Correction proposée · facultatif" : {
       "localizations" : {
         "en" : {
@@ -4583,6 +4727,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Désélectionner"
+          }
+        }
+      }
+    },
+    "Détails masqués : seul l’auteur peut les voir" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details hidden: only the author can see them"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Détails masqués : seul l’auteur peut les voir"
           }
         }
       }
@@ -6070,6 +6230,22 @@
         }
       }
     },
+    "Indisponible tant que la photo n'est pas chargée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unavailable until the photo has loaded"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indisponible tant que la photo n'est pas chargée"
+          }
+        }
+      }
+    },
     "Interrompu" : {
       "localizations" : {
         "en" : {
@@ -6203,6 +6379,22 @@
         }
       }
     },
+    "Joindre des photos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attach photos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joindre des photos"
+          }
+        }
+      }
+    },
     "Joint au signalement" : {
       "localizations" : {
         "en" : {
@@ -6313,6 +6505,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La confirmation de ton compte a échoué. Vérifie le mot de passe du compte, ou reprends avec Apple."
+          }
+        }
+      }
+    },
+    "La conversation n’a pas pu être ouverte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversation couldn’t be opened."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La conversation n’a pas pu être ouverte."
           }
         }
       }
@@ -6559,6 +6767,22 @@
         }
       }
     },
+    "Le chiffrement n’est pas encore prêt sur cet appareil. Réessaie." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encryption isn’t ready on this device yet. Try again."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le chiffrement n’est pas encore prêt sur cet appareil. Réessaie."
+          }
+        }
+      }
+    },
     "Le code est invalide, expiré ou ne correspond plus à cet appareil." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6786,6 +7010,22 @@
         }
       }
     },
+    "Le transfert ne vise que les conversations non chiffrées." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forwarding is only available to unencrypted conversations."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le transfert ne vise que les conversations non chiffrées."
+          }
+        }
+      }
+    },
     "Lenteur" : {
       "localizations" : {
         "en" : {
@@ -6910,6 +7150,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les messages de cette conversation apparaîtront ici."
+          }
+        }
+      }
+    },
+    "Les nombres comptent les sites concernés, pour les opérateurs choisis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Numbers count the sites concerned, for the selected carriers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les nombres comptent les sites concernés, pour les opérateurs choisis."
           }
         }
       }
@@ -7119,6 +7375,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Légende par signal"
+          }
+        }
+      }
+    },
+    "L’ANFR publie un relevé par semaine. La carte montre les antennes à la date choisie et marque celles qui ont changé." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANFR publishes one reading per week. The map shows the antennas on the chosen date and marks the ones that changed."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’ANFR publie un relevé par semaine. La carte montre les antennes à la date choisie et marque celles qui ont changé."
           }
         }
       }
@@ -7444,6 +7716,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mes parents"
+          }
+        }
+      }
+    },
+    "Message d’origine" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original message"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message d’origine"
+          }
+        }
+      }
+    },
+    "Message transféré." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message forwarded."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message transféré."
           }
         }
       }
@@ -8158,6 +8462,22 @@
         }
       }
     },
+    "Partager la photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager la photo"
+          }
+        }
+      }
+    },
     "Pas de connexion pour l'instant. Ton signalement part tout seul au retour du réseau, puis apparaît dans ta liste." : {
       "localizations" : {
         "en" : {
@@ -8462,6 +8782,22 @@
         }
       }
     },
+    "Plus d’emojis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More emojis"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus d’emojis"
+          }
+        }
+      }
+    },
     "Points gagnés ce mois-ci ; le total depuis l’inscription est en dessous." : {
       "localizations" : {
         "en" : {
@@ -8603,6 +8939,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Première mesure"
+          }
+        }
+      }
+    },
+    "Prendre une photo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Take a photo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prendre une photo"
           }
         }
       }
@@ -8876,6 +9228,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "RSRP moyen"
+          }
+        }
+      }
+    },
+    "Rappeler en vidéo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Call back (video)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rappeler en vidéo"
           }
         }
       }
@@ -10207,6 +10575,22 @@
         }
       }
     },
+    "Sur la carte, un repère prend la couleur de l’opérateur dominant du site ; son symbole est le type de modification le plus marquant." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the map, a marker takes the colour of the site’s dominant carrier; its symbol is the most significant type of change."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sur la carte, un repère prend la couleur de l’opérateur dominant du site ; son symbole est le type de modification le plus marquant."
+          }
+        }
+      }
+    },
     "Surveillée depuis nos serveurs, téléphone éteint compris." : {
       "localizations" : {
         "en" : {
@@ -10235,6 +10619,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Système"
+          }
+        }
+      }
+    },
+    "Sélectionner le texte" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select text"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sélectionner le texte"
           }
         }
       }
@@ -10979,6 +11379,22 @@
         }
       }
     },
+    "Transférer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forward"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transférer"
+          }
+        }
+      }
+    },
     "Tri" : {
       "localizations" : {
         "en" : {
@@ -11056,6 +11472,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tu as atteint le nombre maximal de connexions surveillées. Retire-en une pour en ajouter une autre."
+          }
+        }
+      }
+    },
+    "Tu as créé la conversation." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You created the conversation."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu as créé la conversation."
           }
         }
       }
@@ -12797,6 +13229,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écrire une réponse…"
+          }
+        }
+      }
+    },
+    "Écrire à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrire à %@"
           }
         }
       }

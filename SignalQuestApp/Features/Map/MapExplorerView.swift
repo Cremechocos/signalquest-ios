@@ -5005,6 +5005,9 @@ struct MapItemSheet: View {
         do {
             speedtestDetail = try await services.speedtest.details(id: id)
             detailError = nil
+        } catch APIError.http(_, "SPEEDTEST_DETAILS_HIDDEN", _, _, _) {
+            // Test fait dans une zone privée : seul son auteur en voit le détail.
+            detailError = String(localized: "Détails masqués : seul l’auteur peut les voir")
         } catch {
             detailError = String(localized: "Le détail de cette mesure n’a pas pu être chargé. \(error.userFacingMessage)")
         }

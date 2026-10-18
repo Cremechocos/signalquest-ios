@@ -24,6 +24,8 @@ struct SignalDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var speedtestDetail: SpeedtestDetail?
     @State private var detailError: String?
+    /// Le serveur a refusé le détail : test fait dans une zone privée de son auteur.
+    @State private var detailsHiddenByServer = false
     /// Premier commentaire, montré sous les actions : la conversation se lit
     /// sans ouvrir une deuxième feuille.
     @State private var firstComment: SocialComment?
@@ -31,6 +33,7 @@ struct SignalDetailSheet: View {
     @State private var viewerImage: MessageImageTarget?
 
     private var signal: SocialSignalSummary? { item.signal }
+    private var detailsHidden: Bool { signal?.detailsHidden == true || detailsHiddenByServer }
     private var accent: Color { TechAccent.color(for: signal?.technology) }
     private var isSpeedtest: Bool { item.kind.lowercased() == "speedtest" }
     private var place: String? { signal?.city ?? item.placeLabel }
@@ -468,7 +471,12 @@ struct SignalDetailSheet: View {
 
     @ViewBuilder
     private var map: some View {
-        if let lat = item.latitude ?? signal?.latitude ?? speedtestDetail?.latitude,
+        if detailsHidden {
+            Label("Détails masqués : seul l’auteur peut les voir", systemImage: "lock")
+                .font(SQType.subhead)
+                .foregroundStyle(SQColor.labelSecondary)
+                .accessibilityIdentifier("signal.detail.hidden")
+        } else if let lat = item.latitude ?? signal?.latitude ?? speedtestDetail?.latitude,
            let lng = item.longitude ?? signal?.longitude ?? speedtestDetail?.longitude {
             let center = CLLocationCoordinate2D(latitude: lat, longitude: lng)
             let region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
@@ -492,10 +500,12 @@ struct SignalDetailSheet: View {
     private func loadSpeedtestDetailIfNeeded() async {
         guard item.kind.lowercased() == "speedtest",
               let sourceId = item.sourceId?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !sourceId.isEmpty else { return }
+              !sourceId.isEmpty, signal?.detailsHidden != true else { return }
         do {
             speedtestDetail = try await services.speedtest.details(id: sourceId)
             detailError = nil
+        } catch APIError.http(_, "SPEEDTEST_DETAILS_HIDDEN", _, _, _) {
+            detailsHiddenByServer = true
         } catch {
             // Le résumé du post reste une source valide : l'échec du détail ne
             // doit pas transformer une publication lisible en écran d'erreur.

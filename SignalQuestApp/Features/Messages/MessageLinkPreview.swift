@@ -15,6 +15,29 @@ struct LinkPreview: Decodable, Equatable, Sendable {
     )
 }
 
+/// Miroir synchrone des aperçus déjà lus : la carte peut ainsi naître avec sa
+/// taille définitive au lieu d'attendre un `.task` et de faire grandir la bulle.
+final class LinkPreviewMemo: @unchecked Sendable {
+    static let shared = LinkPreviewMemo()
+
+    private let lock = NSLock()
+    private var values: [URL: LinkPreview?] = [:]
+
+    /// `nil` : pas encore lu ; `.some(nil)` : lu, sans aperçu.
+    func known(_ url: URL) -> LinkPreview?? {
+        lock.lock()
+        defer { lock.unlock() }
+        return values[url]
+    }
+
+    func store(_ preview: LinkPreview?, for url: URL) {
+        lock.lock()
+        defer { lock.unlock() }
+        if values.count >= 200 { values.removeAll() }
+        values[url] = .some(preview)
+    }
+}
+
 /// Aperçus déjà lus, en mémoire seulement : une URL n'est demandée qu'une
 /// fois par lancement, même si elle revient dans plusieurs messages.
 actor LinkPreviewStore {
@@ -34,6 +57,7 @@ actor LinkPreviewStore {
         guard let result else { return nil }
         if cache.count >= 200 { cache.removeAll() }
         cache[url] = result
+        LinkPreviewMemo.shared.store(result, for: url)
         return result
     }
 
@@ -66,6 +90,19 @@ struct MessageLinkPreview: View {
     @EnvironmentObject private var services: AppServices
     @State private var link: URL?
     @State private var preview: LinkPreview?
+    /// Vrai une fois la réponse connue (ou lue dans le cache) : avant, une place
+    /// est réservée pour que la bulle ne grandisse pas en défilant.
+    @State private var resolved = false
+
+    init(text: String, mine: Bool) {
+        self.text = text
+        self.mine = mine
+        if let url = Self.firstLink(in: text), let known = LinkPreviewMemo.shared.known(url) {
+            _link = State(initialValue: url)
+            _preview = State(initialValue: known)
+            _resolved = State(initialValue: true)
+        }
+    }
 
     var body: some View {
         Group {
@@ -74,16 +111,23 @@ struct MessageLinkPreview: View {
                     .buttonStyle(.plain)
                     .accessibilityHint("Ouvre le lien")
                     .accessibilityIdentifier("message.linkPreview")
+            } else if !resolved {
+                RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous)
+                    .fill(mine ? SQColor.onInk.opacity(0.14) : SQColor.surfaceMuted)
+                    .frame(maxWidth: .infinity, minHeight: 52, maxHeight: 52)
+                    .sqShimmer()
+                    .accessibilityHidden(true)
             } else {
                 // Une vue réelle, sans taille : `.task` ne part pas sur une vue vide.
                 Color.clear.frame(width: 0, height: 0)
             }
         }
         .task(id: text) {
-            guard let url = Self.firstLink(in: text) else { return }
+            guard let url = Self.firstLink(in: text) else { resolved = true; return }
             let loaded = await LinkPreviewStore.shared.preview(for: url, api: services.api)
             link = url
             preview = loaded
+            resolved = true
         }
     }
 

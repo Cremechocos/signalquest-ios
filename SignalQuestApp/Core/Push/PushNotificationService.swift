@@ -820,6 +820,8 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
     /// Un message v2 est arrivé pendant que l'app est ouverte (notification
     /// opaque, sans conversation) : de quoi relever la conversation affichée.
     static let e2eeV2EnvelopeReceived = Notification.Name("SignalQuest.E2EEV2EnvelopeReceived")
+    /// Push `message_*` reçu au premier plan : la liste de Messages se met à jour.
+    static let inboxMessageReceived = Notification.Name("SignalQuest.InboxMessageReceived")
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
@@ -840,6 +842,10 @@ extension PushNotificationService: UNUserNotificationCenterDelegate {
         // conversation (§2.6) ; l'écran ouvert sur une conversation v2 se relève.
         if Self.string(info, "type")?.lowercased() == "e2ee_v2_envelope" {
             NotificationCenter.default.post(name: Self.e2eeV2EnvelopeReceived, object: nil)
+        }
+        // Message v1 reçu app ouverte : la liste des conversations se recharge.
+        if Self.string(info, "type")?.lowercased().hasPrefix("message_") == true {
+            NotificationCenter.default.post(name: Self.inboxMessageReceived, object: nil)
         }
         // La conversation est déjà à l'écran : ni bannière ni son pour elle,
         // la synchro l'affiche déjà (SOC-24).

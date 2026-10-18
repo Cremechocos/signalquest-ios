@@ -376,8 +376,12 @@ struct SocialSignalSummary: Codable, Equatable {
     let serverName: String?
     let latitude: Double?
     let longitude: Double?
+    /// Speedtest fait dans une zone privée : position et identifiants réservés à l'auteur.
+    let detailsHidden: Bool?
+    let detailsHiddenReason: String?
 
     enum CodingKeys: String, CodingKey {
+        case detailsHidden, detailsHiddenReason
         case type, technology, rsrp, rsrq, sinr, band, cellId, pci, city, capturedAt, downloadMbps, uploadMbps, pingMs, jitterMs, maxDownloadMbps, distanceMeters, durationSeconds, detectedTechs, averageSignalDbm, minSignalDbm, maxSignalDbm, pointsCount, siteLabel, identifierType, identifierValue, identifierSource, validationCount, ratingStars, ratingTrend, frequency, earfcn, arfcn, sectors, deviceModel, serverName, latitude, longitude, servingOperator, simOperator, isRoaming, observedPlmn, simPlmn
         case `operator` = "operator"
     }
@@ -427,6 +431,8 @@ struct SocialSignalSummary: Codable, Equatable {
         serverName = try c.decodeIfPresent(String.self, forKey: .serverName)
         latitude = try c.decodeIfPresent(Double.self, forKey: .latitude)
         longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
+        detailsHidden = try? c.decodeIfPresent(Bool.self, forKey: .detailsHidden)
+        detailsHiddenReason = try? c.decodeIfPresent(String.self, forKey: .detailsHiddenReason)
     }
 }
 

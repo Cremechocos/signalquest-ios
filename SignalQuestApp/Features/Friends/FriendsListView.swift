@@ -105,7 +105,10 @@ final class FriendsViewModel: ObservableObject {
 struct FriendsListView: View {
     @StateObject private var model: FriendsViewModel
     @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var router: AppRouter
     @State private var showAddFriend = false
+    /// Ami dont le fil est en cours d'ouverture ou de création (bouton « Écrire »).
+    @State private var writingToUserId: String?
     /// Ami dont on consulte le profil public (push UserProfileView).
     @State private var profileAuthor: SocialFeedAuthor?
     /// Débloquer réintroduit quelqu'un dans le champ social de l'utilisateur :
@@ -187,22 +190,31 @@ struct FriendsListView: View {
             if !model.friends.isEmpty {
             Section {
                 ForEach(model.friends) { friend in
-                    Button {
-                        Haptics.light()
-                        profileAuthor = SocialFeedAuthor(
-                            id: friend.userId,
-                            name: friend.name,
-                            handle: friend.handle,
-                            avatarUrl: friend.avatarUrl,
-                            isFriend: true,
-                            isFollowing: nil,
-                            liveRadio: nil
-                        )
-                    } label: {
-                        cardSurface { friendRow(friend) }
-                            .contentShape(RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+                    // Deux boutons côte à côte (profil, écrire) : un bouton ne s'imbrique
+                    // pas dans le bouton de la carte.
+                    cardSurface {
+                        HStack(spacing: SQSpace.xs) {
+                            Button {
+                                Haptics.light()
+                                profileAuthor = SocialFeedAuthor(
+                                    id: friend.userId,
+                                    name: friend.name,
+                                    handle: friend.handle,
+                                    avatarUrl: friend.avatarUrl,
+                                    isFriend: true,
+                                    isFollowing: nil,
+                                    liveRadio: nil
+                                )
+                            } label: {
+                                friendRow(friend)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(SQPressButtonStyle())
+                            .accessibilityHint("Ouvre le profil de \(friend.displayName)")
+                            .accessibilityValue(friend.presence?.isOnline == true ? Text("En ligne") : Text(verbatim: ""))
+                            writeButton(friend)
+                        }
                     }
-                    .buttonStyle(SQPressButtonStyle())
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 5, leading: SQSpace.lg, bottom: 5, trailing: SQSpace.lg))
@@ -211,8 +223,6 @@ struct FriendsListView: View {
                             Label("Retirer", systemImage: "person.fill.xmark")
                         }
                     }
-                    .accessibilityHint("Ouvre le profil de \(friend.displayName)")
-                    .accessibilityValue(friend.presence?.isOnline == true ? Text("En ligne") : Text(verbatim: ""))
                 }
             } header: {
                 sectionHeader(String(localized: "Amis (\(model.friends.count))"))
@@ -401,6 +411,76 @@ struct FriendsListView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(SQPressButtonStyle())
+    }
+
+    /// Rond « Écrire » : ouvre le fil existant avec cet ami, sinon le crée.
+    private func writeButton(_ friend: Friend) -> some View {
+        Button {
+            Haptics.light()
+            Task { await write(to: friend) }
+        } label: {
+            Group {
+                if writingToUserId == friend.userId {
+                    SQSpinner().tint(SQColor.brandRed)
+                } else {
+                    Image(systemName: "bubble.left.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(SQColor.label)
+                }
+            }
+            .frame(width: 36, height: 36)
+            .background(SQColor.chip, in: Circle())
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(writingToUserId != nil)
+        .accessibilityLabel("Écrire à \(friend.displayName)")
+    }
+
+    /// Fil direct existant : on l'ouvre. Sinon, création chiffrée (v2) quand
+    /// cet appareil y est prêt ; autrement la feuille « Nouveau message », qui
+    /// déroule l'activation du chiffrement avant de créer.
+    private func write(to friend: Friend) async {
+        guard writingToUserId == nil else { return }
+        writingToUserId = friend.userId
+        defer { writingToUserId = nil }
+        do {
+            let conversations = try await services.messages.conversations()
+            if let existing = conversations.first(where: {
+                !$0.isGroup && ($0.directPeerUserId == friend.userId
+                    || $0.participants.contains { $0.userId == friend.userId })
+            }) {
+                router.route(toConversation: existing.id)
+                return
+            }
+            let messaging = services.e2eeV2Messaging
+            guard messaging.writesEnabled, let session = LocalAccountScope.sessionSnapshot(),
+                  !messaging.lacksV2Readiness(session) else {
+                router.openNewConversation = true
+                router.route(toConversation: nil)
+                return
+            }
+            switch await messaging.create(participantIds: [friend.userId], isGroup: false, title: nil, excludesWeb: false) {
+            case .created(let conversationId, _):
+                Haptics.success()
+                router.route(toConversation: conversationId)
+            case .failure(let failure) where failure.code == "E2EE_DIRECT_CONVERSATION_EXISTS":
+                // Créé entre-temps ailleurs : on l'ouvre.
+                if case .string(let existing)? = failure.details?["conversationId"] {
+                    router.route(toConversation: existing)
+                } else {
+                    model.errorMessage = String(localized: "La conversation n’a pas pu être ouverte.")
+                }
+            case .failure(let failure):
+                model.errorMessage = failure.kind == .retryable
+                    ? String(localized: "Connexion instable. Réessaie.")
+                    : String(localized: "La conversation n’a pas pu être ouverte.")
+            }
+        } catch {
+            guard !error.isCancellation else { return }
+            model.errorMessage = error.userFacingMessage
+        }
     }
 
     private func friendRow(_ friend: Friend) -> some View {
