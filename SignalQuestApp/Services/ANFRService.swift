@@ -302,7 +302,7 @@ final class ANFRService: ANFRServicing {
         try await api.request(APIEndpoint(path: "/api/anfr/archives"), as: ANFRArchiveDates.self)
     }
 
-    /// Route publique : pas de cookie, pas de rafraîchissement de session. Le centre part à
+    /// Lecture ANFR de l'app (session, comme les autres routes `anfr`). Le centre part à
     /// trois décimales (environ 110 m) ; le serveur l'arrondit à sa propre grille.
     static func zoneCompareEndpoint(latitude: Double, longitude: Double, radius: ANFRZoneRadius,
                                     market: String, includeBands: Bool) -> APIEndpoint {
@@ -313,7 +313,7 @@ final class ANFRService: ANFRServicing {
             URLQueryItem(name: "market", value: market)
         ]
         if includeBands { query.append(URLQueryItem(name: "bands", value: "1")) }
-        return APIEndpoint(path: "/api/anfr/zone-compare", query: query, authenticated: false)
+        return APIEndpoint(path: "/api/anfr/zone-compare", query: query)
     }
 
     func zoneCompare(latitude: Double, longitude: Double, radius: ANFRZoneRadius,

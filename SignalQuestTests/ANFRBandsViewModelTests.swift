@@ -1114,7 +1114,7 @@ final class ANFRZoneCompareTests: XCTestCase {
             let endpoint = ANFRService.zoneCompareEndpoint(latitude: 45.76401, longitude: 4.83569, radius: tier,
                                                            market: "FR", includeBands: false)
             XCTAssertEqual(endpoint.path, "/api/anfr/zone-compare")
-            XCTAssertFalse(endpoint.authenticated, "Route publique : ni cookie ni rafraîchissement de session")
+            XCTAssertTrue(endpoint.authenticated, "lecture ANFR de l'app : avec la session")
             let query = Dictionary(uniqueKeysWithValues: endpoint.query.map { ($0.name, $0.value ?? "") })
             XCTAssertEqual(query, ["lat": "45.764", "lon": "4.836", "radiusKm": String(tier.kilometers), "market": "FR"])
         }
@@ -1137,8 +1137,9 @@ final class ANFRZoneCompareTests: XCTestCase {
     func testTheServiceDecodesTheServerAnswerOverTheWire() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
-        let api = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
-                            session: URLSession(configuration: configuration))
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("synthetic-zone-reader")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
         let body = Data(#"{"market":"FR","total":{"active":4,"planned":1},"radiusKm":20,"operators":[{"key":"SFR","active":4}]}"#.utf8)
         let seen = LockedRequests()
         MockURLProtocol.requestHandler = { request in
@@ -1155,7 +1156,29 @@ final class ANFRZoneCompareTests: XCTestCase {
         let query = Dictionary(uniqueKeysWithValues: (URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [])
             .map { ($0.name, $0.value ?? "") })
         XCTAssertEqual(query, ["lat": "45.700", "lon": "4.800", "radiusKm": "20", "market": "FR", "bands": "1"])
-        XCTAssertNil(seen.first?.0.value(forHTTPHeaderField: "Cookie"))
+        XCTAssertNotNil(seen.first?.0.value(forHTTPHeaderField: "Cookie"), "la session part avec la demande")
+    }
+
+    /// Corps réel servi le 19/10 (Grenoble, 10 km, `bands=1`), deux opérateurs sur quatre.
+    func testDecodesTheServedResponse() throws {
+        let json = #"""
+        {"market":"FR","unit":"site","activeDefinition":"statut ANFR « En service » ; « Techniquement opérationnel » et « Projet approuvé » sont comptés dans planned, jamais dans active","snapshot":{"date":"2026-09-30","source":"anfr-map"},"center":{"lat":45.19,"lon":5.72},"radiusKm":10,"total":{"active":274,"planned":29},"totalByGeneration":{"2G":158,"3G":201,"4G":274,"5G":261},"operators":[{"key":"BOUYGUES","active":103,"planned":12,"generations":{"2G":75,"3G":100,"4G":103,"5G":93},"bands":{"2G":{"GSM900":75},"3G":{"U1":1,"U900":100},"4G":{"B1":86,"B20":101,"B28":88,"B3":100,"B7":93},"5G":{"n1":93,"n78":80}}},{"key":"ORANGE","active":95,"planned":3,"generations":{"2G":51,"3G":74,"4G":95,"5G":88},"bands":{"2G":{"GSM900":51},"3G":{"U1":1,"U900":73},"4G":{"B1":92,"B20":91,"B28":45,"B3":93,"B7":88},"5G":{"n1":1,"n28":84,"n78":87}}}],"requestId":"r"}
+        """#
+        let zone = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(json.utf8))
+        XCTAssertEqual(zone.snapshotDate, "2026-09-30")
+        XCTAssertEqual(zone.radiusKm, 10)
+        XCTAssertEqual(zone.totalActive, 274)
+        XCTAssertEqual(zone.totalPlanned, 29)
+        XCTAssertEqual(zone.totalByGeneration.g5, 261)
+        XCTAssertEqual(zone.operators.map(\.key), ["BOUYGUES", "ORANGE"])
+        let orange = try XCTUnwrap(zone.operators.last)
+        XCTAssertEqual(orange.generations.g4, 95)
+        let bands = ANFRZoneBandCount.sorted(orange.bands ?? [])
+        XCTAssertEqual(bands.count, 11)
+        XCTAssertEqual(bands.first?.band, "GSM900")
+        XCTAssertEqual(bands.first { $0.band == "n28" }?.displayName, "5G 700")
+        XCTAssertEqual(bands.first { $0.band == "U1" }?.megahertz, 2100)
+        XCTAssertTrue(bands.allSatisfy { $0.generation != nil }, "toutes les bandes servies sont dans le registre")
     }
 
     // MARK: Erreurs
