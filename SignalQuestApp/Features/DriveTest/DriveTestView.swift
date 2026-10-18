@@ -1736,7 +1736,10 @@ struct DriveTestView: View {
                 settingTile(
                     "Plafond de données",
                     selection: $driveDataCapMB,
-                    options: [(500, "500 Mo"), (2_000, "2 Go"), (5_000, "5 Go"), (0, "Sans limite")],
+                    options: [
+                        (500, "500 Mo"), (2_000, "2 Go"), (5_000, "5 Go"), (10_000, "10 Go"),
+                        (25_000, "25 Go"), (50_000, "50 Go"), (100_000, "100 Go"), (0, "Sans limite"),
+                    ],
                     identifier: "drivetest.dataCap"
                 )
             }

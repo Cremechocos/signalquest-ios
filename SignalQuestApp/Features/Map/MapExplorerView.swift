@@ -3381,7 +3381,13 @@ struct MapExplorerView: View {
                     clusterCount: nil,
                     azimuths: site.azimuths,
                     showsAzimuths: mapZoom >= 13,
-                    tint: model.operatorAccent(site.operators.first ?? model.operatorFilter),
+                    // Filtré sur un opérateur, un site partagé (ZB, Crozon) prend sa
+                    // couleur : son premier opérateur peut être l'autre partenaire.
+                    tint: model.operatorAccent(
+                        model.operatorFilter.uppercased() == "ALL"
+                            ? (site.operators.first ?? model.operatorFilter)
+                            : model.operatorFilter
+                    ),
                     contributionPhotos: site.photoCount,
                     hasEnb: site.hasEnb,
                     hasGnb: site.hasGnb,
