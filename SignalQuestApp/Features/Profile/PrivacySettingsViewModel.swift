@@ -10,6 +10,7 @@ final class PrivacySettingsViewModel: ObservableObject {
     @Published var liveShareMode: LiveShareMode = LiveShareModeStore.load()
     @Published var lastSeenVisibility: LastSeenVisibility = .none
     @Published var messageRequestPolicy: MessageRequestPolicy = .friendsOnly
+    @Published var hideFollowLists = false
     @Published private(set) var isLoadingPrivacy = false
     @Published private(set) var isLoadingPreferences = false
     @Published private(set) var isLoadingZones = false
@@ -32,6 +33,9 @@ final class PrivacySettingsViewModel: ObservableObject {
     var canSavePrivacy: Bool {
         isSessionCurrent && loaded && !isLoadingPrivacy && !isSaving && hasPrivacyChanges
     }
+
+    /// Le réglage « Masquer mes listes » n'est proposé que si le serveur l'a renvoyé.
+    var supportsHideFollowLists: Bool { privacyBaseline?.hideFollowLists != nil }
 
     var isLoading: Bool { isLoadingPrivacy || isLoadingPreferences || isLoadingZones }
     var declaredZones: [PrivacyZone] { zones.filter { !$0.isAutoDetected } }
@@ -230,12 +234,17 @@ final class PrivacySettingsViewModel: ObservableObject {
             shareSessionsWithFriends: sent.shareSessionsWithFriends == baseline.shareSessionsWithFriends ? nil : sent.shareSessionsWithFriends,
             sharePhotosOnFriendMap: sent.sharePhotosOnFriendMap == baseline.sharePhotosOnFriendMap ? nil : sent.sharePhotosOnFriendMap,
             lastSeenVisibility: sent.lastSeenVisibility == baseline.lastSeenVisibility ? nil : sent.lastSeenVisibility,
-            messageRequestPolicy: sent.messageRequestPolicy == baseline.messageRequestPolicy ? nil : sent.messageRequestPolicy)
+            messageRequestPolicy: sent.messageRequestPolicy == baseline.messageRequestPolicy ? nil : sent.messageRequestPolicy,
+            hideFollowLists: (sent.hideFollowLists ?? false) == (baseline.hideFollowLists ?? false) ? nil : sent.hideFollowLists)
         do {
             // Seul un reçu serveur frais peut autoriser la propagation locale.
             // Le baseline pourrait avoir été révoqué depuis un autre client.
-            let value = try await service.update(patch)
+            var value = try await service.update(patch)
             guard checkSession() else { return false }
+            // Une réponse sans la clé n'annule pas un réglage que le serveur vient d'accepter.
+            if value.hideFollowLists == nil, baseline.hideFollowLists != nil {
+                value.hideFollowLists = patch.hideFollowLists ?? baseline.hideFollowLists
+            }
             // Une nouvelle saisie effectuée pendant le réseau reste un brouillon.
             if currentPrivacy == sent { apply(value) }
             privacyBaseline = value
@@ -273,7 +282,8 @@ final class PrivacySettingsViewModel: ObservableObject {
         SocialPrivacy(shareLiveLocationWithFriends: shareLiveLocationWithFriends,
             shareRadioDataWithFriends: shareRadioDataWithFriends, shareSessionsWithFriends: shareSessionsWithFriends,
             sharePhotosOnFriendMap: sharePhotosOnFriendMap, shareExactMeasurements: true,
-            lastSeenVisibility: lastSeenVisibility, messageRequestPolicy: messageRequestPolicy)
+            lastSeenVisibility: lastSeenVisibility, messageRequestPolicy: messageRequestPolicy,
+            hideFollowLists: privacyBaseline?.hideFollowLists == nil ? nil : hideFollowLists)
     }
 
     private var hasPrivacyChanges: Bool {
@@ -284,6 +294,7 @@ final class PrivacySettingsViewModel: ObservableObject {
             || currentPrivacy.sharePhotosOnFriendMap != baseline.sharePhotosOnFriendMap
             || currentPrivacy.lastSeenVisibility != baseline.lastSeenVisibility
             || currentPrivacy.messageRequestPolicy != baseline.messageRequestPolicy
+            || (currentPrivacy.hideFollowLists ?? false) != (baseline.hideFollowLists ?? false)
     }
 
     private func apply(_ p: SocialPrivacy) {
@@ -293,6 +304,7 @@ final class PrivacySettingsViewModel: ObservableObject {
         sharePhotosOnFriendMap = p.sharePhotosOnFriendMap
         lastSeenVisibility = p.lastSeenVisibility
         messageRequestPolicy = p.messageRequestPolicy
+        hideFollowLists = p.hideFollowLists ?? false
     }
 
     private func checkSession() -> Bool {
@@ -307,6 +319,7 @@ final class PrivacySettingsViewModel: ObservableObject {
                 shareLiveLocationWithFriends = false; shareRadioDataWithFriends = false
                 shareSessionsWithFriends = false; sharePhotosOnFriendMap = false
                 lastSeenVisibility = .none; messageRequestPolicy = .friendsOnly
+                hideFollowLists = false
                 errorMessage = String(localized: "La session a changé. Rouvre les réglages de confidentialité.")
             }
             return false

@@ -627,15 +627,21 @@ struct SocialUserProfile: Codable, Equatable {
     let followingCount: Int
     let canMessage: Bool?
     let stats: SocialUserProfileStats?
+    /// Réglages de visibilité exposés par le serveur ; absents d'un serveur plus ancien.
+    let privacy: SocialUserProfilePrivacy?
 
     var displayName: String {
         name ?? handle.map { "@\($0)" } ?? String(localized: "Utilisateur")
     }
 
+    /// Vrai quand le membre masque ses listes Abonnés / Abonnements : les
+    /// compteurs restent affichés mais ne mènent plus à la liste.
+    var followListsHidden: Bool { privacy?.hideFollowLists == true }
+
     enum CodingKeys: String, CodingKey {
         case id, name, handle, bio, avatarUrl, createdAt, isSelf, isFriend
         case isFollowing, followersCount, followingCount, canMessage, stats
-        case accountBadges, networks
+        case accountBadges, networks, privacy
     }
 
     init(
@@ -653,7 +659,8 @@ struct SocialUserProfile: Codable, Equatable {
         canMessage: Bool?,
         stats: SocialUserProfileStats?,
         accountBadges: [SocialUserBadge] = [],
-        networks: SocialProfileNetworks? = nil
+        networks: SocialProfileNetworks? = nil,
+        privacy: SocialUserProfilePrivacy? = nil
     ) {
         self.id = id
         self.name = name
@@ -670,6 +677,7 @@ struct SocialUserProfile: Codable, Equatable {
         self.stats = stats
         self.accountBadges = accountBadges
         self.networks = networks
+        self.privacy = privacy
     }
 
     init(from decoder: Decoder) throws {
@@ -689,6 +697,95 @@ struct SocialUserProfile: Codable, Equatable {
         stats = try? c.decodeIfPresent(SocialUserProfileStats.self, forKey: .stats)
         accountBadges = c.decodeLossyArray([SocialUserBadge].self, forKey: .accountBadges)
         networks = try? c.decodeIfPresent(SocialProfileNetworks.self, forKey: .networks)
+        privacy = try? c.decodeIfPresent(SocialUserProfilePrivacy.self, forKey: .privacy)
+    }
+}
+
+/// `profile.privacy` : ce que le membre a choisi de ne pas montrer.
+struct SocialUserProfilePrivacy: Codable, Equatable {
+    let hideFollowLists: Bool
+
+    enum CodingKeys: String, CodingKey { case hideFollowLists }
+
+    init(hideFollowLists: Bool) { self.hideFollowLists = hideFollowLists }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        hideFollowLists = (try? c.decodeIfPresent(Bool.self, forKey: .hideFollowLists)) ?? false
+    }
+}
+
+/// Les deux listes d'un membre : ceux qui le suivent, ceux qu'il suit.
+enum SocialFollowListKind: String, CaseIterable, Hashable, Sendable {
+    case followers
+    case following
+}
+
+/// Une ligne de GET /api/users/{id}/followers|following. Les drapeaux sont vus
+/// du LECTEUR : `following` = je le suis, `followsMe` = il me suit.
+/// Nom, pseudo et avatar peuvent manquer ; une clé absente prend sa valeur par défaut.
+struct SocialFollowPerson: Codable, Identifiable, Equatable, Hashable {
+    let id: String
+    let name: String?
+    let handle: String?
+    let avatarUrl: URL?
+    var following: Bool
+    let followsMe: Bool
+    let friend: Bool
+
+    /// Repli « Membre » : une ligne sans nom ni pseudo reste lisible et touchable.
+    var displayName: String {
+        name ?? handle.map { "@\($0)" } ?? String(localized: "Membre")
+    }
+
+    enum CodingKeys: String, CodingKey { case id, name, handle, avatarUrl, following, followsMe, friend }
+
+    init(id: String, name: String?, handle: String?, avatarUrl: URL?,
+         following: Bool = false, followsMe: Bool = false, friend: Bool = false) {
+        self.id = id
+        self.name = name
+        self.handle = handle
+        self.avatarUrl = avatarUrl
+        self.following = following
+        self.followsMe = followsMe
+        self.friend = friend
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = c.decodeFlexibleString(forKey: .name)
+        handle = c.decodeFlexibleString(forKey: .handle)
+        avatarUrl = c.decodeLossyURL(forKey: .avatarUrl)
+        following = (try? c.decodeIfPresent(Bool.self, forKey: .following)) ?? false
+        followsMe = (try? c.decodeIfPresent(Bool.self, forKey: .followsMe)) ?? false
+        friend = (try? c.decodeIfPresent(Bool.self, forKey: .friend)) ?? false
+    }
+
+    /// Profil minimal pour ouvrir la fiche du membre avec un en-tête déjà rempli.
+    var asAuthor: SocialFeedAuthor {
+        SocialFeedAuthor(id: id, name: name, handle: handle, avatarUrl: avatarUrl,
+                         isFriend: friend, isFollowing: following, liveRadio: nil)
+    }
+}
+
+/// Une page des listes Abonnés / Abonnements. `nextCursor` nil = fin de liste.
+/// Un élément illisible (sans `id`) est écarté sans faire échouer la page.
+struct SocialFollowPage: Decodable, Equatable {
+    let people: [SocialFollowPerson]
+    let nextCursor: String?
+
+    enum CodingKeys: String, CodingKey { case people, nextCursor }
+
+    init(people: [SocialFollowPerson], nextCursor: String?) {
+        self.people = people
+        self.nextCursor = nextCursor
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        people = c.decodeLossyArray([SocialFollowPerson].self, forKey: .people)
+        nextCursor = c.decodeFlexibleString(forKey: .nextCursor)
     }
 }
 

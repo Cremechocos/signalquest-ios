@@ -189,6 +189,8 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         switch await lifecycle.requestBootstrapEmailChallenge() {
         case .success(let challenge):
             bootstrapChallenge = challenge
+        case .failed(let failure) where failure.statusCode == 429:
+            approvalErrorMessage = String(localized: "Trop d’essais. Réessaie dans quelques minutes.")
         case .failed:
             approvalErrorMessage = String(localized: "Impossible d’envoyer le code de vérification.")
         }
@@ -212,6 +214,11 @@ final class E2EEV2TrustedDevicesViewModel: ObservableObject {
         case .failed(let failure) where failure.code == "E2EE_IDENTITY_ALREADY_ESTABLISHED":
             approvalErrorMessage = String(localized: "Un autre appareil a déjà établi le chiffrement de ce compte. Fais approuver celui-ci en scannant son QR.")
             await load()
+        case .failed(let failure) where failure.statusCode == 429:
+            approvalErrorMessage = String(localized: "Trop d’essais. Réessaie dans quelques minutes.")
+        case .failed(let failure) where failure.code == "E2EE_BOOTSTRAP_EMAIL_INVALID":
+            // Un code ne sert qu'une fois, même faux : le retaper échouerait encore.
+            approvalErrorMessage = String(localized: "Code incorrect ou expiré. Chaque code ne sert qu’une fois : touche « Renvoyer le code ».")
         case .failed:
             approvalErrorMessage = String(localized: "Le code est invalide, expiré ou ne correspond plus à cet appareil.")
         }

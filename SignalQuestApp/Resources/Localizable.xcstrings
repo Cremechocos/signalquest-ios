@@ -2891,6 +2891,38 @@
         }
       }
     },
+    "Aucun abonnement" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not following anyone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun abonnement"
+          }
+        }
+      }
+    },
+    "Aucun abonné" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No followers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun abonné"
+          }
+        }
+      }
+    },
     "Aucun badge débloqué pour l’instant. Ceux qui restent à gagner sont dans « À débloquer »." : {
       "localizations" : {
         "en" : {
@@ -3469,6 +3501,22 @@
         }
       }
     },
+    "Ce membre masque ses listes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This member hides their lists."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce membre masque ses listes."
+          }
+        }
+      }
+    },
     "Ce mois-ci" : {
       "localizations" : {
         "en" : {
@@ -3968,6 +4016,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code e-mail"
+          }
+        }
+      }
+    },
+    "Code incorrect ou expiré. Chaque code ne sert qu’une fois : touche « Renvoyer le code »." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incorrect or expired code. Each code works only once: tap “Resend the code”."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code incorrect ou expiré. Chaque code ne sert qu’une fois : touche « Renvoyer le code »."
           }
         }
       }
@@ -7042,6 +7106,38 @@
         }
       }
     },
+    "Les abonnements de ce membre apparaîtront ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The members they follow will appear here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les abonnements de ce membre apparaîtront ici."
+          }
+        }
+      }
+    },
+    "Les abonnés de ce membre apparaîtront ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This member's followers will appear here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les abonnés de ce membre apparaîtront ici."
+          }
+        }
+      }
+    },
     "Les antennes captées par l’app Android pendant tes trajets." : {
       "localizations" : {
         "en" : {
@@ -7134,6 +7230,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les longs trajets sont allégés à l’affichage : la carte montre un échantillon de %lld points sur %lld. Tes mesures restent toutes enregistrées."
+          }
+        }
+      }
+    },
+    "Les membres que tu suis apparaîtront ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The members you follow will appear here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les membres que tu suis apparaîtront ici."
           }
         }
       }
@@ -7311,6 +7423,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lieu recherché"
+          }
+        }
+      }
+    },
+    "Liste indisponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liste indisponible"
+          }
+        }
+      }
+    },
+    "Listes masquées" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lists hidden"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listes masquées"
           }
         }
       }
@@ -7505,6 +7649,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Masquer"
+          }
+        }
+      }
+    },
+    "Masquer mes listes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide my lists"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer mes listes"
           }
         }
       }
@@ -8267,6 +8427,38 @@
         }
       }
     },
+    "Ouvre la liste des abonnements" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the list of people they follow"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre la liste des abonnements"
+          }
+        }
+      }
+    },
+    "Ouvre la liste des abonnés" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the list of followers"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre la liste des abonnés"
+          }
+        }
+      }
+    },
     "Ouvre le choix du serveur de test" : {
       "localizations" : {
         "en" : {
@@ -8295,6 +8487,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvre le graphique en plein écran"
+          }
+        }
+      }
+    },
+    "Ouvre le profil" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the profile"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre le profil"
           }
         }
       }
@@ -8586,6 +8794,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pendant ton trajet"
+          }
+        }
+      }
+    },
+    "Personne d’autre ne voit qui te suit ni qui tu suis. Tes compteurs restent visibles." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No one else can see who follows you or who you follow. Your counts stay visible."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personne d’autre ne voit qui te suit ni qui tu suis. Tes compteurs restent visibles."
           }
         }
       }
@@ -10671,6 +10895,22 @@
         }
       }
     },
+    "Te suit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Follows you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Te suit"
+          }
+        }
+      }
+    },
     "Temps" : {
       "localizations" : {
         "en" : {
@@ -10795,6 +11035,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tes %lld passages sont trop rapprochés pour situer l’antenne."
+          }
+        }
+      }
+    },
+    "Tes abonnés apparaîtront ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your followers will appear here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tes abonnés apparaîtront ici."
           }
         }
       }
@@ -11456,6 +11712,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trier par"
+          }
+        }
+      }
+    },
+    "Trop d’essais. Réessaie dans quelques minutes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many attempts. Try again in a few minutes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trop d’essais. Réessaie dans quelques minutes."
           }
         }
       }
@@ -12476,6 +12748,22 @@
         }
       }
     },
+    "followlist.segment.following" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Following"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnements"
+          }
+        }
+      }
+    },
     "gNB (5G)" : {
       "localizations" : {
         "en" : {
@@ -13004,6 +13292,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "un participant"
+          }
+        }
+      }
+    },
+    "vu hier à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "seen yesterday at %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vu hier à %@"
+          }
+        }
+      }
+    },
+    "vu le %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "seen %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vu le %@"
+          }
+        }
+      }
+    },
+    "vu à %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "seen at %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "vu à %@"
           }
         }
       }

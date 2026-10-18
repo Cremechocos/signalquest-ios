@@ -863,7 +863,7 @@ struct ConversationDetailView: View {
                             size: 12
                         )
                     }
-                    if otherIsOnline || conversation.isGroup {
+                    if otherIsOnline || conversation.isGroup || otherLastSeenLabel != nil {
                         if otherIsOnline {
                             Text("en ligne")
                                 .font(SQType.micro)
@@ -871,6 +871,13 @@ struct ConversationDetailView: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
                                 .accessibilityIdentifier("conversation.status")
+                        } else if !conversation.isGroup, let lastSeen = otherLastSeenLabel {
+                            Text(verbatim: lastSeen)
+                                .font(SQType.micro(.regular))
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .accessibilityIdentifier("conversation.lastSeen")
                         } else {
                             Text("\(updatedMemberCount ?? conversation.participants.count) membres")
                                 .font(SQType.micro(.regular))
@@ -1007,6 +1014,22 @@ struct ConversationDetailView: View {
         guard !conversation.isGroup else { return false }
         if viewersKnown { return otherIsViewing }
         return conversation.participants.contains { $0.userId != currentUserId && $0.presence?.isOnline == true }
+    }
+
+    /// « vu à 14:32 », « vu hier à 14:32 » ou « vu le 12 oct. » (1:1). Le serveur
+    /// ne donne `lastSeenAt` que si l'autre l'autorise : nil, rien n'est affiché.
+    private var otherLastSeenLabel: String? {
+        guard !conversation.isGroup,
+              let date = conversation.participants
+                .first(where: { $0.userId != currentUserId })?.presence?.lastSeenAt,
+              date <= Date().addingTimeInterval(60)
+        else { return nil }
+        let time = date.formatted(date: .omitted, time: .shortened)
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return String(localized: "vu à \(time)") }
+        if calendar.isDateInYesterday(date) { return String(localized: "vu hier à \(time)") }
+        let day = date.formatted(.dateTime.day().month(.abbreviated))
+        return String(localized: "vu le \(day)")
     }
 
     // MARK: Composer

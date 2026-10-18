@@ -313,6 +313,9 @@ struct UserProfileView: View {
     private let hasActiveStory: Bool
 
     @State private var presentedSheet: ProfileSheet?
+    /// Liste Abonnés / Abonnements poussée par valeur (iOS 16 gelait avec un
+    /// NavigationLink(destination:) dans Profil).
+    @State private var followListRoute: FollowListRoute?
     @State private var showBlockConfirm = false
     @State private var showRemoveFriendConfirm = false
     /// Demande d'ami envoyée pendant cette session (le profil n'expose pas l'état
@@ -400,6 +403,9 @@ struct UserProfileView: View {
             if model.profile == nil { await model.load() }
         }
         .refreshable { await model.load() }
+        .navigationDestinationItemCompat($followListRoute) { route in
+            MemberFollowListView(route: route, service: services.feed)
+        }
         .onChangeCompat(of: model.profile?.id) { _, _ in recordVisit() }
         .onChangeCompat(of: model.actionError) { _, message in
             guard let message else { return }
@@ -650,16 +656,47 @@ struct UserProfileView: View {
                     .foregroundStyle(SQColor.labelSecondary)
             }
             if let profile {
-                // Libellés traduits, singulier compris (SOC-28).
-                HStack(spacing: SQSpace.xs) {
-                    Text(verbatim: followersLabel(profile.followersCount))
-                    Text(verbatim: "·").accessibilityHidden(true)
-                    Text(verbatim: followingLabel(profile.followingCount))
-                }
-                .font(SQType.caption(.semibold))
-                .foregroundStyle(SQColor.label)
-                .padding(.top, SQSpace.xxs)
+                followCounters(profile)
             }
+        }
+    }
+
+    /// Compteurs « N abonnés · N abonnements » : ils ouvrent les listes, sauf
+    /// quand le membre les masque (hors de son propre profil) — le nombre reste
+    /// affiché, grisé et sans geste, et VoiceOver annonce « listes masquées ».
+    /// Libellés traduits, singulier compris (SOC-28).
+    private func followCounters(_ profile: SocialUserProfile) -> some View {
+        let locked = profile.followListsHidden && !profile.isSelf
+        return HStack(spacing: SQSpace.xs) {
+            followCounter(followersLabel(profile.followersCount), kind: .followers, profile: profile, locked: locked)
+            Text(verbatim: "·").accessibilityHidden(true)
+            followCounter(followingLabel(profile.followingCount), kind: .following, profile: profile, locked: locked)
+        }
+        .font(SQType.caption(.semibold))
+        .foregroundStyle(locked ? SQColor.labelSecondary : SQColor.label)
+    }
+
+    @ViewBuilder
+    private func followCounter(_ title: String, kind: SocialFollowListKind, profile: SocialUserProfile, locked: Bool) -> some View {
+        if locked {
+            Text(verbatim: title)
+                .frame(minHeight: 44)
+                .accessibilityValue("Listes masquées")
+                .accessibilityIdentifier("profile.member.\(kind.rawValue).locked")
+        } else {
+            Button {
+                Haptics.light()
+                followListRoute = FollowListRoute(
+                    userId: profile.id, displayName: profile.displayName, kind: kind, isSelf: profile.isSelf
+                )
+            } label: {
+                Text(verbatim: title)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(kind == .followers ? Text("Ouvre la liste des abonnés") : Text("Ouvre la liste des abonnements"))
+            .accessibilityIdentifier("profile.member.\(kind.rawValue)")
         }
     }
 
@@ -989,5 +1026,414 @@ struct UserProfileView: View {
         }
         .sqShimmer()
         .redacted(reason: .placeholder)
+    }
+}
+
+// MARK: - Listes Abonnés / Abonnements
+
+/// Destination poussée par valeur depuis les compteurs d'un profil.
+struct FollowListRoute: Hashable {
+    let userId: String
+    let displayName: String
+    let kind: SocialFollowListKind
+    let isSelf: Bool
+}
+
+/// Pourquoi une liste est fermée : propre au membre, pas une panne à réessayer.
+enum FollowListRestriction: Equatable {
+    case listsHidden
+    case profilePrivate
+}
+
+/// État d'une des deux listes (chacune se charge et se pagine seule).
+struct FollowListing: Equatable {
+    var people: [SocialFollowPerson] = []
+    var nextCursor: String?
+    var hasLoaded = false
+    var isLoading = false
+    var isLoadingMore = false
+    var loadMoreFailed = false
+    var errorMessage: String?
+    var restriction: FollowListRestriction?
+}
+
+@MainActor
+final class FollowListViewModel: ObservableObject {
+    @Published var kind: SocialFollowListKind
+    @Published private(set) var listings: [SocialFollowListKind: FollowListing] = [:]
+    @Published private(set) var followBusyIds: Set<String> = []
+    /// Échec d'un suivi : bandeau passager, la liste reste affichée.
+    @Published var actionError: String?
+
+    let route: FollowListRoute
+    private let service: SocialFeedServicing
+    private static let pageSize = 30
+    private var loadTokens: [SocialFollowListKind: UUID] = [:]
+
+    init(route: FollowListRoute, service: SocialFeedServicing) {
+        self.route = route
+        self.service = service
+        kind = route.kind
+    }
+
+    var current: FollowListing { listings[kind] ?? FollowListing() }
+
+    /// Première page (ou rechargement complet par « tirer pour rafraîchir »).
+    /// Un jeton par liste : une réponse qui arrive après un nouveau chargement
+    /// (changement de segment, rafraîchissement) est ignorée.
+    func load(_ target: SocialFollowListKind? = nil) async {
+        let kind = target ?? self.kind
+        if AppEnvironment.usesDemoData {
+            listings[kind] = Self.demoListing(kind)
+            return
+        }
+        let token = UUID()
+        loadTokens[kind] = token
+        var listing = listings[kind] ?? FollowListing()
+        // Une liste fermée (masquée, privée) repart de zéro : la restriction a pu être levée.
+        if listing.restriction != nil { listing = FollowListing() }
+        listing.isLoading = true
+        listing.isLoadingMore = false
+        listing.loadMoreFailed = false
+        listing.errorMessage = nil
+        listings[kind] = listing
+        do {
+            let page = try await service.followList(kind, userId: route.userId, cursor: nil, limit: Self.pageSize)
+            guard loadTokens[kind] == token else { return }
+            listings[kind] = FollowListing(people: Self.unique(page.people), nextCursor: page.nextCursor, hasLoaded: true)
+        } catch {
+            guard loadTokens[kind] == token else { return }
+            var failed = listings[kind] ?? FollowListing()
+            failed.isLoading = false
+            if error.isCancellation {
+                listings[kind] = failed
+                return
+            }
+            if let restriction = Self.restriction(for: error) {
+                failed = FollowListing(hasLoaded: true, restriction: restriction)
+            } else if failed.hasLoaded && !failed.people.isEmpty {
+                // Rafraîchissement raté : la liste déjà affichée reste, l'échec passe en bandeau.
+                actionError = error.userFacingMessage
+            } else {
+                failed.errorMessage = error.userFacingMessage
+            }
+            listings[kind] = failed
+        }
+    }
+
+    func loadMore() async {
+        let kind = self.kind
+        guard !AppEnvironment.usesDemoData, var listing = listings[kind], !listing.isLoading,
+              !listing.isLoadingMore, let cursor = listing.nextCursor else { return }
+        listing.isLoadingMore = true
+        listing.loadMoreFailed = false
+        listings[kind] = listing
+        do {
+            let page = try await service.followList(kind, userId: route.userId, cursor: cursor, limit: Self.pageSize)
+            var updated = listings[kind] ?? listing
+            let known = Set(updated.people.map(\.id))
+            updated.people.append(contentsOf: Self.unique(page.people).filter { !known.contains($0.id) })
+            updated.nextCursor = page.nextCursor
+            updated.isLoadingMore = false
+            listings[kind] = updated
+        } catch {
+            var failed = listings[kind] ?? listing
+            failed.isLoadingMore = false
+            // Une annulation (changement de segment) n'est pas un échec à montrer.
+            failed.loadMoreFailed = !error.isCancellation
+            listings[kind] = failed
+        }
+    }
+
+    /// Bascule optimiste du suivi, corrigée par la réponse serveur et annulée en cas d'échec
+    /// (même mécanisme que le bouton Suivre d'un profil).
+    func toggleFollow(_ person: SocialFollowPerson) {
+        guard !followBusyIds.contains(person.id) else { return }
+        Haptics.medium()
+        let wasFollowing = person.following
+        setFollowing(!wasFollowing, for: person.id)
+        if AppEnvironment.usesDemoData { return }
+        followBusyIds.insert(person.id)
+        Task {
+            defer { followBusyIds.remove(person.id) }
+            do {
+                let result = try await service.toggleFollow(userId: person.id)
+                setFollowing(result.following, for: person.id)
+            } catch {
+                setFollowing(wasFollowing, for: person.id)
+                if !error.isCancellation { actionError = error.userFacingMessage }
+                Haptics.error()
+            }
+        }
+    }
+
+    /// Le même membre peut figurer dans les deux listes : on met les deux à jour.
+    private func setFollowing(_ value: Bool, for id: String) {
+        for (kind, var listing) in listings {
+            guard let index = listing.people.firstIndex(where: { $0.id == id }) else { continue }
+            listing.people[index].following = value
+            listings[kind] = listing
+        }
+    }
+
+    private static func unique(_ people: [SocialFollowPerson]) -> [SocialFollowPerson] {
+        var seen = Set<String>()
+        return people.filter { seen.insert($0.id).inserted }
+    }
+
+    private static func restriction(for error: Error) -> FollowListRestriction? {
+        guard case let APIError.http(status, code, _, _, _) = error, status == 403 else { return nil }
+        switch code {
+        case "FOLLOW_LISTS_HIDDEN": return .listsHidden
+        case "PROFILE_PRIVATE": return .profilePrivate
+        default: return nil
+        }
+    }
+
+    private static func demoListing(_ kind: SocialFollowListKind) -> FollowListing {
+        let names = ["Camille", "Nora", "Mehdi", "Inès", "Louis"]
+        let people = names.enumerated().map { index, name in
+            SocialFollowPerson(
+                id: "demo-\(kind.rawValue)-\(index)", name: name, handle: name.lowercased(), avatarUrl: nil,
+                following: index % 2 == 0, followsMe: index % 3 == 0, friend: index == 1
+            )
+        } + [SocialFollowPerson(id: "demo-\(kind.rawValue)-anon", name: nil, handle: nil, avatarUrl: nil)]
+        return FollowListing(people: people, nextCursor: nil, hasLoaded: true)
+    }
+}
+
+/// Liste paginée des abonnés ou des abonnements d'un membre. Toucher une ligne
+/// ouvre le profil ; le bouton à droite suit ou se désabonne.
+struct MemberFollowListView: View {
+    @StateObject private var model: FollowListViewModel
+    @EnvironmentObject private var services: AppServices
+    @EnvironmentObject private var inAppNotifications: SQInAppNotificationCenter
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var profileAuthor: SocialFeedAuthor?
+
+    init(route: FollowListRoute, service: SocialFeedServicing) {
+        _model = StateObject(wrappedValue: FollowListViewModel(route: route, service: service))
+    }
+
+    private var ownUserId: String? {
+        AppEnvironment.usesDemoData ? AuthUser.mock.id : LocalAccountScope.currentUserId
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SQSpace.lg) {
+                HStack {
+                    MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "followlist.back") {
+                        dismiss()
+                    }
+                    Spacer()
+                }
+                Text(verbatim: model.route.displayName)
+                    .font(SQFont.display(22, .bold, relativeTo: .title2))
+                    .foregroundStyle(SQColor.label)
+                    .lineLimit(2)
+                    .accessibilityAddTraits(.isHeader)
+                MapSegmented(
+                    selection: $model.kind,
+                    options: [(SocialFollowListKind.followers, "Abonnés"), (SocialFollowListKind.following, "followlist.segment.following")],
+                    identifier: "followlist.segment"
+                )
+                content
+            }
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.top, SQSpace.sm)
+            .padding(.bottom, SQSpace.xxl)
+            .sqReadableWidth()
+        }
+        .navigationTitle(model.route.displayName)
+        .toolbar(.hidden, for: .navigationBar)
+        .sqKeepsSwipeBack()
+        .signalQuestBackground()
+        .task(id: model.kind) {
+            if !model.current.hasLoaded { await model.load() }
+        }
+        .refreshable { await model.load() }
+        .navigationDestinationItemCompat($profileAuthor) { author in
+            UserProfileView(userId: author.id, prefill: author, service: services.feed)
+        }
+        .onChangeCompat(of: model.actionError) { _, message in
+            guard let message else { return }
+            inAppNotifications.showError(message)
+            model.actionError = nil
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        let listing = model.current
+        if let restriction = listing.restriction {
+            switch restriction {
+            case .listsHidden:
+                EmptyStateView(
+                    title: "Listes masquées",
+                    message: "Ce membre masque ses listes.",
+                    systemImage: "eye.slash"
+                )
+                .accessibilityIdentifier("followlist.hidden")
+            case .profilePrivate:
+                EmptyStateView(
+                    title: "Profil privé",
+                    message: "Cette personne a choisi de ne pas montrer son profil.",
+                    systemImage: "lock.fill"
+                )
+                .accessibilityIdentifier("followlist.private")
+            }
+        } else if let error = listing.errorMessage {
+            ErrorStateView(title: "Liste indisponible", message: error) {
+                Task { await model.load() }
+            }
+        } else if !listing.hasLoaded {
+            skeleton
+        } else if listing.people.isEmpty {
+            emptyState
+        } else {
+            rows(listing)
+        }
+    }
+
+    private var emptyState: some View {
+        let followers = model.kind == .followers
+        let isSelf = model.route.isSelf
+        return EmptyStateView(
+            title: followers ? "Aucun abonné" : "Aucun abonnement",
+            message: followers
+                ? (isSelf ? "Tes abonnés apparaîtront ici." : "Les abonnés de ce membre apparaîtront ici.")
+                : (isSelf ? "Les membres que tu suis apparaîtront ici." : "Les abonnements de ce membre apparaîtront ici."),
+            systemImage: "person.2"
+        )
+        .accessibilityIdentifier("followlist.empty")
+    }
+
+    private var skeleton: some View {
+        VStack(spacing: SQSpace.md) {
+            ForEach(0..<6, id: \.self) { _ in
+                HStack(spacing: SQSpace.md) {
+                    Circle().fill(SQColor.fill).frame(width: 44, height: 44)
+                    VStack(alignment: .leading, spacing: SQSpace.xs) {
+                        RoundedRectangle(cornerRadius: SQRadius.sm).fill(SQColor.fill).frame(width: 140, height: 14)
+                        RoundedRectangle(cornerRadius: SQRadius.sm).fill(SQColor.fill).frame(width: 90, height: 10)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .sqShimmer()
+        .redacted(reason: .placeholder)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Chargement…")
+    }
+
+    private func rows(_ listing: FollowListing) -> some View {
+        LazyVStack(spacing: 0) {
+            ForEach(Array(listing.people.enumerated()), id: \.element.id) { index, person in
+                if index > 0 { Divider().padding(.leading, 58) }
+                row(person)
+                    .onAppear {
+                        if person.id == listing.people.last?.id { Task { await model.loadMore() } }
+                    }
+            }
+            if listing.isLoadingMore {
+                SQSpinner()
+                    .tint(SQColor.brandRed)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SQSpace.md)
+            } else if listing.loadMoreFailed {
+                // Le dernier élément est déjà à l'écran : sans bouton, rien ne relancerait la page.
+                Button {
+                    Task { await model.loadMore() }
+                } label: {
+                    Text("Réessayer")
+                        .font(SQType.callout(.semibold))
+                        .foregroundStyle(SQColor.accentInk)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .accessibilityIdentifier("followlist.loadMore.retry")
+            }
+        }
+        .padding(.horizontal, SQSpace.md)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+    }
+
+    private func row(_ person: SocialFollowPerson) -> some View {
+        HStack(spacing: SQSpace.md) {
+            Button {
+                Haptics.light()
+                profileAuthor = person.asAuthor
+            } label: {
+                HStack(spacing: SQSpace.md) {
+                    SQAvatar(url: person.avatarUrl, name: person.displayName, size: 44)
+                    VStack(alignment: .leading, spacing: SQSpace.xxs) {
+                        Text(verbatim: person.displayName)
+                            .font(SQType.body(.bold))
+                            .foregroundStyle(SQColor.label)
+                            .lineLimit(1)
+                        if let handle = person.handle {
+                            Text(verbatim: "@\(handle)")
+                                .font(SQType.caption)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .lineLimit(1)
+                        }
+                        relationPill(person)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Ouvre le profil")
+            .accessibilityIdentifier("followlist.row.\(person.id)")
+
+            if person.id != ownUserId {
+                followButton(person)
+            }
+        }
+        .padding(.vertical, SQSpace.xs2)
+    }
+
+    /// « Ami » prime sur « Te suit » : un ami est déjà un lien dans les deux sens.
+    @ViewBuilder
+    private func relationPill(_ person: SocialFollowPerson) -> some View {
+        if person.friend || person.followsMe {
+            Group {
+                if person.friend { Text("Ami") } else { Text("Te suit") }
+            }
+                .font(SQType.micro)
+                .foregroundStyle(person.friend ? SQColor.accentInk : SQColor.chipInk)
+                .padding(.horizontal, SQSpace.sm)
+                .padding(.vertical, SQSpace.xxs)
+                .background(person.friend ? SQColor.accentSoft : SQColor.chip, in: Capsule(style: .continuous))
+        }
+    }
+
+    /// « Suivre » à l'encre ; une fois suivi, bouton secondaire.
+    private func followButton(_ person: SocialFollowPerson) -> some View {
+        Button {
+            model.toggleFollow(person)
+        } label: {
+            Group {
+                if person.following { Text("Abonné") } else { Text("Suivre") }
+            }
+                .font(SQType.subhead(.bold))
+                .foregroundStyle(person.following ? SQColor.label : SQColor.onInk)
+                .padding(.horizontal, SQSpace.md2)
+                .frame(minHeight: 32)
+                .background(person.following ? SQColor.chip : SQColor.label, in: Capsule(style: .continuous))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .sqLikePop(trigger: person.following)
+        .disabled(model.followBusyIds.contains(person.id))
+        .accessibilityLabel(person.following ? Text("Se désabonner de \(person.displayName)") : Text("Suivre \(person.displayName)"))
+        .accessibilityIdentifier("followlist.follow.\(person.id)")
     }
 }

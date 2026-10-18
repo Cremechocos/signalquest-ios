@@ -70,6 +70,10 @@ protocol SocialFeedServicing: Sendable {
     /// La route backend est un toggle unique (POST /api/social/follows/[userId]) :
     /// le même appel suit ou désabonne selon l'état courant.
     func toggleFollow(userId: String) async throws -> SocialFollowResult
+    /// Une page des abonnés ou des abonnements d'un membre. `cursor` est le
+    /// `nextCursor` de la page précédente, renvoyé tel quel (nil pour la première).
+    /// Refus : 403 PROFILE_PRIVATE, 403 FOLLOW_LISTS_HIDDEN, 403 FORBIDDEN, 404.
+    func followList(_ kind: SocialFollowListKind, userId: String, cursor: String?, limit: Int) async throws -> SocialFollowPage
     /// Posts d'un utilisateur. `mine` bascule sur filter=mine (pagination native) ;
     /// sinon le flux public est balayé côté client (pas de route auteur backend).
     func userPosts(userId: String, cursor: String?, mine: Bool) async throws -> SocialFeedPage
@@ -634,6 +638,18 @@ final class SocialFeedService: SocialFeedServicing {
         try await api.request(
             APIEndpoint(path: "/api/social/follows/\(userId)", method: .post),
             as: SocialFollowResult.self
+        )
+    }
+
+    func followList(_ kind: SocialFollowListKind, userId: String, cursor: String?, limit: Int) async throws -> SocialFollowPage {
+        let encodedId = userId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? userId
+        var query = [URLQueryItem(name: "limit", value: String(min(max(limit, 1), 50)))]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        // `code` est à la racine de la réponse d'erreur : APIClient le lit déjà
+        // (BackendErrorResponse) et le range dans APIError.http.
+        return try await api.request(
+            APIEndpoint(path: "/api/users/\(encodedId)/\(kind.rawValue)", query: query),
+            as: SocialFollowPage.self
         )
     }
 

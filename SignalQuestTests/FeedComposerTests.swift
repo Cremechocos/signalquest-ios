@@ -131,6 +131,137 @@ final class FeedComposerTests: XCTestCase {
         XCTAssertTrue(model.items.isEmpty)
     }
 
+    // MARK: Listes Abonnés / Abonnements
+
+    /// Champs null et fin de liste : la ligne reste affichable (repli « Membre »).
+    func testFollowPageDecodesNullFieldsAndNullCursor() throws {
+        let json = #"{"people":[{"id":"u1","name":null,"handle":null,"avatarUrl":null,"following":true,"followsMe":true,"friend":false}],"nextCursor":null,"requestId":"r"}"#
+        let page = try JSONDecoder.signalQuest.decode(SocialFollowPage.self, from: Data(json.utf8))
+        XCTAssertNil(page.nextCursor)
+        let person = try XCTUnwrap(page.people.first)
+        XCTAssertNil(person.name)
+        XCTAssertNil(person.handle)
+        XCTAssertNil(person.avatarUrl)
+        XCTAssertTrue(person.following)
+        XCTAssertTrue(person.followsMe)
+        XCTAssertFalse(person.friend)
+        XCTAssertEqual(person.displayName, String(localized: "Membre"))
+    }
+
+    /// Une clé absente prend sa valeur par défaut, un élément sans id est écarté :
+    /// jamais d'échec de toute la page pour un champ.
+    func testFollowPageToleratesMissingKeysAndUnreadableItems() throws {
+        let json = #"{"people":[{"id":"u1","handle":"zed"},{"name":"Sans id"},{"id":"u2","following":"oui","friend":true}],"nextCursor":"abc"}"#
+        let page = try JSONDecoder.signalQuest.decode(SocialFollowPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.nextCursor, "abc")
+        XCTAssertEqual(page.people.map(\.id), ["u1", "u2"])
+        XCTAssertEqual(page.people[0].displayName, "@zed")
+        XCTAssertFalse(page.people[0].following)
+        XCTAssertFalse(page.people[0].followsMe)
+        XCTAssertFalse(page.people[0].friend)
+        // Un drapeau mal typé retombe sur « faux » sans toucher les autres.
+        XCTAssertFalse(page.people[1].following)
+        XCTAssertTrue(page.people[1].friend)
+
+        let empty = try JSONDecoder.signalQuest.decode(SocialFollowPage.self, from: Data("{}".utf8))
+        XCTAssertTrue(empty.people.isEmpty)
+        XCTAssertNil(empty.nextCursor)
+    }
+
+    /// `profile.privacy.hideFollowLists` : absent (serveur plus ancien) = listes visibles.
+    func testProfileDecodesHideFollowListsAbsentAndPresent() throws {
+        func profile(_ extra: String) throws -> SocialUserProfile {
+            let json = #"{"id":"u1","name":"Léa","isSelf":false\#(extra)}"#
+            return try JSONDecoder.signalQuest.decode(SocialUserProfile.self, from: Data(json.utf8))
+        }
+        let absent = try profile("")
+        XCTAssertNil(absent.privacy)
+        XCTAssertFalse(absent.followListsHidden)
+
+        let emptyPrivacy = try profile(#","privacy":{}"#)
+        XCTAssertFalse(emptyPrivacy.followListsHidden)
+
+        let hidden = try profile(#","privacy":{"hideFollowLists":true}"#)
+        XCTAssertEqual(hidden.privacy?.hideFollowLists, true)
+        XCTAssertTrue(hidden.followListsHidden)
+
+        let visible = try profile(#","privacy":{"hideFollowLists":false}"#)
+        XCTAssertFalse(visible.followListsHidden)
+    }
+
+    func testFollowListShowsHiddenAndPrivateStatesInsteadOfAnError() async {
+        let fixture = ComposerFeedFixture()
+        let model = FollowListViewModel(
+            route: FollowListRoute(userId: "u1", displayName: "Léa", kind: .followers, isSelf: false),
+            service: fixture
+        )
+        fixture.followListError = APIError.http(status: 403, code: "FOLLOW_LISTS_HIDDEN",
+                                                message: "Ce membre masque ses listes", requestId: nil, retryAfter: nil)
+        await model.load()
+        XCTAssertEqual(model.current.restriction, .listsHidden)
+        XCTAssertNil(model.current.errorMessage)
+
+        fixture.followListError = APIError.http(status: 403, code: "PROFILE_PRIVATE",
+                                                message: "Profil privé", requestId: nil, retryAfter: nil)
+        await model.load()
+        XCTAssertEqual(model.current.restriction, .profilePrivate)
+
+        // 404 sans code (route pas encore en production) : erreur propre, avec « Réessayer ».
+        fixture.followListError = APIError.http(status: 404, code: nil, message: "", requestId: nil, retryAfter: nil)
+        await model.load()
+        XCTAssertNil(model.current.restriction)
+        XCTAssertNotNil(model.current.errorMessage)
+        XCTAssertFalse(model.current.hasLoaded)
+    }
+
+    func testFollowListPaginatesWithOpaqueCursorAndSkipsDuplicates() async {
+        let fixture = ComposerFeedFixture()
+        fixture.followPages = [
+            SocialFollowPage(people: [
+                SocialFollowPerson(id: "a", name: "A", handle: nil, avatarUrl: nil),
+                SocialFollowPerson(id: "b", name: "B", handle: nil, avatarUrl: nil)
+            ], nextCursor: "page-2"),
+            SocialFollowPage(people: [
+                SocialFollowPerson(id: "b", name: "B", handle: nil, avatarUrl: nil),
+                SocialFollowPerson(id: "c", name: "C", handle: nil, avatarUrl: nil)
+            ], nextCursor: nil)
+        ]
+        let model = FollowListViewModel(
+            route: FollowListRoute(userId: "u1", displayName: "Léa", kind: .following, isSelf: true),
+            service: fixture
+        )
+        await model.load()
+        XCTAssertEqual(model.current.people.map(\.id), ["a", "b"])
+        XCTAssertEqual(model.current.nextCursor, "page-2")
+
+        await model.loadMore()
+        XCTAssertEqual(model.current.people.map(\.id), ["a", "b", "c"])
+        XCTAssertNil(model.current.nextCursor)
+        XCTAssertEqual(fixture.followListCursors, [nil, "page-2"])
+
+        // Fin de liste : plus aucun appel.
+        await model.loadMore()
+        XCTAssertEqual(fixture.followListCursors.count, 2)
+    }
+
+    func testFollowListKeepsLoadedRowsWhenNextPageFails() async {
+        let fixture = ComposerFeedFixture()
+        fixture.followPages = [
+            SocialFollowPage(people: [SocialFollowPerson(id: "a", name: "A", handle: nil, avatarUrl: nil)], nextCursor: "page-2")
+        ]
+        let model = FollowListViewModel(
+            route: FollowListRoute(userId: "u1", displayName: "Léa", kind: .followers, isSelf: false),
+            service: fixture
+        )
+        await model.load()
+        fixture.followListError = APIError.transport("offline")
+        await model.loadMore()
+        XCTAssertEqual(model.current.people.map(\.id), ["a"])
+        XCTAssertTrue(model.current.loadMoreFailed)
+        XCTAssertEqual(model.current.nextCursor, "page-2")
+        XCTAssertNil(model.current.errorMessage)
+    }
+
     private static func post(text: String) -> UnifiedSocialFeedItem? {
         let json = #"{"id":"post-1","kind":"post","author":{"id":"me","name":"Moi"},"text":"\#(text)"}"#
         return try? JSONDecoder.signalQuest.decode(UnifiedSocialFeedItem.self, from: Data(json.utf8))
@@ -184,6 +315,16 @@ private final class ComposerFeedFixture: SocialFeedServicing, @unchecked Sendabl
     var userProfileError: Error = ComposerFixtureError.unused
     func userProfile(userId: String) async throws -> SocialUserProfile { throw userProfileError }
     func toggleFollow(userId: String) async throws -> SocialFollowResult { throw ComposerFixtureError.unused }
+    /// Pages servies dans l'ordre ; une erreur prend le pas quand elle est posée.
+    var followPages: [SocialFollowPage] = []
+    var followListError: Error?
+    var followListCursors: [String?] = []
+    func followList(_ kind: SocialFollowListKind, userId: String, cursor: String?, limit: Int) async throws -> SocialFollowPage {
+        followListCursors.append(cursor)
+        if let followListError { throw followListError }
+        guard !followPages.isEmpty else { throw ComposerFixtureError.unused }
+        return followPages.removeFirst()
+    }
     func userPosts(userId: String, cursor: String?, mine: Bool) async throws -> SocialFeedPage { throw ComposerFixtureError.unused }
     func trendingHashtags() async throws -> [TrendingHashtag] { throw ComposerFixtureError.unused }
     func suggestedUsers() async throws -> [SocialFeedAuthor] { throw ComposerFixtureError.unused }

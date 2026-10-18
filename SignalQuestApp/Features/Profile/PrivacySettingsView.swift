@@ -127,6 +127,16 @@ struct PrivacySettingsView: View {
                 }
                 .accessibilityHint("Ce réglage contrôle les nouvelles demandes de conversation. Les conversations existantes restent accessibles.")
                 .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
+                // Proposé seulement quand le serveur renvoie le réglage : sans lui,
+                // l'enregistrement échouerait à coup sûr.
+                if model.supportsHideFollowLists {
+                    Toggle(isOn: committing($model.hideFollowLists)) {
+                        SQSettingsRowLabel("Masquer mes listes", systemImage: "eye.slash",
+                                           subtitle: String(localized: "Personne d’autre ne voit qui te suit ni qui tu suis. Tes compteurs restent visibles."))
+                    }
+                    .accessibilityIdentifier("privacy.hideFollowLists")
+                    .disabled(!model.loaded || model.isLoadingPrivacy || !model.isSessionCurrent)
+                }
             } header: {
                 Text("Profil public").sqKicker()
             }

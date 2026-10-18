@@ -33,6 +33,10 @@ struct SocialPrivacy: Codable, Equatable, Sendable {
     let shareExactMeasurements: Bool
     let lastSeenVisibility: LastSeenVisibility
     let messageRequestPolicy: MessageRequestPolicy
+    /// « Masquer mes listes » (Abonnés / Abonnements). `nil` = le serveur ne
+    /// l'expose pas (clé absente), ce qui n'est pas la même chose que « faux » :
+    /// l'écran ne propose le réglage que s'il est connu.
+    var hideFollowLists: Bool? = nil
 }
 
 // Le serveur a retiré cette ancienne préférence, puis rétabli une clé de
@@ -48,6 +52,7 @@ extension SocialPrivacy {
         shareExactMeasurements = try values.decodeIfPresent(Bool.self, forKey: .shareExactMeasurements) ?? true
         lastSeenVisibility = try values.decode(LastSeenVisibility.self, forKey: .lastSeenVisibility)
         messageRequestPolicy = try values.decode(MessageRequestPolicy.self, forKey: .messageRequestPolicy)
+        hideFollowLists = try? values.decodeIfPresent(Bool.self, forKey: .hideFollowLists)
     }
 }
 
@@ -59,6 +64,7 @@ struct UpdatePrivacyRequest: Codable, Sendable {
     var shareExactMeasurements: Bool? = nil
     var lastSeenVisibility: LastSeenVisibility? = nil
     var messageRequestPolicy: MessageRequestPolicy? = nil
+    var hideFollowLists: Bool? = nil
 }
 
 struct UserPreferencesPatch: Encodable, Sendable {
@@ -150,7 +156,8 @@ final class PrivacyService: PrivacyServicing {
     func get() async throws -> SocialPrivacy {
         struct Response: Decodable { let settings: SocialPrivacy }
         return try await request(
-            APIEndpoint(path: "/api/social/privacy"),
+            // `include=profile` ajoute `hideFollowLists` ; sans lui la réponse est inchangée.
+            APIEndpoint(path: "/api/social/privacy", query: [URLQueryItem(name: "include", value: "profile")]),
             as: Response.self
         ).settings
     }

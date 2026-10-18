@@ -871,6 +871,82 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(patchBody["shareExactMeasurements"] as? Bool, true)
     }
 
+    func testPrivacyServiceReadsAndWritesHideFollowLists() async throws {
+        let client = APIClient(
+            config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: Self.mockSession()
+        )
+        var getQuery: String?
+        var patchBody: [String: Any] = [:]
+        MockURLProtocol.requestHandler = { request in
+            if request.httpMethod == "PATCH", let body = Self.requestBody(request) {
+                patchBody = (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]
+            } else {
+                getQuery = request.url?.query
+            }
+            let settings = #"{"shareLiveLocationWithFriends":false,"shareRadioDataWithFriends":false,"shareSessionsWithFriends":false,"sharePhotosOnFriendMap":false,"lastSeenVisibility":"none","messageRequestPolicy":"friends_only","hideFollowLists":true}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data("{\"settings\":\(settings)}".utf8))
+        }
+
+        let service = PrivacyService(api: client)
+        let read = try await service.get()
+        XCTAssertEqual(getQuery, "include=profile")
+        XCTAssertEqual(read.hideFollowLists, true)
+
+        _ = try await service.update(UpdatePrivacyRequest(hideFollowLists: false))
+        XCTAssertEqual(patchBody["hideFollowLists"] as? Bool, false)
+        XCTAssertEqual(patchBody.count, 1)
+    }
+
+    /// Sans la clé (réponse d'un serveur plus ancien), le réglage reste inconnu
+    /// (`nil`) : il ne devient pas « faux » en silence.
+    func testPrivacyDecodesMissingHideFollowListsAsUnknown() throws {
+        let json = #"{"shareLiveLocationWithFriends":false,"shareRadioDataWithFriends":false,"shareSessionsWithFriends":false,"sharePhotosOnFriendMap":false,"lastSeenVisibility":"none","messageRequestPolicy":"friends_only"}"#
+        let value = try JSONDecoder().decode(SocialPrivacy.self, from: Data(json.utf8))
+        XCTAssertNil(value.hideFollowLists)
+    }
+
+    func testFollowListRequestUsesPathLimitCursorAndReadsRootCode() async throws {
+        let client = APIClient(
+            config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: Self.mockSession()
+        )
+        var requested: [(path: String, query: [String: String])] = []
+        MockURLProtocol.requestHandler = { request in
+            let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
+            let query = Dictionary(uniqueKeysWithValues: (components?.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+            requested.append((request.url?.path ?? "", query))
+            if request.url?.path.hasSuffix("/following") == true {
+                let response = HTTPURLResponse(url: request.url!, statusCode: 403, httpVersion: nil, headerFields: nil)!
+                return (response, Data(#"{"error":"Ce membre masque ses listes","code":"FOLLOW_LISTS_HIDDEN","requestId":"r-1"}"#.utf8))
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"people":[{"id":"u1","name":null,"handle":"zed","avatarUrl":null,"following":true,"followsMe":false,"friend":false}],"nextCursor":"c2","requestId":"r"}"#.utf8))
+        }
+
+        let service = SocialFeedService(api: client)
+        let page = try await service.followList(.followers, userId: "user-9", cursor: "c1", limit: 80)
+        XCTAssertEqual(requested.first?.path, "/api/users/user-9/followers")
+        XCTAssertEqual(requested.first?.query["cursor"], "c1")
+        // Le serveur plafonne à 50 : on ne demande pas plus.
+        XCTAssertEqual(requested.first?.query["limit"], "50")
+        XCTAssertEqual(page.people.map(\.id), ["u1"])
+        XCTAssertEqual(page.nextCursor, "c2")
+
+        do {
+            _ = try await service.followList(.following, userId: "user-9", cursor: nil, limit: 30)
+            XCTFail("403 attendu")
+        } catch let APIError.http(status, code, _, requestId, _) {
+            XCTAssertEqual(status, 403)
+            XCTAssertEqual(code, "FOLLOW_LISTS_HIDDEN")
+            XCTAssertEqual(requestId, "r-1")
+        }
+        XCTAssertNil(requested.last?.query["cursor"])
+    }
+
     func testInstallationIdentityPersistsDeviceAndPushTokenSeparately() throws {
         let store = InMemoryTokenStore()
         let identity = InstallationIdentity(store: store)
