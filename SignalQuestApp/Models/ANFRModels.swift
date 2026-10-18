@@ -685,7 +685,8 @@ struct ANFRWeekSummary: Decodable, Sendable, Identifiable, Equatable {
         deleted = counts?.value(Int.self, .deleted, 0) ?? 0
         modified = counts?.value(Int.self, .modified, 0) ?? 0
         catchUp = counts?.value(Int.self, .catchUp, 0) ?? 0
-        total = c.value(Int.self, .total, new + added + activated + deleted + modified)
+        // Le `total` du serveur somme les quatre types historiques : `modified` s'y ajoute.
+        total = (c.optional(Int.self, .total) ?? new + added + activated + deleted) + modified
         reoriented = c.optional(Int.self, .reoriented)
     }
 

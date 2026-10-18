@@ -325,6 +325,9 @@ final class ANFRMapViewModelTests: XCTestCase {
         let week = try XCTUnwrap(JSONDecoder().decode(ANFRArchiveWeeks.self, from: Data(json.utf8)).weeks.first)
         XCTAssertEqual(week.count(for: .modified), 3)
         XCTAssertEqual(week.total, 4)
+        let served = #"{"weeks":[{"date":"2026-10-15","counts":{"new":1,"modified":3},"total":1}]}"#
+        let servedWeek = try XCTUnwrap(JSONDecoder().decode(ANFRArchiveWeeks.self, from: Data(served.utf8)).weeks.first)
+        XCTAssertEqual(servedWeek.total, 4, "le total du serveur ne compte pas les antennes repassées en projet")
     }
 
     func testFullStateRelevésAreRecognisedByTheirDate() {
