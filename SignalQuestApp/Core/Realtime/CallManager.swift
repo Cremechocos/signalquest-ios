@@ -1560,7 +1560,8 @@ final class CallManager: NSObject, ObservableObject {
                     "platform": "ios",
                     "deviceId": deviceID,
                     "environment": api.config.environment.rawValue,
-                ]
+                ],
+                responseDeadline: PushNotificationService.signOutDeadline
             )
         } catch {
             // Best-effort : la route DELETE peut ne pas encore exister côté backend.

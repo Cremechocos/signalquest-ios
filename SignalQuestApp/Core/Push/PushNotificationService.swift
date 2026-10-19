@@ -731,7 +731,8 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
                         deviceId: deviceID,
                         environment: api.config.environment.rawValue,
                         revocationSecret: nil
-                    )
+                    ),
+                    responseDeadline: Self.signOutDeadline
                 )
                 if let ownerScopeId { identity.removeRegistration(ownerScopeId: ownerScopeId) }
             } catch {
@@ -747,8 +748,12 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         if firebaseConfigured {
             try? await Messaging.messaging().deleteToken()
         }
-        await retryPendingRevocations()
+        await retryPendingRevocations(deadline: Self.signOutDeadline)
     }
+
+    /// Délai maximal des appels serveur d'une déconnexion : hors ligne, la
+    /// déconnexion locale ne les attend pas ; la révocation reste rejouable.
+    static let signOutDeadline: Duration = .seconds(3)
 
     func acceptsPush(_ info: [AnyHashable: Any]) -> Bool {
         let decision = PushRecipientPolicy.evaluate(info)
@@ -766,13 +771,13 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         return true
     }
 
-    private func retryPendingRevocations() async {
+    private func retryPendingRevocations(deadline: Duration = .seconds(10)) async {
         for record in identity.pendingRevocations() {
             guard record.revocationSecret?.isEmpty == false else {
                 identity.completePendingRevocation(record)
                 continue
             }
-            if await revokeUsingStoredSecret(record) {
+            if await revokeUsingStoredSecret(record, deadline: deadline) {
                 identity.completePendingRevocation(record)
             } else {
                 logger.info("Pending push revocation will be retried later")
@@ -780,7 +785,7 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
         }
     }
 
-    private func revokeUsingStoredSecret(_ record: PushRegistrationRecord) async -> Bool {
+    private func revokeUsingStoredSecret(_ record: PushRegistrationRecord, deadline: Duration = .seconds(10)) async -> Bool {
         guard let secret = record.revocationSecret, !secret.isEmpty else { return false }
         do {
             let _: SuccessResponse = try await api.requestJSON(
@@ -793,7 +798,8 @@ final class PushNotificationService: NSObject, @unchecked Sendable {
                     environment: nil,
                     revocationSecret: secret
                 ),
-                authenticated: false
+                authenticated: false,
+                responseDeadline: deadline
             )
             return true
         } catch {

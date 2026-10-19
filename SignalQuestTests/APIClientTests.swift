@@ -771,6 +771,74 @@ final class APIClientTests: XCTestCase {
         XCTAssertLessThanOrEqual(backoff ?? 99, APIClient.maxAutoRetryDelaySeconds)
     }
 
+    /// CORE-01 : une écriture ne reste plus en attente du réseau pendant des jours.
+    func testEveryRequestGetsADefaultDeadlineAndLargeBodiesGetMoreRoom() throws {
+        var request = URLRequest(url: try XCTUnwrap(URL(string: "https://example.invalid/api/x")))
+        request.httpMethod = "GET"
+        XCTAssertEqual(APIClient.defaultDeadline(for: request), APIClient.readConnectivityBudget)
+        for method in ["POST", "PATCH", "PUT", "DELETE"] {
+            request.httpMethod = method
+            request.httpBody = Data(count: 1_024)
+            XCTAssertEqual(APIClient.defaultDeadline(for: request), APIClient.writeConnectivityBudget, method)
+        }
+        request.httpBody = Data(count: APIClient.largeWriteBodyBytes + 1)
+        XCTAssertEqual(APIClient.defaultDeadline(for: request), APIClient.largeWriteConnectivityBudget)
+    }
+
+    func testWriteThatNeverAnswersEndsWithinItsDeadlineAsATimeout() async throws {
+        let client = APIClient(config: .test, credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+                               session: Self.mockSession())
+        MockURLProtocol.requestHandler = { _ in
+            Thread.sleep(forTimeInterval: 3)
+            throw URLError(.timedOut)
+        }
+        let start = ContinuousClock.now
+        do {
+            try await client.request(APIEndpoint(path: "/api/user/fcm-token", method: .delete, authenticated: false,
+                                                 responseDeadline: .milliseconds(150)))
+            XCTFail("A silent server must not produce a success")
+        } catch let error as APIError {
+            XCTAssertTrue(error.isTimeout, "Le délai tombé doit être reconnaissable : \(error)")
+        }
+        XCTAssertLessThan(start.duration(to: .now), .seconds(2.5))
+    }
+
+    /// CORE-05 : les écrans d'erreur reconnaissent une panne de connexion.
+    func testTransportErrorsKeepTheOfflineAndTimeoutKinds() {
+        let offline = APIError.transport(from: URLError(.notConnectedToInternet))
+        XCTAssertTrue(offline.isOffline)
+        XCTAssertEqual(offline.errorDescription, SQOfflineText.message)
+        XCTAssertEqual(offline.userFacingMessage, SQOfflineText.message)
+        XCTAssertTrue(APIError.transport(from: URLError(.networkConnectionLost)).isOffline)
+
+        let slow = APIError.transport(from: URLError(.timedOut))
+        XCTAssertTrue(slow.isTimeout)
+        XCTAssertFalse(slow.isOffline)
+        XCTAssertNotEqual(slow.errorDescription, SQOfflineText.message)
+
+        let other = APIError.transport(from: URLError(.cannotFindHost))
+        XCTAssertFalse(other.isOffline)
+        XCTAssertFalse(other.isTimeout)
+        XCTAssertFalse(APIError.transport("account-deletion-not-confirmed").isOffline)
+    }
+
+    /// CORE-19 : `Retry-After` en secondes ou en date HTTP.
+    func testRetryAfterReadsSecondsAndHTTPDates() throws {
+        let now = Date(timeIntervalSince1970: 1_792_000_000)
+        XCTAssertEqual(APIClient.retryAfterSeconds("42", now: now), 42)
+        XCTAssertEqual(APIClient.retryAfterSeconds(" 7 ", now: now), 7)
+        XCTAssertNil(APIClient.retryAfterSeconds(nil, now: now))
+        XCTAssertNil(APIClient.retryAfterSeconds("bientôt", now: now))
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        let future = formatter.string(from: now.addingTimeInterval(90))
+        XCTAssertEqual(APIClient.retryAfterSeconds(future, now: now), 90)
+        let past = formatter.string(from: now.addingTimeInterval(-90))
+        XCTAssertEqual(APIClient.retryAfterSeconds(past, now: now), 0)
+    }
+
     func testStagingConfigDetectsProductionServices() {
         let config = AppConfig(
             environment: .staging,

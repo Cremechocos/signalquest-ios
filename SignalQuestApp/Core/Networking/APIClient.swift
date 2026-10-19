@@ -51,7 +51,18 @@ struct CredentialResponse<Value> {
 
 extension CredentialResponse: Sendable where Value: Sendable {}
 
-private final class SingleAttemptTaskDelegate: NSObject, URLSessionTaskDelegate, Sendable {
+/// Sait si la requête attend le retour du réseau (`waitsForConnectivity`) : quand
+/// son délai maximal tombe, l'erreur dit alors « hors ligne » et non « trop lent ».
+private class ConnectivityTaskDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let waiting = OSAllocatedUnfairLock(initialState: false)
+    var isWaitingForConnectivity: Bool { waiting.withLock { $0 } }
+
+    func urlSession(_ session: URLSession, taskIsWaitingForConnectivity task: URLSessionTask) {
+        waiting.withLock { $0 = true }
+    }
+}
+
+private final class SingleAttemptTaskDelegate: ConnectivityTaskDelegate, @unchecked Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask,
                     willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
                     completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
@@ -224,9 +235,10 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             request.httpShouldHandleCookies = false
         }
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
+        let deadline = endpoint.responseDeadline ?? Self.defaultDeadline(for: request)
         let result = try await performSingleAttempt(request, context: context,
             captureCredentials: expectedSession == nil, startsNewSession: !endpoint.authenticated) { request in
-            try await self.session.data(for: request, delegate: SingleAttemptTaskDelegate())
+            try await self.responseData(for: request, deadline: deadline, delegate: SingleAttemptTaskDelegate())
         }
         guard expectedSession?.isCurrent != false else { throw APIError.cancelled }
         guard credentials.isCurrent(result.context) else { throw APIError.cancelled }
@@ -257,20 +269,20 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     /// Contrat JSON à tentative unique, pour les jetons de challenge/reset qui
     /// ne peuvent pas être rejoués après un résultat serveur incertain.
     func requestJSONSingleAttempt<T: Decodable, Body: Encodable>(
-        _ path: String, body: Body, authenticated: Bool = true
+        _ path: String, body: Body, authenticated: Bool = true, responseDeadline: Duration? = nil
     ) async throws -> T {
         let result: CredentialResponse<T> = try await requestJSONSingleAttemptWithCredentials(
-            path, body: body, authenticated: authenticated)
+            path, body: body, authenticated: authenticated, responseDeadline: responseDeadline)
         guard credentials.snapshot().sessionID == result.credentialSessionID else { throw APIError.cancelled }
         return result.value
     }
 
     func requestJSONSingleAttemptWithCredentials<T: Decodable, Body: Encodable>(
-        _ path: String, body: Body, authenticated: Bool = true
+        _ path: String, body: Body, authenticated: Bool = true, responseDeadline: Duration? = nil
     ) async throws -> CredentialResponse<T> {
         let endpoint = APIEndpoint(path: path, method: .post,
             headers: ["Content-Type": "application/json"], body: try encoder.encode(body),
-            authenticated: authenticated, skipsAutoRefresh: true)
+            authenticated: authenticated, skipsAutoRefresh: true, responseDeadline: responseDeadline)
         let result = try await singleAttemptResponse(endpoint)
         guard (200..<300).contains(result.response.statusCode) else {
             throw decodeHTTPError(data: result.data, response: result.response)
@@ -287,7 +299,8 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         method: HTTPMethod = .post,
         body: Body,
         authenticated: Bool = true,
-        idempotencyKey: String? = nil
+        idempotencyKey: String? = nil,
+        responseDeadline: Duration? = nil
     ) async throws -> T {
         let data = try encoder.encode(body)
         return try await request(
@@ -297,7 +310,8 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 headers: ["Content-Type": "application/json"],
                 body: data,
                 authenticated: authenticated,
-                idempotencyKey: idempotencyKey
+                idempotencyKey: idempotencyKey,
+                responseDeadline: responseDeadline
             ),
             as: T.self
         )
@@ -307,7 +321,8 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         _ path: String,
         method: HTTPMethod = .post,
         body: Body,
-        authenticated: Bool = true
+        authenticated: Bool = true,
+        responseDeadline: Duration? = nil
     ) async throws {
         let data = try encoder.encode(body)
         try await request(
@@ -316,7 +331,8 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
                 method: method,
                 headers: ["Content-Type": "application/json"],
                 body: data,
-                authenticated: authenticated
+                authenticated: authenticated,
+                responseDeadline: responseDeadline
             )
         )
     }
@@ -575,7 +591,15 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
     /// token avant de rouvrir le flux (SSE-API-07). Silencieux : un échec de
     /// refresh laisse simplement la reconnexion suivante échouer puis reboucler.
     func refreshSession() async {
-        try? await ensureRefreshed(after: credentials.snapshot())
+        let snapshot = credentials.snapshot()
+        do {
+            try await ensureRefreshed(after: snapshot)
+        } catch APIError.http(let status, let code, _, _, _) where status == 401 || status == 403 {
+            // Un flux temps réel ne doit pas relancer un refresh toutes les 30 s sur
+            // une session morte : le refus du refresh annonce l'expiration (CORE-14).
+            guard credentials.isCurrent(snapshot, matchingRevision: true) else { return }
+            notifySessionExpired(for: snapshot, accountSuspended: code == Self.accountSuspendedCode)
+        } catch {}
     }
 
     /// Diffuse « session expirée » (ROB-02). `NotificationCenter` est thread-safe ;
@@ -658,12 +682,12 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         }
         let data: Data
         let response: URLResponse
-        // Une lecture sans délai propre est plafonnée : la session attend le
+        // Une requête sans délai propre est plafonnée : la session attend le
         // retour du réseau (coupure brève tolérée), mais pas indéfiniment.
-        let deadline = endpoint.responseDeadline
-            ?? ((request.httpMethod ?? "GET") == "GET" ? Self.readConnectivityBudget : nil)
+        let deadline = endpoint.responseDeadline ?? Self.defaultDeadline(for: request)
         do {
-            (data, response) = try await responseData(for: request, deadline: deadline)
+            (data, response) = try await responseData(for: request, deadline: deadline,
+                                                      delegate: ConnectivityTaskDelegate())
             try Task.checkCancellation()
             guard credentials.isCurrent(context) else { throw APIError.cancelled }
         } catch is CancellationError {
@@ -677,7 +701,7 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
             // filtrée par `isCancellation` et JAMAIS affichée comme un échec.
             throw APIError.cancelled
         } catch {
-            throw APIError.transport(error.localizedDescription)
+            throw APIError.transport(from: error)
         }
         guard let http = response as? HTTPURLResponse else {
             return Response(data: data, context: context)
@@ -691,18 +715,31 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
 
     /// Plafond d'une lecture (GET) sans délai propre. Hors couverture, la session
     /// attendait le retour du réseau jusqu'à 7 jours : spinners sans fin en zone
-    /// blanche (MES-04). Large pour ne pas couper une lecture lente mais réelle ;
-    /// les envois n'y sont pas soumis (un gros fichier peut prendre plus longtemps).
+    /// blanche (MES-04). Large pour ne pas couper une lecture lente mais réelle.
     static let readConnectivityBudget: Duration = .seconds(60)
+    /// Plafond d'une écriture (POST, PATCH, PUT, DELETE) sans délai propre : même
+    /// raison que pour les lectures, le bouton ne reste pas figé hors couverture.
+    static let writeConnectivityBudget: Duration = .seconds(45)
+    /// Corps volumineux (photo, média) : l'envoi peut être lent mais réel.
+    static let largeWriteConnectivityBudget: Duration = .seconds(180)
+    static let largeWriteBodyBytes = 256 * 1024
 
-    private func responseData(for request: URLRequest, deadline: Duration?) async throws -> (Data, URLResponse) {
-        guard let deadline else { return try await session.data(for: request) }
+    static func defaultDeadline(for request: URLRequest) -> Duration {
+        if (request.httpMethod ?? "GET") == "GET" { return readConnectivityBudget }
+        return (request.httpBody?.count ?? 0) > largeWriteBodyBytes
+            ? largeWriteConnectivityBudget : writeConnectivityBudget
+    }
+
+    private func responseData(for request: URLRequest, deadline: Duration?,
+                              delegate: ConnectivityTaskDelegate? = nil) async throws -> (Data, URLResponse) {
+        guard let deadline else { return try await session.data(for: request, delegate: delegate) }
         let session = self.session
         return try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group in
-            group.addTask { try await session.data(for: request) }
+            group.addTask { try await session.data(for: request, delegate: delegate) }
             group.addTask {
                 try await Task.sleep(for: deadline)
-                throw URLError(.timedOut)
+                // Toujours en attente du réseau à l'échéance : l'appareil est hors ligne.
+                throw URLError(delegate?.isWaitingForConnectivity == true ? .notConnectedToInternet : .timedOut)
             }
             defer { group.cancelAll() }
             guard let result = try await group.next() else { throw CancellationError() }
@@ -740,12 +777,25 @@ final class APIClient: APIClientProtocol, @unchecked Sendable {
         } catch let urlError as URLError where urlError.code == .cancelled {
             throw APIError.cancelled
         } catch {
-            throw APIError.transport(error.localizedDescription)
+            throw APIError.transport(from: error)
         }
     }
 
+    /// `Retry-After` : un nombre de secondes, ou une date HTTP (RFC 9110) dont on
+    /// calcule l'attente restante (CORE-19).
+    static func retryAfterSeconds(_ header: String?, now: Date = Date()) -> Int? {
+        guard let value = header?.trimmingCharacters(in: .whitespaces), !value.isEmpty else { return nil }
+        if let seconds = Int(value) { return max(0, seconds) }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = formatter.date(from: value) else { return nil }
+        return max(0, Int(date.timeIntervalSince(now).rounded(.up)))
+    }
+
     private func decodeHTTPError(data: Data, response: HTTPURLResponse) -> APIError {
-        let retryAfter = response.value(forHTTPHeaderField: "Retry-After").flatMap(Int.init)
+        let retryAfter = Self.retryAfterSeconds(response.value(forHTTPHeaderField: "Retry-After"))
         let headerRequestId = response.value(forHTTPHeaderField: "X-Request-Id")
         if let decoded = try? decoder.decode(BackendErrorResponse.self, from: data) {
             return .http(

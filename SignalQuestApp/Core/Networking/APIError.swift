@@ -18,6 +18,8 @@ enum APIError: Error, LocalizedError, Equatable {
         case .invalidURL:
             return String(localized: "Adresse invalide. Réessaie plus tard.")
         case .transport:
+            if isOffline { return SQOfflineText.message }
+            if isTimeout { return String(localized: "Le réseau est absent ou trop lent. Réessaie quand tu as du réseau.") }
             return String(localized: "Connexion impossible. Vérifie ta connexion puis réessaie.")
         case .http(let status, let code, let message, _, _):
             return APIError.userFacingMessage(status: status, code: code, serverMessage: message)
@@ -28,6 +30,36 @@ enum APIError: Error, LocalizedError, Equatable {
         case .cancelled:
             return String(localized: "Requête annulée.")
         }
+    }
+
+    // Le code `URLError` reste dans le détail du transport : les écrans d'erreur
+    // distinguent ainsi « hors ligne » (rechargement au retour du réseau) d'une
+    // panne quelconque, sans changer la forme du cas `.transport`.
+    private static let offlineTag = "offline"
+    private static let timeoutTag = "timeout"
+
+    static func transport(from error: Error) -> APIError {
+        guard let url = error as? URLError else { return .transport(error.localizedDescription) }
+        switch url.code {
+        case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff:
+            return .transport("\(offlineTag): \(url.localizedDescription)")
+        case .timedOut:
+            return .transport("\(timeoutTag): \(url.localizedDescription)")
+        default:
+            return .transport(url.localizedDescription)
+        }
+    }
+
+    /// Le réseau est absent (et non une panne du serveur ou un délai dépassé).
+    var isOffline: Bool {
+        if case .transport(let detail) = self { return detail.hasPrefix(Self.offlineTag) }
+        return false
+    }
+
+    /// Aucune réponse dans le délai : réseau absent ou trop lent.
+    var isTimeout: Bool {
+        if case .transport(let detail) = self { return detail.hasPrefix(Self.timeoutTag) }
+        return false
     }
 
     /// Détail technique complet pour les logs — jamais affiché tel quel à l'utilisateur.

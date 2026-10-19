@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import os
 import UserNotifications
 import WidgetKit
 
@@ -235,11 +236,18 @@ final class AuthService: AuthServicing {
 
     // MARK: Login / signup
 
+    /// Connexion, inscription, Apple et 2FA : sans réseau, l'écran rend la main
+    /// avec une erreur claire au lieu d'attendre le retour de la connectivité.
+    private static let interactiveDeadline: Duration = .seconds(25)
+    /// Révocation serveur d'une déconnexion : au mieux, jamais bloquante.
+    private static let logoutDeadline: Duration = PushNotificationService.signOutDeadline
+
     func login(email: String, password: String) async throws -> LoginResponse {
         try await api.requestJSON(
             "/api/auth/login",
             body: LoginRequest(email: email, password: password),
-            authenticated: false
+            authenticated: false,
+            responseDeadline: Self.interactiveDeadline
         )
     }
 
@@ -247,7 +255,8 @@ final class AuthService: AuthServicing {
         try await api.requestJSONSingleAttemptWithCredentials(
             "/api/auth/signup",
             body: SignupRequest(email: email, password: password, name: name, acceptedTerms: acceptedTerms, turnstileToken: turnstileToken),
-            authenticated: false
+            authenticated: false,
+            responseDeadline: Self.interactiveDeadline
         )
     }
 
@@ -260,7 +269,8 @@ final class AuthService: AuthServicing {
         return try await api.requestJSON(
             "/api/auth/apple",
             body: AppleSignInRequest(identityToken: identityToken, fullName: fullName, acceptedTerms: acceptedTerms),
-            authenticated: false
+            authenticated: false,
+            responseDeadline: Self.interactiveDeadline
         )
     }
 
@@ -285,7 +295,8 @@ final class AuthService: AuthServicing {
         try await api.requestJSON(
             "/api/auth/2fa/verify",
             body: TwoFactorVerifyRequest(tempToken: tempToken, code: code),
-            authenticated: false
+            authenticated: false,
+            responseDeadline: Self.interactiveDeadline
         )
     }
 
@@ -352,7 +363,8 @@ final class AuthService: AuthServicing {
         let closing = LocalAccountScope.sessionSnapshot()
         let token = api.credentials.accessToken()
         if let closing, let token {
-            _ = try? await api.performSingleAttempt(APIEndpoint(path: "/api/auth/logout", method: .post),
+            _ = try? await api.performSingleAttempt(
+                APIEndpoint(path: "/api/auth/logout", method: .post, responseDeadline: Self.logoutDeadline),
                 fixedAuthToken: token, expectedSession: closing)
         }
         guard LocalAccountScope.sessionSnapshot() == closing, api.credentials.accessToken() == token else { return }
@@ -958,18 +970,44 @@ final class AuthSessionViewModel: ObservableObject {
 
     func logout() async {
         let closing = LocalAccountScope.sessionSnapshot()
-        // Revoke the push token (while the session is still valid) before the
-        // service tears down credentials and E2EE keys.
-        await AppDelegate.sharedPush?.unregister()
-        guard LocalAccountScope.sessionSnapshot() == closing else { return }
-        // CALL-VOIP-05 : révoque aussi le token VoIP côté serveur pour qu'un autre
-        // compte sur cet appareil ne reçoive pas les pushes VoIP de l'ancien
-        // utilisateur (best-effort, session encore valide ici).
-        await AppDelegate.sharedCallManager?.unregisterVoIPToken()
+        // Révoque le token push (session encore valide) et le token VoIP côté
+        // serveur, pour qu'un autre compte sur cet appareil ne reçoive pas les
+        // pushes de l'ancien utilisateur. Au mieux et plafonné : hors ligne ou
+        // serveur lent, la déconnexion locale ne les attend pas (la révocation
+        // push reste rejouable).
+        let push = Task<Void, Never> { _ = await AppDelegate.sharedPush?.unregister() }
+        let voip = Task<Void, Never> { _ = await AppDelegate.sharedCallManager?.unregisterVoIPToken() }
+        await Self.wait(for: [push, voip], atMost: Self.revocationBudget)
         guard LocalAccountScope.sessionSnapshot() == closing else { return }
         try? await service.logout()
         guard LocalAccountScope.currentUserId == nil else { return }
         state = .loggedOut
+    }
+
+    /// Plafond d'attente des révocations serveur d'une déconnexion (secondes).
+    private static let revocationBudget = 6.0
+
+    /// Attend `tasks` au plus `seconds` ; passé ce délai, elles se poursuivent
+    /// en arrière-plan et l'appelant reprend la main.
+    private static func wait(for tasks: [Task<Void, Never>], atMost seconds: Double) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let resumed = OSAllocatedUnfairLock(initialState: false)
+            let resume: @Sendable () -> Void = {
+                let first = resumed.withLock { done -> Bool in
+                    defer { done = true }
+                    return !done
+                }
+                if first { continuation.resume() }
+            }
+            Task {
+                for task in tasks { await task.value }
+                resume()
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                resume()
+            }
+        }
     }
 }
 
