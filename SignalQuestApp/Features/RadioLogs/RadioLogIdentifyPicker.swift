@@ -21,6 +21,12 @@ struct RadioLogCandidate: Identifiable, Equatable {
     let confidenceScore: Int?
     /// Vrai pour la piste que le serveur a classée en tête.
     let isServerHypothesis: Bool
+    /// Vrai pour l'antenne que l'utilisateur a choisie lui-même sur la carte.
+    var isManualChoice = false
+
+    /// Ni la piste du serveur, ni un choix à la main : l'antenne n'est là que parce
+    /// qu'elle est proche des relevés. Ce n'est pas une identification.
+    var needsVerification: Bool { !isServerHypothesis && !isManualChoice }
 
     var distanceLabel: String? {
         guard let distanceMeters else { return nil }
@@ -38,12 +44,17 @@ final class RadioLogIdentifyPicker: ObservableObject {
     /// La recherche des antennes voisines a échoué (réseau, serveur) : ce n'est
     /// pas « aucune antenne connue », et un nouvel essai a un sens.
     @Published private(set) var searchFailed = false
+    /// La piste du serveur n'a pas pu être demandée (réseau, serveur) : ce n'est
+    /// pas « le serveur n'a aucune piste », et un nouvel essai a un sens.
+    @Published private(set) var hypothesisFailed = false
     /// Échec du dernier envoi seulement (la carte ne doit pas répéter les
     /// messages de la recherche).
     @Published private(set) var submitError: String?
     @Published var selectedId: String?
     @Published private(set) var isSubmitting = false
     private var loadGeneration = UUID()
+    /// Journal lu une seule fois pour toute la file : chaque site n'en filtre que son nœud.
+    private var journalEntries: [RadioLogEntry]?
     /// Anneaux TA du nœud visé — « depuis ce point, le site est à peu près à cette
     /// distance ». Leur intersection le désigne, et c'est ce qui permet de trancher entre
     /// deux antennes voisines. Calculés sur le journal DÉJÀ SYNCHRONISÉ localement : aucun
@@ -76,14 +87,26 @@ final class RadioLogIdentifyPicker: ObservableObject {
     /// Le filtre porte sur le NŒUD, pas sur la cellule : ce sont les relevés du même eNB,
     /// pris d'endroits différents, qui se croisent. Les prendre cellule par cellule
     /// donnerait des cercles trop peu nombreux pour désigner quoi que ce soit.
-    private func loadTaRings(for site: RadioLogSite) {
-        let entries = service.cachedSnapshot().entries.filter { entry in
-            switch site.kind {
-            case .enb: return entry.enb == site.node
-            case .gnb: return entry.gnb == site.node
+    ///
+    /// Le journal est lu et décodé hors du fil principal, une seule fois pour toute la
+    /// file : une chaîne de 50 sites ne le relit pas 50 fois.
+    private func loadTaRings(for site: RadioLogSite) async -> (rings: [TaRingSelection.Ring], discarded: Int, assessment: TaRingSelection.Assessment) {
+        let cached = journalEntries
+        let service = self.service
+        let kind = site.kind
+        let node = site.node
+        let (entries, matching) = await Task.detached(priority: .userInitiated) { () -> ([RadioLogEntry], [RadioLogEntry]) in
+            let all = cached ?? service.cachedSnapshot().entries
+            let matching = all.filter { entry in
+                switch kind {
+                case .enb: return entry.enb == node
+                case .gnb: return entry.gnb == node
+                }
             }
-        }
-        let readings = entries.compactMap { entry -> TaRingSelection.Reading? in
+            return (all, matching)
+        }.value
+        journalEntries = entries
+        let readings = matching.compactMap { entry -> TaRingSelection.Reading? in
             guard let latitude = entry.latitude, let longitude = entry.longitude else { return nil }
             return TaRingSelection.Reading(
                 latitude: latitude,
@@ -97,9 +120,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
         // d'une voisine collées à cette identité). Sur un cas réel, un seul anneau de ce genre
         // déplaçait le site estimé de 2,8 km. Ce qui est écarté est compté, jamais caché.
         let pruned = TaRingSelection.pruneOutliers(TaRingSelection.rings(for: readings))
-        taRings = pruned.kept
-        taDiscardedCount = pruned.discarded.count
-        taAssessment = TaRingSelection.assess(pruned.kept)
+        return (pruned.kept, pruned.discarded.count, TaRingSelection.assess(pruned.kept))
     }
 
     func load(for site: RadioLogSite) async {
@@ -111,11 +132,19 @@ final class RadioLogIdentifyPicker: ObservableObject {
         isLoading = true
         errorMessage = nil
         searchFailed = false
+        hypothesisFailed = false
         candidates = []
         selectedId = nil
+        taRings = []
+        taDiscardedCount = 0
+        taAssessment = .unusable
         defer { if loadGeneration == generation { isLoading = false } }
 
-        loadTaRings(for: site)
+        let ta = await loadTaRings(for: site)
+        guard loadGeneration == generation, !Task.isCancelled else { return }
+        taRings = ta.rings
+        taDiscardedCount = ta.discarded
+        taAssessment = ta.assessment
 
         guard let latitude = site.latitude, let longitude = site.longitude else {
             // Sans position, ni le serveur ni nous ne pouvons proposer quoi que
@@ -136,7 +165,7 @@ final class RadioLogIdentifyPicker: ObservableObject {
         // proposer les antennes de tous les opérateurs que zéro.
         let operatorKey = site.resolvedOperatorKey ?? "ALL"
 
-        async let hypothesisTask = service.hypothesis(for: site)
+        async let hypothesisTask = fetchHypothesis(for: site)
         async let nearbyTask = try? antennas.list(
             bbox: BoundingBox(
                 north: latitude + searchHalfSpan,
@@ -149,10 +178,11 @@ final class RadioLogIdentifyPicker: ObservableObject {
             technologies: []
         )
 
-        let hypothesis = await hypothesisTask
+        let (hypothesis, hypothesisDidFail) = await hypothesisTask
         // `nil` : la recherche a échoué ; `[]` : rien à moins de 3 km.
         let nearbyResult = await nearbyTask
         guard loadGeneration == generation, !Task.isCancelled else { return }
+        hypothesisFailed = hypothesisDidFail
         let nearby = nearbyResult ?? []
 
         var result: [RadioLogCandidate] = []
@@ -211,6 +241,16 @@ final class RadioLogIdentifyPicker: ObservableObject {
         }
     }
 
+    /// La piste du serveur, ou `nil`, avec l'échec dit à part : « pas de piste » et
+    /// « piste indisponible » ne se traitent pas de la même façon.
+    private func fetchHypothesis(for site: RadioLogSite) async -> (RadioLogSiteHypothesis?, Bool) {
+        do {
+            return (try await service.hypothesis(for: site), false)
+        } catch {
+            return (nil, !error.isCancellation)
+        }
+    }
+
     /// Ajoute une antenne choisie À LA MAIN sur la carte et la sélectionne.
     ///
     /// Elle rejoint la liste au lieu de la remplacer : on doit pouvoir revenir
@@ -242,7 +282,8 @@ final class RadioLogIdentifyPicker: ObservableObject {
             address: antenna.address,
             distanceMeters: distance,
             confidenceScore: nil,
-            isServerHypothesis: false
+            isServerHypothesis: false,
+            isManualChoice: true
         )
         candidates.insert(candidate, at: 0)
         selectedId = candidate.id
@@ -258,11 +299,20 @@ final class RadioLogIdentifyPicker: ObservableObject {
     /// Le texte de la confirmation, le même depuis la feuille, la file et la carte :
     /// on publie dans une base commune, l'utilisateur doit lire sur quel site et
     /// savoir qu'il pourra revenir dessus.
-    nonisolated static func confirmationMessage(nodeLabel: String, siteId: String, address: String?) -> String {
+    nonisolated static func confirmationMessage(
+        nodeLabel: String,
+        siteId: String,
+        address: String?,
+        needsVerification: Bool = false
+    ) -> String {
         let base = String(localized: "\(nodeLabel) sera identifié sur le site \(siteId)")
         let place = address.flatMap { $0.isEmpty ? nil : $0 }
         let located = place.map { String(localized: "\(base) — \($0)") } ?? base
-        return located + ".\n\n" + String(localized: "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications ».")
+        // Antenne retenue pour sa seule proximité : on le dit avant que le geste ne parte.
+        let caution = needsVerification
+            ? String(localized: "Ce site est seulement le plus proche de tes relevés : le serveur ne l'a pas reconnu. Vérifie-le avant de confirmer.") + "\n\n"
+            : ""
+        return located + ".\n\n" + caution + String(localized: "Cette identification est publique et attribuée à ton compte. Tu pourras la retirer depuis « Mes identifications ».")
     }
 
     /// Écrit l'identification. Retourne le `siteId` retenu, ou nil en cas d'échec

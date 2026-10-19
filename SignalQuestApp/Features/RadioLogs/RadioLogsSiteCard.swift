@@ -261,18 +261,22 @@ struct RadioLogSiteCard: View {
             if state.isUnidentified {
                 RadioLogStatePill(state: state, checkable: site.isCheckable)
                     .padding(.leading, actionInset)
-                HStack(spacing: M.ctaGap) {
-                    // Le site dans le libellé VoiceOver : la liste en répète des centaines.
-                    RadioLogActionButton(label: "Identifier", action: onIdentify)
-                        .accessibilityLabel(Text("Identifier \(site.nodeLabel)"))
-                        .accessibilityIdentifier("radioLogs.site.identify")
-                    if site.hasCoordinate {
-                        RadioLogActionButton(label: "Carte", ghost: true, systemImage: "map", action: onOpenMap)
-                            .accessibilityLabel(Text("Voir \(site.nodeLabel) sur la carte"))
-                            .accessibilityIdentifier("radioLogs.site.map")
+                // Une ligne tant qu'elle tient ; texte agrandi, les cellules passent
+                // dessous, puis chaque contrôle sur sa ligne, plutôt que de tronquer.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: M.ctaGap) {
+                        identifyActions
+                        Spacer(minLength: 0)
+                        cellsToggle(short: true)
                     }
-                    Spacer(minLength: 0)
-                    cellsToggle(short: true)
+                    VStack(alignment: .leading, spacing: M.ctaGap) {
+                        HStack(spacing: M.ctaGap) { identifyActions }
+                        cellsToggle(short: true)
+                    }
+                    VStack(alignment: .leading, spacing: M.ctaGap) {
+                        identifyActions
+                        cellsToggle(short: true)
+                    }
                 }
                 .padding(.leading, actionInset)
             } else {
@@ -293,6 +297,19 @@ struct RadioLogSiteCard: View {
     }
 
     // MARK: Sous-vues
+
+    @ViewBuilder
+    private var identifyActions: some View {
+        // Le site dans le libellé VoiceOver : la liste en répète des centaines.
+        RadioLogActionButton(label: "Identifier", action: onIdentify)
+            .accessibilityLabel(Text("Identifier \(site.nodeLabel)"))
+            .accessibilityIdentifier("radioLogs.site.identify")
+        if site.hasCoordinate {
+            RadioLogActionButton(label: "Carte", ghost: true, systemImage: "map", action: onOpenMap)
+                .accessibilityLabel(Text("Voir \(site.nodeLabel) sur la carte"))
+                .accessibilityIdentifier("radioLogs.site.map")
+        }
+    }
 
     /// Pastille d'accent quand le site est identifié, neutre sinon. C'est le seul
     /// repère qui se lit au balayage vertical, avant même de lire.

@@ -136,7 +136,12 @@ struct RadioLogIdentifyChainView: View {
                     GradientButton(String(localized: "Passer"), style: .secondary) { advance(skipped: true) }
                         .frame(maxWidth: .infinity)
                         .accessibilityIdentifier("radioLogs.chain.skip")
-                    GradientButton(String(localized: "Identifier ici"), isBusy: picker.isSubmitting) {
+                    GradientButton(
+                        picker.selectedCandidate?.needsVerification == true
+                            ? String(localized: "Vérifier ce site")
+                            : String(localized: "Identifier ici"),
+                        isBusy: picker.isSubmitting
+                    ) {
                         // Sans choix, l'envoi dit lui-même qu'il manque une antenne.
                         if picker.selectedCandidate == nil {
                             Task { await identifyCurrent(site) }
@@ -165,7 +170,12 @@ struct RadioLogIdentifyChainView: View {
             Button("Annuler", role: .cancel) {}
             Button("Identifier") { Task { await identifyCurrent(site) } }
         } message: { candidate in
-            Text(RadioLogIdentifyPicker.confirmationMessage(nodeLabel: site.nodeLabel, siteId: candidate.siteId, address: candidate.address))
+            Text(RadioLogIdentifyPicker.confirmationMessage(
+                nodeLabel: site.nodeLabel,
+                siteId: candidate.siteId,
+                address: candidate.address,
+                needsVerification: candidate.needsVerification
+            ))
         }
         .sheet(isPresented: $showsMapPicker) {
             RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas, customSites: customSites) { siteId in
@@ -246,6 +256,8 @@ struct RadioLogIdentifyChainView: View {
                 candidates: Array(picker.candidates.prefix(3)),
                 selectedId: picker.selectedId,
                 mapLabel: "Choisir sur la carte",
+                hypothesisFailed: picker.hypothesisFailed,
+                onRetryHypothesis: { Task { await picker.load(for: site) } },
                 onSelect: { candidate in
                     picker.selectedId = candidate.id
                     recenterOnSelection()

@@ -22,7 +22,8 @@ protocol RadioLogsServicing: Sendable {
     func scanStream(sites: [RadioLogSite]) -> AsyncStream<[String: RadioLogSiteState]>
     /// Hypothèse de site pour UN site non identifié — charge complète, position
     /// comprise. Coûteuse : réservée à l'écran où l'on regarde un site à la fois.
-    func hypothesis(for site: RadioLogSite) async -> RadioLogSiteHypothesis?
+    /// `nil` = le serveur n'a pas de piste ; une erreur = la piste n'a pas pu être demandée.
+    func hypothesis(for site: RadioLogSite) async throws -> RadioLogSiteHypothesis?
     /// Purge serveur du journal. Jamais gatée côté serveur : révoquer son
     /// consentement doit toujours aboutir.
     func purge() async throws
@@ -410,19 +411,25 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
         // l'unité de la page est le SITE, une cellule ne l'identifie pas.
         if !resolution.matchedRadio.isEmpty { return .unidentified }
 
-        // Compatibilité eNB historique seulement : un gNB sans détail reste
-        // toujours non identifié, même avec `found:true`.
+        // Compatibilité eNB sans détail : un gNB sans détail reste toujours non
+        // identifié, même avec `found:true`. Sans `matchedRadio`, seuls les modes
+        // où le serveur a rapproché le nœud lui-même (DROM, Belgique, Suisse,
+        // Canada, site déclaré) comptent ; tout autre mode (proximité, hypothèse,
+        // site partagé…) propose un site sans identifier le nœud.
         if resolution.requiresUserConfirmation == true { return .unidentified }
-        if let mode = resolution.resolutionMode?.lowercased(), mode.contains("proximity") {
-            return .unidentified
-        }
+        guard let mode = resolution.resolutionMode?.lowercased(),
+              nodeResolutionModes.contains(mode) else { return .unidentified }
         if site.kind == .gnb { return .unidentified }
         return .identified(siteId: siteId)
     }
 
+    /// `resolutionMode` du serveur qui valent identification du nœud même quand la
+    /// réponse n'énumère pas `matchedRadio`.
+    private static let nodeResolutionModes: Set<String> = ["exact_operator", "canada_ised", "community_user_site"]
+
     // MARK: - Hypothèse (charge complète, un site à la fois)
 
-    func hypothesis(for site: RadioLogSite) async -> RadioLogSiteHypothesis? {
+    func hypothesis(for site: RadioLogSite) async throws -> RadioLogSiteHypothesis? {
         guard let latitude = site.latitude, let longitude = site.longitude else { return nil }
         guard let market = site.resolvedMarketCode else { return nil }
         guard let observedPlmn = site.observedPlmn else { return nil }
@@ -457,10 +464,10 @@ final class RadioLogsService: RadioLogsServicing, @unchecked Sendable {
             query.compactMap { item in item.value.map { (item.name, $0) } },
             uniquingKeysWith: { first, _ in first }
         )
-        guard let resolution: QuickIdentifyResolution = try? await api.requestJSON(
+        let resolution: QuickIdentifyResolution = try await api.requestJSON(
             "/api/android/map/identify/quick",
             body: fields
-        ) else { return nil }
+        )
 
         guard resolution.found == true,
               !resolution.isAmbiguousOrUnresolved,

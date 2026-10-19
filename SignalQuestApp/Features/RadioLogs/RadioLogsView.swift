@@ -28,6 +28,7 @@ struct RadioLogsView: View {
     @State private var mapTarget: RadioLogSite?
     @State private var showsPurgeConfirmation = false
     @State private var showsPremiumPaywall = false
+    @State private var tierBeforePaywall: SupporterTier = .free
     @State private var isRefreshingEntitlement = false
 
     init(service: RadioLogsServicing, antennas: AntennasServicing, networkPath: NetworkPathMonitor) {
@@ -138,7 +139,9 @@ struct RadioLogsView: View {
         .task { await model.onAppear() }
         .onDisappear { model.stopScan() }
         .sheet(isPresented: $showsPremiumPaywall, onDismiss: {
-            // Un achat abouti change le droit côté serveur : resynchroniser.
+            // Un achat abouti change le droit côté serveur : resynchroniser. Un simple
+            // retour, sans changement d'abonnement, ne relance rien.
+            guard services.entitlements.confirmedServerTier != tierBeforePaywall else { return }
             Task { await model.refresh() }
         }) {
             NavigationStack {
@@ -554,6 +557,7 @@ struct RadioLogsView: View {
     @ViewBuilder
     private var premiumActions: some View {
         premiumAction("Voir l’abonnement", prominent: true, identifier: "radioLogs.premium.paywall") {
+            tierBeforePaywall = services.entitlements.confirmedServerTier
             showsPremiumPaywall = true
         }
         premiumAction(isRefreshingEntitlement ? "Vérification…" : "Actualiser mon abonnement",
@@ -603,8 +607,9 @@ struct RadioLogsView: View {
                 .padding(.bottom, SQSpace.xxl)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .accessibilityIdentifier("radioLogs.toast")
-                .task {
-                    try? await Task.sleep(nanoseconds: 2_400_000_000)
+                // Un message qui en remplace un autre relance la minuterie.
+                .task(id: toast) {
+                    guard (try? await Task.sleep(nanoseconds: 2_400_000_000)) != nil else { return }
                     model.toast = nil
                 }
         }

@@ -112,7 +112,12 @@ struct RadioLogIdentifySheet: View {
                     }
                 }
             } message: { candidate in
-                Text(RadioLogIdentifyPicker.confirmationMessage(nodeLabel: site.nodeLabel, siteId: candidate.siteId, address: candidate.address))
+                Text(RadioLogIdentifyPicker.confirmationMessage(
+                    nodeLabel: site.nodeLabel,
+                    siteId: candidate.siteId,
+                    address: candidate.address,
+                    needsVerification: candidate.needsVerification
+                ))
             }
             .sheet(isPresented: $showsMapPicker) {
                 RadioLogSiteMapPicker(site: site, picker: picker, antennas: antennas, customSites: customSites) { siteId in
@@ -131,7 +136,7 @@ struct RadioLogIdentifySheet: View {
     private var submitBlock: some View {
         VStack(spacing: SQSpace.sm) {
             GradientButton(
-                picker.selectedCandidate.map { String(localized: "Identifier sur le site \($0.siteId)") } ?? String(localized: "Identifier"),
+                primaryTitle,
                 isBusy: picker.isSubmitting
             ) {
                 showsConfirmation = true
@@ -146,6 +151,15 @@ struct RadioLogIdentifySheet: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, SQSpace.xs)
+    }
+
+    /// Une antenne retenue pour sa seule proximité n'« identifie » pas : le bouton
+    /// invite à la vérifier, la confirmation qui suit le redit.
+    private var primaryTitle: String {
+        guard let candidate = picker.selectedCandidate else { return String(localized: "Identifier") }
+        return candidate.needsVerification
+            ? String(localized: "Vérifier le site \(candidate.siteId)")
+            : String(localized: "Identifier sur le site \(candidate.siteId)")
     }
 
     /// Le résultat, une fois le serveur d'accord : quel nœud, sur quel site.
@@ -276,6 +290,8 @@ struct RadioLogIdentifySheet: View {
                 candidates: picker.candidates,
                 selectedId: picker.selectedId,
                 mapLabel: "Choisir une autre antenne sur la carte",
+                hypothesisFailed: picker.hypothesisFailed,
+                onRetryHypothesis: { Task { await picker.load(for: site) } },
                 onSelect: { candidate in
                     picker.selectedId = candidate.id
                     if let latitude = candidate.latitude, let longitude = candidate.longitude {
@@ -305,6 +321,9 @@ struct RadioLogCandidateCard: View {
     let candidates: [RadioLogCandidate]
     let selectedId: String?
     let mapLabel: LocalizedStringKey
+    /// La piste du serveur n'a pas pu être demandée : on le dit, avec un nouvel essai.
+    var hypothesisFailed = false
+    var onRetryHypothesis: (() -> Void)?
     let onSelect: (RadioLogCandidate) -> Void
     let onOpenMap: () -> Void
 
@@ -314,6 +333,21 @@ struct RadioLogCandidateCard: View {
                 .font(SQFont.display(17, .bold, relativeTo: .headline))
                 .foregroundStyle(P.ink)
                 .sqHeader()
+            if hypothesisFailed {
+                HStack(spacing: SQSpace.sm) {
+                    Text("Piste du serveur indisponible.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let onRetryHypothesis {
+                        Button("Réessayer", action: onRetryHypothesis)
+                            .font(SQFont.body(14, .semibold))
+                            .foregroundStyle(SQColor.accentInk)
+                            .frame(minHeight: 44)
+                            .accessibilityIdentifier("radioLogs.identify.retryHypothesis")
+                    }
+                }
+            }
             VStack(spacing: 0) {
                 ForEach(candidates) { candidate in
                     RadioLogCandidateRow(candidate: candidate, isSelected: selectedId == candidate.id) {
@@ -386,6 +420,15 @@ struct RadioLogCandidateRow: View {
                                 .padding(.horizontal, M.techPaddingH)
                                 .padding(.vertical, M.techPaddingV)
                                 .background(P.accentSoft, in: Capsule(style: .continuous))
+                        } else if isSelected, candidate.needsVerification {
+                            // Texte réel, pas une icône : VoiceOver le lit avec la rangée.
+                            Text("Proximité, à vérifier")
+                                .font(SQFont.body(11, .bold))
+                                .foregroundStyle(OutageTint.degradedInk)
+                                .padding(.horizontal, M.techPaddingH)
+                                .padding(.vertical, M.techPaddingV)
+                                .background(SQColor.warningSoft, in: Capsule(style: .continuous))
+                                .accessibilityIdentifier("radioLogs.identify.proximityBadge")
                         }
                         Spacer(minLength: 0)
                     }

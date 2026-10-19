@@ -96,6 +96,8 @@ final class RadioLogsViewModel: ObservableObject {
     @Published private(set) var checkedCount = 0
     /// Sites que le balayage ne peut pas vérifier (PLMN ou pays manquant).
     @Published private(set) var uncheckableCount = 0
+    /// Sites non identifiés du filtre courant — la matière de la file en chaîne.
+    @Published private(set) var chainCandidates: [RadioLogSite] = []
 
     // MARK: Dépendances
 
@@ -103,7 +105,17 @@ final class RadioLogsViewModel: ObservableObject {
     private let antennas: AntennasServicing
     private let networkPath: NetworkPathMonitor
     private var scanTask: Task<Void, Never>?
+    /// Numéro du balayage en cours : la fin d'un balayage annulé ne doit pas éteindre
+    /// celui qui l'a remplacé (« Tout revérifier » arrête puis relance dans le même tour).
+    private var scanGeneration = 0
     private var nameTasks: Set<String> = []
+    /// Détails de commune/adresse demandés au plus quatre à la fois : un défilement
+    /// rapide ne lance pas des dizaines de requêtes en parallèle.
+    private let maxConcurrentNameLoads = 4
+    private var queuedNames: [RadioLogSite] = []
+    /// Sites dont le détail vient d'échouer, retentés après un délai seulement.
+    private var nameFailures: [String: Date] = [:]
+    private let nameRetryDelay: TimeInterval = 60
 
     init(service: RadioLogsServicing, antennas: AntennasServicing, networkPath: NetworkPathMonitor) {
         self.service = service
@@ -165,6 +177,8 @@ final class RadioLogsViewModel: ObservableObject {
         sections = groupByOperator ? grouped(visible) : [
             Section(id: "all", operatorName: nil, sites: visible, logCount: visible.reduce(0) { $0 + $1.logCount })
         ]
+        // Dans l'ordre d'affichage des sections : la file suit ce que l'on voit.
+        chainCandidates = sections.flatMap(\.sites).filter { (states[$0.id] ?? .unchecked).isUnidentified }
     }
 
     private func matches(_ site: RadioLogSite, query: String) -> Bool {
@@ -234,11 +248,6 @@ final class RadioLogsViewModel: ObservableObject {
 
     func state(of site: RadioLogSite) -> RadioLogSiteState {
         states[site.id] ?? .unchecked
-    }
-
-    /// Sites non identifiés du filtre courant — la matière de la file en chaîne.
-    var chainCandidates: [RadioLogSite] {
-        sections.flatMap(\.sites).filter { state(of: $0).isUnidentified }
     }
 
     private func order(_ lhs: RadioLogSite, _ rhs: RadioLogSite) -> Bool {
@@ -366,6 +375,8 @@ final class RadioLogsViewModel: ObservableObject {
         guard !pending.isEmpty else { return }
         isScanning = true
         isPaused = false
+        scanGeneration += 1
+        let generation = scanGeneration
         // Le flux est créé hors de la tâche et `self` est ré-obtenu à chaque
         // fenêtre : un `guard let self` en tête retiendrait le modèle pendant
         // tout le balayage, même une fois l'écran fermé.
@@ -376,6 +387,8 @@ final class RadioLogsViewModel: ObservableObject {
                 self.states.merge(resolved) { _, new in new }
                 self.rebuild()
             }
+            // Un balayage annulé ou remplacé ne touche plus à l'état du suivant.
+            guard !Task.isCancelled, self?.scanGeneration == generation else { return }
             self?.isScanning = false
         }
     }
@@ -385,6 +398,7 @@ final class RadioLogsViewModel: ObservableObject {
     func stopScan() {
         scanTask?.cancel()
         scanTask = nil
+        scanGeneration += 1
         isScanning = false
     }
 
@@ -412,21 +426,49 @@ final class RadioLogsViewModel: ObservableObject {
     func loadSiteName(for site: RadioLogSite) {
         guard let siteId = state(of: site).siteId, !siteId.isEmpty else { return }
         guard siteNames[site.id] == nil, !nameTasks.contains(site.id) else { return }
+        if let failedAt = nameFailures[site.id], Date().timeIntervalSince(failedAt) < nameRetryDelay { return }
         nameTasks.insert(site.id)
+        // Au-delà du plafond, le site attend son tour : le plus récemment affiché passe d'abord.
+        if nameTasks.count - queuedNames.count > maxConcurrentNameLoads {
+            queuedNames.append(site)
+            return
+        }
+        startNameLoad(for: site, siteId: siteId)
+    }
+
+    private func startNameLoad(for site: RadioLogSite, siteId: String) {
         Task { [weak self] in
             guard let self else { return }
             guard let market = site.resolvedMarketCode else {
-                self.nameTasks.remove(site.id)
+                self.finishNameLoad(site)
                 return
             }
-            let details = try? await self.antennas.details(
-                id: siteId,
-                market: market,
-                operatorName: site.resolvedOperatorKey ?? "ALL"
-            )
-            self.nameTasks.remove(site.id)
+            let details: AntennaDetails?
+            do {
+                details = try await self.antennas.details(
+                    id: siteId,
+                    market: market,
+                    operatorName: site.resolvedOperatorKey ?? "ALL"
+                )
+            } catch {
+                // Un échec n'est pas retenté à chaque apparition de la ligne.
+                self.nameFailures[site.id] = Date()
+                self.finishNameLoad(site)
+                return
+            }
+            self.finishNameLoad(site)
             guard let label = Self.locationLabel(from: details) else { return }
             self.siteNames[site.id] = label
+        }
+    }
+
+    private func finishNameLoad(_ site: RadioLogSite) {
+        nameTasks.remove(site.id)
+        guard let next = queuedNames.popLast() else { return }
+        if let siteId = state(of: next).siteId, !siteId.isEmpty {
+            startNameLoad(for: next, siteId: siteId)
+        } else {
+            finishNameLoad(next)
         }
     }
 

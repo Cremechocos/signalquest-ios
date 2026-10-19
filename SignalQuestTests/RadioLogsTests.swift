@@ -1059,7 +1059,7 @@ final class RadioLogsTests: XCTestCase {
         let service = RadioLogsService(
             api: APIClient(config: .test, session: URLSession(configuration: configuration))
         )
-        _ = await service.hypothesis(for: site)
+        _ = try? await service.hypothesis(for: site)
         let url = try XCTUnwrap(captured.url, "Aucune requête quick-identify capturée")
         XCTAssertEqual(url.path, "/api/android/map/identify/quick")
         XCTAssertEqual(captured.method, "POST")
@@ -1089,6 +1089,18 @@ final class RadioLogsTests: XCTestCase {
             data.append(buffer, count: read)
         }
         return data
+    }
+    /// ANFR-07 : seule la piste du serveur ou un choix à la main est une identification ;
+    /// une antenne proposée par la seule proximité est à vérifier.
+    func testAProximityOnlyCandidateNeedsVerification() {
+        func candidate(server: Bool, manual: Bool) -> RadioLogCandidate {
+            RadioLogCandidate(id: "1", siteId: "1", latitude: nil, longitude: nil, operators: [], technologies: [],
+                              address: nil, distanceMeters: 120, confidenceScore: nil, isServerHypothesis: server,
+                              isManualChoice: manual)
+        }
+        XCTAssertFalse(candidate(server: true, manual: false).needsVerification)
+        XCTAssertFalse(candidate(server: false, manual: true).needsVerification)
+        XCTAssertTrue(candidate(server: false, manual: false).needsVerification)
     }
 }
 
