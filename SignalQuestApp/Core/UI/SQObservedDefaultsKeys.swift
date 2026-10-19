@@ -45,9 +45,9 @@ enum SQObservedDefaultsKeys {
 /// choisit jamais pour un utilisateur : seule la surcharge ci-dessous y puise.
 ///
 /// POURQUOI UN `Bundle` SURCHARGÉ. Les ~5000 chaînes sont lues par SwiftUI
-/// (`Text`, `Button`, titres), par `String(localized:)`, par `NSLocalizedString` et
-/// par UIKit : trois entrées de `Bundle.main`, que `SQAddressBundle` redirige d'un
-/// seul endroit, sans toucher aux appels. Le drapeau est lu à chaque chaîne, d'où un
+/// (`Text`, `Button`, titres), par `NSLocalizedString` et par UIKit : deux entrées
+/// de `Bundle.main`, que `SQAddressBundle` redirige d'un seul endroit, sans toucher
+/// aux appels. `String(localized:)` n'en passe par aucune et reste au tutoiement. Le drapeau est lu à chaque chaîne, d'où un
 /// verrou et non un `UserDefaults`.
 ///
 /// Sans vouvoiement actif, ou si l'app n'est pas en français, ou si une clé n'a
@@ -262,10 +262,10 @@ final class SQAddressStore: ObservableObject {
 /// est actif et que l'app est en français. Aucune propriété stockée : la classe
 /// remplace celle de `Bundle.main` en place (`object_setClass`).
 ///
-/// Trois entrées, car Foundation et SwiftUI n'en partagent pas une seule (mesuré au
+/// Deux entrées, car Foundation et SwiftUI n'en partagent pas une seule (mesuré au
 /// simulateur) : `NSLocalizedString`, UIKit et les alertes passent par
 /// `localizedString(forKey:)`, tout `Text`, `Button` et titre SwiftUI par la version
-/// attribuée, et `String(localized:)` par la méthode à `localizations:` ci-dessous.
+/// attribuée. `String(localized:)` lit le tutoiement.
 private final class SQAddressBundle: Bundle, @unchecked Sendable {
     override func localizedString(forKey key: String, value: String?, table tableName: String?) -> String {
         if SQAddress.isFormal, let formal = SQAddress.formalBundle {
@@ -283,21 +283,5 @@ private final class SQAddressBundle: Bundle, @unchecked Sendable {
             if text.string != marker { return text }
         }
         return super.__localizedAttributedString(forKey: key, value: value, table: tableName)
-    }
-
-    /// Point d'entrée de `String(localized:)` : sans langue demandée il lit les
-    /// localisations préférées du système. On lui donne `fr-x-formal` puis `fr`, de
-    /// sorte qu'une clé sans variante retombe sur le tutoiement. Une langue demandée
-    /// explicitement (`locale:`) est respectée.
-    @objc(_localizedStringForKey:value:table:localizations:)
-    func sqLocalizedString(_ key: NSString, _ value: NSString?, _ table: NSString?, _ localizations: NSArray?) -> NSString {
-        typealias Original = @convention(c) (AnyObject, Selector, NSString, NSString?, NSString?, NSArray?) -> NSString
-        let selector = NSSelectorFromString("_localizedStringForKey:value:table:localizations:")
-        let original = unsafeBitCast(class_getMethodImplementation(Bundle.self, selector), to: Original.self)
-        let requested = localizations as? [String] ?? []
-        if SQAddress.isFormal, SQAddress.appIsFrench, requested.isEmpty || requested.first == "fr" {
-            return original(self, selector, key, value, table, [SQAddress.formalLocalization, "fr"] as NSArray)
-        }
-        return original(self, selector, key, value, table, localizations)
     }
 }

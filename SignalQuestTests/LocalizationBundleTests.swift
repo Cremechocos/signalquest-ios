@@ -66,8 +66,8 @@ final class LocalizationBundleTests: XCTestCase {
         }
     }
 
-    /// En français, le vouvoiement actif redirige `NSLocalizedString` et
-    /// `String(localized:)` vers `fr-x-formal` ; une clé sans variante reste en tutoiement.
+    /// En français, le vouvoiement actif redirige `NSLocalizedString` vers
+    /// `fr-x-formal` ; une clé sans variante reste en tutoiement.
     func testFormalToneRoutesBundleLookups() throws {
         try XCTSkipUnless(SQAddress.appIsFrench, "Test à lancer avec -testLanguage fr")
         SQAddress.install()
@@ -79,7 +79,7 @@ final class LocalizationBundleTests: XCTestCase {
         XCTAssertEqual(Bundle.main.localizedString(forKey: key, value: nil, table: nil), key)
         SQAddress.setFormal(true)
         XCTAssertEqual(Bundle.main.localizedString(forKey: key, value: nil, table: nil), formalText)
-        XCTAssertEqual(String(localized: String.LocalizationValue(key)), formalText)
+        XCTAssertEqual(NSLocalizedString(key, comment: ""), formalText)
         XCTAssertEqual(Bundle.main.localizedString(forKey: "Tutoiement", value: nil, table: nil), "Tutoiement")
     }
 }
