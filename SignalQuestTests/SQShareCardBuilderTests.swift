@@ -242,6 +242,14 @@ final class SQShareCardBuilderTests: XCTestCase {
         XCTAssertNil(network?.barColor)
     }
 
+    /// FAI hors palette : son nom sans barre — le gris de repli se lirait « Free ».
+    func testUnknownIspKeepsItsNameWithoutABar() {
+        let network = model(result(connection: .wifi, operatorName: "OVHcloud")).network
+        XCTAssertEqual(network?.name, "OVHcloud")
+        XCTAssertEqual(network?.detail, "Wi-Fi")
+        XCTAssertNil(network?.barColor)
+    }
+
     /// Sous VPN, l'adresse vue est celle du tunnel : la techno seule, sans barre.
     func testVpnHeaderKeepsTheTechnologyAlone() {
         let network = model(result(connection: .other, operatorName: "M247", technology: .fourG)).network

@@ -187,9 +187,9 @@ enum SQShareCardBuilder {
     /// sa place — `networkOperatorName` le porte en Wi-Fi, résolu par IP/ASN,
     /// donc sans rien révéler du réseau local.
     ///
-    /// Opérateur inconnu, ou lien `.other` (VPN : l'adresse vue est celle du
-    /// tunnel) : la techno seule, sans barre de couleur — on n'attribue pas un
-    /// réseau qu'on ne connaît pas.
+    /// Opérateur hors palette : son nom, sans barre. Opérateur inconnu, ou lien
+    /// `.other` (VPN : l'adresse vue est celle du tunnel) : la techno seule, sans
+    /// barre — on n'attribue pas un réseau qu'on ne connaît pas.
     static func networkLine(for result: SpeedtestRunResult) -> SQShareCardModel.NetworkLine? {
         let link: String?
         switch result.connectionType {
@@ -199,7 +199,11 @@ enum SQShareCardBuilder {
         }
         let operatorName = result.connectionType == .other ? nil : result.networkOperatorName?.shareTrimmed
         if let operatorName {
-            return .init(name: operatorName, detail: link, barColor: UIColor(SQBrand.operatorColor(operatorName)))
+            // Barre seulement pour un opérateur de la palette : le gris ardoise du
+            // repli se lirait « Free » (#6B7280). Hors palette, son nom seul.
+            let colors = SQBrand.operatorColors(operatorName)
+            let isKnown = colors.name != SQBrand.defaultOperator.name
+            return .init(name: operatorName, detail: link, barColor: isKnown ? UIColor(colors.solid) : nil)
         }
         return link.map { .init(name: $0, detail: nil, barColor: nil) }
     }
