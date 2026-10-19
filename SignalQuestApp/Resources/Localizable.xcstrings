@@ -6707,6 +6707,22 @@
         }
       }
     },
+    "Données du %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data from %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Données du %@"
+          }
+        }
+      }
+    },
     "Dont %lld en rattrapage" : {
       "localizations" : {
         "en" : {

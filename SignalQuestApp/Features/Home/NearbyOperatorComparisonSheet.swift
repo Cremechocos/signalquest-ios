@@ -914,17 +914,14 @@ private struct ZoneAntennasSection: View {
     // MARK: Pied
 
     private func footer(_ data: ANFRZoneCompare) -> some View {
-        let source = data.snapshotSource.flatMap { $0.isEmpty ? nil : $0 } ?? "ANFR"
-        let line: String
-        if let date = ANFRText.date(data.snapshotDate) {
-            line = String(localized: "Relevé \(source) du \(date)")
-        } else {
-            line = String(localized: "Relevé \(source)")
-        }
+        // Date du fichier des sites que le serveur a comparé, sans nommer la source (décision du 19/10).
+        let date = ANFRText.date(data.snapshotDate, month: .abbreviated)
         return VStack(alignment: .leading, spacing: SQSpace.xs) {
-            Text(verbatim: line)
-                .font(SQType.caption(.semibold))
-                .foregroundStyle(SQColor.labelSecondary)
+            if let date {
+                Text(verbatim: String(localized: "Données du \(date)"))
+                    .font(SQType.caption(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
             if !data.activeDefinition.isEmpty {
                 Text(verbatim: data.activeDefinition)
                     .font(SQType.caption)
