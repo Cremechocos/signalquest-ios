@@ -2498,22 +2498,6 @@
         }
       }
     },
-    "%lld km" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld km"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld km"
-          }
-        }
-      }
-    },
     "(vide)" : {
       "localizations" : {
         "en" : {
@@ -3748,6 +3732,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Application"
+          }
+        }
+      }
+    },
+    "Appui long sur la carte : compare les opérateurs autour d’un point." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long-press the map to compare carriers around a point."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appui long sur la carte : compare les opérateurs autour d’un point."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appui long sur la carte : comparez les opérateurs autour d’un point."
           }
         }
       }
@@ -5956,18 +5962,18 @@
         }
       }
     },
-    "Chaque barre compte les sites par génération ; un site qui en émet plusieurs compte dans chacune." : {
+    "Chaque colonne compte les sites qui émettent dans la génération ; un site peut compter dans plusieurs. Encadré : l’opérateur qui en a le plus." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Each bar counts sites by generation; a site that transmits in several is counted in each one."
+            "value" : "Each column counts the sites that transmit in that generation; a site can count in several. Outlined: the carrier with the most."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chaque barre compte les sites par génération ; un site qui en émet plusieurs compte dans chacune."
+            "value" : "Chaque colonne compte les sites qui émettent dans la génération ; un site peut compter dans plusieurs. Encadré : l’opérateur qui en a le plus."
           }
         }
       }
@@ -8533,6 +8539,22 @@
         }
       }
     },
+    "Essayer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try it"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Essayer"
+          }
+        }
+      }
+    },
     "Ex. Comparer deux speedtests côte à côte" : {
       "localizations" : {
         "en" : {
@@ -8944,6 +8966,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Glissez le doigt sur la courbe, touchez-la pour l’agrandir."
+          }
+        }
+      }
+    },
+    "Glisse pour déplacer le point. Un appui long ailleurs sur la carte le déplace aussi." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag to move the point. A long press elsewhere on the map moves it too."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glisse pour déplacer le point. Un appui long ailleurs sur la carte le déplace aussi."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glissez pour déplacer le point. Un appui long ailleurs sur la carte le déplace aussi."
           }
         }
       }
@@ -11223,6 +11267,22 @@
         }
       }
     },
+    "Le plus de sites en %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most sites in %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le plus de sites en %@."
+          }
+        }
+      }
+    },
     "Le presse-papiers ne contient rien à coller." : {
       "localizations" : {
         "en" : {
@@ -12473,6 +12533,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Masquer les rattrapages"
+          }
+        }
+      }
+    },
+    "Masquer l’astuce" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide tip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer l’astuce"
           }
         }
       }
@@ -14830,6 +14906,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plus d’emojis"
+          }
+        }
+      }
+    },
+    "Point de comparaison" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparison point"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Point de comparaison"
           }
         }
       }

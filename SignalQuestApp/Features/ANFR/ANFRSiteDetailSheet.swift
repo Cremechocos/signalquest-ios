@@ -679,7 +679,7 @@ private struct ANFRTimelineRow: View {
     }
 }
 
-private extension View {
+extension View {
     /// Garde la carte utilisable derrière la fiche à hauteur moyenne (iOS 16.4+) : on
     /// peut déplacer la carte et toucher un autre repère sans la refermer.
     @ViewBuilder

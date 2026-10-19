@@ -1560,10 +1560,10 @@ private enum MapLocationIssue {
     }
 }
 
-/// Un point choisi par appui long sur la carte.
+/// Un point choisi par appui long sur la carte. Il se déplace sans refermer la feuille.
 private struct ZoneCompareTarget: Identifiable {
     let id = UUID()
-    let coordinate: CLLocationCoordinate2D
+    var coordinate: CLLocationCoordinate2D
 }
 
 struct MapExplorerView: View {
@@ -1647,6 +1647,14 @@ struct MapExplorerView: View {
     @State private var showFilterSheet = false
     /// Point touché longuement sur la carte : ouvre le comparatif d'opérateurs de la zone.
     @State private var zoneCompareTarget: ZoneCompareTarget?
+    /// Rayon montré sur la carte par la comparaison ouverte, et cadrage demandé.
+    @State private var zoneCompareRadiusMeters: Double = Double(ANFRZoneRadius.default.kilometers) * 1000
+    @State private var zoneCompareFitToken = 0
+    /// Marqueur touché pendant la comparaison : ouvert une fois la feuille refermée.
+    @State private var selectionAfterZoneCompare: MapAnnotationPayload?
+    /// Astuce de l'appui long : montrée une fois, à partir de la 2e ouverture de la carte.
+    @AppStorage("map_zone_compare_tip_visits") private var zoneCompareTipVisits = 0
+    @AppStorage("map_zone_compare_tip_done") private var zoneCompareTipDone = false
     /// Feuille Carte : opérateur, couches, fond, pays, légende et registre ANFR.
     @State private var showLayersSheet = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -1703,13 +1711,21 @@ struct MapExplorerView: View {
             ANFRStatsView(service: services.anfr)
         }
         .sheet(item: $selectedItem) { item in MapItemSheet(item: item) }
-        .sheet(item: $zoneCompareTarget) { target in
+        .sheet(item: $zoneCompareTarget, onDismiss: {
+            guard let annotation = selectionAfterZoneCompare else { return }
+            selectionAfterZoneCompare = nil
+            selectAnnotation(annotation)
+        }) { target in
             NearbyOperatorComparisonSheet(
                 metric: .download,
                 latitude: target.coordinate.latitude,
                 longitude: target.coordinate.longitude,
                 startsOnAntennas: true,
-                isChosenPoint: true
+                isChosenPoint: true,
+                onRadiusChange: { meters, committed in
+                    zoneCompareRadiusMeters = meters
+                    if committed { zoneCompareFitToken &+= 1 }
+                }
             )
         }
         .sheet(item: $selectedOutage) { site in
@@ -2069,6 +2085,7 @@ struct MapExplorerView: View {
         .onChangeCompat(of: router.pendingLiveFriendId) { _, _ in openLiveFriendFromRouterIfNeeded() }
         .onAppear {
             viewportRefreshID &+= 1
+            if !zoneCompareTipDone { zoneCompareTipVisits += 1 }
             // L'onglet Carte peut ne pas être monté pendant une modification de zone.
             // Dans ce cas, aucun observer n'a reçu l'événement : vider puis recharger
             // au retour, même si l'emprise et le zoom n'ont pas changé.
@@ -2183,7 +2200,17 @@ struct MapExplorerView: View {
                 if changed { scheduleCurrentViewport() }
             },
             onSelect: selectAnnotation,
-            onLongPress: { coordinate in zoneCompareTarget = ZoneCompareTarget(coordinate: coordinate) }
+            onLongPress: { coordinate in openZoneCompare(at: coordinate) },
+            zoneCompare: zoneCompareTarget.map {
+                MapZoneCompareOverlay(
+                    coordinate: $0.coordinate,
+                    radiusMeters: zoneCompareRadiusMeters,
+                    fitToken: zoneCompareFitToken,
+                    // iPad : la feuille est centrée, elle ne cache pas le bas de la carte.
+                    sheetCover: horizontalSizeClass == .regular ? .none : .half
+                )
+            },
+            onZoneCompareMove: { coordinate in zoneCompareTarget?.coordinate = coordinate }
         )
         // La carte file sous la barre de statut / Dynamic Island (comme Plans),
         // au lieu de laisser une bande systemBackground non-crème en haut (UI-09).
@@ -2482,6 +2509,10 @@ struct MapExplorerView: View {
         VStack(spacing: SQSpace.sm) {
             Spacer()
             marketSwitchNotice
+            if showsZoneCompareTip {
+                zoneCompareTip
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             if showsCoverageKey { coverageFocusBanner }
             MapContextControls(limitMessages: showsDisplayLimit ? model.displayLimitMessages : [])
             mapStatusToast
@@ -2496,6 +2527,61 @@ struct MapExplorerView: View {
         .padding(.bottom, mapControlsBottomInset)
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsCoverageKey)
         .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsDisplayLimit)
+        .animation(SQMotion.resolve(SQMotion.standard, reduceMotion), value: showsZoneCompareTip)
+    }
+
+    /// Rien ne signale l'appui long sur la carte : une astuce, une seule fois, là où le
+    /// comparatif des antennes répond (France et outre-mer), jamais dans les tests UI.
+    private var showsZoneCompareTip: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["SQ_QA_ZONE_COMPARE_TIP"] == "1" { return !zoneCompareTipDone }
+        #endif
+        return !zoneCompareTipDone && zoneCompareTipVisits >= 2 && zoneCompareTarget == nil
+            && !searchIsActive && !AppEnvironment.usesDemoData && !AppEnvironment.resetsMapOnLaunch
+            && ANFRZoneMarket.apiCode(forMarket: model.marketFilter) != nil
+    }
+
+    private var zoneCompareTip: some View {
+        HStack(spacing: SQSpace.sm) {
+            Image(systemName: "hand.tap")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(SQColor.accentInk)
+                .accessibilityHidden(true)
+            Text("Appui long sur la carte : compare les opérateurs autour d’un point.")
+                .font(SQFont.body(14, .semibold))
+                .foregroundStyle(SQColor.label)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                Haptics.light()
+                openZoneCompare(at: mapCenter)
+            } label: {
+                Text("Essayer")
+                    .font(SQType.chip)
+                    .foregroundStyle(SQColor.accentInk)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("map.zoneCompareTip.try")
+            Button {
+                zoneCompareTipDone = true
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Masquer l’astuce"))
+            .accessibilityIdentifier("map.zoneCompareTip.close")
+        }
+        .padding(.leading, SQSpace.md)
+        .padding(.vertical, SQSpace.xxs)
+        .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+        .sqShadowCard()
+        .accessibilityElement(children: .contain)
     }
 
     private var showsCoverageKey: Bool {
@@ -2910,7 +2996,18 @@ struct MapExplorerView: View {
         case .map: showsANFRMap = true
         case .stats: showsANFRStats = true
         case .zoneCompare:
-            if let center = model.viewportCenter { zoneCompareTarget = ZoneCompareTarget(coordinate: center) }
+            if let center = model.viewportCenter { openZoneCompare(at: center) }
+        }
+    }
+
+    /// Ouvre la comparaison sur ce point ; déjà ouverte, elle y déplace son épingle.
+    private func openZoneCompare(at coordinate: CLLocationCoordinate2D) {
+        zoneCompareTipDone = true
+        if zoneCompareTarget != nil {
+            zoneCompareTarget?.coordinate = coordinate
+        } else {
+            zoneCompareRadiusMeters = Double(ANFRZoneRadius.default.kilometers) * 1000
+            zoneCompareTarget = ZoneCompareTarget(coordinate: coordinate)
         }
     }
 
@@ -4620,6 +4717,13 @@ struct MapExplorerView: View {
     private func selectAnnotation(_ annotation: MapAnnotationPayload) {
         Haptics.light()
         if annotation.isSearchPin { return }
+        // Comme sur le web, ouvrir un repère ferme la comparaison : une seule feuille à la fois.
+        // Un groupe ne fait que zoomer, la comparaison reste.
+        if zoneCompareTarget != nil, annotation.clusterCount == nil {
+            selectionAfterZoneCompare = annotation
+            zoneCompareTarget = nil
+            return
+        }
         if let antennaId = annotation.antennaId,
            let site = model.antennas.first(where: { $0.id == antennaId }) {
             selectedAntenna = site

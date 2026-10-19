@@ -18,16 +18,249 @@ final class SQMapKitContainerView: UIView {
         installMap()
     }
 
+    let zoneCompareView = SQZoneCompareOverlayView(frame: .zero)
+
     private func installMap() {
         isAccessibilityElement = false
-        mapView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(mapView)
-        NSLayoutConstraint.activate([
-            mapView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            mapView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            mapView.topAnchor.constraint(equalTo: topAnchor),
-            mapView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
+        for view in [mapView, zoneCompareView] as [UIView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(view)
+            NSLayoutConstraint.activate([
+                view.leadingAnchor.constraint(equalTo: leadingAnchor),
+                view.trailingAnchor.constraint(equalTo: trailingAnchor),
+                view.topAnchor.constraint(equalTo: topAnchor),
+                view.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
+        }
+        zoneCompareView.mapView = mapView
+    }
+}
+
+/// Point et rayon de la comparaison d'opérateurs, tels que la carte doit les montrer.
+struct MapZoneCompareOverlay {
+    /// Ce que la feuille de comparaison cache en bas de la carte : le cercle se cadre au-dessus.
+    enum SheetCover: Equatable {
+        case none
+        case height(CGFloat)
+        case half
+        case full
+    }
+
+    var coordinate: CLLocationCoordinate2D
+    var radiusMeters: Double
+    /// Change à chaque cadrage voulu (ouverture, rayon choisi) ; un déplacement du point ne recadre pas.
+    var fitToken: Int
+    var sheetCover: SheetCover
+}
+
+/// Épingle et cercle de la comparaison, en repère écran au-dessus de la carte plutôt qu'en
+/// overlay MapKit : pendant un glissé, le cercle suit l'épingle à chaque image sans re-rendre
+/// les tuiles. Seule l'épingle reçoit les touchers ; le reste passe à la carte.
+@MainActor
+final class SQZoneCompareOverlayView: UIView {
+    weak var mapView: MKMapView?
+    var onMoveEnd: ((CLLocationCoordinate2D) -> Void)?
+
+    private let circleLayer = CAShapeLayer()
+    private let radiusLabel = UILabel()
+    private let radiusBadge = UIView()
+    private let pin = UIView()
+    private let pinDot = UIView()
+    private var coordinate: CLLocationCoordinate2D?
+    private var radiusMeters: Double = 0
+    /// Centre de l'épingle pendant un glissé, en points de cette vue.
+    private var dragCenter: CGPoint?
+    private var grabOffset: CGPoint = .zero
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setUp()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setUp()
+    }
+
+    private func setUp() {
+        backgroundColor = .clear
+        isHidden = true
+        circleLayer.lineWidth = 2
+        circleLayer.lineDashPattern = [7, 5]
+        layer.addSublayer(circleLayer)
+
+        radiusBadge.layer.cornerRadius = 11
+        radiusBadge.layer.shadowOpacity = 0.14
+        radiusBadge.layer.shadowRadius = 4
+        radiusBadge.layer.shadowOffset = CGSize(width: 0, height: 1)
+        radiusBadge.isAccessibilityElement = false
+        radiusLabel.font = UIFontMetrics(forTextStyle: .caption1)
+            .scaledFont(for: .systemFont(ofSize: 12, weight: .semibold), maximumPointSize: 17)
+        radiusLabel.adjustsFontForContentSizeCategory = true
+        radiusBadge.addSubview(radiusLabel)
+        addSubview(radiusBadge)
+
+        // Cible de 44 pt autour d'un point de 22 pt : le centre du cercle reste lisible.
+        pin.frame = CGRect(x: 0, y: 0, width: 44, height: 44)
+        pinDot.frame = CGRect(x: 11, y: 11, width: 22, height: 22)
+        pinDot.layer.cornerRadius = 11
+        pinDot.layer.borderWidth = 3
+        pinDot.layer.shadowOpacity = 0.28
+        pinDot.layer.shadowRadius = 4
+        pinDot.layer.shadowOffset = CGSize(width: 0, height: 2)
+        pinDot.isUserInteractionEnabled = false
+        pin.addSubview(pinDot)
+        pin.isAccessibilityElement = true
+        pin.accessibilityLabel = String(localized: "Point de comparaison")
+        pin.accessibilityHint = String(localized: "Glisse pour déplacer le point. Un appui long ailleurs sur la carte le déplace aussi.")
+        pin.accessibilityIdentifier = "map.zoneCompare.pin"
+        pin.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:))))
+        addSubview(pin)
+        applyColors()
+    }
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard !isHidden, pin.frame.contains(point) else { return nil }
+        return pin
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        applyColors()
+    }
+
+    private func applyColors() {
+        let accent = (UIColor(named: "BrandRed") ?? .systemRed).resolvedColor(with: traitCollection)
+        circleLayer.strokeColor = accent.cgColor
+        circleLayer.fillColor = accent.withAlphaComponent(0.08).cgColor
+        pinDot.backgroundColor = accent
+        pinDot.layer.borderColor = UIColor.white.cgColor
+        pinDot.layer.shadowColor = UIColor.black.cgColor
+        radiusBadge.backgroundColor = UIColor.systemBackground.resolvedColor(with: traitCollection)
+        radiusBadge.layer.shadowColor = UIColor.black.cgColor
+        radiusLabel.textColor = accent
+    }
+
+    /// Nouvel état voulu par l'écran. Pendant un glissé, le doigt garde la main sur le point.
+    func update(_ overlay: MapZoneCompareOverlay?) {
+        guard let overlay else {
+            coordinate = nil
+            dragCenter = nil
+            isHidden = true
+            return
+        }
+        if dragCenter == nil { coordinate = overlay.coordinate }
+        radiusMeters = overlay.radiusMeters
+        radiusLabel.text = SQUnits.distanceCompact(meters: overlay.radiusMeters)
+        isHidden = false
+        relayout()
+    }
+
+    /// Repositionne l'épingle et le cercle sur la carte (déplacement, zoom, rotation).
+    func relayout() {
+        guard !isHidden, let map = mapView, let coordinate else { return }
+        let center = dragCenter ?? map.convert(coordinate, toPointTo: self)
+        let centerCoordinate = dragCenter.map { map.convert($0, toCoordinateFrom: self) } ?? coordinate
+        let rect = Self.screenRect(center: centerCoordinate, radiusMeters: radiusMeters, map: map, in: self)
+        // Le cercle se recentre sur le point écran exact, pour qu'il ne flotte pas sous le doigt.
+        let circle = CGRect(x: center.x - rect.width / 2, y: center.y - rect.height / 2, width: rect.width, height: rect.height)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        circleLayer.path = UIBezierPath(ovalIn: circle).cgPath
+        CATransaction.commit()
+        pin.center = center
+        radiusLabel.sizeToFit()
+        let badge = CGSize(width: radiusLabel.bounds.width + 16, height: max(22, radiusLabel.bounds.height + 6))
+        radiusBadge.bounds = CGRect(origin: .zero, size: badge)
+        radiusLabel.center = CGPoint(x: badge.width / 2, y: badge.height / 2)
+        radiusBadge.center = CGPoint(x: circle.midX, y: circle.minY)
+        // Un cercle plus petit que l'épingle n'a pas d'étiquette lisible.
+        radiusBadge.isHidden = circle.width < 60
+    }
+
+    /// Rectangle écran d'un cercle géographique : même projection que `MKCircle`.
+    static func screenRect(center: CLLocationCoordinate2D, radiusMeters: Double, map: MKMapView, in view: UIView) -> CGRect {
+        let origin = MKMapPoint(center)
+        let radius = radiusMeters * MKMapPointsPerMeterAtLatitude(center.latitude)
+        let mapRect = MKMapRect(x: origin.x - radius, y: origin.y - radius, width: radius * 2, height: radius * 2)
+        return map.convert(MKCoordinateRegion(mapRect), toRectTo: view)
+    }
+
+    @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {
+        guard let map = mapView else { return }
+        let location = recognizer.location(in: self)
+        switch recognizer.state {
+        case .began:
+            grabOffset = CGPoint(x: pin.center.x - location.x, y: pin.center.y - location.y)
+            dragCenter = pin.center
+            Haptics.light()
+            if !UIAccessibility.isReduceMotionEnabled {
+                UIView.animate(withDuration: 0.15) { self.pinDot.transform = CGAffineTransform(scaleX: 1.25, y: 1.25) }
+            }
+        case .changed:
+            dragCenter = CGPoint(x: location.x + grabOffset.x, y: location.y + grabOffset.y)
+            relayout()
+        case .ended, .cancelled, .failed:
+            let end = dragCenter ?? pin.center
+            dragCenter = nil
+            UIView.animate(withDuration: UIAccessibility.isReduceMotionEnabled ? 0 : 0.15) { self.pinDot.transform = .identity }
+            let moved = map.convert(end, toCoordinateFrom: self)
+            guard recognizer.state == .ended, CLLocationCoordinate2DIsValid(moved) else {
+                relayout()
+                return
+            }
+            coordinate = moved
+            relayout()
+            Haptics.medium()
+            onMoveEnd?(moved)
+        default:
+            break
+        }
+    }
+
+    private var pendingFit: DispatchWorkItem?
+
+    /// Le cadrage attend la fin de l'arrivée de la feuille : pendant sa montée, MapKit
+    /// interrompt l'animation et ne garde que le recentrage, pas le zoom. Deux demandes
+    /// rapprochées (ouverture puis rayon) n'en font qu'une.
+    func scheduleFit(_ overlay: MapZoneCompareOverlay) {
+        pendingFit?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.fit(overlay, animated: !UIAccessibility.isReduceMotionEnabled)
+        }
+        pendingFit = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work)
+    }
+
+    /// Cadre le cercle dans la partie de carte que la feuille laisse visible.
+    func fit(_ overlay: MapZoneCompareOverlay, animated: Bool) {
+        guard let map = mapView, map.bounds.height > 0 else { return }
+        let height = map.bounds.height
+        let covered: CGFloat
+        switch overlay.sheetCover {
+        case .none: covered = 0
+        case .height(let value): covered = value
+        case .half: covered = height / 2
+        case .full: return
+        }
+        // Sous la barre de recherche en haut, au-dessus de la feuille en bas, avec une marge.
+        let top = map.safeAreaInsets.top + 76
+        let bottom = covered + 24
+        let side: CGFloat = 28
+        let visibleHeight = height - top - bottom
+        let visibleWidth = map.bounds.width - side * 2
+        guard visibleHeight > 120, visibleWidth > 120 else { return }
+        // Rectangle de carte complet calculé à la main : avec de grandes marges,
+        // `setVisibleMapRect(_:edgePadding:)` recentrait sans zoomer.
+        let origin = MKMapPoint(overlay.coordinate)
+        let diameter = overlay.radiusMeters * 2 * MKMapPointsPerMeterAtLatitude(overlay.coordinate.latitude)
+        let perPoint = diameter / Double(min(visibleHeight, visibleWidth))
+        let width = Double(map.bounds.width) * perPoint
+        let fullHeight = Double(height) * perPoint
+        // Le centre du cercle tombe au milieu de la bande visible, pas au milieu de l'écran.
+        let circleY = Double(top + visibleHeight / 2) * perPoint
+        let rect = MKMapRect(x: origin.x - width / 2, y: origin.y - circleY, width: width, height: fullHeight)
+        map.setVisibleMapRect(rect, animated: animated)
     }
 }
 
@@ -53,6 +286,10 @@ struct MapKitMapView: UIViewRepresentable {
     let onSelect: (MapAnnotationPayload) -> Void
     /// Appui long sur un fond de carte (hors marqueur) : le point touché.
     var onLongPress: ((CLLocationCoordinate2D) -> Void)? = nil
+    /// Point et rayon de la comparaison d'opérateurs ouverte ; `nil` quand elle est fermée.
+    var zoneCompare: MapZoneCompareOverlay? = nil
+    /// Fin d'un glissé de l'épingle de comparaison.
+    var onZoneCompareMove: ((CLLocationCoordinate2D) -> Void)? = nil
     @AppStorage(MapBackdrop.storageKey) private var backdropRaw = MapBackdrop.applePlan.rawValue
     var backdrop: MapBackdrop { MapBackdrop.resolve(backdropRaw) }
 
@@ -101,6 +338,7 @@ struct MapKitMapView: UIViewRepresentable {
         longPress.minimumPressDuration = 0.6
         map.addGestureRecognizer(longPress)
         context.coordinator.installSpeedtestAccessibility(on: map, in: container)
+        context.coordinator.zoneCompareView = container.zoneCompareView
         let region = MKCoordinateRegion(center: center, span: Coordinator.span(forZoom: zoom, width: Self.referenceWidth))
         map.setRegion(region, animated: false)
         context.coordinator.lastAppliedCenter = center
@@ -126,6 +364,14 @@ struct MapKitMapView: UIViewRepresentable {
         if context.coordinator.lastViewportRefreshID != viewportRefreshID {
             context.coordinator.lastViewportRefreshID = viewportRefreshID
             (map as? SQViewportMapView)?.requestViewportDelivery()
+        }
+        container.zoneCompareView.onMoveEnd = onZoneCompareMove
+        container.zoneCompareView.update(zoneCompare)
+        if let zoneCompare, context.coordinator.lastZoneCompareFitToken != zoneCompare.fitToken {
+            context.coordinator.lastZoneCompareFitToken = zoneCompare.fitToken
+            container.zoneCompareView.scheduleFit(zoneCompare)
+        } else if zoneCompare == nil {
+            context.coordinator.lastZoneCompareFitToken = nil
         }
     }
 
@@ -155,6 +401,8 @@ struct MapKitMapView: UIViewRepresentable {
         var tileOverlay: MKTileOverlay?
         var lastRenderVersion = -1
         var lastViewportRefreshID = -1
+        weak var zoneCompareView: SQZoneCompareOverlayView?
+        var lastZoneCompareFitToken: Int?
         private var isMovingCamera = false
         /// Dernier cap de carte propagé aux marqueurs. Les lobes d'azimut sont
         /// dessinés en repère écran : ils doivent contre-tourner quand la carte
@@ -440,20 +688,36 @@ struct MapKitMapView: UIViewRepresentable {
             if let best { onSelect(speedtestPayload(from: best)) }
         }
 
+        /// Point retenu au début d'un appui long, remis au lever du doigt.
+        private var longPressCoordinate: CLLocationCoordinate2D?
+
         /// Un appui long sur le fond de carte donne le point à comparer. Sur un marqueur, la
-        /// sélection reste seule maîtresse : on ne répond qu'au fond.
+        /// sélection reste seule maîtresse : on ne répond qu'au fond. Le point part au lever du
+        /// doigt : un doigt encore posé interrompt le cadrage animé de la carte sur le cercle.
         @objc func handleLongPress(_ recognizer: UILongPressGestureRecognizer) {
-            guard recognizer.state == .began, let map = recognizer.view as? MKMapView, let onLongPress else { return }
-            let point = recognizer.location(in: map)
-            var hit = map.hitTest(point, with: nil)
-            while let view = hit {
-                if view is MKAnnotationView || view is MKCompassButton { return }
-                hit = view.superview
+            guard let map = recognizer.view as? MKMapView, let onLongPress else { return }
+            switch recognizer.state {
+            case .began:
+                longPressCoordinate = nil
+                let point = recognizer.location(in: map)
+                var hit = map.hitTest(point, with: nil)
+                while let view = hit {
+                    if view is MKAnnotationView || view is MKCompassButton { return }
+                    hit = view.superview
+                }
+                let coordinate = map.convert(point, toCoordinateFrom: map)
+                guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+                Haptics.medium()
+                longPressCoordinate = coordinate
+            case .ended:
+                guard let coordinate = longPressCoordinate else { return }
+                longPressCoordinate = nil
+                onLongPress(coordinate)
+            case .cancelled, .failed:
+                longPressCoordinate = nil
+            default:
+                break
             }
-            let coordinate = map.convert(point, toCoordinateFrom: map)
-            guard CLLocationCoordinate2DIsValid(coordinate) else { return }
-            Haptics.medium()
-            onLongPress(coordinate)
         }
 
         func speedtestPayload(from speedtest: SpeedtestFeature) -> MapAnnotationPayload {
@@ -577,6 +841,7 @@ struct MapKitMapView: UIViewRepresentable {
 
         func mapViewDidChangeVisibleRegion(_ map: MKMapView) {
             applyMapHeading(on: map)
+            zoneCompareView?.relayout()
         }
 
         func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {

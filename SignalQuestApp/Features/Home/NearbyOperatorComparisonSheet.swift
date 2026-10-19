@@ -16,6 +16,9 @@ struct NearbyOperatorComparisonSheet: View {
     var radiusMeters: Int = 1000
     /// Point choisi sur la carte plutôt que ta position.
     var isChosenPoint = false
+    /// Ouverte depuis la carte : rayon montré sur la carte (mètres ; `true` = rayon arrêté,
+    /// `false` = curseur en cours de glissé), et carte utilisable derrière la feuille.
+    var onRadiusChange: ((Double, Bool) -> Void)?
 
     @EnvironmentObject private var services: AppServices
     @Environment(\.dismiss) private var dismiss
@@ -29,27 +32,32 @@ struct NearbyOperatorComparisonSheet: View {
     @StateObject private var zone: ZoneCompareModel
 
     init(metric: NearbyOperatorMetric, latitude: Double, longitude: Double, radiusMeters: Int = 1000,
-         startsOnAntennas: Bool = false, isChosenPoint: Bool = false) {
+         startsOnAntennas: Bool = false, isChosenPoint: Bool = false,
+         onRadiusChange: ((Double, Bool) -> Void)? = nil) {
         _tab = State(initialValue: startsOnAntennas ? .antennas : (metric == .signal ? .signal : .download))
         self.latitude = latitude
         self.longitude = longitude
         self.radiusMeters = radiusMeters
         self.isChosenPoint = isChosenPoint
+        self.onRadiusChange = onRadiusChange
         _zone = StateObject(wrappedValue: ZoneCompareModel(latitude: latitude, longitude: longitude))
     }
 
     private var metric: NearbyOperatorMetric { tab == .signal ? .signal : .download }
 
-    /// Une requête ANFR par rayon, par détail de bandes et par relance ; changer de clé annule la précédente.
+    /// Une requête par point, par rayon, par détail de bandes et par relance ; changer de clé annule la précédente.
     private struct TaskKey: Equatable {
         let tab: Tab
+        let latitude: Double
+        let longitude: Double
         let radius: ANFRZoneRadius
         let bands: Bool
         let reload: Int
     }
 
     private var taskKey: TaskKey {
-        TaskKey(tab: tab, radius: zone.radius, bands: zone.wantsBands, reload: zone.reloadToken)
+        TaskKey(tab: tab, latitude: latitude, longitude: longitude, radius: zone.radius,
+                bands: zone.wantsBands, reload: zone.reloadToken)
     }
 
     private var maxValue: Int { max(stats.map(\.value).max() ?? 1, 1) }
@@ -61,7 +69,9 @@ struct NearbyOperatorComparisonSheet: View {
                 header
                 metricPicker
                 if tab == .antennas {
-                    ZoneAntennasSection(model: zone)
+                    ZoneAntennasSection(model: zone) { kilometers in
+                        onRadiusChange?(Double(kilometers) * 1000, false)
+                    }
                 } else if !loaded {
                     SQSpinner()
                         .frame(maxWidth: .infinity)
@@ -96,15 +106,26 @@ struct NearbyOperatorComparisonSheet: View {
             .padding(.bottom, SQSpace.xl)
         }
         .presentationDetents([.medium, .large])
+        .modifier(MapBackgroundInteraction(enabled: onRadiusChange != nil))
         .sqSheet()
         .task(id: taskKey) {
             if tab == .antennas {
                 zone.attach(service: services.anfr, markets: services.markets)
+                zone.move(latitude: latitude, longitude: longitude)
                 await zone.load()
             } else {
                 await load()
             }
         }
+        .onAppear { reportRadius() }
+        .onChangeCompat(of: tab) { _, _ in reportRadius() }
+        .onChangeCompat(of: zone.radius) { _, _ in reportRadius() }
+    }
+
+    /// Le cercle de la carte suit le rayon de l'onglet : sites ANFR (20 à 100 km) ou mesures (1 km).
+    private func reportRadius() {
+        let meters = tab == .antennas ? Double(zone.radius.kilometers) * 1000 : Double(radiusMeters)
+        onRadiusChange?(meters, true)
     }
 
     private func load() async {
@@ -338,12 +359,14 @@ final class ZoneCompareModel: ObservableObject {
         case outOfMarket
     }
 
-    let latitude: Double
-    let longitude: Double
+    private(set) var latitude: Double
+    private(set) var longitude: Double
     @Published var radius: ANFRZoneRadius = .default
     @Published var wantsBands = false
     @Published private(set) var reloadToken = 0
     @Published private(set) var phase: Phase = .loading
+    /// Nouveau point ou nouveau rayon : les chiffres affichés restent, estompés, jusqu'à la réponse.
+    @Published private(set) var isRefreshing = false
     @Published private(set) var bandsLoading = false
     @Published private(set) var bandsFailed = false
     @Published private(set) var marketEntry: MarketRegistryEntry?
@@ -352,8 +375,9 @@ final class ZoneCompareModel: ObservableObject {
     private var markets: MarketRegistryServicing?
     private var resolution: Resolution?
     private var cache: [String: ANFRZoneCompare] = [:]
-    /// Rayon des chiffres affichés : le détail par bande se charge sans vider la liste tant qu’il le partage.
+    /// Rayon et point des chiffres affichés : le détail par bande se charge sans vider la liste tant qu’il les partage.
     private var shownRadius: ANFRZoneRadius?
+    private var shownPoint: [Double]?
 
     init(latitude: Double, longitude: Double) {
         self.latitude = latitude
@@ -372,6 +396,14 @@ final class ZoneCompareModel: ObservableObject {
         reloadToken += 1
     }
 
+    /// Point déplacé sur la carte. Le marché se relit : le point a pu changer de territoire.
+    func move(latitude: Double, longitude: Double) {
+        guard latitude != self.latitude || longitude != self.longitude else { return }
+        self.latitude = latitude
+        self.longitude = longitude
+        resolution = nil
+    }
+
     // MARK: Règles pures (testées)
 
     /// Un échec d’appel vu par l’écran. `nil` : annulation, jamais affichée comme un échec.
@@ -383,6 +415,18 @@ final class ZoneCompareModel: ObservableObject {
         case (422, "OUT_OF_MARKET"): return .outOfMarket
         default: return .failed
         }
+    }
+
+    /// Pour chaque opérateur, les générations où il a le plus de sites de la zone (ex æquo compris ;
+    /// une génération que personne n'émet n'a pas de meilleur).
+    static func leaders(_ rows: [ANFRZoneOperator]) -> [String: Set<String>] {
+        var result: [String: Set<String>] = [:]
+        for label in ["2G", "3G", "4G", "5G"] {
+            let counts = rows.map { row in (row.key, row.generations.ordered.first { $0.label == label }?.count ?? 0) }
+            guard let best = counts.map(\.1).max(), best > 0 else { continue }
+            for (key, count) in counts where count == best { result[key, default: []].insert(label) }
+        }
+        return result
     }
 
     /// Même case de grille serveur et même rayon : même réponse.
@@ -406,8 +450,8 @@ final class ZoneCompareModel: ObservableObject {
         }
         let market: String
         switch resolved {
-        case .noAntennaData: phase = .noAntennaData; return
-        case .outOfMarket: phase = .outOfMarket; return
+        case .noAntennaData: isRefreshing = false; phase = .noAntennaData; return
+        case .outOfMarket: isRefreshing = false; phase = .outOfMarket; return
         case .supported(let code): market = code
         }
 
@@ -421,10 +465,15 @@ final class ZoneCompareModel: ObservableObject {
             return
         }
 
-        let keepsList = bands && shownRadius == radius && showsList
+        // Seul le détail par bande manque : la liste reste nette. Autre point ou autre rayon :
+        // la liste reste aussi, estompée, plutôt qu'un écran de chargement à chaque geste.
+        let keepsList = bands && shownRadius == radius && shownPoint == [latitude, longitude] && showsList
         if keepsList {
             bandsLoading = true
             bandsFailed = false
+        } else if showsList {
+            bandsLoading = false
+            isRefreshing = true
         } else {
             bandsLoading = false
             phase = .loading
@@ -448,6 +497,7 @@ final class ZoneCompareModel: ObservableObject {
         } catch {
             guard !Task.isCancelled, let failure = Self.phase(for: error) else { return }
             bandsLoading = false
+            isRefreshing = false
             if keepsList { bandsFailed = true } else { phase = failure }
         }
     }
@@ -459,8 +509,10 @@ final class ZoneCompareModel: ObservableObject {
 
     private func show(_ result: ANFRZoneCompare, radius: ANFRZoneRadius) {
         shownRadius = radius
+        shownPoint = [latitude, longitude]
         bandsFailed = false
         bandsLoading = false
+        isRefreshing = false
         phase = .loaded(result)
     }
 
@@ -481,10 +533,10 @@ final class ZoneCompareModel: ObservableObject {
 /// Contenu de l’onglet Antennes : rayon, total de la zone, une rangée par opérateur, pied de relevé.
 private struct ZoneAntennasSection: View {
     @ObservedObject var model: ZoneCompareModel
+    /// Rayon en cours de glissé, pour que la carte redessine son cercle sans attendre le relâcher.
+    var onRadiusPreview: (Int) -> Void = { _ in }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .caption) private var legendMinWidth: CGFloat = 74
-    @State private var animate = false
     /// Position du curseur pendant un glissé ; `nil` = suit le rayon du modèle.
     @State private var sliderIndex: Double?
     @State private var isDraggingRadius = false
@@ -501,7 +553,6 @@ private struct ZoneAntennasSection: View {
             }
         case .loaded(let data):
             loadedContent(data)
-                .onAppear { reveal() }
         case .noAntennaData:
             // Canada, Belgique, Suisse et collectivités : des antennes existent ailleurs dans
             // l'app, mais le comparatif de zone ne les lit pas encore.
@@ -528,11 +579,6 @@ private struct ZoneAntennasSection: View {
         }
     }
 
-    private func reveal() {
-        animate = false
-        withAnimation(SQMotion.resolve(.easeOut(duration: 0.55), reduceMotion)) { animate = true }
-    }
-
     private func loadedContent(_ data: ANFRZoneCompare) -> some View {
         let rows = data.operators.filter { $0.key.uppercased() != "ALL" }
         return VStack(alignment: .leading, spacing: SQSpace.md) {
@@ -545,15 +591,17 @@ private struct ZoneAntennasSection: View {
                     systemImage: "chart.bar.xaxis"
                 )
             } else {
+                let leaders = ZoneCompareModel.leaders(rows)
                 VStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, item in
                         if index > 0 { Divider().overlay(SQColor.separator) }
-                        operatorRow(item, in: data)
+                        operatorRow(item, leads: leaders[item.key] ?? [])
                     }
                 }
                 .padding(.horizontal, SQSpace.md)
                 .sqSurface(SQColor.surfaceMuted, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
-                Text("Chaque barre compte les sites par génération ; un site qui en émet plusieurs compte dans chacune.")
+                .opacity(model.isRefreshing ? 0.5 : 1)
+                Text("Chaque colonne compte les sites qui émettent dans la génération ; un site peut compter dans plusieurs. Encadré : l’opérateur qui en a le plus.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -589,25 +637,13 @@ private struct ZoneAntennasSection: View {
             .accessibilityLabel(Text("Rayon"))
             .accessibilityValue(Text(verbatim: "\(shownKilometers)\u{00A0}km"))
             .accessibilityIdentifier("home.compare.radius.slider")
-            .onChange(of: sliderIndex) { _ in
+            .onChange(of: sliderIndex) { index in
+                if let index { onRadiusPreview(steps[min(max(Int(index), 0), steps.count - 1)]) }
                 // VoiceOver ajuste la valeur sans glissé : on l'applique tout de suite.
                 if !isDraggingRadius { commitRadius() }
             }
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: SQSpace.sm))
-                : AnyLayout(HStackLayout(spacing: SQSpace.sm))
-            layout {
-                ForEach(ANFRZoneRadius.presets) { option in
-                    // Espace insécable : « 20 km » ne se coupe pas entre le nombre et l’unité.
-                    SQChip(label: String(localized: "\(option.kilometers)\u{00A0}km"), isSelected: model.radius == option) {
-                        sliderIndex = nil
-                        guard model.radius != option else { return }
-                        model.radius = option
-                    }
-                    .accessibilityIdentifier("home.compare.radius.\(option.kilometers)")
-                }
-                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
-            }
+            // Plus de pastilles 20 · 50 · 100 km : le curseur couvre toute l'échelle et la place
+            // gagnée laisse voir les chiffres à mi-hauteur de feuille (demande du 19/10).
         }
         .accessibilityElement(children: .contain)
     }
@@ -625,9 +661,12 @@ private struct ZoneAntennasSection: View {
     private func summary(_ data: ANFRZoneCompare) -> some View {
         let radius = data.radiusKm > 0 ? data.radiusKm : model.radius.kilometers
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
-            Text("Sites en service dans \(radius) km")
-                .font(SQType.callout)
-                .foregroundStyle(SQColor.ink2)
+            HStack(spacing: SQSpace.sm) {
+                Text("Sites en service dans \(radius) km")
+                    .font(SQType.callout)
+                    .foregroundStyle(SQColor.ink2)
+                if model.isRefreshing { SQSpinner() }
+            }
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 Text(verbatim: data.totalActive.formatted())
                     .font(SQFont.display(32, .bold))
@@ -639,21 +678,8 @@ private struct ZoneAntennasSection: View {
                         .foregroundStyle(SQColor.labelSecondary)
                 }
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: legendMinWidth), alignment: .leading)], alignment: .leading, spacing: SQSpace.xs) {
-                ForEach(data.totalByGeneration.ordered, id: \.label) { item in
-                    HStack(spacing: SQSpace.xs2) {
-                        Circle()
-                            .fill(SQNetworkColors.generationChartColor(item.label))
-                            .frame(width: 8, height: 8)
-                            .accessibilityHidden(true)
-                        Text(verbatim: "\(item.label) \(item.count.formatted())")
-                            .font(SQType.caption(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(SQColor.label)
-                    }
-                }
-            }
-            .accessibilityHidden(true)
+            GenerationCountsGrid(counts: data.totalByGeneration.ordered)
+                .opacity(model.isRefreshing ? 0.5 : 1)
             Text("Un site qui émet en 4G et en 5G ne compte qu’une fois.")
                 .font(SQType.caption)
                 .foregroundStyle(SQColor.labelSecondary)
@@ -674,10 +700,9 @@ private struct ZoneAntennasSection: View {
 
     // MARK: Rangée d’opérateur
 
-    private func operatorRow(_ item: ANFRZoneOperator, in data: ANFRZoneCompare) -> some View {
+    private func operatorRow(_ item: ANFRZoneOperator, leads: Set<String>) -> some View {
         let name = MarketRegistryEntry.operatorLabel(item.key, in: model.marketEntry)
         let color = model.marketEntry?.operatorColor(forKey: item.key) ?? SQBrand.operatorColor(item.key)
-        let generations = item.generations.ordered.filter { $0.count > 0 }
         return VStack(alignment: .leading, spacing: SQSpace.sm) {
             HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -701,43 +726,20 @@ private struct ZoneAntennasSection: View {
                     }
                 }
             }
-            generationBar(data.barSegments(for: item))
-            if !generations.isEmpty {
-                Text(verbatim: generations.map { "\($0.label) \($0.count.formatted())" }.joined(separator: " · "))
-                    .font(SQType.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(SQColor.labelSecondary)
-                    .padding(.leading, SQSpace.sm + 4)
-            }
+            GenerationCountsGrid(counts: item.generations.ordered, leaders: leads)
+                .padding(.leading, SQSpace.sm + 4)
         }
         .padding(.vertical, SQSpace.md)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(rowAccessibility(name: name, item: item))
+        .accessibilityLabel(rowAccessibility(name: name, item: item, leads: leads))
     }
 
-    /// Une barre par opérateur, graduée sur la plus grande somme de la zone, découpée par génération.
-    private func generationBar(_ segments: [ANFRZoneCompare.BarSegment]) -> some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(SQColor.chip)
-                HStack(spacing: 0) {
-                    ForEach(segments, id: \.generation) { segment in
-                        Rectangle()
-                            .fill(SQNetworkColors.generationChartColor(segment.generation))
-                            .frame(width: animate && segment.count > 0 ? max(2, geo.size.width * CGFloat(segment.fraction)) : 0)
-                    }
-                }
-                .clipShape(Capsule())
-            }
-        }
-        .frame(height: 8)
-        .padding(.leading, SQSpace.sm + 4)
-        .accessibilityHidden(true)
-    }
-
-    private func rowAccessibility(name: String, item: ANFRZoneOperator) -> String {
+    private func rowAccessibility(name: String, item: ANFRZoneOperator, leads: Set<String>) -> String {
         let generations = item.generations.ordered.map { "\($0.label) \($0.count)" }.joined(separator: ", ")
-        return String(localized: "\(name) : en service \(item.active), en projet \(item.planned). \(generations).")
+        let row = String(localized: "\(name) : en service \(item.active), en projet \(item.planned). \(generations).")
+        guard !leads.isEmpty else { return row }
+        let best = ["2G", "3G", "4G", "5G"].filter(leads.contains).joined(separator: ", ")
+        return row + " " + String(localized: "Le plus de sites en \(best).")
     }
 
     // MARK: Détail par bande
@@ -922,5 +924,64 @@ private struct ZoneAntennasSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Les quatre générations en colonnes de même largeur, d'une rangée à l'autre : on compare les
+/// opérateurs en lisant de haut en bas. La plus forte valeur de chaque colonne est encadrée.
+private struct GenerationCountsGrid: View {
+    let counts: [(label: String, count: Int)]
+    var leaders: Set<String> = []
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        // Aux très grandes tailles de texte, deux colonnes : un nombre ne se coupe jamais.
+        let columns = Array(repeating: GridItem(.flexible(), spacing: SQSpace.xs, alignment: .leading),
+                            count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
+        LazyVGrid(columns: columns, alignment: .leading, spacing: SQSpace.xs) {
+            ForEach(counts, id: \.label) { item in cell(item) }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func cell(_ item: (label: String, count: Int)) -> some View {
+        let color = SQNetworkColors.generationChartColor(item.label)
+        let leads = leaders.contains(item.label) && item.count > 0
+        let shape = RoundedRectangle(cornerRadius: SQRadius.sm, style: .continuous)
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: SQSpace.xs) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+                Text(verbatim: item.label)
+                    .font(SQType.caption(.semibold))
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+            Text(verbatim: item.count > 0 ? item.count.formatted() : "–")
+                .font(SQFont.display(17, .bold))
+                .monospacedDigit()
+                .foregroundStyle(item.count > 0 ? SQColor.label : SQColor.labelSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.horizontal, SQSpace.sm)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(shape.fill(leads ? color.opacity(0.14) : SQColor.surface))
+        .overlay { if leads { shape.strokeBorder(color, lineWidth: 1.5) } }
+    }
+}
+
+/// Feuille ouverte depuis la carte : la carte reste utilisable derrière à hauteur moyenne
+/// (iOS 16.4+), pour glisser l'épingle et voir le cercle pendant qu'on lit les chiffres.
+private struct MapBackgroundInteraction: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.presentationBackgroundInteractionCompat()
+        } else {
+            content
+        }
     }
 }

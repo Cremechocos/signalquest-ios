@@ -1346,6 +1346,45 @@ final class ANFRZoneCompareTests: XCTestCase {
         XCTAssertNotEqual(a, ZoneCompareModel.cacheKey(market: "FR", radius: .km50, latitude: 45.761, longitude: 4.801, bands: true))
     }
 
+    func testAPointMovedOnTheMapIsQueriedAndTheFiguresStayUntilTheAnswer() async throws {
+        let service = ZoneService()
+        let model = makeModel(service)
+        await model.load()
+        model.move(latitude: 45.90, longitude: 4.95)
+        XCTAssertEqual(model.latitude, 45.90)
+        await model.load()
+        XCTAssertEqual(service.calls.map(\.latitude), [45.7640, 45.90], "l'épingle glissée part au serveur")
+        XCTAssertFalse(model.isRefreshing)
+        if case .loaded = model.phase {} else { XCTFail("la zone déplacée s'affiche") }
+
+        model.move(latitude: 45.90, longitude: 4.95)
+        await model.load()
+        XCTAssertEqual(service.calls.count, 2, "Même point : rien à redemander")
+
+        service.failure = APIError.transport("offline")
+        model.move(latitude: 46.5, longitude: 5.5)
+        await model.load()
+        XCTAssertEqual(model.phase, .failed, "Un échec sur le nouveau point ne laisse pas les chiffres de l'ancien")
+        XCTAssertFalse(model.isRefreshing)
+    }
+
+    func testTheBestCarrierOfEachGenerationIsOutlinedTiesIncludedAndNobodyForAnEmptyGeneration() {
+        func row(_ key: String, _ g2: Int, _ g3: Int, _ g4: Int, _ g5: Int) -> ANFRZoneOperator {
+            ANFRZoneOperator(key: key, active: g4, planned: 0,
+                             generations: ANFRZoneGenerations(g2: g2, g3: g3, g4: g4, g5: g5), bands: nil)
+        }
+        let leaders = ZoneCompareModel.leaders([
+            row("ORANGE", 0, 190, 396, 172),
+            row("FREE", 0, 120, 341, 205),
+            row("SFR", 0, 190, 288, 131),
+        ])
+        XCTAssertEqual(leaders["ORANGE"], ["3G", "4G"])
+        XCTAssertEqual(leaders["FREE"], ["5G"])
+        XCTAssertEqual(leaders["SFR"], ["3G"], "ex æquo : les deux sont encadrés")
+        XCTAssertFalse(leaders.values.contains { $0.contains("2G") }, "personne n'émet en 2G : pas de meilleur")
+        XCTAssertTrue(ZoneCompareModel.leaders([]).isEmpty)
+    }
+
     func testTheBandDetailReloadsOnDemandWithoutEmptyingTheList() async throws {
         let service = ZoneService()
         let model = makeModel(service)
