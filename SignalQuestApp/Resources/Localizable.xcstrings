@@ -4437,6 +4437,22 @@
         }
       }
     },
+    "Bonjour" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hello"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bonjour"
+          }
+        }
+      }
+    },
     "Bug · %@" : {
       "localizations" : {
         "en" : {
@@ -4995,6 +5011,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette image dépasse 20 Mo."
+          }
+        }
+      }
+    },
+    "Cette panne n’est plus disponible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This outage is no longer available"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette panne n’est plus disponible"
           }
         }
       }
@@ -7781,6 +7813,22 @@
         }
       }
     },
+    "Glisse une notification vers la gauche pour la marquer comme lue ou la supprimer." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swipe a notification left to mark it as read or delete it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glisse une notification vers la gauche pour la marquer comme lue ou la supprimer."
+          }
+        }
+      }
+    },
     "Gravité" : {
       "localizations" : {
         "en" : {
@@ -9137,6 +9185,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La conversation n’a pas pu être ouverte."
+          }
+        }
+      }
+    },
+    "La localisation est restreinte sur cet appareil (contrôle parental ou gestion de l’appareil) : SignalQuest ne peut pas l’utiliser." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location is restricted on this device (parental controls or device management): SignalQuest can’t use it."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La localisation est restreinte sur cet appareil (contrôle parental ou gestion de l’appareil) : SignalQuest ne peut pas l’utiliser."
+          }
+        }
+      }
+    },
+    "La localisation est restreinte sur cet appareil." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location is restricted on this device."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La localisation est restreinte sur cet appareil."
           }
         }
       }
@@ -14463,6 +14543,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Signal le long du trajet"
+          }
+        }
+      }
+    },
+    "SignalQuest ne couvre pas encore cette zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest doesn’t cover this area yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SignalQuest ne couvre pas encore cette zone."
           }
         }
       }
