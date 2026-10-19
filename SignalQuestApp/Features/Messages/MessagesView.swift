@@ -28,6 +28,12 @@ final class MessagesViewModel: ObservableObject {
     /// Archivées chargées à l'ouverture de l'écran « Archivées ».
     @Published private(set) var shelvedConversations: [MessageConversation] = []
     @Published private(set) var isLoadingShelved = false
+    /// Demandes de message en attente (DM-REQ-1), servies avec la liste par défaut. `nil` : le
+    /// serveur ne propose pas les demandes, et la ligne « Demandes de message » n'existe pas.
+    @Published private(set) var requestsSummary: MessageRequestsSummary?
+    /// Demandes chargées à l'ouverture de leur écran.
+    @Published private(set) var requestConversations: [MessageConversation] = []
+    @Published private(set) var isLoadingRequests = false
     private var organizationSeededForDemo = false
     private var nextCursor: String?
     /// Pages déjà chargées : une relecture périodique les refait toutes, sinon elle
@@ -53,12 +59,14 @@ final class MessagesViewModel: ObservableObject {
 
     func load() async {
         if AppEnvironment.usesDemoData {
-            conversations = Array.demo.inDisplayOrder().filter { demo in
+            conversations = (Array.demo + Array.demoSenderRequests).inDisplayOrder().filter { demo in
                 !shelvedConversations.contains { $0.id == demo.id }
             }
             if !organizationSeededForDemo {
                 shelvedSummary = ShelvedSummary(count: Array.demoShelved.count, unreadCount: 1)
                 shelvedConversations = Array.demoShelved
+                requestConversations = Array.demoRequests
+                requestsSummary = MessageRequestsSummary(count: requestConversations.count, unreadCount: requestConversations.count)
             }
             errorMessage = nil
             return
@@ -70,14 +78,14 @@ final class MessagesViewModel: ObservableObject {
         }
         do {
             let first = try await service.conversationPage(cursor: nil, take: Self.pageSize)
-            var all = first.conversations
+            var all = Self.withoutIncomingRequests(first.conversations)
             var seen = Set(all.map(\.id))
             var last = first
             var pages = 1
             // Relit les pages déjà défilées ; une page qui échoue garde ce qui précède.
             while pages < loadedPages, last.hasMore, let cursor = last.nextCursor {
                 guard let page = try? await service.conversationPage(cursor: cursor, take: Self.pageSize) else { break }
-                all += page.conversations.filter { seen.insert($0.id).inserted }
+                all += Self.withoutIncomingRequests(page.conversations).filter { seen.insert($0.id).inserted }
                 last = page
                 pages += 1
             }
@@ -85,6 +93,7 @@ final class MessagesViewModel: ObservableObject {
             conversations = all.inDisplayOrder()
             pinLimit = first.pinLimit
             shelvedSummary = first.shelvedSummary
+            requestsSummary = first.requestsSummary
             hasMoreConversations = last.hasMore && last.nextCursor != nil
             nextCursor = last.nextCursor
             loadMoreFailed = false
@@ -253,13 +262,81 @@ final class MessagesViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Demandes de message (DM-REQ-1)
+
+    /// Le serveur écarte les demandes de la liste ordinaire ; ce filtre garde la liste, le badge et
+    /// les accusés de distribution à l'abri d'une demande qui s'y glisserait quand même.
+    static func withoutIncomingRequests(_ list: [MessageConversation]) -> [MessageConversation] {
+        list.filter { $0.request?.isIncomingPending != true }
+    }
+
+    /// Les demandes en attente, lues à l'ouverture de leur écran. Un échec garde ce qui est affiché.
+    func loadRequests() async {
+        if AppEnvironment.usesDemoData { return }
+        isLoadingRequests = true
+        defer { isLoadingRequests = false }
+        do {
+            requestConversations = try await service.requestConversations().inDisplayOrder()
+            if let summary = requestsSummary, summary.count != requestConversations.count {
+                requestsSummary = MessageRequestsSummary(
+                    count: requestConversations.count, unreadCount: min(summary.unreadCount, requestConversations.count)
+                )
+            }
+        } catch {
+            if !error.isCancellation { actionError = error.userFacingMessage }
+        }
+    }
+
+    /// Accepte ou refuse une demande. Elle quitte tout de suite l'écran ; elle y revient si le serveur
+    /// refuse. 404 et 409 veulent dire que la demande a déjà été réglée ailleurs : on relit alors.
+    @discardableResult
+    func decideRequest(_ conversation: MessageConversation, accept: Bool) async -> Bool {
+        let previousList = requestConversations
+        let previousSummary = requestsSummary
+        requestConversations.removeAll { $0.id == conversation.id }
+        if let summary = requestsSummary {
+            requestsSummary = MessageRequestsSummary(
+                count: summary.count - 1, unreadCount: min(summary.unreadCount, max(0, summary.count - 1))
+            )
+        }
+        do {
+            if accept {
+                try await service.acceptMessageRequest(conversationId: conversation.id)
+            } else {
+                try await service.declineMessageRequest(conversationId: conversation.id)
+            }
+            if accept { await load() }
+            return true
+        } catch {
+            if error.isCancellation {
+                requestConversations = previousList
+                requestsSummary = previousSummary
+                return false
+            }
+            if case APIError.http(let status, let code, _, _, _) = error,
+               status == 404 || (status == 409 && code == "MESSAGE_REQUEST_ALREADY_ACCEPTED") {
+                actionError = error.userFacingMessage
+                await load()
+                await loadRequests()
+                return false
+            }
+            requestConversations = previousList
+            requestsSummary = previousSummary
+            actionError = error.userFacingMessage
+            return false
+        }
+    }
+
     /// Une conversation hors des pages chargées (notification, lien) : elle est
     /// lue seule et ajoutée à la liste, pour pouvoir être ouverte (B01).
     func ensureLoaded(id: String) async {
         guard openableConversation(id: id) == nil,
               let conversation = try? await service.conversation(id: id) else { return }
-        // Une conversation archivée s'ouvre sans reparaître dans la liste par défaut.
-        if conversation.shelved {
+        // Une demande reçue en attente s'ouvre en aperçu, sans entrer dans la liste ordinaire.
+        if conversation.request?.isIncomingPending == true {
+            requestConversations = (requestConversations + [conversation]).inDisplayOrder()
+        } else if conversation.shelved {
+            // Une conversation archivée s'ouvre sans reparaître dans la liste par défaut.
             shelvedConversations = (shelvedConversations + [conversation]).inDisplayOrder()
         } else {
             conversations = (conversations + [conversation]).inDisplayOrder()
@@ -269,6 +346,7 @@ final class MessagesViewModel: ObservableObject {
     /// Une conversation que l'on peut ouvrir : de la liste, ou des archivées chargées.
     func openableConversation(id: String) -> MessageConversation? {
         conversations.first { $0.id == id } ?? shelvedConversations.first { $0.id == id }
+            ?? requestConversations.first { $0.id == id }
     }
 
     /// Page suivante de la liste, au défilement en bas (B01).
@@ -282,7 +360,7 @@ final class MessagesViewModel: ObservableObject {
             return
         }
         let known = Set(conversations.map(\.id))
-        conversations = (conversations + page.conversations.filter { !known.contains($0.id) }).inDisplayOrder()
+        conversations = (conversations + Self.withoutIncomingRequests(page.conversations).filter { !known.contains($0.id) }).inDisplayOrder()
         loadedPages += 1
         hasMoreConversations = page.hasMore && page.nextCursor != nil && loadedPages < Self.maxPages
         nextCursor = page.nextCursor
@@ -291,14 +369,16 @@ final class MessagesViewModel: ObservableObject {
     /// Déchiffre les aperçus des derniers messages des conversations E2EE une
     /// fois la clé déverrouillée. Best-effort : un échec laisse le cadenas.
     func decryptPreviews(e2ee: E2EEServicing?, v2: E2EEV2MessagingRuntime? = nil) async {
+        // Les demandes s'y lisent aussi : leur premier message, quand l'appareil l'a déjà déchiffré.
+        let readable = conversations + requestConversations
         // v2 : le dernier message vérifié et gardé ici, sans requête ni clé v1.
         if let v2 {
-            for conversation in conversations where EncryptedConversationSurfaces.isV2(conversation) {
+            for conversation in readable where EncryptedConversationSurfaces.isV2(conversation) {
                 if let text = v2.latestText(conversationId: conversation.id) { decryptedPreviews[conversation.id] = text }
             }
         }
         guard let e2ee, await e2ee.isUnlocked() else { return }
-        for conversation in conversations where conversation.e2eeEnabled == true {
+        for conversation in readable where conversation.e2eeEnabled == true {
             guard let last = conversation.lastMessage, last.isEncrypted,
                   decryptedPreviews[conversation.id] == nil else { continue }
             if let plain = try? await e2ee.decryptText(conversationId: conversation.id, message: last) {
@@ -447,6 +527,8 @@ struct MessagesView: View {
     @State private var folderFilterId: String?
     /// Écran « Archivées » : même liste, alimentée par les conversations archivées.
     @State private var showingShelved = false
+    /// Écran « Demandes de message » (DM-REQ-1).
+    @State private var showingRequests = false
     @State private var folderSheet: FolderSheetRequest?
     @State private var showFocusSheet = false
 
@@ -615,10 +697,10 @@ struct MessagesView: View {
                 if E2EEV2RuntimeReadGate.enabled {
                     E2EEV2NotificationPreviewNotice()
                 }
-                if let focus = model.focus, !showingShelved {
+                if let focus = model.focus, !showingShelved, !showingRequests {
                     focusBanner(focus)
                 }
-                if !model.conversations.isEmpty || showingShelved {
+                if (!model.conversations.isEmpty || showingShelved) && !showingRequests {
                     // Aux tailles d'accessibilité, l'intitulé long ne tient pas sur une ligne.
                     SQSearchField(
                         text: $query,
@@ -628,7 +710,10 @@ struct MessagesView: View {
                         .accessibilityIdentifier("messages.search")
                     if !showingShelved { filterChips }
                 }
-                if !showingShelved, let summary = model.shelvedSummary, summary.count > 0 {
+                if !showingShelved, !showingRequests, let summary = model.requestsSummary, summary.count > 0 {
+                    requestsRow(summary)
+                }
+                if !showingShelved, !showingRequests, let summary = model.shelvedSummary, summary.count > 0 {
                     shelvedRow(summary)
                 }
             }
@@ -636,7 +721,10 @@ struct MessagesView: View {
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: SQSpace.sm, leading: SQSpace.xl, bottom: SQSpace.sm, trailing: SQSpace.xl))
 
-            if model.isLoading && model.conversations.isEmpty {
+            if showingRequests {
+                requestsContent
+            }
+            if model.isLoading && model.conversations.isEmpty && !showingRequests {
                 ConversationListSkeleton()
                     .sqShimmer()
                     .listRowBackground(Color.clear)
@@ -715,7 +803,7 @@ struct MessagesView: View {
             if !messageHits.isEmpty {
                 messageResultsSection
             }
-            if model.hasMoreConversations && !showingShelved {
+            if model.hasMoreConversations && !showingShelved && !showingRequests {
                 // Page suivante au défilement ; la tâche repart à chaque page reçue,
                 // de sorte qu'un filtre encore vide continue de chercher (B01).
                 if model.loadMoreFailed {
@@ -777,7 +865,7 @@ struct MessagesView: View {
                     .listRowSeparator(.hidden)
                     .accessibilityIdentifier("messages.noMatch")
             }
-            if !showingShelved && !model.isLoading && model.conversations.isEmpty && model.errorMessage == nil {
+            if !showingShelved && !showingRequests && !model.isLoading && model.conversations.isEmpty && model.errorMessage == nil {
                 EmptyStateView(
                     title: "Aucune conversation",
                     message: "Démarre une discussion avec un membre de la communauté.",
@@ -823,6 +911,7 @@ struct MessagesView: View {
             await model.loadOrganization()
             await maybePresentE2EEUnlock()
             openNewConversationIfRequested()
+            openRequestsIfRequested()
             await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
             await openRoutedConversationIfNeeded()
         }
@@ -850,6 +939,7 @@ struct MessagesView: View {
                 try? await Task.sleep(nanoseconds: 15_000_000_000)
                 guard !Task.isCancelled else { break }
                 await model.load()
+                if showingRequests { await model.loadRequests() }
                 await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
                 await services.applyLoadedInbox(model.conversations, isComplete: !model.hasMoreConversations)
             }
@@ -861,6 +951,7 @@ struct MessagesView: View {
             Task {
                 await model.load()
                 await model.loadOrganization()
+                if showingRequests { await model.loadRequests() }
                 await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
                 await services.applyLoadedInbox(model.conversations, isComplete: !model.hasMoreConversations)
             }
@@ -869,6 +960,7 @@ struct MessagesView: View {
             await model.load()
             await model.loadOrganization()
             if showingShelved { await model.loadShelved() }
+            if showingRequests { await model.loadRequests() }
             await model.decryptPreviews(e2ee: e2ee, v2: services.e2eeV2Messaging)
         }
         .onReceive(NotificationCenter.default.publisher(for: MessageDraftStore.didChange)) { _ in
@@ -933,6 +1025,9 @@ struct MessagesView: View {
         }
         .onChangeCompat(of: router.openNewConversation) { _, requested in
             if requested { openNewConversationIfRequested() }
+        }
+        .onChangeCompat(of: router.openMessageRequests) { _, requested in
+            if requested { openRequestsIfRequested() }
         }
         .task(id: PushOwnerScope.current) { refreshV2Activation() }
         // Les appels se décrochent souvent écran verrouillé, où iOS ne peut pas
@@ -1062,10 +1157,10 @@ struct MessagesView: View {
         VStack(alignment: .leading, spacing: SQSpace.md) {
             HStack(spacing: SQSpace.sm) {
                 MapChipIconButton(systemImage: "chevron.left", label: "Retour", identifier: "messages.back") {
-                    if showingShelved { showingShelved = false } else { dismiss() }
+                    if showingShelved { showingShelved = false } else if showingRequests { showingRequests = false } else { dismiss() }
                 }
                 Spacer(minLength: SQSpace.sm)
-                if !showingShelved {
+                if !showingShelved && !showingRequests {
                     listMenu
                     Button {
                         Haptics.light()
@@ -1084,12 +1179,18 @@ struct MessagesView: View {
                 }
             }
             VStack(alignment: .leading, spacing: SQSpace.xs) {
-                Text(showingShelved ? "Archivées" : "Messages")
+                Text(showingRequests ? "Demandes de message" : (showingShelved ? "Archivées" : "Messages"))
                     .font(SQFont.display(30, .bold, relativeTo: .largeTitle))
                     .foregroundStyle(SQColor.label)
                     .sqHeader()
                 let unread = model.conversations.filter(isUnread).count
-                if showingShelved {
+                if showingRequests {
+                    Text("Ces personnes ne sont pas dans tes amis. Tant que tu n’acceptes pas, elles ne savent pas que tu as lu leur message.")
+                        .font(SQType.callout)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("messages.requests.note")
+                } else if showingShelved {
                     Text("Une conversation archivée revient dans ta liste au prochain message, sauf si elle est en sourdine.")
                         .font(SQType.callout)
                         .foregroundStyle(SQColor.labelSecondary)
@@ -1324,6 +1425,173 @@ struct MessagesView: View {
         return String(localized: "Archivées : \(summary.count)")
     }
 
+    // MARK: - Demandes de message (DM-REQ-1)
+
+    /// Ligne « Demandes de message » en tête de liste. Le compteur est à l'encre, pas au carmin : une
+    /// demande n'est pas une alerte.
+    private func requestsRow(_ summary: MessageRequestsSummary) -> some View {
+        Button {
+            Haptics.selection()
+            showingRequests = true
+            filter = .all
+            folderFilterId = nil
+            query = ""
+            Task { await model.loadRequests() }
+        } label: {
+            HStack(spacing: SQSpace.md) {
+                Image(systemName: "tray")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SQColor.chipInk)
+                    .frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Demandes de message")
+                        .font(SQType.body(.semibold))
+                        .foregroundStyle(SQColor.label)
+                    Text("\(summary.count) personnes veulent t’écrire")
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: SQSpace.sm)
+                Text(verbatim: "\(summary.count)")
+                    .font(SQType.micro(.heavy))
+                    .monospacedDigit()
+                    .foregroundStyle(SQColor.onInk)
+                    .padding(.horizontal, 6)
+                    .frame(minWidth: 20, minHeight: 20)
+                    .background(SQColor.label, in: Capsule())
+                    .accessibilityHidden(true)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(SQColor.labelTertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.sm)
+            .frame(minHeight: 56)
+            .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.md, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle(scale: 0.99))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(localized: "Demandes de message") + ", " + String(localized: "\(summary.count) personnes veulent t’écrire"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("messages.requests.row")
+    }
+
+    /// Les demandes, sous l'en-tête de leur écran.
+    @ViewBuilder
+    private var requestsContent: some View {
+        let requests = model.requestConversations
+        ForEach(Array(requests.enumerated()), id: \.element.id) { index, conversation in
+            Button {
+                routedConversationId = conversation.id
+            } label: {
+                requestRow(conversation)
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(usesSplitLayout && routedConversationId == conversation.id ? .isSelected : [])
+            .listRowBackground(
+                MessagesCardSegment(top: index == 0, bottom: index == requests.count - 1)
+                    .fill(usesSplitLayout && routedConversationId == conversation.id ? SQColor.accentSoft : SQColor.surface)
+                    .overlay {
+                        MessagesCardSegment(top: index == 0, bottom: index == requests.count - 1)
+                            .strokeBorder(SQOledPalette.cardStroke, lineWidth: 1)
+                    }
+                    .padding(.horizontal, SQSpace.xl)
+            )
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 0, leading: SQSpace.xl, bottom: 0, trailing: SQSpace.xl))
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button { Task { await model.decideRequest(conversation, accept: true) } } label: {
+                    Label("Accepter", systemImage: "checkmark")
+                }
+                .tint(SQColor.info)
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button(role: .destructive) { Task { await model.decideRequest(conversation, accept: false) } } label: {
+                    Label("Refuser", systemImage: "xmark")
+                }
+            }
+        }
+        if requests.isEmpty && !model.isLoadingRequests {
+            EmptyStateView(
+                title: "Aucune demande",
+                message: "Quand une personne qui n’est pas dans tes amis t’écrit pour la première fois, sa demande arrive ici.",
+                systemImage: "tray"
+            )
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .accessibilityIdentifier("messages.requests.empty")
+        }
+    }
+
+    /// Rangée d'une demande : nom, palier, premier message et heure.
+    private func requestRow(_ conversation: MessageConversation) -> some View {
+        let sender = conversation.request?.sender
+        let fallback = conversation.displayTitle(excluding: currentUserId)
+        let name = sender?.displayName ?? (fallback.isEmpty ? String(localized: "Membre") : fallback)
+        let preview = lastMessagePreview(conversation)
+        let date = conversation.lastMessageAt ?? conversation.request?.createdAt
+        let tier = sender?.tier
+        let avatarUrl = sender?.avatarUrl ?? conversation.participants.first { $0.userId != currentUserId }?.user.avatarUrl
+        return HStack(spacing: SQSpace.md) {
+            SQAvatar(url: avatarUrl, name: name, size: 44)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: SQSpace.xs) {
+                    Text(verbatim: name)
+                        .font(SQType.rowTitle)
+                        .foregroundStyle(SQColor.label)
+                        .lineLimit(1)
+                    if let tier {
+                        Text(verbatim: tier.label)
+                            .font(SQType.micro(.semibold))
+                            .foregroundStyle(SQColor.chipInk)
+                            .padding(.horizontal, SQSpace.xs2)
+                            .padding(.vertical, 2)
+                            .background(SQColor.chip, in: Capsule())
+                            .fixedSize()
+                            .accessibilityHidden(true)
+                    }
+                    Spacer(minLength: SQSpace.sm)
+                    if let date { rowDate(date, unread: false) }
+                }
+                Text(verbatim: preview)
+                    .font(SQType.subhead(.regular))
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.vertical, SQSpace.sm2)
+        .frame(minHeight: 64)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([name, tier?.label, preview].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("messages.requests.item")
+    }
+
+    /// Ouvre l'écran des demandes quand une notification `message_request` le demande.
+    private func openRequestsIfRequested() {
+        guard router.openMessageRequests else { return }
+        router.openMessageRequests = false
+        routedConversationId = nil
+        showingShelved = false
+        showingRequests = true
+        filter = .all
+        folderFilterId = nil
+        query = ""
+        Task {
+            await model.load()
+            await model.loadRequests()
+        }
+    }
+
     private func endFocus() async {
         await model.endFocus()
         if filter == .focus { filter = .all }
@@ -1417,7 +1685,8 @@ struct MessagesView: View {
 
     /// La liste affichée : les conversations, ou les archivées sur leur écran.
     private var listSource: [MessageConversation] {
-        showingShelved ? model.shelvedConversations : model.conversations
+        // L'écran des demandes a ses propres rangées (`requestsContent`).
+        showingRequests ? [] : (showingShelved ? model.shelvedConversations : model.conversations)
     }
 
     /// Conversations après le filtre et la recherche (titre, puis aperçu).
@@ -2069,6 +2338,8 @@ private struct NewConversationSheet: View {
     @State private var selected: [MessageSearchUser] = []
     @State private var isBusy = false
     @State private var errorMessage: String?
+    /// Plafond quotidien de demandes de message atteint (DM-REQ-1) : une alerte, pas une erreur de plus.
+    @State private var requestLimit: MessageRequestLimitError?
     /// Recherche en vol, et dernière requête dont la réponse est arrivée (pour
     /// ne dire « aucun résultat » que pour ce qui est tapé).
     @State private var isSearching = false
@@ -2167,6 +2438,14 @@ private struct NewConversationSheet: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .sqSheet(background: SQColor.bg)
+        .alert(
+            "Plus de demandes pour aujourd’hui",
+            isPresented: Binding(get: { requestLimit != nil }, set: { if !$0 { requestLimit = nil } })
+        ) {
+            Button("OK", role: .cancel) { requestLimit = nil }
+        } message: {
+            Text("Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire à \(selected.first?.displayName ?? "") demain, ou dès maintenant s’il t’ajoute en ami.")
+        }
         .sheet(isPresented: $showV2Activation, onDismiss: {
             guard createAfterActivation else { return }
             createAfterActivation = false
@@ -2370,6 +2649,11 @@ private struct NewConversationSheet: View {
                         return
                     }
                     throw E2EEV2MessagingError(String(localized: "La conversation chiffrée n’a pas pu être créée."))
+                case .failure(let failure) where MessageRequestLimitError.isLimit(failure):
+                    // Plafond quotidien : on le dit, sans rejouer la création.
+                    requestLimit = MessageRequestLimitError(failure: failure)
+                    Haptics.error()
+                    return
                 case .failure(let failure):
                     throw E2EEV2MessagingError(failure.kind == .retryable
                         ? String(localized: "Connexion instable. Réessaie.")
@@ -2393,9 +2677,100 @@ private struct NewConversationSheet: View {
                 showUnlock = true
                 return
             }
+            if let limit = error.messageRequestLimit {
+                requestLimit = limit
+                Haptics.error()
+                return
+            }
             errorMessage = error.userFacingMessage
             Haptics.error()
         }
+    }
+}
+
+// MARK: - Demandes de message (DM-REQ-1) — mode démo
+
+extension Array where Element == MessageConversation {
+    /// Deux demandes reçues : un compte récent et un membre.
+    static var demoRequests: [MessageConversation] {
+        func request(
+            id: String, senderId: String, name: String, handle: String, tier: String, text: String, minutesAgo: Double
+        ) -> MessageConversation {
+            let sentAt = Date().addingTimeInterval(-minutesAgo * 60)
+            let sender = MessageRequestSender(id: senderId, handle: handle, name: name, avatarUrl: nil, reputation: tier)
+            var conversation = MessageConversation(
+                id: id, title: nil, isGroup: false, e2eeEnabled: false, groupPhotoUrl: nil,
+                createdAt: sentAt, updatedAt: sentAt, lastMessageAt: sentAt, lastReadAt: nil, pinnedAt: nil,
+                participants: [
+                    ConversationParticipant(
+                        userId: "mock-user", role: "member", joinedAt: sentAt, lastReadAt: nil,
+                        user: MessageUser(id: "mock-user", name: "SignalQuest iOS", email: "ios@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    ),
+                    ConversationParticipant(
+                        userId: senderId, role: "member", joinedAt: sentAt, lastReadAt: nil,
+                        user: MessageUser(id: senderId, name: name, email: "\(handle)@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    )
+                ],
+                lastMessage: MessageItem(
+                    id: "\(id)-message", conversationId: id, senderId: senderId, kind: "TEXT", content: text,
+                    e2eeVersion: nil, e2eeIvB64: nil, e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil,
+                    createdAt: sentAt, editedAt: nil, deletedAt: nil, replyToId: nil, threadReplyCount: 0,
+                    sender: MessageUser(id: senderId, name: name, email: "\(handle)@signalquest.fr", avatarUrl: nil),
+                    attachments: [], reactions: []
+                )
+            )
+            conversation.request = MessageRequest(
+                role: .recipient, status: "pending", id: "\(id)-request", createdAt: sentAt, sender: sender
+            )
+            return conversation
+        }
+        return [
+            request(id: "demo-request-1", senderId: "demo-requester-1", name: "Kevin R.", handle: "kevin_r", tier: "new",
+                    text: "Salut, tu connais le relais de la Croix-Rousse ? Il capte mal chez moi.", minutesAgo: 25),
+            request(id: "demo-request-2", senderId: "demo-requester-2", name: "Inès Marchand", handle: "ines_m", tier: "member",
+                    text: "Bonjour, j’ai vu ton relevé sur Lyon 7e, tu aurais le détail de la bande ?", minutesAgo: 180)
+        ]
+    }
+
+    /// Deux conversations où je suis l'expéditeur d'une demande : avant et après le premier message.
+    static var demoSenderRequests: [MessageConversation] {
+        func outgoing(id: String, peerId: String, name: String, remaining: Int, text: String?) -> MessageConversation {
+            let at = Date().addingTimeInterval(remaining == 0 ? -1_800 : -600)
+            var conversation = MessageConversation(
+                id: id, title: nil, isGroup: false, e2eeEnabled: false, groupPhotoUrl: nil,
+                createdAt: at, updatedAt: at, lastMessageAt: text == nil ? nil : at, lastReadAt: at, pinnedAt: nil,
+                participants: [
+                    ConversationParticipant(
+                        userId: "mock-user", role: "member", joinedAt: at, lastReadAt: nil,
+                        user: MessageUser(id: "mock-user", name: "SignalQuest iOS", email: "ios@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    ),
+                    ConversationParticipant(
+                        userId: peerId, role: "member", joinedAt: at, lastReadAt: nil,
+                        user: MessageUser(id: peerId, name: name, email: "\(peerId)@signalquest.fr", avatarUrl: nil),
+                        presence: nil
+                    )
+                ],
+                lastMessage: text.map { content in
+                    MessageItem(
+                        id: "\(id)-message", conversationId: id, senderId: "mock-user", kind: "TEXT", content: content,
+                        e2eeVersion: nil, e2eeIvB64: nil, e2eeCiphertextB64: nil, e2eeAadB64: nil, metadata: nil,
+                        createdAt: at, editedAt: nil, deletedAt: nil, replyToId: nil, threadReplyCount: 0,
+                        sender: MessageUser(id: "mock-user", name: "SignalQuest iOS", email: "ios@signalquest.fr", avatarUrl: nil),
+                        attachments: [], reactions: []
+                    )
+                }
+            )
+            conversation.request = MessageRequest(role: .sender, status: "pending", remaining: remaining)
+            return conversation
+        }
+        return [
+            outgoing(id: "demo-request-out-1", peerId: "demo-peer-1", name: "Hugo Lemaire", remaining: 1, text: nil),
+            outgoing(id: "demo-request-out-0", peerId: "demo-peer-2", name: "Sofia Benali", remaining: 0,
+                     text: "Bonjour Sofia, je cherche un avis sur la couverture 5G de ton quartier.")
+        ]
     }
 }
 

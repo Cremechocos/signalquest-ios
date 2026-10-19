@@ -392,6 +392,28 @@
         }
       }
     },
+    "%@ veut t’écrire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ wants to message you"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ veut t’écrire"
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ veut vous écrire"
+          }
+        }
+      }
+    },
     "%@ · %@ en réception" : {
       "localizations" : {
         "en" : {
@@ -1522,6 +1544,65 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld passés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld personnes veulent t’écrire" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld person wants to message you"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld people want to message you"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld personne veut t’écrire"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld personnes veulent t’écrire"
+                }
+              }
+            }
+          }
+        },
+        "fr-x-formal" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld personne veut vous écrire"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld personnes veulent vous écrire"
                 }
               }
             }
@@ -4413,6 +4494,22 @@
         }
       }
     },
+    "Aucune demande" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No requests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune demande"
+          }
+        }
+      }
+    },
     "Aucune des sessions de cette page n’a de position. Passe à la page suivante." : {
       "localizations" : {
         "en" : {
@@ -5405,6 +5502,28 @@
         }
       }
     },
+    "Ces personnes ne sont pas dans tes amis. Tant que tu n’acceptes pas, elles ne savent pas que tu as lu leur message." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These people aren’t your friends. Until you accept, they can’t tell that you’ve read their message."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces personnes ne sont pas dans tes amis. Tant que tu n’acceptes pas, elles ne savent pas que tu as lu leur message."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ces personnes ne sont pas dans vos amis. Tant que vous n’acceptez pas, elles ne savent pas que vous avez lu leur message."
+          }
+        }
+      }
+    },
     "Cet appareil est déjà approuvé." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5514,6 +5633,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette conversation est protégée : ouvre-la dans SignalQuest pour y écrire."
+          }
+        }
+      }
+    },
+    "Cette demande a déjà été acceptée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This request has already been accepted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette demande a déjà été acceptée."
+          }
+        }
+      }
+    },
+    "Cette demande n’existe plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This request no longer exists."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette demande n’existe plus."
           }
         }
       }
@@ -6521,6 +6672,22 @@
         }
       }
     },
+    "Compte récent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New account"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte récent"
+          }
+        }
+      }
+    },
     "Compte sans nom" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7299,6 +7466,22 @@
         }
       }
     },
+    "Demande de message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message request"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande de message"
+          }
+        }
+      }
+    },
     "Demande invalide, expirée ou incohérente avec le serveur." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7312,6 +7495,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Demande invalide, expirée ou incohérente avec le serveur."
+          }
+        }
+      }
+    },
+    "Demandes de message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message requests"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandes de message"
           }
         }
       }
@@ -13160,6 +13359,22 @@
         }
       }
     },
+    "Nouveau" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau"
+          }
+        }
+      }
+    },
     "Nouveau dossier" : {
       "localizations" : {
         "en" : {
@@ -14571,6 +14786,22 @@
         }
       }
     },
+    "Plus de demandes pour aujourd’hui" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No more requests for today"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus de demandes pour aujourd’hui"
+          }
+        }
+      }
+    },
     "Plus de détails" : {
       "localizations" : {
         "en" : {
@@ -15094,6 +15325,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "QR indisponible. Créez une nouvelle demande."
+          }
+        }
+      }
+    },
+    "Quand une personne qui n’est pas dans tes amis t’écrit pour la première fois, sa demande arrive ici." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When someone who isn’t your friend writes to you for the first time, their request shows up here."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand une personne qui n’est pas dans tes amis t’écrit pour la première fois, sa demande arrive ici."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand une personne qui n’est pas dans vos amis vous écrit pour la première fois, sa demande arrive ici."
           }
         }
       }
@@ -17584,6 +17837,28 @@
         }
       }
     },
+    "Ta demande de message n’a pas encore été acceptée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your message request hasn’t been accepted yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta demande de message n’a pas encore été acceptée."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre demande de message n’a pas encore été acceptée."
+          }
+        }
+      }
+    },
     "Ta position et ton réseau, en continu, dans %@." : {
       "localizations" : {
         "en" : {
@@ -18268,6 +18543,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre opérateur ne peut pas être détecté : ce test ne sera pas publié sur la carte."
+          }
+        }
+      }
+    },
+    "Ton premier message arrivera comme une demande. Tu pourras en envoyer d’autres quand %@ l’aura acceptée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your first message will arrive as a request. You can send more once %@ has accepted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton premier message arrivera comme une demande. Tu pourras en envoyer d’autres quand %@ l’aura acceptée."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre premier message arrivera comme une demande. Vous pourrez en envoyer d’autres quand %@ l’aura acceptée."
           }
         }
       }
@@ -18963,6 +19260,28 @@
         }
       }
     },
+    "Tu pourras écrire à nouveau quand %@ l’aura acceptée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You’ll be able to write again once %@ has accepted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pourras écrire à nouveau quand %@ l’aura acceptée."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pourrez écrire à nouveau quand %@ l’aura acceptée."
+          }
+        }
+      }
+    },
     "Type %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19047,6 +19366,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un bug, un écran qui gêne, une idée ? Chaque signalement est lu par l'équipe, et vous suivez sa réponse ici."
+          }
+        }
+      }
+    },
+    "Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire demain, ou dès maintenant si la personne t’ajoute en ami." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A new account can send 5 message requests a day. You can write tomorrow, or right now if they add you as a friend."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire demain, ou dès maintenant si la personne t’ajoute en ami."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un compte récent peut envoyer 5 demandes de message par jour. Vous pourrez écrire demain, ou dès maintenant si la personne vous ajoute en ami."
+          }
+        }
+      }
+    },
+    "Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire à %@ demain, ou dès maintenant s’il t’ajoute en ami." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A new account can send 5 message requests a day. You can write to %@ tomorrow, or right now if they add you as a friend."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un compte récent peut envoyer 5 demandes de message par jour. Tu pourras écrire à %@ demain, ou dès maintenant s’il t’ajoute en ami."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un compte récent peut envoyer 5 demandes de message par jour. Vous pourrez écrire à %@ demain, ou dès maintenant s’il vous ajoute en ami."
           }
         }
       }

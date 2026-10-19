@@ -98,6 +98,11 @@ enum EncryptedConversationSurfaces {
             return String(localized: "Un membre a un nouveau numéro de sécurité. Vérifie-le avant d’envoyer.")
         case .needsEpoch, .needsRotation:
             return String(localized: "La conversation chiffrée se met à jour. Réessaie dans un instant.")
+        case .failure(let failure) where MessageRequestLimitError.isPending(failure):
+            // DM-REQ-1 : le premier message est parti, la suite attend l'acceptation.
+            return String(localized: "Ta demande de message n’a pas encore été acceptée.")
+        case .failure(let failure) where MessageRequestLimitError.isLimit(failure):
+            return MessageRequestLimitError(failure: failure).errorDescription
         case .failure(let failure):
             return failure.kind == .retryable
                 ? String(localized: "Connexion instable. Réessaie.")

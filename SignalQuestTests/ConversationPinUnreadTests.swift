@@ -217,6 +217,93 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertNil(model.conversations.first?.pinnedAt, "L'épingle revient à son état")
     }
 
+    // MARK: Demandes de message (DM-REQ-1)
+
+    @MainActor
+    private func requestsModel(token: String, handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)) throws -> MessagesViewModel {
+        MockURLProtocol.requestHandler = handler
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken(token)
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        return MessagesViewModel(service: MessagesService(api: api))
+    }
+
+    /// La ligne « Demandes de message » n'existe que si le serveur sert `requestsSummary` ; sans lui
+    /// (serveur d'aujourd'hui), la messagerie est inchangée.
+    @MainActor
+    func testTheRequestsRowExistsOnlyWhenTheServerServesASummary() async throws {
+        var withSummary = false
+        let model = try requestsModel(token: "requests-row-token") { request in
+            let json = withSummary
+                ? #"{"conversations":[{"id":"a","participants":[]}],"hasMore":false,"requestsSummary":{"count":2,"unreadCount":1}}"#
+                : #"{"conversations":[{"id":"a","participants":[]}],"hasMore":false}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(json.utf8))
+        }
+        await model.load()
+        XCTAssertNil(model.requestsSummary)
+        withSummary = true
+        await model.load()
+        XCTAssertEqual(model.requestsSummary, MessageRequestsSummary(count: 2, unreadCount: 1))
+        withSummary = false
+        await model.load()
+        XCTAssertNil(model.requestsSummary, "Le serveur qui n'en sert plus fait disparaître la ligne")
+    }
+
+    /// Accepter retire la demande de l'écran et recharge la liste ; refuser la retire sans rien d'autre ;
+    /// un refus du serveur la remet ; un 404 (déjà réglée ailleurs) relit au lieu de la remettre.
+    @MainActor
+    func testDecidingARequestUpdatesTheScreenAndHandlesStaleRequests() async throws {
+        var calls: [String] = []
+        var failure: (status: Int, code: String)?
+        let model = try requestsModel(token: "requests-decide-token") { request in
+            let path = request.url?.path ?? ""
+            let query = request.url?.query ?? ""
+            calls.append("\(request.httpMethod ?? "GET") \(path)")
+            if path.contains("/requests/"), let failure {
+                let body = #"{"error":"x","code":"\#(failure.code)"}"#
+                return (HTTPURLResponse(url: request.url!, statusCode: failure.status, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+            }
+            if path.contains("/requests/") {
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(#"{"ok":true}"#.utf8))
+            }
+            let asking = query.contains("requests=only")
+            let json = asking
+                ? #"{"conversations":[{"id":"r1","participants":[],"request":{"role":"recipient","status":"pending","id":"q1"}}],"hasMore":false}"#
+                : #"{"conversations":[],"hasMore":false,"requestsSummary":{"count":1,"unreadCount":1}}"#
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(json.utf8))
+        }
+        await model.load()
+        await model.loadRequests()
+        let first = try XCTUnwrap(model.requestConversations.first)
+        XCTAssertEqual(model.requestConversations.map(\.id), ["r1"])
+        XCTAssertTrue(calls.contains { $0.contains("/api/messages/conversations") })
+
+        // Refus du serveur (500) : la demande revient.
+        failure = (500, "INTERNAL_ERROR")
+        let refused = await model.decideRequest(first, accept: false)
+        XCTAssertFalse(refused)
+        XCTAssertEqual(model.requestConversations.map(\.id), ["r1"])
+        XCTAssertNotNil(model.actionError)
+        model.actionError = nil
+
+        // 404 : déjà réglée ailleurs, l'écran se relit (ici, le faux serveur la rend encore).
+        failure = (404, "MESSAGE_REQUEST_NOT_FOUND")
+        _ = await model.decideRequest(first, accept: true)
+        XCTAssertTrue(calls.contains("POST /api/messages/requests/r1/accept"))
+        XCTAssertNotNil(model.actionError)
+        model.actionError = nil
+
+        // Refuser : POST decline, la demande part de l'écran et le compteur baisse.
+        failure = nil
+        let declined = await model.decideRequest(first, accept: false)
+        XCTAssertTrue(declined)
+        XCTAssertTrue(calls.contains("POST /api/messages/requests/r1/decline"))
+        XCTAssertTrue(model.requestConversations.isEmpty)
+        XCTAssertEqual(model.requestsSummary?.count, 0)
+    }
+
     /// MSG-02 : une page suivante qui échoue le dit (« Réessayer »), sans effacer la liste ;
     /// le réessai qui aboutit retire l'échec.
     @MainActor
@@ -338,6 +425,14 @@ final class ConversationPinUnreadTests: XCTestCase {
         let acks = DeliveryAcknowledger.latestIncoming(in: list, currentUserId: "me")
         XCTAssertEqual(acks.map { "\($0.0)=\($0.1)" }, ["a=m-a", "d=envelope_7"])
         XCTAssertTrue(DeliveryAcknowledger.latestIncoming(in: list, currentUserId: nil).isEmpty)
+
+        // DM-REQ-1 : une demande reçue en attente n'est jamais accusée « Distribuée » avant l'acceptation.
+        var asked = conversation("e", lastMessageAt: now, senderId: "other")
+        asked.request = MessageRequest(role: .recipient, status: "pending", id: "r1")
+        XCTAssertEqual(DeliveryAcknowledger.latestIncoming(in: list + [asked], currentUserId: "me").map { $0.0 }, ["a", "d"])
+        asked.request = MessageRequest(role: .recipient, status: "accepted", id: "r1")
+        XCTAssertEqual(DeliveryAcknowledger.latestIncoming(in: [asked], currentUserId: "me").map { $0.0 }, ["e"],
+                       "Acceptée, elle redevient une conversation ordinaire")
     }
 
     // MARK: Messagerie, seconde passe (B01, B04, M05, M16)

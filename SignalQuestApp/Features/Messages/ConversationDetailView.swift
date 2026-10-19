@@ -24,7 +24,15 @@ struct ConversationDetailView: View {
         _secretPolicy = State(initialValue: AppEnvironment.usesDemoData
             ? ConversationSecretPolicy()
             : ConversationSecretPolicyCache.policy(conversationId: conversation.id))
+        // Demande de message (DM-REQ-1) : celle de la conversation, ou celle que vient d'annoncer la création.
+        _requestState = State(initialValue: conversation.request
+            ?? MessageRequestEvents.recentRequest(conversationId: conversation.id))
     }
+
+    /// Demande de message de cette conversation (DM-REQ-1) : `nil` pour une conversation ordinaire
+    /// et pour un serveur qui ne connaît pas les demandes.
+    @State private var requestState: MessageRequest?
+    @State private var isDecidingRequest = false
 
     @EnvironmentObject private var services: AppServices
     @EnvironmentObject private var session: AuthSessionViewModel
@@ -290,6 +298,10 @@ struct ConversationDetailView: View {
 
             if !networkPath.isOnline {
                 MessagesOfflineBanner()
+            }
+
+            if requestState?.remindsSender == true {
+                requestReminder
             }
 
             if EncryptedConversationSurfaces.showsLegacyUnlockBanner(
@@ -583,6 +595,12 @@ struct ConversationDetailView: View {
                     .padding(.horizontal)
                     .padding(.vertical, SQSpace.sm)
                     .accessibilityIdentifier("conversation.v2Unavailable")
+                    .sqReadableWidth()
+            } else if isPreviewingRequest {
+                requestDecisionBar
+                    .sqReadableWidth()
+            } else if requestState?.locksSenderComposer == true {
+                requestSentBar
                     .sqReadableWidth()
             } else {
                 composer
@@ -912,6 +930,7 @@ struct ConversationDetailView: View {
                 conversationIsV2 = true
             }
             v2Resolved = true
+            await refreshSenderRequestState()
             await restoreDraftIfNeeded()
             if usesV2 {
                 await loadV2()
@@ -947,6 +966,10 @@ struct ConversationDetailView: View {
             startSync()
             startActivePing()
         }
+        .onReceive(NotificationCenter.default.publisher(for: MessageRequestEvents.didChange)) { note in
+            if let request = MessageRequestEvents.request(in: note, conversationId: conversation.id) { requestState = request }
+        }
+        .onChangeCompat(of: conversation.request) { _, request in requestState = request }
         .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.e2eeV2EnvelopeReceived)) { _ in
             guard usesV2, isOnScreen else { return }
             Task {
@@ -1075,7 +1098,8 @@ struct ConversationDetailView: View {
 
             // CALL-SCOPE-17 : kill-switch de repli — masque toute initiation
             // d'appel quand SQFeatures.callsEnabled est false.
-            if SQFeatures.callsEnabled {
+            // Une demande en aperçu ne sonne pas chez l'expéditeur (DM-REQ-1) : pas d'appel avant l'acceptation.
+            if SQFeatures.callsEnabled && !isPreviewingRequest {
                 Menu {
                     Button { startCall(mode: "audio") } label: {
                         Label("Appel audio", systemImage: "phone.fill")
@@ -2524,7 +2548,8 @@ struct ConversationDetailView: View {
     /// Accuse réception du plus récent message d'autrui ; une seule fois par message, échec
     /// silencieux. En v1 l'identifiant est celui du message, en v2 celui de son enveloppe.
     private func acknowledgeDelivery() async {
-        guard !AppEnvironment.usesDemoData, let currentUserId else { return }
+        // Aperçu d'une demande : l'expéditeur ne doit pas apprendre que le message est arrivé (DM-REQ-1).
+        guard !AppEnvironment.usesDemoData, !isPreviewingRequest, let currentUserId else { return }
         if usesV2 {
             guard let envelopeId = v2LastIncomingEnvelopeId else { return }
             await services.deliveryAcks.acknowledge(conversationId: conversation.id, messageId: envelopeId, using: service)
@@ -2798,6 +2823,13 @@ struct ConversationDetailView: View {
             clientRequestId: clientRequestId, conversationId: conversation.id, isGroup: conversation.isGroup,
             participantIds: conversation.participants.map(\.userId)
         )
+        if case .sent(let receipt, _) = result, let block = receipt.request {
+            // DM-REQ-1 : le premier message d'une demande est parti ; la suite attend l'acceptation.
+            requestState = block.messageRequest
+        }
+        if case .failure(let failure) = result, MessageRequestLimitError.isPending(failure) {
+            await markRequestRefusal(clientRequestId: clientRequestId)
+        }
         if let failure = EncryptedConversationSurfaces.v2SendFailureMessage(result) {
             showActionError(failure)
             return false
@@ -2842,7 +2874,7 @@ struct ConversationDetailView: View {
             let localId = "local-\(record.clientRequestId)"
             pendingSends[localId] = PendingSend(
                 text: record.text, replyToId: record.replyToRef, idempotencyKey: record.clientRequestId,
-                ttlSeconds: record.ttlSeconds, restored: true
+                ttlSeconds: record.ttlSeconds, restored: true, failureReason: record.failureReason
             )
             sendStatus[localId] = .failed
             restored.append(makeOptimisticMessage(
@@ -3060,6 +3092,7 @@ struct ConversationDetailView: View {
                     await MainActor.run { if threadTarget != nil { threadRefreshToken &+= 1 } }
                     // Le flux ne rejoue pas les appels terminés pendant une coupure : on relit les plus récents.
                     if trigger == .polling { await refreshRecentCalls() }
+                    if trigger == .polling { await refreshSenderRequestState() }
                     if usesV2 {
                         await loadV2()
                         await markReadIfLastIncoming()
@@ -3083,7 +3116,7 @@ struct ConversationDetailView: View {
     /// backend qu'on regarde la conv (ping 30 s) ; il diffuse l'event `viewing`
     /// aux autres participants. Coupé en arrière-plan / à la fermeture.
     private func startActivePing() {
-        guard !AppEnvironment.usesDemoData else { return }
+        guard !AppEnvironment.usesDemoData, !isPreviewingRequest else { return }
         activePingTask?.cancel()
         let conversationId = conversation.id
         activePingTask = Task {
@@ -3411,7 +3444,7 @@ struct ConversationDetailView: View {
 
     private func signalTypingIfNeeded() {
         // Throttle 3 s, comme le composer web.
-        guard Date().timeIntervalSince(lastTypingSignal) > 3 else { return }
+        guard Date().timeIntervalSince(lastTypingSignal) > 3, !isPreviewingRequest else { return }
         lastTypingSignal = Date()
         Task { await service.setTyping(conversationId: conversation.id) }
     }
@@ -4323,7 +4356,8 @@ struct ConversationDetailView: View {
 
     private func markRead() async {
         // Tant que le fil est masqué, il n'est pas lu : l'autre personne ne verrait pas « Vu » à tort.
-        guard !holdsProtection else { return }
+        // Une demande en aperçu n'est pas lue non plus : pas de « Vu » avant l'acceptation (DM-REQ-1).
+        guard !holdsProtection, !isPreviewingRequest else { return }
         // Une bulle encore locale n'existe pas côté serveur : on lit jusqu'au dernier vrai message.
         let lastServerId = messages.last { !$0.id.hasPrefix("local-") }?.id
         readGate.lastMarkReadAt = Date()
@@ -4347,6 +4381,167 @@ struct ConversationDetailView: View {
               last.senderId != currentUserId,
               last.id != readGate.lastMarkedMessageId else { return }
         await markRead()
+    }
+
+    // MARK: - Demandes de message (DM-REQ-1)
+
+    /// Demande reçue qui attend ma décision : le fil se lit, sans rien annoncer à l'expéditeur.
+    private var isPreviewingRequest: Bool { requestState?.isIncomingPending == true }
+
+    private var requestSenderName: String {
+        requestState?.sender?.displayName ?? conversationTitle
+    }
+
+    /// « Compte récent · il y a 2 h » : le palier de l'expéditeur et le moment de sa demande.
+    private var requestSenderDetail: String? {
+        guard let request = requestState else { return nil }
+        var parts: [String] = []
+        if let tier = request.sender?.tier {
+            parts.append(tier == .new ? String(localized: "Compte récent") : tier.label)
+        }
+        if let date = request.createdAt {
+            parts.append(date.formatted(.relative(presentation: .named)))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Barre de décision : elle remplace le compositeur d'une demande reçue.
+    private var requestDecisionBar: some View {
+        VStack(spacing: SQSpace.sm) {
+            VStack(spacing: 2) {
+                Text("\(requestSenderName) veut t’écrire")
+                    .font(SQType.body(.semibold))
+                    .foregroundStyle(SQColor.label)
+                    .multilineTextAlignment(.center)
+                if let detail = requestSenderDetail {
+                    Text(verbatim: detail)
+                        .font(SQType.subhead)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            GradientButton("Accepter", systemImage: "checkmark", isBusy: isDecidingRequest) {
+                Task { await decideRequest(accept: true) }
+            }
+            .accessibilityIdentifier("conversation.request.accept")
+            HStack(spacing: SQSpace.sm) {
+                GradientButton("Refuser", style: .secondary) {
+                    Task { await decideRequest(accept: false) }
+                }
+                .accessibilityIdentifier("conversation.request.decline")
+                GradientButton("Bloquer", style: .destructive) {
+                    confirmBlockOther = true
+                }
+                .accessibilityIdentifier("conversation.request.block")
+            }
+            .disabled(isDecidingRequest)
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.md)
+        .frame(maxWidth: .infinity)
+        .background(SQColor.surface)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(String(localized: "\(requestSenderName) veut t’écrire"))
+        .accessibilityIdentifier("conversation.request.bar")
+    }
+
+    /// Côté expéditeur, après le premier message : le compositeur est remplacé tant que la demande attend.
+    private var requestSentBar: some View {
+        VStack(spacing: 2) {
+            Text("Demande envoyée")
+                .font(SQType.body(.semibold))
+                .foregroundStyle(SQColor.label)
+            Text("Tu pourras écrire à nouveau quand \(conversationTitle) l’aura acceptée.")
+                .font(SQType.subhead)
+                .foregroundStyle(SQColor.labelSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, SQSpace.lg)
+        .padding(.vertical, SQSpace.md)
+        .frame(maxWidth: .infinity)
+        .background(SQColor.surface)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("conversation.request.sent")
+    }
+
+    /// Côté expéditeur, avant le premier message : ce qui va se passer.
+    private var requestReminder: some View {
+        Text("Ton premier message arrivera comme une demande. Tu pourras en envoyer d’autres quand \(conversationTitle) l’aura acceptée.")
+            .font(SQType.subhead)
+            .foregroundStyle(SQColor.labelSecondary)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, SQSpace.lg)
+            .padding(.vertical, SQSpace.sm)
+            .accessibilityIdentifier("conversation.request.reminder")
+            .sqReadableWidth()
+    }
+
+    /// Accepter ou refuser. Accepter fait de la conversation une conversation ordinaire (lecture et
+    /// accusés reprennent) ; refuser la ferme. 404 : la demande n'existe plus ; 409 : déjà acceptée.
+    private func decideRequest(accept: Bool) async {
+        guard isPreviewingRequest, !isDecidingRequest else { return }
+        isDecidingRequest = true
+        defer { isDecidingRequest = false }
+        do {
+            if accept {
+                try await service.acceptMessageRequest(conversationId: conversation.id)
+            } else {
+                try await service.declineMessageRequest(conversationId: conversation.id)
+            }
+            Haptics.success()
+            if accept { await continueAsOrdinaryConversation() } else { closeConversation() }
+        } catch {
+            if error.isCancellation { return }
+            if case APIError.http(let status, let code, _, _, _) = error {
+                if status == 409, code == "MESSAGE_REQUEST_ALREADY_ACCEPTED" {
+                    await continueAsOrdinaryConversation()
+                    return
+                }
+                if status == 404 {
+                    showActionError(error.userFacingMessage)
+                    closeConversation()
+                    return
+                }
+            }
+            showActionError(error.userFacingMessage)
+            Haptics.error()
+        }
+    }
+
+    private func continueAsOrdinaryConversation() async {
+        withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { requestState = nil }
+        await acknowledgeDelivery()
+        await markRead()
+        startActivePing()
+    }
+
+    /// Expéditeur : le serveur a pu accepter la demande depuis la dernière lecture. Rien à lire sans
+    /// demande de ce côté-là, ni sans serveur qui les connaisse.
+    private func refreshSenderRequestState() async {
+        guard !AppEnvironment.usesDemoData, requestState?.role == .sender,
+              let fresh = try? await service.conversation(id: conversation.id) else { return }
+        if fresh.request != requestState {
+            await MainActor.run { withAnimation(SQMotion.resolve(SQMotion.fast, reduceMotion)) { requestState = fresh.request } }
+        }
+    }
+
+    /// 403 `MESSAGE_REQUEST_PENDING` en v2 : la demande attend. Le texte reste affiché « Non envoyé » avec
+    /// la raison, sans être rejoué par la reprise en arrière-plan ; le compositeur laisse place à « Demande envoyée ».
+    private func markRequestRefusal(clientRequestId: String) async {
+        let reason = String(localized: "Ta demande de message n’a pas encore été acceptée.")
+        requestState = .senderSent
+        if let scope = LocalAccountScope.sessionSnapshot()?.ownerScopeId {
+            await MessageDraftStore.shared.markV2SendFailed(clientRequestId: clientRequestId, reason: reason, ownerScopeId: scope)
+        }
+        for (localId, pending) in pendingSends where pending.idempotencyKey == clientRequestId {
+            pendingSends[localId]?.failureReason = reason
+        }
     }
 
     // MARK: Partage de position (parité Android)
@@ -4424,7 +4619,7 @@ struct ConversationDetailView: View {
     }
 
     private func shareKeyIfNeeded() async {
-        guard isE2EE, isE2EEUnlocked, let e2ee else { return }
+        guard isE2EE, isE2EEUnlocked, !isPreviewingRequest, let e2ee else { return }
         await e2ee.shareConversationKeyIfNeeded(conversationId: conversation.id)
     }
 
