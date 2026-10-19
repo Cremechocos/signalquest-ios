@@ -162,6 +162,16 @@ final class ModelDecodeTests: XCTestCase {
      ],"requestId":"req-1"}
     """
 
+    func testZoneCompareFooterDateIsTheServedSnapshotDay() throws {
+        // Forme servie par la prod le 19/10 : seule la date du fichier des sites compte, au jour près.
+        let json = Self.zoneJSON.replacingOccurrences(of: #""date":"2026-09-24""#, with: #""date":"2026-09-30""#)
+        let zone = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(json.utf8))
+        XCTAssertEqual(zone.snapshotDate, "2026-09-30")
+        let label = try XCTUnwrap(ANFRText.date(zone.snapshotDate, month: .abbreviated))
+        XCTAssertTrue(label.contains("30") && label.contains("2026") && !label.contains("29"), label)
+        XCTAssertEqual(ANFRText.date("2026-09-30T23:30:00+02:00", month: .abbreviated), label)
+    }
+
     func testZoneCompareDecodesTheFullContractInRegistryOrder() throws {
         let zone = try JSONDecoder.signalQuest.decode(ANFRZoneCompare.self, from: Data(Self.zoneJSON.utf8))
         XCTAssertEqual(zone.market, "FR")

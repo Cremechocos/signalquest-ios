@@ -353,7 +353,7 @@ enum ANFRDemoData {
         return ANFRZoneCompare(
             market: "FR",
             activeDefinition: "Sites au statut « En service » dans le relevé ANFR ; « Techniquement opérationnel » et « Projet approuvé » comptent en projet.",
-            snapshotDate: "2026-09-24", snapshotSource: "ANFR",
+            snapshotDate: "2026-09-30", snapshotSource: "ANFR",
             radiusKm: radius.kilometers, totalActive: n(540), totalPlanned: n(78),
             totalByGeneration: ANFRZoneGenerations(g2: n(230), g3: n(310), g4: n(530), g5: n(300)),
             operators: operators
