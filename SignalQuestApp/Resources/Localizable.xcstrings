@@ -22033,7 +22033,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ from %@ to %@ supports"
+            "value" : "%@ from %@ to %@ sites"
           }
         },
         "fr" : {
@@ -30223,7 +30223,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No archived change for this support."
+            "value" : "No archived change for this site."
           }
         },
         "fr" : {
@@ -66311,7 +66311,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Support %@"
+            "value" : "Site %@"
           }
         },
         "fr" : {
@@ -66327,7 +66327,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Supports"
+            "value" : "Sites"
           }
         },
         "fr" : {
@@ -76728,7 +76728,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Change in %@ supports in %@: no data available for the period."
+            "value" : "Change in %@ sites in %@: no data available for the period."
           }
         },
         "fr" : {
@@ -76744,7 +76744,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Change in %@ supports in %@, %@: "
+            "value" : "Change in %@ sites in %@, %@: "
           }
         },
         "fr" : {
@@ -77794,7 +77794,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search for an ANFR support number, an address or a town."
+            "value" : "Search for an ANFR site number, an address or a town."
           }
         }
       }

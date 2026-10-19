@@ -2861,7 +2861,9 @@ struct ConversationDetailView: View {
     private func load() async {
         defer { hasLoadedOnce = true }
         if AppEnvironment.usesDemoData {
-            messages = conversation.lastMessage.map { [$0] } ?? MessageItem.demo
+            // Le fil de démo de la conversation s'il existe (cartes de site P2-47 comprises).
+            let thread = MessageItem.demo.filter { $0.conversationId == conversation.id }
+            messages = thread.isEmpty ? (conversation.lastMessage.map { [$0] } ?? MessageItem.demo) : Self.normalized(thread)
             errorMessage = nil
             return
         }
