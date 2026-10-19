@@ -21,6 +21,12 @@ final class SectorEditViewModel: ObservableObject {
     }
 
     var operatorName: String { item.operatorName ?? "ALL" }
+    /// PLMN de l'identification : il départage les MVNO, que le seul nom ne reconnaît pas.
+    private var mccMnc: String? { SectorNumbering.plmn(mcc: item.operatorMcc, mnc: item.operatorMnc) }
+
+    /// En France et dans les DROM le secteur se déduit du PCI : la feuille le montre,
+    /// elle ne le fait pas modifier.
+    var isReadOnly: Bool { market == "FR" || market == "DROM" }
     var market: String? {
         let value = item.marketCode?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
         return value.isEmpty ? nil : value
@@ -48,13 +54,13 @@ final class SectorEditViewModel: ObservableObject {
         // numérotation de l'opérateur (SFR 0-based vs Orange/Bouygues/Free 1-based).
         if let first = item.sectors.first {
             selectedIndex = SectorNumbering.index(
-                forStoredValue: first, azimuthCount: unique.count, operatorName: item.operatorName
+                forStoredValue: first, azimuthCount: unique.count, mccMnc: mccMnc, operatorName: item.operatorName
             )
         }
         // SECTOR-UX-04 : en France le secteur est imposé par le PCI — on l'annonce
-        // AVANT l'édition (et non plus après l'appel réseau, façon Android).
-        if market == "FR", !unique.isEmpty {
-            infoMessage = String(localized: "En France, le secteur se déduit du PCI. Ton choix ici est indicatif.")
+        // AVANT toute action, et la feuille reste en lecture seule.
+        if isReadOnly, !unique.isEmpty {
+            infoMessage = String(localized: "En France, le secteur se déduit automatiquement du PCI : il ne se corrige pas à la main.")
         }
         if unique.isEmpty {
             errorMessage = String(localized: "Ce site n'expose pas d'azimuts de secteur.")
@@ -63,14 +69,14 @@ final class SectorEditViewModel: ObservableObject {
 
     /// Numéro de secteur affiché pour un index, dans la convention de l'opérateur.
     func sectorLabel(forIndex index: Int) -> Int {
-        SectorNumbering.displayValue(index: index, operatorName: item.operatorName)
+        SectorNumbering.displayValue(index: index, mccMnc: mccMnc, operatorName: item.operatorName)
     }
 
     func submit() async {
-        guard let selectedIndex, selectedIndex < azimuths.count else { return }
+        guard !isReadOnly, let selectedIndex, selectedIndex < azimuths.count else { return }
         // SECTOR-TELECOM-01 : valeur soumise dans la convention de l'opérateur
         // (un `index + 1` naïf écrivait une valeur fausse pour SFR).
-        let sectorNumber = SectorNumbering.submissionValue(index: selectedIndex, operatorName: item.operatorName)
+        let sectorNumber = SectorNumbering.submissionValue(index: selectedIndex, mccMnc: mccMnc, operatorName: item.operatorName)
         isSubmitting = true
         defer { isSubmitting = false }
         do {
@@ -94,7 +100,7 @@ final class SectorEditViewModel: ObservableObject {
                     ? String(localized: "En France, le secteur se déduit du PCI.")
                     : String(localized: "En France, le secteur se déduit du PCI : secteur \(derived).")
                 if let d = result.sectors.first,
-                   let index = SectorNumbering.index(forStoredValue: d, azimuthCount: azimuths.count, operatorName: item.operatorName) {
+                   let index = SectorNumbering.index(forStoredValue: d, azimuthCount: azimuths.count, mccMnc: mccMnc, operatorName: item.operatorName) {
                     self.selectedIndex = index
                 }
                 Haptics.warning()
@@ -125,8 +131,8 @@ struct SectorEditSheet: View {
         ScrollView {
             VStack(spacing: SQSpace.lg) {
                 MapSheetHeader(
-                    title: "Corriger le secteur",
-                    subtitle: String(localized: "Touche le secteur qui dessert vraiment \(model.item.nodeLabel)."),
+                    title: model.isReadOnly ? String(localized: "Secteur") : String(localized: "Corriger le secteur"),
+                    subtitle: model.isReadOnly ? nil : String(localized: "Touche le secteur qui dessert vraiment \(model.item.nodeLabel)."),
                     closeIdentifier: "sector.cancel"
                 ) { dismiss() }
 
@@ -142,6 +148,7 @@ struct SectorEditSheet: View {
                     SelectableSectorRadar(
                         azimuths: model.azimuths,
                         selectedIndex: $model.selectedIndex,
+                        isInteractive: !model.isReadOnly,
                         displayNumber: { model.sectorLabel(forIndex: $0) }
                     )
                     .frame(width: 260, height: 260)
@@ -200,7 +207,7 @@ struct SectorEditSheet: View {
             .padding(.vertical, SQSpace.xs2)
             .background(SQColor.accentSoft, in: Capsule(style: .continuous))
             .accessibilityIdentifier("sector.selection")
-        } else {
+        } else if !model.isReadOnly {
             Text("Aucun secteur sélectionné")
                 .font(SQType.subhead)
                 .foregroundStyle(SQColor.labelSecondary)
@@ -209,7 +216,10 @@ struct SectorEditSheet: View {
 
     @ViewBuilder
     private var saveButton: some View {
-        if !model.azimuths.isEmpty {
+        if model.isReadOnly {
+            GradientButton(String(localized: "Fermer"), style: .secondary) { dismiss() }
+                .accessibilityIdentifier("sector.close")
+        } else if !model.azimuths.isEmpty {
             GradientButton(
                 "Enregistrer le secteur",
                 systemImage: "checkmark",
@@ -230,6 +240,8 @@ struct SectorEditSheet: View {
 struct SelectableSectorRadar: View {
     let azimuths: [Double]
     @Binding var selectedIndex: Int?
+    /// Faux : le radar montre le secteur sans le laisser changer.
+    var isInteractive = true
     var color: Color = SQColor.brandRed
     /// Numéro de secteur affiché pour un index (convention opérateur). 1-based par défaut.
     var displayNumber: (Int) -> Int = { $0 + 1 }
@@ -272,11 +284,10 @@ struct SelectableSectorRadar: View {
                         // sélectionnable (le radar tactile est sinon invisible à VoiceOver).
                         .accessibilityElement()
                         .accessibilityLabel("Secteur \(displayNumber(index)), azimut \(Int(azimuth.rounded())) degrés")
-                        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-                        .accessibilityAction {
+                        .modifier(SectorSelectionAccessibility(isInteractive: isInteractive, isSelected: isSelected) {
                             selectedIndex = index
                             Haptics.selection()
-                        }
+                        })
                 }
 
                 Text("N")
@@ -292,6 +303,7 @@ struct SelectableSectorRadar: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onEnded { value in
+                        guard isInteractive else { return }
                         if let hit = hitTest(value.location, center: center, radius: radius) {
                             selectedIndex = hit
                             Haptics.selection()
@@ -331,6 +343,24 @@ struct SelectableSectorRadar: View {
     private func angularDistance(_ a: Double, _ b: Double) -> Double {
         let d = abs(a - b).truncatingRemainder(dividingBy: 360)
         return min(d, 360 - d)
+    }
+}
+
+/// Un secteur se choisit au toucher ; en lecture seule il se lit seulement, sans action.
+private struct SectorSelectionAccessibility: ViewModifier {
+    let isInteractive: Bool
+    let isSelected: Bool
+    let select: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isInteractive {
+            content
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAction(.default, select)
+        } else {
+            content.accessibilityAddTraits(isSelected ? .isSelected : [])
+        }
     }
 }
 

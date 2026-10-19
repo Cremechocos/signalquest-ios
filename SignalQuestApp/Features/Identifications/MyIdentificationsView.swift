@@ -307,8 +307,9 @@ struct MyIdentificationsView: View {
                     .sqShadowCard()
                     .padding(.bottom, SQSpace.lg)
                     .accessibilityIdentifier("identifications.toast")
-                    .task {
-                        try? await Task.sleep(nanoseconds: 2_200_000_000)
+                    // Un message qui en remplace un autre relance la minuterie.
+                    .task(id: toast) {
+                        guard (try? await Task.sleep(nanoseconds: 2_200_000_000)) != nil else { return }
                         model.toast = nil
                     }
             }
@@ -556,6 +557,7 @@ private struct IdentificationDetailSheet: View {
                 antennas: services.antennas,
                 identify: services.identify,
                 location: services.location,
+                markets: services.markets,
                 onDone: { onChanged(); dismiss() }
             )
         }

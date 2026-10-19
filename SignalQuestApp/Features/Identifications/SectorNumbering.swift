@@ -48,6 +48,13 @@ enum SectorNumbering {
         return submissionValue(index: pci % 3, mccMnc: mccMnc, operatorName: operatorName)
     }
 
+    /// PLMN (« 20810 ») d'une identification, quand son MCC et son MNC sont connus.
+    /// Le MNC garde ses deux chiffres : c'est la forme que `resolveMode` lit.
+    static func plmn(mcc: Int?, mnc: Int?) -> String? {
+        guard let mcc, let mnc else { return nil }
+        return String(format: "%03d%02d", mcc, mnc)
+    }
+
     static func resolveMode(mccMnc: String?, operatorName: String?) -> Mode {
         let code = (mccMnc ?? "").filter(\.isNumber)
         let mcc = String(code.prefix(3))

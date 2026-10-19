@@ -78,6 +78,15 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         conflictSiteLng = try? c.decodeIfPresent(Double.self, forKey: .conflictSiteLng)
     }
 
+    /// iOS écrit « 4G »/« 5G », Android et le serveur peuvent renvoyer « LTE »/« NR » :
+    /// on ramène les deux vocabulaires à la génération, pour le filtre et le groupement.
+    static func normalizedTech(_ raw: String) -> String {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if value.contains("5G") || value == "NR" || value.hasPrefix("NR ") || value.hasPrefix("NR-") { return "5G" }
+        if value.contains("4G") || value.contains("LTE") { return "4G" }
+        return value
+    }
+
     /// Catégorie radio normalisée pour le filtrage / affichage.
     enum Kind: String { case enb, gnb, pci, cellid, other }
     var kind: Kind { Kind(rawValue: type) ?? .other }
@@ -88,7 +97,7 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
         case .enb: return "eNB \(enb ?? cellId ?? "—")"
         case .gnb: return "gNB \(gnb ?? cellId ?? "—")"
         case .pci: return "PCI \(pciValue ?? "—")"
-        case .cellid: return "Cell \(cellId ?? "—")"
+        case .cellid: return String(localized: "Cellule \(cellId ?? "—")")
         case .other: return enb ?? gnb ?? cellId ?? siteId
         }
     }
@@ -101,7 +110,7 @@ struct MyIdentification: Decodable, Identifiable, Equatable {
 
     /// Génération réseau déduite (5G si gNB, sinon le champ `tech`, sinon 4G).
     var techLabel: String {
-        if let t = tech, !t.isEmpty { return t.uppercased() }
+        if let t = tech, !t.isEmpty { return Self.normalizedTech(t) }
         switch kind {
         case .gnb: return "5G"
         case .enb: return "4G"
@@ -127,7 +136,7 @@ struct IdentifiedCell: Identifiable, Equatable {
 
     var label: String {
         if let pci, !pci.isEmpty { return "PCI \(pci)" }
-        if let cellId, !cellId.isEmpty { return "Cell \(cellId)" }
+        if let cellId, !cellId.isEmpty { return String(localized: "Cellule \(cellId)") }
         if let ci, !ci.isEmpty { return "CI \(ci)" }
         return String(localized: "Cellule")
     }

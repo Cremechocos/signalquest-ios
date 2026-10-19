@@ -16,13 +16,37 @@ final class SiteRemapViewModel: ObservableObject {
     private let antennas: AntennasServicing
     private let identify: IdentifyServicing
     private let location: LocationService
+    private let markets: MarketRegistryServicing?
     private var loadTask: Task<Void, Never>?
 
-    init(item: MyIdentification, antennas: AntennasServicing, identify: IdentifyServicing, location: LocationService) {
+    init(
+        item: MyIdentification,
+        antennas: AntennasServicing,
+        identify: IdentifyServicing,
+        location: LocationService,
+        markets: MarketRegistryServicing? = nil
+    ) {
         self.item = item
         self.antennas = antennas
         self.identify = identify
         self.location = location
+        self.markets = markets
+    }
+
+    /// Le site touché est celui où le nœud se trouve déjà : le déplacer ici ne ferait rien.
+    var selectedIsCurrentSite: Bool {
+        guard let selected else { return false }
+        return selected.siteId == item.siteId || selected.id == item.siteId || selected.writeSiteId == item.siteId
+    }
+
+    /// Centre de repli quand ni le site actuel ni la position ne répondent : celui du
+    /// marché de l'identification, à défaut la France, jamais le golfe de Guinée.
+    private func marketCenter() async -> CLLocationCoordinate2D {
+        if let entry = await markets?.market(forCode: market),
+           let latitude = entry.defaultCenterLatitude, let longitude = entry.defaultCenterLongitude {
+            return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        }
+        return CLLocationCoordinate2D(latitude: 46.6, longitude: 2.5)
     }
 
     var operatorName: String { item.operatorName ?? "ALL" }
@@ -36,8 +60,11 @@ final class SiteRemapViewModel: ObservableObject {
     func prepareCenter() async {
         guard let market else {
             errorMessage = String(localized: "Le marché de cette identification n'est pas renseigné. Aucun pays ne sera déduit automatiquement.")
-            initialCenter = (await location.currentLocation(timeoutSeconds: 4))?.coordinate
-                ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
+            if let coordinate = (await location.currentLocation(timeoutSeconds: 4))?.coordinate {
+                initialCenter = coordinate
+            } else {
+                initialCenter = await marketCenter()
+            }
             return
         }
         if let details = try? await antennas.details(id: item.siteId, market: market, operatorName: operatorName),
@@ -48,7 +75,7 @@ final class SiteRemapViewModel: ObservableObject {
         if let loc = await location.currentLocation(timeoutSeconds: 4) {
             initialCenter = loc.coordinate
         } else {
-            initialCenter = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+            initialCenter = await marketCenter()
         }
     }
 
@@ -60,6 +87,13 @@ final class SiteRemapViewModel: ObservableObject {
             guard let market else {
                 sites = []
                 errorMessage = String(localized: "Le marché doit être connu avant de rechercher un site.")
+                return
+            }
+            // Au-delà de 0,5° de haut, on ne demande pas tous les sites de l'opérateur :
+            // la carte invite à zoomer.
+            guard bbox.north - bbox.south < 0.5 else {
+                sites = []
+                errorMessage = String(localized: "Zoome pour afficher les antennes.")
                 return
             }
             do {
@@ -109,8 +143,17 @@ struct SiteRemapSheet: View {
     /// confirme, comme le choix sur carte des Logs (AF-RAD-17).
     @State private var confirmsRemap = false
 
-    init(item: MyIdentification, antennas: AntennasServicing, identify: IdentifyServicing, location: LocationService, onDone: @escaping () -> Void) {
-        _model = StateObject(wrappedValue: SiteRemapViewModel(item: item, antennas: antennas, identify: identify, location: location))
+    init(
+        item: MyIdentification,
+        antennas: AntennasServicing,
+        identify: IdentifyServicing,
+        location: LocationService,
+        markets: MarketRegistryServicing? = nil,
+        onDone: @escaping () -> Void
+    ) {
+        _model = StateObject(wrappedValue: SiteRemapViewModel(
+            item: item, antennas: antennas, identify: identify, location: location, markets: markets
+        ))
         self.onDone = onDone
     }
 
@@ -213,6 +256,12 @@ struct SiteRemapSheet: View {
                         model.selected = nil
                     }
                 }
+                if model.selectedIsCurrentSite {
+                    Text("Ce nœud est déjà sur ce site.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 GradientButton(
                     "Déplacer ici",
                     systemImage: "arrow.triangle.swap",
@@ -221,6 +270,7 @@ struct SiteRemapSheet: View {
                 ) {
                     confirmsRemap = true
                 }
+                .disabled(model.selectedIsCurrentSite)
                 .accessibilityIdentifier("remap.move")
                 .confirmationDialog(
                     "Déplacer ce nœud ?",
