@@ -8,7 +8,7 @@ struct OutageNotificationReceiptPayload: Codable, Equatable, Sendable {
         guard (info["type"] as? String)?.lowercased() == "community_outage",
               state == "received" || state == "opened",
               let rawID = info["outageNotificationId"] as? String,
-              !rawID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              rawID.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}\z"#, options: .regularExpression) != nil,
               let token = info["outageNotificationReceiptToken"] as? String,
               token.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil else {
             return nil

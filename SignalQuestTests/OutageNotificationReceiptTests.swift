@@ -32,6 +32,23 @@ final class OutageNotificationReceiptTests: XCTestCase {
         ], state: "displayed"))
     }
 
+    /// L'identifiant entre dans le chemin d'API du reçu : un séparateur ou un point-point ne passe pas.
+    func testReceiptRejectsAnIdentifierThatCouldChangeThePath() {
+        let token = String(repeating: "a", count: 43)
+        for id in ["../../x", "a/b", "id?x=1", "id%2F", " id", "id ", "", "-id", String(repeating: "a", count: 129)] {
+            XCTAssertNil(OutageNotificationReceiptPayload.parse([
+                "type": "community_outage",
+                "outageNotificationId": id,
+                "outageNotificationReceiptToken": token,
+            ], state: "opened"), "« \(id) » doit être refusé")
+        }
+        XCTAssertNotNil(OutageNotificationReceiptPayload.parse([
+            "type": "community_outage",
+            "outageNotificationId": "cm0abc123_DEF-9",
+            "outageNotificationReceiptToken": token,
+        ], state: "opened"))
+    }
+
     func testClientVersionIncludesBuildForProductionDiagnostics() {
         XCTAssertEqual(
             APIClient.appVersionLabel(shortVersion: "1.0", build: "75"),

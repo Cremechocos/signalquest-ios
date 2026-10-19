@@ -369,27 +369,19 @@ enum PushRecipientPolicy {
         }
     }
 
+    /// Diffusions publiques du serveur : le même contenu pour tous, rien du compte.
+    private static let publicTypes: Set<String> = ["anfr_update", "data_update"]
+
+    /// Même règle que le serveur : tout type est lié au compte, sauf les diffusions
+    /// publiques. Une notification locale sans type ni identifiant (appel chiffré à
+    /// déverrouiller, alerte de couverture CarPlay) ne vise aucun compte.
     private static func isAccountBound(_ info: [AnyHashable: Any]) -> Bool {
         if string(info, "conversationId", "conversation_id", "messageId", "message_id",
                   "callId", "call_id", "sessionId", "session_id") != nil {
             return true
         }
-        let type = string(info, "type")?.lowercased() ?? ""
-        return type.hasPrefix("message_") ||
-            type.hasPrefix("call_") ||
-            type.hasPrefix("live_share_") ||
-            type.hasPrefix("friend_") ||
-            type.hasPrefix("bug_") ||
-            type.hasPrefix("badge_") ||
-            type.hasPrefix("level_") ||
-            type.hasPrefix("streak_") ||
-            [
-                "e2ee_sync", "favorite_antenna_issue", "zone_antenna_issue",
-                "zone_new_antenna", "zone_antenna_upgrade", "coverage_session_auto_closed",
-                "antenna_report_reply", "photo_comment", "photo_like", "photo_mention",
-                "photo_reply", "test_push", "new_bug", "e2ee_v2_device_approval",
-                "e2ee_v2_envelope", "e2ee_v2_identity_reset", "site_follow"
-            ].contains(type)
+        guard let type = string(info, "type")?.lowercased() else { return false }
+        return !publicTypes.contains(type)
     }
 
     private static func string(_ info: [AnyHashable: Any], _ keys: String...) -> String? {
@@ -994,8 +986,14 @@ extension PushNotificationService {
 
 extension PushNotificationService {
     /// Contenu du rappel local « Ta réponse n'a pas pu être envoyée » ; il mène au fil
-    /// comme une notification de message.
-    nonisolated static func replyFailureContent(conversationId: String, conversationTitle: String?) -> UNMutableNotificationContent {
+    /// comme une notification de message. Il porte le compte courant, que le délégué
+    /// exige pour toute notification liée à une conversation ; sans compte actif, rien à poster.
+    nonisolated static func replyFailureContent(
+        conversationId: String,
+        conversationTitle: String?,
+        ownerScopeId: String? = PushOwnerScope.current
+    ) -> UNMutableNotificationContent? {
+        guard let ownerScopeId else { return nil }
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Réponse non envoyée")
         if let title = conversationTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
@@ -1003,15 +1001,20 @@ extension PushNotificationService {
         } else {
             content.body = String(localized: "Ta réponse n’a pas pu être envoyée.")
         }
-        content.userInfo = ["type": "message_new", "conversationId": conversationId]
+        content.userInfo = [
+            "type": "message_new",
+            "conversationId": conversationId,
+            "recipientOwnerScope": ownerScopeId
+        ]
         content.sound = .default
         return content
     }
 
     private static func postReplyFailureNotice(conversationId: String, conversationTitle: String?) async {
+        guard let content = replyFailureContent(conversationId: conversationId, conversationTitle: conversationTitle) else { return }
         let request = UNNotificationRequest(
             identifier: "reply-failure-\(conversationId)",
-            content: replyFailureContent(conversationId: conversationId, conversationTitle: conversationTitle),
+            content: content,
             trigger: nil
         )
         try? await UNUserNotificationCenter.current().add(request)

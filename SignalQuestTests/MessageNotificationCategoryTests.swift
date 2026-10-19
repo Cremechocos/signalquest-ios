@@ -72,16 +72,38 @@ final class MessageNotificationCategoryTests: XCTestCase {
     }
 
     /// U04 : une réponse refusée par le serveur prévient, et le toucher mène au fil.
-    func testFailedReplyNoticeNamesTheConversationAndOpensIt() {
-        let named = PushNotificationService.replyFailureContent(conversationId: "conv-1", conversationTitle: "Camille")
+    func testFailedReplyNoticeNamesTheConversationAndOpensIt() throws {
+        let owner = PushOwnerScope.id(for: "account-a")
+        let named = try XCTUnwrap(PushNotificationService.replyFailureContent(
+            conversationId: "conv-1", conversationTitle: "Camille", ownerScopeId: owner
+        ))
         XCTAssertEqual(named.userInfo["type"] as? String, "message_new")
         XCTAssertEqual(named.userInfo["conversationId"] as? String, "conv-1")
         XCTAssertTrue(named.body.contains("Camille"))
 
-        let anonymous = PushNotificationService.replyFailureContent(conversationId: "conv-1", conversationTitle: "  ")
+        let anonymous = try XCTUnwrap(PushNotificationService.replyFailureContent(
+            conversationId: "conv-1", conversationTitle: "  ", ownerScopeId: owner
+        ))
         XCTAssertFalse(anonymous.body.isEmpty)
         XCTAssertNotEqual(anonymous.body, named.body)
         XCTAssertEqual(anonymous.userInfo["conversationId"] as? String, "conv-1")
+    }
+
+    /// Le rappel passe par la même politique que les pushs : il porte le compte courant,
+    /// sinon le délégué l'écarterait au tap. Sans compte actif, rien n'est posté.
+    func testFailedReplyNoticeIsAcceptedByTheRecipientPolicyOfItsAccountOnly() throws {
+        let owner = PushOwnerScope.id(for: "account-a")
+        let content = try XCTUnwrap(PushNotificationService.replyFailureContent(
+            conversationId: "conv-1", conversationTitle: nil, ownerScopeId: owner
+        ))
+        XCTAssertEqual(PushRecipientPolicy.evaluate(content.userInfo, currentOwnerScopeId: owner), .acceptTargeted)
+        XCTAssertEqual(
+            PushRecipientPolicy.evaluate(content.userInfo, currentOwnerScopeId: PushOwnerScope.id(for: "account-b")),
+            .rejectWrongAccount
+        )
+        XCTAssertNil(PushNotificationService.replyFailureContent(
+            conversationId: "conv-1", conversationTitle: nil, ownerScopeId: nil
+        ))
     }
 
     func testOfflineReplyTargetIsAPlainConversation() {

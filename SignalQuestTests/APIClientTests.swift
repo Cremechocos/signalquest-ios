@@ -1047,6 +1047,26 @@ final class APIClientTests: XCTestCase {
         )
     }
 
+    /// Comme le serveur : tout type est lié au compte, sauf les diffusions publiques ; une
+    /// notification locale sans type ni identifiant reste affichable.
+    func testPushRecipientPolicyBindsPersonalTypesToTheAccount() {
+        let owner = PushOwnerScope.id(for: "account-a")
+        for type in ["social_comment", "community_outage", "sentinelle_incident", "supporter_granted",
+                     "antenna_report", "improvement", "status_change", "story", "mention", "site_follow"] {
+            XCTAssertEqual(PushRecipientPolicy.evaluate(["type": type], currentOwnerScopeId: nil),
+                           .rejectNoActiveAccount, type)
+            XCTAssertEqual(PushRecipientPolicy.evaluate(["type": type], currentOwnerScopeId: owner),
+                           .rejectMissingTarget, type)
+            XCTAssertEqual(PushRecipientPolicy.evaluate(["type": type, "recipientOwnerScope": owner],
+                                                        currentOwnerScopeId: owner), .acceptTargeted, type)
+        }
+        for type in ["anfr_update", "data_update", "ANFR_UPDATE"] {
+            XCTAssertEqual(PushRecipientPolicy.evaluate(["type": type], currentOwnerScopeId: nil),
+                           .acceptPublic, type)
+        }
+        XCTAssertEqual(PushRecipientPolicy.evaluate([:], currentOwnerScopeId: nil), .acceptPublic)
+    }
+
     func testAccountDeletionUsesServerPreviewAndSupportedReauthenticationProofs() async throws {
         let client = APIClient(
             config: .test,
