@@ -147,6 +147,10 @@ enum APIError: Error, LocalizedError, Equatable {
         "EMPTY_STORY": String(localized: "Ajoute un texte, une photo ou ton relevé radio à ta story."),
         "INVALID_STORY_EXPIRATION": String(localized: "Cette durée n'est pas disponible pour une story."),
         "INVALID_STORY": String(localized: "Cette story n'a pas pu être publiée. Vérifie son texte et réessaie."),
+
+        // Discussion d'un site (`/api/site-threads/comments`) : limites des comptes récents.
+        "LINKS_NOT_ALLOWED_YET": String(localized: "Les liens sont possibles une fois ton compte âgé de 7 jours. Retire le lien pour publier."),
+        "NEW_ACCOUNT_DAILY_LIMIT": String(localized: "Pendant les 7 premiers jours, un compte publie au plus 3 messages par jour. Réessaie demain."),
     ]
 }
 

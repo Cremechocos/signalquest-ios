@@ -822,6 +822,17 @@ struct AntennaDetailSheet: View {
             if onIsolateCoverage == nil { miniMap }
             siteActions
             reportRows
+            // Un fil par opérateur : « ALL » n'en a pas, il faut une facette précise.
+            if selectedOperator.uppercased() != "ALL" {
+                SiteThreadSection(
+                    market: market.uppercased(),
+                    operatorKey: selectedOperator,
+                    siteId: site.writeSiteId,
+                    operatorLabel: MarketRegistryEntry.operatorLabel(selectedOperator, in: marketEntry)
+                )
+                .padding(SQSpace.md)
+                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+            }
         }
     }
 

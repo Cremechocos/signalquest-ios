@@ -2637,6 +2637,22 @@
         }
       }
     },
+    "Actions sur le message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message actions"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actions sur le message"
+          }
+        }
+      }
+    },
     "Active le chiffrement sur cet appareil pour créer une conversation chiffrée." : {
       "localizations" : {
         "en" : {
@@ -5982,6 +5998,22 @@
         }
       }
     },
+    "Connecte-toi pour participer à la discussion." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to join the discussion."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi pour participer à la discussion."
+          }
+        }
+      }
+    },
     "Connecte-toi à SignalQuest pour envoyer un message." : {
       "localizations" : {
         "en" : {
@@ -6497,6 +6529,22 @@
         }
       }
     },
+    "Demande d'aide" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help request"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande d'aide"
+          }
+        }
+      }
+    },
     "Demande invalide, expirée ou incohérente avec le serveur." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6574,6 +6622,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dernière mesure : %@. Ouvre le Speedtest."
+          }
+        }
+      }
+    },
+    "Discussion du site" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Site discussion"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discussion du site"
           }
         }
       }
@@ -6735,6 +6799,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Décris ce que tu faisais et ce que tu as vu…"
+          }
+        }
+      }
+    },
+    "Décris ce qui ne va pas…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Describe what's wrong…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Décris ce qui ne va pas…"
           }
         }
       }
@@ -8138,6 +8218,22 @@
         }
       }
     },
+    "Il disparaîtra de la discussion pour tout le monde." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It will disappear from the discussion for everyone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il disparaîtra de la discussion pour tout le monde."
+          }
+        }
+      }
+    },
     "Il ne verra plus l’état de cette connexion." : {
       "localizations" : {
         "en" : {
@@ -8815,6 +8911,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Joint au signalement"
+          }
+        }
+      }
+    },
+    "Joint ta technologie actuelle (%@). Aucune position n'est envoyée." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attaches your current technology (%@). No location is sent."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joint ta technologie actuelle (%@). Aucune position n'est envoyée."
           }
         }
       }
@@ -9942,6 +10054,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les idées sont lues par l'équipe ; tu es prévenu si elle est retenue."
+          }
+        }
+      }
+    },
+    "Les liens sont possibles une fois ton compte âgé de 7 jours. Retire le lien pour publier." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Links are allowed once your account is 7 days old. Remove the link to post."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les liens sont possibles une fois ton compte âgé de 7 jours. Retire le lien pour publier."
           }
         }
       }
@@ -11603,6 +11731,22 @@
         }
       }
     },
+    "Ouverte à tous, sur le réseau %@ de ce site. Les messages ne modifient ni les pannes ni les identifiants." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open to everyone, about this site's %@ network. Messages don't change outages or identifiers."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouverte à tous, sur le réseau %@ de ce site. Les messages ne modifient ni les pannes ni les identifiants."
+          }
+        }
+      }
+    },
     "Ouverts · %lld" : {
       "localizations" : {
         "en" : {
@@ -12118,6 +12262,22 @@
         }
       }
     },
+    "Pendant les 7 premiers jours, un compte publie au plus 3 messages par jour. Réessaie demain." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During its first 7 days, an account can post up to 3 messages a day. Try again tomorrow."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pendant les 7 premiers jours, un compte publie au plus 3 messages par jour. Réessaie demain."
+          }
+        }
+      }
+    },
     "Pendant ton trajet" : {
       "localizations" : {
         "en" : {
@@ -12146,6 +12306,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Personne d’autre ne voit qui te suit ni qui tu suis. Tes compteurs restent visibles."
+          }
+        }
+      }
+    },
+    "Personne n'a encore écrit sur ce site." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No one has written about this site yet."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personne n'a encore écrit sur ce site."
           }
         }
       }
@@ -13899,6 +14075,22 @@
         }
       }
     },
+    "SINR %lld dB" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SINR %lld dB"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SINR %lld dB"
+          }
+        }
+      }
+    },
     "Sa couverture" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14755,6 +14947,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer ce dossier ?"
+          }
+        }
+      }
+    },
+    "Supprimer ce message ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete this message?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer ce message ?"
           }
         }
       }
@@ -16601,6 +16809,22 @@
         }
       }
     },
+    "Voir les messages plus anciens" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show older messages"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir les messages plus anciens"
+          }
+        }
+      }
+    },
     "Voir mon signalement" : {
       "localizations" : {
         "en" : {
@@ -18069,6 +18293,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Échec d’envoi"
+          }
+        }
+      }
+    },
+    "Écrire sur ce site…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write about this site…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrire sur ce site…"
           }
         }
       }

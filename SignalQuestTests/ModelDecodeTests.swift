@@ -912,6 +912,46 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertTrue(twoLines.contains("Opérateur: Orange, SFR"))
     }
 
+    /// SITE-1a : la forme servie par `GET /api/site-threads/comments` (bdf14de61), et le corps
+    /// strict de la publication (le serveur refuse toute clé inconnue).
+    func testDecodesASiteThreadPageAndEncodesAStrictPost() throws {
+        let json = """
+        {"thread":{"market":"FR","operator":"ORANGE","siteKey":"0123456","commentCount":2,"following":false},
+         "comments":[
+          {"id":"c2","kind":"help","text":"Débit faible ce soir","createdAt":"2026-10-19T00:51:37.123Z",
+           "radio":{"technology":"4G","band":"b3","pci":214,"rsrp":-98.4,"neighbors":[{"pci":12}]},
+           "author":{"id":"u2","handle":"camille","name":"Camille","avatarUrl":null},"own":false,"canDelete":false},
+          {"id":"c1","kind":"comment","text":"5G active","createdAt":"2026-10-17T08:00:00.000Z","radio":null,
+           "author":{"id":"u1","handle":null,"name":null,"avatarUrl":null},"own":true,"canDelete":true}],
+         "nextCursor":"2026-10-17T08:00:00.000Z::c1","requestId":"r1"}
+        """
+        let page = try JSONDecoder.signalQuest.decode(SiteCommentsPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.thread.commentCount, 2)
+        XCTAssertEqual(page.nextCursor, "2026-10-17T08:00:00.000Z::c1")
+        XCTAssertEqual(page.comments.map(\.kind), [.help, .comment])
+        XCTAssertNotNil(page.comments[0].createdAt)
+        XCTAssertEqual(page.comments[0].radio?.summary, "4G · B3 · PCI 214 · -98 dBm")
+        XCTAssertEqual(page.comments[0].author.displayName, "Camille")
+        XCTAssertTrue(page.comments[1].canDelete)
+        XCTAssertNil(page.comments[1].radio)
+
+        // iOS ne joint que la technologie, la 5G NSA et SA au même format que le serveur.
+        XCTAssertEqual(SiteCommentRadio.coarse(.fiveGNSA)?.technology, "5G")
+        XCTAssertNil(SiteCommentRadio.coarse(nil))
+        let radio = try XCTUnwrap(SiteCommentRadio.coarse(.fourG))
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(radio)) as? [String: Any]
+        XCTAssertEqual(encoded?.keys.sorted(), ["technology"])
+
+        XCTAssertEqual(ReportTarget.siteComment("c2").id, "c2")
+
+        // Les refus propres aux comptes récents se disent par leur code, jamais par le texte serveur.
+        let links = APIError.http(status: 422, code: "LINKS_NOT_ALLOWED_YET", message: "Les liens sont possibles après 7 jours",
+                                  requestId: nil, retryAfter: nil)
+        XCTAssertEqual(links.errorDescription, String(localized: "Les liens sont possibles une fois ton compte âgé de 7 jours. Retire le lien pour publier."))
+        let daily = APIError.http(status: 429, code: "NEW_ACCOUNT_DAILY_LIMIT", message: "3 messages par jour", requestId: nil, retryAfter: nil)
+        XCTAssertEqual(daily.errorDescription, String(localized: "Pendant les 7 premiers jours, un compte publie au plus 3 messages par jour. Réessaie demain."))
+    }
+
     private static let mapJSON = """
     {"timestamp":"2026-05-11T10:00:00.000Z","friends":[],"photos":[],"validations":[],"sessions":[],"coveragePoints":[],"speedtests":[{"id":"sp1","userId":"u1","latitude":48.85,"longitude":2.35,"averageSpeed":210,"uploadAvg":42,"pingAvg":18,"timestamp":"2026-05-11T10:00:00.000Z","networkType":"WIFI","mobileOperator":"SignalQuest"}],"photosCount":0,"validationsCount":0,"sessionsCount":0,"coveragePointsCount":0,"speedtestsCount":1,"rawCoveragePointsCount":0,"logicalCoveragePointsCount":0}
     """

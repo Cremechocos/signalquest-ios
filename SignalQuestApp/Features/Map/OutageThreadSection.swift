@@ -536,3 +536,388 @@ struct OutageThreadSection: View {
         comments[index].likes = response.count
     }
 }
+
+/**
+ LA DISCUSSION d'un site, pour l'opérateur affiché dans sa fiche (SITE-1).
+
+ Même surface que le fil d'une panne, mais un autre sujet : on y parle du site lui-même (une
+ bande activée, des travaux, un débit qui chute le soir), et une demande d'aide joint l'état
+ radio de l'appareil. Sur iPhone, cet état se limite à la technologie : le reste n'est pas lisible.
+ Chaque opérateur d'un site partagé a son propre fil.
+ */
+struct SiteThreadSection: View {
+    let market: String
+    let operatorKey: String
+    let siteId: String
+    let operatorLabel: String
+
+    @EnvironmentObject private var services: AppServices
+
+    @State private var comments: [SiteComment] = []
+    @State private var commentCount = 0
+    @State private var nextCursor: String?
+    @State private var loading = true
+    @State private var failed = false
+    /// Le serveur ne connaît pas de fil pour ce site et cet opérateur : la section se retire.
+    @State private var unavailable = false
+    @State private var loadingMore = false
+    @State private var moreFailed = false
+    @State private var draft = ""
+    @State private var asksHelp = false
+    @State private var posting = false
+    @State private var postError: String?
+    @State private var actionError: String?
+    @State private var pendingDelete: SiteComment?
+    @State private var deletingId: String?
+    @State private var reportTarget: SiteComment?
+
+    private static let textLimit = 1000
+
+    private var threadKey: String { "\(market)|\(operatorKey)|\(siteId)" }
+
+    private var isSignedIn: Bool {
+        AppEnvironment.usesDemoData || LocalAccountScope.sessionSnapshot() != nil
+    }
+
+    /// La technologie de l'appareil, seule part de l'état radio qu'iOS expose.
+    private var deviceRadio: SiteCommentRadio? {
+        SiteCommentRadio.coarse(services.networkPath.status.cellularTechnology)
+    }
+
+    var body: some View {
+        Group {
+            if !unavailable {
+                content
+            }
+        }
+        .task(id: threadKey) { await load() }
+        .alert(
+            "Supprimer ce message ?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            presenting: pendingDelete
+        ) { comment in
+            Button("Supprimer", role: .destructive) {
+                pendingDelete = nil
+                Task { await delete(comment) }
+            }
+            Button("Annuler", role: .cancel) { pendingDelete = nil }
+        } message: { _ in
+            Text("Il disparaîtra de la discussion pour tout le monde.")
+        }
+        .sheet(item: $reportTarget) { comment in
+            ReportSheet(target: .siteComment(comment.id), service: services.reports)
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: SQSpace.md) {
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                HStack(spacing: SQSpace.sm) {
+                    Text("Discussion du site").sqKicker().accessibilityAddTraits(.isHeader)
+                    if commentCount > 0 {
+                        Text("\(commentCount)")
+                            .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                            .monospacedDigit()
+                            .foregroundStyle(SQColor.labelSecondary)
+                    }
+                }
+                Text("Ouverte à tous, sur le réseau \(operatorLabel) de ce site. Les messages ne modifient ni les pannes ni les identifiants.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if isSignedIn {
+                composer
+            } else {
+                Text("Connecte-toi pour participer à la discussion.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            }
+
+            if let actionError {
+                SQInlineError(message: actionError)
+            }
+
+            if loading {
+                SQSpinner()
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, SQSpace.md)
+            } else if failed {
+                VStack(alignment: .leading, spacing: SQSpace.xs) {
+                    Text("Impossible de charger la discussion.")
+                        .font(SQType.caption)
+                        .foregroundStyle(SQColor.labelSecondary)
+                    retryButton("Réessayer") { await load() }
+                }
+            } else if comments.isEmpty {
+                Text("Personne n'a encore écrit sur ce site.")
+                    .font(SQType.caption)
+                    .foregroundStyle(SQColor.labelSecondary)
+            } else {
+                VStack(alignment: .leading, spacing: SQSpace.lg) {
+                    ForEach(comments) { comment in
+                        row(comment)
+                    }
+                    if nextCursor != nil {
+                        retryButton(moreFailed ? "Réessayer de charger la suite" : "Voir les messages plus anciens",
+                                    busy: loadingMore) { await loadMore() }
+                            .disabled(loadingMore)
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("antenna.detail.siteThread")
+    }
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: SQSpace.sm) {
+            if let postError {
+                SQInlineError(message: postError)
+            }
+
+            TextField(
+                asksHelp ? String(localized: "Décris ce qui ne va pas…") : String(localized: "Écrire sur ce site…"),
+                text: $draft,
+                axis: .vertical
+            )
+                .lineLimit(2...6)
+                .font(SQType.body)
+                .padding(SQSpace.md)
+                .background(SQColor.fill, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                .disabled(posting)
+                .accessibilityIdentifier("antenna.detail.siteThread.field")
+
+            if let radio = deviceRadio {
+                Toggle(isOn: $asksHelp) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Demande d'aide")
+                            .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(SQColor.label)
+                        Text("Joint ta technologie actuelle (\(radio.summary)). Aucune position n'est envoyée.")
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(SQColor.brandRed)
+                .disabled(posting)
+                .accessibilityIdentifier("antenna.detail.siteThread.help")
+            }
+
+            HStack {
+                let count = draft.count
+                if count > Self.textLimit - 100 {
+                    Text("\(count)/\(Self.textLimit)")
+                        .font(SQType.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(count > Self.textLimit ? SQColor.dangerInk : SQColor.labelSecondary)
+                }
+                Spacer()
+                Button {
+                    Task { await post() }
+                } label: {
+                    Text(posting ? "Envoi…" : "Publier")
+                        .font(SQType.button)
+                        .padding(.horizontal, SQSpace.xl)
+                        .frame(minHeight: 44)
+                        .foregroundStyle(canPost ? SQColor.surface : SQColor.labelSecondary)
+                        .background(
+                            RoundedRectangle(cornerRadius: SQRadius.pill, style: .continuous)
+                                .fill(canPost ? SQColor.brandRed : SQColor.fill)
+                        )
+                }
+                .buttonStyle(SQPressButtonStyle())
+                .disabled(!canPost)
+                .accessibilityIdentifier("antenna.detail.siteThread.post")
+            }
+        }
+    }
+
+    private var canPost: Bool {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !posting && !text.isEmpty && text.count <= Self.textLimit
+    }
+
+    private func row(_ comment: SiteComment) -> some View {
+        HStack(alignment: .top, spacing: SQSpace.md) {
+            Text(String(comment.author.displayName.prefix(2)).uppercased())
+                .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                .frame(width: 34, height: 34)
+                .background(SQColor.accentSoft, in: Circle())
+                .foregroundStyle(SQColor.brandRed)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: SQSpace.xs) {
+                HStack(alignment: .firstTextBaseline, spacing: SQSpace.sm) {
+                    Text(comment.author.displayName)
+                        .font(SQFont.body(15, .semibold, relativeTo: .subheadline))
+                        .sqSingleLine()
+                    if let date = comment.createdAt {
+                        Text(date, format: .relative(presentation: .named))
+                            .font(SQType.caption)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .sqSingleLine()
+                    }
+                }
+                if comment.kind == .help {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("Demande d'aide", systemImage: "lifepreserver")
+                            .font(SQFont.body(12, .semibold, relativeTo: .caption))
+                            .foregroundStyle(SQColor.accentInk)
+                        if let summary = comment.radio?.summary, !summary.isEmpty {
+                            Text(summary)
+                                .font(SQType.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(SQColor.labelSecondary)
+                        }
+                    }
+                }
+                Text(comment.text)
+                    .font(SQType.body)
+                    .foregroundStyle(SQColor.label)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if comment.canDelete || isSignedIn {
+                rowMenu(comment)
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func rowMenu(_ comment: SiteComment) -> some View {
+        Menu {
+            if comment.canDelete {
+                Button(role: .destructive) {
+                    pendingDelete = comment
+                } label: {
+                    Label("Supprimer", systemImage: "trash")
+                }
+            } else {
+                Button {
+                    reportTarget = comment
+                } label: {
+                    Label("Signaler", systemImage: "flag")
+                }
+            }
+        } label: {
+            Group {
+                if deletingId == comment.id {
+                    SQSpinner()
+                } else {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(SQColor.labelSecondary)
+                }
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .disabled(deletingId != nil)
+        .accessibilityLabel(String(localized: "Actions sur le message"))
+    }
+
+    private func retryButton(_ title: LocalizedStringKey, busy: Bool = false, action: @escaping () async -> Void) -> some View {
+        Button {
+            Task { await action() }
+        } label: {
+            HStack(spacing: SQSpace.sm) {
+                Text(title)
+                if busy { SQSpinner() }
+            }
+            .font(SQFont.body(14, .semibold, relativeTo: .subheadline))
+            .foregroundStyle(SQColor.accentInk)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(SQPressButtonStyle())
+    }
+
+    // MARK: - Actions
+
+    private func load() async {
+        loading = true
+        failed = false
+        unavailable = false
+        actionError = nil
+        defer { loading = false }
+        do {
+            let page = try await services.siteComments.list(market: market, operatorKey: operatorKey, siteId: siteId, cursor: nil)
+            comments = page.comments
+            commentCount = page.thread.commentCount
+            nextCursor = page.nextCursor
+            moreFailed = false
+        } catch {
+            guard !error.isCancellation else { return }
+            comments = []
+            commentCount = 0
+            nextCursor = nil
+            if case .http(let status, _, _, _, _) = error as? APIError, status == 404 || status == 400 {
+                unavailable = true
+            } else {
+                failed = true
+            }
+        }
+    }
+
+    private func loadMore() async {
+        guard let cursor = nextCursor, !loadingMore else { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        do {
+            let page = try await services.siteComments.list(market: market, operatorKey: operatorKey, siteId: siteId, cursor: cursor)
+            let ids = Set(comments.map(\.id))
+            comments += page.comments.filter { !ids.contains($0.id) }
+            nextCursor = page.nextCursor
+            moreFailed = false
+        } catch {
+            if !error.isCancellation { moreFailed = true }
+        }
+    }
+
+    private func post() async {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canPost else { return }
+        let radio = asksHelp ? deviceRadio : nil
+        let kind: SiteCommentKind = radio == nil ? .comment : .help
+        posting = true
+        postError = nil
+        defer { posting = false }
+        do {
+            // Le serveur renvoie le message tel qu'il l'a enregistré : on l'affiche sans relire le fil.
+            let comment = try await services.siteComments.add(
+                market: market, operatorKey: operatorKey, siteId: siteId, kind: kind, text: text, radio: radio
+            )
+            comments.insert(comment, at: 0)
+            commentCount += 1
+            draft = ""
+            asksHelp = false
+            Haptics.success()
+        } catch {
+            // Le brouillon reste pour un nouvel essai.
+            if !error.isCancellation {
+                Haptics.error()
+                postError = error.userFacingMessage
+            }
+        }
+    }
+
+    private func delete(_ comment: SiteComment) async {
+        deletingId = comment.id
+        actionError = nil
+        defer { deletingId = nil }
+        do {
+            try await services.siteComments.delete(id: comment.id)
+            comments.removeAll { $0.id == comment.id }
+            commentCount = max(0, commentCount - 1)
+        } catch {
+            if !error.isCancellation { actionError = error.userFacingMessage }
+        }
+    }
+}
