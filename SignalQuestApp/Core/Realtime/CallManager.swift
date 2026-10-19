@@ -410,6 +410,9 @@ final class CallManager: NSObject, ObservableObject {
         didSet { if oldValue?.id != activeCall?.id { resetNetworkSharing() } }
     }
     @Published var showCallScreen = false
+    /// Un appel (sonnerie, CallKit ou LiveKit) tient la session audio : les notes
+    /// vocales n'y touchent pas tant qu'il dure.
+    static var isCallInProgress: Bool { AppDelegate.sharedCallManager?.activeCall != nil }
     @Published private(set) var endNotice: EndNotice?
     /// « Partager mon réseau » (D.11) : volontaire, coupé par défaut, arrêté
     /// avec l'appel.

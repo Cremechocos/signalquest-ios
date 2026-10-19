@@ -1,6 +1,45 @@
 import AVFoundation
 import Foundation
 
+/// Session audio empruntée le temps d'une note vocale (lecture ou
+/// enregistrement) : `begin` garde la configuration d'avant, `end` la rétablit
+/// et désactive la session que la note avait activée. Pendant un appel, la
+/// session appartient à CallKit/LiveKit : la note n'y touche ni au début ni à
+/// la fin.
+@MainActor
+struct VoiceNoteAudioSession {
+    private let category: AVAudioSession.Category
+    private let mode: AVAudioSession.Mode
+    private let options: AVAudioSession.CategoryOptions
+
+    static func begin(
+        category: AVAudioSession.Category,
+        mode: AVAudioSession.Mode,
+        options: AVAudioSession.CategoryOptions = []
+    ) throws -> VoiceNoteAudioSession {
+        let session = AVAudioSession.sharedInstance()
+        let previous = VoiceNoteAudioSession(category: session.category, mode: session.mode, options: session.categoryOptions)
+        do {
+            try session.setCategory(category, mode: mode, options: options)
+            try session.setActive(true)
+        } catch {
+            previous.restoreCategory()
+            throw error
+        }
+        return previous
+    }
+
+    func end() {
+        guard !CallManager.isCallInProgress else { return }
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        restoreCategory()
+    }
+
+    private func restoreCategory() {
+        try? AVAudioSession.sharedInstance().setCategory(category, mode: mode, options: options)
+    }
+}
+
 /// Lecteur de note vocale.
 ///
 /// iOS AFFICHAIT déjà les transcriptions sans savoir lire l'audio : on recevait
@@ -41,6 +80,7 @@ final class VoiceNotePlayer: NSObject, ObservableObject {
     private var playingKey: String?
 
     private var player: AVAudioPlayer?
+    private var audioSession: VoiceNoteAudioSession?
     private var tickTask: Task<Void, Never>?
     private var chainTask: Task<Void, Never>?
 
@@ -81,14 +121,19 @@ final class VoiceNotePlayer: NSObject, ObservableObject {
         stop()
         do {
             // `.playback` : une note vocale doit s'entendre même en mode
-            // silencieux, comme dans toutes les messageries.
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
-            try AVAudioSession.sharedInstance().setActive(true)
+            // silencieux, comme dans toutes les messageries. Pendant un appel,
+            // la session est celle de l'appel : on joue dessus sans la changer.
+            if !CallManager.isCallInProgress {
+                audioSession = try VoiceNoteAudioSession.begin(category: .playback, mode: .spokenAudio)
+            }
             let player = try AVAudioPlayer(contentsOf: url)
             player.delegate = self
             player.enableRate = true
             player.rate = rate
-            guard player.play() else { return }
+            guard player.play() else {
+                stop()
+                return
+            }
             self.player = player
             playingURL = url
             playingKey = key
@@ -112,11 +157,13 @@ final class VoiceNotePlayer: NSObject, ObservableObject {
 
     func resume() {
         guard let player, isPaused else { return }
-        do {
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            stop()
-            return
+        if audioSession != nil {
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                stop()
+                return
+            }
         }
         player.enableRate = true
         player.rate = rate
@@ -139,7 +186,10 @@ final class VoiceNotePlayer: NSObject, ObservableObject {
         playingKey = nil
         isPaused = false
         progress = 0
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // Seulement si cette lecture avait pris la session (jamais pendant un
+        // appel, ni pour une musique qu'elle n'a pas interrompue).
+        audioSession?.end()
+        audioSession = nil
     }
 
     /// Déplace la lecture à `fraction` (0…1) de la note au premier plan.

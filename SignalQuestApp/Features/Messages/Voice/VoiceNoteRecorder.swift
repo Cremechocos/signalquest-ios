@@ -41,6 +41,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
     @Published private(set) var levels: [Float] = []
 
     private var recorder: AVAudioRecorder?
+    private var audioSession: VoiceNoteAudioSession?
     private var meterTask: Task<Void, Never>?
     private var startedAt: Date?
 
@@ -62,17 +63,24 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
     func start() async {
         guard state != .recording else { return }
         if case .finished = state { return }
+        // Le micro appartient à l'appel : pas de note vocale tant qu'il dure.
+        guard !CallManager.isCallInProgress else {
+            state = .failed(String(localized: "Indisponible pendant un appel"))
+            return
+        }
         guard await Self.requestPermission() else {
             state = .permissionDenied
             return
         }
 
         do {
-            let session = AVAudioSession.sharedInstance()
             // `.playAndRecord` et non `.record` : sans lui, réécouter la note
             // juste après l'avoir enregistrée resterait muet.
-            try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.duckOthers, .defaultToSpeaker])
-            try session.setActive(true)
+            audioSession = try VoiceNoteAudioSession.begin(
+                category: .playAndRecord,
+                mode: .spokenAudio,
+                options: [.duckOthers, .defaultToSpeaker]
+            )
 
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("voice-\(UUID().uuidString).m4a")
@@ -89,6 +97,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
             recorder.isMeteringEnabled = true
             recorder.delegate = self
             guard recorder.record(forDuration: Self.maximumDuration) else {
+                releaseAudioSession()
                 state = .failed(String(localized: "Impossible de démarrer l'enregistrement."))
                 return
             }
@@ -100,8 +109,15 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
             startMetering()
             observeInterruptions()
         } catch {
+            releaseAudioSession()
             state = .failed(String(localized: "Impossible de démarrer l'enregistrement."))
         }
+    }
+
+    /// Rend la session audio dans l'état où la note l'avait trouvée.
+    private func releaseAudioSession() {
+        audioSession?.end()
+        audioSession = nil
     }
 
     /// Arrête et renvoie le fichier. `nil` si la note est trop courte — un appui
@@ -116,7 +132,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
         let elapsed = min(Self.maximumDuration, startedAt.map { Date().timeIntervalSince($0) } ?? 0)
         recorder.stop()
         self.recorder = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        releaseAudioSession()
 
         guard elapsed >= Self.minimumDuration else {
             try? FileManager.default.removeItem(at: url)
@@ -169,7 +185,7 @@ final class VoiceNoteRecorder: NSObject, ObservableObject {
         }
         recorder = nil
         startedAt = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        releaseAudioSession()
         state = .idle
         duration = 0
         levels = []
