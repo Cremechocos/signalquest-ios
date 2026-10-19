@@ -1567,7 +1567,8 @@ struct MessagesView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.vertical, SQSpace.sm2)
+        .padding(.vertical, SQSpace.md)
+        .padding(.horizontal, SQSpace.lg)
         .frame(minHeight: 64)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
