@@ -537,8 +537,18 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         guard runGate.tryAcquire() else { throw SpeedtestBusyError.alreadyRunning }
         defer { runGate.release() }
         let recorder = SpeedtestTraceRecorder()
-        return try await SpeedtestTraceScope.$current.withValue(recorder) {
-            try await runScoped(pathStatus: pathStatus, location: location, settings: settings, progress: progress)
+        let attempts = IPerfAttemptLog()
+        // Le lot part une fois le test fini, réussi ou non.
+        defer {
+            IPerfAttemptReporter.send(
+                attempts.attempts,
+                networkType: IPerfAttemptReporter.networkType(pathStatus.connection, viaVpn: vpnIsActive())
+            )
+        }
+        return try await IPerfAttemptScope.$current.withValue(attempts) {
+            try await SpeedtestTraceScope.$current.withValue(recorder) {
+                try await runScoped(pathStatus: pathStatus, location: location, settings: settings, progress: progress)
+            }
         }
     }
 
@@ -869,6 +879,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let dlPort: UInt16
         do {
             (dlResult, dlPort) = try await runIPerf3WithPortFallback(
+            serverId: iperfServer.id,
             hostname: iperfServer.hostname,
             preferredPort: port,
             portMin: iperfServer.portMin,
@@ -1075,6 +1086,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 let preferred = attemptIndex == 0 ? ulPreferredPort : port
                 do {
                     let (ulResult, ulPort) = try await runIPerf3WithPortFallback(
+                        serverId: iperfServer.id,
                         hostname: iperfServer.hostname,
                         preferredPort: preferred,
                         portMin: iperfServer.portMin,
@@ -2242,6 +2254,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
     /// **Fallback** : seulement si le preferred échoue, on sonde les autres
     /// ports de la plage puis on réessaie.
     private func runIPerf3WithPortFallback(
+        serverId: String,
         hostname: String,
         preferredPort: UInt16,
         portMin: UInt16,
@@ -2267,22 +2280,48 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         var lastError: Error?
         var attempt = 0
 
-        // 1) Preferred d’abord — zéro latence de discovery (cas UL après DL).
-        onPortAttempt?(preferredPort, attempt)
-        attempt += 1
-        do {
+        // Chaque port essayé devient une tentative du lot IPERF-2. Un « Arrêter »
+        // n'en est pas une : ni le port ni le serveur n'y sont pour rien.
+        let attemptLog = IPerfAttemptScope.current
+        func runPort(_ port: UInt16) async throws -> IPerf3Result {
+            let progress = IPerfAttemptProgress()
+            let start = speedtestMonotonicSeconds()
+            func note(_ error: Error?) {
+                guard let attemptLog else { return }
+                let state = progress.snapshot
+                let (stage, outcome, code) = IPerfAttempt.classify(
+                    error, reached: state.reached, sawBytes: state.sawBytes, isDownload: isDownload)
+                let ms = Int(((speedtestMonotonicSeconds() - start) * 1_000).rounded())
+                attemptLog.append(IPerfAttempt(serverId: serverId, port: Int(port), stage: stage, outcome: outcome,
+                                               code: code, durationMs: min(max(0, ms), 120_000)))
+            }
             let runner = IPerf3Runner(
                 hostname: hostname,
-                port: preferredPort,
+                port: port,
                 streams: streams,
                 durationSeconds: durationSeconds,
                 omitSeconds: omitSeconds,
                 isDownload: isDownload,
                 onStreamConnect: onStreamConnect,
                 onProgress: onProgress,
-                onWarmup: onWarmup
+                onWarmup: onWarmup,
+                attemptProgress: progress
             )
-            return (try await runner.run(), preferredPort)
+            do {
+                let result = try await runner.run()
+                note(nil)
+                return result
+            } catch {
+                if !(Task.isCancelled || error is CancellationError) { note(error) }
+                throw error
+            }
+        }
+
+        // 1) Preferred d’abord — zéro latence de discovery (cas UL après DL).
+        onPortAttempt?(preferredPort, attempt)
+        attempt += 1
+        do {
+            return (try await runPort(preferredPort), preferredPort)
         } catch {
             // Un « Arrêter » utilisateur ne doit JAMAIS déclencher le re-scan
             // de la plage : l'erreur .cancelled est retryable côté serveur,
@@ -2323,18 +2362,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             onPortAttempt?(candidatePort, attempt)
             attempt += 1
             do {
-                let runner = IPerf3Runner(
-                    hostname: hostname,
-                    port: candidatePort,
-                    streams: streams,
-                    durationSeconds: durationSeconds,
-                    omitSeconds: omitSeconds,
-                    isDownload: isDownload,
-                    onStreamConnect: onStreamConnect,
-                    onProgress: onProgress,
-                    onWarmup: onWarmup
-                )
-                return (try await runner.run(), candidatePort)
+                return (try await runPort(candidatePort), candidatePort)
             } catch {
                 if Task.isCancelled || error is CancellationError {
                     throw CancellationError()
@@ -4217,6 +4245,171 @@ final class SpeedtestPhaseLiveSampler: Sendable {
     }
 }
 
+// MARK: - Tentatives iPerf3 (IPERF-2)
+
+/// Un port essayé pour une étape, tel que le serveur le recense (contrat IPERF-2,
+/// `POST /api/speedtest/attempts`) : de quoi repérer un port qui refuse ou un POP
+/// saturé, sans rien qui désigne la personne ni son réseau.
+struct IPerfAttempt: Encodable, Equatable, Sendable {
+    enum Stage: String, Encodable, Sendable { case dns, connect, handshake, download, upload }
+    enum Outcome: String, Encodable, Sendable { case ok, fail }
+    enum Code: String, Encodable, Sendable {
+        case refused, busy, timeout, mute, reset, other
+        case dnsError = "dns_error"
+    }
+
+    let serverId: String
+    let port: Int
+    let stage: Stage
+    let outcome: Outcome
+    /// Absent quand `outcome == .ok`.
+    let code: Code?
+    let durationMs: Int
+
+    /// Où une tentative s'est arrêtée, et pourquoi. Les définitions des codes sont
+    /// celles du contrat, communes à iOS et Android.
+    static func classify(
+        _ error: Error?, reached: IPerfAttemptProgress.Reached, sawBytes: Bool, isDownload: Bool
+    ) -> (Stage, Outcome, Code?) {
+        let transfer: Stage = isDownload ? .download : .upload
+        guard let error else { return (transfer, .ok, nil) }
+        if let nw = error as? NWError, case .dns = nw { return (.dns, .fail, .dnsError) }
+        let posix: POSIXErrorCode? = {
+            if let nw = error as? NWError, case .posix(let code) = nw { return code }
+            return nil
+        }()
+        let isTimeout = (error as? IPerf3Error).map { if case .timeout = $0 { return true } else { return false } } ?? false
+            || posix == .ETIMEDOUT
+        let isReset: Bool = {
+            if posix == .ECONNRESET || posix == .EPIPE || posix == .ECONNABORTED { return true }
+            switch error as? IPerf3Error {
+            case .connectionClosed, .emptyRead: return true
+            default: return false
+            }
+        }()
+        switch reached {
+        case .none:
+            if posix == .ECONNREFUSED { return (.connect, .fail, .refused) }
+            if isTimeout { return (.connect, .fail, .timeout) }
+            return (.connect, .fail, isReset ? .reset : .other)
+        case .connected:
+            if case .accessDenied? = error as? IPerf3Error { return (.handshake, .fail, .busy) }
+            if isTimeout { return (.handshake, .fail, .timeout) }
+            return (.handshake, .fail, isReset ? .reset : .other)
+        case .running:
+            if !sawBytes { return (transfer, .fail, .mute) }
+            return (transfer, .fail, isReset ? .reset : .other)
+        }
+    }
+}
+
+/// Jusqu'où une tentative est allée, renseigné par `IPerf3Runner` au fil du
+/// protocole.
+final class IPerfAttemptProgress: @unchecked Sendable {
+    enum Reached: Int, Sendable { case none, connected, running }
+
+    private let state = OSAllocatedUnfairLock(initialState: (reached: Reached.none, sawBytes: false))
+
+    func reach(_ step: Reached) {
+        state.withLock { if step.rawValue > $0.reached.rawValue { $0.reached = step } }
+    }
+
+    func sawBytes() {
+        state.withLock { $0.sawBytes = true }
+    }
+
+    var snapshot: (reached: Reached, sawBytes: Bool) {
+        state.withLock { ($0.reached, $0.sawBytes) }
+    }
+}
+
+/// Les tentatives d'un test, dans l'ordre d'essai.
+final class IPerfAttemptLog: @unchecked Sendable {
+    private let entries = OSAllocatedUnfairLock(initialState: [IPerfAttempt]())
+
+    func append(_ attempt: IPerfAttempt) {
+        entries.withLock { $0.append(attempt) }
+    }
+
+    var attempts: [IPerfAttempt] {
+        entries.withLock { $0 }
+    }
+}
+
+enum IPerfAttemptScope {
+    /// Posé par `SpeedtestService.run` pour la durée d'un test.
+    @TaskLocal static var current: IPerfAttemptLog?
+}
+
+/// Envoi du lot, APRÈS le test : jamais pendant, pour ne pas fausser la mesure.
+/// Anonyme par construction : session éphémère sans cookie, ni compte, ni
+/// opérateur, ni position. Un échec abandonne le lot, sans file de rejeu : ce
+/// n'est pas une donnée de l'utilisateur.
+enum IPerfAttemptReporter {
+    static let maxAttempts = 64
+    private static let logger = Logger(subsystem: "fr.signalquest.ios", category: "IPerfAttempts")
+
+    struct Batch: Encodable, Equatable {
+        let platform: String
+        let build: String
+        let networkType: String?
+        let attempts: [IPerfAttempt]
+        let truncated: Bool
+    }
+
+    /// `nil` sans tentative. Au-delà de 64, les 64 DERNIÈRES : le succès final
+    /// est toujours dedans.
+    static func batch(_ attempts: [IPerfAttempt], build: String, networkType: String?) -> Batch? {
+        guard !attempts.isEmpty else { return nil }
+        let kept = Array(attempts.suffix(maxAttempts))
+        return Batch(platform: "ios", build: String(build.prefix(20)), networkType: networkType,
+                     attempts: kept, truncated: kept.count < attempts.count)
+    }
+
+    /// `other` sous VPN : le chemin vu est celui du tunnel.
+    static func networkType(_ connection: NetworkConnectionKind, viaVpn: Bool) -> String {
+        if viaVpn { return "other" }
+        switch connection {
+        case .wifi: return "wifi"
+        case .cellular: return "cellular"
+        case .wired: return "ethernet"
+        case .other: return "other"
+        }
+    }
+
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpCookieStorage = nil
+        config.httpShouldSetCookies = false
+        config.urlCache = nil
+        config.timeoutIntervalForRequest = 15
+        return URLSession(configuration: config)
+    }()
+
+    static func send(_ attempts: [IPerfAttempt], networkType: String?) {
+        // Identifiants de catalogue, ports et codes : rien de personnel.
+        let summary = attempts.map {
+            "\($0.serverId):\($0.port) \($0.stage.rawValue)/\($0.code?.rawValue ?? "ok") \($0.durationMs)ms"
+        }.joined(separator: ", ")
+        logger.debug("SQ_IPERF_ATTEMPTS lot \(summary, privacy: .public)")
+        // Ni démonstration ni tests automatiques : leurs serveurs locaux ne
+        // décrivent pas le réseau d'un testeur.
+        guard !AppEnvironment.usesDemoData,
+              ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        guard let batch = batch(attempts, build: build, networkType: networkType),
+              let body = try? JSONEncoder().encode(batch) else { return }
+        var request = URLRequest(url: AppConfig.current.apiBaseURL.appendingPathComponent("api/speedtest/attempts"))
+        request.httpMethod = "POST"
+        request.httpBody = body
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        Task.detached(priority: .background) {
+            let status = (try? await session.data(for: request)).flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            logger.debug("SQ_IPERF_ATTEMPTS envoi \(batch.attempts.count) → \(status.map(String.init) ?? "échec", privacy: .public)")
+        }
+    }
+}
+
 enum IPerf3Error: Error, LocalizedError {
     case cancelled
     case timeout
@@ -4641,6 +4834,8 @@ actor IPerf3Runner {
     /// avec les octets bruts cumulés et le temps mural. Permet au cadran de
     /// montrer le débit dès le début du transfert sans attendre la fin de l'omit.
     let onWarmup: (@Sendable (_ rawTotalBytes: Int, _ wallSeconds: Double) -> Void)?
+    /// Étape atteinte, pour classer la tentative si elle échoue (IPERF-2).
+    let attemptProgress: IPerfAttemptProgress?
 
     private var activeSenders: [StreamSender] = []
     private var activeReceivers: [StreamReceiver] = []
@@ -4654,8 +4849,10 @@ actor IPerf3Runner {
         isDownload: Bool,
         onStreamConnect: (@Sendable (_ connectMs: Double) -> Void)? = nil,
         onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)? = nil,
-        onWarmup: (@Sendable (_ rawTotalBytes: Int, _ wallSeconds: Double) -> Void)? = nil
+        onWarmup: (@Sendable (_ rawTotalBytes: Int, _ wallSeconds: Double) -> Void)? = nil,
+        attemptProgress: IPerfAttemptProgress? = nil
     ) {
+        self.attemptProgress = attemptProgress
         self.hostname = hostname
         self.port = port
         self.streams = max(1, streams)
@@ -4723,6 +4920,7 @@ actor IPerf3Runner {
         bag.register(controlConnection)
         try await connectNW(controlConnection, queue: queue, timeoutSeconds: 5)
         defer { controlConnection.cancel() }
+        attemptProgress?.reach(.connected)
 
         let cookieData = makeCookie()
         let cookieString = String(data: cookieData.prefix(36), encoding: .ascii) ?? ""
@@ -4734,7 +4932,11 @@ actor IPerf3Runner {
         }
 
         let phaseName = isDownload ? "download" : "upload"
-        let totalBytesCounter = SafeCounter(onDelta: { bytes in recorder?.recordTraffic(phase: phaseName, bytes: bytes) })
+        let progressOfAttempt = attemptProgress
+        let totalBytesCounter = SafeCounter(onDelta: { bytes in
+            recorder?.recordTraffic(phase: phaseName, bytes: bytes)
+            if bytes > 0 { progressOfAttempt?.sawBytes() }
+        })
         let omitBytesCounter = SafeCounter()
         var startTestTime: TimeInterval?
         var transferEndTime: TimeInterval?
@@ -4791,6 +4993,7 @@ actor IPerf3Runner {
             case 2: // TEST_RUNNING
                 guard !enderStarted else { break }
                 enderStarted = true
+                attemptProgress?.reach(.running)
                 isTestRunning.value = true
                 startTestTime = speedtestMonotonicSeconds()
 

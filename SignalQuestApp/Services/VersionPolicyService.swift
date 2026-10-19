@@ -48,6 +48,8 @@ enum ClientProtocolContract {
     static let messageRequestsCapability = "message_requests_v1"
     static let capabilities: Set<String> = [
         "exact_schedules_v2",
+        // Lot anonyme des ports iPerf3 essayés, envoyé après chaque test (IPERF-2).
+        "iperf_attempts_v1",
         "message_reminder_idempotency_v1",
         messageRequestsCapability,
         "network_identity_v2",

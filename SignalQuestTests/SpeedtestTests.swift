@@ -1,6 +1,7 @@
 import XCTest
 import CoreTelephony
 import Network
+import os
 import SwiftUI
 @testable import SignalQuest
 
@@ -1723,5 +1724,126 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertEqual(box.values.count, 200)
         XCTAssertEqual(box.values.sorted().first, 0)
         XCTAssertEqual(box.append(5).count, 201)
+    }
+
+    // MARK: - Tentatives iPerf3 (IPERF-2)
+
+    func testAttemptClassificationFollowsTheSharedContract() {
+        typealias A = IPerfAttempt
+        func classify(_ error: Error?, _ reached: IPerfAttemptProgress.Reached, bytes: Bool = false, dl: Bool = true) -> String {
+            let (stage, outcome, code) = A.classify(error, reached: reached, sawBytes: bytes, isDownload: dl)
+            return [stage.rawValue, outcome.rawValue, code?.rawValue].compactMap { $0 }.joined(separator: "/")
+        }
+        XCTAssertEqual(classify(nil, .running, bytes: true), "download/ok")
+        XCTAssertEqual(classify(nil, .running, bytes: true, dl: false), "upload/ok")
+        XCTAssertEqual(classify(NWError.posix(.ECONNREFUSED), .none), "connect/fail/refused")
+        XCTAssertEqual(classify(IPerf3Error.timeout, .none), "connect/fail/timeout")
+        XCTAssertEqual(classify(NWError.dns(-65554), .none), "dns/fail/dns_error")
+        XCTAssertEqual(classify(IPerf3Error.accessDenied, .connected), "handshake/fail/busy")
+        XCTAssertEqual(classify(IPerf3Error.timeout, .connected), "handshake/fail/timeout")
+        XCTAssertEqual(classify(IPerf3Error.connectionClosed(got: 0, expected: 1), .connected), "handshake/fail/reset")
+        XCTAssertEqual(classify(IPerf3Error.timeout, .running), "download/fail/mute",
+                       "Connecté sans un octet de mesure : muet")
+        XCTAssertEqual(classify(NWError.posix(.ECONNRESET), .running, bytes: true, dl: false), "upload/fail/reset")
+        XCTAssertEqual(classify(IPerf3Error.serverError, .running, bytes: true), "download/fail/other")
+    }
+
+    func testAttemptBatchKeepsTheLast64AndOmitsTheCodeOfASuccess() throws {
+        let fail = IPerfAttempt(serverId: "bytel_lyo_bbr", port: 9207, stage: .connect, outcome: .fail,
+                                code: .refused, durationMs: 31)
+        let ok = IPerfAttempt(serverId: "bytel_lyo_bbr", port: 9210, stage: .download, outcome: .ok,
+                              code: nil, durationMs: 10_840)
+        XCTAssertNil(IPerfAttemptReporter.batch([], build: "175", networkType: "wifi"), "Pas de lot vide")
+
+        let batch = try XCTUnwrap(IPerfAttemptReporter.batch(Array(repeating: fail, count: 70) + [ok],
+                                                             build: "175", networkType: "cellular"))
+        XCTAssertEqual(batch.attempts.count, 64)
+        XCTAssertEqual(batch.attempts.last, ok, "Le succès final est toujours dans le lot")
+        XCTAssertTrue(batch.truncated)
+
+        let small = try XCTUnwrap(IPerfAttemptReporter.batch([fail, ok], build: "175", networkType: nil))
+        XCTAssertFalse(small.truncated)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(small)) as? [String: Any])
+        XCTAssertEqual(Set(json.keys), ["platform", "build", "attempts", "truncated"], "networkType absent s'il est inconnu")
+        XCTAssertEqual(json["platform"] as? String, "ios")
+        let attempts = try XCTUnwrap(json["attempts"] as? [[String: Any]])
+        XCTAssertEqual(attempts[0]["code"] as? String, "refused")
+        XCTAssertNil(attempts[1]["code"], "Pas de code pour un succès")
+        XCTAssertEqual(Set(attempts[1].keys), ["serverId", "port", "stage", "outcome", "durationMs"])
+    }
+
+    func testAttemptNetworkTypeNeverDescribesTheTunnel() {
+        XCTAssertEqual(IPerfAttemptReporter.networkType(.wifi, viaVpn: false), "wifi")
+        XCTAssertEqual(IPerfAttemptReporter.networkType(.cellular, viaVpn: false), "cellular")
+        XCTAssertEqual(IPerfAttemptReporter.networkType(.wired, viaVpn: false), "ethernet")
+        XCTAssertEqual(IPerfAttemptReporter.networkType(.cellular, viaVpn: true), "other")
+    }
+
+    /// Le runner signale l'étape atteinte, sur de vrais sockets en boucle locale :
+    /// port fermé, serveur muet, serveur occupé.
+    func testRunnerReportsTheStageItReachedOnLoopback() async throws {
+        func run(port: UInt16) async -> (String, IPerfAttemptProgress.Reached) {
+            let progress = IPerfAttemptProgress()
+            let runner = IPerf3Runner(hostname: "127.0.0.1", port: port, streams: 1, durationSeconds: 1,
+                                      omitSeconds: 0, isDownload: true, attemptProgress: progress)
+            var thrown: Error?
+            do { _ = try await runner.run() } catch { thrown = error }
+            let state = progress.snapshot
+            let (stage, _, code) = IPerfAttempt.classify(thrown, reached: state.reached, sawBytes: state.sawBytes,
+                                                         isDownload: true)
+            return ("\(stage.rawValue)/\(code?.rawValue ?? "ok")", state.reached)
+        }
+
+        // Port fermé : refus au connect.
+        let closed = try NWListener(using: .tcp, on: .any)
+        closed.newConnectionHandler = { $0.cancel() }
+        let closedPort = try await Self.start(closed)
+        closed.cancel()
+        try await Task.sleep(nanoseconds: 200_000_000)
+        let refused = await run(port: closedPort)
+        XCTAssertEqual(refused.0, "connect/refused")
+
+        // Serveur qui accepte sans jamais répondre : l'échange iPerf3 expire.
+        let mute = try NWListener(using: .tcp, on: .any)
+        mute.newConnectionHandler = { $0.start(queue: .global()) }
+        let mutePort = try await Self.start(mute)
+        defer { mute.cancel() }
+        let silent = await run(port: mutePort)
+        XCTAssertEqual(silent.0, "handshake/timeout")
+        XCTAssertEqual(silent.1, .connected)
+
+        // Serveur occupé : ACCESS_DENIED (-1) en premier état.
+        let busy = try NWListener(using: .tcp, on: .any)
+        busy.newConnectionHandler = { connection in
+            connection.start(queue: .global())
+            connection.receive(minimumIncompleteLength: 37, maximumLength: 37) { _, _, _, _ in
+                connection.send(content: Data([0xFF]), completion: .contentProcessed { _ in })
+            }
+        }
+        let busyPort = try await Self.start(busy)
+        defer { busy.cancel() }
+        let occupied = await run(port: busyPort)
+        XCTAssertEqual(occupied.0, "handshake/busy")
+    }
+
+    private static func start(_ listener: NWListener) async throws -> UInt16 {
+        try await withCheckedThrowingContinuation { continuation in
+            let resumed = OSAllocatedUnfairLock(initialState: false)
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    if resumed.withLock({ let was = $0; $0 = true; return !was }) {
+                        continuation.resume(returning: listener.port?.rawValue ?? 0)
+                    }
+                case .failed(let error):
+                    if resumed.withLock({ let was = $0; $0 = true; return !was }) {
+                        continuation.resume(throwing: error)
+                    }
+                default:
+                    break
+                }
+            }
+            listener.start(queue: .global())
+        }
     }
 }
