@@ -66,6 +66,7 @@ protocol NotificationsServicing: Sendable {
     func list(cursor: String?) async throws -> AppNotificationPage
     func markRead(id: String) async throws
     func markAllRead() async throws
+    func delete(id: String) async throws
     func deleteAll() async throws
 }
 
@@ -120,6 +121,13 @@ final class NotificationsService: NotificationsServicing {
     func markAllRead() async throws {
         let _: SuccessResponse = try await api.request(
             APIEndpoint(path: "/api/notifications/read-all", method: .post),
+            as: SuccessResponse.self
+        )
+    }
+
+    func delete(id: String) async throws {
+        let _: SuccessResponse = try await api.request(
+            APIEndpoint(path: "/api/notifications/\(id)", method: .delete),
             as: SuccessResponse.self
         )
     }

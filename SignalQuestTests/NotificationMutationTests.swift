@@ -137,6 +137,51 @@ final class NotificationMutationTests: XCTestCase {
         XCTAssertNil(model.failedAction)
     }
 
+    /// Suppression unitaire : la ligne et le compteur de non-lues suivent le serveur ;
+    /// un échec garde la ligne et se rejoue.
+    func testSingleDeleteRemovesTheRowAndKeepsItWhenTheServerFails() async {
+        let service = NotificationMutationMock(items: [item("a"), item("b", read: true)], failDeleteOnce: true)
+        let model = NotificationsCenterViewModel(service: service)
+        await model.load()
+        XCTAssertEqual(model.unreadCount, 1)
+
+        await model.delete("a")
+        XCTAssertEqual(model.items.map(\.id), ["a", "b"])
+        XCTAssertEqual(model.failedAction, .delete("a"))
+        XCTAssertNotNil(model.actionErrorMessage)
+
+        await model.retryFailedAction()
+        XCTAssertEqual(model.items.map(\.id), ["b"])
+        XCTAssertEqual(model.unreadCount, 0)
+        XCTAssertNil(model.failedAction)
+
+        await model.delete("b")
+        XCTAssertTrue(model.items.isEmpty)
+        XCTAssertEqual(model.unreadCount, 0)
+    }
+
+    /// Une métadonnée hors plage ne doit pas arrêter l'app au tap ; l'année s'affiche hors de l'année courante.
+    func testMetadataTextIgnoresNumbersThatAreNotWholeIntegers() {
+        XCTAssertEqual(NotificationsCenterView.metaText(.string("site-1")), "site-1")
+        XCTAssertEqual(NotificationsCenterView.metaText(.number(42)), "42")
+        XCTAssertNil(NotificationsCenterView.metaText(.number(1e20)))
+        XCTAssertNil(NotificationsCenterView.metaText(.number(.infinity)))
+        XCTAssertNil(NotificationsCenterView.metaText(.number(.nan)))
+        XCTAssertNil(NotificationsCenterView.metaText(.number(1.5)))
+        XCTAssertNil(NotificationsCenterView.metaText(.string("")))
+        XCTAssertNil(NotificationsCenterView.metaText(nil))
+    }
+
+    func testOlderNotificationsShowTheYearOnlyOutsideTheCurrentOne() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Paris")!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 19, hour: 12))!
+        let sameYear = calendar.date(from: DateComponents(year: 2026, month: 1, day: 12))!
+        let lastYear = calendar.date(from: DateComponents(year: 2025, month: 10, day: 12))!
+        XCTAssertFalse(NotificationPeriod.isOutsideCurrentYear(sameYear, now: now, calendar: calendar))
+        XCTAssertTrue(NotificationPeriod.isOutsideCurrentYear(lastYear, now: now, calendar: calendar))
+    }
+
     func testOlderReloadCannotUndoAcknowledgedMarkAll() async {
         let gate = NotificationLoadGate()
         let service = NotificationMutationMock(items: [item("a")], delayedSecondList: gate)
@@ -355,6 +400,10 @@ private actor NotificationMutationMock: NotificationsServicing {
                 message: row.message, createdAt: row.createdAt, read: true,
                 link: row.link, metadata: row.metadata)
         }
+    }
+    func delete(id: String) async throws {
+        if deleteFailures > 0 { deleteFailures -= 1; throw Failure.offline }
+        rows.removeAll { $0.id == id }
     }
     func deleteAll() async throws {
         if deleteFailures > 0 { deleteFailures -= 1; throw Failure.offline }

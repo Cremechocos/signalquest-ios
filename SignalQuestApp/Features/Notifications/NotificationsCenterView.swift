@@ -14,7 +14,7 @@ final class NotificationsCenterViewModel: ObservableObject {
     @Published private(set) var pendingReadIDs: Set<String> = []
 
     enum FailedAction: Equatable {
-        case markRead(String), markAll, deleteAll
+        case markRead(String), delete(String), markAll, deleteAll
     }
     @Published private(set) var failedAction: FailedAction?
 
@@ -112,6 +112,33 @@ final class NotificationsCenterViewModel: ObservableObject {
         }
     }
 
+    /// Supprime une notification (définitif côté serveur) ; la ligne reste tant que le serveur n'a pas répondu.
+    func delete(_ id: String) async {
+        guard isCurrentAccount, !isMutating, !pendingReadIDs.contains(id),
+              items.contains(where: { $0.id == id }) else { return }
+        let generation = actionGeneration
+        pendingReadIDs.insert(id)
+        actionErrorMessage = nil
+        failedAction = nil
+        defer { pendingReadIDs.remove(id) }
+        do {
+            if !AppEnvironment.usesDemoData { try await service.delete(id: id) }
+            guard actionGeneration == generation, isCurrentAccount else { return }
+            loadGeneration = UUID()
+            isLoading = false
+            isLoadingMore = false
+            if let index = items.firstIndex(where: { $0.id == id }) {
+                if items[index].read != true { unreadCount = max(0, unreadCount - 1) }
+                items.remove(at: index)
+            }
+            if let accountSession { badge?.applyNotificationBadgeMutation(unreadCount: unreadCount, for: accountSession) }
+        } catch {
+            guard actionGeneration == generation, isCurrentAccount, !error.isCancellation else { return }
+            actionErrorMessage = String(localized: "Action impossible")
+            failedAction = .delete(id)
+        }
+    }
+
     func markAll() async {
         guard isCurrentAccount, !isMutating, pendingReadIDs.isEmpty else { return }
         isMutating = true
@@ -164,6 +191,7 @@ final class NotificationsCenterViewModel: ObservableObject {
     func retryFailedAction() async {
         switch failedAction {
         case .markRead(let id): await markRead(id)
+        case .delete(let id): await delete(id)
         case .markAll: await markAll()
         case .deleteAll: await deleteAll()
         case nil: break
@@ -273,8 +301,12 @@ struct NotificationsCenterView: View {
                             .buttonStyle(.plain)
                             .listRowBackground(SQColor.surface)
                             .listRowSeparatorTint(SQColor.separator)
-                            .swipeActions {
-                                Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
+                            // Sans balayage complet : la suppression est définitive.
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button("Supprimer", role: .destructive) { Task { await model.delete(item.id) } }
+                                if item.read != true {
+                                    Button("Lu") { Task { await model.markRead(item.id) } }.tint(SQColor.success)
+                                }
                             }
                         }
                     } header: {
@@ -299,7 +331,7 @@ struct NotificationsCenterView: View {
                             .foregroundStyle(SQColor.dangerInk)
                     }
                 } footer: {
-                    Text("Glisse une notification vers la gauche pour la marquer comme lue.")
+                    Text("Glisse une notification vers la gauche pour la marquer comme lue ou la supprimer.")
                         .font(SQType.caption)
                         .foregroundStyle(SQColor.labelSecondary)
                         .multilineTextAlignment(.center)
@@ -380,8 +412,15 @@ struct NotificationsCenterView: View {
                     Group {
                         switch period {
                         case .today: Text(date, format: .relative(presentation: .named))
-                        case .thisWeek: Text(date, format: .dateTime.weekday(.wide))
-                        case .older: Text(date, format: .dateTime.day().month(.wide))
+                        // Le jour seul ne départage pas deux notifications : l'heure s'y ajoute,
+                        // et l'année quand ce n'est pas l'année courante.
+                        case .thisWeek: Text(date, format: .dateTime.weekday(.wide).hour().minute())
+                        case .older:
+                            if NotificationPeriod.isOutsideCurrentYear(date) {
+                                Text(date, format: .dateTime.day().month(.wide).year())
+                            } else {
+                                Text(date, format: .dateTime.day().month(.wide))
+                            }
                         }
                     }
                     .font(SQFont.body(12, relativeTo: .caption2))
@@ -458,13 +497,19 @@ struct NotificationsCenterView: View {
     private func metaString(_ metadata: [String: JSONValue]?, _ keys: String...) -> String? {
         guard let metadata else { return nil }
         for key in keys {
-            switch metadata[key] {
-            case .string(let v) where !v.isEmpty: return v
-            case .number(let n): return String(Int(n))
-            default: continue
-            }
+            if let text = Self.metaText(metadata[key]) { return text }
         }
         return nil
+    }
+
+    /// Une métadonnée du serveur lue comme texte ; un nombre non entier ou hors de la plage des
+    /// entiers est ignoré plutôt que converti.
+    static func metaText(_ value: JSONValue?) -> String? {
+        switch value {
+        case .string(let v)? where !v.isEmpty: return v
+        case .number(let n)?: return Int(exactly: n).map(String.init)
+        default: return nil
+        }
     }
 
     /// Titre lisible quand le serveur n'en envoie pas : la liste affichait le
@@ -534,6 +579,11 @@ enum NotificationPeriod: Int, CaseIterable, Identifiable {
         let startOfToday = calendar.startOfDay(for: now)
         guard let weekAgo = calendar.date(byAdding: .day, value: -6, to: startOfToday) else { return .older }
         return date >= weekAgo ? .thisWeek : .older
+    }
+
+    /// Vrai quand la date n'est pas de l'année courante : la liste y ajoute l'année.
+    static func isOutsideCurrentYear(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> Bool {
+        !calendar.isDate(date, equalTo: now, toGranularity: .year)
     }
 
     struct Bucket: Identifiable {
