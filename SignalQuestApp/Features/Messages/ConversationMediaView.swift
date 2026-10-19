@@ -17,6 +17,8 @@ struct ConversationMediaView: View {
     /// Une page pleine laisse penser qu'il en reste : la suivante part de la date du plus ancien.
     @State private var hasMore = false
     @State private var isLoadingMore = false
+    /// La page suivante n'a pas pu être lue : « Réessayer » remplace le spinner.
+    @State private var loadMoreFailed = false
     @State private var imageViewerTarget: MessageImageTarget?
     /// `nil` : l'onglet par défaut, Photos s'il y en a.
     @State private var tab: Tab?
@@ -62,7 +64,28 @@ struct ConversationMediaView: View {
                     case .files:
                         if files.isEmpty { emptyTab("Aucun fichier ni note vocale dans cette conversation.") } else { filesSection }
                     }
-                    if hasMore {
+                    if hasMore && loadMoreFailed {
+                        // La tâche du spinner ne repart pas seule (le nombre de
+                        // messages ne change pas) : le bouton relance la page.
+                        VStack(spacing: SQSpace.xs) {
+                            Text("Impossible de charger la suite")
+                                .font(SQType.callout)
+                                .foregroundStyle(SQColor.labelSecondary)
+                                .sqAnnounce("Impossible de charger la suite")
+                            Button {
+                                Task { await loadMore() }
+                            } label: {
+                                Text("Réessayer")
+                                    .font(SQType.callout(.semibold))
+                                    .foregroundStyle(SQColor.accentInk)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(SQPressButtonStyle())
+                            .accessibilityIdentifier("conversationMedia.loadMore.retry")
+                        }
+                        .frame(maxWidth: .infinity)
+                    } else if hasMore {
                         SQSpinner()
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .accessibilityElement(children: .ignore)
@@ -238,6 +261,7 @@ struct ConversationMediaView: View {
             let page = try await service.searchMessages(query: "", filters: filters, take: Self.pageSize).map(\.message)
             messages = page
             hasMore = page.count >= Self.pageSize
+            loadMoreFailed = false
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }
@@ -250,6 +274,7 @@ struct ConversationMediaView: View {
         guard hasMore, !isLoadingMore, !AppEnvironment.usesDemoData,
               let oldest = messages.compactMap(\.createdAt).min() else { return }
         isLoadingMore = true
+        loadMoreFailed = false
         defer { isLoadingMore = false }
         do {
             var filters = MessageSearchFilters()
@@ -266,7 +291,8 @@ struct ConversationMediaView: View {
             messages = (messages + fresh).sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
             hasMore = page.count >= Self.pageSize
         } catch {
-            if !error.isCancellation { hasMore = false }
+            // La liste garde ses médias et reste ouverte : un échec n'est pas la fin.
+            if !error.isCancellation { loadMoreFailed = true }
         }
     }
 }

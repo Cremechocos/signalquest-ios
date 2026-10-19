@@ -217,6 +217,44 @@ final class ConversationPinUnreadTests: XCTestCase {
         XCTAssertNil(model.conversations.first?.pinnedAt, "L'épingle revient à son état")
     }
 
+    /// MSG-02 : une page suivante qui échoue le dit (« Réessayer »), sans effacer la liste ;
+    /// le réessai qui aboutit retire l'échec.
+    @MainActor
+    func testAFailedNextPageIsFlaggedAndRetryClearsIt() async throws {
+        var failSecondPage = true
+        MockURLProtocol.requestHandler = { request in
+            let isSecondPage = request.url?.query?.contains("cursor=next") == true
+            let ok = !isSecondPage || !failSecondPage
+            let json = isSecondPage
+                ? #"{"conversations":[{"id":"b","isGroup":false,"participants":[]}],"hasMore":false}"#
+                : #"{"conversations":[{"id":"a","isGroup":false,"participants":[]}],"hasMore":true,"nextCursor":"next"}"#
+            let response = HTTPURLResponse(url: request.url!, statusCode: ok ? 200 : 500, httpVersion: nil,
+                                           headerFields: ["Content-Type": "application/json"])!
+            return (response, Data((ok ? json : #"{"error":"boom"}"#).utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let credentials = CredentialStore(tokenStore: InMemoryTokenStore())
+        try credentials.setAccessToken("next-page-access-token")
+        let api = APIClient(config: .test, credentials: credentials, session: URLSession(configuration: configuration))
+        let model = MessagesViewModel(service: MessagesService(api: api))
+
+        await model.load()
+        XCTAssertTrue(model.hasMoreConversations)
+        XCTAssertFalse(model.loadMoreFailed)
+
+        await model.loadMore()
+        XCTAssertTrue(model.loadMoreFailed, "L'échec s'affiche au lieu d'un spinner sans fin")
+        XCTAssertTrue(model.hasMoreConversations, "La suite reste à charger")
+        XCTAssertEqual(model.conversations.map(\.id), ["a"])
+
+        failSecondPage = false
+        await model.loadMore()
+        XCTAssertFalse(model.loadMoreFailed)
+        XCTAssertFalse(model.hasMoreConversations)
+        XCTAssertEqual(Set(model.conversations.map(\.id)), ["a", "b"])
+    }
+
     func testDeliveredAndReceiptsUseTheServerRoutes() async throws {
         var calls: [(method: String?, path: String?, body: [String: Any])] = []
         MockURLProtocol.requestHandler = { request in

@@ -16,6 +16,8 @@ final class MessagesViewModel: ObservableObject {
     /// D'autres conversations existent côté serveur au-delà de celles chargées (B01).
     @Published private(set) var hasMoreConversations = false
     @Published private(set) var isLoadingMore = false
+    /// La page suivante n'a pas pu être lue : « Réessayer » remplace le spinner.
+    @Published private(set) var loadMoreFailed = false
     /// Dossiers du compte et leurs conversations.
     @Published private(set) var folders: [ConversationFolder] = []
     /// Session focus en cours (échue ou inactive : `nil`).
@@ -85,6 +87,7 @@ final class MessagesViewModel: ObservableObject {
             shelvedSummary = first.shelvedSummary
             hasMoreConversations = last.hasMore && last.nextCursor != nil
             nextCursor = last.nextCursor
+            loadMoreFailed = false
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.userFacingMessage }
@@ -272,8 +275,12 @@ final class MessagesViewModel: ObservableObject {
     func loadMore() async {
         guard hasMoreConversations, !isLoadingMore, loadedPages < Self.maxPages, let cursor = nextCursor else { return }
         isLoadingMore = true
+        loadMoreFailed = false
         defer { isLoadingMore = false }
-        guard let page = try? await service.conversationPage(cursor: cursor, take: Self.pageSize) else { return }
+        guard let page = try? await service.conversationPage(cursor: cursor, take: Self.pageSize) else {
+            loadMoreFailed = true
+            return
+        }
         let known = Set(conversations.map(\.id))
         conversations = (conversations + page.conversations.filter { !known.contains($0.id) }).inDisplayOrder()
         loadedPages += 1
@@ -711,18 +718,44 @@ struct MessagesView: View {
             if model.hasMoreConversations && !showingShelved {
                 // Page suivante au défilement ; la tâche repart à chaque page reçue,
                 // de sorte qu'un filtre encore vide continue de chercher (B01).
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
+                if model.loadMoreFailed {
+                    // La tâche ci-dessous ne repart pas toute seule (le nombre de
+                    // conversations ne change pas) : le bouton relance la page.
+                    VStack(spacing: SQSpace.xs) {
+                        Text("Impossible de charger la suite")
+                            .font(SQType.callout)
+                            .foregroundStyle(SQColor.labelSecondary)
+                            .sqAnnounce("Impossible de charger la suite")
+                        Button {
+                            Task { await model.loadMore() }
+                        } label: {
+                            Text("Réessayer")
+                                .font(SQType.callout(.semibold))
+                                .foregroundStyle(SQColor.accentInk)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(SQPressButtonStyle())
+                        .accessibilityIdentifier("messages.loadMore.retry")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SQSpace.md)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                } else {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .padding(.vertical, SQSpace.md)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Chargement d’autres conversations")
+                    .accessibilityIdentifier("messages.loadingMore")
+                    .task(id: model.conversations.count) { await model.loadMore() }
                 }
-                .padding(.vertical, SQSpace.md)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Chargement d’autres conversations")
-                .accessibilityIdentifier("messages.loadingMore")
-                .task(id: model.conversations.count) { await model.loadMore() }
             }
             if showingShelved && model.shelvedConversations.isEmpty && !model.isLoadingShelved {
                 EmptyStateView(
@@ -2751,6 +2784,8 @@ struct ReceivedShareSheet: View {
     @EnvironmentObject private var session: AuthSessionViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var conversations: [MessageConversation] = []
+    /// Conversations archivées pour soi : proposées sous « Archivées ».
+    @State private var archived: [MessageConversation] = []
     @State private var routes: [String: EncryptedConversationSurfaces.ForwardRoute] = [:]
     @State private var hasLoaded = false
     @State private var loadError: String?
@@ -2770,8 +2805,12 @@ struct ReceivedShareSheet: View {
         conversations.filter { accepts($0) }
     }
 
+    private var archivedTargets: [MessageConversation] {
+        archived.filter { accepts($0) }
+    }
+
     private var hiddenEncryptedCount: Int {
-        conversations.filter { $0.e2eeEnabled == true && !accepts($0) }.count
+        (conversations + archived).filter { $0.e2eeEnabled == true && !accepts($0) }.count
     }
 
     private func accepts(_ conversation: MessageConversation) -> Bool {
@@ -2781,10 +2820,13 @@ struct ReceivedShareSheet: View {
         )
     }
 
-    private var visibleTargets: [MessageConversation] {
+    private var visibleTargets: [MessageConversation] { filtered(targets) }
+    private var visibleArchivedTargets: [MessageConversation] { filtered(archivedTargets) }
+
+    private func filtered(_ list: [MessageConversation]) -> [MessageConversation] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !needle.isEmpty else { return targets }
-        return targets.filter {
+        guard !needle.isEmpty else { return list }
+        return list.filter {
             $0.displayTitle(excluding: currentUserId).localizedCaseInsensitiveContains(needle)
         }
     }
@@ -2909,26 +2951,43 @@ struct ReceivedShareSheet: View {
                     .tint(SQColor.brandRed)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, SQSpace.xl)
-            } else if targets.isEmpty {
+            } else if targets.isEmpty && archivedTargets.isEmpty {
                 EmptyStateView(
                     title: String(localized: "Aucune conversation"),
                     message: String(localized: "Aucune conversation ne peut recevoir ce partage."),
                     systemImage: "bubble.left.and.bubble.right"
                 )
             } else {
-                if targets.count > 6 {
+                if targets.count + archivedTargets.count > 6 {
                     TextField("Rechercher une conversation", text: $query)
                         .submitLabel(.search)
                         .sqHaloField()
                         .accessibilityIdentifier("share.search")
                 }
-                VStack(spacing: 0) {
-                    ForEach(visibleTargets) { target in
-                        if target.id != visibleTargets.first?.id { Divider().padding(.leading, 64) }
-                        row(for: target)
+                if !visibleTargets.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(visibleTargets) { target in
+                            if target.id != visibleTargets.first?.id { Divider().padding(.leading, 64) }
+                            row(for: target)
+                        }
                     }
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
                 }
-                .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                if !visibleArchivedTargets.isEmpty {
+                    Text("Archivées")
+                        .sqKicker()
+                        .padding(.leading, SQSpace.xs)
+                        .padding(.top, SQSpace.xs)
+                        .accessibilityAddTraits(.isHeader)
+                    VStack(spacing: 0) {
+                        ForEach(visibleArchivedTargets) { target in
+                            if target.id != visibleArchivedTargets.first?.id { Divider().padding(.leading, 64) }
+                            row(for: target)
+                        }
+                    }
+                    .sqSurface(SQColor.surface, in: RoundedRectangle(cornerRadius: SQRadius.lg, style: .continuous))
+                    .accessibilityIdentifier("share.archived")
+                }
                 if hiddenEncryptedCount > 0 {
                     Text("Les conversations chiffrées ne reçoivent que du texte.")
                         .font(SQType.caption)
@@ -3020,8 +3079,14 @@ struct ReceivedShareSheet: View {
                 ? [MessageConversation].demo.inDisplayOrder()
                 : try await services.messages.conversations()
             let v2Enabled = services.e2eeV2Messaging.readsEnabled && services.e2eeV2Messaging.writesEnabled
+            // Les archivées se proposent aussi, sans doublon ; un échec ne retire pas la liste principale.
+            let known = Set(loaded.map(\.id))
+            let shelved = AppEnvironment.usesDemoData
+                ? []
+                : ((try? await services.messages.shelvedConversations()) ?? []).filter { !known.contains($0.id) }
             conversations = loaded
-            routes = Dictionary(loaded.map { conversation -> (String, EncryptedConversationSurfaces.ForwardRoute) in
+            archived = shelved
+            routes = Dictionary((loaded + shelved).map { conversation -> (String, EncryptedConversationSurfaces.ForwardRoute) in
                 let encrypted = conversation.e2eeEnabled == true
                 return (conversation.id, EncryptedConversationSurfaces.forwardRoute(
                     toEncrypted: encrypted,

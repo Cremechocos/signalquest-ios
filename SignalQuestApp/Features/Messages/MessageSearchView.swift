@@ -23,6 +23,8 @@ struct MessageSearchView: View {
     @State private var isSearching = false
     @State private var errorMessage: String?
     @State private var hasSearched = false
+    /// Une recherche est programmée (délai de frappe) : l'état « Aucun résultat » de la requête précédente ne s'affiche pas.
+    @State private var searchPending = false
     @State private var decrypted: [String: String] = [:]
     @State private var searchTask: Task<Void, Never>?
 
@@ -59,7 +61,7 @@ struct MessageSearchView: View {
 
     @ViewBuilder
     private var content: some View {
-        if isSearching && results.isEmpty {
+        if (isSearching || searchPending) && results.isEmpty {
             SQSpinner().frame(maxWidth: .infinity).padding(.top, SQSpace.xxl)
         } else if let errorMessage {
             ErrorStateView(title: "Recherche indisponible", message: errorMessage)
@@ -169,8 +171,10 @@ struct MessageSearchView: View {
         guard trimmed.count >= 2 else {
             results = []
             hasSearched = false
+            searchPending = false
             return
         }
+        searchPending = true
         searchTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000)
             if Task.isCancelled { return }
@@ -184,6 +188,7 @@ struct MessageSearchView: View {
     }
 
     private func performSearch() async {
+        defer { searchPending = false }
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         if let localCorpus {
@@ -208,7 +213,11 @@ struct MessageSearchView: View {
             errorMessage = nil
             await decryptResults()
         } catch {
-            if !error.isCancellation { errorMessage = error.userFacingMessage }
+            // Les résultats de la requête précédente ne répondent plus à celle-ci.
+            if !error.isCancellation {
+                results = []
+                errorMessage = error.userFacingMessage
+            }
             hasSearched = true
         }
     }
