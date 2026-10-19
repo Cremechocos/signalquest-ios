@@ -5,6 +5,14 @@ import Foundation
 /// Elles existaient côté serveur depuis longtemps — le web et Android les
 /// réglaient, iOS ne les lisait même pas. Décodage tolérant : le serveur ne
 /// renvoie pas toujours `showHypothesisSystem` selon la version déployée.
+/// Tutoiement ou vouvoiement (`addressForm`, contrat ADDR-1). Le serveur parle de
+/// « forme » et non de « tu/vous » : la même valeur sert aux langues qui
+/// distinguent les deux (du/Sie, tu/Lei…).
+enum SQAddressForm: String, Codable, CaseIterable, Sendable {
+    case informal
+    case formal
+}
+
 struct UserPreferences: Codable, Equatable, Sendable {
     var unitsSystem: SQUnitsSystem
     /// Marché par défaut de la carte (« FR », « CA »…). `nil` = déduit.
@@ -13,21 +21,32 @@ struct UserPreferences: Codable, Equatable, Sendable {
     var showHandleOnLeaderboard: Bool
     /// Afficher le système d'hypothèses d'identification.
     var showHypothesisSystem: Bool
+    /// Ton choisi. `nil` = rien choisi, clé absente (route pas encore déployée)
+    /// ou valeur inconnue : les trois cas donnent le tutoiement.
+    var addressForm: SQAddressForm?
+    /// `nil` = le serveur ne l'expose pas : la question du ton n'est alors jamais
+    /// posée. `false` = compte qui n'a encore rien choisi.
+    var addressFormChosen: Bool?
 
     enum CodingKeys: String, CodingKey {
         case unitsSystem, defaultMarket, showHandleOnLeaderboard, showHypothesisSystem
+        case addressForm, addressFormChosen
     }
 
     init(
         unitsSystem: SQUnitsSystem = .metric,
         defaultMarket: String? = nil,
         showHandleOnLeaderboard: Bool = false,
-        showHypothesisSystem: Bool = true
+        showHypothesisSystem: Bool = true,
+        addressForm: SQAddressForm? = nil,
+        addressFormChosen: Bool? = nil
     ) {
         self.unitsSystem = unitsSystem
         self.defaultMarket = defaultMarket
         self.showHandleOnLeaderboard = showHandleOnLeaderboard
         self.showHypothesisSystem = showHypothesisSystem
+        self.addressForm = addressForm
+        self.addressFormChosen = addressFormChosen
     }
 
     init(from decoder: Decoder) throws {
@@ -39,6 +58,10 @@ struct UserPreferences: Codable, Equatable, Sendable {
         showHandleOnLeaderboard = try c.decode(Bool.self, forKey: .showHandleOnLeaderboard)
         // Facultatif dans les anciennes réponses, mais strict si présent.
         showHypothesisSystem = try c.decodeIfPresent(Bool.self, forKey: .showHypothesisSystem) ?? true
+        // ADDR-1 : décodage tolérant. Une clé absente, `null`, ou d'un type ou d'une
+        // valeur inattendus ne doit ni faire échouer les préférences ni changer le ton.
+        addressForm = (try? c.decodeIfPresent(String.self, forKey: .addressForm)).flatMap(SQAddressForm.init(rawValue:))
+        addressFormChosen = try? c.decodeIfPresent(Bool.self, forKey: .addressFormChosen)
     }
 }
 

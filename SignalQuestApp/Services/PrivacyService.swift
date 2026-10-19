@@ -71,6 +71,7 @@ struct UserPreferencesPatch: Encodable, Sendable {
     var unitsSystem: SQUnitsSystem? = nil
     var showHandleOnLeaderboard: Bool? = nil
     var showHypothesisSystem: Bool? = nil
+    var addressForm: SQAddressForm? = nil
 }
 
 protocol PrivacyServicing: Sendable {

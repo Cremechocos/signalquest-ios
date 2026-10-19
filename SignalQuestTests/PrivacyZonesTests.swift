@@ -80,6 +80,36 @@ final class PrivacyZoneDraftTests: XCTestCase {
         XCTAssertTrue(value.showHypothesisSystem)
     }
 
+    func testAddressFormDecodesTolerantlyAndNeverBreaksThePreferences() throws {
+        let base = #""unitsSystem":"metric","showHandleOnLeaderboard":false,"showHypothesisSystem":true"#
+        func decode(_ extra: String) throws -> UserPreferences {
+            try JSONDecoder().decode(UserPreferences.self, from: Data("{\(base)\(extra)}".utf8))
+        }
+        // Serveur qui n'expose pas encore le réglage : clé absente = null = tutoiement, sans question.
+        let absent = try decode("")
+        XCTAssertNil(absent.addressForm)
+        XCTAssertNil(absent.addressFormChosen)
+        let unchosen = try decode(#","addressForm":null,"addressFormChosen":false"#)
+        XCTAssertNil(unchosen.addressForm)
+        XCTAssertEqual(unchosen.addressFormChosen, false)
+        let formal = try decode(#","addressForm":"formal","addressFormChosen":true"#)
+        XCTAssertEqual(formal.addressForm, .formal)
+        XCTAssertEqual(formal.addressFormChosen, true)
+        XCTAssertEqual(try decode(#","addressForm":"informal","addressFormChosen":true"#).addressForm, .informal)
+        // Valeur inconnue ou type inattendu : les préférences restent lisibles, le ton reste celui par défaut.
+        let unknown = try decode(#","addressForm":"casual","addressFormChosen":"yes""#)
+        XCTAssertNil(unknown.addressForm)
+        XCTAssertNil(unknown.addressFormChosen)
+        XCTAssertNil(try decode(#","addressForm":3"#).addressForm)
+        XCTAssertEqual(unknown.unitsSystem, .metric)
+    }
+
+    func testAddressFormPatchCarriesOnlyTheChoice() throws {
+        let data = try JSONEncoder().encode(UserPreferencesPatch(addressForm: .formal))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: String])
+        XCTAssertEqual(json, ["addressForm": "formal"])
+    }
+
     func testMissingLegacyPrecisionDecodesWithoutInventingOtherPermissions() throws {
         let withoutPrecision = #"{"shareLiveLocationWithFriends":false,"shareRadioDataWithFriends":true,"shareSessionsWithFriends":false,"sharePhotosOnFriendMap":false,"lastSeenVisibility":"none","messageRequestPolicy":"friends_only"}"#
         let value = try JSONDecoder().decode(SocialPrivacy.self, from: Data(withoutPrecision.utf8))
