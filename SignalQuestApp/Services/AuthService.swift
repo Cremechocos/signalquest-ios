@@ -503,7 +503,8 @@ final class AuthService: AuthServicing {
         if let previousUserId, previousUserId != user.id {
             let previousScope = "user:\(previousUserId)"
             Self.purgeScopedStores(ownerScopeId: previousScope)
-            CarPlayDestinationStore.reset()
+            // Widgets, Spotlight et destinations CarPlay appartiennent au compte précédent.
+            Self.clearDeviceSurfaces()
             // Le partage en attente a été fait pour l'ancien compte, pas pour celui-ci.
             ShareInbox.appGroup()?.purgeAll()
             Task { await MessageDraftStore.shared.purge(ownerScopeId: previousScope) }
