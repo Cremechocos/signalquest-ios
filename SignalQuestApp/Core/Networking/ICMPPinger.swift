@@ -64,9 +64,13 @@ struct ICMPPinger: Sendable {
     ///   échantillon seul, pour que l'appelant n'ait aucun état mutable à gérer —
     ///   et parce que la valeur affichée (minimum, gigue) se calcule sur la série,
     ///   pas sur le dernier écho.
+    /// `giveUpAfterLeadingLosses` : abandonne la série quand les N premiers échos
+    /// sont tous perdus. Un hôte qui filtre l'ICMP (les POP iPerf Bouygues) faisait
+    /// sinon payer la série entière en délais d'attente — près de 12 s avant le repli.
     func ping(
         count: Int,
         intervalMs: Double,
+        giveUpAfterLeadingLosses: Int? = nil,
         onSample: (@Sendable ([Sample]) -> Void)? = nil
     ) async throws -> [Sample] {
         let host = self.host
@@ -83,6 +87,8 @@ struct ICMPPinger: Sendable {
             }) {
                 samples.append(sample)
                 onSample?(samples)
+            } else if icmpShouldGiveUp(samplesSoFar: samples.count, attempts: Int(sequence) + 1, giveUpAfterLeadingLosses: giveUpAfterLeadingLosses) {
+                break
             }
             if sequence + 1 < UInt16(count) {
                 try? await Task.sleep(nanoseconds: UInt64(max(0, intervalMs) * 1_000_000))
@@ -318,4 +324,11 @@ enum ICMPPacket {
         guard headerLength >= 20, data.count > headerLength else { return data }
         return data.subdata(in: headerLength..<data.count)
     }
+}
+
+/// Vrai quand aucun écho n'est revenu après `giveUpAfterLeadingLosses` tentatives.
+/// Un seul écho reçu suffit à garder la série : l'hôte répond, la perte est ponctuelle.
+func icmpShouldGiveUp(samplesSoFar: Int, attempts: Int, giveUpAfterLeadingLosses: Int?) -> Bool {
+    guard let limit = giveUpAfterLeadingLosses, limit > 0 else { return false }
+    return samplesSoFar == 0 && attempts >= limit
 }

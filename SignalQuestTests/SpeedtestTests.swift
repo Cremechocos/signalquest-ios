@@ -1672,4 +1672,56 @@ final class SpeedtestTests: XCTestCase {
         XCTAssertTrue(isRetryableIPerfTransportError(IPerf3Error.accessDenied))
         XCTAssertFalse(isRetryableIPerfTransportError(IPerf3Error.invalidJSON))
     }
+
+    /// Un refus laisse `NWConnection` en `.waiting` : seul ECONNREFUSED doit court-
+    /// circuiter le délai. Une absence de réseau garde son délai, elle peut se lever.
+    func testOnlyARefusedConnectionFailsWithoutWaitingForTheTimeout() {
+        XCTAssertTrue(isImmediateConnectRefusal(.posix(.ECONNREFUSED)))
+        XCTAssertFalse(isImmediateConnectRefusal(.posix(.ENETDOWN)))
+        XCTAssertFalse(isImmediateConnectRefusal(.posix(.ETIMEDOUT)))
+        // Le refus reste retentable : le repli de port passe au suivant.
+        XCTAssertTrue(isRetryableIPerfTransportError(NWError.posix(.ECONNREFUSED)))
+    }
+
+    /// Les POP iPerf Bouygues filtrent l'ICMP : 2 échos perdus d'entrée suffisent à
+    /// l'établir, au lieu des 8 de la série (≈ 12 s). Un écho reçu garde la série.
+    func testAnICMPSeriesGivesUpAfterTwoLeadingLossesButNotAfterAReply() {
+        XCTAssertFalse(icmpShouldGiveUp(samplesSoFar: 0, attempts: 1, giveUpAfterLeadingLosses: 2))
+        XCTAssertTrue(icmpShouldGiveUp(samplesSoFar: 0, attempts: 2, giveUpAfterLeadingLosses: 2))
+        XCTAssertFalse(icmpShouldGiveUp(samplesSoFar: 1, attempts: 5, giveUpAfterLeadingLosses: 2))
+        XCTAssertFalse(icmpShouldGiveUp(samplesSoFar: 0, attempts: 8, giveUpAfterLeadingLosses: nil))
+    }
+
+    func testAnICMPSilentHostIsRememberedUntilTheNetworkChanges() async {
+        let cache = IPerfEndpointCache()
+        await cache.invalidateIfNetworkChanged("wifi|Free|208")
+        let silentBefore = await cache.isICMPSilent("paris.bbr.iperf.bytel.fr")
+        XCTAssertFalse(silentBefore)
+
+        await cache.markICMPSilent("Paris.BBR.iperf.bytel.fr")
+        let silent = await cache.isICMPSilent("paris.bbr.iperf.bytel.fr")
+        let other = await cache.isICMPSilent("iperf3.moji.fr")
+        XCTAssertTrue(silent)
+        XCTAssertFalse(other)
+
+        // Même réseau : la mémoire tient.
+        await cache.invalidateIfNetworkChanged("wifi|Free|208")
+        let sameNetwork = await cache.isICMPSilent("paris.bbr.iperf.bytel.fr")
+        XCTAssertTrue(sameNetwork)
+
+        // Passage en cellulaire : l'hôte peut répondre sur ce chemin-là.
+        await cache.invalidateIfNetworkChanged("cellular|Bouygues|208")
+        let afterSwitch = await cache.isICMPSilent("paris.bbr.iperf.bytel.fr")
+        XCTAssertFalse(afterSwitch)
+    }
+
+    func testStreamConnectLatenciesAreCollectedFromConcurrentQueues() {
+        let box = SpeedtestLatencyBox()
+        DispatchQueue.concurrentPerform(iterations: 200) { index in
+            box.append(Double(index))
+        }
+        XCTAssertEqual(box.values.count, 200)
+        XCTAssertEqual(box.values.sorted().first, 0)
+        XCTAssertEqual(box.append(5).count, 201)
+    }
 }

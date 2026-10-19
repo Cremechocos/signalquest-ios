@@ -226,6 +226,13 @@ struct NetworkSpeedtestTCPProbe: SpeedtestTCPProbing {
                     }
                 case .cancelled:
                     break
+                case .waiting(let error):
+                    if isImmediateConnectRefusal(error) {
+                        gate.run {
+                            connection.cancel()
+                            continuation.resume(throwing: error)
+                        }
+                    }
                 default:
                     break
                 }
@@ -315,6 +322,10 @@ private enum SpeedtestEngineConfig {
     static let pingMinimumValidSamples: Int = 3
     static let pingIntervalMs: Double = 300
     static let pingTimeoutSeconds: TimeInterval = 1.2
+    /// Échos ICMP perdus d'affilée, dès le début, avant de conclure que l'hôte filtre
+    /// l'ICMP : l'écho d'échauffement plus un. Coût du constat : ~2,7 s, puis 0 s
+    /// pendant 15 min grâce à `IPerfEndpointCache`.
+    static let icmpGiveUpAfterLeadingLosses: Int = 2
     /// Probes de rattrapage (cadence rapprochée) quand le budget principal
     /// n'a pas produit assez d'échantillons valides sur un réseau perdant.
     static let pingSalvageAttempts: Int = 3
@@ -775,8 +786,9 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             ))
         }
 
-        // 2. Ping TCP pur sur le port iPerf (pas de fallback HTTP : ATS bloquerait
-        // les hosts Bouygues/OVH en clair, et le port iPerf n'est pas un serveur HTTP).
+        // 2. Latence à vide : ICMP, sinon RTT de connexion des flux du download (pas
+        // de fallback HTTP : ATS bloquerait les hosts Bouygues/OVH en clair, et le
+        // port iPerf n'est pas un serveur HTTP).
         progress?(SpeedtestLiveProgress(
             phase: .ping,
             fraction: 0,
@@ -784,18 +796,32 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             serverName: serverName
         ))
 
-        let pingOutcome = try await measureIPerfTcpPings(
+        let idlePing = await measureIPerfIdlePings(
             host: iperfServer.hostname,
-            port: port,
             serverName: serverName,
             progress: progress
         )
-
-        let pingValue = SpeedMetricCalculator.average(pingOutcome.values)
-        let pingMedianValue = SpeedMetricCalculator.median(pingOutcome.values)
-        let pingMinValue = pingOutcome.values.min()
-        let pingMaxValue = pingOutcome.values.max()
-        let jitterValue = SpeedMetricCalculator.jitter(pingOutcome.values)
+        try Task.checkCancellation()
+        // Sans ICMP : chaque flux du download ouvre sa connexion avant que les données
+        // ne circulent — son temps d'établissement est un RTT TCP à vide, la même
+        // grandeur que l'ancien repli, sans connexion vide en plus.
+        let streamConnectRtts = SpeedtestLatencyBox()
+        let onStreamConnect: (@Sendable (Double) -> Void)? = idlePing != nil ? nil : { @Sendable rtt in
+            let values = streamConnectRtts.append(rtt)
+            progress?(SpeedtestLiveProgress(
+                phase: .download,
+                fraction: 0,
+                pingLiveMs: values.min(),
+                pingFinalMs: values.min(),
+                jitterMs: SpeedMetricCalculator.jitter(values),
+                pingProtocol: "TCP",
+                pingSampleCount: values.count,
+                pingSampleTarget: parallelStreams,
+                serverName: serverName,
+                stage: "preparation",
+                usefulElapsedSeconds: 0
+            ))
+        }
 
         // 3. Download measurement (iPerf3 reverse) — démarre immédiatement après le ping.
         progress?(SpeedtestLiveProgress(phase: .download, fraction: 0, serverName: serverName, stage: "preparation", usefulElapsedSeconds: 0))
@@ -852,6 +878,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             omitSeconds: omitSeconds,
             isDownload: true,
             knownOpenPorts: endpoint.openPorts,
+            onStreamConnect: onStreamConnect,
             onProgress: { @Sendable bytes, elapsed in
                 let elapsedMs = elapsed * 1000.0
                 let needleMbps = dlLiveSampler.observeUseful(totalBytes: bytes, elapsedMs: elapsedMs)
@@ -916,6 +943,12 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             )
         }
         port = dlPort
+        let pingOutcome = idlePing ?? PingOutcome(values: streamConnectRtts.values, protocolName: "TCP")
+        let pingValue = SpeedMetricCalculator.average(pingOutcome.values)
+        let pingMedianValue = SpeedMetricCalculator.median(pingOutcome.values)
+        let pingMinValue = pingOutcome.values.min()
+        let pingMaxValue = pingOutcome.values.max()
+        let jitterValue = SpeedMetricCalculator.jitter(pingOutcome.values)
         dlLoadedPingsTask.cancel()
         let downloadPings = await dlLoadedPingsTask.value
         let pingDlMs = downloadPings.isEmpty ? nil : SpeedMetricCalculator.average(downloadPings)
@@ -1194,7 +1227,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
             pingUlMs: pingUlMs,
             jitterUlMs: jitterUlMs,
             pingServerHost: iperfServer.hostname,
-            pingServerPort: pingOutcome.protocolName == "TCP" ? Int(endpoint.port) : nil,
+            pingServerPort: pingOutcome.protocolName == "TCP" ? Int(dlPort) : nil,
             uploadServerHost: ulAverageMbps == nil ? nil : iperfServer.hostname,
             uploadServerPort: ulAverageMbps == nil ? nil : Int(port)
         )
@@ -2218,6 +2251,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         omitSeconds: Int,
         isDownload: Bool,
         knownOpenPorts: [UInt16] = [],
+        onStreamConnect: (@Sendable (_ connectMs: Double) -> Void)? = nil,
         onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)?,
         onWarmup: (@Sendable (_ rawTotalBytes: Int, _ wallSeconds: Double) -> Void)? = nil,
         onPortAttempt: (@Sendable (_ port: UInt16, _ attempt: Int) -> Void)? = nil
@@ -2244,6 +2278,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                 durationSeconds: durationSeconds,
                 omitSeconds: omitSeconds,
                 isDownload: isDownload,
+                onStreamConnect: onStreamConnect,
                 onProgress: onProgress,
                 onWarmup: onWarmup
             )
@@ -2295,6 +2330,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
                     durationSeconds: durationSeconds,
                     omitSeconds: omitSeconds,
                     isDownload: isDownload,
+                    onStreamConnect: onStreamConnect,
                     onProgress: onProgress,
                     onWarmup: onWarmup
                 )
@@ -2896,33 +2932,26 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         let attemptsUsed: Int
     }
 
-    /// Ping TCP dédié iPerf : jamais de fallback HTTP (ATS / ports non-HTTP).
-    /// Exige ≥ 2 échantillons (jitter/médiane sans signification à 1) — avec
-    /// salvage intégré à `measureTcpPings` avant d'échouer le run.
-    private func measureIPerfTcpPings(
+    /// Latence à vide d'un POP iPerf3. ICMP d'abord : c'est le seul vrai RTT.
+    ///
+    /// `nil` quand l'hôte ne répond pas à l'ICMP (beaucoup d'opérateurs mobiles et de
+    /// POP publics le filtrent, dont tous les POP Bouygues) : la latence est alors
+    /// prise sur les connexions des flux du download, avant que les données ne
+    /// circulent. L'ancien repli ouvrait jusqu'à 9 connexions TCP VIDES sur le port de
+    /// mesure : un démon iPerf3 mono-place prend chacune pour un client et refuse
+    /// ensuite le port un court instant — le download suivant tombait dessus. Il
+    /// coûtait aussi près de 4 s, après les 12 s d'une série ICMP perdue.
+    private func measureIPerfIdlePings(
         host: String,
-        port: UInt16,
         serverName: String,
         progress: SpeedtestProgressHandler?
-    ) async throws -> PingOutcome {
-        // ICMP d'abord : c'est le seul vrai RTT. Le connect TCP reste en repli parce
-        // que beaucoup d'opérateurs mobiles et de POP publics filtrent l'ICMP — mais
-        // il ne doit plus être le chemin nominal, il surestime structurellement.
+    ) async -> PingOutcome? {
+        guard await !IPerfEndpointCache.shared.isICMPSilent(host) else { return nil }
         if let icmp = await measureIcmpPings(host: host, serverName: serverName, progress: progress) {
             return icmp
         }
-
-        // Repli : hôte résolu UNE fois, la sonde reçoit une adresse et non un nom.
-        let address = (try? ICMPPinger.resolve(host: host))?.addressText ?? host
-        let result = await measureTcpPings(
-            host: address,
-            port: port,
-            serverName: serverName,
-            progress: progress,
-            minimumValidSamples: 2
-        )
-        guard !result.values.isEmpty else { throw SpeedtestEngineError.pingFailed }
-        return PingOutcome(values: result.values, protocolName: "TCP")
+        if !Task.isCancelled { await IPerfEndpointCache.shared.markICMPSilent(host) }
+        return nil
     }
 
     /// Série ICMP. `nil` — et non une erreur — quand l'ICMP n'aboutit pas : c'est le
@@ -2945,6 +2974,7 @@ final class SpeedtestService: SpeedtestServicing, @unchecked Sendable {
         guard let samples = try? await pinger.ping(
             count: target + 1,
             intervalMs: SpeedtestEngineConfig.pingIntervalMs,
+            giveUpAfterLeadingLosses: SpeedtestEngineConfig.icmpGiveUpAfterLeadingLosses,
             onSample: { [weak self] running in
                 // Même `dropFirst()` que le résultat final ci-dessous : le premier
                 // écho paie la mise en route du chemin radio et sera écarté. Afficher
@@ -3416,6 +3446,25 @@ class ConcurrencyGate: @unchecked Sendable {
     }
 }
 
+/// Série de latences remplie depuis plusieurs files (connexions de flux iPerf3).
+final class SpeedtestLatencyBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Double] = []
+
+    /// Ajoute une valeur et renvoie la série complète, pour l'affichage en direct.
+    @discardableResult
+    func append(_ value: Double) -> [Double] {
+        lock.lock(); defer { lock.unlock() }
+        storage.append(value)
+        return storage
+    }
+
+    var values: [Double] {
+        lock.lock(); defer { lock.unlock() }
+        return storage
+    }
+}
+
 class AtomicBool: @unchecked Sendable {
     private let lock = NSLock()
     private var val: Bool
@@ -3657,6 +3706,10 @@ actor IPerfEndpointCache {
     }
 
     private var entries: [String: Entry] = [:]
+    /// Hôtes qui n'ont renvoyé aucun écho ICMP : les POP iPerf Bouygues filtrent
+    /// l'ICMP. Sans cette mémoire, chaque test repayait la série perdue avant de
+    /// prendre la latence sur les connexions du test.
+    private var icmpSilentHosts: [String: Date] = [:]
     private var networkSignature: String?
     private static let successTTL: TimeInterval = 600   // 10 min
     private static let failureTTL: TimeInterval = 900   // 15 min
@@ -3676,6 +3729,18 @@ actor IPerfEndpointCache {
         guard networkSignature != signature else { return }
         networkSignature = signature
         entries.removeAll()
+        icmpSilentHosts.removeAll()
+    }
+
+    func isICMPSilent(_ hostname: String) -> Bool {
+        let key = hostname.lowercased()
+        guard let expiry = icmpSilentHosts[key] else { return false }
+        guard expiry > Date() else { icmpSilentHosts[key] = nil; return false }
+        return true
+    }
+
+    func markICMPSilent(_ hostname: String) {
+        icmpSilentHosts[hostname.lowercased()] = Date().addingTimeInterval(Self.failureTTL)
     }
 
     func cached(_ server: IPerfPublicServer) -> IPerfEndpoint?? {
@@ -3709,6 +3774,7 @@ actor IPerfEndpointCache {
 
     func invalidateAll() {
         entries.removeAll()
+        icmpSilentHosts.removeAll()
         networkSignature = nil
     }
 }
@@ -3858,6 +3924,11 @@ private func tcpPortIsOpen(host: String, port: UInt16, timeoutSeconds: TimeInter
                     connection.cancel()
                     continuation.resume(returning: false)
                 }
+            case .waiting(let error):
+                if isImmediateConnectRefusal(error), !gate.testAndSet() {
+                    connection.cancel()
+                    continuation.resume(returning: false)
+                }
             default:
                 break
             }
@@ -3870,6 +3941,16 @@ private func tcpPortIsOpen(host: String, port: UInt16, timeoutSeconds: TimeInter
         }
         connection.start(queue: queue)
     }
+}
+
+/// Un refus (RST) ne fait PAS échouer une `NWConnection` : elle passe en `.waiting`
+/// et réessaie au prochain changement de chemin. Pour une sonde ou un connect iPerf3
+/// c'est pourtant une réponse définitive — attendre le délai (1,2 s pour une sonde,
+/// 5 s pour un connect iPerf3) ne faisait que retarder le passage au port suivant.
+/// Les autres attentes (pas de réseau, pas de route) gardent leur délai.
+func isImmediateConnectRefusal(_ error: NWError) -> Bool {
+    if case .posix(let code) = error, code == .ECONNREFUSED { return true }
+    return false
 }
 
 func iperfTCPParameters() -> NWParameters {
@@ -3970,6 +4051,11 @@ private func connectNW(_ connection: NWConnection, queue: DispatchQueue, timeout
                 if !gate.testAndSet() { continuation.resume() }
             case .failed(let error):
                 if !gate.testAndSet() { continuation.resume(throwing: error) }
+            case .waiting(let error):
+                if isImmediateConnectRefusal(error), !gate.testAndSet() {
+                    connection.cancel()
+                    continuation.resume(throwing: error)
+                }
             case .cancelled:
                 if !gate.testAndSet() {
                     continuation.resume(throwing: IPerf3Error.cancelled)
@@ -4547,6 +4633,9 @@ actor IPerf3Runner {
     let durationSeconds: Int
     let omitSeconds: Int
     let isDownload: Bool
+    /// Temps d'établissement de chaque connexion de flux (ms), mesuré avant que les
+    /// données ne circulent : sert de latence à vide quand l'hôte filtre l'ICMP.
+    let onStreamConnect: (@Sendable (_ connectMs: Double) -> Void)?
     let onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)?
     /// Callback émis toutes les ~150 ms PENDANT la phase omit (warm-up TCP)
     /// avec les octets bruts cumulés et le temps mural. Permet au cadran de
@@ -4563,6 +4652,7 @@ actor IPerf3Runner {
         durationSeconds: Int,
         omitSeconds: Int = SpeedtestEngineConfig.iperf3OmitSeconds,
         isDownload: Bool,
+        onStreamConnect: (@Sendable (_ connectMs: Double) -> Void)? = nil,
         onProgress: (@Sendable (_ bytesTransferred: Int, _ elapsedSeconds: Double) -> Void)? = nil,
         onWarmup: (@Sendable (_ rawTotalBytes: Int, _ wallSeconds: Double) -> Void)? = nil
     ) {
@@ -4572,6 +4662,7 @@ actor IPerf3Runner {
         self.durationSeconds = max(1, durationSeconds)
         self.omitSeconds = max(0, omitSeconds)
         self.isDownload = isDownload
+        self.onStreamConnect = onStreamConnect
         self.onProgress = onProgress
         self.onWarmup = onWarmup
     }
@@ -4687,7 +4778,9 @@ actor IPerf3Runner {
                 for _ in 0..<streams {
                     let dataConn = NWConnection(host: host, port: portEndpoint, using: params)
                     bag.register(dataConn)
+                    let connectStart = speedtestMonotonicSeconds()
                     try await connectNW(dataConn, queue: queue, timeoutSeconds: 5)
+                    onStreamConnect?((speedtestMonotonicSeconds() - connectStart) * 1_000)
                     dataConnections.append(dataConn)
                     try await sendNW(dataConn, cookieData)
                 }
