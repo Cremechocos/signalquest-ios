@@ -899,6 +899,30 @@ final class APIClientTests: XCTestCase {
         ])
     }
 
+    /// Profil d'un autre membre : la route de ses publications, sans balayer le fil public.
+    func testAnotherMembersPostsUseTheAuthorRouteAndItsCursor() async throws {
+        let client = APIClient(
+            config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: Self.mockSession()
+        )
+        var requests: [URL] = []
+        MockURLProtocol.requestHandler = { request in
+            requests.append(request.url!)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"items":[],"nextCursor":"c2","requestId":"r"}"#.utf8))
+        }
+
+        let page = try await SocialFeedService(api: client).userPosts(userId: "user-2", cursor: "c1", mine: false)
+
+        XCTAssertEqual(requests.map(\.path), ["/api/social/users/user-2/posts"])
+        let items = URLComponents(url: requests[0], resolvingAgainstBaseURL: false)?.queryItems ?? []
+        XCTAssertEqual(items.first { $0.name == "cursor" }?.value, "c1")
+        XCTAssertEqual(items.first { $0.name == "limit" }?.value, "20")
+        XCTAssertEqual(page.nextCursor, "c2")
+        XCTAssertTrue(page.items.isEmpty)
+    }
+
     func testPrivacyServiceDecodesAndPersistsCanonicalContract() async throws {
         let client = APIClient(
             config: .test,

@@ -1007,13 +1007,10 @@ struct UserProfileView: View {
 
     // MARK: Posts
 
-    /// Titre « Publications » (ou « récentes » sur un autre profil), puis la liste.
+    /// Titre « Publications », puis la liste complète, paginée.
     private var postsBlock: some View {
         VStack(alignment: .leading, spacing: SQSpace.lg) {
-            // Un autre profil n'affiche que ses publications récentes du fil public :
-            // le titre ne promet pas la liste complète.
-            let title = model.profile?.isSelf == true ? Text("Publications") : Text("Publications récentes")
-            title
+            Text("Publications")
                 .sqKicker()
                 .accessibilityAddTraits(.isHeader)
             .padding(.leading, SQSpace.xs)

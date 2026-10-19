@@ -686,38 +686,15 @@ final class SocialFeedService: SocialFeedServicing {
             return try await api.request(APIEndpoint(path: "/api/social/feed", query: query), as: SocialFeedPage.self)
         }
 
-        // Pas de route "posts d'un auteur" côté backend : on balaie le flux
-        // public récent (ranking=latest) et on filtre côté client, en suivant
-        // quelques curseurs pour remplir la page.
-        var collected: [UnifiedSocialFeedItem] = []
-        var nextCursor = cursor
-        var scannedPages = 0
-        let maxScannedPages = 4
-        let targetCount = 10
-
-        repeat {
-            var query = [
-                URLQueryItem(name: "limit", value: "50"),
-                URLQueryItem(name: "filter", value: "all"),
-                URLQueryItem(name: "ranking", value: "latest"),
-                URLQueryItem(name: "include", value: "items")
-            ]
-            if let nextCursorValue = nextCursor {
-                query.append(URLQueryItem(name: "cursor", value: nextCursorValue))
-            }
-            let page = try await api.request(APIEndpoint(path: "/api/social/feed", query: query), as: SocialFeedPage.self)
-            collected.append(contentsOf: page.items.filter { $0.author.id == userId })
-            nextCursor = page.nextCursor
-            scannedPages += 1
-        } while nextCursor != nil && collected.count < targetCount && scannedPages < maxScannedPages
-
-        return SocialFeedPage(
-            items: collected,
-            nextCursor: nextCursor,
-            stories: [],
-            trendingHashtags: [],
-            suggestedUsers: [],
-            requestId: nil
+        // Publications d'un autre membre : route dédiée, même enveloppe que le
+        // fil (épinglées en tête de la première page). Refus de profil privé :
+        // 403 PROFILE_PRIVATE, comme le profil lui-même.
+        let encodedId = userId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? userId
+        var query = [URLQueryItem(name: "limit", value: "20")]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        return try await api.request(
+            APIEndpoint(path: "/api/social/users/\(encodedId)/posts", query: query),
+            as: SocialFeedPage.self
         )
     }
 
