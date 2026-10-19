@@ -323,3 +323,493 @@ struct SiteFollowStatus: Decodable, Equatable {
     let following: Bool
     let followId: String?
 }
+
+// MARK: - Salons (ROOM-1)
+
+/// La région d'un salon (« auvergne-rhone-alpes », « Auvergne-Rhône-Alpes »).
+struct RoomRegion: Decodable, Equatable, Hashable, Sendable {
+    let slug: String
+    let name: String
+}
+
+/// Un salon public : fixe, décrit par le serveur, jamais créé par un membre.
+///
+/// `scope` vaut `region` (une région ou un territoire × un opérateur) ou `national` (un opérateur,
+/// ou « 5G SA · France »). `departments` porte les codes ANFR sur 3 caractères (« 038 », « 02A »,
+/// « 971 ») : c'est ce qui permet de retrouver « Ton salon » sans envoyer de position.
+struct RoomSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
+    let id: String
+    let market: String
+    let scope: String
+    let name: String
+    let region: RoomRegion?
+    let departments: [String]?
+    let operatorKey: String?
+    let technology: String?
+    /// Partages radio en cours dans le salon.
+    let liveCount: Int
+    let lastMessageAt: Date?
+    let messages24h: Int
+
+    var isNational: Bool { scope == "national" }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, market, scope, name, region, departments, technology, liveCount, lastMessageAt, messages24h
+        case operatorKey = "operator"
+    }
+
+    init(id: String, market: String = "FR", scope: String = "region", name: String, region: RoomRegion? = nil,
+         departments: [String]? = nil, operatorKey: String? = nil, technology: String? = nil,
+         liveCount: Int = 0, lastMessageAt: Date? = nil, messages24h: Int = 0) {
+        self.id = id
+        self.market = market
+        self.scope = scope
+        self.name = name
+        self.region = region
+        self.departments = departments
+        self.operatorKey = operatorKey
+        self.technology = technology
+        self.liveCount = liveCount
+        self.lastMessageAt = lastMessageAt
+        self.messages24h = messages24h
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        market = c.decodeFlexibleString(forKey: .market) ?? "FR"
+        scope = c.decodeFlexibleString(forKey: .scope) ?? "region"
+        region = try? c.decodeIfPresent(RoomRegion.self, forKey: .region)
+        departments = try? c.decodeIfPresent([String].self, forKey: .departments)
+        operatorKey = c.decodeFlexibleString(forKey: .operatorKey)
+        technology = c.decodeFlexibleString(forKey: .technology)
+        liveCount = (try? c.decodeIfPresent(Int.self, forKey: .liveCount)) ?? 0
+        lastMessageAt = try? c.decodeIfPresent(Date.self, forKey: .lastMessageAt)
+        messages24h = (try? c.decodeIfPresent(Int.self, forKey: .messages24h)) ?? 0
+    }
+}
+
+private struct RoomsListResponse: Decodable {
+    let rooms: [RoomSummary]
+
+    private enum CodingKeys: String, CodingKey { case rooms }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rooms = c.decodeLossyArray([RoomSummary].self, forKey: .rooms)
+    }
+}
+
+/// Un message de salon. Même forme que celui du fil d'une antenne, sans genre « aide ».
+struct RoomMessage: Decodable, Identifiable, Equatable {
+    let id: String
+    let text: String
+    let createdAt: Date?
+    /// Ce qu'Android ou le web ont joint ; iOS n'en joint pas (aucune métrique radio lisible).
+    let radio: SiteCommentRadio?
+    let author: SocialFeedAuthor
+    let own: Bool
+    let canDelete: Bool
+
+    private enum CodingKeys: String, CodingKey { case id, text, createdAt, radio, author, own, canDelete }
+
+    init(id: String, text: String, createdAt: Date?, radio: SiteCommentRadio?, author: SocialFeedAuthor,
+         own: Bool, canDelete: Bool) {
+        self.id = id
+        self.text = text
+        self.createdAt = createdAt
+        self.radio = radio
+        self.author = author
+        self.own = own
+        self.canDelete = canDelete
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        text = try c.decode(String.self, forKey: .text)
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+        radio = try? c.decodeIfPresent(SiteCommentRadio.self, forKey: .radio)
+        author = try c.decode(SocialFeedAuthor.self, forKey: .author)
+        let own = (try? c.decodeIfPresent(Bool.self, forKey: .own)) ?? false
+        self.own = own
+        canDelete = (try? c.decodeIfPresent(Bool.self, forKey: .canDelete)) ?? own
+    }
+}
+
+/// Une page de messages, du plus récent au plus ancien. Un message illisible est écarté sans
+/// vider la page.
+struct RoomMessagesPage: Decodable {
+    let room: RoomSummary?
+    let messages: [RoomMessage]
+    let nextCursor: String?
+
+    private enum CodingKeys: String, CodingKey { case room, messages, nextCursor }
+
+    init(room: RoomSummary? = nil, messages: [RoomMessage], nextCursor: String?) {
+        self.room = room
+        self.messages = messages
+        self.nextCursor = nextCursor
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        room = try? c.decodeIfPresent(RoomSummary.self, forKey: .room)
+        messages = c.decodeLossyArray([RoomMessage].self, forKey: .messages)
+        nextCursor = c.decodeFlexibleString(forKey: .nextCursor)
+    }
+}
+
+private struct RoomMessageCreateResponse: Decodable {
+    let message: RoomMessage
+}
+
+/// Corps STRICT de `POST /api/rooms/{id}/messages` : le serveur refuse toute autre clé.
+private struct RoomMessageCreateRequest: Encodable {
+    let text: String
+}
+
+/// Le partage radio en direct d'un membre du salon, en lecture seule (ROOM-1b).
+///
+/// Le serveur n'expose que des mesures, jamais de position ni de cellule. Un partage expire 90 s
+/// après le dernier envoi de son auteur. iOS ne peut pas en publier (aucune métrique radio lisible).
+struct RoomLiveShare: Decodable, Identifiable, Equatable {
+    struct Download: Decodable, Equatable {
+        let mbps: Double
+        let measuredAt: Date?
+    }
+
+    let author: SocialFeedAuthor
+    /// `radio` (mesures détaillées) ou `coarse` (technologie seule).
+    let detail: String
+    let radio: SiteCommentRadio?
+    /// Clé de l'opérateur du réseau servant observé par le membre, ou nil.
+    let network: String?
+    let download: Download?
+    let updatedAt: Date?
+    let own: Bool
+
+    var id: String { author.id }
+
+    private enum CodingKeys: String, CodingKey { case author, detail, radio, network, download, updatedAt, own }
+
+    init(author: SocialFeedAuthor, detail: String = "coarse", radio: SiteCommentRadio? = nil, network: String? = nil,
+         download: Download? = nil, updatedAt: Date? = nil, own: Bool = false) {
+        self.author = author
+        self.detail = detail
+        self.radio = radio
+        self.network = network
+        self.download = download
+        self.updatedAt = updatedAt
+        self.own = own
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        author = try c.decode(SocialFeedAuthor.self, forKey: .author)
+        detail = c.decodeFlexibleString(forKey: .detail) ?? "coarse"
+        radio = try? c.decodeIfPresent(SiteCommentRadio.self, forKey: .radio)
+        network = c.decodeFlexibleString(forKey: .network)
+        download = try? c.decodeIfPresent(Download.self, forKey: .download)
+        updatedAt = try? c.decodeIfPresent(Date.self, forKey: .updatedAt)
+        own = (try? c.decodeIfPresent(Bool.self, forKey: .own)) ?? false
+    }
+}
+
+private struct RoomLiveResponse: Decodable {
+    let live: [RoomLiveShare]
+
+    private enum CodingKeys: String, CodingKey { case live }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        live = c.decodeLossyArray([RoomLiveShare].self, forKey: .live)
+    }
+}
+
+protocol RoomsServicing: Sendable {
+    /// Les salons d'un marché (« FR » ou « DROM »), avec leur activité. Lecture ouverte à tous.
+    func rooms(market: String) async throws -> [RoomSummary]
+    /// Une page de messages, du plus récent au plus ancien. Lecture ouverte à tous.
+    func messages(roomId: String, cursor: String?) async throws -> RoomMessagesPage
+    func post(roomId: String, text: String) async throws -> RoomMessage
+    /// Ses propres messages seulement : le serveur répond 404 pour celui d'un autre.
+    func delete(messageId: String) async throws
+    /// Les partages radio en cours. Exige une session : à n'appeler que connecté.
+    func live(roomId: String) async throws -> [RoomLiveShare]
+}
+
+final class RoomsService: RoomsServicing {
+    /// 20 par page, comme le fil d'une antenne.
+    static let pageSize = 20
+
+    private let api: APIClient
+
+    init(api: APIClient) {
+        self.api = api
+    }
+
+    func rooms(market: String) async throws -> [RoomSummary] {
+        if AppEnvironment.usesDemoData { return RoomsDemo.rooms(market: market) }
+        let response = try await api.request(
+            APIEndpoint(path: "/api/rooms", query: [URLQueryItem(name: "market", value: market)]),
+            as: RoomsListResponse.self
+        )
+        return response.rooms
+    }
+
+    func messages(roomId: String, cursor: String? = nil) async throws -> RoomMessagesPage {
+        if AppEnvironment.usesDemoData { return RoomsDemo.page(roomId: roomId, cursor: cursor) }
+        var query = [URLQueryItem(name: "limit", value: String(Self.pageSize))]
+        if let cursor { query.append(URLQueryItem(name: "cursor", value: cursor)) }
+        return try await api.request(
+            APIEndpoint(path: "/api/rooms/\(roomId)/messages", query: query),
+            as: RoomMessagesPage.self
+        )
+    }
+
+    func post(roomId: String, text: String) async throws -> RoomMessage {
+        if AppEnvironment.usesDemoData {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            return RoomsDemo.ownMessage(text: text)
+        }
+        let response: RoomMessageCreateResponse = try await api.requestJSON(
+            "/api/rooms/\(roomId)/messages",
+            body: RoomMessageCreateRequest(text: text)
+        )
+        return response.message
+    }
+
+    func delete(messageId: String) async throws {
+        if AppEnvironment.usesDemoData { return }
+        try await api.request(APIEndpoint(path: "/api/rooms/messages/\(messageId)", method: .delete))
+    }
+
+    func live(roomId: String) async throws -> [RoomLiveShare] {
+        if AppEnvironment.usesDemoData { return RoomsDemo.live(roomId: roomId) }
+        return try await api.request(
+            APIEndpoint(path: "/api/rooms/\(roomId)/live"),
+            as: RoomLiveResponse.self
+        ).live
+    }
+}
+
+/// Les règles locales des salons, sans réseau ni position envoyée.
+enum RoomsLogic {
+    /// Les quatre opérateurs métropolitains des salons de région et des salons nationaux.
+    static let metroOperators = ["ORANGE", "SFR", "BOUYGUES", "FREE"]
+
+    /// Clés du registre radio des territoires d'outre-mer.
+    private static let dromOperators: Set<String> = [
+        "FREE_CARAIBES", "DIGICEL", "OUTREMER_TELECOM", "SRR", "TELCO_OI", "ZEOP", "MAORE_MOBILE",
+    ]
+
+    /// Le nom d'un opérateur dans un salon : un nom propre, identique dans toutes les langues.
+    static func operatorLabel(_ key: String) -> String {
+        switch key {
+        case "ORANGE": return "Orange"
+        case "SFR": return "SFR"
+        case "BOUYGUES": return "Bouygues"
+        case "FREE": return "Free"
+        case "FREE_CARAIBES": return "Free Caraïbe"
+        case "OUTREMER_TELECOM": return "SFR Caraïbe"
+        case "SRR": return "SFR Réunion"
+        case "TELCO_OI": return "Free Réunion"
+        case "DIGICEL": return "Digicel"
+        case "ZEOP": return "Zeop"
+        case "MAORE_MOBILE": return "Maore Mobile"
+        default: return key.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    /// La clé d'opérateur d'un salon à partir d'une clé du registre (« ORANGE », « Free »,
+    /// « OUTREMER_TELECOM ») ou d'un nom d'opérateur (« Orange F », « F SFR »). nil si l'opérateur
+    /// n'a aucun salon : mieux vaut ne rien proposer que le mauvais.
+    static func operatorKey(from raw: String?) -> String? {
+        guard let raw else { return nil }
+        let folded = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR"))
+            .uppercased()
+        guard !folded.isEmpty else { return nil }
+        let key = folded.replacingOccurrences(of: "[ -]", with: "_", options: .regularExpression)
+        if metroOperators.contains(key) || dromOperators.contains(key) { return key }
+        // Un nom d'opérateur ultramarin n'est jamais ramené à son homonyme métropolitain.
+        let overseas = ["CARAIB", "REUNION", "MAYOTTE", "GUADELOUPE", "MARTINIQUE", "GUYANE", "DIGICEL", "ZEOP", "OUTREMER"]
+        guard !overseas.contains(where: folded.contains) else { return nil }
+        if folded.contains("ORANGE") { return "ORANGE" }
+        if folded.contains("BOUYGUES") || folded.contains("BYTEL") { return "BOUYGUES" }
+        if folded.contains("SFR") || folded.contains("ALTICE") { return "SFR" }
+        if folded.split(whereSeparator: { !$0.isLetter }).contains("FREE") { return "FREE" }
+        return nil
+    }
+
+    /// Le code ANFR sur 3 caractères d'un code postal métropolitain ou ultramarin : « 38000 » →
+    /// « 038 », « 20090 » → « 02A », « 97100 » → « 971 ». nil pour Monaco, un code incomplet ou
+    /// un territoire sans salon.
+    static func departmentCode(postalCode: String?) -> String? {
+        guard let digits = postalCode?.trimmingCharacters(in: .whitespacesAndNewlines),
+              digits.count == 5, digits.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+        let prefix = String(digits.prefix(2))
+        switch prefix {
+        case "00", "96", "98", "99":
+            return nil
+        case "20":
+            // 200xx et 201xx : Corse-du-Sud ; à partir de 202xx : Haute-Corse.
+            return (Int(digits.prefix(3)) ?? 0) <= 201 ? "02A" : "02B"
+        case "97":
+            let code = String(digits.prefix(3))
+            return DromRegion(rawValue: code) != nil ? code : nil
+        default:
+            return "0" + prefix
+        }
+    }
+
+    /// « Ton salon » : le salon de la région de l'utilisateur chez son opérateur, sinon le salon
+    /// national de cet opérateur. Sans opérateur connu, rien. Un département d'outre-mer sans salon
+    /// pour cet opérateur ne retombe pas sur un salon métropolitain.
+    static func yourRoom(in rooms: [RoomSummary], operatorKey: String?, department: String?) -> RoomSummary? {
+        guard let operatorKey = self.operatorKey(from: operatorKey) else { return nil }
+        if let department {
+            if let regional = rooms.first(where: {
+                !$0.isNational && $0.operatorKey == operatorKey && ($0.departments ?? []).contains(department)
+            }) { return regional }
+            if DromRegion.fromDepartment(department) != nil { return nil }
+        }
+        return rooms.first { $0.isNational && $0.operatorKey == operatorKey && $0.technology == nil }
+    }
+
+    /// Relecture de la première page : les messages reçus passent devant, ceux déjà descendus
+    /// (pages suivantes) restent dessous, et un message supprimé ou masqué disparaît s'il tombait
+    /// dans la fenêtre relue. Fusion par identifiant, sans doublon.
+    static func refreshed(firstPage: [RoomMessage], hasMore: Bool, existing: [RoomMessage]) -> [RoomMessage] {
+        guard hasMore, let oldest = firstPage.last else { return firstPage }
+        let ids = Set(firstPage.map(\.id))
+        let older = existing.filter { message in
+            guard !ids.contains(message.id) else { return false }
+            guard let date = message.createdAt, let boundary = oldest.createdAt else { return true }
+            return date <= boundary
+        }
+        return firstPage + older
+    }
+
+    /// Une page de plus sous les messages déjà lus, sans doublon.
+    static func appending(_ page: [RoomMessage], to existing: [RoomMessage]) -> [RoomMessage] {
+        let ids = Set(existing.map(\.id))
+        return existing + page.filter { !ids.contains($0.id) }
+    }
+
+    /// Les identifiants que la relecture ajoute à ce qui est affiché.
+    static func newIds(in merged: [RoomMessage], comparedTo shown: [RoomMessage]) -> [String] {
+        let known = Set(shown.map(\.id))
+        return merged.map(\.id).filter { !known.contains($0) }
+    }
+}
+
+/// Le dernier passage de l'utilisateur dans chaque salon, gardé sur l'appareil : il sert au badge
+/// « nouveaux messages » de la liste et ne part jamais au serveur.
+enum RoomSeenStore {
+    static let key = "rooms.lastSeen.v1"
+
+    static func seenAt(_ roomId: String, defaults: UserDefaults = .standard) -> Date? {
+        let all = defaults.dictionary(forKey: key) as? [String: Double]
+        return all?[roomId].map { Date(timeIntervalSince1970: $0) }
+    }
+
+    static func markSeen(_ roomId: String, at date: Date = Date(), defaults: UserDefaults = .standard) {
+        var all = (defaults.dictionary(forKey: key) as? [String: Double]) ?? [:]
+        all[roomId] = date.timeIntervalSince1970
+        defaults.set(all, forKey: key)
+    }
+
+    /// Le nombre à afficher sur la ligne d'un salon : l'activité des dernières 24 h, quand un message
+    /// est arrivé depuis le dernier passage (ou que le salon n'a jamais été ouvert).
+    static func newMessageCount(for room: RoomSummary, defaults: UserDefaults = .standard) -> Int {
+        guard room.messages24h > 0, let last = room.lastMessageAt else { return 0 }
+        guard let seen = seenAt(room.id, defaults: defaults) else { return room.messages24h }
+        return last > seen ? room.messages24h : 0
+    }
+}
+
+/// Salons de démonstration (`--demo-data`) : « Ton salon » en tête, des messages avec et sans
+/// radio, un message à soi.
+enum RoomsDemo {
+    private static func author(_ id: String, _ name: String) -> SocialFeedAuthor {
+        SocialFeedAuthor(id: id, name: name, handle: name.lowercased(), avatarUrl: nil,
+                         isFriend: nil, isFollowing: nil, liveRadio: nil)
+    }
+
+    static func rooms(market: String) -> [RoomSummary] {
+        let now = Date()
+        if market.uppercased() == "DROM" {
+            let region = RoomRegion(slug: "guadeloupe", name: "Guadeloupe")
+            return [
+                RoomSummary(id: "drom-guadeloupe-orange", market: "DROM", name: "Orange · Guadeloupe", region: region,
+                            departments: ["971"], operatorKey: "ORANGE", liveCount: 1,
+                            lastMessageAt: now.addingTimeInterval(-900), messages24h: 6),
+                RoomSummary(id: "drom-guadeloupe-digicel", market: "DROM", name: "Digicel · Guadeloupe", region: region,
+                            departments: ["971"], operatorKey: "DIGICEL"),
+            ]
+        }
+        let ara = RoomRegion(slug: "auvergne-rhone-alpes", name: "Auvergne-Rhône-Alpes")
+        let idf = RoomRegion(slug: "ile-de-france", name: "Île-de-France")
+        let paca = RoomRegion(slug: "provence-alpes-cote-d-azur", name: "Provence-Alpes-Côte d'Azur")
+        return [
+            RoomSummary(id: "fr-auvergne-rhone-alpes-sfr", name: "SFR · Auvergne-Rhône-Alpes", region: ara,
+                        departments: ["001", "038", "069"], operatorKey: "SFR", liveCount: 2,
+                        lastMessageAt: now.addingTimeInterval(-240), messages24h: 14),
+            RoomSummary(id: "fr-auvergne-rhone-alpes-orange", name: "Orange · Auvergne-Rhône-Alpes", region: ara,
+                        departments: ["001", "038", "069"], operatorKey: "ORANGE",
+                        lastMessageAt: now.addingTimeInterval(-7_200), messages24h: 5),
+            RoomSummary(id: "fr-auvergne-rhone-alpes-bouygues", name: "Bouygues Telecom · Auvergne-Rhône-Alpes", region: ara,
+                        departments: ["001", "038", "069"], operatorKey: "BOUYGUES"),
+            RoomSummary(id: "fr-auvergne-rhone-alpes-free", name: "Free · Auvergne-Rhône-Alpes", region: ara,
+                        departments: ["001", "038", "069"], operatorKey: "FREE",
+                        lastMessageAt: now.addingTimeInterval(-40_000), messages24h: 1),
+            RoomSummary(id: "fr-ile-de-france-sfr", name: "SFR · Île-de-France", region: idf,
+                        departments: ["075", "092"], operatorKey: "SFR",
+                        lastMessageAt: now.addingTimeInterval(-600), messages24h: 31),
+            RoomSummary(id: "fr-ile-de-france-orange", name: "Orange · Île-de-France", region: idf,
+                        departments: ["075", "092"], operatorKey: "ORANGE",
+                        lastMessageAt: now.addingTimeInterval(-3_000), messages24h: 22),
+            RoomSummary(id: "fr-provence-alpes-cote-d-azur-free", name: "Free · Provence-Alpes-Côte d'Azur", region: paca,
+                        departments: ["006", "013"], operatorKey: "FREE"),
+            RoomSummary(id: "fr-national-sfr", scope: "national", name: "SFR · France", operatorKey: "SFR",
+                        lastMessageAt: now.addingTimeInterval(-1_800), messages24h: 48),
+            RoomSummary(id: "fr-national-orange", scope: "national", name: "Orange · France", operatorKey: "ORANGE",
+                        lastMessageAt: now.addingTimeInterval(-2_400), messages24h: 52),
+            RoomSummary(id: "fr-national-5g-sa", scope: "national", name: "5G SA · France", technology: "5G_SA",
+                        liveCount: 1, lastMessageAt: now.addingTimeInterval(-5_400), messages24h: 9),
+        ]
+    }
+
+    static func page(roomId: String, cursor: String?) -> RoomMessagesPage {
+        let now = Date()
+        return RoomMessagesPage(room: nil, messages: [
+            RoomMessage(id: "demo-room-3", text: "Plus de 5G depuis ce matin du côté de la Part-Dieu, quelqu'un d'autre ?",
+                        createdAt: now.addingTimeInterval(-240),
+                        radio: SiteCommentRadio(technology: "4G", band: "b3", pci: 214, rsrp: -98),
+                        author: author("demo-camille", "Camille"), own: false, canDelete: false),
+            RoomMessage(id: "demo-room-2", text: "Chez moi, la 5G est revenue vers midi.",
+                        createdAt: now.addingTimeInterval(-1_500), radio: nil,
+                        author: author("demo-me", "Alex"), own: true, canDelete: true),
+            RoomMessage(id: "demo-room-1", text: "Bonjour à tous, le débit est correct à Grenoble ce matin.",
+                        createdAt: now.addingTimeInterval(-9_000), radio: nil,
+                        author: author("demo-yanis", "Yanis"), own: false, canDelete: false),
+        ], nextCursor: nil)
+    }
+
+    static func ownMessage(text: String) -> RoomMessage {
+        RoomMessage(id: UUID().uuidString, text: text, createdAt: Date(), radio: nil,
+                    author: author("demo-me", "Alex"), own: true, canDelete: true)
+    }
+
+    static func live(roomId: String) -> [RoomLiveShare] {
+        [RoomLiveShare(
+            author: author("demo-nora", "Nora"), detail: "radio",
+            radio: SiteCommentRadio(technology: "5G", band: "n78", pci: 417, rsrp: -91, sinr: 17),
+            network: "SFR", download: RoomLiveShare.Download(mbps: 312, measuredAt: Date().addingTimeInterval(-120)),
+            updatedAt: Date().addingTimeInterval(-20), own: false
+        )]
+    }
+}

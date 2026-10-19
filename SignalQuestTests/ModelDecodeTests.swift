@@ -1033,6 +1033,44 @@ final class ModelDecodeTests: XCTestCase {
         XCTAssertEqual(daily.errorDescription, String(localized: "Pendant les 7 premiers jours, un compte publie au plus 3 messages par jour. Réessaie demain."))
     }
 
+    /// ROOM-1 : une page de salon, avec ce que le serveur peut omettre ou mettre à null.
+    func testDecodesARoomMessagesPageWithMissingAndNullFields() throws {
+        let json = """
+        {"room":{"id":"fr-national-sfr","market":"FR","scope":"national","name":"SFR · France","region":null,
+                 "departments":null,"operator":"SFR","technology":null,"liveCount":0,"lastMessageAt":null,"messages24h":3},
+         "messages":[
+           {"id":"m2","text":"Bonjour","createdAt":"2026-10-19T08:00:00.000Z",
+            "radio":{"technology":"4G","band":"b3","pci":214,"rsrp":-98},
+            "author":{"id":"u1","handle":"camille","name":"Camille","avatarUrl":null,"reputation":"gold"},
+            "own":false,"canDelete":false},
+           {"id":"m1","text":"Sans radio ni drapeaux","createdAt":null,"radio":null,
+            "author":{"id":"u2","handle":null,"name":null,"avatarUrl":null}},
+           {"text":"sans identifiant","author":{"id":"u3"}}
+         ],
+         "nextCursor":"2026-10-19T07:00:00.000Z::m0","requestId":"r1"}
+        """
+        let page = try JSONDecoder.signalQuest.decode(RoomMessagesPage.self, from: Data(json.utf8))
+        XCTAssertEqual(page.room?.operatorKey, "SFR")
+        XCTAssertEqual(page.room?.messages24h, 3)
+        XCTAssertNil(page.room?.lastMessageAt)
+        XCTAssertEqual(page.nextCursor, "2026-10-19T07:00:00.000Z::m0")
+        // Le message sans identifiant est écarté, les deux autres restent.
+        XCTAssertEqual(page.messages.map(\.id), ["m2", "m1"])
+        XCTAssertEqual(page.messages[0].radio?.summary, "4G · B3 · PCI 214 · -98 dBm")
+        XCTAssertEqual(page.messages[0].author.displayName, "Camille")
+        XCTAssertFalse(page.messages[0].canDelete)
+        XCTAssertNil(page.messages[1].radio)
+        XCTAssertNil(page.messages[1].createdAt)
+        XCTAssertFalse(page.messages[1].own)
+        XCTAssertFalse(page.messages[1].canDelete)
+        XCTAssertEqual(ReportTarget.roomMessage("m2").id, "m2")
+
+        let last = try JSONDecoder.signalQuest.decode(RoomMessagesPage.self, from: Data(#"{"messages":[]}"#.utf8))
+        XCTAssertTrue(last.messages.isEmpty)
+        XCTAssertNil(last.nextCursor)
+        XCTAssertNil(last.room)
+    }
+
     private static let mapJSON = """
     {"timestamp":"2026-05-11T10:00:00.000Z","friends":[],"photos":[],"validations":[],"sessions":[],"coveragePoints":[],"speedtests":[{"id":"sp1","userId":"u1","latitude":48.85,"longitude":2.35,"averageSpeed":210,"uploadAvg":42,"pingAvg":18,"timestamp":"2026-05-11T10:00:00.000Z","networkType":"WIFI","mobileOperator":"SignalQuest"}],"photosCount":0,"validationsCount":0,"sessionsCount":0,"coveragePointsCount":0,"speedtestsCount":1,"rawCoveragePointsCount":0,"logicalCoveragePointsCount":0}
     """

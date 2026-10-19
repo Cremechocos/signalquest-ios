@@ -1122,6 +1122,22 @@
         }
       }
     },
+    "%lld en direct" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld live"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld en direct"
+          }
+        }
+      }
+    },
     "%lld image" : {
       "localizations" : {
         "en" : {
@@ -1342,6 +1358,47 @@
         }
       }
     },
+    "%lld messages ces dernières 24 h" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld message in the last 24 h"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld messages in the last 24 h"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld message ces dernières 24 h"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld messages ces dernières 24 h"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld mesures · %lld contributeurs" : {
       "localizations" : {
         "en" : {
@@ -1375,17 +1432,42 @@
       }
     },
     "%lld nouveaux messages" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld new messages"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new message"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new messages"
+                }
+              }
+            }
           }
         },
         "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld nouveaux messages"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld nouveau message"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld nouveaux messages"
+                }
+              }
+            }
           }
         }
       }
@@ -3941,6 +4023,22 @@
         }
       }
     },
+    "Aucun message ces dernières 24 h" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No messages in the last 24 h"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun message ces dernières 24 h"
+          }
+        }
+      }
+    },
     "Aucun message pour l’instant" : {
       "localizations" : {
         "en" : {
@@ -3969,6 +4067,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucun opérateur à comparer dans ce rayon pour l’instant."
+          }
+        }
+      }
+    },
+    "Aucun salon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No rooms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun salon"
+          }
+        }
+      }
+    },
+    "Aucun salon ne correspond à ce filtre." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No room matches this filter."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun salon ne correspond à ce filtre."
           }
         }
       }
@@ -5131,6 +5261,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce résultat n’a pas pu être sauvegardé."
+          }
+        }
+      }
+    },
+    "Ce salon n'existe plus." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This room no longer exists."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce salon n'existe plus."
           }
         }
       }
@@ -6588,6 +6734,28 @@
         }
       }
     },
+    "Connecte-toi pour écrire dans ce salon." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to write in this room."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi pour écrire dans ce salon."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous pour écrire dans ce salon."
+          }
+        }
+      }
+    },
     "Connecte-toi à SignalQuest pour envoyer un message." : {
       "localizations" : {
         "en" : {
@@ -7250,6 +7418,28 @@
         }
       }
     },
+    "Discute avec les autres membres, par région et par opérateur." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat with other members, by region and by operator."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discute avec les autres membres, par région et par opérateur."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discutez avec les autres membres, par région et par opérateur."
+          }
+        }
+      }
+    },
     "Dispo. 30 j" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7876,6 +8066,22 @@
         }
       }
     },
+    "En direct · radio partagée" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live · shared radio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En direct · radio partagée"
+          }
+        }
+      }
+    },
     "En envoi" : {
       "localizations" : {
         "en" : {
@@ -8371,6 +8577,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fournisseurs"
+          }
+        }
+      }
+    },
+    "France" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "France"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "France"
           }
         }
       }
@@ -9080,6 +9302,22 @@
         }
       }
     },
+    "Il disparaîtra du salon pour tout le monde." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It will disappear from the room for everyone."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il disparaîtra du salon pour tout le monde."
+          }
+        }
+      }
+    },
     "Il ne verra plus l’état de cette connexion." : {
       "localizations" : {
         "en" : {
@@ -9316,6 +9554,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de charger le registre E2EE v2."
+          }
+        }
+      }
+    },
+    "Impossible de charger le salon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t load the room"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger le salon"
           }
         }
       }
@@ -13114,6 +13368,22 @@
         }
       }
     },
+    "Outre-mer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overseas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outre-mer"
+          }
+        }
+      }
+    },
     "Ouvert" : {
       "localizations" : {
         "en" : {
@@ -13633,6 +13903,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Par identifiant"
+          }
+        }
+      }
+    },
+    "Par région et par opérateur" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "By region and by operator"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par région et par opérateur"
           }
         }
       }
@@ -15983,6 +16269,70 @@
         }
       }
     },
+    "Salon introuvable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Room not found"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salon introuvable"
+          }
+        }
+      }
+    },
+    "Salon public : tout le monde peut lire. Les messages ne sont pas chiffrés." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Public room: anyone can read it. Messages are not encrypted."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salon public : tout le monde peut lire. Les messages ne sont pas chiffrés."
+          }
+        }
+      }
+    },
+    "Salons" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rooms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salons"
+          }
+        }
+      }
+    },
+    "Salons indisponibles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rooms unavailable"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salons indisponibles"
+          }
+        }
+      }
+    },
     "Sans date" : {
       "localizations" : {
         "en" : {
@@ -16603,6 +16953,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sites opérationnels, tous opérateurs."
+          }
+        }
+      }
+    },
+    "Sois le premier à écrire dans ce salon." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Be the first to write in this room."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sois le premier à écrire dans ce salon."
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soyez le premier à écrire dans ce salon."
           }
         }
       }
@@ -17396,6 +17768,22 @@
         }
       }
     },
+    "Territoire" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Area"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Territoire"
+          }
+        }
+      }
+    },
     "Territoires non chargés" : {
       "localizations" : {
         "en" : {
@@ -17884,6 +18272,28 @@
         }
       }
     },
+    "Ton salon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your room"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton salon"
+          }
+        },
+        "fr-x-formal" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre salon"
+          }
+        }
+      }
+    },
     "Ton signalement part à l’équipe de modération, qui pourra te répondre." : {
       "localizations" : {
         "en" : {
@@ -18096,6 +18506,22 @@
         }
       }
     },
+    "Tous les salons" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All rooms"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous les salons"
+          }
+        }
+      }
+    },
     "Tous les signalements de l'app iPhone, d'Android et du site. Seule l'équipe voit cet espace." : {
       "localizations" : {
         "en" : {
@@ -18140,6 +18566,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tout afficher"
+          }
+        }
+      }
+    },
+    "Toute la France" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All of France"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toute la France"
           }
         }
       }
@@ -20804,6 +21246,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Échec d’envoi"
+          }
+        }
+      }
+    },
+    "Écrire dans ce salon…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write in this room…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrire dans ce salon…"
           }
         }
       }

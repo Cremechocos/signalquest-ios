@@ -65,6 +65,8 @@ final class AppServices: ObservableObject {
     let feedSignals: FeedSignalsCollector
     let comments: CommentsServicing
     let siteComments: SiteCommentsServicing
+    /// Salons publics (ROOM-1).
+    let rooms: RoomsServicing
     let stories: StoriesServicing
     let reports: ReportsServicing
     let privacy: PrivacyServicing
@@ -191,6 +193,7 @@ final class AppServices: ObservableObject {
         feedSignals = FeedSignalsCollector(api: api)
         comments = CommentsService(api: api)
         siteComments = SiteCommentsService(api: api)
+        rooms = RoomsService(api: api)
         stories = StoriesService(api: api)
         reports = ReportsService(api: api)
         let mapService = MapSnapshotService(api: api)

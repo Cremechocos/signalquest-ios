@@ -291,3 +291,150 @@ private extension URLRequest {
         return data
     }
 }
+
+/// Contrat des routes des salons (ROOM-1) : chemins, query, corps strict.
+final class RoomsContractTests: XCTestCase {
+    private var api: APIClient!
+    private var service: RoomsService!
+
+    override func setUp() {
+        super.setUp()
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        api = APIClient(
+            config: .test,
+            credentials: CredentialStore(tokenStore: InMemoryTokenStore()),
+            session: URLSession(configuration: config)
+        )
+        service = RoomsService(api: api)
+    }
+
+    override func tearDown() {
+        MockURLProtocol.requestHandler = nil
+        service = nil
+        api = nil
+        super.tearDown()
+    }
+
+    private func respond(_ json: String, status: Int = 200, capture box: RequestBox? = nil) {
+        MockURLProtocol.requestHandler = { request in
+            box?.method = request.httpMethod ?? ""
+            box?.path = request.url?.path ?? ""
+            box?.query = request.url?.query
+            box?.body = request.sq_bodyData
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: status,
+                httpVersion: nil, headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(json.utf8))
+        }
+    }
+
+    func testRoomsListAsksTheMarketAndKeepsEveryRoomReadable() async throws {
+        let box = RequestBox()
+        respond(#"""
+        {"rooms":[
+          {"id":"fr-auvergne-rhone-alpes-sfr","market":"FR","scope":"region","name":"SFR · Auvergne-Rhône-Alpes",
+           "region":{"slug":"auvergne-rhone-alpes","name":"Auvergne-Rhône-Alpes"},"departments":["001","038"],
+           "operator":"SFR","technology":null,"liveCount":2,"lastMessageAt":"2026-10-19T08:00:00.000Z","messages24h":14},
+          {"id":"fr-national-5g-sa","market":"FR","scope":"national","name":"5G SA · France","region":null,
+           "departments":null,"operator":null,"technology":"5G_SA","liveCount":0,"lastMessageAt":null,"messages24h":0},
+          {"name":"sans identifiant"}
+        ],"requestId":"r1"}
+        """#, capture: box)
+
+        let rooms = try await service.rooms(market: "FR")
+        XCTAssertEqual(box.method, "GET")
+        XCTAssertEqual(box.path, "/api/rooms")
+        XCTAssertEqual(box.query, "market=FR")
+        // Un salon illisible est écarté sans vider la liste.
+        XCTAssertEqual(rooms.map(\.id), ["fr-auvergne-rhone-alpes-sfr", "fr-national-5g-sa"])
+        XCTAssertEqual(rooms[0].operatorKey, "SFR")
+        XCTAssertEqual(rooms[0].departments, ["001", "038"])
+        XCTAssertEqual(rooms[0].region?.name, "Auvergne-Rhône-Alpes")
+        XCTAssertNotNil(rooms[0].lastMessageAt)
+        XCTAssertTrue(rooms[1].isNational)
+        XCTAssertEqual(rooms[1].technology, "5G_SA")
+        XCTAssertNil(rooms[1].operatorKey)
+        XCTAssertNil(rooms[1].lastMessageAt)
+    }
+
+    func testMessagesUseThePageSizeAndTheCursor() async throws {
+        let box = RequestBox()
+        respond(#"{"room":{"id":"r1","name":"R1"},"messages":[],"nextCursor":null,"requestId":"r"}"#, capture: box)
+
+        _ = try await service.messages(roomId: "fr-national-sfr", cursor: nil)
+        XCTAssertEqual(box.method, "GET")
+        XCTAssertEqual(box.path, "/api/rooms/fr-national-sfr/messages")
+        XCTAssertEqual(box.query, "limit=20")
+
+        _ = try await service.messages(roomId: "fr-national-sfr", cursor: "2026-10-19T08:00:00.000Z::m1")
+        let query = try XCTUnwrap(box.query)
+        XCTAssertTrue(query.contains("limit=20"))
+        XCTAssertTrue(query.contains("cursor=2026-10-19T08:00:00.000Z::m1"))
+    }
+
+    func testPostSendsAStrictTextOnlyBodyAndReadsTheMessage() async throws {
+        let box = RequestBox()
+        respond(#"""
+        {"message":{"id":"m9","text":"Salut","createdAt":"2026-10-19T08:00:00.000Z","radio":null,
+          "author":{"id":"me","handle":"alex","name":"Alex","avatarUrl":null},"own":true,"canDelete":true},"requestId":"r"}
+        """#, status: 201, capture: box)
+
+        let message = try await service.post(roomId: "fr-national-sfr", text: "Salut")
+        XCTAssertEqual(box.method, "POST")
+        XCTAssertEqual(box.path, "/api/rooms/fr-national-sfr/messages")
+        let body = try JSONSerialization.jsonObject(with: XCTUnwrap(box.body)) as? [String: Any]
+        XCTAssertEqual(body?.keys.sorted(), ["text"], "Le serveur refuse toute autre clé que `text`")
+        XCTAssertEqual(body?["text"] as? String, "Salut")
+        XCTAssertEqual(message.id, "m9")
+        XCTAssertTrue(message.own)
+        XCTAssertTrue(message.canDelete)
+    }
+
+    func testDeleteTargetsTheMessageNotTheRoom() async throws {
+        let box = RequestBox()
+        respond(#"{"ok":true,"requestId":"r"}"#, capture: box)
+
+        try await service.delete(messageId: "m9")
+        XCTAssertEqual(box.method, "DELETE")
+        XCTAssertEqual(box.path, "/api/rooms/messages/m9")
+    }
+
+    func testLiveSharesAreReadFromTheLiveRoute() async throws {
+        let box = RequestBox()
+        respond(#"""
+        {"live":[
+          {"author":{"id":"u2","handle":"nora","name":"Nora","avatarUrl":null},"detail":"radio",
+           "radio":{"technology":"5G","band":"n78","pci":417,"rsrp":-91,"sinr":17},"network":"SFR",
+           "download":{"mbps":312.4,"measuredAt":"2026-10-19T08:00:00.000Z"},
+           "updatedAt":"2026-10-19T08:01:00.000Z","own":false},
+          {"author":{"id":"u3","handle":null,"name":null,"avatarUrl":null},"detail":"coarse",
+           "radio":{"technology":"4G"},"network":null,"download":null,"updatedAt":"2026-10-19T08:01:10.000Z","own":true}
+        ],"requestId":"r"}
+        """#, capture: box)
+
+        let live = try await service.live(roomId: "fr-national-sfr")
+        XCTAssertEqual(box.method, "GET")
+        XCTAssertEqual(box.path, "/api/rooms/fr-national-sfr/live")
+        XCTAssertEqual(live.map(\.id), ["u2", "u3"])
+        XCTAssertEqual(live[0].radio?.summary, "5G · N78 · PCI 417 · -91 dBm · SINR 17 dB")
+        XCTAssertEqual(live[0].network, "SFR")
+        XCTAssertEqual(live[0].download?.mbps, 312.4)
+        XCTAssertNil(live[1].download)
+        XCTAssertNil(live[1].network)
+        XCTAssertTrue(live[1].own)
+        XCTAssertEqual(live[1].radio?.summary, "4G")
+    }
+
+    func testReportingARoomMessageUsesTheRoomMessageTargetType() async throws {
+        let box = RequestBox()
+        respond(#"{"success":true}"#, capture: box)
+
+        try await ReportsService(api: api).report(.roomMessage("m9"), reason: .spam, comment: nil)
+        XCTAssertEqual(box.path, "/api/social/reports")
+        let body = try JSONSerialization.jsonObject(with: XCTUnwrap(box.body)) as? [String: Any]
+        XCTAssertEqual(body?["targetType"] as? String, "room_message")
+        XCTAssertEqual(body?["targetId"] as? String, "m9")
+    }
+}

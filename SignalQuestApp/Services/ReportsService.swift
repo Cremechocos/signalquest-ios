@@ -42,11 +42,13 @@ enum ReportTarget: Equatable, Sendable {
     case photoComment(String)
     /// Un message du fil d'une antenne (SITE-1).
     case siteComment(String)
+    /// Un message d'un salon public (ROOM-1).
+    case roomMessage(String)
 
     var id: String {
         switch self {
         case .post(let id), .comment(let id), .profile(let id), .story(let id),
-             .photo(let id), .photoComment(let id), .siteComment(let id):
+             .photo(let id), .photoComment(let id), .siteComment(let id), .roomMessage(let id):
             return id
         }
     }
@@ -97,7 +99,7 @@ final class ReportsService: ReportsServicing {
                 "/api/photos/comments/\(id)/report",
                 body: ContentReportRequest(reason: reason.rawValue, description: details)
             )
-        case .post, .comment, .profile, .story, .siteComment:
+        case .post, .comment, .profile, .story, .siteComment, .roomMessage:
             let _: SuccessResponse = try await api.requestJSON(
                 "/api/social/reports",
                 body: ReportRequest(
@@ -119,6 +121,7 @@ final class ReportsService: ReportsServicing {
         // Accepté par le serveur depuis le 29/09 (SOC-12).
         case .story: return "story"
         case .siteComment: return "site_comment"
+        case .roomMessage: return "room_message"
         // Inatteignable : les cas photo sont routés vers leurs endpoints dédiés
         // avant d'arriver ici. Le `switch` reste exhaustif pour qu'un nouveau
         // cas force une décision explicite.
