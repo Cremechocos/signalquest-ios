@@ -208,7 +208,7 @@ struct NotificationSettingsView: View {
                     FavoriteCountSettingsRow(favorites: services.favoriteAntennas)
                 }
                 preferenceToggle("Activité des antennes suivies", systemImage: "star.bubble", \.notifySiteFollowsPush,
-                                 subtitle: String(localized: "Messages, activations et nouvelles bandes"))
+                                 subtitle: String(localized: "Pannes, messages, activations et nouvelles bandes"))
                 HStack(spacing: SQSpace.sm) {
                     preferenceToggle("Mises à jour ANFR", systemImage: "antenna.radiowaves.left.and.right",
                                      \.notifyAnfrUpdatesPush)
@@ -220,7 +220,7 @@ struct NotificationSettingsView: View {
                 Text("Antennes et réseau").sqKicker()
                     .accessibilityIdentifier("notifications.header.antennas")
             } footer: {
-                Text("Pour une antenne suivie, l’alerte arrive dès le premier signalement, sans attendre que la communauté confirme.")
+                Text("Pour une antenne suivie, tu reçois une seule alerte par panne.")
                     .font(SQType.caption)
                     .foregroundStyle(SQColor.labelSecondary)
                     .accessibilityIdentifier("notifications.footer.antennas")
