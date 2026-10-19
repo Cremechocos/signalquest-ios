@@ -853,6 +853,9 @@ struct SiteThreadSection: View {
             commentCount = page.thread.commentCount
             nextCursor = page.nextCursor
             moreFailed = false
+            if isSignedIn {
+                await services.siteComments.markSeen(market: market, operatorKey: operatorKey, siteId: siteId)
+            }
         } catch {
             guard !error.isCancellation else { return }
             comments = []

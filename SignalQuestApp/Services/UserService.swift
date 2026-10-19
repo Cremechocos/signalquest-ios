@@ -132,6 +132,9 @@ struct NotificationPreferences: Codable {
     /// l'on passe tous les jours est exactement le genre d'information qu'on veut sans avoir à
     /// la demander. `= nil` garde l'init memberwise compatible avec les appelants existants.
     var notifyCommunityOutagesPush: Bool? = nil
+    /// Activité des antennes suivies (messages, activations, nouvelles bandes, panne
+    /// confirmée), au plus une alerte par site et par jour. Activée par défaut côté serveur.
+    var notifySiteFollowsPush: Bool? = nil
     var callsDoNotDisturb: Bool?
 }
 

@@ -2685,6 +2685,22 @@
         }
       }
     },
+    "Activité des antennes suivies" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Followed antenna activity"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activité des antennes suivies"
+          }
+        }
+      }
+    },
     "Actualisation impossible. Tire vers le bas pour réessayer." : {
       "localizations" : {
         "en" : {
@@ -11052,6 +11068,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Messages éphémères · disparaissent après %@"
+          }
+        }
+      }
+    },
+    "Messages, activations et nouvelles bandes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages, activations and new bands"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messages, activations et nouvelles bandes"
           }
         }
       }

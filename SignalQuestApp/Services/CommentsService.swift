@@ -188,6 +188,8 @@ protocol SiteCommentsServicing: Sendable {
     func add(market: String, operatorKey: String, siteId: String, kind: SiteCommentKind, text: String, radio: SiteCommentRadio?) async throws -> SiteComment
     /// Ses propres messages seulement.
     func delete(id: String) async throws
+    /// Le membre a ouvert la discussion d'un site qu'il suit : son activité repart de maintenant.
+    func markSeen(market: String, operatorKey: String, siteId: String) async
 }
 
 final class SiteCommentsService: SiteCommentsServicing {
@@ -236,6 +238,18 @@ final class SiteCommentsService: SiteCommentsServicing {
         try await api.request(APIEndpoint(path: "/api/site-threads/comments/\(id)", method: .delete))
     }
 
+    /// Sans suivi, rien n'est écrit ; un échec ne se montre pas, c'est un simple compteur.
+    func markSeen(market: String, operatorKey: String, siteId: String) async {
+        guard !AppEnvironment.usesDemoData,
+              let key = SiteFollowKey(market: market, operatorKey: operatorKey, siteId: siteId) else { return }
+        do {
+            let status = try await api.request(APIEndpoint(path: "/api/me/follows/status", query: key.queryItems),
+                                               as: SiteFollowStatus.self)
+            guard let followId = status.followId else { return }
+            try await api.request(APIEndpoint(path: "/api/me/follows/\(followId)/seen", method: .post))
+        } catch {}
+    }
+
     private static var demoPage: SiteCommentsPage { SiteCommentsPage(
         thread: SiteThreadSummary(commentCount: 2),
         comments: [
@@ -260,4 +274,33 @@ final class SiteCommentsService: SiteCommentsServicing {
         ],
         nextCursor: nil
     ) }
+}
+
+/// La clé d'un suivi de site : un site, un marché et un opérateur précis (jamais « ALL »).
+struct SiteFollowKey: Equatable, Sendable {
+    let market: String
+    let operatorKey: String
+    let siteId: String
+
+    init?(market: String, operatorKey: String?, siteId: String) {
+        let market = market.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let operatorKey = operatorKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let siteId = siteId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !market.isEmpty, !siteId.isEmpty, !operatorKey.isEmpty, operatorKey.uppercased() != "ALL" else { return nil }
+        self.market = market
+        self.operatorKey = operatorKey
+        self.siteId = siteId
+    }
+
+    /// L'identifiant passe en query string : certains contiennent « : ».
+    var queryItems: [URLQueryItem] {
+        [URLQueryItem(name: "market", value: market),
+         URLQueryItem(name: "operator", value: operatorKey),
+         URLQueryItem(name: "siteId", value: siteId)]
+    }
+}
+
+struct SiteFollowStatus: Decodable, Equatable {
+    let following: Bool
+    let followId: String?
 }

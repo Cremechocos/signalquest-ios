@@ -914,6 +914,21 @@ final class ModelDecodeTests: XCTestCase {
 
     /// SITE-1a : la forme servie par `GET /api/site-threads/comments` (bdf14de61), et le corps
     /// strict de la publication (le serveur refuse toute clé inconnue).
+    func testSiteFollowKeyNeedsAPreciseOperator() throws {
+        XCTAssertNil(SiteFollowKey(market: "fr", operatorKey: "ALL", siteId: "0123456"))
+        XCTAssertNil(SiteFollowKey(market: "fr", operatorKey: " ", siteId: "0123456"))
+        XCTAssertNil(SiteFollowKey(market: "", operatorKey: "ORANGE", siteId: "0123456"))
+        let key = try XCTUnwrap(SiteFollowKey(market: " drom ", operatorKey: "ORANGE", siteId: "DROM:97100001"))
+        XCTAssertEqual(key.queryItems.map { "\($0.name)=\($0.value ?? "")" },
+                       ["market=DROM", "operator=ORANGE", "siteId=DROM:97100001"])
+        let status = try JSONDecoder().decode(SiteFollowStatus.self,
+                                              from: Data(#"{"following":true,"followId":"f_1","notify":true}"#.utf8))
+        XCTAssertEqual(status, SiteFollowStatus(following: true, followId: "f_1"))
+        let none = try JSONDecoder().decode(SiteFollowStatus.self,
+                                            from: Data(#"{"following":false,"followId":null,"notify":null}"#.utf8))
+        XCTAssertNil(none.followId)
+    }
+
     func testDecodesASiteThreadPageAndEncodesAStrictPost() throws {
         let json = """
         {"thread":{"market":"FR","operator":"ORANGE","siteKey":"0123456","commentCount":2,"following":false},

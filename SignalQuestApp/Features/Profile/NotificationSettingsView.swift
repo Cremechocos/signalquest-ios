@@ -81,6 +81,7 @@ private extension NotificationPreferences {
         prefs.notifySocialPush = true
         prefs.notifyPhotoLikesPush = false
         prefs.notifyCommunityOutagesPush = true
+        prefs.notifySiteFollowsPush = true
         prefs.notifyAnfrUpdatesPush = false
         prefs.notifyAntennaReportsEmail = true
         prefs.callsDoNotDisturb = false
@@ -205,6 +206,8 @@ struct NotificationSettingsView: View {
                 } label: {
                     FavoriteCountSettingsRow(favorites: services.favoriteAntennas)
                 }
+                preferenceToggle("Activité des antennes suivies", systemImage: "star.bubble", \.notifySiteFollowsPush,
+                                 subtitle: String(localized: "Messages, activations et nouvelles bandes"))
                 HStack(spacing: SQSpace.sm) {
                     preferenceToggle("Mises à jour ANFR", systemImage: "antenna.radiowaves.left.and.right",
                                      \.notifyAnfrUpdatesPush)
