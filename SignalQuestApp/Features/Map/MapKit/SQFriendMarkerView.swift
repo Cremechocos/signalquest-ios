@@ -40,6 +40,9 @@ final class SQFriendMarkerView: MKAnnotationView, SQAccessibleAnnotationView {
                         startAngle: -.pi / 2 - coneHalf, endAngle: -.pi / 2 + coneHalf,
                         clockwise: true)
         conePath.close()
+        // Le calque couvre la vue : sa rotation pivote alors autour du centre de l'avatar
+        // (un calque sans cadre tournerait autour du coin haut-gauche).
+        coneLayer.frame = CGRect(x: 0, y: 0, width: markerSize, height: markerSize)
         coneLayer.path = conePath.cgPath
         coneLayer.fillColor = UIColor.clear.cgColor
         coneLayer.isHidden = true

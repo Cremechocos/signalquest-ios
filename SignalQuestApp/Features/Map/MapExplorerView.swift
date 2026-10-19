@@ -1929,7 +1929,8 @@ struct MapExplorerView: View {
             session: services.map.sessionIdentifier,
             generation: friendsStreamGeneration
         )) {
-            guard filters.contains(.friend), services.auth.hasStoredCredentials() else {
+            // La démo n'a pas de serveur à joindre : le flux ne s'ouvre pas et l'état reste neutre.
+            guard filters.contains(.friend), services.auth.hasStoredCredentials(), !AppEnvironment.usesDemoData else {
                 model.deactivateFriendsStream()
                 selectedFriendFilterID = nil
                 return
@@ -2231,9 +2232,15 @@ struct MapExplorerView: View {
                     mapTopControlBar
                         .padding(.horizontal, SQSpace.md)
                     if filters.contains(.friend), services.auth.hasStoredCredentials() {
-                        friendsStatusPanel
-                            .padding(.horizontal, SQSpace.md)
-                            .transition(.move(edge: .top))
+                        if showsFriendsStatusPanel {
+                            friendsStatusPanel
+                                .padding(.horizontal, SQSpace.md)
+                                .transition(.move(edge: .top))
+                        } else if showsFriendsEmptyPill {
+                            friendsEmptyPill
+                                .padding(.horizontal, SQSpace.md)
+                                .transition(.opacity)
+                        }
                     }
                     // Le mode de couverture et les limites restent dans la rangée basse.
                     // Panneau de recherche : visible dès qu'une requête est saisie
@@ -2274,7 +2281,9 @@ struct MapExplorerView: View {
     }
 
     private var effectiveFriendsConnectionState: MapExplorerViewModel.FriendsConnectionState {
-        if model.friendsConnectionState == .live,
+        // La démo n'a pas de serveur : son état ne se périme pas.
+        if !AppEnvironment.usesDemoData,
+           model.friendsConnectionState == .live,
            let updatedAt = model.friendsLastUpdatedAt,
            friendFreshnessNow.timeIntervalSince(updatedAt) > 20 {
             return .connecting
@@ -2282,12 +2291,42 @@ struct MapExplorerView: View {
         return model.friendsConnectionState
     }
 
+    /// Le panneau complet n'apparaît que s'il a quelque chose à montrer : des amis, ou un flux en
+    /// panne qu'on peut relancer. Sans ami, un simple « Inactif · 0/0 » masquait le haut de la carte.
+    private var showsFriendsStatusPanel: Bool {
+        !model.liveFriends.isEmpty || effectiveFriendsConnectionState == .unavailable
+    }
+
+    /// Flux ouvert mais personne ne partage : une pastille discrète le dit, sans bande pleine largeur.
+    private var showsFriendsEmptyPill: Bool {
+        model.liveFriends.isEmpty
+            && (effectiveFriendsConnectionState == .live || effectiveFriendsConnectionState == .fallback)
+    }
+
+    private var friendsEmptyPill: some View {
+        Text("Aucun ami ne partage de position récente.")
+            .font(SQType.caption)
+            .foregroundStyle(SQColor.label)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, SQSpace.md)
+            .padding(.vertical, SQSpace.xs2)
+            .sqSurface(SQColor.surface, in: Capsule(style: .continuous))
+            .sqShadowSoft()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("map.friends.empty")
+    }
+
     private var friendsConnectionPresentation: (label: String, icon: String, color: Color) {
         switch effectiveFriendsConnectionState {
         case .inactive:
-            return (String(localized: "Inactif"), "circle", SQColor.labelTertiary)
+            // Sans flux (démo), l'état reste neutre : le nom de la couche, sans « Inactif ».
+            return (String(localized: "Amis"), "person.2", SQColor.labelTertiary)
         case .connecting:
-            return (String(localized: "Reconnexion…"), "arrow.triangle.2.circlepath", SQColor.warning)
+            // « Reconnexion… » seulement après un flux qui a déjà répondu ; à l'ouverture, on se connecte.
+            return model.friendsLastUpdatedAt == nil
+                ? (String(localized: "Connexion…"), "arrow.triangle.2.circlepath", SQColor.warning)
+                : (String(localized: "Reconnexion…"), "arrow.triangle.2.circlepath", SQColor.warning)
         case .live:
             return (String(localized: "En direct"), "dot.radiowaves.left.and.right", SQColor.success)
         case .fallback:

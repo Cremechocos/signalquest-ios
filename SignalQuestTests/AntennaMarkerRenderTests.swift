@@ -35,6 +35,24 @@ final class AntennaMarkerRenderTests: XCTestCase {
         return view
     }
 
+    // MARK: Cône de cap des amis
+
+    /// Le cône de cap tourne autour du centre de l'avatar : son sommet reste sous l'avatar quel
+    /// que soit le cap, au lieu de partir avec le coin haut-gauche de la vue.
+    func testFriendHeadingConeRotatesAroundTheAvatarCenter() {
+        let view = SQFriendMarkerView(annotation: nil, reuseIdentifier: SQFriendMarkerView.reuseID)
+        let info = FriendAnnotationInfo(
+            userId: "u1", displayName: "Camille", avatarURL: nil, presence: .online,
+            heading: 90, speedMps: nil, accuracyMeters: nil, technology: nil, operatorName: nil, isStale: false
+        )
+        view.apply(info, displayScale: 1)
+        XCTAssertFalse(view.coneLayer.isHidden)
+        let center = CGPoint(x: view.markerSize / 2, y: view.markerSize / 2)
+        let tip = view.coneLayer.convert(center, to: view.layer)
+        XCTAssertEqual(tip.x, center.x, accuracy: 0.01)
+        XCTAssertEqual(tip.y, center.y, accuracy: 0.01)
+    }
+
     // MARK: Géométrie
 
     /// La vue s'agrandit pour contenir les lobes, mais la pastille garde sa
