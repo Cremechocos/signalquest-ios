@@ -292,8 +292,17 @@ struct ConversationDetailView: View {
 
     /// Le corps est coupé en deux : la chaîne de modificateurs entière dépassait ce que le
     /// compilateur type-check en un temps raisonnable.
-    private var conversationBase: some View {
-        VStack(spacing: 0) {
+    /// Le fil, ses bannières et la saisie, sans navigation ni présentation.
+    ///
+    /// POURQUOI TROIS `AnyView`. La 1.0 (174) plantait à l'ouverture de toute
+    /// conversation sur iPhone (EXC_BAD_ACCESS dans `conversationBase.getter`) : le
+    /// type opaque de l'écran, ce `VStack` sous une trentaine de modificateurs, était
+    /// si imbriqué que le runtime Swift épuisait la pile en le décodant. Le fil, ses
+    /// dialogues et ses feuilles sont donc des étages séparés par `AnyView`, qui
+    /// remet cette profondeur à zéro ; le type de chaque étage ne change jamais, la
+    /// vue garde son identité.
+    private var conversationLayout: AnyView {
+        AnyView(VStack(spacing: 0) {
             topBar
 
             if !networkPath.isOnline {
@@ -606,7 +615,12 @@ struct ConversationDetailView: View {
                 composer
                     .sqReadableWidth()
             }
-        }
+        })
+    }
+
+    /// Premier étage : navigation et dialogues de confirmation du fil.
+    private var conversationDialogs: AnyView {
+        AnyView(conversationLayout
         // Barre masquée pour l'en-tête maison ; le balayage retour, que UIKit
         // coupe avec la barre, est rétabli (SOC-30).
         .toolbar(.hidden, for: .navigationBar)
@@ -679,7 +693,12 @@ struct ConversationDetailView: View {
             Button("Annuler", role: .cancel) {}
         } message: {
             Text("Ta position exacte et l’adresse la plus proche seront envoyées dans \(conversationTitle).")
-        }
+        })
+    }
+
+    /// Second étage : les feuilles du fil.
+    private var conversationBase: some View {
+        conversationDialogs
         .sheet(isPresented: $showSchedulePicker) {
             ScheduleMessageSheet(
                 conversation: conversation,
@@ -804,7 +823,7 @@ struct ConversationDetailView: View {
     }
 
     var body: some View {
-        conversationBase
+        AnyView(conversationBase)
         .modifier(ConversationInputModifier(
             acceptsDrops: canSend && editTarget == nil && !showsProtectionVeil,
             pendingShareId: router.pendingShare?.id,
