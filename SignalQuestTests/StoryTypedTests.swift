@@ -48,14 +48,14 @@ final class StoryTypedTests: XCTestCase {
     }
 
     func testSocialImageSanitizerRemovesGPSAndCameraMetadata() throws {
-        let original = try makeJpegWithSensitiveMetadata()
-        let originalProperties = try properties(of: original)
+        let original = try Self.makeJpegWithSensitiveMetadata()
+        let originalProperties = try Self.properties(of: original)
         XCTAssertNotNil(originalProperties[kCGImagePropertyGPSDictionary])
 
         let sanitized = try XCTUnwrap(
             SocialImagePrivacy.sanitizedJPEG(from: original, maxSide: 1600, quality: 0.85)
         )
-        let sanitizedProperties = try properties(of: sanitized)
+        let sanitizedProperties = try Self.properties(of: sanitized)
         XCTAssertNil(sanitizedProperties[kCGImagePropertyGPSDictionary])
         let tiff = sanitizedProperties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
         XCTAssertNil(tiff?[kCGImagePropertyTIFFMake])
@@ -64,11 +64,27 @@ final class StoryTypedTests: XCTestCase {
         XCTAssertEqual((sanitizedProperties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue, 12)
     }
 
+    /// La photo d'un post est nettoyée par la fonction que `publishPost` appelle
+    /// avant la mise en file (hors main thread).
+    func testPostImagePreparationRemovesGPSAndReducesTheImage() async throws {
+        let original = try Self.makeJpegWithSensitiveMetadata()
+        XCTAssertNotNil(try Self.properties(of: original)[kCGImagePropertyGPSDictionary])
+
+        let preparedOrNil = await SocialFeedService.sanitizedImageForPublication(original)
+        let prepared = try XCTUnwrap(preparedOrNil)
+        let properties = try Self.properties(of: prepared)
+        XCTAssertNil(properties[kCGImagePropertyGPSDictionary])
+        let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        XCTAssertNil(tiff?[kCGImagePropertyTIFFMake])
+        let notAnImage = await SocialFeedService.sanitizedImageForPublication(Data("not-an-image".utf8))
+        XCTAssertNil(notAnImage)
+    }
+
     func testSocialImageSanitizerFailsClosedForInvalidInput() {
         XCTAssertNil(SocialImagePrivacy.sanitizedJPEG(from: Data("not-an-image".utf8)))
     }
 
-    private func makeJpegWithSensitiveMetadata() throws -> Data {
+    static func makeJpegWithSensitiveMetadata() throws -> Data {
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 8), format: format)
@@ -100,7 +116,7 @@ final class StoryTypedTests: XCTestCase {
         return output as Data
     }
 
-    private func properties(of data: Data) throws -> [CFString: Any] {
+    static func properties(of data: Data) throws -> [CFString: Any] {
         let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
         return try XCTUnwrap(
             CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]

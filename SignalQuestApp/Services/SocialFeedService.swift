@@ -257,6 +257,18 @@ final class SocialFeedService: SocialFeedServicing {
         guard let session = LocalAccountScope.sessionSnapshot() else {
             throw CancellationError()
         }
+        // La photo est ré-encodée AVANT la mise en file : l'image gardée sur
+        // disque, son empreinte et l'envoi portent déjà sur la version réduite
+        // et sans métadonnées (même contrat que `uploadImage` et les stories).
+        var imageData = imageData
+        var imageMimeType = imageMimeType
+        if let original = imageData {
+            guard let sanitized = await Self.sanitizedImageForPublication(original) else {
+                throw SocialPostOutboxError.imageUnreadable
+            }
+            imageData = sanitized
+            imageMimeType = "image/jpeg"
+        }
         let imageSha256 = imageData.map(Self.sha256Hex)
         // SOC-02 : un second appui sur « Publier » après un échec créait un
         // second envoi, et le premier repartait plus tard tout seul : doublon.
@@ -303,6 +315,14 @@ final class SocialFeedService: SocialFeedServicing {
         )
         try await postOutbox.stage(record, imageData: imageData, session: session)
         return try await submitPreparedPost(record, session: session)
+    }
+
+    /// JPEG réduit à 1600 px, orientation rendue dans les pixels et sans EXIF/GPS,
+    /// calculé hors du main thread ; nil si les octets ne sont pas une image.
+    static func sanitizedImageForPublication(_ data: Data) async -> Data? {
+        await Task.detached(priority: .userInitiated) {
+            SocialImagePrivacy.sanitizedJPEG(from: data, maxSide: 1600, quality: 0.84)
+        }.value
     }
 
     /// Au-delà, un envoi resté en attente n'est plus d'actualité : le publier des
@@ -758,6 +778,20 @@ enum SocialPostOutboxError: Error, Equatable {
     case imageMissing
     case imageCorrupted
     case imageTooLarge
+    case imageUnreadable
+}
+
+extension SocialPostOutboxError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .imageTooLarge:
+            return String(localized: "Photo trop lourde. Choisis-en une plus légère.")
+        case .imageUnreadable:
+            return String(localized: "Photo illisible")
+        default:
+            return nil
+        }
+    }
 }
 
 struct SocialPostOutboxRecord: Codable, Equatable, Sendable {

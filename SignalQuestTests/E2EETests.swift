@@ -1,4 +1,5 @@
 import CryptoKit
+import ImageIO
 import XCTest
 @testable import SignalQuest
 
@@ -6529,7 +6530,7 @@ final class SocialPostOutboxTests: XCTestCase {
         )
         let outbox = SocialPostOutboxStore(baseDirectory: root)
         let service = SocialFeedService(api: api, postOutbox: outbox)
-        let image = Data("social-image-service".utf8)
+        let image = try StoryTypedTests.makeJpegWithSensitiveMetadata()
         var uploadBodies: [String] = []
         var postBodies: [[String: Any]] = []
         var failFirstUpload = true
@@ -6566,7 +6567,10 @@ final class SocialPostOutboxTests: XCTestCase {
         let staged = try await outbox.pending(session: session)
         let stagedRecord = try XCTUnwrap(staged.first)
         let restoredImage = try await outbox.imageData(stagedRecord, session: session)
-        XCTAssertEqual(restoredImage, image)
+        // L'image gardée dans la file est déjà la version nettoyée : sans GPS.
+        XCTAssertNotEqual(restoredImage, image)
+        XCTAssertNil(try StoryTypedTests.properties(of: restoredImage)[kCGImagePropertyGPSDictionary])
+        XCTAssertEqual(stagedRecord.imageMimeType, "image/jpeg")
 
         failFirstUpload = false
         await service.retryPendingPosts()
